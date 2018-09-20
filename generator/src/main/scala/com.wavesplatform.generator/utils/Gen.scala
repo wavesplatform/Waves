@@ -3,14 +3,54 @@ package com.wavesplatform.generator.utils
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.generator.utils.Implicits._
-import scorex.account.{Address, PrivateKeyAccount}
-import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.transfer._
-import scorex.transaction.{Proofs, Transaction}
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{Proofs, Transaction}
+import scorex.crypto.signatures.Curve25519._
 
 object Gen {
   private def random = ThreadLocalRandom.current
+
+  def multiSigScript(owners: Seq[PrivateKeyAccount], requiredProofsCount: Int): Script = {
+    val accountsWithIndexes = owners.zipWithIndex
+    val keyLets =
+      accountsWithIndexes map {
+        case (acc, i) =>
+          s"let accountPK$i = base58'${ByteStr(acc.publicKey).base58}'"
+      } mkString "\n"
+
+    val signedLets =
+      accountsWithIndexes map {
+        case (_, i) =>
+          s"let accountSigned$i = if(sigVerify(tx.bodyBytes, tx.proofs[$i], accountPK$i)) then 1 else 0"
+      } mkString "\n"
+
+    val proofSum = accountsWithIndexes map {
+      case (_, ind) =>
+        s"accountSigned$ind"
+    } mkString ("let proofSum = ", " + ", "")
+
+    val finalStatement = s"proofSum >= $requiredProofsCount"
+
+    val src =
+      s"""
+       |$keyLets
+       |
+       |$signedLets
+       |
+       |$proofSum
+       |
+       |$finalStatement
+      """.stripMargin
+
+    val (script, _) = ScriptCompiler(src)
+      .explicitGet()
+
+    script
+  }
 
   def txs(minFee: Long, maxFee: Long, senderAccounts: Seq[PrivateKeyAccount], recipientGen: Iterator[Address]): Iterator[Transaction] = {
     val senderGen = Iterator.randomContinually(senderAccounts)

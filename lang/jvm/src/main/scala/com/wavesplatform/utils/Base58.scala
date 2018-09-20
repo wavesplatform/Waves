@@ -42,7 +42,7 @@ object Base58 {
   def decode(string: String): Try[Array[Byte]] = Try {
     val input: Array[Byte] = new Array[Byte](string.length)
     for (i <- 0 until string.length)
-      input(i) = toBase58(string(i)).ensuring(_ != -1, "Wrong char in Base58 string")
+      input(i) = toBase58(string(i)).ensuring(_ != -1, s"Wrong char '${string(i)}' in Base58 string '$string'")
 
     val zeroCount = input.takeWhile(_ == 0).length
 

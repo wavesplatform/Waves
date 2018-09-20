@@ -9,24 +9,25 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import com.typesafe.config._
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.api.http.alias.AliasBroadcastApiRoute
+import com.wavesplatform.api.http.assets.AssetsBroadcastApiRoute
+import com.wavesplatform.api.http.leasing.LeaseBroadcastApiRoute
+import com.wavesplatform.api.http.{CompositeHttpService, PeersApiRoute, UtilsApiRoute}
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
+import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time, forceStopApplication}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
+import kamon.influxdb.CustomInfluxDBReporter
+import kamon.system.SystemMetrics
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
-import scorex.account.AddressScheme
-import scorex.api.http._
-import scorex.api.http.alias.AliasBroadcastApiRoute
-import scorex.api.http.assets.AssetsBroadcastApiRoute
-import scorex.api.http.leasing.LeaseBroadcastApiRoute
-import scorex.utils.{NTP, ScorexLogging, Time}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -34,8 +35,6 @@ import scala.reflect.runtime.universe._
 import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
-
-  import monix.execution.Scheduler.Implicits.{global => scheduler}
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -97,7 +96,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     //on unexpected shutdown
     sys.addShutdownHook {
-      Kamon.shutdown()
+      Await.ready(Kamon.stopAllReporters(), 20.seconds)
       Metrics.shutdown()
       shutdown(utxStorage, network)
     }
@@ -189,7 +188,13 @@ object Application extends ScorexLogging {
     }
 
     val settings = WavesSettings.fromConfig(config)
-    Kamon.start(config)
+    if (config.getBoolean("kamon.enable")) {
+      log.info("Aggregated metrics are enabled")
+      Kamon.reconfigure(config)
+      Kamon.addReporter(new CustomInfluxDBReporter())
+      SystemMetrics.startCollecting()
+    }
+
     val isMetricsStarted = Metrics.start(settings.metrics)
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>

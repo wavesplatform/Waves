@@ -8,6 +8,7 @@ import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings._
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
@@ -18,7 +19,6 @@ import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepende
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
-import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -95,12 +95,13 @@ object NetworkServer extends ScorexLogging {
         .channel(classOf[NioServerSocketChannel])
         .childHandler(new PipelineInitializer[SocketChannel](Seq(
           inboundConnectionFilter,
+          new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
           new HandshakeDecoder(peerDatabase),
           new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
           serverHandshakeHandler,
           lengthFieldPrepender,
           new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
-          new LegacyFrameCodec(peerDatabase),
+          new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
           channelClosedHandler,
           trafficWatcher,
           messageCodec,
@@ -123,12 +124,13 @@ object NetworkServer extends ScorexLogging {
       .group(workerGroup)
       .channel(classOf[NioSocketChannel])
       .handler(new PipelineInitializer[SocketChannel](Seq(
+        new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
         new HandshakeDecoder(peerDatabase),
         new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
         clientHandshakeHandler,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
-        new LegacyFrameCodec(peerDatabase),
+        new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
         channelClosedHandler,
         trafficWatcher,
         messageCodec,

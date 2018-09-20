@@ -7,11 +7,11 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.PrivateKeyAccount
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.{CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.{CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
 
 class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -48,8 +48,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
             blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
             newState.aliasesOfAddress(senderAcc).toSet shouldBe Set(anotherAliasTx.alias, aliasTx.alias)
-            newState.resolveAlias(aliasTx.alias) shouldBe Some(senderAcc)
-            newState.resolveAlias(anotherAliasTx.alias) shouldBe Some(senderAcc)
+            newState.resolveAlias(aliasTx.alias) shouldBe Right(senderAcc)
+            newState.resolveAlias(anotherAliasTx.alias) shouldBe Right(senderAcc)
         }
     }
   }

@@ -12,7 +12,6 @@ case class SynchronizationSettings(maxRollback: Int,
                                    maxChainLength: Int,
                                    synchronizationTimeout: FiniteDuration,
                                    scoreTTL: FiniteDuration,
-                                   remoteScoreDebounce: FiniteDuration,
                                    invalidBlocksStorage: InvalidBlockStorageSettings,
                                    microBlockSynchronizer: MicroblockSynchronizerSettings,
                                    historyReplierSettings: HistoryReplierSettings,
@@ -35,7 +34,6 @@ object SynchronizationSettings {
     val maxChainLength          = config.as[Int](s"$configPath.max-chain-length")
     val synchronizationTimeout  = config.as[FiniteDuration](s"$configPath.synchronization-timeout")
     val scoreTTL                = config.as[FiniteDuration](s"$configPath.score-ttl")
-    val remoteScoreDebounce     = config.as[FiniteDuration](s"$configPath.remote-score-debounce")
     val invalidBlocksStorage    = config.as[InvalidBlockStorageSettings](s"$configPath.invalid-blocks-storage")
     val microBlockSynchronizer  = config.as[MicroblockSynchronizerSettings](s"$configPath.micro-block-synchronizer")
     val historyReplierSettings  = config.as[HistoryReplierSettings](s"$configPath.history-replier")
@@ -46,7 +44,6 @@ object SynchronizationSettings {
       maxChainLength,
       synchronizationTimeout,
       scoreTTL,
-      remoteScoreDebounce,
       invalidBlocksStorage,
       microBlockSynchronizer,
       historyReplierSettings,

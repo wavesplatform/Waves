@@ -8,29 +8,8 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient}
 import scodec.bits.ByteVector
 
 class EnvironmentFunctions(environment: Environment) {
-  import EnvironmentFunctions._
-  private val Global = com.wavesplatform.lang.hacks.Global // Hack for IDEA
 
-  def addressFromString(str: String): Either[String, Option[ByteVector]] = {
-    val base58String = if (str.startsWith(Prefix)) str.drop(Prefix.length) else str
-    Global.base58Decode(base58String, Global.MaxAddressLength) match {
-      case Left(e) => Left(e)
-      case Right(addressBytes) =>
-        val version = addressBytes.head
-        val network = addressBytes.tail.head
-        lazy val checksumCorrect = {
-          val checkSum          = addressBytes.takeRight(ChecksumLength)
-          val checkSumGenerated = Global.secureHash(addressBytes.dropRight(ChecksumLength)).take(ChecksumLength)
-          checkSum sameElements checkSumGenerated
-        }
-
-        if (version == AddressVersion && network == environment.networkByte && addressBytes.length == AddressLength && checksumCorrect)
-          Right(Some(ByteVector(addressBytes)))
-        else Right(None)
-    }
-  }
-
-  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): Either[String, Any] = {
+  def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): Either[String, Option[Any]] = {
     val objTypeName = addressOrAlias.caseType.name
 
     val recipientEi =
@@ -58,9 +37,9 @@ class EnvironmentFunctions(environment: Environment) {
 }
 
 object EnvironmentFunctions {
-  val ChecksumLength        = 4
-  val HashLength            = 20
-  val AddressVersion: Byte  = 1
-  private val AddressLength = 1 + 1 + ChecksumLength + HashLength
-  private val Prefix        = "address:"
+  val ChecksumLength       = 4
+  val HashLength           = 20
+  val AddressVersion: Byte = 1
+  val AddressLength: Int   = 1 + 1 + ChecksumLength + HashLength
+  val AddressPrefix        = "address:"
 }

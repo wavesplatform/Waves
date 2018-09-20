@@ -4,6 +4,8 @@ import java.io._
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
@@ -11,15 +13,11 @@ import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
 import monix.execution.Scheduler
 import org.slf4j.bridge.SLF4JBridgeHandler
-import scorex.account.{Address, AddressScheme}
-import scorex.block.Block
-import scorex.transaction.Transaction
-import scorex.utils.{NTP, ScorexLogging}
-
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}

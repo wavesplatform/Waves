@@ -4,14 +4,14 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats._
 import cats.data.NonEmptyList
+import com.wavesplatform.account.Address
 import com.wavesplatform.mining.{MiningConstraint, MultiDimensionalMiningConstraint}
 import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.{ByteStr, Diff, Portfolio}
-import scorex.account.Address
-import scorex.transaction.ValidationError.SenderIsBlacklisted
-import scorex.transaction._
-import scorex.transaction.transfer._
-import scorex.utils.{ScorexLogging, Time}
+import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._
 import scala.util.Right

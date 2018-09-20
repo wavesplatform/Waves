@@ -6,16 +6,16 @@ import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase, formatBlocks, id}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
 import org.influxdb.dto.Point
-import scorex.block.Block
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction._
-import scorex.utils.{ScorexLogging, Time}
+import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction._
 
 import scala.util.{Left, Right}
 

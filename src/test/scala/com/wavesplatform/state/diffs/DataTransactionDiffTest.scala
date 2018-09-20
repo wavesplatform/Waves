@@ -1,15 +1,15 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, LongDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, IntegerDataEntry}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.PrivateKeyAccount
-import scorex.lagonaki.mocks.TestBlock.{create => block}
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{DataTransaction, GenesisTransaction}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 
 class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -30,7 +30,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
 
       key1   <- validAliasStringGen
       value1 <- positiveLongGen
-      item1 = LongDataEntry(key1, value1)
+      item1 = IntegerDataEntry(key1, value1)
       fee1     <- smallFeeGen
       version1 <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)
       dataTx1 = data(version1, master, List(item1), fee1, ts + 10000)
@@ -43,7 +43,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
       dataTx2 = data(version2, master, List(item2), fee2, ts + 20000)
 
       value3 <- positiveLongGen
-      item3 = LongDataEntry(key1, value3)
+      item3 = IntegerDataEntry(key1, value3)
       fee3     <- smallFeeGen
       version3 <- Gen.oneOf(DataTransaction.supportedVersions.toSeq)
       dataTx3 = data(version3, master, List(item3), fee3, ts + 30000)

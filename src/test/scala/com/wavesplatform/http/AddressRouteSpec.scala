@@ -12,10 +12,10 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.account.Address
-import scorex.api.http.{AddressApiRoute, ApiKeyNotValid}
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.account.Address
+import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
+import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 
 class AddressRouteSpec
     extends RouteSpec("/addresses")

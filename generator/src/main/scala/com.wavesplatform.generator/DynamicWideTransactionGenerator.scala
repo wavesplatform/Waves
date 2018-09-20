@@ -5,8 +5,8 @@ import java.util.concurrent.atomic.AtomicReference
 import cats.Show
 import com.wavesplatform.generator.DynamicWideTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.Transaction
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.transaction.Transaction
 
 class DynamicWideTransactionGenerator(settings: Settings, accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
   require(accounts.nonEmpty)

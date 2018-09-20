@@ -11,9 +11,9 @@ import monix.eval.{Coeval, Task}
 import monix.reactive.Observable
 import monix.reactive.subjects.{PublishSubject => PS}
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.block.Block
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
+import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.GenericError
 
 import scala.concurrent.duration._
 

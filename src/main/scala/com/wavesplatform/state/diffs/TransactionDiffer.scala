@@ -2,13 +2,13 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import scorex.transaction.ValidationError.UnsupportedTransactionType
-import scorex.transaction._
-import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.{SetScriptTransaction, Verifier}
-import scorex.transaction.transfer._
+import com.wavesplatform.transaction.ValidationError.UnsupportedTransactionType
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.{SetScriptTransaction, Verifier}
+import com.wavesplatform.transaction.transfer._
 
 object TransactionDiffer {
 
@@ -36,7 +36,7 @@ object TransactionDiffer {
         case ltx: LeaseTransaction        => LeaseTransactionsDiff.lease(blockchain, currentBlockHeight)(ltx)
         case ltx: LeaseCancelTransaction  => LeaseTransactionsDiff.leaseCancel(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(ltx)
         case etx: ExchangeTransaction     => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
-        case atx: CreateAliasTransaction  => CreateAliasTransactionDiff(currentBlockHeight)(atx)
+        case atx: CreateAliasTransaction  => CreateAliasTransactionDiff(blockchain, currentBlockHeight)(atx)
         case dtx: DataTransaction         => DataTransactionDiff(blockchain, currentBlockHeight)(dtx)
         case sstx: SetScriptTransaction   => SetScriptTransactionDiff(currentBlockHeight)(sstx)
         case stx: SponsorFeeTransaction   => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)

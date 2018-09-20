@@ -3,10 +3,10 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import scorex.account.Address
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.transfer._
+import com.wavesplatform.account.Address
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.transfer._
 
 import scala.util.Right
 
@@ -16,7 +16,7 @@ object TransferTransactionDiff {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
 
     val isInvalidEi = for {
-      recipient <- blockchain.resolveAliasEi(tx.recipient)
+      recipient <- blockchain.resolveAlias(tx.recipient)
       _ <- Either.cond((tx.feeAssetId >>= blockchain.assetDescription >>= (_.script)).isEmpty,
                        (),
                        GenericError("Smart assets can't participate in TransferTransactions as a fee"))

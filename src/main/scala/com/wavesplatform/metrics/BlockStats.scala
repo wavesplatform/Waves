@@ -4,7 +4,7 @@ import com.wavesplatform.network.{HandshakeHandler, MicroBlockInv}
 import com.wavesplatform.state.ByteStr
 import io.netty.channel.Channel
 import org.influxdb.dto.Point
-import scorex.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, MicroBlock}
 
 object BlockStats {
 

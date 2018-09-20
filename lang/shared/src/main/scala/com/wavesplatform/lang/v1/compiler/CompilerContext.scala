@@ -1,13 +1,19 @@
 package com.wavesplatform.lang.v1.compiler
 
 import cats.Monoid
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.Types.TYPE
-import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, DefinedType, FunctionTypeSignature}
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
+import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, CaseType, DefinedType, FunctionTypeSignature}
 import shapeless._
 
 case class CompilerContext(predefTypes: Map[String, DefinedType], varDefs: VariableTypes, functionDefs: FunctionTypes, tmpArgsIdx: Int = 0) {
-  def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = functionDefs.getOrElse(name, List.empty)
+  private lazy val allFuncDefs: FunctionTypes = predefTypes.collect {
+    case (_, t @ CaseType(typeName, fields)) =>
+      typeName -> List(FunctionTypeSignature(CASETYPEREF(typeName, fields), fields.map(_._2), FunctionHeader.User(typeName)))
+  } ++ functionDefs
+
+  def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = allFuncDefs.getOrElse(name, List.empty)
 }
 
 object CompilerContext {
@@ -18,7 +24,7 @@ object CompilerContext {
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
   )
 
-  type VariableTypes = Map[String, TYPE]
+  type VariableTypes = Map[String, FINAL]
   type FunctionTypes = Map[String, List[FunctionTypeSignature]]
 
   val empty = CompilerContext(Map.empty, Map.empty, Map.empty, 0)

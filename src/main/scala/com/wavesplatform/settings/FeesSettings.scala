@@ -3,7 +3,7 @@ package com.wavesplatform.settings
 import com.google.common.base.CaseFormat
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
-import scorex.transaction.TransactionParsers
+import com.wavesplatform.transaction.TransactionParsers
 
 import scala.collection.JavaConverters._
 

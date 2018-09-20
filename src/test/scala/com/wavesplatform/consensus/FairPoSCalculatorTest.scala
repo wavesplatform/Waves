@@ -3,7 +3,7 @@ package com.wavesplatform.consensus
 import cats.data.NonEmptyList
 import cats.implicits._
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.PrivateKeyAccount
+import com.wavesplatform.account.PrivateKeyAccount
 
 import scala.util.Random
 
@@ -21,11 +21,11 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
     arr
   }
 
-  val balance           = 50000000L * 100000000L
+  val balance: Long     = 50000000L * 100000000L
   val blockDelaySeconds = 60
   val defaultBaseTarget = 100L
 
-  property("Correct consensus parameters of blocks generated with FairPoS") {
+  property("Correct consensus parameters distribution of blocks generated with FairPoS") {
 
     val miners = mkMiners
     val first  = Block(0, defaultBaseTarget, PrivateKeyAccount(generationSignature), System.currentTimeMillis(), 0)
@@ -39,24 +39,12 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
       next :: acc
     }).reverse.tail
 
-    val maxBT = chain.maxBy(_.baseTarget).baseTarget
-    val avgBT = chain.map(_.baseTarget).sum / chain.length
-    val minBT = chain.minBy(_.baseTarget).baseTarget
-
-    val maxDelay = chain.tail.maxBy(_.delay).delay
+    val avgBT    = chain.map(_.baseTarget).sum / chain.length
     val avgDelay = chain.tail.map(_.delay).sum / (chain.length - 1)
-    val minDelay = chain.tail.minBy(_.delay).delay
 
-    println(
-      s"""
-        |BT: $minBT $avgBT $maxBT
-        |Delay: $minDelay $avgDelay $maxDelay
-      """.stripMargin
-    )
+    val minersPerformance = calcPerfomance(chain, miners)
 
-    val minersPerfomance = calcPerfomance(chain, miners)
-
-    assert(minersPerfomance.forall(p => p._2 < 1.1 && p._2 > 0.9))
+    assert(minersPerformance.forall(p => p._2 < 1.1 && p._2 > 0.9))
     assert(avgDelay < 80000 && avgDelay > 40000)
     assert(avgBT < 200 && avgBT > 20)
   }

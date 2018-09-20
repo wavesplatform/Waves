@@ -1,16 +1,15 @@
 package com.wavesplatform
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.settings.{BlockchainSettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state._
-import scorex.account.PrivateKeyAccount
-import scorex.block.{Block, MicroBlock}
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.Transaction
+import com.wavesplatform.transaction.Transaction
+import scorex.crypto.signatures.Curve25519._
 
 package object history {
   val MaxTransactionsPerBlockDiff = 10
@@ -18,8 +17,6 @@ package object history {
   val DefaultBaseTarget           = 1000L
   val DefaultBlockchainSettings = BlockchainSettings(
     addressSchemeCharacter = 'N',
-    maxTransactionsPerBlockDiff = MaxTransactionsPerBlockDiff,
-    minBlocksInMemory = MaxBlocksInMemory,
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = null
   )
@@ -32,7 +29,8 @@ package object history {
 
   val MicroblocksActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = MicroblocksActivatedAt0BlockchainSettings)
 
-  val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
+  val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings,
+                                                          featuresSettings = settings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
 
   val defaultSigner       = PrivateKeyAccount(Array.fill(KeyLength)(0))
   val generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))

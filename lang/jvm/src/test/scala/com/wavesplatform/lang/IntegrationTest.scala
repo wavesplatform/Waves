@@ -4,8 +4,8 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
-import com.wavesplatform.lang.v1.compiler.Types.TYPE
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -15,6 +15,18 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
+
+  property("proper error message") {
+    val src =
+      """
+        |match p {
+        |  case pa: PointA => let x = 3
+        |  case _ => throw()
+        |}
+      """.stripMargin
+
+    eval[Boolean](src) should produce("can't parse the expression")
+  }
 
   property("patternMatching") {
     val sampleScript =
@@ -37,7 +49,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
-  property("union types have filds") {
+  property("union types have fields") {
     val sampleScript =
       """match p {
         |  case pa: PointA => pa.X
@@ -48,7 +60,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
   }
 
-  property("union types have  only common filds") {
+  property("union types have  only common fields") {
     val sampleScript =
       """match p {
         |  case pa: PointA => pa.X
@@ -95,14 +107,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
-  private def eval[T](code: String, pointInstance: Option[CaseObj] = None): Either[String, T] = {
-    val untyped = Parser(code).get.value
-    require(untyped.size == 1)
-    val lazyVal                                     = LazyVal(EitherT.pure(pointInstance.orNull))
-    val stringToTuple: Map[String, (TYPE, LazyVal)] = Map(("p", (AorBorC, lazyVal)))
+  private def eval[T](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
+    val untyped                                      = Parser(code).get.value
+    val lazyVal                                      = LazyVal(EitherT.pure(pointInstance.orNull))
+    val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (pointType, lazyVal)))
     val ctx: CTX =
       Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Seq.empty))
-    val typed = CompilerV1(ctx.compilerContext, untyped.head)
+    val typed = CompilerV1(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1)._2)
   }
 
@@ -136,11 +147,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Boolean]("true == true") shouldBe Right(true)
     eval[Boolean]("""   "x" == "x"     """) shouldBe Right(true)
     eval[Boolean]("""   "x" == "y"     """) shouldBe Right(false)
-  }
-
-  property("equals should work with Option") {
-    eval[Boolean]("Some(1) == Some(1)") shouldBe Right(true)
-    eval[Boolean]("Some(true) == Some(false)") shouldBe Right(false)
+    eval[Boolean]("""   "x" != "y"     """) shouldBe Right(true)
+    eval[Boolean]("""   "x" == 3     """) should produce("Can't match inferred types")
+    eval[Boolean]("""   "x" != 3     """) should produce("Can't match inferred types")
+    eval[Boolean](""" let union = if(true) then "x" else 3; union == "x"   """) shouldBe Right(true)
   }
 
   property("equals some lang structure") {
@@ -194,4 +204,59 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
+  property("Match with not case types") {
+    eval[Long]("""
+        |
+        |let a = if (true) then 1 else ""
+        |
+        |match a {
+        | case x: Int => x 
+        | case y: String => 2
+        |}""".stripMargin) shouldBe Right(1)
+  }
+
+  property("allow unions in pattern matching") {
+    val sampleScript =
+      """match p {
+        |  case p1: PointBC => {
+        |    match p1 {
+        |      case pb: PointB => pb.X
+        |      case pc: PointC => pc.YB
+        |    }
+        |  }
+        |  case other => throw()
+        |}""".stripMargin
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(3)
+    eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
+  }
+
+  property("different types, same name of field") {
+    val sampleScript =
+      """match (p.YB) {
+        | case l: Int => l
+        | case u: Unit => 1
+        | }
+      """.stripMargin
+    eval[Long](sampleScript, Some(pointCInstance), CorD) shouldBe Right(42)
+    eval[Long](sampleScript, Some(pointDInstance1), CorD) shouldBe Right(43)
+    eval[Long](sampleScript, Some(pointDInstance2), CorD) shouldBe Right(1)
+
+    eval[Long]("p.YB", Some(pointCInstance), CorD) shouldBe Right(42)
+    eval[Long]("p.YB", Some(pointDInstance1), CorD) shouldBe Right(43)
+    eval[Unit]("p.YB", Some(pointDInstance2), CorD) shouldBe Right(())
+  }
+
+  property("throw") {
+    val script =
+      """
+        |match p {
+        |  case a: PointA => 0
+        |  case b: PointB => throw()
+        |  case c: PointC => throw("arrgh")
+        |}
+      """.stripMargin
+    eval[Long](script, Some(pointAInstance)) shouldBe Right(0)
+    eval[Long](script, Some(pointBInstance)) shouldBe Left("Explicit script termination")
+    eval[Long](script, Some(pointCInstance)) shouldBe Left("arrgh")
+  }
 }

@@ -1,11 +1,11 @@
 package com.wavesplatform.state
 
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.state.reader.LeaseDetails
-import scorex.account.{Address, Alias}
-import scorex.block.{Block, BlockHeader}
-import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction}
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
 
 trait Blockchain {
   def height: Int
@@ -16,6 +16,7 @@ trait Blockchain {
   def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]
 
   def lastBlock: Option[Block]
+  def carryFee: Long
   def blockBytes(height: Int): Option[Array[Byte]]
   def blockBytes(blockId: ByteStr): Option[Array[Byte]]
 
@@ -42,10 +43,12 @@ trait Blockchain {
   def addressTransactions(address: Address, types: Set[Transaction.Type], count: Int, from: Int): Seq[(Int, Transaction)]
 
   def containsTransaction(id: ByteStr): Boolean
+  def forgetTransactions(pred: (ByteStr, Long) => Boolean): Map[ByteStr, Long]
+  def learnTransactions(values: Map[ByteStr, Long]): Unit
 
   def assetDescription(id: ByteStr): Option[AssetDescription]
 
-  def resolveAlias(a: Alias): Option[Address]
+  def resolveAlias(a: Alias): Either[ValidationError, Address]
 
   def leaseDetails(leaseId: ByteStr): Option[LeaseDetails]
 
@@ -72,7 +75,6 @@ trait Blockchain {
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
-  def append(diff: Diff, block: Block): Unit
+  def append(diff: Diff, carryFee: Long, block: Block): Unit
   def rollbackTo(targetBlockId: ByteStr): Seq[Block]
-
 }

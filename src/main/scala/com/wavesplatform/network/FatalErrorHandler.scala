@@ -2,10 +2,9 @@ package com.wavesplatform.network
 
 import java.io.IOException
 
-import com.wavesplatform.utils.forceStopApplication
+import com.wavesplatform.utils.{ScorexLogging, forceStopApplication}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import scorex.utils.ScorexLogging
 
 import scala.util.control.NonFatal
 @Sharable

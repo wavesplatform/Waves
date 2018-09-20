@@ -1,8 +1,8 @@
 package com.wavesplatform.state
 
-import scorex.block.Block
-import scorex.crypto.signatures.Curve25519.SignatureLength
-import scorex.lagonaki.mocks.TestBlock
+import com.wavesplatform.block.Block
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import scorex.crypto.signatures.Curve25519._
 
 trait HistoryTest {
   val genesisBlock: Block = TestBlock.withReference(ByteStr(Array.fill(SignatureLength)(0: Byte)))

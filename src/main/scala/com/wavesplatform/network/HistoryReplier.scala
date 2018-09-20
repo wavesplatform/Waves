@@ -5,11 +5,11 @@ import com.wavesplatform.network.HistoryReplier._
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroBlockSignature
 import com.wavesplatform.settings.SynchronizationSettings
 import com.wavesplatform.state.{ByteStr, NG}
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
-import scorex.utils.ScorexLogging
 
 @Sharable
 class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: SchedulerService) extends ChannelInboundHandlerAdapter with ScorexLogging {

@@ -8,20 +8,19 @@ import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimen
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
-import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
+import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
+import kamon.metric.MeasurementUnit
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import scorex.account.{Address, Alias}
-import scorex.block.Block.BlockId
-import scorex.block.{Block, BlockHeader, MicroBlock}
-import scorex.transaction.Transaction.Type
-import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
-import scorex.transaction._
-import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.lease._
-import scorex.transaction.smart.script.Script
-import scorex.utils.{ScorexLogging, Time}
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
+import com.wavesplatform.transaction.Transaction.Type
+import com.wavesplatform.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.script.Script
 
 class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, time: Time)
     extends BlockchainUpdater
@@ -157,7 +156,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
             } else
               measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)) match {
                 case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
-                case Some((referencedForgedBlock, referencedLiquidDiff, discarded)) =>
+                case Some((referencedForgedBlock, referencedLiquidDiff, carry, discarded)) =>
                   if (referencedForgedBlock.signaturesValid().isRight) {
                     if (discarded.nonEmpty) {
                       microBlockForkStats.increment()
@@ -170,17 +169,24 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                       miningConstraints.total
                     }
 
+                    val expiredTransactions = blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs > 2 * 60 * 60 * 1000)
+
                     val diff = BlockDiffer
                       .fromBlock(
                         functionalitySettings,
-                        CompositeBlockchain.composite(blockchain, referencedLiquidDiff),
+                        CompositeBlockchain.composite(blockchain, referencedLiquidDiff, carry),
                         Some(referencedForgedBlock),
                         block,
                         constraint
                       )
 
+                    diff.left.foreach { _ =>
+                      log.trace(s"Could not append new block, remembering ${expiredTransactions.size} transaction(s)")
+                      blockchain.learnTransactions(expiredTransactions)
+                    }
+
                     diff.map { hardenedDiff =>
-                      blockchain.append(referencedLiquidDiff, referencedForgedBlock)
+                      blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
                       TxsInBlockchainStats.record(ng.transactions.size)
                       Some((hardenedDiff, discarded.flatMap(_.transactionData)))
                     }
@@ -192,10 +198,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
               }
         }).map {
           _ map {
-            case ((newBlockDiff, updatedTotalConstraint), discarded) =>
+            case ((newBlockDiff, carry, updatedTotalConstraint), discarded) =>
               val height = blockchain.height + 1
               restTotalConstraint = updatedTotalConstraint
-              ngState = Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block)))
+              ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
               if ((block.timestamp > time
                     .getTimestamp() - settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
@@ -241,9 +247,9 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 BlockDiffer.fromMicroBlock(functionalitySettings, this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, mdConstraint)
               }
             } yield {
-              val (diff, updatedMdConstraint) = r
+              val (diff, carry, updatedMdConstraint) = r
               restTotalConstraint = updatedMdConstraint.constraints.head
-              ng.append(microBlock, diff, System.currentTimeMillis)
+              ng.append(microBlock, diff, carry, System.currentTimeMillis)
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
             }
@@ -335,10 +341,12 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
   override def lastBlock: Option[Block] = ngState.map(_.bestLiquidBlock).orElse(blockchain.lastBlock)
 
+  override def carryFee: Long = ngState.map(_.carryFee).getOrElse(blockchain.carryFee)
+
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] =
     (for {
-      ng            <- ngState
-      (block, _, _) <- ng.totalDiffOf(blockId)
+      ng               <- ngState
+      (block, _, _, _) <- ng.totalDiffOf(blockId)
     } yield block.bytes()).orElse(blockchain.blockBytes(blockId))
 
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = {
@@ -401,48 +409,18 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     ng.bestLiquidDiff.transactions.contains(id) || blockchain.containsTransaction(id)
   }
 
+  override def forgetTransactions(pred: (AssetId, Long) => Boolean): Map[AssetId, Long] = blockchain.forgetTransactions(pred)
+
+  override def learnTransactions(values: Map[AssetId, Long]): Unit = blockchain.learnTransactions(values)
+
   override def assetDescription(id: AssetId): Option[AssetDescription] = ngState.fold(blockchain.assetDescription(id)) { ng =>
     val diff = ng.bestLiquidDiff
-    blockchain.assetDescription(id) match {
-      case Some(ad) =>
-        ng.bestLiquidDiff.issuedAssets
-          .get(id)
-          .map { newAssetInfo =>
-            ad.copy(
-              reissuable = newAssetInfo.isReissuable,
-              totalVolume = ad.totalVolume + newAssetInfo.volume,
-              script = newAssetInfo.script
-            )
-          }
-          .orElse(Some(ad))
-          .map { ad =>
-            diff.sponsorship.get(id).fold(ad) {
-              case SponsorshipValue(sponsorship) =>
-                ad.copy(sponsorship = sponsorship)
-              case SponsorshipNoInfo =>
-                ad
-            }
-          }
-      case None =>
-        val sponsorship = diff.sponsorship.get(id).fold(0L) {
-          case SponsorshipValue(sponsorship) =>
-            sponsorship
-          case SponsorshipNoInfo =>
-            0L
-        }
-        ng.bestLiquidDiff.transactions
-          .get(id)
-          .collectFirst {
-            case (_, it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script, sponsorship)
-          }
-          .map(z =>
-            ng.bestLiquidDiff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = r.script)))
-    }
+    CompositeBlockchain.composite(blockchain, diff).assetDescription(id)
   }
 
-  override def resolveAlias(a: Alias): Option[Address] =
-    ngState.fold(blockchain.resolveAlias(a))(_.bestLiquidDiff.aliases.get(a).orElse(blockchain.resolveAlias(a)))
+  override def resolveAlias(alias: Alias): Either[ValidationError, Address] = ngState.fold(blockchain.resolveAlias(alias)) { ng =>
+    CompositeBlockchain.composite(blockchain, ng.bestLiquidDiff).resolveAlias(alias)
+  }
 
   override def leaseDetails(leaseId: AssetId): Option[LeaseDetails] = ngState match {
     case Some(ng) =>
@@ -536,7 +514,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       blockchain.collectLposPortfolios(pf) ++ b.result()
     }
 
-  override def append(diff: Diff, block: Block): Unit = blockchain.append(diff, block)
+  override def append(diff: Diff, carry: Long, block: Block): Unit = blockchain.append(diff, carry, block)
 
   override def rollbackTo(targetBlockId: AssetId): Seq[Block] = blockchain.rollbackTo(targetBlockId)
 
@@ -555,13 +533,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
 object BlockchainUpdaterImpl extends ScorexLogging {
 
-  import kamon.metric.instrument.{Time => KTime}
-
-  private val blockMicroForkStats       = Kamon.metrics.counter("block-micro-fork")
-  private val microMicroForkStats       = Kamon.metrics.counter("micro-micro-fork")
-  private val microBlockForkStats       = Kamon.metrics.counter("micro-block-fork")
-  private val microBlockForkHeightStats = Kamon.metrics.histogram("micro-block-fork-height")
-  private val forgeBlockTimeStats       = Kamon.metrics.histogram("forge-block-time", KTime.Milliseconds)
+  private val blockMicroForkStats       = Kamon.counter("block-micro-fork")
+  private val microMicroForkStats       = Kamon.counter("micro-micro-fork")
+  private val microBlockForkStats       = Kamon.counter("micro-block-fork")
+  private val microBlockForkHeightStats = Kamon.histogram("micro-block-fork-height")
+  private val forgeBlockTimeStats       = Kamon.histogram("forge-block-time", MeasurementUnit.time.milliseconds)
 
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.signerData.generator == b2.signerData.generator &&

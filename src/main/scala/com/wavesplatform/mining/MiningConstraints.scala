@@ -5,7 +5,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
-import scorex.block.Block
+import com.wavesplatform.block.Block
 
 case class MiningConstraints(total: MiningConstraint, keyBlock: MiningConstraint, micro: MiningConstraint)
 

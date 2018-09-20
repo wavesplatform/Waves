@@ -4,11 +4,11 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, TransferSending}
-import com.wavesplatform.state.{BooleanDataEntry, LongDataEntry}
+import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry}
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 
-import scala.concurrent.duration._
 import scala.concurrent.Await
+import scala.concurrent.duration._
 
 class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSending with NodesFromDocker with Matchers {
   override def nodeConfigs: Seq[Config] =
@@ -34,7 +34,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
 
     val stateAfterFirstTry = nodes.head.debugStateAt(sender.height)
 
-    for (n <- nodes) n.rollback(startHeight)
+    nodes.rollback(startHeight)
 
     nodes.waitFor[Int]("empty utx")(1.second)(_.utxSize, _.forall(_ == 0))
 
@@ -60,7 +60,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
 
     sender.debugStateAt(sender.height).size shouldBe stateBeforeApply.size + 190
 
-    for (n <- nodes) n.rollback(startHeight, returnToUTX = false)
+    nodes.rollback(startHeight, returnToUTX = false)
 
     nodes.waitFor[Int]("empty utx")(1.second)(_.utxSize, _.forall(_ == 0))
 
@@ -78,23 +78,29 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     val aliasTxId = sender.createAlias(firstAddress, alias, transferAmount).id
     nodes.waitForHeightAriseAndTxPresent(aliasTxId)
 
+    val txsBefore = sender.transactionsByAddress(firstAddress, 10)
+
     val txHeight = sender.waitForTransaction(aliasTxId).height
 
-    for (n <- nodes) n.rollback(txHeight - 1, returnToUTX = false)
-    sender.waitForHeight(txHeight + 1, 40.seconds)
+    nodes.rollback(txHeight - 1, returnToUTX = false)
+    nodes.waitForHeight(txHeight + 1)
 
     val secondAliasTxId = sender.createAlias(firstAddress, alias, transferAmount).id
     nodes.waitForHeightAriseAndTxPresent(secondAliasTxId)
+    sender.transactionsByAddress(firstAddress, 10) shouldNot contain theSameElementsAs txsBefore
+
   }
 
   test("Data transaction rollback") {
-    val node   = nodes.head
-    val entry1 = LongDataEntry("1", 0)
-    val entry2 = BooleanDataEntry("2", true)
-    val entry3 = LongDataEntry("1", 1)
+    val node       = nodes.head
+    val entry1     = IntegerDataEntry("1", 0)
+    val entry2     = BooleanDataEntry("2", true)
+    val entry3     = IntegerDataEntry("1", 1)
+    val txsBefore0 = sender.transactionsByAddress(firstAddress, 10)
 
     val tx1 = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1))).id
     nodes.waitForHeightAriseAndTxPresent(tx1)
+    val txsBefore1 = sender.transactionsByAddress(firstAddress, 10)
 
     val tx1height = sender.waitForTransaction(tx1).height
 
@@ -104,17 +110,19 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     val data2 = sender.getData(firstAddress)
     assert(data2 == List(entry3, entry2))
 
-    for (n <- nodes) n.rollback(tx1height, returnToUTX = false)
+    nodes.rollback(tx1height, returnToUTX = false)
     nodes.waitForSameBlockHeadesAt(tx1height)
 
     val data1 = node.getData(firstAddress)
     assert(data1 == List(entry1))
+    sender.transactionsByAddress(firstAddress, 10) should contain theSameElementsAs txsBefore1
 
-    for (n <- nodes) n.rollback(tx1height - 1, returnToUTX = false)
+    nodes.rollback(tx1height - 1, returnToUTX = false)
     nodes.waitForSameBlockHeadesAt(tx1height - 1)
 
     val data0 = node.getData(firstAddress)
     assert(data0 == List.empty)
+    sender.transactionsByAddress(firstAddress, 10) should contain theSameElementsAs txsBefore0
   }
 
   test("Sponsorship transaction rollback") {
@@ -129,7 +137,8 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     val sponsorId = sender.sponsorAsset(sender.address, sponsorAssetId, baseFee = 100L, fee = issueFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorId)
 
-    val height = sender.waitForTransaction(sponsorId).height
+    val height     = sender.waitForTransaction(sponsorId).height
+    val txsBefore1 = sender.transactionsByAddress(firstAddress, 10)
 
     val assetDetailsBefore = sender.assetsDetails(sponsorAssetId)
 
@@ -137,12 +146,13 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     val sponsorSecondId = sender.sponsorAsset(sender.address, sponsorAssetId, baseFee = 2 * 100L, fee = issueFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorSecondId)
 
-    for (n <- nodes) n.rollback(height, false)
+    nodes.rollback(height, false)
 
     nodes.waitForHeightArise()
 
     val assetDetailsAfter = sender.assetsDetails(sponsorAssetId)
 
     assert(assetDetailsAfter.minSponsoredAssetFee == assetDetailsBefore.minSponsoredAssetFee)
+    sender.transactionsByAddress(sender.address, 10) should contain theSameElementsAs txsBefore1
   }
 }

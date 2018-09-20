@@ -3,13 +3,14 @@ package com.wavesplatform.matcher
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.crypto
+import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.ByteStr
 import org.scalacheck.{Arbitrary, Gen}
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.NTP
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.utils.NTP
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 trait MatcherTestData {
   private val signatureSize = 32
@@ -42,7 +43,6 @@ trait MatcherTestData {
       |    snapshots-interval: 1d
       |    max-open-orders: 1000
       |    price-assets: ["BASE1", "BASE2", "BASE"]
-      |    predefined-pairs: [{amountAsset = "BASE2", priceAsset = "BASE1"}]
       |    blacklisted-assets: ["BLACKLST"]
       |    blacklisted-names: ["[F,f]orbidden"]
       |  }
@@ -91,16 +91,30 @@ trait MatcherTestData {
           amount: Long,
           sender: Option[PrivateKeyAccount] = None,
           matcherFee: Option[Long] = None,
-          ts: Option[Long] = None): Order =
-    valueFromGen(buyGenerator(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts))._1
+          ts: Option[Long] = None): Order = rawBuy(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts)
+
+  def rawBuy(pair: AssetPair,
+             price: Price,
+             amount: Long,
+             sender: Option[PrivateKeyAccount] = None,
+             matcherFee: Option[Long] = None,
+             ts: Option[Long] = None): Order =
+    valueFromGen(buyGenerator(pair, price, amount, sender, matcherFee, ts))._1
 
   def sell(pair: AssetPair,
            price: BigDecimal,
            amount: Long,
            sender: Option[PrivateKeyAccount] = None,
            matcherFee: Option[Long] = None,
-           ts: Option[Long] = None): Order =
-    valueFromGen(sellGenerator(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts))._1
+           ts: Option[Long] = None): Order = rawSell(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts)
+
+  def rawSell(pair: AssetPair,
+              price: Long,
+              amount: Long,
+              sender: Option[PrivateKeyAccount] = None,
+              matcherFee: Option[Long] = None,
+              ts: Option[Long] = None): Order =
+    valueFromGen(sellGenerator(pair, price, amount, sender, matcherFee, ts))._1
 
   val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 
@@ -123,7 +137,7 @@ trait MatcherTestData {
     timestamp: Long           <- createdTimeGen
     expiration: Long          <- maxTimeGen
     matcherFee: Long          <- maxWavesAmountGen
-  } yield BuyLimitOrder(price, amount, Order.buy(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
+  } yield BuyLimitOrder(price, amount, matcherFee, Order.buy(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
   val sellLimitOrderGenerator: Gen[SellLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -133,6 +147,6 @@ trait MatcherTestData {
     timestamp: Long           <- createdTimeGen
     expiration: Long          <- maxTimeGen
     matcherFee: Long          <- maxWavesAmountGen
-  } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
+  } yield SellLimitOrder(price, amount, matcherFee, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
 }

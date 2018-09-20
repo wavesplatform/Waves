@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
 import cats.Show
-import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 
 sealed trait CompilationError {
@@ -36,7 +36,7 @@ object CompilationError {
     val message = "Only union type can be matched"
   }
 
-  final case class MatchNotExhaustive(start: Int, end: Int, possible: List[CASETYPEREF], matched: List[CASETYPEREF]) extends CompilationError {
+  final case class MatchNotExhaustive(start: Int, end: Int, possible: List[TYPE], matched: List[TYPE]) extends CompilationError {
     val message = s"Matching not exhaustive: possibleTypes are $possible, while matched are $matched"
   }
   final case class AlreadyDefined(start: Int, end: Int, name: String, isFunction: Boolean) extends CompilationError {

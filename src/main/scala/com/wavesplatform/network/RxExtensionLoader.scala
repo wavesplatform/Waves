@@ -4,17 +4,17 @@ import com.wavesplatform.network.RxExtensionLoader.ApplierState.Buffer
 import com.wavesplatform.network.RxExtensionLoader.LoaderState.WithPeer
 import com.wavesplatform.network.RxScoreObserver.{ChannelClosedAndSyncWith, SyncWith}
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import monix.reactive.{Observable, Observer}
-import scorex.block.Block
-import scorex.block.Block.BlockId
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
-import scorex.utils.ScorexLogging
+import com.wavesplatform.block.Block
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.GenericError
 
 import scala.concurrent.duration._
 

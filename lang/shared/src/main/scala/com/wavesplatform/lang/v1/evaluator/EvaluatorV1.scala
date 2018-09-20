@@ -38,11 +38,8 @@ object EvaluatorV1 extends ExprEvaluator {
     }
 
   private def evalGetter(expr: EXPR, field: String) =
-    evalExpr(expr).map(_.asInstanceOf[CaseObj]) flatMap {
-      _.fields.get(field) match {
-        case Some(eager) => eager.pure[EvalM]
-        case None        => raiseError[EvaluationContext, ExecutionError, Any](s"field '$field' not found")
-      }
+    evalExpr(expr).map(_.asInstanceOf[CaseObj]) map {
+      _.fields(field)
     }
 
   private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]): EvalM[Any] =
@@ -51,14 +48,28 @@ object EvaluatorV1 extends ExprEvaluator {
       result <- funcs
         .get(ctx)
         .get(header)
-        .fold(raiseError[EvaluationContext, ExecutionError, Any](s"function '$header' not found")) {
-          case func: UserFunction => func.ev(args).liftTo[EvalM].flatMap(evalExpr)
+        .map {
+          case func: UserFunction => func.ev(args).pure[EvalM].flatMap(evalExpr)
           case func: NativeFunction =>
             args
               .traverse[EvalM, Any](a => evalExpr(a))
               .map(func.eval)
               .flatMap(r => liftTER[Any](r.value))
         }
+        .orElse(
+          // no such function, try data constructor
+          header match {
+            case FunctionHeader.User(typeName) =>
+              types.get(ctx).get(typeName).collect {
+                case t @ CaseType(_, fields) =>
+                  args
+                    .traverse[EvalM, Any](a => evalExpr(a))
+                    .map(argValues => CaseObj(t.typeRef, fields.map(_._1).zip(argValues).toMap))
+              }
+            case _ => None
+          }
+        )
+        .getOrElse(raiseError[EvaluationContext, ExecutionError, Any](s"function '$header' not found"))
     } yield result
 
   private def pureAny[A](v: A): EvalM[Any] = v.pure[EvalM].map(_.asInstanceOf[Any])

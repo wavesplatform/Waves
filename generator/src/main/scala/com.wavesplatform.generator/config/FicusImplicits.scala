@@ -3,7 +3,7 @@ package com.wavesplatform.generator.config
 import com.google.common.base.CaseFormat
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
-import scorex.transaction.{TransactionParser, TransactionParsers}
+import com.wavesplatform.transaction.{TransactionParser, TransactionParsers}
 
 trait FicusImplicits {
 

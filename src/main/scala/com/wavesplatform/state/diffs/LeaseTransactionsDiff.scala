@@ -4,10 +4,10 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import scorex.account.Address
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.lease._
+import com.wavesplatform.account.Address
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.lease._
 
 import scala.util.{Left, Right}
 
@@ -15,7 +15,7 @@ object LeaseTransactionsDiff {
 
   def lease(blockchain: Blockchain, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
-    blockchain.resolveAliasEi(tx.recipient).flatMap { recipient =>
+    blockchain.resolveAlias(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
         Left(GenericError("Cannot lease to self"))
       else {
@@ -41,7 +41,7 @@ object LeaseTransactionsDiff {
     }
     for {
       lease     <- leaseEi
-      recipient <- blockchain.resolveAliasEi(lease.recipient)
+      recipient <- blockchain.resolveAlias(lease.recipient)
       isLeaseActive = lease.isActive
       _ <- if (!isLeaseActive && time > settings.allowMultipleLeaseCancelTransactionUntilTimestamp)
         Left(GenericError(s"Cannot cancel already cancelled lease"))

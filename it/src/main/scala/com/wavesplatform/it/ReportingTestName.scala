@@ -1,9 +1,9 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.{Args, Status, Suite, SuiteMixin}
-import scorex.utils.ScorexLogging
-import scorex.waves.http.DebugMessage
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -22,6 +22,10 @@ trait ReportingTestName extends SuiteMixin with ScorexLogging {
     import scala.concurrent.ExecutionContext.Implicits.global
     val formatted = s"---------- $text ----------"
     log.debug(formatted)
-    Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(formatted))), 10.seconds)
+    try {
+      Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(formatted))), 10.seconds)
+    } catch {
+      case _: Throwable => ()
+    }
   }
 }

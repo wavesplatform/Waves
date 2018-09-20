@@ -11,11 +11,11 @@ object Types {
 
   val transfer = CaseType("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
 
-  val optionByteVector: OPTION = OPTION(BYTEVECTOR)
-  val optionAddress            = OPTION(addressType.typeRef)
-  val optionLong: OPTION       = OPTION(LONG)
-  val listByteVector: LIST     = LIST(BYTEVECTOR)
-  val listTransfers            = LIST(transfer.typeRef)
+  val optionByteVector     = UNION(BYTEVECTOR, UNIT)
+  val optionAddress        = UNION(addressType.typeRef, UNIT)
+  val optionLong           = UNION(LONG, UNIT)
+  val listByteVector: LIST = LIST(BYTEVECTOR)
+  val listTransfers        = LIST(transfer.typeRef)
 
   val header = List(
     "id"        -> BYTEVECTOR,
@@ -38,11 +38,11 @@ object Types {
   val transferTransactionType = CaseType(
     "TransferTransaction",
     List(
-      "feeAssetId"      -> optionByteVector,
-      "amount"          -> LONG,
-      "transferAssetId" -> optionByteVector,
-      "recipient"       -> addressOrAliasType,
-      "attachment"      -> BYTEVECTOR
+      "feeAssetId" -> optionByteVector,
+      "amount"     -> LONG,
+      "assetId"    -> optionByteVector,
+      "recipient"  -> addressOrAliasType,
+      "attachment" -> BYTEVECTOR
     ) ++ header ++ proven
   )
 
@@ -122,8 +122,6 @@ object Types {
     "Order",
     List(
       "id"               -> BYTEVECTOR,
-      "sender"           -> addressType.typeRef,
-      "senderPublicKey"  -> BYTEVECTOR,
       "matcherPublicKey" -> BYTEVECTOR,
       "assetPair"        -> assetPairType.typeRef,
       "orderType"        -> ordTypeType,
@@ -132,8 +130,7 @@ object Types {
       "timestamp"        -> LONG,
       "expiration"       -> LONG,
       "matcherFee"       -> LONG,
-      "signature"        -> BYTEVECTOR
-    )
+    ) ++ proven
   )
   val exchangeTransactionType = CaseType(
     "ExchangeTransaction",
@@ -146,19 +143,12 @@ object Types {
       ++ header ++ proven
   )
 
-  def buildDataEntryType(name: String, tpe: TYPE) = CaseType(name + "DataEntry", List("key" -> STRING, "value" -> tpe))
-
-  val strDataEntryType  = buildDataEntryType("Str", STRING)
-  val boolDataEntryType = buildDataEntryType("Bool", BOOLEAN)
-  val bvDataEntryType   = buildDataEntryType("ByteVector", BYTEVECTOR)
-  val longDataEntryType = buildDataEntryType("Long", LONG)
-  val dataEntryTypes    = List(strDataEntryType, boolDataEntryType, bvDataEntryType, longDataEntryType)
-
-  val listOfDataEntriesType = LIST(UNION(dataEntryTypes.map(_.typeRef)))
+  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTEVECTOR, STRING)
+  val dataEntryType              = CaseType("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
 
   val dataTransactionType = CaseType(
     "DataTransaction",
-    List("data" -> listOfDataEntriesType) ++ header ++ proven
+    List("data" -> LIST(dataEntryType.typeRef)) ++ header ++ proven
   )
 
   val massTransferTransactionType = CaseType(
@@ -197,10 +187,10 @@ object Types {
     dataTransactionType
   )
 
-  val transactionTypes = /*obsoleteTransactionTypes ++ */ activeTransactionTypes
+  val transactionTypes = obsoleteTransactionTypes ++ activeTransactionTypes
 
-  val outgoingTransactionType = UNION(activeTransactionTypes.map(_.typeRef))
-  val anyTransactionType      = UNION(transactionTypes.map(_.typeRef))
+  val outgoingTransactionType = UNION.create(activeTransactionTypes.map(_.typeRef))
+  val anyTransactionType      = UNION.create(transactionTypes.map(_.typeRef))
 
-  val wavesTypes = Seq(addressType, aliasType, transfer, orderType, assetPairType) ++ dataEntryTypes ++ transactionTypes
+  val wavesTypes = Seq(addressType, aliasType, transfer, orderType, assetPairType, dataEntryType) ++ transactionTypes
 }

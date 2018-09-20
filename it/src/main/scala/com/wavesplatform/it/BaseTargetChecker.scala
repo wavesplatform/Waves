@@ -1,7 +1,5 @@
 package com.wavesplatform.it
 
-import java.time.Instant
-
 import com.typesafe.config.ConfigFactory.{defaultApplication, defaultReference}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
@@ -9,9 +7,9 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings._
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import net.ceedubs.ficus.Ficus._
-import scorex.account.PublicKeyAccount
-import scorex.block.Block
-import scorex.utils.NTP
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.utils.NTP
+import com.wavesplatform.block.Block
 
 object BaseTargetChecker {
   def main(args: Array[String]): Unit = {
@@ -28,9 +26,7 @@ object BaseTargetChecker {
     val pos          = new PoSSelector(bu, settings.blockchainSettings)
     bu.processBlock(genesisBlock)
 
-    println(s"Genesis TS = ${Instant.ofEpochMilli(genesisBlock.timestamp)}")
-
-    val m = NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
+    NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
       case cfg if cfg.as[Boolean]("waves.miner.enable") =>
         val account   = PublicKeyAccount(cfg.as[ByteStr]("public-key").arr)
         val address   = account.toAddress
@@ -44,7 +40,5 @@ object BaseTargetChecker {
     }
 
     docker.close()
-
-    println(m.mkString("\n"))
   }
 }

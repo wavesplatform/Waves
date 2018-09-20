@@ -12,13 +12,13 @@ import fastparse.core.Parsed
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.AddressScheme
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets._
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer._
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -138,7 +138,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     val fs =
       TestFunctionalitySettings.Enabled
         .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.BurnAnyTokens.id -> 0)
+          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
         )
 
     forAll(setup) {
@@ -196,7 +196,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     val fs =
       TestFunctionalitySettings.Enabled
         .copy(
-          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.BurnAnyTokens.id -> 0)
+          preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
         )
 
     forAll(setup) {
@@ -218,8 +218,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   private def createScript(code: String) = {
     val Parsed.Success(expr, _) = Parser(code).get
-    assert(expr.size == 1)
-    ScriptV1(CompilerV1(dummyCompilerContext, expr.head).explicitGet()._1).explicitGet()
+    ScriptV1(CompilerV1(dummyCompilerContext, expr).explicitGet()._1).explicitGet()
   }
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransactionV1)] =
@@ -286,7 +285,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
           case (blockDiff, newState) =>
             val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.assets(issue.id()) shouldEqual issue.quantity
-            newState.portfolio(newState.resolveAliasEi(transfer.recipient).explicitGet()).assets(issue.id()) shouldEqual transfer.amount
+            newState.portfolio(newState.resolveAlias(transfer.recipient).explicitGet()).assets(issue.id()) shouldEqual transfer.amount
         }
     }
   }

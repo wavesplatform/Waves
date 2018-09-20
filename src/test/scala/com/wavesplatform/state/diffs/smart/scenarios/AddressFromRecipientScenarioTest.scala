@@ -1,11 +1,16 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
+import com.wavesplatform.transaction.smart.BlockchainContext
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import fastparse.core.Parsed
 import monix.eval.Coeval
@@ -13,11 +18,6 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
-import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.smart.BlockchainContext
-import scorex.transaction.transfer._
-import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction}
 
 class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -41,11 +41,10 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     val Parsed.Success(expr, _) = Parser("""
         | match tx {
         |  case t : TransferTransaction =>  addressFromRecipient(t.recipient)
-        |  case other => throw
+        |  case other => throw()
         |  }
         |  """.stripMargin)
-    assert(expr.size == 1)
-    val Right((typedExpr, _)) = CompilerV1(com.wavesplatform.utils.dummyCompilerContext, expr.head)
+    val Right((typedExpr, _))   = CompilerV1(com.wavesplatform.utils.dummyCompilerContext, expr)
     EvaluatorV1[CaseObj](context, typedExpr)._2
   }
 

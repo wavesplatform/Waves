@@ -5,10 +5,11 @@ import java.util
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.state._
-import scorex.account.{Address, Alias}
-import scorex.block.Block
-import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction}
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.AssetId
 
 import scala.collection.JavaConverters._
 
@@ -32,9 +33,22 @@ trait Caches extends Blockchain {
   protected def loadLastBlock(): Option[Block]
   override def lastBlock: Option[Block] = lastBlockCache
 
-  private val transactionIds                             = new util.HashMap[ByteStr, Long]()
-  protected def forgetTransaction(id: ByteStr): Unit     = transactionIds.remove(id)
-  override def containsTransaction(id: ByteStr): Boolean = transactionIds.containsKey(id)
+  private val transactionIds                                       = new util.HashMap[ByteStr, Long]()
+  protected def forgetTransaction(id: ByteStr): Unit               = transactionIds.remove(id)
+  override def containsTransaction(id: ByteStr): Boolean           = transactionIds.containsKey(id)
+  override def learnTransactions(values: Map[ByteStr, Long]): Unit = transactionIds.putAll(values.asJava)
+  override def forgetTransactions(pred: (ByteStr, Long) => Boolean): Map[ByteStr, Long] = {
+    val removedTransactions = Map.newBuilder[ByteStr, Long]
+    val iterator            = transactionIds.entrySet().iterator()
+    while (iterator.hasNext) {
+      val e = iterator.next()
+      if (pred(e.getKey, e.getValue)) {
+        removedTransactions += e.getKey -> e.getValue
+        iterator.remove()
+      }
+    }
+    removedTransactions.result()
+  }
 
   private val portfolioCache: LoadingCache[Address, Portfolio] = cache(maxCacheSize, loadPortfolio)
   protected def loadPortfolio(address: Address): Portfolio
@@ -78,12 +92,14 @@ trait Caches extends Blockchain {
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   protected def doAppend(block: Block,
+                         carryFee: Long,
                          addresses: Map[Address, BigInt],
                          wavesBalances: Map[BigInt, Long],
                          assetBalances: Map[BigInt, Map[ByteStr, Long]],
                          leaseBalances: Map[BigInt, LeaseBalance],
                          leaseStates: Map[ByteStr, Boolean],
                          transactions: Map[ByteStr, (Transaction, Set[BigInt])],
+                         addressTransactions: Map[BigInt, List[(Int, ByteStr)]],
                          reissuedAssets: Map[ByteStr, AssetInfo],
                          filledQuantity: Map[ByteStr, VolumeAndFee],
                          scripts: Map[BigInt, Option[Script]],
@@ -91,7 +107,7 @@ trait Caches extends Blockchain {
                          aliases: Map[Alias, BigInt],
                          sponsorship: Map[AssetId, Sponsorship]): Unit
 
-  override def append(diff: Diff, block: Block): Unit = {
+  override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
     heightCache += 1
     scoreCache += block.blockScore()
     lastBlockCache = Some(block)
@@ -109,8 +125,6 @@ trait Caches extends Blockchain {
     def addressId(address: Address): BigInt = (newAddressIds.get(address) orElse addressIdCache.get(address)).get
 
     lastAddressId += newAddressIds.size
-
-    transactionIds.entrySet().removeIf(kv => block.timestamp - kv.getValue > 2 * 60 * 60 * 1000)
 
     val wavesBalances = Map.newBuilder[BigInt, Long]
     val assetBalances = Map.newBuilder[BigInt, Map[ByteStr, Long]]
@@ -149,12 +163,14 @@ trait Caches extends Blockchain {
 
     doAppend(
       block,
+      carryFee,
       newAddressIds,
       wavesBalances.result(),
       assetBalances.result(),
       leaseBalances.result(),
       diff.leaseState,
       newTransactions.result(),
+      diff.accountTransactionIds.map({ case (addr, txs) => addressId(addr) -> txs }),
       diff.issuedAssets,
       newFills,
       diff.scripts.map { case (address, s)        => addressId(address) -> s },

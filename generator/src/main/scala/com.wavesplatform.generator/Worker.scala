@@ -9,8 +9,8 @@ import cats.implicits._
 import com.wavesplatform.generator.Worker.Settings
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.network.client.NetworkSender
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
-import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, blocking}

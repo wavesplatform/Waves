@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import cats.data.NonEmptyList
 import com.wavesplatform.state.Blockchain
-import scorex.transaction.Transaction
+import com.wavesplatform.transaction.Transaction
 
 trait MiningConstraint {
   def isEmpty: Boolean
@@ -19,10 +19,16 @@ object MiningConstraint {
 }
 
 case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn) extends MiningConstraint {
-  override def isEmpty: Boolean                                                            = rest <= 0
-  override def isOverfilled: Boolean                                                       = rest < 0
+  override def isEmpty: Boolean = {
+    rest < estimator.minEstimate
+  }
+  override def isOverfilled: Boolean = {
+    rest < 0
+  }
   override def put(blockchain: Blockchain, x: Transaction): OneDimensionalMiningConstraint = put(estimator(blockchain, x))
-  private def put(x: Long): OneDimensionalMiningConstraint                                 = copy(rest = this.rest - x)
+  private def put(x: Long): OneDimensionalMiningConstraint = {
+    copy(rest = this.rest - x)
+  }
 }
 
 case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningConstraint]) extends MiningConstraint {

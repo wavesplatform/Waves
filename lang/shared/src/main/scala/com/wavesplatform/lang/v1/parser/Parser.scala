@@ -20,17 +20,17 @@ object Parser {
   import fastparse.noApi._
 
   val keywords               = Set("let", "base58", "base64", "true", "false", "if", "then", "else", "match", "case")
-  private val lowerChar      = CharIn('a' to 'z')
-  private val upperChar      = CharIn('A' to 'Z')
-  private val char           = lowerChar | upperChar
-  private val digit          = CharIn('0' to '9')
-  private val unicodeSymbolP = P("\\u" ~/ Pass ~~ (char | digit).repX(min = 0, max = 4))
-  private val notEndOfString = CharPred(_ != '\"')
-  private val specialSymbols = P("\\" ~~ notEndOfString.?)
-  private val comment        = P("#" ~~ CharPred(_ != '\n').repX).rep
+  val lowerChar      = CharIn('a' to 'z')
+  val upperChar      = CharIn('A' to 'Z')
+  val char           = lowerChar | upperChar
+  val digit          = CharIn('0' to '9')
+  val unicodeSymbolP = P("\\u" ~/ Pass ~~ (char | digit).repX(min = 0, max = 4))
+  val notEndOfString = CharPred(_ != '\"')
+  val specialSymbols = P("\\" ~~ AnyChar)
+  val comment: P[Unit] = P("#" ~~ CharPred(_ != '\n').repX).rep.map(_ => ())
 
-  private val escapedUnicodeSymbolP: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
-  private val stringP: P[EXPR] = P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
+  val escapedUnicodeSymbolP: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
+  val stringP: P[EXPR] = P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
     .map {
       case (start, xs, end) =>
         var errors         = Vector.empty[String]
@@ -64,6 +64,8 @@ object Parser {
                 case 'n' => "\n"
                 case 'r' => "\r"
                 case 't' => "\t"
+                case '\\' => "\\"
+                case '"' => "\""
                 case _ =>
                   errors :+= s"""unknown escaped symbol: '$x'. The valid are \b, \f, \n, \r, \t"""
                   x
@@ -84,17 +86,17 @@ object Parser {
     }
     .map(Function.tupled(CONST_STRING))
 
-  private val correctVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index)
+  val correctVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index)
     .filter { case (_, x, _) => !keywords.contains(x) }
     .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
-  private val anyVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
+  val anyVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
     case (start, x, end) =>
       if (keywords.contains(x)) PART.INVALID(Pos(start, end), s"keywords are restricted: $x")
       else PART.VALID(Pos(start, end), x)
   }
 
-  private val invalid: P[INVALID] = {
+  val invalid: P[INVALID] = {
     val White = WhitespaceApi.Wrapper {
       import fastparse.all._
       NoTrace("")
@@ -107,22 +109,22 @@ object Parser {
       }
   }
 
-  private val border: P[Unit] = CharIn(" \t\n\r({")
+  val border: P[Unit] = CharIn(" \t\n\r({")
 
-  private val numberP: P[CONST_LONG] =
+  val numberP: P[CONST_LONG] =
     P(Index ~~ (CharIn("+-").? ~~ digit.repX(min = 1)).! ~~ ("_" ~~ digit.repX(min = 1).!).repX(min = 0) ~~ Index)
       .map({ case (start, x1, x2, end) => CONST_LONG(Pos(start, end), x2.foldLeft(x1)(_ ++ _).toLong) })
 
-  private val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(Pos(start, end)) }
-  private val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(Pos(start, end)) }
-  private val bracesP: P[EXPR]      = P("(" ~ baseExpr ~ ")")
-  private val curlyBracesP: P[EXPR] = P("{" ~ baseExpr ~ "}")
+  val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(Pos(start, end)) }
+  val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(Pos(start, end)) }
+  val bracesP: P[EXPR]      = P("(" ~ baseExpr ~ ")")
+  val curlyBracesP: P[EXPR] = P("{" ~ baseExpr ~ "}")
 
-  private val refP: P[REF] = P(correctVarName).map { x =>
+  val refP: P[REF] = P(correctVarName).map { x =>
     REF(Pos(x.position.start, x.position.end), x)
   }
 
-  private val ifP: P[IF] = {
+  val ifP: P[IF] = {
     def optionalPart(keyword: String, branch: String): P[EXPR] = (Index ~ (keyword ~/ Index ~ baseExpr.?).?).map {
       case (ifTruePos, ifTrueRaw) =>
         ifTrueRaw
@@ -150,16 +152,20 @@ object Parser {
       }
   }
 
-  private val functionCallArgs: P[Seq[EXPR]] = baseExpr.rep(sep = ",")
+  val functionCallArgs: P[Seq[EXPR]] = comment ~ baseExpr.rep(sep = comment ~ "," ~ comment) ~ comment
 
-  private val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | refP)
+  val maybeFunctionCallP: P[EXPR] =  (Index ~~ refP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
+    case (start, REF(_, functionName), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
+    case (_, id, None, _) => id
+  }
 
-  private abstract class Accessor
-  private case class Getter(name: PART[String]) extends Accessor
-  private case class Args(args: Seq[EXPR])      extends Accessor
-  private case class ListIndex(index: EXPR)     extends Accessor
+  val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | maybeFunctionCallP)
 
-  private val matchCaseP: P[MATCH_CASE] = {
+  abstract class Accessor
+  case class Getter(name: PART[String]) extends Accessor
+  case class ListIndex(index: EXPR)     extends Accessor
+
+  val matchCaseP: P[MATCH_CASE] = {
     val restMatchCaseInvalidP: P[String] = P((!"=>" ~~ AnyChars(1).!).repX.map(_.mkString))
     val varDefP: P[Option[PART[String]]] = anyVarName.map(Some(_)) | "_".!.map(_ => None)
     val typesP: P[Seq[PART[String]]]     = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
@@ -193,20 +199,19 @@ object Parser {
     }
   }
 
-  private lazy val matchP: P[EXPR] =
+  lazy val matchP: P[EXPR] =
     P(Index ~~ "match" ~~ &(border) ~/ baseExpr ~ "{" ~ comment ~ matchCaseP.rep(sep = comment) ~ comment ~ "}" ~~ Index)
       .map {
         case (start, _, Nil, end)   => INVALID(Pos(start, end), "pattern matching requires case branches")
         case (start, e, cases, end) => MATCH(Pos(start, end), e, cases.toList)
       }
 
-  private val accessP: P[(Int, Accessor, Int)] = P(
+  val accessP: P[(Int, Accessor, Int)] = P(
     ("" ~ comment ~ Index ~ "." ~/ comment ~ anyVarName.map(Getter) ~~ Index) |
-      (Index ~~ "(" ~/ functionCallArgs.map(Args) ~ ")" ~~ Index) |
-      (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
+    (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
   )
 
-  private val maybeAccessP: P[EXPR] =
+  val maybeAccessP: P[EXPR] =
     P(Index ~~ extractableAtom ~~ Index ~~ NoCut(accessP).rep)
       .map {
         case (start, obj, objEnd, accessors) =>
@@ -214,17 +219,14 @@ object Parser {
             case (e, (accessStart, a, accessEnd)) =>
               a match {
                 case Getter(n) => GETTER(Pos(start, accessEnd), e, n)
-                case Args(args) =>
-                  e match {
-                    case REF(_, functionName) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
-                    case _                       => FUNCTION_CALL(Pos(start, accessEnd), PART.INVALID(Pos(start, objEnd), s"'$obj' is not a function name"), args.toList)
-                  }
                 case ListIndex(index) => FUNCTION_CALL(Pos(start, accessEnd), PART.VALID(Pos(accessStart, accessEnd), "getElement"), List(e, index))
               }
           }
       }
 
-  private val byteVectorP: P[EXPR] =
+
+
+  val byteVectorP: P[EXPR] =
     P(Index ~~ "base" ~~ ("58" | "64").! ~~ "'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~~ Index)
       .map {
         case (start, base, xs, end) =>
@@ -240,7 +242,7 @@ object Parser {
           }
       }
 
-  private val letP: P[LET] =
+  val letP: P[LET] =
     P(Index ~~ "let" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ Index ~ anyVarName.? ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
       .map {
         case (start, namePos, nameRaw, valuePos, valueRaw, end) =>
@@ -251,7 +253,7 @@ object Parser {
           LET(Pos(start, end), name, value, Seq.empty)
       }
 
-  private val block: P[EXPR] = {
+  val block: P[EXPR] = {
     // Hack to force parse of "\n". Otherwise it is treated as a separator
     val newLineSep = {
       val rawSep = '\n'
@@ -279,13 +281,13 @@ object Parser {
     }
   }
 
-  private val baseAtom = comment ~
+  val baseAtom = comment ~
     P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP) ~
     comment
 
-  private lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
+  lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
 
-  private def binaryOp(atom: P[EXPR], rest: List[List[BinaryOperation]]): P[EXPR] = rest match {
+  def binaryOp(atom: P[EXPR], rest: List[List[BinaryOperation]]): P[EXPR] = rest match {
     case Nil => unaryOp(atom, unaryOps)
     case kinds :: restOps =>
       val operand = binaryOp(atom, restOps)
@@ -303,12 +305,5 @@ object Parser {
       } | acc
   }
 
-  private val statements: P[Seq[EXPR]] = (baseExpr | invalid).rep(min = 1).map { xs =>
-    xs.foldLeft(Vector.empty[EXPR]) {
-      case (init :+ INVALID(p1, _), INVALID(p2, _)) => init :+ INVALID(Pos(p1.start, p2.end), "can't parse the expression")
-      case (init, x)                                          => init :+ x
-    }
-  }
-
-  def apply(str: String): core.Parsed[Seq[EXPR], Char, String] = P(Start ~ statements ~ End).parse(str)
+  def apply(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
 }

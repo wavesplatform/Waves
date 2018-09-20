@@ -2,8 +2,8 @@ package com.wavesplatform.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
-import scorex.utils.ScorexLogging
 
 trait PeerDatabase extends AutoCloseable {
 

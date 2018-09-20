@@ -12,6 +12,7 @@ object BlockchainFeatures {
   val BurnAnyTokens                   = BlockchainFeature(6, "Burn Any Tokens")
   val FeeSponsorship                  = BlockchainFeature(7, "Fee Sponsorship")
   val FairPoS                         = BlockchainFeature(8, "Fair PoS")
+  val SmartAssets                     = BlockchainFeature(9, "Smart Assets")
 
   private val dict = Seq(
     SmallerMinimalGeneratingBalance,

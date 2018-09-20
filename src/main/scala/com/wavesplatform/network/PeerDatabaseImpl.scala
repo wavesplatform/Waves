@@ -6,10 +6,9 @@ import java.util.concurrent.TimeUnit
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.EvictingQueue
 import com.wavesplatform.settings.NetworkSettings
-import com.wavesplatform.utils.JsonFileStorage
+import com.wavesplatform.utils.{JsonFileStorage, ScorexLogging}
 import io.netty.channel.Channel
 import io.netty.channel.socket.nio.NioSocketChannel
-import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.collection._
@@ -45,7 +44,10 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
   }
 
   override def addCandidate(socketAddress: InetSocketAddress): Boolean = unverifiedPeers.synchronized {
-    val r = Option(peersPersistence.getIfPresent(socketAddress)).isEmpty && !unverifiedPeers.contains(socketAddress)
+    val r = !socketAddress.getAddress.isAnyLocalAddress &&
+      !(socketAddress.getAddress.isLoopbackAddress && socketAddress.getPort == settings.bindAddress.getPort) &&
+      Option(peersPersistence.getIfPresent(socketAddress)).isEmpty &&
+      !unverifiedPeers.contains(socketAddress)
     if (r) unverifiedPeers.add(socketAddress)
     r
   }
