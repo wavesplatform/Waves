@@ -182,7 +182,7 @@ linuxScriptReplacements += "detect-loader" ->
 inConfig(Debian)(
   Seq(
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
-    debianPackageDependencies += "java8-runtime-headless",
+    debianPackageDependencies += "default-jre-headless",
     serviceAutostart := false,
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm"))
   ))
