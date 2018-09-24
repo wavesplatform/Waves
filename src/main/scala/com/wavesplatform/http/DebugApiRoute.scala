@@ -196,7 +196,7 @@ case class DebugApiRoute(ws: WavesSettings,
   def rollback: Route = (path("rollback") & post & withAuth) {
     json[RollbackParams] { params =>
       if (ng.height - params.rollbackTo > LevelDBWriter.MAX_DEPTH - 10)
-        (StatusCodes.BadRequest, "Rollback of more than 1990 blocks is forbidden")
+        (StatusCodes.BadRequest, s"Rollback of more than ${LevelDBWriter.MAX_DEPTH - 10} blocks is forbidden")
       else {
         ng.blockAt(params.rollbackTo) match {
           case Some(block) =>
@@ -296,7 +296,7 @@ case class DebugApiRoute(ws: WavesSettings,
           .cond(
             ng.height - height < (LevelDBWriter.MAX_DEPTH - 10),
             (),
-            GenericError("Rollback of more than 1990 blocks is forbidden")
+            GenericError(s"Rollback of more than ${LevelDBWriter.MAX_DEPTH - 10} blocks is forbidden")
           )
       } yield signature
 
