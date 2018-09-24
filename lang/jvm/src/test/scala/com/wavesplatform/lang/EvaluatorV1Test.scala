@@ -773,4 +773,68 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       evalToBytes(toBytesString, CONST_STRING(s)) shouldBe Right(ByteVector(s.getBytes("UTF-8")))
     }
   }
+
+  property("each argument is evaluated maximum once for user function") {
+    var functionEvaluated = 0
+
+    val f = NativeFunction("F", 1, 258, LONG, "_" -> LONG) { _ =>
+      functionEvaluated = functionEvaluated + 1
+      Right(1L)
+    }
+
+    val doubleFst = UserFunction("ID", LONG, "x" -> LONG) {
+      FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
+    }
+
+    val context = Monoid.combine(PureContext.evalContext,
+                                 EvaluationContext(
+                                   typeDefs = Map.empty,
+                                   letDefs = Map.empty,
+                                   functions = Map(f.header -> f, doubleFst.header -> doubleFst)
+                                 ))
+
+    // g(...(g(f(1000)))))
+    val expr = (1 to 6).foldLeft(FUNCTION_CALL(f.header, List(CONST_LONG(1000)))) {
+      case (r, _) => FUNCTION_CALL(doubleFst.header, List(r))
+    }
+
+    ev[Long](context, expr)._2 shouldBe Right(64L)
+
+    functionEvaluated shouldBe 1
+  }
+
+  property("function parameters (REF) in body should be taken from the arguments, not from the outer context") {
+    val doubleFn = UserFunction("doubleFn", LONG, "x" -> LONG) {
+      FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
+    }
+
+    val subFn = UserFunction("mulFn", LONG, "y" -> LONG, "x" -> LONG) {
+      FUNCTION_CALL(subLong.header, List(REF("y"), REF("x")))
+    }
+
+    // let x = 3
+    // let y = 100
+    val context = Monoid.combine(
+      PureContext.evalContext,
+      EvaluationContext(
+        typeDefs = Map.empty,
+        letDefs = Map(
+          "x" -> LazyVal(EitherT.pure(3L)),
+          "y" -> LazyVal(EitherT.pure(100L))
+        ),
+        functions = Map(
+          doubleFn.header -> doubleFn,
+          subFn.header    -> subFn
+        )
+      )
+    )
+
+    // sub(dub(x), 7)
+    val expr1 = FUNCTION_CALL(subFn.header, List(FUNCTION_CALL(doubleFn.header, List(REF("x"))), CONST_LONG(7)))
+    ev[Long](context, expr1)._2 shouldBe Right(-1)
+
+    // sub(7, dub(x))
+    val expr2 = FUNCTION_CALL(subFn.header, List(CONST_LONG(7), FUNCTION_CALL(doubleFn.header, List(REF("x")))))
+    ev[Long](context, expr2)._2 shouldBe Right(1)
+  }
 }

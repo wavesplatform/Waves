@@ -191,7 +191,7 @@ object CompilerV1 {
     else {
       val typedExpressionArgumentsAndTypedPlaceholders = resolvedArgs.zip(argTypes)
 
-      val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case (typedExpr, tph) => (typedExpr._2, tph) }
+      val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case (typedExpr, tph) => (typedExpr._2, tph._2) }
       for {
         resolvedTypeParams <- TypeInferrer(typePairs, predefTypes).leftMap(Generic(p.start, p.end, _))
         args = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
@@ -242,8 +242,7 @@ object CompilerV1 {
       }
     }
 
-    val default: Either[CompilationError, Expressions.EXPR] = Right(
-      Expressions.FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "throw"), List.empty))
+    val default: Either[CompilationError, Expressions.EXPR] = Right(Expressions.FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "throw"), List.empty))
     cases.foldRight(default) {
       case (mc, furtherEi) =>
         furtherEi match {

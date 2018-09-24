@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext.Lenses._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.task.imports._
-import com.wavesplatform.lang.{ExecutionError, ExprEvaluator}
+import com.wavesplatform.lang.{ExecutionError, ExprEvaluator, TrampolinedExecResult}
 
 object EvaluatorV1 extends ExprEvaluator {
 
@@ -49,10 +49,22 @@ object EvaluatorV1 extends ExprEvaluator {
         .get(ctx)
         .get(header)
         .map {
-          case func: UserFunction => func.ev(args).pure[EvalM].flatMap(evalExpr)
+          case func: UserFunction =>
+            args
+              .traverse[EvalM, Any](evalExpr)
+              .flatMap { args =>
+                val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.letDefs) {
+                  case (r, (argValue, (argName, _))) => r + (argName -> LazyVal(argValue.pure[TrampolinedExecResult]))
+                }
+                local {
+                  set(ctx.copy(letDefs = letDefsWithArgs)).flatMap(_ => evalExpr(func.ev))
+                }
+              }
           case func: NativeFunction =>
             args
-              .traverse[EvalM, Any](a => evalExpr(a))
+              .traverse[EvalM, Any] { x =>
+                evalExpr(x)
+              }
               .map(func.eval)
               .flatMap(r => liftTER[Any](r.value))
         }
