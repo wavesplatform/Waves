@@ -17,6 +17,13 @@ trait TaskMFunctions {
       ref.write(s).map(_.asRight)
     }))
 
+  def local[S, E, A](fa: TaskM[S, E, A]): TaskM[S, E, A] = {
+    TaskM.fromKleisli(Kleisli((ref: CoevalRef[S]) => {
+      val newRef = ref.copy()
+      fa.inner.run(newRef)
+    }))
+  }
+
   def inspect[S, E, A](f: S => A): TaskM[S, E, A]                  = get[S, E].map(f)
   def inspectFlat[S, E, A](f: S => TaskM[S, E, A]): TaskM[S, E, A] = get[S, E].flatMap(f)
 

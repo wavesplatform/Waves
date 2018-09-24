@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 import cats.data.EitherT
 import com.wavesplatform.lang.TrampolinedExecResult
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, EXPR, LET}
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types._
 import monix.eval.Coeval
 
@@ -31,11 +31,7 @@ object NativeFunction {
 
 }
 
-case class UserFunction private (name: String, internalName: String, signature: FunctionTypeSignature, private val ev: EXPR) extends BaseFunction {
-  def inlineAsBlock(args: List[EXPR]): EXPR = args.zip(signature.args).foldLeft(ev) {
-    case (r, (arg, (argName, _))) => BLOCK(LET(argName, arg), r)
-  }
-}
+case class UserFunction private (name: String, internalName: String, signature: FunctionTypeSignature, ev: EXPR) extends BaseFunction
 
 object UserFunction {
 

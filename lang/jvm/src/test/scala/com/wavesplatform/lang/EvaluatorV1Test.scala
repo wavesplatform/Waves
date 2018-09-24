@@ -802,4 +802,31 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     functionEvaluated shouldBe 1
   }
+
+  property("function parameters (REF) in body should be taken from the arguments, not from the outer context") {
+    val doubleFn = UserFunction("doubleFn", LONG, "x" -> LONG) {
+      FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
+    }
+
+    val mulFn = UserFunction("mulFn", LONG, "y" -> LONG, "x" -> LONG) {
+      FUNCTION_CALL(mulLong.header, List(REF("y"), REF("x")))
+    }
+
+    val context = Monoid.combine(
+      PureContext.evalContext,
+      EvaluationContext(
+        typeDefs = Map.empty,
+        letDefs = Map("x" -> LazyVal(EitherT.pure(3L))),
+        functions = Map(
+          doubleFn.header -> doubleFn,
+          mulFn.header    -> mulFn
+        )
+      )
+    )
+
+    // let x = 3 # in context
+    // mul(dub(x), 7)
+    val expr = FUNCTION_CALL(mulFn.header, List(FUNCTION_CALL(doubleFn.header, List(REF("x"))), CONST_LONG(7)))
+    ev[Long](context, expr)._2 shouldBe Right(42)
+  }
 }

@@ -9,7 +9,6 @@ import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -100,7 +99,7 @@ package object utils extends ScorexLogging {
       val cost = func match {
         case f: UserFunction =>
           import f.signature.args
-          Coeval.evalOnce(ScriptEstimator(costs, f.inlineAsBlock(args.map(_ => TRUE).toList)).right.get - args.size)
+          Coeval.evalOnce(ScriptEstimator(costs, f.ev).right.get - args.size)
         case f: NativeFunction => Coeval.now(f.cost)
       }
       costs += func.header -> cost
