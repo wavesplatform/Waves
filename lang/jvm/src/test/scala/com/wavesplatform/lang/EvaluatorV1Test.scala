@@ -773,4 +773,33 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       evalToBytes(toBytesString, CONST_STRING(s)) shouldBe Right(ByteVector(s.getBytes("UTF-8")))
     }
   }
+
+  property("each argument is evaluated maximum once for user function") {
+    var functionEvaluated = 0
+
+    val f = NativeFunction("F", 1, 258, LONG, "_" -> LONG) { _ =>
+      functionEvaluated = functionEvaluated + 1
+      Right(1L)
+    }
+
+    val doubleFst = UserFunction("ID", LONG, "x" -> LONG) {
+      FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
+    }
+
+    val context = Monoid.combine(PureContext.evalContext,
+                                 EvaluationContext(
+                                   typeDefs = Map.empty,
+                                   letDefs = Map.empty,
+                                   functions = Map(f.header -> f, doubleFst.header -> doubleFst)
+                                 ))
+
+    // g(...(g(f(1000)))))
+    val expr = (1 to 6).foldLeft(FUNCTION_CALL(f.header, List(CONST_LONG(1000)))) {
+      case (r, _) => FUNCTION_CALL(doubleFst.header, List(r))
+    }
+
+    ev[Long](context, expr)._2 shouldBe Right(64L)
+
+    functionEvaluated shouldBe 1
+  }
 }

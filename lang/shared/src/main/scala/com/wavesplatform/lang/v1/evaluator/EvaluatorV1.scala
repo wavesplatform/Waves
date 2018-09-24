@@ -49,7 +49,12 @@ object EvaluatorV1 extends ExprEvaluator {
         .get(ctx)
         .get(header)
         .map {
-          case func: UserFunction => func.ev(args).pure[EvalM].flatMap(evalExpr)
+          case func: UserFunction =>
+            val wrappedFunc = args.zip(func.signature.args).foldLeft(func.ev) {
+              case (r, (arg, (name, _))) =>
+                BLOCK(LET(name, arg), r)
+            }
+            evalExpr(wrappedFunc)
           case func: NativeFunction =>
             args
               .traverse[EvalM, Any](a => evalExpr(a))
