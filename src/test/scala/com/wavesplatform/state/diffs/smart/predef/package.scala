@@ -18,13 +18,21 @@ package object predef {
     val Success(expr, _) = Parser(script)
     for {
       compileResult <- CompilerV1(dummyCompilerContext, expr)
-      (typedExpr, tpe) = compileResult
-      er               = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
+      (typedExpr, _) = compileResult
+      er             = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
       r <- er._2
     } yield r
   }
 
+  private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
+
   def scriptWithAllFunctions(tx: DataTransaction, t: TransferTransaction): String =
+    s"""${dropLastLine(scriptWithPureFunctions(tx, t))}
+       |${dropLastLine(scriptWithWavesFunctions(tx, t))}
+       |${dropLastLine(scriptWithCryptoFunctions)}
+       |if rnd then pure && waves else crypto""".stripMargin
+
+  def scriptWithPureFunctions(tx: DataTransaction, t: TransferTransaction): String =
     s"""
        | # Pure context
        | # 1) basic(+ eq) -> mulLong, divLong, modLong, sumLong, subLong, sumString, sumByteVector
@@ -90,8 +98,10 @@ package object predef {
        | let strOps = size("haha") != 0 && take("haha", 1) != "" && drop("haha", 0) != "" && takeRight("haha", 1) != "" && dropRight("haha", 0) != ""
        |
        | let pure = basic && ne && gteLong && getListSize && unary && frAction && bytesOps && strOps
-       |
-       | # Waves context
+       | pure""".stripMargin
+
+  def scriptWithWavesFunctions(tx: DataTransaction, t: TransferTransaction): String =
+    s""" # Waves context
        | let txById = match tx {
        |     case d: DataTransaction => true
        |     case d: TransferTransaction =>
@@ -140,7 +150,10 @@ package object predef {
        | let balances = assetBalance(tx.sender, unit) > 0 && wavesBalance(tx.sender) != 0
        |
        | let waves = txById && entries && balances && aFromPK && aFromStrOrRecip && height > 0
-       |
+       | waves""".stripMargin
+
+  def scriptWithCryptoFunctions: String =
+    s"""
        | # Crypto context
        | let bks = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58''
        | let sig = sigVerify(base58'333', base58'123', base58'567') != true
@@ -148,8 +161,6 @@ package object predef {
        | let str64 = fromBase64String(toBase64String(tx.id)) == tx.id
        |
        | let crypto = bks && sig && str58 && str64
-       |
-       | if rnd then pure && waves else crypto
-    """.stripMargin
+       | crypto""".stripMargin
 
 }
