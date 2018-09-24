@@ -1,13 +1,13 @@
-package com.wavesplatform.generator.utils
+package com.wavesplatform.dexgen.utils
 
 import java.util.concurrent.ThreadLocalRandom
 
-import com.wavesplatform.generator.utils.Implicits._
-import scorex.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.dexgen.utils.Implicits._
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1}
+import com.wavesplatform.transaction.{Proofs, Transaction}
 import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import scorex.transaction.transfer.{MassTransferTransaction, TransferTransactionV1}
-import scorex.transaction.{Proofs, Transaction}
 
 object Gen {
   private def random = ThreadLocalRandom.current

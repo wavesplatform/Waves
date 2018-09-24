@@ -1,30 +1,30 @@
-package com.wavesplatform.generator
+package com.wavesplatform.dexgen
 
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
+import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.crypto
-import com.wavesplatform.generator.Worker._
-import com.wavesplatform.generator.utils.{ApiRequests, GenOrderType}
+import com.wavesplatform.dexgen.Worker._
+import com.wavesplatform.dexgen.utils.{ApiRequests, GenOrderType}
 import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, OrderbookHistory, Transaction, UnexpectedStatusCodeException}
 import com.wavesplatform.it.util._
+import com.wavesplatform.matcher.AssetPairBuilder
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.utils.LoggerFacade
 import org.asynchttpclient.AsyncHttpClient
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
-import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
-import scorex.api.http.assets.SignedTransferV1Request
-import scorex.crypto.encode.Base58
-import scorex.transaction.AssetId
-import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.transaction.transfer.{TransferTransaction, TransferTransactionV1}
-import scorex.utils.LoggerFacade
 import settings.{GeneratorSettings, MatcherNodeSettings}
 
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 class Worker(workerSettings: Settings,
              generatorSettings: GeneratorSettings,
@@ -34,6 +34,8 @@ class Worker(workerSettings: Settings,
              ordersCount: Int,
              client: AsyncHttpClient)(implicit ec: ExecutionContext)
     extends ApiRequests(client) {
+
+  import AssetPairCreator._
 
   log.info("started worker " + orderType)
 
@@ -55,27 +57,37 @@ class Worker(workerSettings: Settings,
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(Random.nextInt(c.size))) else None
 
   def buyOrder(price: Long, amount: Long, buyer: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
-    val order = Order.buy(buyer, matcherPublicKey, pair, price, amount, now, now + 1.day.toMillis, fee)
-    log.info(s"[$tag] Buy ${order.idStr()}: $order")
+    to(matcherSettings.endpoint).orderHistory(buyer)
+    to(matcherSettings.endpoint).orderBook(pair)
+    val order = Order.buy(buyer, matcherPublicKey, pair, price, amount, now, now + 29.day.toMillis, fee)
+    log.info(s"[$tag] Buy ${order.id()}: $order")
     val response = to(matcherSettings.endpoint).placeOrder(order).andThen {
-      case Failure(e) => log.error(s"[$tag] Can't place buy order ${order.idStr()}: $e")
+      case Failure(e) => log.error(s"[$tag] Can't place buy order ${order.id()}: $e")
     }
-    log.info(order.idStr())
+    log.info(order.id().base58)
+    to(matcherSettings.endpoint).orderHistory(buyer)
+    to(matcherSettings.endpoint).orderBook(pair)
+    to(matcherSettings.endpoint).orderStatus(order.id().base58, pair)
     (order, response)
   }
 
   def sellOrder(price: Long, amount: Long, seller: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
-    val order = Order.sell(seller, matcherPublicKey, pair, price, amount, now, now + 1.day.toMillis, fee)
-    log.info(s"[$tag] Sell ${order.idStr()}: $order")
+    to(matcherSettings.endpoint).orderHistory(seller)
+    to(matcherSettings.endpoint).orderBook(pair)
+    val order = Order.sell(seller, matcherPublicKey, pair, price, amount, now, now + 29.day.toMillis, fee)
+    log.info(s"[$tag] Sell ${order.id()}: $order")
     val response = to(matcherSettings.endpoint).placeOrder(order).andThen {
-      case Failure(e) => log.error(s"[$tag] Can't place sell order ${order.idStr()}: $e")
+      case Failure(e) => log.error(s"[$tag] Can't place sell order ${order.id()}: $e")
     }
+    to(matcherSettings.endpoint).orderHistory(seller)
+    to(matcherSettings.endpoint).orderBook(pair)
+    to(matcherSettings.endpoint).orderStatus(order.id().base58, pair)
     (order, response)
   }
 
   def cancelOrder(pk: PrivateKeyAccount, pair: AssetPair, orderId: String)(implicit tag: String): Future[MatcherStatusResponse] = {
     log.info(s"[$tag] Cancel $orderId in $pair")
-    val request       = CancelOrderRequest(PublicKeyAccount(pk.publicKey), Base58.decode(orderId).get, Array.emptyByteArray)
+    val request       = CancelOrderRequest(PublicKeyAccount(pk.publicKey), ByteStr.decodeBase58(orderId).toOption, None, Array.emptyByteArray)
     val sig           = crypto.sign(pk, request.toSign)
     val signedRequest = request.copy(signature = sig)
     to(matcherSettings.endpoint).cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest).andThen {
@@ -135,30 +147,29 @@ class Worker(workerSettings: Settings,
   def send(orderType: GenOrderType.Value): Future[Any] = {
     implicit val tag: String = s"$orderType, ${Random.nextInt(1, 1000000)}"
 
+    val tradingAssetsSize = tradingAssets.size
+    val pair = createAssetPair(randomFrom(tradingAssets.dropRight(2).dropRight(tradingAssetsSize / 2)),
+                               randomFrom(tradingAssets.dropRight(2).takeRight(tradingAssetsSize / 2 - 1)))
+
     val work = orderType match {
       case GenOrderType.ActiveBuy =>
         val buyer = randomFrom(validAccounts).get
-        val pair  = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
-        buyOrder(DefaultPrice / 100, DefaultAmount, buyer, pair)._2
+        buyOrder(DefaultPrice - Random.nextInt(2, DefaultPrice / 10), DefaultAmount, buyer, pair)._2
 
       case GenOrderType.ActiveSell =>
         val seller = randomFrom(validAccounts).get
-        val pair   = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
-        sellOrder(DefaultPrice * 10, DefaultAmount, seller, pair)._2
+        sellOrder(DefaultPrice + Random.nextInt(2, DefaultPrice / 5), DefaultAmount, seller, pair)._2
 
       case GenOrderType.Buy =>
         val buyer = randomFrom(validAccounts).get
-        val pair  = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
-        buyOrder(DefaultPrice, DefaultAmount, buyer, pair)._2
+        buyOrder(DefaultPrice + Random.nextInt(2, 1000), DefaultAmount, buyer, pair)._2
 
       case GenOrderType.Sell =>
         val seller = randomFrom(validAccounts).get
-        val pair   = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
-        sellOrder(DefaultPrice, DefaultAmount, seller, pair)._2
+        sellOrder(DefaultPrice - Random.nextInt(2, 1000), DefaultAmount, seller, pair)._2
 
       case GenOrderType.Cancel =>
         val buyer = randomFrom(validAccounts).get
-        val pair  = AssetPair(randomFrom(tradingAssets.dropRight(2)), None)
         sellOrder(DefaultPrice * 15, DefaultAmount, buyer, pair)._2.flatMap { orderInfo =>
           cancelOrder(buyer, pair, orderInfo.message.id)
         }
@@ -243,8 +254,8 @@ class Worker(workerSettings: Settings,
 
 object Worker {
 
-  private val DefaultAmount = 10000
-  private val DefaultPrice  = 10000
+  private val DefaultAmount = 100000
+  private val DefaultPrice  = 5000000
 
   case class Settings(autoReconnect: Boolean, iterations: Int, delay: FiniteDuration, reconnectDelay: FiniteDuration)
 
@@ -265,14 +276,9 @@ object Worker {
 object AssetPairCreator {
   val WavesName = "WAVES"
 
-  private def extractAssetId(a: String): Try[Option[AssetId]] = a match {
-    case `WavesName` => Success(None)
-    case other       => ByteStr.decodeBase58(other).map(Option(_))
-  }
-
-  def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =
-    for {
-      a1 <- extractAssetId(amountAsset)
-      a2 <- extractAssetId(priceAsset)
-    } yield AssetPair(a1, a2)
+  def createAssetPair(asset1: Option[AssetId], asset2: Option[AssetId]): AssetPair =
+    if (AssetPairBuilder.assetIdOrdering.compare(asset1, asset2) > 0)
+      AssetPair(asset1, asset2)
+    else
+      AssetPair(asset2, asset1)
 }

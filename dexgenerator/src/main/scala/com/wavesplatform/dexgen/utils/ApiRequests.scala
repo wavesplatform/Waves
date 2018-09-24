@@ -1,16 +1,18 @@
-package com.wavesplatform.generator.utils
+package com.wavesplatform.dexgen.utils
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
-import akka.http.scaladsl.model.headers.ContentDispositionTypes.attachment
 import com.google.common.primitives.Longs
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest, SignedTransferV1Request}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.{
   AssetBalance,
   Balance,
   MatcherResponse,
   MatcherStatusResponse,
+  OrderBookResponse,
   OrderbookHistory,
   ResponseFutureExt,
   Transaction,
@@ -20,21 +22,18 @@ import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
-
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1}
+import com.wavesplatform.utils.ScorexLogging
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
-import scorex.account.PrivateKeyAccount
-import scorex.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest, SignedTransferV1Request}
 import scorex.crypto.encode.Base58
-import scorex.transaction.AssetId
-import scorex.transaction.assets.exchange.Order
-import scorex.transaction.assets.IssueTransactionV1
-import scorex.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
-import scorex.transaction.transfer.{MassTransferTransaction, TransferTransactionV1}
-import scorex.utils.ScorexLogging
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -137,6 +136,10 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     def matcherPost[A: Writes](path: String, body: A)(implicit tag: String): Future[Response] =
       post(s"$endpoint$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
+    def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200)(
+        implicit tag: String): Future[Response] =
+      retrying(f(_get(s"$endpoint$path")).build(), statusCode = statusCode)
+
     def placeOrder(order: Order)(implicit tag: String): Future[MatcherResponse] =
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
@@ -157,9 +160,6 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     def signedIssue(issue: SignedIssueV1Request)(implicit tag: String): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
 
-    //    def signedMassTransfer(massTx: SignedMassTransferRequest): Future[Transaction] =
-    //      postJson("/assets/broadcast/issue", massTx).as[Transaction]
-
     def orderbookByPublicKey(publicKey: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity)(
         implicit tag: String): Future[Seq[OrderbookHistory]] =
       retrying {
@@ -169,11 +169,25 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
           .build()
       }.as[Seq[OrderbookHistory]]
 
-    //    def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
-    //      matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
+    def parseAssetPair(assetPair: AssetPair): (String, String) = {
+      val amountAsset = AssetPair.assetIdStr(assetPair.amountAsset)
+      val priceAsset  = AssetPair.assetIdStr(assetPair.priceAsset)
+      (amountAsset, priceAsset)
+    }
+
+    def orderBook(assetPair: AssetPair)(implicit tag: String): Future[OrderBookResponse] = {
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset").as[OrderBookResponse]
+    }
+
+    def orderStatus(orderId: String, assetPair: AssetPair)(implicit tag: String): Future[MatcherStatusResponse] = {
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset/$orderId")
+        .as[MatcherStatusResponse]
+    }
 
     def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest)(implicit tag: String): Future[MatcherStatusResponse] =
-      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
+      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request).as[MatcherStatusResponse]
 
     def broadcastRequest[A: Writes](req: A)(implicit tag: String): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 

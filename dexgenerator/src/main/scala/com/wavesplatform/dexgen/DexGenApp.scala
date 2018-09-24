@@ -1,16 +1,23 @@
-package com.wavesplatform.generator
+package com.wavesplatform.dexgen
 
 import java.util.concurrent.Executors
 
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.generator.cli.ScoptImplicits
-import com.wavesplatform.generator.config.FicusImplicits
-import com.wavesplatform.generator.utils.{ApiRequests, GenOrderType}
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest}
+import com.wavesplatform.dexgen.cli.ScoptImplicits
+import com.wavesplatform.dexgen.config.FicusImplicits
+import com.wavesplatform.dexgen.utils.{ApiRequests, GenOrderType}
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.utils.LoggerFacade
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
@@ -19,13 +26,6 @@ import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
 import scopt.OptionParser
-import scorex.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
-import scorex.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest}
-import scorex.transaction.AssetId
-import scorex.transaction.assets.{IssueTransactionV1}
-import scorex.transaction.transfer.MassTransferTransaction
-import scorex.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import scorex.utils.LoggerFacade
 import settings.GeneratorSettings
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -33,7 +33,7 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
 
-object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
+object DexGenApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
 
   implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // IDEA bug
 
@@ -74,14 +74,14 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
   def issueAssets(endpoint: String, richAddressSeed: String, n: Int)(implicit tag: String): Seq[AssetId] = {
     val node = api.to(endpoint)
 
-    val assetsTx: Seq[IssueTransactionV1] = (1 to n).map { _ =>
+    val assetsTx: Seq[IssueTransactionV1] = (1 to n).map { i =>
       IssueTransactionV1
         .selfSigned(
           PrivateKeyAccount.fromSeed(richAddressSeed).right.get,
-          name = s"asset$n".getBytes(),
-          description = "asset description".getBytes(),
-          quantity = 99999999999L,
-          decimals = 8,
+          name = s"asset$i".getBytes(),
+          description = s"asset description - $i".getBytes(),
+          quantity = 99999999999999999L,
+          decimals = 2,
           reissuable = false,
           fee = 100000000,
           timestamp = System.currentTimeMillis()
@@ -101,7 +101,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       }
 
     val allIssued: Future[Seq[Transaction]] = Future.sequence(issued)
-    Await.result(allIssued, 30.seconds)
+    Await.result(allIssued, 120.seconds)
     tradingAssets
   }
 
@@ -122,7 +122,11 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       node
         .balance(richAccountPk.address, assetId)
         .flatMap { balance =>
-          val transferAmount  = (balance / accounts.size) / 1000
+          val transferAmount =
+            if (assetId.isEmpty)
+              30000000000l
+            else
+              balance / accounts.size / 1000
           val assetsTransfers = parsedTransfersList(endpoint, assetId, transferAmount, richAccountPk, accounts)
           val tx = MassTransferTransaction
             .selfSigned(
@@ -131,7 +135,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
               sender = richAccountPk,
               transfers = assetsTransfers,
               timestamp = System.currentTimeMillis(),
-              feeAmount = 100000 + 50000 * assetsTransfers.size,
+              feeAmount = 200000 + 50000 * (assetsTransfers.size + 1),
               attachment = Array.emptyByteArray
             )
             .right
@@ -170,13 +174,15 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val endpoint = finalConfig.sendTo.head.getHostString
 
       val tradingAssets = issueAssets(endpoint, finalConfig.richAccounts.head, finalConfig.assetPairsNum)
+      Thread.sleep(5000)
 
       val transfers = Seq(
         massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, None +: tradingAssets.dropRight(2).map(Option(_))),
         massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.fakeAccounts, None +: tradingAssets.takeRight(2).map(Option(_)))
       )
 
-      Await.ready(Future.sequence(transfers), 30.seconds)
+      Await.ready(Future.sequence(transfers), 120.seconds)
+      Thread.sleep(10000)
 
       log.info(s"Running ${ordersDistr.size} workers")
       val workers = ordersDistr.map(p => new Worker(finalConfig.worker, finalConfig, finalConfig.matcherConfig, tradingAssets, p._1, p._2, client))

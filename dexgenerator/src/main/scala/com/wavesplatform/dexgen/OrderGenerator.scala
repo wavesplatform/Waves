@@ -1,4 +1,4 @@
-package com.wavesplatform.generator
+package com.wavesplatform.dexgen
 
 import scala.concurrent.Future
 

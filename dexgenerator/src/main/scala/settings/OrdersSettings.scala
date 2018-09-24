@@ -1,8 +1,8 @@
 package settings
 
 import cats.Show
-import com.wavesplatform.generator.utils.GenOrderType
-import scorex.account.PrivateKeyAccount
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.dexgen.utils.GenOrderType
 import settings.OrdersSettings.Settings
 
 class OrdersSettings(settings: Settings, val accounts: Seq[PrivateKeyAccount], val assets: Int) {}

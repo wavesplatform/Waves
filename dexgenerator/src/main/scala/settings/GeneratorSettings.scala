@@ -4,10 +4,9 @@ import java.net.InetSocketAddress
 
 import cats.Show
 import cats.implicits.showInterpolator
-import com.wavesplatform.generator._
-import com.wavesplatform.state.ByteStr
-import scorex.account.PrivateKeyAccount
-import scorex.utils.randomBytes
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.dexgen._
+import com.wavesplatform.wallet.Wallet
 
 case class GeneratorSettings(chainId: String,
                              richAccounts: Seq[String],
@@ -24,15 +23,14 @@ case class GeneratorSettings(chainId: String,
   //accounts
   val richPrivateKeyAccounts: Seq[PrivateKeyAccount] = richAccounts.map(s => PrivateKeyAccount.fromSeed(s).right.get)
 
-  def accounts(n: Int): Seq[PrivateKeyAccount] = {
-    (1 to n).map { _ =>
-      PrivateKeyAccount.fromSeed(ByteStr(randomBytes(64)).base58).right.get
+  def accounts(startNonce: Int, end: Int): Seq[PrivateKeyAccount] =
+    (startNonce to end).map { i =>
+      Wallet.generateNewAccount(Array.emptyByteArray, i)
     }
-  }
 
-  val validAccounts: Seq[PrivateKeyAccount]   = accounts(accountsDistribution.valid)
-  val invalidAccounts: Seq[PrivateKeyAccount] = accounts(accountsDistribution.invalid)
-  val fakeAccounts: Seq[PrivateKeyAccount]    = accounts(accountsDistribution.fake)
+  val validAccounts: Seq[PrivateKeyAccount]   = accounts(1, accountsDistribution.valid)
+  val invalidAccounts: Seq[PrivateKeyAccount] = accounts(accountsDistribution.valid + 1, accountsDistribution.invalid)
+  val fakeAccounts: Seq[PrivateKeyAccount]    = accounts(accountsDistribution.valid + accountsDistribution.invalid + 1, accountsDistribution.fake)
 
 }
 

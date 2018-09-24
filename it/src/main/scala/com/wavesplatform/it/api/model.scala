@@ -1,8 +1,8 @@
 package com.wavesplatform.it.api
 
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import play.api.libs.json._
-import scorex.transaction.assets.exchange.AssetPair
 
 import scala.util.{Failure, Success}
 
@@ -213,7 +213,7 @@ object OrderbookHistory {
 
   implicit val assetPairFormat: Format[AssetPair] = Json.format[AssetPair]
 
-  implicit val orderbookHistory: Format[OrderBookHistory] = Json.format
+  implicit val orderbookHistory: Format[OrderbookHistory] = Json.format
 }
 
 case class PairResponse(amountAsset: String, priceAsset: String)

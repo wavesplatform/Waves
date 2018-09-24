@@ -1,7 +1,7 @@
-package com.wavesplatform.generator
+package com.wavesplatform.dexgen
 
 import cats.Show
-import com.wavesplatform.generator.AccountsDistribution.Settings
+import com.wavesplatform.dexgen.AccountsDistribution.Settings
 
 class AccountsDistribution(settings: Settings, valid: Int, invalid: Int, fake: Int) {}
 

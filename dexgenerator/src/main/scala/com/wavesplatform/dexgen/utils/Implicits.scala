@@ -1,4 +1,4 @@
-package com.wavesplatform.generator.utils
+package com.wavesplatform.dexgen.utils
 
 import java.util.concurrent.ThreadLocalRandom
 
