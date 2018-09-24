@@ -5,12 +5,11 @@ import monix.execution.schedulers.SchedulerService
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observer
 import org.scalatest.{BeforeAndAfterAll, Suite}
-import scorex.account.PrivateKeyAccount
-import scorex.block.{Block, MicroBlock, SignerData}
-import scorex.crypto.signatures.Curve25519.SignatureLength
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.transfer._
-
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.{Block, MicroBlock, SignerData}
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.transfer._
+import scorex.crypto.signatures.Curve25519._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 

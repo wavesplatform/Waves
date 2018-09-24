@@ -38,7 +38,7 @@ object Types {
 
   def toFinal(resultType: TYPE, resolvedPlaceholders: Map[TYPEPARAM, FINAL]): FINAL = {
     resultType match {
-      case NOTHING               => ??? // no functions require nothing
+      case NOTHING               => NOTHING
       case tp: TYPEPARAM         => resolvedPlaceholders(tp)
       case PARAMETERIZEDUNION(l) => UNION.create(l.map(l => toFinal(l, resolvedPlaceholders)))
       case PARAMETERIZEDLIST(t)  => LIST(toFinal(t, resolvedPlaceholders))

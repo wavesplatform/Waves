@@ -4,38 +4,38 @@ import java.util.concurrent.TimeUnit
 
 import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
-import scorex.block.Block.BlockId
-import scorex.block.{Block, MicroBlock}
-import scorex.transaction.{DiscardedMicroBlocks, Transaction}
-import scorex.utils.ScorexLogging
+import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
-class NgState(val base: Block, val baseBlockDiff: Diff, val approvedFeatures: Set[Short]) extends ScorexLogging {
+class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val approvedFeatures: Set[Short]) extends ScorexLogging {
 
   private val MaxTotalDiffs = 3
 
-  private val microDiffs: MMap[BlockId, (Diff, Long)] = MMap.empty
-  private val micros: MList[MicroBlock]               = MList.empty // fresh head
+  private val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
+  private val micros: MList[MicroBlock]                     = MList.empty // fresh head
   private val totalBlockDiffCache = CacheBuilder
     .newBuilder()
     .maximumSize(MaxTotalDiffs)
     .expireAfterWrite(10, TimeUnit.MINUTES)
-    .build[BlockId, Diff]()
+    .build[BlockId, (Diff, Long)]()
 
   def microBlockIds: Seq[BlockId] = micros.map(_.totalResBlockSig).toList
 
-  private def diffFor(totalResBlockSig: BlockId): Diff =
+  private def diffFor(totalResBlockSig: BlockId): (Diff, Long) =
     if (totalResBlockSig == base.uniqueId)
-      baseBlockDiff
+      (baseBlockDiff, baseBlockCarry)
     else
       Option(totalBlockDiffCache.getIfPresent(totalResBlockSig)) match {
         case Some(d) => d
         case None =>
-          val prevResBlockSig  = micros.find(_.totalResBlockSig == totalResBlockSig).get.prevResBlockSig
-          val prevResBlockDiff = Option(totalBlockDiffCache.getIfPresent(prevResBlockSig)).getOrElse(diffFor(prevResBlockSig))
-          val currentMicroDiff = microDiffs(totalResBlockSig)._1
-          val r                = Monoid.combine(prevResBlockDiff, currentMicroDiff)
+          val prevResBlockSig          = micros.find(_.totalResBlockSig == totalResBlockSig).get.prevResBlockSig
+          val (prevDiff, prevCarry)    = Option(totalBlockDiffCache.getIfPresent(prevResBlockSig)).getOrElse(diffFor(prevResBlockSig))
+          val (currDiff, currCarry, _) = microDiffs(totalResBlockSig)
+          val r                        = (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry)
           totalBlockDiffCache.put(totalResBlockSig, r)
           r
       }
@@ -54,8 +54,12 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val approvedFeatures: Se
       base.copy(signerData = base.signerData.copy(signature = micros.head.totalResBlockSig), transactionData = transactions)
     }
 
-  def totalDiffOf(id: BlockId): Option[(Block, Diff, DiscardedMicroBlocks)] =
-    forgeBlock(id).map { case (b, txs) => (b, diffFor(id), txs) }
+  def totalDiffOf(id: BlockId): Option[(Block, Diff, Long, DiscardedMicroBlocks)] =
+    forgeBlock(id).map {
+      case (b, txs) =>
+        val (d, c) = diffFor(id)
+        (b, d, c, txs)
+    }
 
   def bestLiquidDiff: Diff = micros.headOption.fold(baseBlockDiff)(m => totalDiffOf(m.totalResBlockSig).get._2)
 
@@ -90,14 +94,16 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val approvedFeatures: Se
 
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
     val blockId = micros
-      .find(micro => microDiffs(micro.totalResBlockSig)._2 <= maxTimeStamp)
+      .find(micro => microDiffs(micro.totalResBlockSig)._3 <= maxTimeStamp)
       .map(_.totalResBlockSig)
       .getOrElse(base.uniqueId)
     BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
 
-  def append(m: MicroBlock, diff: Diff, timestamp: Long): Unit = {
-    microDiffs.put(m.totalResBlockSig, (diff, timestamp))
+  def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
+    microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
     micros.prepend(m)
   }
+
+  def carryFee: Long = baseBlockCarry + microDiffs.values.map(_._2).sum
 }

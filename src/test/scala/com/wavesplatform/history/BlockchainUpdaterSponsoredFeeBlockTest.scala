@@ -8,11 +8,11 @@ import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.PrivateKeyAccount
-import scorex.crypto.signatures.Curve25519.KeyLength
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
-import scorex.transaction.transfer._
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.transfer._
+import scorex.crypto.signatures.Curve25519._
 
 class BlockchainUpdaterSponsoredFeeBlockTest
     extends PropSpec

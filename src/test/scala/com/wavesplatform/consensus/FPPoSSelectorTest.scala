@@ -1,27 +1,23 @@
 package com.wavesplatform.consensus
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.Block
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ProduceError}
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
+import com.wavesplatform.utils.{Time, TimeImpl}
 import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.PrivateKeyAccount
-import scorex.block.Block
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{BlockchainUpdater, GenesisTransaction}
-import scorex.utils.{Time, TimeImpl}
 
 import scala.concurrent.duration._
 import scala.util.Random
 
-/***
-  * Tests for PoSSelector with activated FairPoS
-  */
 class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen {
 
   import FPPoSSelectorTest._
@@ -206,8 +202,9 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   def withEnv(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: Env => Unit): Unit = {
     val time          = new TimeImpl
     val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
-    val settings      = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, WavesSettings.fromConfig(loadConfig(ConfigFactory.load())), time)
+    val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, time)
     val pos           = new PoSSelector(bcu, settings.blockchainSettings)
     try {
       val (accounts, blocks) = gen(time).sample.get

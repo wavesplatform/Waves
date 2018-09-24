@@ -46,16 +46,23 @@ object Common {
   val pointTypeA = CaseType("PointA", List("X"  -> LONG, "YA" -> LONG))
   val pointTypeB = CaseType("PointB", List("X"  -> LONG, "YB" -> LONG))
   val pointTypeC = CaseType("PointC", List("YB" -> LONG))
+  val pointTypeD = CaseType("PointD", List("YB" -> UNION(LONG, UNIT)))
 
   val AorB    = UNION(pointTypeA.typeRef, pointTypeB.typeRef)
   val AorBorC = UNION(pointTypeA.typeRef, pointTypeB.typeRef, pointTypeC.typeRef)
   val BorC    = UNION(pointTypeB.typeRef, pointTypeC.typeRef)
+  val CorD    = UNION(pointTypeC.typeRef, pointTypeD.typeRef)
 
-  val pointAInstance = CaseObj(pointTypeA.typeRef, Map("X"  -> 3L, "YA" -> 40L))
-  val pointBInstance = CaseObj(pointTypeB.typeRef, Map("X"  -> 3L, "YB" -> 41L))
-  val pointCInstance = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
+  val pointAInstance     = CaseObj(pointTypeA.typeRef, Map("X" -> 3L, "YA" -> 40L))
+  val pointBInstance     = CaseObj(pointTypeB.typeRef, Map("X" -> 3L, "YB" -> 41L))
+  val pointCInstance     = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
+  val pointDInstance1    = CaseObj(pointTypeD.typeRef, Map("YB" -> 43L))
+  private val unit: Unit = ()
+  val pointDInstance2    = CaseObj(pointTypeD.typeRef, Map("YB" -> unit))
 
-  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC) ++ Seq(UnionType("PointAB", AorB.l), UnionType("PointBC", BorC.l))
+  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC, pointTypeD) ++ Seq(UnionType("PointAB", AorB.l),
+                                                                               UnionType("PointBC", BorC.l),
+                                                                               UnionType("PointCD", CorD.l))
 
   def sampleUnionContext(instance: CaseObj) =
     EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)

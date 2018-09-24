@@ -27,10 +27,10 @@ trait DataItem[T] {
 }
 
 object DataItem {
-  case class Lng(k: String, v: Long)       extends DataItem[Long] { val key = k; val value = v }
-  case class Bool(k: String, v: Boolean)   extends DataItem[Boolean] { val key = k; val value = v }
+  case class Lng(k: String, v: Long)       extends DataItem[Long]       { val key = k; val value = v }
+  case class Bool(k: String, v: Boolean)   extends DataItem[Boolean]    { val key = k; val value = v }
   case class Bin(k: String, v: ByteVector) extends DataItem[ByteVector] { val key = k; val value = v }
-  case class Str(k: String, v: String)     extends DataItem[String] { val key = k; val value = v }
+  case class Str(k: String, v: String)     extends DataItem[String]     { val key = k; val value = v }
 }
 
 case class Ord(id: ByteVector,
@@ -44,7 +44,8 @@ case class Ord(id: ByteVector,
                timestamp: Long,
                expiration: Long,
                matcherFee: Long,
-               signature: ByteVector)
+               bodyBytes: ByteVector,
+               proofs: IndexedSeq[ByteVector])
 trait Tx
 object Tx {
 
@@ -52,7 +53,7 @@ object Tx {
   case class Payment(p: Proven, amount: Long, recipient: Recipient)      extends Tx
   case class Transfer(p: Proven,
                       feeAssetId: Option[ByteVector],
-                      transferAssetId: Option[ByteVector],
+                      assetId: Option[ByteVector],
                       amount: Long,
                       recipient: Recipient,
                       attachment: ByteVector)

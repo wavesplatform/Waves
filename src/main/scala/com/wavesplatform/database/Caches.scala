@@ -5,10 +5,11 @@ import java.util
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.state._
-import scorex.account.{Address, Alias}
-import scorex.block.Block
-import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction}
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.AssetId
 
 import scala.collection.JavaConverters._
 
@@ -91,6 +92,7 @@ trait Caches extends Blockchain {
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   protected def doAppend(block: Block,
+                         carryFee: Long,
                          addresses: Map[Address, BigInt],
                          wavesBalances: Map[BigInt, Long],
                          assetBalances: Map[BigInt, Map[ByteStr, Long]],
@@ -105,7 +107,7 @@ trait Caches extends Blockchain {
                          aliases: Map[Alias, BigInt],
                          sponsorship: Map[AssetId, Sponsorship]): Unit
 
-  override def append(diff: Diff, block: Block): Unit = {
+  override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
     heightCache += 1
     scoreCache += block.blockScore()
     lastBlockCache = Some(block)
@@ -161,6 +163,7 @@ trait Caches extends Blockchain {
 
     doAppend(
       block,
+      carryFee,
       newAddressIds,
       wavesBalances.result(),
       assetBalances.result(),

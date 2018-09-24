@@ -3,12 +3,12 @@ package com.wavesplatform.metrics
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
+import com.wavesplatform.utils.{ScorexLogging, TimeImpl}
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
-import scorex.utils.{ScorexLogging, TimeImpl}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -45,7 +45,7 @@ object Metrics extends ScorexLogging {
       if (settings.enable) {
         import config.{influxDb => dbSettings}
 
-        log.info(s"Metrics are enabled and will be sent to ${dbSettings.uri}/${dbSettings.db}")
+        log.info(s"Precise metrics are enabled and will be sent to ${dbSettings.uri}/${dbSettings.db}")
         try {
           val x = if (dbSettings.username.nonEmpty && dbSettings.password.nonEmpty) {
             InfluxDBFactory.connect(

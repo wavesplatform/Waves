@@ -11,21 +11,18 @@ import com.wavesplatform.state._
 import com.wavesplatform.utils.dummyCompilerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, Json}
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.Proofs
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer._
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
 
 class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private def pkFromAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).explicitGet()
-
   private val fourthAddress: String = sender.createAddress()
 
-  private val acc0 = pkFromAddress(firstAddress)
-  private val acc1 = pkFromAddress(secondAddress)
-  private val acc2 = pkFromAddress(thirdAddress)
-  private val acc3 = pkFromAddress(fourthAddress)
+  private val acc0 = pkByAddress(firstAddress)
+  private val acc1 = pkByAddress(secondAddress)
+  private val acc2 = pkByAddress(thirdAddress)
+  private val acc3 = pkByAddress(fourthAddress)
 
   test("setup acc0 with 1 waves") {
     val tx =
@@ -62,8 +59,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
          AC && BC
 
       """.stripMargin).get.value
-      assert(untyped.size == 1)
-      CompilerV1(dummyCompilerContext, untyped.head).explicitGet()._1
+      CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
     }
 
     val script = ScriptV1(scriptText).explicitGet()

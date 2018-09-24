@@ -11,12 +11,12 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scorex.api.http.ScriptExecutionError
-import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer._
-import scorex.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Proofs}
+import com.wavesplatform.api.http.ScriptExecutionError
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Proofs}
 
 class OracleDataTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions
@@ -55,8 +55,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                                    |}""".stripMargin
       setScript <- {
         val untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
-        assert(untypedAllFieldsRequiredScript.size == 1)
-        val typedAllFieldsRequiredScript = CompilerV1(dummyCompilerContext, untypedAllFieldsRequiredScript.head).explicitGet()._1
+        val typedAllFieldsRequiredScript   = CompilerV1(dummyCompilerContext, untypedAllFieldsRequiredScript).explicitGet()._1
         selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
       }
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)

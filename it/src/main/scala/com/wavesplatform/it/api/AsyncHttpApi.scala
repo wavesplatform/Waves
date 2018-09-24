@@ -4,12 +4,21 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
+import com.wavesplatform.api.http.PeersApiRoute.{ConnectReq, connectFormat}
+import com.wavesplatform.api.http.alias.CreateAliasV1Request
+import com.wavesplatform.api.http.assets._
+import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
+import com.wavesplatform.api.http.{AddressApiRoute, DataRequest}
 import com.wavesplatform.features.api.ActivationStatus
-import com.wavesplatform.http.api_key
+import com.wavesplatform.http.DebugApiRoute._
+import com.wavesplatform.http.DebugMessage._
+import com.wavesplatform.http.{DebugMessage, RollbackParams, api_key}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{DataEntry, Portfolio}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.transfer._
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -17,16 +26,6 @@ import org.scalactic.source.Position
 import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
-import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
-import scorex.api.http.alias.CreateAliasV1Request
-import scorex.api.http.assets._
-import scorex.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
-import scorex.api.http.{AddressApiRoute, DataRequest}
-import scorex.transaction.transfer.MassTransferTransaction.Transfer
-import scorex.transaction.transfer._
-import scorex.waves.http.DebugApiRoute._
-import scorex.waves.http.DebugMessage._
-import scorex.waves.http.{DebugMessage, RollbackParams}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -144,6 +143,8 @@ object AsyncHttpApi extends Assertions {
 
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
+    def getAddresses: Future[Seq[String]] = get(s"/addresses").as[Seq[String]]
+
     def scriptInfo(address: String): Future[AddressApiRoute.AddressScriptInfo] =
       get(s"/addresses/scriptInfo/$address").as[AddressApiRoute.AddressScriptInfo]
 
@@ -171,6 +172,8 @@ object AsyncHttpApi extends Assertions {
     )
 
     def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 5.seconds)
+
+    def rawTransactionInfo(txId: String): Future[JsValue] = get(s"/transactions/info/$txId").map(r => Json.parse(r.getResponseBody))
 
     def transactionInfo(txId: String): Future[TransactionInfo] = get(s"/transactions/info/$txId").as[TransactionInfo]
 
@@ -270,7 +273,7 @@ object AsyncHttpApi extends Assertions {
     def signedIssue(issue: SignedIssueV1Request): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
 
-    def batchSignedTransfer(transfers: Seq[SignedTransferV1Request], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
+    def batchSignedTransfer(transfers: Seq[SignedTransferV2Request], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")
         .setHeader("Content-type", "application/json")
         .withApiKey(n.apiKey)
@@ -482,19 +485,24 @@ object AsyncHttpApi extends Assertions {
       n.assetBalance(acc, assetIdString).map(_.balance shouldBe balance)
     }
 
+    def calculateFee(jsobj: JsObject): Future[FeeInfo] =
+      postJsObjectWithApiKey("/transactions/calculateFee", jsobj).as[FeeInfo]
+
   }
 
   implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers {
+    def height: Future[Seq[Int]] = traverse(nodes)(_.height)
+
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =
       for {
         allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
-        _            <- traverse(nodes)(_.waitForHeight(allHeights.max + 2))
+        _            <- traverse(nodes)(_.waitForHeight(allHeights.max + 1))
         finalHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
       } yield all(finalHeights).shouldBe(finalHeights.head)
 
     def waitForHeightArise(): Future[Unit] =
       for {
-        height <- traverse(nodes)(_.height).map(_.max)
+        height <- height.map(_.max)
         _      <- traverse(nodes)(_.waitForHeight(height + 1))
       } yield ()
 

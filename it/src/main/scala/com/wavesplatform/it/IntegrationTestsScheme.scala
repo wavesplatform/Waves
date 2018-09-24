@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import scorex.account.AddressScheme
+import com.wavesplatform.account.AddressScheme
 
 trait IntegrationTestsScheme {
   AddressScheme.current = new AddressScheme {

@@ -3,10 +3,10 @@ package com.wavesplatform.network.client
 import java.io.IOException
 
 import com.wavesplatform.network._
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel._
 import io.netty.channel.socket.SocketChannel
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import scorex.utils.ScorexLogging
 
 import scala.concurrent.Promise
 import scala.concurrent.duration._
@@ -54,6 +54,6 @@ class LegacyChannelInitializer(handshake: Handshake, promise: Promise[Channel]) 
         new ClientHandshakeHandler(handshake, promise),
         new LengthFieldPrepender(lengthFieldLength),
         new LengthFieldBasedFrameDecoder(maxFieldLength, 0, lengthFieldLength, 0, lengthFieldLength),
-        new LegacyFrameCodec(PeerDatabase.NoOp)
+        new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes)
       )
 }

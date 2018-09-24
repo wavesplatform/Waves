@@ -8,9 +8,9 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state.{EitherExt2, Sponsorship}
 import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
-import scorex.account.PrivateKeyAccount
-import scorex.api.http.assets.SignedIssueV1Request
-import scorex.transaction.assets.IssueTransactionV1
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.api.http.assets.SignedIssueV1Request
+import com.wavesplatform.transaction.assets.IssueTransactionV1
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -70,7 +70,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 object CustomFeeTransactionSuite {
   val minerAddress             = Default(0).getString("address")
   val senderAddress            = Default(3).getString("address")
-  val defaultAssetQuantity     = 1000000
+  val defaultAssetQuantity     = 999999999999l
   val featureCheckBlocksPeriod = 13
 
   private val seed = Default(3).getString("account-seed")
@@ -117,7 +117,7 @@ object CustomFeeTransactionSuite {
       quantity,
       decimals,
       reissuable,
-      fee,
+      issueFee,
       timestamp,
       signature.base58
     )

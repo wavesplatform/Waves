@@ -1,5 +1,7 @@
 package com.wavesplatform.utx
 
+import java.time.Duration
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
@@ -10,20 +12,20 @@ import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
 import kamon.Kamon
-import kamon.metric.instrument.{Time => KamonTime}
+import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import scorex.account.Address
-import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
-import scorex.transaction._
-import scorex.transaction.assets.ReissueTransaction
-import scorex.transaction.transfer._
-import scorex.utils.{ScorexLogging, Time}
+import com.wavesplatform.account.Address
+import com.wavesplatform.consensus.TransactionsOrdering
+import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.ReissueTransaction
+import com.wavesplatform.transaction.transfer._
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration._
+import scala.concurrent.duration.DurationLong
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculator, fs: FunctionalitySettings, utxSettings: UtxSettings)
@@ -53,20 +55,18 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
     scheduler.shutdown()
   }
 
-  private val utxPoolSizeStats    = Kamon.metrics.minMaxCounter("utx-pool-size", 500.millis)
-  private val processingTimeStats = Kamon.metrics.histogram("utx-transaction-processing-time", KamonTime.Milliseconds)
-  private val putRequestStats     = Kamon.metrics.counter("utx-pool-put-if-new")
+  private val utxPoolSizeStats    = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
+  private val processingTimeStats = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
+  private val putRequestStats     = Kamon.counter("utx-pool-put-if-new")
 
   private def removeExpired(currentTs: Long): Unit = {
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
 
     transactions.values.asScala
-      .filter(isExpired)
-      .foreach { tx =>
-        transactions.remove(tx.id())
-        pessimisticPortfolios.remove(tx.id())
-        utxPoolSizeStats.decrement()
+      .collect {
+        case tx if isExpired(tx) => tx.id()
       }
+      .foreach(remove)
   }
 
   override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = putIfNew(blockchain, tx)
@@ -97,12 +97,13 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
   }
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
-    txs.view.map(_.id()).foreach { id =>
-      Option(transactions.remove(id)).foreach(_ => utxPoolSizeStats.decrement())
-      pessimisticPortfolios.remove(id)
-    }
-
+    txs.view.map(_.id()).foreach(remove)
     removeExpired(time.correctedTime())
+  }
+
+  private def remove(txId: ByteStr): Unit = {
+    Option(transactions.remove(txId)).foreach(_ => utxPoolSizeStats.decrement())
+    pessimisticPortfolios.remove(txId)
   }
 
   override def accountPortfolio(addr: Address): Portfolio = blockchain.portfolio(addr)
@@ -123,25 +124,26 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
     val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
-      .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
-        case (curr @ (_, _, _, _, skip), _) if skip => curr
-        case ((invalid, valid, diff, currRest, _), tx) =>
+      .iterator
+      .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
+        case ((invalid, valid, diff, currRest, isEmpty), tx) =>
           val updatedBlockchain = composite(b, diff)
-          differ(updatedBlockchain, tx) match {
-            case Right(newDiff) =>
-              val updatedRest = currRest.put(updatedBlockchain, tx)
-              if (updatedRest.isOverfilled) (invalid, valid, diff, currRest, true)
-              else (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, updatedRest.isEmpty)
-            case Left(e) =>
-              log.trace(s"Tx ${tx.id().base58} became invalid: $e")
-              (tx.id() +: invalid, valid, diff, currRest, false)
+          val updatedRest       = currRest.put(updatedBlockchain, tx)
+          if (updatedRest.isOverfilled) {
+            (invalid, valid, diff, currRest, isEmpty)
+          } else {
+            differ(updatedBlockchain, tx) match {
+              case Right(newDiff) =>
+                (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty)
+              case Left(_) =>
+                (tx.id() +: invalid, valid, diff, currRest, isEmpty)
+            }
           }
       }
+      .takeWhile(!_._5)
+      .reduce((_, s) => s)
 
-    invalidTxs.foreach { itx =>
-      transactions.remove(itx)
-      pessimisticPortfolios.remove(itx)
-    }
+    invalidTxs.foreach(remove)
     val txs = if (sortInBlock) reversedValidTxs.sorted(TransactionsOrdering.InBlock) else reversedValidTxs.reverse
     (txs, finalConstraint)
   }
@@ -174,9 +176,10 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
           _    <- feeCalculator.enoughFee(tx, blockchain, fs)
           diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
         } yield {
-          utxPoolSizeStats.increment()
           pessimisticPortfolios.add(tx.id(), diff)
-          (Option(transactions.put(tx.id(), tx)).isEmpty, diff)
+          val isNew = Option(transactions.put(tx.id(), tx)).isEmpty
+          if (isNew) utxPoolSizeStats.increment()
+          (isNew, diff)
         }
       }
     )

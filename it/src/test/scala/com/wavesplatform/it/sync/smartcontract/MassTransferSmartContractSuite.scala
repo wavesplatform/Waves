@@ -7,15 +7,14 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.{Base58, dummyCompilerContext}
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
-import scorex.crypto.encode.Base58
-import scorex.transaction.Proofs
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.transfer.MassTransferTransaction.Transfer
-import scorex.transaction.transfer._
 
 import scala.concurrent.duration._
 
@@ -60,8 +59,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
         case other => false
         }
         """.stripMargin).get.value
-      assert(untyped.size == 1)
-      CompilerV1(dummyCompilerContext, untyped.head).explicitGet()._1
+      CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
     }
 
     // set script

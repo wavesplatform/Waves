@@ -3,9 +3,9 @@ package com.wavesplatform.matcher
 import java.io.File
 
 import com.typesafe.config.Config
-import com.wavesplatform.matcher.market.BalanceWatcherWorkerActor
+import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.NameMapper
 
 import scala.concurrent.duration.FiniteDuration
@@ -23,14 +23,14 @@ case class MatcherSettings(enable: Boolean,
                            snapshotsDataDir: String,
                            snapshotsInterval: FiniteDuration,
                            orderCleanupInterval: FiniteDuration,
-                           maxOpenOrders: Int,
                            priceAssets: Seq[String],
                            maxTimestampDiff: FiniteDuration,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
+                           validationTimeout: FiniteDuration,
                            maxOrdersPerRequest: Int,
                            blacklistedAddresses: Set[String],
-                           balanceWatching: BalanceWatcherWorkerActor.Settings)
+                           orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings)
 
 object MatcherSettings {
 
@@ -49,18 +49,18 @@ object MatcherSettings {
     val snapshotsDirectory   = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval    = config.as[FiniteDuration](s"$configPath.snapshots-interval")
     val orderCleanupInterval = config.as[FiniteDuration](s"$configPath.order-cleanup-interval")
-    val maxOpenOrders        = config.as[Int](s"$configPath.max-open-orders")
     val maxOrdersPerRequest  = config.as[Int](s"$configPath.rest-order-limit")
     val baseAssets           = config.as[List[String]](s"$configPath.price-assets")
     val maxTimestampDiff     = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
 
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
+    val validationTimeout = config.as[FiniteDuration](s"$configPath.validation-timeout")
     val blacklistedNames  = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
 
-    val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
+    val blacklistedAddresses       = config.as[List[String]](s"$configPath.blacklisted-addresses")
+    val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings](s"$configPath.order-book-snapshot-http-cache")
 
     val isMigrateToNewOrderHistoryStorage = !new File(dataDirectory).exists()
-    val balanceWatching                   = config.as[BalanceWatcherWorkerActor.Settings](s"$configPath.balance-watching")
 
     MatcherSettings(
       enabled,
@@ -75,14 +75,14 @@ object MatcherSettings {
       snapshotsDirectory,
       snapshotsInterval,
       orderCleanupInterval,
-      maxOpenOrders,
       baseAssets,
       maxTimestampDiff,
       blacklistedAssets.toSet,
       blacklistedNames,
+      validationTimeout,
       maxOrdersPerRequest,
       blacklistedAddresses.toSet,
-      balanceWatching
+      orderBookSnapshotHttpCache
     )
   }
 }

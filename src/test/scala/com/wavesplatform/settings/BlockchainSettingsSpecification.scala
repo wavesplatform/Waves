@@ -12,8 +12,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |  directory = "/waves"
         |  data-directory = "/waves/data"
         |  blockchain {
-        |    max-transactions-per-block-diff = 201
-        |    min-blocks-in-memory = 202
         |    type = CUSTOM
         |    custom {
         |      address-scheme-character = "C"
@@ -53,8 +51,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |}""".stripMargin))
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.maxTransactionsPerBlockDiff should be(201)
-    settings.minBlocksInMemory should be(202)
     settings.addressSchemeCharacter should be('C')
     settings.functionalitySettings.featureCheckBlocksPeriod should be(10000)
     settings.functionalitySettings.blocksForFeatureActivation should be(9000)
@@ -85,15 +81,11 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |  directory = "/waves"
         |  data-directory = "/waves/data"
         |  blockchain {
-        |    max-transactions-per-block-diff = 202
-        |    min-blocks-in-memory = 203
         |    type = TESTNET
         |  }
         |}""".stripMargin))
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.maxTransactionsPerBlockDiff should be(202)
-    settings.minBlocksInMemory should be(203)
     settings.addressSchemeCharacter should be('T')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1477958400000L)
     settings.functionalitySettings.requireSortedTransactionsAfter should be(1477958400000L)
@@ -126,15 +118,11 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |  directory = "/waves"
         |  data-directory = "/waves/data"
         |  blockchain {
-        |    max-transactions-per-block-diff = 203
-        |    min-blocks-in-memory = 204
         |    type = MAINNET
         |  }
         |}""".stripMargin))
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.maxTransactionsPerBlockDiff should be(203)
-    settings.minBlocksInMemory should be(204)
     settings.addressSchemeCharacter should be('W')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1479168000000L)
     settings.functionalitySettings.requireSortedTransactionsAfter should be(1479168000000L)

@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.it.TransferSending
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -9,13 +8,13 @@ import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json._
-import scorex.account.AddressOrAlias
-import scorex.api.http.assets.SignedTransferV1Request
-import scorex.transaction.transfer._
+import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.api.http.assets.SignedTransferV1Request
+import com.wavesplatform.transaction.transfer._
 
 import scala.concurrent.duration._
 
-class TransferTransactionV1Suite extends BaseTransactionSuite with TransferSending with CancelAfterFailure {
+class TransferTransactionV1Suite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("asset transfer changes sender's and recipient's asset balance; issuer's.waves balance is decreased by fee") {
     val (firstBalance, firstEffBalance)   = notMiner.accountBalances(firstAddress)

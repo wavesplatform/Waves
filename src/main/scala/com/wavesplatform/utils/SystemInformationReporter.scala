@@ -1,7 +1,6 @@
 package com.wavesplatform.utils
 
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import scorex.utils.ScorexLogging
 
 object SystemInformationReporter extends ScorexLogging {
   def report(config: Config): Unit = {

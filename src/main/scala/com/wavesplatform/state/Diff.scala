@@ -5,9 +5,9 @@ import cats.kernel.Monoid
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
-import scorex.account.{Address, Alias, PublicKeyAccount}
-import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction}
+import com.wavesplatform.account.{Address, Alias, PublicKeyAccount}
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{AssetId, Transaction}
 
 case class LeaseBalance(in: Long, out: Long)
 
@@ -104,6 +104,14 @@ object Sponsorship {
       throw new java.lang.ArithmeticException("Overflow")
     }
     waves.toLong
+  }
+
+  def fromWaves(wavesFee: Long, sponsorship: Long): Long = {
+    val assetFee = (BigDecimal(wavesFee) / BigDecimal(Sponsorship.FeeUnit)) * BigDecimal(sponsorship)
+    if (assetFee > Long.MaxValue) {
+      throw new java.lang.ArithmeticException("Overflow")
+    }
+    assetFee.toLong
   }
 }
 

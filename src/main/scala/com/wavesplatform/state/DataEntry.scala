@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.state.DataEntry._
 import play.api.libs.json._
-import scorex.serialization.Deser
+import com.wavesplatform.serialization.Deser
 
 sealed abstract class DataEntry[T](val key: String, val value: T) {
   def valueBytes: Array[Byte]

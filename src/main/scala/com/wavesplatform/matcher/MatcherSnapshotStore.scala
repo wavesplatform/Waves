@@ -1,7 +1,5 @@
 package com.wavesplatform.matcher
 
-import java.io._
-import java.net.{URLDecoder, URLEncoder}
 import java.nio.ByteBuffer
 
 import akka.persistence._
@@ -13,12 +11,11 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.Config
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
+import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.ReadOptions
-import scorex.utils.ScorexLogging
 
 import scala.concurrent.Future
 import scala.util._
-import scala.util.control.NonFatal
 
 class MatcherSnapshotStore(config: Config) extends SnapshotStore {
   import MatcherSnapshotStore._
@@ -27,7 +24,7 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
 
   private val serializationExtension = SerializationExtension(context.system)
 
-  private val writableDB = openDB(config.getString("leveldb-dir"))
+  private val writableDB = openDB(config.getString("dir"))
 
   private def readOnly[A](f: ReadOnlyDB => A): A = {
     val s = writableDB.getSnapshot
@@ -103,10 +100,10 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
     )
 
   override def receivePluginInternal: Receive = {
-    case SaveSnapshotSuccess(metadata) ⇒
-    case _: SaveSnapshotFailure        ⇒ // ignore
-    case _: DeleteSnapshotsSuccess     ⇒ // ignore
-    case _: DeleteSnapshotsFailure     ⇒ // ignore
+    case _: SaveSnapshotSuccess    ⇒ // ignore
+    case _: SaveSnapshotFailure    ⇒ // ignore
+    case _: DeleteSnapshotsSuccess ⇒ // ignore
+    case _: DeleteSnapshotsFailure ⇒ // ignore
   }
 
   protected def save(metadata: SnapshotMetadata, snapshot: Any): Unit =
@@ -124,44 +121,6 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
     serializationExtension.deserialize(input, classOf[Snapshot]).get
 
   private def serialize(s: Any) = serializationExtension.serialize(Snapshot(s)).get
-
-  override def preStart() {
-    migrate()
-    super.preStart()
-  }
-
-  private def migrate(): Unit = for (snapshotDir <- Option(new File(config.getString("dir"))) if snapshotDir.isDirectory) {
-    log.info(s"Migrating snapshots from $snapshotDir")
-
-    def snapshotFileForWrite(metadata: SnapshotMetadata, extension: String = ""): File =
-      new File(snapshotDir,
-               s"snapshot-${URLEncoder.encode(metadata.persistenceId, UTF_8.name())}-${metadata.sequenceNr}-${metadata.timestamp}$extension")
-
-    val allSnapshots = Option(snapshotDir.listFiles()).fold(Seq.empty[SnapshotMetadata]) { fs =>
-      fs.map(f => extractMetadata(f.getName)).collect {
-        case Some((pid, snr, tms)) => SnapshotMetadata(URLDecoder.decode(pid, UTF_8.name()), snr, tms)
-      }
-    }
-
-    if (allSnapshots.nonEmpty) {
-      log.info(s"Collected ${allSnapshots.size} snapshot(s)")
-      for (sm <- allSnapshots) {
-        val snapshotFile        = snapshotFileForWrite(sm)
-        val snapshotInputStream = new BufferedInputStream(new FileInputStream(snapshotFile))
-        try {
-          save(sm, deserialize(streamToBytes(snapshotInputStream)).data)
-          snapshotInputStream.close()
-          snapshotFile.delete()
-        } catch {
-          case NonFatal(e) => log.error(s"Error migrating snapshot $sm", e)
-        }
-      }
-    } else {
-      log.info("No snapshots found")
-    }
-
-    log.info("Migration completed")
-  }
 }
 
 object MatcherSnapshotStore extends ScorexLogging {
@@ -172,20 +131,6 @@ object MatcherSnapshotStore extends ScorexLogging {
 
     def matches(metadata: SnapshotMetadata): Boolean =
       seqNr == metadata.sequenceNr && (metadata.timestamp == 0 || ts == metadata.timestamp)
-  }
-
-  private val persistenceIdStartIdx = 9 // Persistence ID starts after the "snapshot-" substring
-  private def extractMetadata(filename: String): Option[(String, Long, Long)] = {
-    val sequenceNumberEndIdx = filename.lastIndexOf('-')
-    val persistenceIdEndIdx  = filename.lastIndexOf('-', sequenceNumberEndIdx - 1)
-    val timestampString      = filename.substring(sequenceNumberEndIdx + 1)
-    if (persistenceIdStartIdx >= persistenceIdEndIdx || timestampString.exists(!_.isDigit)) None
-    else {
-      val persistenceId  = filename.substring(persistenceIdStartIdx, persistenceIdEndIdx)
-      val sequenceNumber = filename.substring(persistenceIdEndIdx + 1, sequenceNumberEndIdx).toLong
-      val timestamp      = filename.substring(sequenceNumberEndIdx + 1).toLong
-      Some((persistenceId, sequenceNumber, timestamp))
-    }
   }
 
   private def readSnapshotMetadata(b: Array[Byte]) = {
@@ -199,6 +144,6 @@ object MatcherSnapshotStore extends ScorexLogging {
   private def kSMHistory(persistenceId: String) = Key[Seq[Int]](Bytes.concat(Array(1: Byte), persistenceId.getBytes(UTF_8)), readIntSeq, writeIntSeq)
   private def kSM(persistenceId: String, seqNr: Int) =
     Key[SM](Bytes.concat(Array(2: Byte), persistenceId.getBytes(UTF_8), Ints.toByteArray(seqNr)), readSnapshotMetadata, writeSnapshotMetadata)
-  private def kSnapshot(persistenceId: String, seqNr: Int) =
+  def kSnapshot(persistenceId: String, seqNr: Int) =
     Key[Array[Byte]](Bytes.concat(Array(3: Byte), persistenceId.getBytes(UTF_8), Ints.toByteArray(seqNr)), identity, identity)
 }

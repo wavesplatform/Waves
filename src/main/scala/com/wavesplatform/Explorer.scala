@@ -5,14 +5,13 @@ import java.nio.ByteBuffer
 import java.util
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{ByteStr, EitherExt2}
-import com.wavesplatform.utils.{Base58, Base64}
+import com.wavesplatform.utils.{Base58, Base64, ScorexLogging}
 import org.slf4j.bridge.SLF4JBridgeHandler
-import scorex.account.{Address, AddressScheme}
-import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.util.Try
@@ -63,7 +62,8 @@ object Explorer extends ScorexLogging {
     "addresses-for-asset-seq-nr",
     "addresses-for-asset",
     "address-transaction-ids-seq-nr",
-    "address-transaction-ids"
+    "address-transaction-ids",
+    "alias-is-disabled"
   )
 
   def main(args: Array[String]): Unit = {

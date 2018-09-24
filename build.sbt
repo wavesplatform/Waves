@@ -2,6 +2,7 @@ import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys.{sourceGenerators, _}
 import sbt._
 import sbtcrossproject.CrossPlugin.autoImport.crossProject
+import sbt.internal.inc.ReflectUtilities
 import sbtassembly.MergeStrategy
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
@@ -12,7 +13,7 @@ val versionSource = Def.task {
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 14, 0)
+  val FallbackVersion = (0, 14, 4)
 
   val versionFile      = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
@@ -49,7 +50,10 @@ inThisBuild(
     scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
   ))
 
-resolvers += Resolver.bintrayRepo("ethereum", "maven")
+resolvers ++= Seq(
+  Resolver.bintrayRepo("ethereum", "maven"),
+  Resolver.bintrayRepo("dnvriend", "maven")
+)
 
 fork in run := true
 javaOptions in run ++= Seq(
@@ -190,6 +194,22 @@ commands += Command.command("packageAll") { state =>
   "clean" :: "assembly" :: "debian:packageBin" :: state
 }
 
+// https://stackoverflow.com/a/48592704/4050580
+def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList map { p =>
+  p: ProjectReference
+}
+
+addCommandAlias("checkPR", """;set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings"); Global / checkPRRaw""")
+lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
+checkPRRaw in Global := {
+  try {
+    clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
+  } finally {
+    test.all(ScopeFilter(inProjects(langJVM, node), inConfigurations(Test))).value
+    compile.all(ScopeFilter(inProjects(generator, benchmark), inConfigurations(Test))).value
+  }
+}
+
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
@@ -213,7 +233,7 @@ lazy val lang =
     )
     .jsSettings(
       scalaJSLinkerConfig ~= {
-        _.withModuleKind(ModuleKind.NoModule)
+        _.withModuleKind(ModuleKind.CommonJSModule)
       }
     )
     .jvmSettings(

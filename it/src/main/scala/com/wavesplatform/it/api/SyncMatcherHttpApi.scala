@@ -1,45 +1,21 @@
 package com.wavesplatform.it.api
 
-import akka.http.scaladsl.model.StatusCodes
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
-import org.scalatest.{Assertion, Assertions, Matchers}
-import play.api.libs.json.Json.parse
+import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.{Format, Json, Writes}
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.util.{Failure, Try}
 
 object SyncMatcherHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
 
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
-
-  def assertBadRequest[R](f: => R): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
-    case Failure(e)                                               => Assertions.fail(e)
-    case _                                                        => Assertions.fail("Expecting bad request")
-  }
-
-  def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Assertions.assert(
-        statusCode == StatusCodes.BadRequest.intValue &&
-          responseBody.replace("\n", "").matches(s".*$errorRegex.*"))
-    case Failure(e) => Assertions.fail(e)
-    case _          => Assertions.fail("Expecting bad request")
-  }
-
-  def assertBadRequestAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == StatusCodes.BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
-    case Failure(e) => Assertions.fail(e)
-    case _          => Assertions.fail(s"Expecting bad request")
-  }
 
   implicit class MatcherNodeExtSync(m: Node) extends Matchers {
 
@@ -51,8 +27,11 @@ object SyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): OrderBookResponse =
       Await.result(async(m).orderBook(assetPair), RequestAwaitTime)
 
-    def orderHistory(sender: Node): Seq[OrderbookHistory] =
-      Await.result(async(m).orderHistory(sender), RequestAwaitTime)
+    def fullOrderHistory(sender: Node): Seq[OrderbookHistory] =
+      Await.result(async(m).fullOrdersHistory(sender), RequestAwaitTime)
+
+    def orderHistoryByPair(sender: Node, assetPair: AssetPair): Seq[OrderbookHistory] =
+      Await.result(async(m).orderHistoryByPair(sender, assetPair), RequestAwaitTime)
 
     def activeOrderHistory(sender: Node): Seq[OrderbookHistory] =
       Await.result(async(m).activeOrderHistory(sender), RequestAwaitTime)
@@ -71,14 +50,36 @@ object SyncMatcherHttpApi extends Assertions {
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       Await.result(async(m).orderStatus(orderId, assetPair, waitForStatus), RequestAwaitTime)
 
+    def transactionsByOrder(orderId: String): Seq[ExchangeTransaction] =
+      Await.result(async(m).transactionsByOrder(orderId), RequestAwaitTime)
+
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
                         expectedStatus: String,
                         waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).waitOrderStatus(assetPair, orderId, expectedStatus), waitTime)
 
+    def waitOrderStatusAndAmount(assetPair: AssetPair,
+                                 orderId: String,
+                                 expectedStatus: String,
+                                 expectedFilledAmount: Option[Long],
+                                 waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      Await.result(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
+
     def reservedBalance(sender: Node, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
+      reservedBalance(sender.privateKey, waitTime)
+
+    def reservedBalance(sender: PrivateKeyAccount, waitTime: Duration): Map[String, Long] =
       Await.result(async(m).reservedBalance(sender), waitTime)
+
+    def tradableBalance(sender: Node, assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
+      tradableBalance(sender.privateKey, assetPair, waitTime)
+
+    def tradableBalance(sender: PrivateKeyAccount, assetPair: AssetPair, waitTime: Duration): Map[String, Long] =
+      Await.result(async(m).tradableBalance(sender, assetPair), waitTime)
+
+    def tradingMarkets(waitTime: Duration = OrderRequestAwaitTime): MarketDataInfo =
+      Await.result(async(m).tradingMarkets(), waitTime)
 
     def expectIncorrectOrderPlacement(order: Order,
                                       expectedStatusCode: Int,
@@ -86,8 +87,25 @@ object SyncMatcherHttpApi extends Assertions {
                                       waitTime: Duration = OrderRequestAwaitTime): Boolean =
       Await.result(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus), waitTime)
 
-    def cancelOrder(sender: Node, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
-      Await.result(async(m).cancelOrder(sender, assetPair, orderId), waitTime)
+    def cancelOrder(sender: Node,
+                    assetPair: AssetPair,
+                    orderId: Option[String],
+                    timestamp: Option[Long] = None,
+                    waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      cancelOrder(sender.privateKey, assetPair, orderId, timestamp, waitTime)
+
+    def cancelOrder(sender: PrivateKeyAccount,
+                    assetPair: AssetPair,
+                    orderId: Option[String],
+                    timestamp: Option[Long],
+                    waitTime: Duration): MatcherStatusResponse =
+      Await.result(async(m).cancelOrder(sender, assetPair, orderId, timestamp), waitTime)
+
+    def cancelAllOrders(sender: Node, timestamp: Option[Long] = None, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      Await.result(async(m).cancelAllOrders(sender, timestamp), waitTime)
+
+    def cancelOrderWithApiKey(orderId: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      Await.result(async(m).cancelOrderWithApiKey(orderId), waitTime)
 
     def matcherGet(path: String,
                    f: RequestBuilder => RequestBuilder = identity,
@@ -111,10 +129,25 @@ object SyncMatcherHttpApi extends Assertions {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = m.publicKey
-      val unsigned            = Order(node.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Array())
-      val signature           = crypto.sign(node.privateKey, unsigned.toSign)
+      val unsigned = Order(node.publicKey,
+                           matcherPublicKey,
+                           pair,
+                           orderType,
+                           price,
+                           amount,
+                           creationTime,
+                           timeToLiveTimestamp,
+                           AsyncMatcherHttpApi.DefaultMatcherFee,
+                           Array())
+      val signature = crypto.sign(node.privateKey, unsigned.toSign)
       unsigned.copy(signature = signature)
     }
+
+    def ordersByAddress(sender: Node, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderbookHistory] =
+      ordersByAddress(sender.address, activeOnly, waitTime)
+
+    def ordersByAddress(senderAddress: String, activeOnly: Boolean, waitTime: Duration): Seq[OrderbookHistory] =
+      Await.result(async(m).ordersByAddress(senderAddress, activeOnly), waitTime)
   }
 
 }

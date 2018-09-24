@@ -2,17 +2,17 @@ package com.wavesplatform.state.reader
 
 import cats.implicits._
 import cats.kernel.Monoid
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.state._
-import scorex.account.{Address, Alias}
-import scorex.block.{Block, BlockHeader}
-import scorex.transaction.Transaction.Type
-import scorex.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
-import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.script.Script
-import scorex.transaction.{AssetId, Transaction, ValidationError}
+import com.wavesplatform.transaction.Transaction.Type
+import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
 
-class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends Blockchain {
+class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: Long = 0) extends Blockchain {
 
   private def diff = maybeDiff.getOrElse(Diff.empty)
 
@@ -95,7 +95,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {
     case l @ Left(AliasIsDisabled(_)) => l
     case Right(addr)                  => Right(diff.aliases.getOrElse(alias, addr))
-    case _                            => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
+    case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
   override def allActiveLeases: Set[LeaseTransaction] = {
@@ -190,6 +190,8 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
 
   override def lastBlock: Option[Block] = inner.lastBlock
 
+  override def carryFee: Long = carry
+
   override def blockBytes(height: Int): Option[Array[Type]] = inner.blockBytes(height)
 
   override def blockBytes(blockId: ByteStr): Option[Array[Type]] = inner.blockBytes(blockId)
@@ -211,12 +213,12 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff]) extends
 
   override def featureVotes(height: Int): Map[Short, Int] = inner.featureVotes(height)
 
-  override def append(diff: Diff, block: Block): Unit = inner.append(diff, block)
+  override def append(diff: Diff, carryFee: Long, block: Block): Unit = inner.append(diff, carryFee, block)
 
   override def rollbackTo(targetBlockId: ByteStr): Seq[Block] = inner.rollbackTo(targetBlockId)
 }
 
 object CompositeBlockchain {
-  def composite(inner: Blockchain, diff: => Option[Diff]): Blockchain = new CompositeBlockchain(inner, diff)
-  def composite(inner: Blockchain, diff: Diff): Blockchain            = new CompositeBlockchain(inner, Some(diff))
+  def composite(inner: Blockchain, diff: => Option[Diff]): Blockchain          = new CompositeBlockchain(inner, diff)
+  def composite(inner: Blockchain, diff: Diff, carryFee: Long = 0): Blockchain = new CompositeBlockchain(inner, Some(diff), carryFee)
 }

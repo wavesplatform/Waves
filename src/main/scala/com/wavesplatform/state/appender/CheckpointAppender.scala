@@ -3,13 +3,13 @@ package com.wavesplatform.state.appender
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint, PeerDatabase, id}
 import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
-import scorex.transaction.{BlockchainUpdater, CheckpointService, ValidationError}
-import scorex.utils.ScorexLogging
+import com.wavesplatform.transaction.{BlockchainUpdater, CheckpointService, ValidationError}
 
 object CheckpointAppender extends ScorexLogging {
   def apply(checkpointService: CheckpointService,
@@ -62,6 +62,6 @@ object CheckpointAppender extends ScorexLogging {
     }
   }
 
-  private val blockBlockForkStats  = Kamon.metrics.counter("block-fork")
-  private val blockForkHeightStats = Kamon.metrics.histogram("block-fork-height")
+  private val blockBlockForkStats  = Kamon.counter("block-fork")
+  private val blockForkHeightStats = Kamon.histogram("block-fork-height")
 }

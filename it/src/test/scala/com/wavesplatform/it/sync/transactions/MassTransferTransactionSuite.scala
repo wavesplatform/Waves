@@ -8,11 +8,11 @@ import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json._
-import scorex.account.Alias
-import scorex.api.http.assets.{MassTransferRequest, SignedMassTransferRequest}
-import scorex.transaction.transfer.MassTransferTransaction.{MaxTransferCount, Transfer}
-import scorex.transaction.transfer.TransferTransaction.MaxAttachmentSize
-import scorex.transaction.transfer._
+import com.wavesplatform.account.Alias
+import com.wavesplatform.api.http.assets.{MassTransferRequest, SignedMassTransferRequest}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, Transfer}
+import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
+import com.wavesplatform.transaction.transfer._
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -97,7 +97,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("invalid transfer should not be in UTX or blockchain") {
-    import scorex.transaction.transfer._
+    import com.wavesplatform.transaction.transfer._
 
     def request(version: Byte = MassTransferTransaction.version,
                 transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),

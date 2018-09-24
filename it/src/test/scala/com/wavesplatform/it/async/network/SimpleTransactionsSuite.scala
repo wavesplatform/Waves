@@ -12,8 +12,8 @@ import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import com.wavesplatform.state.EitherExt2
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import scorex.account.Address
-import scorex.transaction.transfer._
+import com.wavesplatform.account.Address
+import com.wavesplatform.transaction.transfer._
 
 import scala.concurrent.Await
 import scala.concurrent.Future.traverse

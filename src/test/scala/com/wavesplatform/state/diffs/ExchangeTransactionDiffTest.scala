@@ -3,22 +3,21 @@ package com.wavesplatform.state.diffs
 import cats._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
-import com.wavesplatform.settings.Constants
+import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
-import scorex.account.PrivateKeyAccount
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.ValidationError.AccountBalanceError
-import scorex.transaction.assets.{IssueTransaction, IssueTransactionV1}
-import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
-import scorex.transaction.{GenesisTransaction, ValidationError}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.ValidationError.AccountBalanceError
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.{GenesisTransaction, ValidationError}
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
@@ -38,7 +37,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     } yield (gen1, gen2, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange) {
-      case ((gen1, gen2, issue1, issue2, exchange)) =>
+      case (gen1, gen2, issue1, issue2, exchange) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange))) {
           case (blockDiff, state) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
@@ -64,17 +63,17 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       ts      <- timestampGen
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).explicitGet()
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
-      setScript                = SetScriptTransaction.selfSigned(version, seller, Some(ScriptV1(TRUE).explicitGet()), fee, ts).explicitGet()
       issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id())
-      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
-      exchange                 <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
+      setScript = SetScriptTransaction.selfSigned(version, seller, Some(ScriptV1(TRUE).explicitGet()), fee, ts).explicitGet()
+      maybeAsset1 <- Gen.option(issue1.id())
+      maybeAsset2 <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
+      exchange    <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, setScript, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange) {
       case ((gen1, gen2, setScript, issue1, issue2, exchange)) =>
-        assertLeft(Seq(TestBlock.create(Seq(gen1, gen2, setScript, issue1, issue2))), TestBlock.create(Seq(exchange)), fs)(
+        assertLeft(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2, setScript))), TestBlock.create(Seq(exchange)), fs)(
           "can't participate in ExchangeTransaction")
     }
   }
@@ -178,6 +177,53 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
               errs should contain key seller.toAddress
           }
         }
+    }
+  }
+
+  property("Diff for ExchangeTransaction works as expected and doesn't use rounding inside") {
+    val MatcherFee = 300000L
+    val Ts         = 1000L
+
+    val preconditions: Gen[
+      (PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+      for {
+        buyer   <- accountGen
+        seller  <- accountGen
+        matcher <- accountGen
+        ts      <- timestampGen
+        gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).explicitGet()
+        gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
+        gen3: GenesisTransaction = GenesisTransaction.create(matcher, ENOUGH_AMT, ts).explicitGet()
+        issue1: IssueTransactionV1 <- issueGen(buyer, fixedQuantity = Some(Long.MaxValue))
+      } yield (buyer, seller, matcher, gen1, gen2, gen3, issue1)
+
+    val (buyer, seller, matcher, gen1, gen2, gen3, issue1) = preconditions.sample.get
+    val assetPair                                          = AssetPair(None, Some(issue1.id()))
+
+    val buy  = Order.buy(buyer, matcher, assetPair, 238, 3100000000L, Ts, Ts + 1, MatcherFee)
+    val sell = Order.sell(seller, matcher, assetPair, 235, 425532L, Ts, Ts + 1, MatcherFee)
+    val tx = ExchangeTransaction
+      .create(
+        matcher = matcher,
+        buyOrder = buy,
+        sellOrder = sell,
+        price = 238,
+        amount = 425532,
+        buyMatcherFee = 41,
+        sellMatcherFee = 300000,
+        fee = buy.matcherFee,
+        timestamp = Ts
+      )
+      .explicitGet()
+
+    assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1))), TestBlock.create(Seq(tx))) { totalDiffEi =>
+      inside(totalDiffEi) {
+        case Right(diff) =>
+          import diff.portfolios
+          portfolios(buyer).balance shouldBe (-41L + 425532L)
+          portfolios(seller).balance shouldBe (-300000L - 425532L)
+          portfolios(matcher).balance shouldBe (+41L + 300000L - tx.fee)
+      }
     }
   }
 }

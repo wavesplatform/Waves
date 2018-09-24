@@ -4,8 +4,8 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
+import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -21,7 +21,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """
         |match p {
         |  case pa: PointA => let x = 3
-        |  case _ => throw
+        |  case _ => throw()
         |}
       """.stripMargin
 
@@ -107,14 +107,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
   }
 
-  private def eval[T](code: String, pointInstance: Option[CaseObj] = None): Either[String, T] = {
-    val untyped = Parser(code).get.value
-    require(untyped.size == 1)
+  private def eval[T](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
+    val untyped                                      = Parser(code).get.value
     val lazyVal                                      = LazyVal(EitherT.pure(pointInstance.orNull))
-    val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (AorBorC, lazyVal)))
+    val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (pointType, lazyVal)))
     val ctx: CTX =
       Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Seq.empty))
-    val typed = CompilerV1(ctx.compilerContext, untyped.head)
+    val typed = CompilerV1(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1)._2)
   }
 
@@ -225,9 +224,39 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |      case pc: PointC => pc.YB
         |    }
         |  }
-        |  case other => throw
+        |  case other => throw()
         |}""".stripMargin
     eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(3)
     eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
+  }
+
+  property("different types, same name of field") {
+    val sampleScript =
+      """match (p.YB) {
+        | case l: Int => l
+        | case u: Unit => 1
+        | }
+      """.stripMargin
+    eval[Long](sampleScript, Some(pointCInstance), CorD) shouldBe Right(42)
+    eval[Long](sampleScript, Some(pointDInstance1), CorD) shouldBe Right(43)
+    eval[Long](sampleScript, Some(pointDInstance2), CorD) shouldBe Right(1)
+
+    eval[Long]("p.YB", Some(pointCInstance), CorD) shouldBe Right(42)
+    eval[Long]("p.YB", Some(pointDInstance1), CorD) shouldBe Right(43)
+    eval[Unit]("p.YB", Some(pointDInstance2), CorD) shouldBe Right(())
+  }
+
+  property("throw") {
+    val script =
+      """
+        |match p {
+        |  case a: PointA => 0
+        |  case b: PointB => throw()
+        |  case c: PointC => throw("arrgh")
+        |}
+      """.stripMargin
+    eval[Long](script, Some(pointAInstance)) shouldBe Right(0)
+    eval[Long](script, Some(pointBInstance)) shouldBe Left("Explicit script termination")
+    eval[Long](script, Some(pointCInstance)) shouldBe Left("arrgh")
   }
 }

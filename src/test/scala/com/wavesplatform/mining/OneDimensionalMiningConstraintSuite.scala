@@ -6,12 +6,12 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.transaction.Transaction
+import com.wavesplatform.transaction.Transaction
 
 class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with PropertyChecks with PathMockFactory with TransactionGen with NoShrink {
   "OneDimensionalMiningConstraint" - {
     "should be empty if the limit is 0, but not overfilled" in {
-      val tank = createConstConstraint(0)
+      val tank = createConstConstraint(0, 1)
       tank.isEmpty shouldBe true
       tank.isOverfilled shouldBe false
     }

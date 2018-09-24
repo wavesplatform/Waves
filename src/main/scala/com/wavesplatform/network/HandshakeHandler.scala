@@ -4,6 +4,7 @@ import java.util
 import java.util.concurrent.{ConcurrentMap, TimeUnit}
 
 import com.wavesplatform.network.Handshake.InvalidHandshakeException
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
@@ -11,7 +12,6 @@ import io.netty.channel.group.ChannelGroup
 import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.AttributeKey
 import io.netty.util.concurrent.ScheduledFuture
-import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -135,7 +135,7 @@ object HandshakeHandler extends ScorexLogging {
   val NodeNameAttributeKey = AttributeKey.newInstance[String]("name")
 
   def versionIsSupported(remoteVersion: (Int, Int, Int)): Boolean =
-    remoteVersion._1 == 0 && remoteVersion._2 >= 13
+    (remoteVersion._1 == 0 && remoteVersion._2 >= 13) || (remoteVersion._1 == 1 && remoteVersion._2 >= 0)
 
   def removeHandshakeHandlers(ctx: ChannelHandlerContext, thisHandler: ChannelHandler): Unit = {
     ctx.pipeline().remove(classOf[HandshakeTimeoutHandler])

@@ -11,18 +11,16 @@ import com.wavesplatform.state._
 import com.wavesplatform.utils.dummyCompilerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
-import scorex.account.{AddressScheme, PrivateKeyAccount}
-import scorex.transaction.Proofs
-import scorex.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
-import scorex.transaction.smart.SetScriptTransaction
-import scorex.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.account.{AddressScheme}
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 
 class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private def pkFromAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).explicitGet()
-
-  private val acc0 = pkFromAddress(firstAddress)
-  private val acc1 = pkFromAddress(secondAddress)
-  private val acc2 = pkFromAddress(thirdAddress)
+  private val acc0 = pkByAddress(firstAddress)
+  private val acc1 = pkByAddress(secondAddress)
+  private val acc2 = pkByAddress(thirdAddress)
 
   test("set contract, make leasing and cancel leasing") {
     val (balance1, eff1) = notMiner.accountBalances(acc0.address)
@@ -45,8 +43,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
           case other => false
         }
         """.stripMargin).get.value
-      assert(sc.size == 1)
-      CompilerV1(dummyCompilerContext, sc.head).explicitGet()._1
+      CompilerV1(dummyCompilerContext, sc).explicitGet()._1
     }
 
     val script = ScriptV1(scriptText).explicitGet()

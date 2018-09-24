@@ -5,47 +5,56 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import org.scalatest.Matchers
-import scorex.block.Block
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.{TestFunctionalitySettings => TFS}
-import scorex.transaction.{Transaction, ValidationError}
+import com.wavesplatform.block.Block
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.transaction.{Transaction, ValidationError}
+import com.wavesplatform.settings.{TestFunctionalitySettings => TFS}
 
 package object diffs extends WithState with Matchers {
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
       assertion: Either[ValidationError, Diff] => Unit): Unit = withStateAndHistory(fs) { state =>
-    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(fs, blockchain, None, b, MiningConstraint.Unlimited).map(_._1)
+    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(fs, blockchain, None, b, MiningConstraint.Unlimited)
 
     preconditions.foreach { precondition =>
-      val preconditionDiffEI = differ(state, precondition)
-      val preconditionDiff   = preconditionDiffEI.explicitGet()
-      state.append(preconditionDiff, precondition)
+      val (preconditionDiff, preconditionFees, _) = differ(state, precondition).explicitGet()
+      state.append(preconditionDiff, preconditionFees, precondition)
     }
     val totalDiff1 = differ(state, block)
-    assertion(totalDiff1)
+    assertion(totalDiff1.map(_._1))
   }
+
+  private def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings, withNg: Boolean)(
+      assertion: (Diff, Blockchain) => Unit): Unit = withStateAndHistory(fs) { state =>
+    def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block) =
+      BlockDiffer.fromBlock(fs, blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited)
+
+    preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
+      val (diff, fees, _) = differ(state, prevBlock, curBlock).explicitGet()
+      state.append(diff, fees, curBlock)
+      Some(curBlock)
+    }
+    val (diff, fees, _) = differ(state, preconditions.lastOption, block).explicitGet()
+    state.append(diff, fees, block)
+    assertion(diff, state)
+  }
+
+  def assertNgDiffState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
+      assertion: (Diff, Blockchain) => Unit): Unit =
+    assertDiffAndState(preconditions, block, fs, withNg = true)(assertion)
 
   def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
-      assertion: (Diff, Blockchain) => Unit): Unit = withStateAndHistory(fs) { state =>
-    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(fs, blockchain, None, b, MiningConstraint.Unlimited).map(_._1)
-
-    preconditions.foreach { precondition =>
-      val preconditionDiff = differ(state, precondition).explicitGet()
-      state.append(preconditionDiff, precondition)
-    }
-    val totalDiff1 = differ(state, block).explicitGet()
-    state.append(totalDiff1, block)
-    assertion(totalDiff1, state)
-  }
+      assertion: (Diff, Blockchain) => Unit): Unit =
+    assertDiffAndState(preconditions, block, fs, withNg = false)(assertion)
 
   def assertDiffAndState(fs: FunctionalitySettings)(test: (Seq[Transaction] => Either[ValidationError, Unit]) => Unit): Unit =
     withStateAndHistory(fs) { state =>
-      def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(fs, blockchain, None, b, MiningConstraint.Unlimited).map(_._1)
+      def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(fs, blockchain, None, b, MiningConstraint.Unlimited)
 
       test(txs => {
         val block = TestBlock.create(txs)
-        differ(state, block).map(diff => state.append(diff, block))
+        differ(state, block).map(diff => state.append(diff._1, diff._2, block))
       })
     }
 
@@ -60,8 +69,4 @@ package object diffs extends WithState with Matchers {
     assertDiffEi(preconditions, block, fs)(_ should produce(errorMessage))
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
-
-  def zipWithPrev[A](seq: Seq[A]): Seq[(Option[A], A)] = {
-    seq.zipWithIndex.map { case (a, i) => (if (i == 0) None else Some(seq(i - 1)), a) }
-  }
 }
