@@ -4,7 +4,8 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.compiler.Types.FINAL
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -259,4 +260,51 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](script, Some(pointBInstance)) shouldBe Left("Explicit script termination")
     eval[Long](script, Some(pointCInstance)) shouldBe Left("arrgh")
   }
+
+  property("context won't change after inner let") {
+    val script = "{ let x = 3; x } + { let x = 5; x}"
+    eval[Long](script, Some(pointAInstance)) shouldBe Right(8)
+  }
+
+  property("context won't change after execution of a user function") {
+    val doubleFst = UserFunction("ID", LONG, "x" -> LONG) {
+      FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
+    }
+
+    val context = Monoid.combine(
+      PureContext.evalContext,
+      EvaluationContext(
+        typeDefs = Map.empty,
+        letDefs = Map("x"                -> LazyVal(EitherT.pure(3l))),
+        functions = Map(doubleFst.header -> doubleFst)
+      )
+    )
+
+    val expr = FUNCTION_CALL(PureContext.sumLong.header, List(FUNCTION_CALL(doubleFst.header, List(CONST_LONG(1000l))), REF("x")))
+    ev[Long](context, expr)._2 shouldBe Right(2003l)
+  }
+
+  property("context won't change after execution of an inner block") {
+    val context = Monoid.combine(
+      PureContext.evalContext,
+      EvaluationContext(
+        typeDefs = Map.empty,
+        letDefs = Map("x" -> LazyVal(EitherT.pure(3l))),
+        functions = Map.empty
+      )
+    )
+
+    val expr = FUNCTION_CALL(
+      function = PureContext.sumLong.header,
+      args = List(
+        BLOCK(
+          let = LET("x", CONST_LONG(5l)),
+          body = REF("x")
+        ),
+        REF("x")
+      )
+    )
+    ev[Long](context, expr)._2 shouldBe Right(8)
+  }
+
 }

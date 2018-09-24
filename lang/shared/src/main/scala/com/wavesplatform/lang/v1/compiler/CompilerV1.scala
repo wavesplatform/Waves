@@ -63,15 +63,15 @@ object CompilerV1 {
                         condExpr: Expressions.EXPR,
                         ifTrueExpr: Expressions.EXPR,
                         ifFalseExpr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
-    get[CompilerContext, CompilationError].flatMap(ctx => {
-      (for {
-        cond       <- compileExpr(condExpr).run(ctx).map(_._2)()
-        _          <- Either.cond(cond._2 equivalent BOOLEAN, (), UnexpectedType(p.start, p.end, BOOLEAN.toString, cond._2.toString))
-        ifTrue     <- compileExpr(ifTrueExpr).run(ctx).map(_._2)()
-        ifFalse    <- compileExpr(ifFalseExpr).run(ctx).map(_._2)()
-        compiledIf <- mkIf(p, cond._1, ifTrue, ifFalse)
-      } yield compiledIf).toCompileM
-    })
+    for {
+      cond       <- local {
+        compileExpr(condExpr)
+          .ensureOr(c => UnexpectedType(p.start, p.end, BOOLEAN.toString, c._2.toString))(_._2 equivalent BOOLEAN)
+      }
+      ifTrue     <- local(compileExpr(ifTrueExpr))
+      ifFalse    <- local(compileExpr(ifFalseExpr))
+      compiledIf <- liftEither(mkIf(p, cond._1, ifTrue, ifFalse))
+    } yield compiledIf
   }
 
   def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[FINAL] =
@@ -127,8 +127,10 @@ object CompilerV1 {
         .traverse[CompileM, String](handlePart)
         .ensure(NonExistingType(p.start, p.end, letName, ctx.predefTypes.keys.toList))(_.forall(ctx.predefTypes.contains))
       typeUnion = if (letTypes.isEmpty) compiledLet._2 else UNION.create(letTypes.map(ctx.predefTypes).map(_.typeRef))
-      _            <- modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> typeUnion)))
-      compiledBody <- compileExpr(body)
+      compiledBody <- local {
+        modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> typeUnion)))
+          .flatMap(_ => compileExpr(body))
+      }
     } yield (BLOCK(LET(letName, compiledLet._1), compiledBody._1), compiledBody._2)
   }
 

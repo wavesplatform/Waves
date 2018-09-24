@@ -50,7 +50,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Long](expr = term)._2 shouldBe Right(100000)
   }
 
-  property("return error and context of failed evaluation") {
+  ignore("return error and context of failed evaluation") {
     val (ctx, Left(err)) = ev[Long](
       expr = BLOCK(
         LET("x", CONST_LONG(3)),
@@ -286,7 +286,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     r.isRight shouldBe true
   }
 
-  property("returns correct context") {
+  ignore("returns correct context") {
     val (alicePrivateKey, _)          = Curve25519.createKeyPair("seed0".getBytes())
     val (bobPrivateKey, bobPublicKey) = Curve25519.createKeyPair("seed1".getBytes())
     val (_, senderPublicKey)          = Curve25519.createKeyPair("seed2".getBytes())

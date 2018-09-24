@@ -19,8 +19,10 @@ object EvaluatorV1 extends ExprEvaluator {
       ctx <- get[EvaluationContext, ExecutionError]
       blockEvaluation = evalExpr(let.value)
       lazyBlock       = LazyVal(blockEvaluation.ter(ctx))
-      _      <- modify[EvaluationContext, ExecutionError](lets.modify(_)(_.updated(let.name, lazyBlock)))
-      result <- evalExpr(inner)
+      result <- local {
+        modify[EvaluationContext, ExecutionError](lets.modify(_)(_.updated(let.name, lazyBlock)))
+          .flatMap(_ => evalExpr(inner))
+      }
     } yield result
 
   private def evalRef(key: String) =

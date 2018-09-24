@@ -15,7 +15,7 @@ object CoevalRef {
       private val atom: Atomic[A]            = Atomic(a)
       override def read: Coeval[A]           = Coeval.delay(atom.get)
       override def write(a: A): Coeval[Unit] = Coeval.delay(atom.set(a))
-      override def copy(): CoevalRef[A]      = of(a)
+      override def copy(): CoevalRef[A]      = of(read())
     }
   }
 }
