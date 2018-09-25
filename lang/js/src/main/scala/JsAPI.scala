@@ -69,6 +69,9 @@ object JsAPI {
   @JSExportTopLevel("fullContext")
   val fullContext: CTX = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext))
 
+  @JSExportTopLevel("getTypes")
+  def getTypes() = fullContext.types.map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v.typeRef))).toJSArray
+
   @JSExportTopLevel("getVarsDoc")
   def getVarsDoc() = fullContext.vars.map(v => js.Dynamic.literal("name" -> v._1, "type" -> typeRepr(v._2._1._1), "doc" -> v._2._1._2)).toJSArray
 
