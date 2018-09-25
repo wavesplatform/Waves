@@ -20,6 +20,7 @@ object ScriptV1 {
 
   def apply(x: EXPR, checkSize: Boolean = true): Either[String, Script] =
     for {
+      _                <- ScriptEstimator.denyDuplicateNames(x)
       scriptComplexity <- ScriptEstimator(utils.dummyVarNames, functionCosts, x)
       _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
       s = new ScriptV1(x)

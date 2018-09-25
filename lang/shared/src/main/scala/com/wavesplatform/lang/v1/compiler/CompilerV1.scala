@@ -114,7 +114,7 @@ object CompilerV1 {
             )
             .toCompileM
         })
-//      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId))
+      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId))
 
     } yield compiledMatch
   }

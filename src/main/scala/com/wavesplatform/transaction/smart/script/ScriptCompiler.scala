@@ -5,10 +5,10 @@ import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
 import com.wavesplatform.lang.v1.ScriptEstimator
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.utils
 import com.wavesplatform.utils.functionCosts
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 
 import scala.util.{Failure, Success, Try}
 

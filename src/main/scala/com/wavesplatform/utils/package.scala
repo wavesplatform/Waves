@@ -7,6 +7,7 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.Global
+import com.wavesplatform.state._
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -99,7 +100,7 @@ package object utils extends ScorexLogging {
       val cost = func match {
         case f: UserFunction =>
           import f.signature.args
-          Coeval.evalOnce(ScriptEstimator(ctx.letDefs.keySet, costs, f.ev).right.get - args.size)
+          Coeval.evalOnce(ScriptEstimator(ctx.letDefs.keySet ++ args.map(_._1), costs, f.ev).explicitGet() - args.size)
         case f: NativeFunction => Coeval.now(f.cost)
       }
       costs += func.header -> cost
