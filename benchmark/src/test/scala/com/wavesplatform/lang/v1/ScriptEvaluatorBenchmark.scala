@@ -44,7 +44,7 @@ class ScriptEvaluatorBenchmark {
   def stringConcat(st: Concat, bh: Blackhole): Unit = bh.consume(EvaluatorV1[String](st.context, st.strings))
 
   @Benchmark
-  def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(EvaluatorV1[String](st.context, st.bytes)._2)
+  def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(EvaluatorV1[String](st.context, st.bytes))
 }
 
 @State(Scope.Benchmark)

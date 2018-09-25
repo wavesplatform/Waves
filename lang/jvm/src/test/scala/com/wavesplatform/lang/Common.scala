@@ -15,8 +15,7 @@ import scala.util.{Left, Right, Try}
 
 object Common {
 
-  def ev[T](context: EvaluationContext = PureContext.evalContext, expr: EXPR): (EvaluationContext, Either[ExecutionError, T]) =
-    EvaluatorV1[T](context, expr)
+  def ev[T](context: EvaluationContext = PureContext.evalContext, expr: EXPR): Either[ExecutionError, T] = EvaluatorV1[T](context, expr)
 
   trait NoShrink {
     implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)

@@ -45,7 +45,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
         |  }
         |  """.stripMargin)
     val Right((typedExpr, _))   = CompilerV1(com.wavesplatform.utils.dummyCompilerContext, expr)
-    EvaluatorV1[CaseObj](context, typedExpr)._2
+    EvaluatorV1[CaseObj](context, typedExpr)
   }
 
   property("Script can resolve AddressOrAlias") {
