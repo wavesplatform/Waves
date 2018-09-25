@@ -2,11 +2,10 @@ package com.wavesplatform.lang.v1
 
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import monix.eval.Coeval
 
 object ScriptEstimator {
-  def apply(ctx: EvaluationContext, functionCosts: collection.Map[FunctionHeader, Coeval[Long]], t: EXPR): Either[String, Long] = {
+  def apply(declaredVals: Set[String], functionCosts: collection.Map[FunctionHeader, Coeval[Long]], t: EXPR): Either[String, Long] = {
     type Result[T] = EitherT[Coeval, String, T]
 
     def aux(t: Result[EXPR], syms: Map[String, (EXPR, Boolean)]): Result[(Long, Map[String, (EXPR, Boolean)])] = t.flatMap {
@@ -50,25 +49,25 @@ object ScriptEstimator {
         } yield (callCost() + argsComp, argsSyms)
     }
 
-    aux(EitherT.pure(t), ctx.letDefs.mapValues(_ => (TRUE, true))).value().map(_._1)
+    aux(EitherT.pure(t), declaredVals.map(_ -> (TRUE, true)).toMap).value().map(_._1)
   }
 
   def denyDuplicateNames(t: EXPR): Either[String, Unit] = {
     type DenyDuplicates[T] = EitherT[Coeval, String, T]
     def aux(t: DenyDuplicates[EXPR], declared: Set[String]): DenyDuplicates[Set[String]] = {
       t flatMap {
-        case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | TRUE | FALSE => EitherT.pure(declared)
+        case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | TRUE | FALSE | REF(_) => EitherT.pure(declared)
         case BLOCK(LET(name, expr), body) =>
           EitherT
-            .cond[Coeval](!(declared contains name), declared + name, "FOO")
+            .cond[Coeval](!(declared contains name), declared + name, s"ScriptValidator: duplicate variable names are not allowed: '$name'")
             .flatMap(aux(EitherT.pure(expr), _))
             .flatMap(aux(EitherT.pure(body), _))
         case IF(cond, ifTrue, ifFalse) =>
           aux(EitherT.pure(cond), declared)
             .flatMap(aux(EitherT.pure(ifTrue), _))
             .flatMap(aux(EitherT.pure(ifFalse), _))
-        case GETTER(expr, field) => aux(EitherT.pure(expr), declared)
-        case FUNCTION_CALL(function, args) =>
+        case GETTER(expr, _) => aux(EitherT.pure(expr), declared)
+        case FUNCTION_CALL(_, args) =>
           args.foldLeft(EitherT.pure[Coeval, String](declared)) {
             case (declEi, arg) => declEi.flatMap(aux(EitherT.pure[Coeval, String](arg), _))
           }

@@ -40,7 +40,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   private def estimate(functionCosts: collection.Map[FunctionHeader, Coeval[Long]], script: EXPR) =
-    ScriptEstimator(ctx.evaluationContext, functionCosts, script)
+    ScriptEstimator(ctx.evaluationContext.letDefs.keySet, functionCosts, script)
 
   property("successful on very deep expressions(stack overflow check)") {
     val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>

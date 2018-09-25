@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.smart.script.v1
 
-import com.wavesplatform.crypto
+import com.wavesplatform.{crypto, utils}
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -20,7 +20,7 @@ object ScriptV1 {
 
   def apply(x: EXPR, checkSize: Boolean = true): Either[String, Script] =
     for {
-      scriptComplexity <- ScriptEstimator(functionCosts, x)
+      scriptComplexity <- ScriptEstimator(utils.dummyVarNames, functionCosts, x)
       _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
       s = new ScriptV1(x)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())

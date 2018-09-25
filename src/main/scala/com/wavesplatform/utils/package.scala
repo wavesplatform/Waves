@@ -99,7 +99,7 @@ package object utils extends ScorexLogging {
       val cost = func match {
         case f: UserFunction =>
           import f.signature.args
-          Coeval.evalOnce(ScriptEstimator(costs, f.ev).right.get - args.size)
+          Coeval.evalOnce(ScriptEstimator(ctx.letDefs.keySet, costs, f.ev).right.get - args.size)
         case f: NativeFunction => Coeval.now(f.cost)
       }
       costs += func.header -> cost
@@ -115,6 +115,8 @@ package object utils extends ScorexLogging {
         WavesContext.build(new WavesEnvironment(dummyNetworkByte, Coeval(???), Coeval(???), null)).compilerContext,
         PureContext.compilerContext
       ))
+
+  lazy val dummyVarNames = dummyCompilerContext.varDefs.keySet
 
   @tailrec
   final def untilTimeout[T](timeout: FiniteDuration, delay: FiniteDuration = 100.milliseconds, onFailure: => Unit = {})(fn: => T): T = {
