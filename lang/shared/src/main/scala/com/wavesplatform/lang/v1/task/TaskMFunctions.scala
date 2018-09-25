@@ -10,6 +10,8 @@ trait TaskMFunctions {
 
   def raiseError[S, E, R](e: E): TaskM[S, E, R] = TaskM(_ => Coeval.pure(e.asLeft))
 
+  def liftEither[S, E, R](ei: Either[E, R]): TaskM[S, E, R] = TaskM.fromKleisli(Kleisli.pure(ei))
+
   def get[S, E]: TaskM[S, E, S] = TaskM(s => Coeval.pure(s.asRight))
 
   def set[S, E](s: S): TaskM[S, E, Unit] =
@@ -25,6 +27,7 @@ trait TaskMFunctions {
   }
 
   def inspect[S, E, A](f: S => A): TaskM[S, E, A]                  = get[S, E].map(f)
+
   def inspectFlat[S, E, A](f: S => TaskM[S, E, A]): TaskM[S, E, A] = get[S, E].flatMap(f)
 
   def modify[S, E](f: S => S): TaskM[S, E, Unit] = get[S, E].flatMap(f andThen set)
