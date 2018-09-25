@@ -808,25 +808,33 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
-    val mulFn = UserFunction("mulFn", LONG, "y" -> LONG, "x" -> LONG) {
-      FUNCTION_CALL(mulLong.header, List(REF("y"), REF("x")))
+    val subFn = UserFunction("mulFn", LONG, "y" -> LONG, "x" -> LONG) {
+      FUNCTION_CALL(subLong.header, List(REF("y"), REF("x")))
     }
 
+    // let x = 3
+    // let y = 100
     val context = Monoid.combine(
       PureContext.evalContext,
       EvaluationContext(
         typeDefs = Map.empty,
-        letDefs = Map("x" -> LazyVal(EitherT.pure(3L))),
+        letDefs = Map(
+          "x" -> LazyVal(EitherT.pure(3L)),
+          "y" -> LazyVal(EitherT.pure(100L))
+        ),
         functions = Map(
           doubleFn.header -> doubleFn,
-          mulFn.header    -> mulFn
+          subFn.header    -> subFn
         )
       )
     )
 
-    // let x = 3 # in context
-    // mul(dub(x), 7)
-    val expr = FUNCTION_CALL(mulFn.header, List(FUNCTION_CALL(doubleFn.header, List(REF("x"))), CONST_LONG(7)))
-    ev[Long](context, expr)._2 shouldBe Right(42)
+    // sub(dub(x), 7)
+    val expr1 = FUNCTION_CALL(subFn.header, List(FUNCTION_CALL(doubleFn.header, List(REF("x"))), CONST_LONG(7)))
+    ev[Long](context, expr1)._2 shouldBe Right(-1)
+
+    // sub(7, dub(x))
+    val expr2 = FUNCTION_CALL(subFn.header, List(CONST_LONG(7), FUNCTION_CALL(doubleFn.header, List(REF("x")))))
+    ev[Long](context, expr2)._2 shouldBe Right(1)
   }
 }
