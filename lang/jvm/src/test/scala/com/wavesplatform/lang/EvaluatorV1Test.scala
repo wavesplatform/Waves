@@ -50,7 +50,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[Long](expr = term) shouldBe Right(100000)
   }
 
-  ignore("return error and context of failed evaluation") {
+  property("return error and log of failed evaluation") {
     val (log, Left(err)) = EvaluatorV1.applywithLogging[Boolean](
       PureContext.evalContext,
       expr = BLOCK(
@@ -65,7 +65,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val expectedError = "A definition of 'z' not found"
 
     err shouldBe expectedError
-    log.exists(_._1 == "x") shouldBe true
+    log.isEmpty shouldBe true
   }
 
   property("successful on unused let") {
@@ -287,7 +287,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     r.isRight shouldBe true
   }
 
-  ignore("returns correct context") {
+  property("returns correct context") {
     val (alicePrivateKey, _)          = Curve25519.createKeyPair("seed0".getBytes())
     val (bobPrivateKey, bobPublicKey) = Curve25519.createKeyPair("seed1".getBytes())
     val (_, senderPublicKey)          = Curve25519.createKeyPair("seed2".getBytes())
@@ -307,7 +307,6 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     //it false, because script fails on Alice's signature check, and bobSigned is not evaluated
     log.find(_._1 == "bobSigned") shouldBe None
-    log.find(_._1 == "aliceSigned") shouldBe None
     log.find(_._1 == "aliceSigned") shouldBe Some(("aliceSigned", Right(false)))
   }
 
