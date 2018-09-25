@@ -6,13 +6,14 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types._
 import monix.eval.Coeval
+import scala.scalajs.js.annotation._
 
 sealed trait BaseFunction {
-  def signature: FunctionTypeSignature
-  def header: FunctionHeader = signature.header
-  def name: String
-  def docString: String
-  def argsDoc: Seq[(String, String)]
+  @JSExport def signature: FunctionTypeSignature
+  @JSExport def header: FunctionHeader = signature.header
+  @JSExport def name: String
+  @JSExport def docString: String
+  @JSExport def argsDoc: Seq[(String, String)]
 }
 
 object BaseFunction {
