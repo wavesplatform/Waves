@@ -436,7 +436,7 @@ object AsyncHttpApi extends Assertions {
     }
 
     def once(r: Request): Future[Response] = {
-      n.log.debug(s"Request: ${r.getUrl}")
+      n.log.debug(s"Request: ${r.getMethod} ${r.getUrl}")
       n.client
         .executeRequest(
           r,
