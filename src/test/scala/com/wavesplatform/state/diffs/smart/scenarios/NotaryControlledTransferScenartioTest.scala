@@ -110,7 +110,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
   private def eval[T](code: String) = {
     val untyped = Parser(code).get.value
     val typed   = CompilerV1(dummyCompilerContext, untyped).map(_._1)
-    typed.flatMap(EvaluatorV1[T](dummyEvaluationContext, _)._2)
+    typed.flatMap(EvaluatorV1[T](dummyEvaluationContext, _))
   }
 
   property("Script toBase58String") {

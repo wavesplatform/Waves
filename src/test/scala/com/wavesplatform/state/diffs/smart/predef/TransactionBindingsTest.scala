@@ -41,7 +41,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
       // `version`  is not properly bound yet
-
+      println(
+        "***********************************************************************************************************************************************************")
       val result = runScript[Boolean](
         s"""
            |match tx {

@@ -17,6 +17,16 @@ import org.scalatest.{Matchers, PropSpec}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
 
+  property("simple let") {
+    val src =
+      """
+        |let a = 1
+        |let b = a + a
+        |b + b + b
+      """.stripMargin
+    eval[Long](src) shouldBe Right(6)
+  }
+
   property("proper error message") {
     val src =
       """
@@ -25,7 +35,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case _ => throw()
         |}
       """.stripMargin
-
     eval[Boolean](src) should produce("can't parse the expression")
   }
 
@@ -115,7 +124,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val ctx: CTX =
       Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Seq.empty))
     val typed = CompilerV1(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1)._2)
+    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
 
   property("function call") {
@@ -250,11 +259,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("throw") {
     val script =
       """
-        |match p {
+        |let result = match p {
         |  case a: PointA => 0
         |  case b: PointB => throw()
         |  case c: PointC => throw("arrgh")
         |}
+        |result
       """.stripMargin
     eval[Long](script, Some(pointAInstance)) shouldBe Right(0)
     eval[Long](script, Some(pointBInstance)) shouldBe Left("Explicit script termination")
@@ -286,7 +296,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     )
 
     val expr = FUNCTION_CALL(PureContext.sumLong.header, List(FUNCTION_CALL(doubleFst.header, List(CONST_LONG(1000l))), REF("x")))
-    ev[Long](context, expr)._2 shouldBe Right(2003l)
+    ev[Long](context, expr) shouldBe Right(2003l)
   }
 
   property("context won't change after execution of an inner block") {
@@ -309,7 +319,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         REF("x")
       )
     )
-    ev[Long](context, expr)._2 shouldBe Right(8)
+    ev[Long](context, expr) shouldBe Right(8)
   }
 
 }

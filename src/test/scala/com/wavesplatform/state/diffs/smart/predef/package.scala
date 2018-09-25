@@ -20,7 +20,7 @@ package object predef {
       compileResult <- CompilerV1(dummyCompilerContext, expr)
       (typedExpr, _) = compileResult
       er             = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
-      r <- er._2
+      r <- er
     } yield r
   }
 
