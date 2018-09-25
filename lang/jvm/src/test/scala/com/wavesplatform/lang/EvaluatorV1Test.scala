@@ -683,7 +683,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       Seq(
         PureContext.ctx,
         defaultCryptoContext,
-        CTX(Seq(txType), vars, Seq.empty)
+        CTX(Seq(txType), vars, Array.empty)
       ))
 
     val script =

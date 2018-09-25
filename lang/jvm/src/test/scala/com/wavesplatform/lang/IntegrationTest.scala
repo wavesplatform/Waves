@@ -112,7 +112,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
-      Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Seq.empty))
+      Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Array.empty))
     val typed = CompilerV1(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1)._2)
   }

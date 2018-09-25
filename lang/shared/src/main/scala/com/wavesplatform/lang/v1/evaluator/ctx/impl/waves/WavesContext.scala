@@ -261,7 +261,7 @@ object WavesContext {
       ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
     )
 
-    val functions = Seq(
+    val functions = Array(
       txByIdF,
       txHeightByIdF,
       getIntegerFromStateF,

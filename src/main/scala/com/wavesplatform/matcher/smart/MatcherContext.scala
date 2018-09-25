@@ -51,7 +51,7 @@ object MatcherContext {
             msg.asLeft
         }),
         msg,
-        Seq.empty
+        Array.empty
       )
     }
 
@@ -67,7 +67,7 @@ object MatcherContext {
     val assetBalanceF: BaseFunction         = inaccessibleFunction("assetBalanceF", ACCOUNTASSETBALANCE)
     val wavesBalanceF: BaseFunction         = inaccessibleUserFunction("wavesBalanceF")
 
-    val functions = Seq(
+    val functions = Array(
       txByIdF,
       txHeightByIdF,
       getIntegerF,

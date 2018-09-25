@@ -50,7 +50,7 @@ object CryptoContext {
     CTX(
       Seq.empty,
       Map.empty,
-      Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, fromBase58StringF, toBase64StringF, fromBase64StringF)
+      Array(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, fromBase58StringF, toBase64StringF, fromBase64StringF)
     )
   }
 

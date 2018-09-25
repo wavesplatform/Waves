@@ -31,7 +31,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
         CTX(
           Seq(transferTransactionType),
           Map(("tx", ((transferTransactionType.typeRef, "Fake transaction"), LazyVal(EitherT.pure(tx))))),
-          Seq.empty
+          Array.empty
         )
       )
       .compilerContext

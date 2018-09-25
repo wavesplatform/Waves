@@ -4,9 +4,11 @@ import cats.Monoid
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import scala.annotation.meta.field
 import scala.scalajs.js.annotation._
 
-case class CTX(@JSExport types: Seq[DefinedType], @JSExport vars: Map[String, ((FINAL, String), LazyVal)], @JSExport functions: Seq[BaseFunction]) {
+@JSExportTopLevel("CTX")
+case class CTX(@(JSExport @field) types: Seq[DefinedType], @(JSExport @field) vars: Map[String, ((FINAL, String), LazyVal)], @(JSExport @field) functions: Array[BaseFunction]) {
   lazy val typeDefs = types.map(t => t.name -> t).toMap
   lazy val evaluationContext: EvaluationContext = {
     if (functions.map(_.header).distinct.size != functions.size) {
@@ -22,7 +24,7 @@ case class CTX(@JSExport types: Seq[DefinedType], @JSExport vars: Map[String, ((
   )
 }
 object CTX {
-  val empty = CTX(Seq.empty, Map.empty, Seq.empty)
+  val empty = CTX(Seq.empty, Map.empty, Array.empty)
 
   implicit val monoid: Monoid[CTX] = new Monoid[CTX] {
     override val empty: CTX                   = CTX.empty

@@ -274,7 +274,7 @@ object PureContext {
     case _        => ???
   }
 
-  private val operators: Seq[BaseFunction] = Seq(
+  private val operators: Array[BaseFunction] = Array(
     mulLong,
     divLong,
     modLong,
@@ -293,7 +293,7 @@ object PureContext {
   )
 
   private val vars: Map[String, ((Types.FINAL, String), LazyVal)] = Map(("unit", ((Types.UNIT,"Single instance value"), LazyVal(EitherT.pure(())))))
-  private val functions = Seq(
+  private val functions = Array(
     fraction,
     sizeBytes,
     toBytesBoolean,

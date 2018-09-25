@@ -1,7 +1,7 @@
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.{Serde, CTX}
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -12,10 +12,12 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import fastparse.core.Parsed.{Failure, Success}
 import shapeless.{:+:, CNil}
 
+import scala.annotation.meta.field
 import scala.scalajs.js
+import scala.scalajs.js.UndefOr
 import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
-import scala.scalajs.js.annotation.JSExportTopLevel
+import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
 object JsAPI {
 
@@ -57,8 +59,28 @@ object JsAPI {
 
   val cryptoContext = CryptoContext.build(Global)
 
+  @JSExportTopLevel("fullContext")
+  val fullContext: CTX = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext))
+
+  @JSExportTopLevel("getVarsDoc")
+  def getVarsDoc(name: String): UndefOr[String] = fullContext.vars.get(name).map(_._1._2).orUndefined
+
+  @JSExportTopLevel("getFunctionsDoc")
+  def getFunctionnsDoc(name: String) =
+    fullContext.functions
+      .filter(_.name == name)
+      .map(f =>
+        js.Dynamic.literal(
+          "name" -> f.name,
+          "doc"  -> f.docString,
+          "args" -> ((f.argsDoc zip f.signature.args) map { arg =>
+            js.Dynamic.literal("name" -> arg._1._1, "type" -> arg._2.toString, "doc" -> arg._1._2)
+          }).toJSArray
+      ))
+      .toJSArray
+
   @JSExportTopLevel("compilerContext")
-  val compilerContext = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext)).compilerContext
+  val compilerContext = fullContext.compilerContext
 
   @JSExportTopLevel("compile")
   def compile(input: String): js.Dynamic = {
