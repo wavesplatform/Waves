@@ -2,26 +2,28 @@ package com.wavesplatform.lang.v1
 
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import monix.eval.Coeval
 
 object ScriptEstimator {
-  def apply(functionCosts: collection.Map[FunctionHeader, Coeval[Long]], t: EXPR): Either[String, Long] = {
+  def apply(ctx: EvaluationContext, functionCosts: collection.Map[FunctionHeader, Coeval[Long]], t: EXPR): Either[String, Long] = {
     type Result[T] = EitherT[Coeval, String, T]
 
-    def aux(t: Result[EXPR], syms: Map[String, EXPR]): Result[(Long, Map[String, EXPR])] = t.flatMap {
+    def aux(t: Result[EXPR], syms: Map[String, (EXPR, Boolean)]): Result[(Long, Map[String, (EXPR, Boolean)])] = t.flatMap {
       case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | TRUE | FALSE => EitherT.pure((1, syms))
       case t: GETTER                                                            => aux(EitherT.pure(t.expr), syms).map { case (comp, out) => (comp + 2, out) }
 
-      case t: BLOCK =>
-        aux(EitherT.pure(t.body), syms + (t.let.name -> t.let.value))
+      case BLOCK(let, body) =>
+        aux(EitherT.pure(body), syms + (let.name -> (let.value, false)))
           .map { case (comp, out) => (comp + 5, out) }
 
-      case t: REF =>
-        syms
-          .get(t.key)
-          .map(expr => aux(EitherT.pure(expr), syms - t.key))
-          .getOrElse(EitherT.pure[Coeval, String]((0L, syms)))
-          .map { case (comp, out) => (comp + 2, out) }
+      case REF(key) =>
+        val ei: EitherT[Coeval, String, (Long, Map[String, (EXPR, Boolean)])] = syms.get(key) match {
+          case None                => EitherT.fromEither(Left(s"Undeclared variable '$key'"))
+          case Some((_, true))     => EitherT.pure[Coeval, String](0L, syms)
+          case Some((expr, false)) => aux(EitherT.pure(expr), syms + (key -> (expr, true)))
+        }
+        ei.map { case (comp: Long, out: Map[String, (EXPR, Boolean)]) => (comp + 2, out) }
 
       case t: IF =>
         for {
@@ -34,7 +36,7 @@ object ScriptEstimator {
 
       case t: FUNCTION_CALL =>
         for {
-          callCost <- EitherT.fromOption[Coeval](functionCosts.get(t.function), s"Unknown function ${t.function}")
+          callCost <- EitherT.fromOption[Coeval](functionCosts.get(t.function), s"Unknown function '${t.function}'")
           args <- t.args.foldLeft(EitherT.pure[Coeval, String]((0L, syms))) {
             case (accEi, arg) =>
               for {
@@ -48,6 +50,30 @@ object ScriptEstimator {
         } yield (callCost() + argsComp, argsSyms)
     }
 
-    aux(EitherT.pure(t), Map.empty).value().map(_._1)
+    aux(EitherT.pure(t), ctx.letDefs.mapValues(_ => (TRUE, true))).value().map(_._1)
+  }
+
+  def denyDuplicateNames(t: EXPR): Either[String, Unit] = {
+    type DenyDuplicates[T] = EitherT[Coeval, String, T]
+    def aux(t: DenyDuplicates[EXPR], declared: Set[String]): DenyDuplicates[Set[String]] = {
+      t flatMap {
+        case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | TRUE | FALSE => EitherT.pure(declared)
+        case BLOCK(LET(name, expr), body) =>
+          EitherT
+            .cond[Coeval](!(declared contains name), declared + name, "FOO")
+            .flatMap(aux(EitherT.pure(expr), _))
+            .flatMap(aux(EitherT.pure(body), _))
+        case IF(cond, ifTrue, ifFalse) =>
+          aux(EitherT.pure(cond), declared)
+            .flatMap(aux(EitherT.pure(ifTrue), _))
+            .flatMap(aux(EitherT.pure(ifFalse), _))
+        case GETTER(expr, field) => aux(EitherT.pure(expr), declared)
+        case FUNCTION_CALL(function, args) =>
+          args.foldLeft(EitherT.pure[Coeval, String](declared)) {
+            case (declEi, arg) => declEi.flatMap(aux(EitherT.pure[Coeval, String](arg), _))
+          }
+      }
+    }
+    aux(EitherT.pure(t), Set.empty).value().map(_ => ())
   }
 }
