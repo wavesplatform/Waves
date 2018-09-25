@@ -266,6 +266,11 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](script, Some(pointAInstance)) shouldBe Right(8)
   }
 
+  property("contexts of different if parts do not affect each other") {
+    val script = "if ({let x= 0; x > 0 }) then { let x = 3; x } else { let x = 5; x}"
+    eval[Long](script, Some(pointAInstance)) shouldBe Right(5)
+  }
+
   property("context won't change after execution of a user function") {
     val doubleFst = UserFunction("ID", LONG, "x" -> LONG) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))

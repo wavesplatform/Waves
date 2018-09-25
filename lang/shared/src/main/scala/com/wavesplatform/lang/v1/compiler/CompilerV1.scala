@@ -64,7 +64,7 @@ object CompilerV1 {
                         ifTrueExpr: Expressions.EXPR,
                         ifFalseExpr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
     for {
-      cond       <- local {
+      cond <- local {
         compileExpr(condExpr)
           .ensureOr(c => UnexpectedType(p.start, p.end, BOOLEAN.toString, c._2.toString))(_._2 equivalent BOOLEAN)
       }
@@ -90,8 +90,9 @@ object CompilerV1 {
         case u: UNION => u.pure[CompileM]
         case _        => raiseError[CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
       }
-      refTmpKey = "$match" + ctx.tmpArgsIdx
-      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1))
+      tmpArgId       = ctx.tmpArgsIdx
+      refTmpKey = "$match" + tmpArgId
+      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId + 1))
       allowShadowVarName = typedExpr._1 match {
         case REF(k) => Some(k)
         case _      => None
@@ -113,6 +114,8 @@ object CompilerV1 {
             )
             .toCompileM
         })
+      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId))
+
     } yield compiledMatch
   }
 
@@ -139,11 +142,7 @@ object CompilerV1 {
       ctx         <- get[CompilerContext, CompilationError]
       field       <- handlePart(fieldPart)
       compiledRef <- compileExpr(refExpr)
-      result <- (compiledRef._2 match {
-        case (t @ CASETYPEREF(_, fielsd)) => mkGetter(p, ctx, List(t), field, compiledRef._1)
-        case UNION(tl)                    => mkGetter(p, ctx, tl, field, compiledRef._1)
-        case _                            => Generic(p.start, p.end, "Unexpected ref type: neither simple type nor union type").asLeft[(EXPR, FINAL)]
-      }).toCompileM
+      result <-  mkGetter(p, ctx, compiledRef._2.l, field, compiledRef._1).toCompileM
     } yield result
   }
 
