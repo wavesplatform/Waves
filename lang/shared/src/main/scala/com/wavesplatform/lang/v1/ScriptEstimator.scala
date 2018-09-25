@@ -13,18 +13,14 @@ object ScriptEstimator {
       case t: GETTER                                                            => aux(EitherT.pure(t.expr), syms).map { case (comp, out) => (comp + 2, out) }
 
       case BLOCK(let, body) =>
-        aux(EitherT.pure(body), syms + (let.name -> (let.value, false)))
+        aux(EitherT.pure(body), syms + ((let.name, (let.value, false))))
           .map { case (comp, out) => (comp + 5, out) }
 
       case REF(key) =>
         val ei: EitherT[Coeval, String, (Long, Map[String, (EXPR, Boolean)])] = syms.get(key) match {
-          case None                => EitherT.fromEither(
-            Left(
-              s"Undeclared variable '$key'"
-            )
-          )
-          case Some((_, true))     => EitherT.pure[Coeval, String](0L, syms)
-          case Some((expr, false)) => aux(EitherT.pure(expr), syms + (key -> (expr, true)))
+          case None                => EitherT.fromEither(Left(s"Undeclared variable '$key'"))
+          case Some((_, true))     => EitherT.pure[Coeval, String]((0L, syms))
+          case Some((expr, false)) => aux(EitherT.pure(expr), syms + ((key, (expr, true))))
         }
         ei.map { case (comp: Long, out: Map[String, (EXPR, Boolean)]) => (comp + 2, out) }
 
@@ -53,7 +49,7 @@ object ScriptEstimator {
         } yield (callCost() + argsComp, argsSyms)
     }
 
-    aux(EitherT.pure(t), declaredVals.map(_ -> (TRUE, true)).toMap).value().map(_._1)
+    aux(EitherT.pure(t), declaredVals.map(_ -> ((TRUE, true))).toMap).value().map(_._1)
   }
 
   def denyDuplicateNames(t: EXPR): Either[String, Unit] = {
@@ -63,7 +59,9 @@ object ScriptEstimator {
         case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | TRUE | FALSE | REF(_) => EitherT.pure(declared)
         case BLOCK(LET(name, expr), body) =>
           EitherT
-            .cond[Coeval](!(declared contains name) || name(0) == '$' || name(0) == '@', declared + name, s"ScriptValidator: duplicate variable names are not allowed: '$name'")
+            .cond[Coeval](!(declared contains name) || name(0) == '$' || name(0) == '@',
+                          declared + name,
+                          s"ScriptValidator: duplicate variable names are not allowed: '$name'")
             .flatMap(aux(EitherT.pure(expr), _))
             .flatMap(aux(EitherT.pure(body), _))
         case IF(cond, ifTrue, ifFalse) =>
