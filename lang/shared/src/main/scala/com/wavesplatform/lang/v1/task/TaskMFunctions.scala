@@ -26,6 +26,8 @@ trait TaskMFunctions {
     }))
   }
 
+  def id[S, E, A](fa: TaskM[S, E, A]): TaskM[S, E, A] = fa
+
   def inspect[S, E, A](f: S => A): TaskM[S, E, A]                  = get[S, E].map(f)
 
   def inspectFlat[S, E, A](f: S => TaskM[S, E, A]): TaskM[S, E, A] = get[S, E].flatMap(f)
