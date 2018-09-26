@@ -54,14 +54,20 @@ object ScriptEstimator {
 
   def denyDuplicateNames(t: EXPR): Either[String, Unit] = {
     type DenyDuplicates[T] = EitherT[Coeval, String, T]
+
+    def isVarValid(declared: Set[String], name: String): Either[String, Set[String]] = name(0) match {
+      case '$' => Right(declared)
+      case '@' => Left("ScriptValidator: Can't declare var starting with @")
+      case _ =>
+        Either.cond(!(declared contains name), declared + name, s"ScriptValidator: duplicate variable names are temporarily not allowed: '$name'")
+    }
+
     def aux(t: DenyDuplicates[EXPR], declared: Set[String]): DenyDuplicates[Set[String]] = {
       t flatMap {
         case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | TRUE | FALSE | REF(_) => EitherT.pure(declared)
         case BLOCK(LET(name, expr), body) =>
           EitherT
-            .cond[Coeval](!(declared contains name) || name(0) == '$' || name(0) == '@',
-                          declared + name,
-                          s"ScriptValidator: duplicate variable names are temporarily not allowed: '$name'")
+            .fromEither[Coeval](isVarValid(declared, name))
             .flatMap(aux(EitherT.pure(expr), _))
             .flatMap(aux(EitherT.pure(body), _))
         case IF(cond, ifTrue, ifFalse) =>

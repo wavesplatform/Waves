@@ -100,7 +100,7 @@ package object utils extends ScorexLogging {
       val cost = func match {
         case f: UserFunction =>
           import f.signature.args
-          Coeval.evalOnce(ScriptEstimator(ctx.letDefs.keySet ++ args.map(_._1), costs, f.ev).explicitGet() - args.size)
+          Coeval.evalOnce(ScriptEstimator(ctx.letDefs.keySet ++ args.map(_._1), costs, f.ev).explicitGet() + args.size * 5)
         case f: NativeFunction => Coeval.now(f.cost)
       }
       costs += func.header -> cost
