@@ -16,7 +16,7 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 10)
 class ScriptEstimatorBenchmark {
   @Benchmark
-  def apply_test(st: St, bh: Blackhole): Unit = bh.consume(ScriptEstimator(st.functionCosts, st.expr))
+  def apply_test(st: St, bh: Blackhole): Unit = bh.consume(ScriptEstimator(Set.empty, st.functionCosts, st.expr))
 }
 
 object ScriptEstimatorBenchmark {
