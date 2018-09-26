@@ -4,7 +4,7 @@ import com.wavesplatform.{crypto, utils}
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator, Serde}
+import com.wavesplatform.lang.v1.{DenyDuplicateVarNames, FunctionHeader, ScriptEstimator, Serde}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.functionCosts
 import monix.eval.Coeval
@@ -20,7 +20,7 @@ object ScriptV1 {
 
   def apply(x: EXPR, checkSize: Boolean = true): Either[String, Script] =
     for {
-      _                <- ScriptEstimator.denyDuplicateNames(x)
+      _                <- DenyDuplicateVarNames(utils.dummyVarNames, x)
       scriptComplexity <- ScriptEstimator(utils.dummyVarNames, functionCosts, x)
       _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
       s = new ScriptV1(x)
