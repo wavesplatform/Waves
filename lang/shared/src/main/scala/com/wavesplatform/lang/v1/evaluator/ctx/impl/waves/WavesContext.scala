@@ -50,9 +50,9 @@ object WavesContext {
     val getStringFromArrayF: BaseFunction  = getDataFromArrayF("getString", DATA_STRING_FROM_ARRAY, DataType.String)
 
     def getDataByIndexF(name: String, dataType: DataType): BaseFunction =
-      UserFunction(name, UNION(dataType.innerType, UNIT), "data" -> LIST(dataEntryType.typeRef), "index" -> LONG) {
+      UserFunction(name, UNION(dataType.innerType, UNIT), "@data" -> LIST(dataEntryType.typeRef), "@index" -> LONG) {
         BLOCK(
-          LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(REF("data"), REF("index"))), "value")),
+          LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(REF("@data"), REF("@index"))), "value")),
           IF(FUNCTION_CALL(PureContext._isInstanceOf, List(REF("@val"), CONST_STRING(dataType.innerType.name))), REF("@val"), REF("unit"))
         )
       }
@@ -72,7 +72,7 @@ object WavesContext {
       )
     )
 
-    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", addressType.typeRef, "publicKey" -> BYTEVECTOR) {
+    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", addressType.typeRef, "@publicKey" -> BYTEVECTOR) {
       FUNCTION_CALL(
         FunctionHeader.User("Address"),
         List(
@@ -87,7 +87,7 @@ object WavesContext {
                   FUNCTION_CALL(
                     PureContext.takeBytes,
                     List(
-                      secureHashExpr(REF("publicKey")),
+                      secureHashExpr(REF("@publicKey")),
                       CONST_LONG(EnvironmentFunctions.HashLength)
                     )
                   )
@@ -141,10 +141,10 @@ object WavesContext {
       )
     )
 
-    val addressFromStringF: BaseFunction = UserFunction("addressFromString", optionAddress, "string" -> STRING) {
+    val addressFromStringF: BaseFunction = UserFunction("addressFromString", optionAddress, "@string" -> STRING) {
       BLOCK(
         LET("@afs_addrBytes",
-            FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(REF("string"), EnvironmentFunctions.AddressPrefix)))),
+            FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(REF("@string"), EnvironmentFunctions.AddressPrefix)))),
         IF(
           FUNCTION_CALL(
             PureContext.eq,
@@ -228,8 +228,8 @@ object WavesContext {
         case _ => ???
       }
 
-    val wavesBalanceF: UserFunction = UserFunction("wavesBalance", LONG, "addressOrAlias" -> addressOrAliasType) {
-      FUNCTION_CALL(assetBalanceF.header, List(REF("addressOrAlias"), REF("unit")))
+    val wavesBalanceF: UserFunction = UserFunction("wavesBalance", LONG, "@addressOrAlias" -> addressOrAliasType) {
+      FUNCTION_CALL(assetBalanceF.header, List(REF("@addressOrAlias"), REF("unit")))
     }
 
     val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
