@@ -151,7 +151,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         val outOfBounds = runScript[Boolean](
           s"""
              |match tx {
-             | case tx: DataTransaction => isDefined(getInteger(tx.data, $badIndex))
+             | case d: DataTransaction => isDefined(getInteger(d.data, $badIndex))
              | case _ => false
              |}
              |""".stripMargin,

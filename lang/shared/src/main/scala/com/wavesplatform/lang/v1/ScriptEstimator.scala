@@ -18,7 +18,7 @@ object ScriptEstimator {
 
       case REF(key) =>
         val ei: EitherT[Coeval, String, (Long, Map[String, (EXPR, Boolean)])] = syms.get(key) match {
-          case None                => EitherT.fromEither(Left(s"Undeclared variable '$key'"))
+          case None                => EitherT.fromEither(Left(s"ScriptValidator: Undeclared variable '$key'"))
           case Some((_, true))     => EitherT.pure[Coeval, String]((0L, syms))
           case Some((expr, false)) => aux(EitherT.pure(expr), syms + ((key, (expr, true))))
         }
@@ -35,7 +35,7 @@ object ScriptEstimator {
 
       case t: FUNCTION_CALL =>
         for {
-          callCost <- EitherT.fromOption[Coeval](functionCosts.get(t.function), s"Unknown function '${t.function}'")
+          callCost <- EitherT.fromOption[Coeval](functionCosts.get(t.function), s"ScriptValidator: Unknown function '${t.function}'")
           args <- t.args.foldLeft(EitherT.pure[Coeval, String]((0L, syms))) {
             case (accEi, arg) =>
               for {
@@ -61,7 +61,7 @@ object ScriptEstimator {
           EitherT
             .cond[Coeval](!(declared contains name) || name(0) == '$' || name(0) == '@',
                           declared + name,
-                          s"ScriptValidator: duplicate variable names are not allowed: '$name'")
+                          s"ScriptValidator: duplicate variable names are temporarily not allowed: '$name'")
             .flatMap(aux(EitherT.pure(expr), _))
             .flatMap(aux(EitherT.pure(body), _))
         case IF(cond, ifTrue, ifFalse) =>
