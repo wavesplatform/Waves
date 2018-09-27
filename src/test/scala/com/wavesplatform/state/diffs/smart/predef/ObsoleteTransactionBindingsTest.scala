@@ -18,10 +18,10 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
 
   def script(g: GenesisTransaction, p: PaymentTransaction): String =
     s"""
-      | let gen = extract(transactionById(base58'${g.id().base58}'))
-      | let pay = extract(transactionById(base58'${p.id().base58}'))
+      | let genTx = extract(transactionById(base58'${g.id().base58}'))
+      | let payTx = extract(transactionById(base58'${p.id().base58}'))
       |
-      | let genTotal = match gen {
+      | let genTotal = match genTx {
       |   case gen: GenesisTransaction =>
       |     let genId = gen.id == base58'${g.id().base58}'
       |     let genFee = gen.fee == ${g.assetFee._2}
@@ -33,7 +33,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
       |    case _ => false
       |  }
       |
-      | let payTotal = match pay {
+      | let payTotal = match payTx {
       |   case pay: PaymentTransaction =>
       |     let payId = pay.id == base58'${p.id().base58}'
       |     let payFee = pay.fee == ${p.assetFee._2}

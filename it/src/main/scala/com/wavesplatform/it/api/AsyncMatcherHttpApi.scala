@@ -16,7 +16,7 @@ import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
-import play.api.libs.json.Writes
+import play.api.libs.json.{Json, Writes}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -111,7 +111,20 @@ object AsyncMatcherHttpApi extends Assertions {
       val sig                       = crypto.sign(privateKey, request.toSign)
       val signedRequest             = request.copy(signature = sig)
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest.json).as[MatcherStatusResponse]
+      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest).as[MatcherStatusResponse]
+    }
+
+    def deleteOrder(sender: PrivateKeyAccount,
+                    assetPair: AssetPair,
+                    orderId: Option[String],
+                    timestamp: Option[Long]): Future[MatcherStatusResponse] = {
+      val privateKey                = sender.privateKey
+      val publicKey                 = PublicKeyAccount(sender.publicKey)
+      val request                   = CancelOrderRequest(publicKey, orderId.map(ByteStr.decodeBase58(_).get), timestamp, Array.emptyByteArray)
+      val sig                       = crypto.sign(privateKey, request.toSign)
+      val signedRequest             = request.copy(signature = sig)
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/delete", signedRequest).as[MatcherStatusResponse]
     }
 
     def cancelAllOrders(sender: Node, timestamp: Option[Long]): Future[MatcherStatusResponse] = {
@@ -120,7 +133,7 @@ object AsyncMatcherHttpApi extends Assertions {
       val request       = CancelOrderRequest(publicKey, None, timestamp, Array.emptyByteArray)
       val sig           = crypto.sign(privateKey, request.toSign)
       val signedRequest = request.copy(signature = sig)
-      matcherPost(s"/matcher/orderbook/cancel", signedRequest.json).as[MatcherStatusResponse]
+      matcherPost(s"/matcher/orderbook/cancel", Json.toJson(signedRequest)).as[MatcherStatusResponse]
     }
 
     def cancelOrderWithApiKey(orderId: String): Future[MatcherStatusResponse] = {

@@ -92,7 +92,7 @@ class OrdersFromScriptedAccTestSuite
       val orderId = aliceOrder.message.id
 
       // Alice checks that the order in order book
-      matcherNode.orderStatus(orderId, aliceWavesPair).status shouldBe "Filled"
+      matcherNode.waitOrderStatus(aliceWavesPair, orderId, "Filled")
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Filled"
 
       // sell order should be in the aliceNode orderbook

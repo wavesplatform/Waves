@@ -84,7 +84,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
           }
           withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.orderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
+            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Accepted")
           }
 
           // Cleanup
@@ -109,7 +109,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
           }
           withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.orderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
+            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Accepted")
           }
 
           // Cleanup
@@ -133,7 +133,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
           }
           withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.orderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
+            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Accepted")
           }
 
           // Cleanup
@@ -161,7 +161,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
           }
           withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.orderStatus(newestOrderId, bobWavesPair).status shouldBe "Accepted"
+            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Accepted")
           }
 
           // Cleanup
@@ -254,7 +254,7 @@ object TradersTestSuite {
                                              |  order-match-tx-fee = 300000
                                              |  blacklisted-assets = ["$ForbiddenAssetId"]
                                              |  balance-watching.enable = yes
-                                             |}""".stripMargin)
+                                             |}""".stripMargin).withFallback(minerDisabled)
 
   private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))

@@ -88,8 +88,8 @@ class MatcherMassOrdersTestSuite
     //check orders after filling
     matcherNode.waitOrderStatus(aliceSecondWavesPair, alicePartialOrderId, "PartiallyFilled")
 
-    orderStatus(aliceNode, aliceOrderIdFill) shouldBe "Filled"
-    orderStatus(aliceNode, alicePartialOrderId) shouldBe "PartiallyFilled"
+    orderStatus(aliceNode, aliceSecondWavesPair, aliceOrderIdFill, "Filled")
+    orderStatus(aliceNode, aliceSecondWavesPair, alicePartialOrderId, "PartiallyFilled")
 
     "Mass orders creation with random lifetime. Active orders still in list" in {
       matcherNode.ordersByAddress(aliceNode, activeOnly = false).length shouldBe 4
@@ -102,11 +102,12 @@ class MatcherMassOrdersTestSuite
 
       orderIds should contain(aliceActiveOrderId)
 
-      ordersRequestsGen(orderLimit, aliceNode, aliceWavesPair, OrderType.SELL, 3)
+      ordersRequestsGen(orderLimit + 1, aliceNode, aliceWavesPair, OrderType.SELL, 3)
+
       //wait for some orders cancelled
-      Thread.sleep(100000)
-      /*val bobsOrderIds = */
-      ordersRequestsGen(orderLimit, bobNode, aliceWavesPair, OrderType.BUY, 2)
+      Thread.sleep(5000)
+      val bobsOrderIds = ordersRequestsGen(orderLimit + 1, bobNode, aliceWavesPair, OrderType.BUY, 2)
+      Thread.sleep(5000)
 
       // Alice check that order Active order is still in list
       val orderIdsAfterMatching = matcherNode.fullOrderHistory(aliceNode).map(_.id)
@@ -117,8 +118,8 @@ class MatcherMassOrdersTestSuite
       matcherNode.waitOrderStatus(aliceSecondWavesPair, aliceActiveOrderId, "Accepted")
       matcherNode.waitOrderStatus(aliceSecondWavesPair, alicePartialOrderId, "PartiallyFilled")
 
-//      matcherNode.fullOrderHistory(bobNode).map(_.id) should contain(bobsOrderIds)
-//      matcherNode.orderHistoryByPair(bobNode, aliceWavesPair).map(_.id) should contain(bobsOrderIds)
+      matcherNode.fullOrderHistory(bobNode).map(_.id) should equal(bobsOrderIds.drop(1).reverse)
+      matcherNode.orderHistoryByPair(bobNode, aliceWavesPair).map(_.id) should equal(bobsOrderIds.drop(1).reverse)
     }
 
     "Filled and Cancelled orders should be after Partial And Accepted" in {
@@ -140,9 +141,11 @@ class MatcherMassOrdersTestSuite
       filledAndCancelledOrders.reverse shouldBe sorted
     }
 
-    "check order history orders count" in {
+    "check order history orders count after fill" in {
       val aliceOrderHistory = matcherNode.fullOrderHistory(aliceNode)
       aliceOrderHistory.size shouldBe orderLimit
+      val aliceOrderHistoryByPair = matcherNode.orderHistoryByPair(aliceNode, aliceWavesPair)
+      aliceOrderHistoryByPair.size shouldBe orderLimit
     }
 
   }
@@ -157,8 +160,9 @@ class MatcherMassOrdersTestSuite
     orderIds
   }
 
-  private def orderStatus(node: Node, orderId: String) = {
-    matcherNode.fullOrderHistory(node).filter(_.id == orderId).seq.head.status
+  private def orderStatus(node: Node, assetPair: AssetPair, orderId: String, expectedStatus: String) = {
+    matcherNode.waitOrderStatus(assetPair, orderId, expectedStatus)
+    matcherNode.fullOrderHistory(node).filter(_.id == orderId).seq.head.status shouldBe expectedStatus
   }
 }
 
@@ -170,6 +174,7 @@ object MatcherMassOrdersTestSuite {
   import ConfigFactory._
   import NodeConfigs.Default
 
+  private val minerDisabled = parseString("waves.miner.enable = no")
   private val matcherConfig = ConfigFactory.parseString(s"""
        |waves.matcher {
        |  enable = yes
@@ -179,9 +184,7 @@ object MatcherMassOrdersTestSuite {
        |  blacklisted-assets = [$ForbiddenAssetId]
        |  order-cleanup-interval = 20s
        |  rest-order-limit=$orderLimit
-       |}""".stripMargin)
-
-  private val minerDisabled = parseString("waves.miner.enable = no")
+       |}""".stripMargin).withFallback(minerDisabled)
 
   private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
