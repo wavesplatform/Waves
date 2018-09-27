@@ -19,6 +19,7 @@ import play.api.libs.json.JsNumber
 
 import scala.concurrent.duration._
 import scala.util.Random
+import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 
 class OrdersFromScriptedAccTestSuite
     extends FreeSpec
@@ -27,8 +28,6 @@ class OrdersFromScriptedAccTestSuite
     with CancelAfterFailure
     with ReportingTestName
     with NodesFromDocker {
-
-  import OrdersFromScriptedAccTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -99,43 +98,4 @@ class OrdersFromScriptedAccTestSuite
     }
   }
 
-}
-
-object OrdersFromScriptedAccTestSuite {
-  val ForbiddenAssetId = "FdbnAsset"
-
-  import NodeConfigs.Default
-
-  private val matcherConfig = ConfigFactory.parseString(s"""
-                                                           |waves {
-                                                           |  matcher {
-                                                           |    enable = yes
-                                                           |    account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
-                                                           |    bind-address = "0.0.0.0"
-                                                           |    order-match-tx-fee = 300000
-                                                           |    blacklisted-assets = [$ForbiddenAssetId]
-                                                           |    order-cleanup-interval = 20s
-                                                           |  }
-                                                           |  rest-api {
-                                                           |    enable = yes
-                                                           |    api-key-hash = 7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i
-                                                           |  }
-                                                           |  miner.enable=no
-                                                           |}""".stripMargin)
-
-  private val nonGeneratingPeersConfig = ConfigFactory.parseString(
-    """waves {
-      | matcher.order-cleanup-interval = 30s
-      | miner.enable=no
-      |}""".stripMargin
-  )
-
-  val MatcherFee: Long     = 300000
-  val TransactionFee: Long = 300000
-
-  private val Configs: Seq[Config] = {
-    val notMatchingNodes = Random.shuffle(Default.init).take(3)
-    Seq(matcherConfig.withFallback(Default.last), notMatchingNodes.head) ++
-      notMatchingNodes.tail.map(nonGeneratingPeersConfig.withFallback)
-  }
 }
