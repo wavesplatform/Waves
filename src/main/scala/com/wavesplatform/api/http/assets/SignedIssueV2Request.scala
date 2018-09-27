@@ -5,6 +5,7 @@ import com.google.common.base.Charsets
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
@@ -33,13 +34,19 @@ case class SignedIssueV2Request(@ApiModelProperty(required = true)
                                 @ApiModelProperty(required = true)
                                 timestamp: Long,
                                 @ApiModelProperty(required = true)
-                                proofs: List[String])
+                                proofs: List[String],
+                                @ApiModelProperty(value = "Base58 encoded compiled asset script")
+                                script: Option[String])
     extends BroadcastRequest {
   def toTx: Either[ValidationError, IssueTransactionV2] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
+      _script <- script match {
+        case None    => Right(None)
+        case Some(s) => Script.fromBase64String(s).map(Some(_))
+      }
       t <- IssueTransactionV2.create(
         version,
         AddressScheme.current.chainId,
@@ -49,7 +56,7 @@ case class SignedIssueV2Request(@ApiModelProperty(required = true)
         quantity,
         decimals,
         reissuable,
-        None,
+        _script,
         fee,
         timestamp,
         _proofs
