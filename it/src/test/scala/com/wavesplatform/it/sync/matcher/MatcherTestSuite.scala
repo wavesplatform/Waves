@@ -28,24 +28,26 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   private val aliceSellAmount         = 500
   private val TransactionFee          = 300000
   private val amountAssetName         = "AliceCoin"
+  private val AssetQuantity           = 1000
   private val aliceCoinDecimals: Byte = 0
 
   "Check cross ordering between Alice and Bob " - {
     // Alice issues new asset
 
     val aliceAsset = aliceNode
-      .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", someAssetAmount, aliceCoinDecimals, reissuable = false, 100000000L)
+      .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, 100000000L)
       .id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
-    // Wait for balance on Alice's account
-    aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, someAssetAmount)
-    matcherNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
-    bobNode.assertAssetBalance(bobNode.address, aliceAsset, 0)
-
     val order1 = matcherNode.placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, aliceSellAmount, 2.minutes)
+
+    "assert addresses balances" in {
+      aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, AssetQuantity)
+      matcherNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
+      bobNode.assertAssetBalance(bobNode.address, aliceAsset, 0)
+    }
 
     "matcher should respond with Public key" in {
       matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr

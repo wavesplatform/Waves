@@ -29,6 +29,7 @@ object MatcherPriceAssetConfig {
 
   val usdAssetName = "USD-X"
   val wctAssetName = "WCT-X"
+  val ethAssetName = "ETH-X"
 
   val IssueUsdTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
@@ -58,6 +59,20 @@ object MatcherPriceAssetConfig {
     .right
     .get
 
+  val IssueEthTx: IssueTransactionV1 = IssueTransactionV1
+    .selfSigned(
+      sender = bobPk,
+      name = ethAssetName.getBytes(),
+      description = "asset description".getBytes(),
+      quantity = defaultAssetQuantity,
+      decimals = 8,
+      reissuable = false,
+      fee = 1.waves,
+      timestamp = System.currentTimeMillis()
+    )
+    .right
+    .get
+
   val IssueBtcTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
       sender = alicePk,
@@ -73,7 +88,7 @@ object MatcherPriceAssetConfig {
     .get
 
   val BtcId = IssueBtcTx.id()
-
+  val EthId = IssueEthTx.id()
   val UsdId = IssueUsdTx.id()
   val WctId = IssueWctTx.id()
 
@@ -85,6 +100,16 @@ object MatcherPriceAssetConfig {
   val wctWavesPair = AssetPair(
     amountAsset = Some(WctId),
     priceAsset = None
+  )
+
+  val ethWavesPair = AssetPair(
+    amountAsset = Some(EthId),
+    priceAsset = None
+  )
+
+  val ethBtcPair = AssetPair(
+    amountAsset = Some(EthId),
+    priceAsset = Some(BtcId)
   )
 
   val wavesUsdPair = AssetPair(

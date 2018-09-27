@@ -30,13 +30,7 @@ class RoundingIssuesTestSuite
 
   private def bobNode = nodes(2)
 
-  val ethId = bobNode.issue(bobNode.address, "xETH", "x-ETH", someAssetAmount, 8, false, issueFee).id
-
-  val ethBtcPair = AssetPair(
-    amountAsset = Some(ByteStr(s"$ethId".getBytes)),
-    priceAsset = Some(BtcId)
-  )
-  Seq(IssueUsdTx, IssueBtcTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
+  Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
   nodes.waitForHeightArise()
 
   "should correctly fill an order with small amount" in {

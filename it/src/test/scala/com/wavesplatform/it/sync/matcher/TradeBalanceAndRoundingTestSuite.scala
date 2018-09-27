@@ -35,13 +35,7 @@ class TradeBalanceAndRoundingTestSuite
 
   private def bobNode = nodes(2)
 
-  val ethId = bobNode.issue(bobNode.address, "xETH", "x-ETH", someAssetAmount, 8, false, issueFee).id
-
-  val ethWavesPair = AssetPair(
-    amountAsset = Some(ByteStr(s"$ethId".getBytes)),
-    priceAsset = None
-  )
-  Seq(IssueUsdTx, IssueWctTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
+  Seq(IssueUsdTx, IssueEthTx, IssueWctTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
   nodes.waitForHeightArise()
 
   "Alice and Bob trade WAVES-USD" - {
