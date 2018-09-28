@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -10,7 +10,7 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.Json
-import shapeless.{Coproduct} // For string escapes.
+import shapeless.Coproduct // For string escapes.
 
 class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   def letProof(p: Proofs, prefix: String)(i: Int) =
@@ -435,4 +435,19 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
+  property("Order type bindings") {
+    forAll(orderGen) { ord =>
+      val src =
+        s"""
+           |match tx {
+           |  case o: Order =>
+           |    let orderType = o.orderType
+           |    orderType == ${if (ord.orderType == OrderType.BUY) "Buy" else "Sell"}
+           |  case _ => throw()
+           |}
+       """.stripMargin
+
+      runScript[Boolean](src, Coproduct[In](ord), 'T') shouldBe Right(true)
+    }
+  }
 }
