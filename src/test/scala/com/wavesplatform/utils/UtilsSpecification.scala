@@ -9,8 +9,8 @@ class UtilsSpecification extends FreeSpec with Matchers {
 
   "estimate()" - {
     "handles functions that depend on each other" in {
-      val callee = UserFunction("callee", BOOLEAN)(TRUE)
-      val caller = UserFunction("caller", BOOLEAN)(FUNCTION_CALL(callee.header, List.empty))
+      val callee = UserFunction("callee", BOOLEAN, "test users true")(TRUE)
+      val caller = UserFunction("caller", BOOLEAN, "test call")(FUNCTION_CALL(callee.header, List.empty))
       val ctx = EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map.empty,

@@ -10,39 +10,39 @@ import scodec.bits.ByteVector
 object CryptoContext {
 
   def build(global: BaseGlobal): CTX = {
-    def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]): BaseFunction =
-      NativeFunction(name, cost, internalName, BYTEVECTOR, "bytes" -> BYTEVECTOR) {
+    def hashFunction(name: String, internalName: Short, cost: Long, docString: String)(h: Array[Byte] => Array[Byte]): BaseFunction =
+      NativeFunction(name, cost, internalName, BYTEVECTOR, docString, ("bytes", BYTEVECTOR, "value")) {
         case (m: ByteVector) :: Nil => Right(ByteVector(h(m.toArray)))
         case _                      => ???
       }
 
-    val keccak256F: BaseFunction  = hashFunction("keccak256", KECCAK256, 10)(global.keccak256)
-    val blake2b256F: BaseFunction = hashFunction("blake2b256", BLAKE256, 10)(global.blake2b256)
-    val sha256F: BaseFunction     = hashFunction("sha256", SHA256, 10)(global.sha256)
+    val keccak256F: BaseFunction  = hashFunction("keccak256", KECCAK256, 10, "256 bit Keccak/SHA-3/TIPS-202")(global.keccak256)
+    val blake2b256F: BaseFunction = hashFunction("blake2b256", BLAKE256, 10, "256 bit BLAKE")(global.blake2b256)
+    val sha256F: BaseFunction     = hashFunction("sha256", SHA256, 10, "256 bit SHA-2")(global.sha256)
 
     val sigVerifyF: BaseFunction =
-      NativeFunction("sigVerify", 100, SIGVERIFY, BOOLEAN, "message" -> BYTEVECTOR, "sig" -> BYTEVECTOR, "pub" -> BYTEVECTOR) {
+      NativeFunction("sigVerify", 100, SIGVERIFY, BOOLEAN, "check signature", ("message", BYTEVECTOR, "value"), ("sig", BYTEVECTOR, "signature"), ("pub", BYTEVECTOR, "public key")) {
         case (m: ByteVector) :: (s: ByteVector) :: (p: ByteVector) :: Nil =>
           Right(global.curve25519verify(m.toArray, s.toArray, p.toArray))
         case _ => ???
       }
 
-    def toBase58StringF: BaseFunction = NativeFunction("toBase58String", 10, TOBASE58, STRING, "bytes" -> BYTEVECTOR) {
+    def toBase58StringF: BaseFunction = NativeFunction("toBase58String", 10, TOBASE58, STRING, "Base58 encode", ("bytes", BYTEVECTOR, "value")) {
       case (bytes: ByteVector) :: Nil => global.base58Encode(bytes.toArray)
       case xs                         => notImplemented("toBase58String(bytes: byte[])", xs)
     }
 
-    def fromBase58StringF: BaseFunction = NativeFunction("fromBase58String", 10, FROMBASE58, BYTEVECTOR, "str" -> STRING) {
+    def fromBase58StringF: BaseFunction = NativeFunction("fromBase58String", 10, FROMBASE58, BYTEVECTOR,  "Base58 decode", ("str", STRING, "base58 encoded string")) {
       case (str: String) :: Nil => global.base58Decode(str, global.MaxBase58String).map(ByteVector(_))
       case xs                   => notImplemented("fromBase58String(str: String)", xs)
     }
 
-    def toBase64StringF: BaseFunction = NativeFunction("toBase64String", 10, TOBASE64, STRING, "bytes" -> BYTEVECTOR) {
+    def toBase64StringF: BaseFunction = NativeFunction("toBase64String", 10, TOBASE64, STRING, "Base64 encode", ("bytes", BYTEVECTOR, "value")) {
       case (bytes: ByteVector) :: Nil => global.base64Encode(bytes.toArray)
       case xs                         => notImplemented("toBase64String(bytes: byte[])", xs)
     }
 
-    def fromBase64StringF: BaseFunction = NativeFunction("fromBase64String", 10, FROMBASE64, BYTEVECTOR, "str" -> STRING) {
+    def fromBase64StringF: BaseFunction = NativeFunction("fromBase64String", 10, FROMBASE64, BYTEVECTOR, "Base64 decode", ("str", STRING, "base64 encoded string")) {
       case (str: String) :: Nil => global.base64Decode(str).map(ByteVector(_))
       case xs                   => notImplemented("fromBase64String(str: String)", xs)
     }
@@ -50,7 +50,7 @@ object CryptoContext {
     CTX(
       Seq.empty,
       Map.empty,
-      Seq(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, fromBase58StringF, toBase64StringF, fromBase64StringF)
+      Array(keccak256F, blake2b256F, sha256F, sigVerifyF, toBase58StringF, fromBase58StringF, toBase64StringF, fromBase64StringF)
     )
   }
 

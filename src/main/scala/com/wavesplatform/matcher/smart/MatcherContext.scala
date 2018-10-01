@@ -27,26 +27,31 @@ object MatcherContext {
 
     val matcherTypes = Seq(addressType, aliasType, orderType, assetPairType)
 
-    val matcherVars: Map[String, (FINAL, LazyVal)] = Map(
-      ("height", (com.wavesplatform.lang.v1.compiler.Types.LONG, LazyVal(EitherT(heightCoeval)))),
-      ("tx", (orderType.typeRef, LazyVal(EitherT(inputEntityCoeval))))
+    val matcherVars: Map[String, ((FINAL, String), LazyVal)] = Map(
+      ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "undefined height placeholder"), LazyVal(EitherT(heightCoeval)))),
+      ("tx", ((orderType.typeRef, "Processing order"), LazyVal(EitherT(inputEntityCoeval))))
     )
 
-    def inaccessibleFunction(name: String, internalName: Short): BaseFunction =
-      NativeFunction(name, 1, internalName, UNIT, Seq.empty: _*) {
+    def inaccessibleFunction(name: String, internalName: Short): BaseFunction = {
+      val msg = s"Function ${name} is inaccessible when running script on matcher"
+      NativeFunction(name, 1, internalName, UNIT, msg, Seq.empty: _*) {
         case _ =>
-          s"Function ${name} is inaccessible when running script on matcher".asLeft
+          msg.asLeft
       }
+    }
 
     def inaccessibleUserFunction(name: String): BaseFunction = {
+      val msg = s"Function ${name} is inaccessible when running script on matcher"
       NativeFunction(
         name,
         1,
         FunctionTypeSignature(UNIT, Seq.empty, FunctionHeader.User(name)),
-        ev = {
+        ({
           case _ =>
-            s"Function ${name} is inaccessible when running script on matcher".asLeft
-        }
+            msg.asLeft
+        }),
+        msg,
+        Array.empty
       )
     }
 
@@ -62,7 +67,7 @@ object MatcherContext {
     val assetBalanceF: BaseFunction         = inaccessibleFunction("assetBalanceF", ACCOUNTASSETBALANCE)
     val wavesBalanceF: BaseFunction         = inaccessibleUserFunction("wavesBalanceF")
 
-    val functions = Seq(
+    val functions = Array(
       txByIdF,
       txHeightByIdF,
       getIntegerF,
