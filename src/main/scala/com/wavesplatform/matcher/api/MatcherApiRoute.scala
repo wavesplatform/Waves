@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.api
 import java.util.concurrent.Executors
 
 import akka.actor.ActorRef
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.server.{Directive1, Route}
 import akka.pattern.ask
@@ -14,12 +15,13 @@ import com.wavesplatform.crypto
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactionsByOrder
 import com.wavesplatform.matcher.market.OrderBookActor._
+import com.wavesplatform.matcher.market.OrderHistoryActor
 import com.wavesplatform.matcher.market.OrderHistoryActor._
-import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
-import com.wavesplatform.matcher.model.{LevelAgg, LimitOrder, OrderBook, OrderInfo}
+import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
@@ -42,10 +44,11 @@ case class MatcherApiRoute(wallet: Wallet,
                            matcher: ActorRef,
                            orderHistory: ActorRef,
                            orderBook: AssetPair => Option[ActorRef],
-                           orderBookSnapshot: AssetPair => Option[OrderBook],
+                           orderBookSnapshot: OrderBookSnapshotHttpCache,
                            txWriter: ActorRef,
                            settings: RestAPISettings,
                            matcherSettings: MatcherSettings,
+                           blockchain: Blockchain,
                            db: DB)
     extends ApiRoute
     with ScorexLogging {
@@ -61,7 +64,7 @@ case class MatcherApiRoute(wallet: Wallet,
     pathPrefix("matcher") {
       matcherPublicKey ~ getOrderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ getTradableBalance ~ reservedBalance ~ orderStatus ~
-        historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
+        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
         getSettings
     }
 
@@ -110,7 +113,7 @@ case class MatcherApiRoute(wallet: Wallet,
   def getOrderBook: Route = (path("orderbook" / AssetPairPM) & get) { p =>
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
-        complete(StatusCodes.OK -> orderBookSnapshot(pair).fold(GetOrderBookResponse.empty(pair))(handleGetOrderBook(pair, _, depth)).json)
+        complete(orderBookSnapshot.get(pair, depth))
       }
     }
   }
@@ -135,57 +138,45 @@ case class MatcherApiRoute(wallet: Wallet,
     (pathEndOrSingleSlash & post) {
       json[Order] { order =>
         placeTimer.measure {
-          (matcher ? order).mapTo[MatcherResponse].map(r => r.code -> r.json)
+          if (blockchain.hasScript(order.senderPublicKey.toAddress)) {
+            Future.successful[MatcherResponse](StatusCodes.BadRequest -> "Trading on scripted account isn't allowed yet.")
+          } else {
+            log.trace(s"Placing ${order.id()}")
+            (matcher ? order).mapTo[MatcherResponse]
+          }
         }
       }
     }
   }
 
-  @Path("/orderbook/cancel")
-  @ApiOperation(
-    value = "Cancel orders",
-    notes = "Cancel all previously submitted orders if it's not already filled completely",
-    httpMethod = "POST",
-    produces = "application/json",
-    consumes = "application/json"
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
-      )
-    ))
-  def cancelAll: Route = (path("orderbook" / "cancel") & post) {
-    implicit val ec = MatcherApiRoute.cancelExecutor
-    json[CancelOrderRequest] { req =>
-      if (req.isSignatureValid()) {
-        req.timestamp match {
-          case None => InvalidSignature
-          case Some(timestamp) =>
-            val address = req.senderPublicKey.address
-            MatcherApiRoute.checkTimestamp(address, timestamp.millis) {
-              val requests = DBUtils
-                .ordersByAddress(db, req.senderPublicKey.toAddress, Set.empty, activeOnly = true, matcherSettings.maxOrdersPerRequest)
-                .map {
-                  case (order, _) =>
-                    orderBook(order.assetPair).fold {
-                      log.warn(s"Can't find pair ${order.assetPair} for order ${order.id()}")
-                      Future.successful[Any](())
-                    } { x =>
-                      cancelTimer.measure(x ? CancelOrder(order.assetPair, req.senderPublicKey, order.id()))
-                    }
-                }
-
-              Future.sequence(requests).map { _ =>
-                StatusCodes.OK -> Json.obj("status" -> "Cancelled")
-              }
+  private def cancelOrder(orderId: ByteStr, senderPublicKey: Option[PublicKeyAccount]): ToResponseMarshallable = {
+    val st = cancelTimer.start()
+    DBUtils.orderInfo(db, orderId).status match {
+      case LimitOrder.NotFound      => StatusCodes.NotFound
+      case status if status.isFinal => StatusCodes.BadRequest -> Json.obj("message" -> s"Order is already ${status.name}")
+      case _ =>
+        DBUtils.order(db, orderId) match {
+          case None =>
+            log.warn(s"Order $orderId was not found in history")
+            StatusCodes.NotFound
+          case Some(order) if senderPublicKey.exists(_ != order.senderPublicKey) =>
+            StatusCodes.BadRequest -> Json.obj("message" -> "Public Key mismatch")
+          case Some(order) =>
+            orderBook(order.assetPair) match {
+              case Some(orderBookRef) =>
+                log.trace(s"Cancelling ${order.id()} for ${senderPublicKey.map(_.address)}")
+                (orderBookRef ? CancelOrder(orderId)).mapTo[MatcherResponse].andThen { case _ => st.stop() }
+              case None =>
+                log.debug(s"Order book for ${order.assetPair} was not found, cancelling $orderId anyway")
+                (orderHistory ? OrderHistoryActor.ForceCancelOrderFromHistory(orderId))
+                  .mapTo[Option[Order]]
+                  .map {
+                    case None    => StatusCodes.NotFound
+                    case Some(_) => StatusCodes.OK
+                  }
+                  .andThen { case _ => st.stop() }
             }
         }
-      } else InvalidSignature
     }
   }
 
@@ -211,37 +202,17 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def cancel: Route = (path("orderbook" / AssetPairPM / "cancel") & post) { p =>
     withAssetPair(p) { pair =>
-      orderBook(pair).fold[Route](complete(StatusCodes.NotFound -> Json.obj("message" -> "Invalid asset pair"))) { oba =>
+      orderBook(pair).fold[Route](complete(StatusCodes.NotFound -> Json.obj("message" -> "Invalid asset pair"))) { _ =>
         json[CancelOrderRequest] { req =>
-          if (req.isSignatureValid())
-            req.orderId match {
-              case Some(id) =>
-                cancelTimer
-                  .measure(oba ? CancelOrder(pair, req.senderPublicKey, id))
-                  .mapTo[MatcherResponse]
-                  .map(r => r.code -> r.json)
-
-              case None =>
-                val requests = DBUtils
-                  .ordersByAddressAndPair(db, req.senderPublicKey.toAddress, pair, activeOnly = true)
-                  .map {
-                    case (order, _) =>
-                      orderBook(order.assetPair).fold {
-                        log.warn(s"Can't find pair ${order.assetPair} for order ${order.id()}")
-                        Future.successful[Any](())
-                      } { x =>
-                        cancelTimer.measure(x ? CancelOrder(order.assetPair, req.senderPublicKey, order.id()))
-                      }
-                  }
-
-                Future.sequence(requests).map { _ =>
-                  StatusCodes.OK -> Json.obj("status" -> "Cancelled")
-                }
-            } else InvalidSignature
+          if (req.isSignatureValid()) req.orderId match {
+            case Some(id) => cancelOrder(id, Some(req.sender))
+            case None     => NotImplemented("Batch cancel is not supported yet")
+          } else InvalidSignature
         }
       }
     }
   }
+
   @Path("/orderbook/{amountAsset}/{priceAsset}/delete")
   @ApiOperation(
     value = "Delete Order from History by Id",
@@ -266,9 +237,9 @@ case class MatcherApiRoute(wallet: Wallet,
     withAssetPair(p) { pair =>
       json[CancelOrderRequest] { req =>
         if (req.isSignatureValid()) {
-          (orderHistory ? DeleteOrderFromHistory(pair, req.senderPublicKey, req.orderId, NTP.correctedTime()))
+          log.trace(s"Deleting ${req.orderId.fold(s"all orders for ${req.sender}")(_.base58)}")
+          (orderHistory ? DeleteOrderFromHistory(pair, req.sender, req.orderId, NTP.correctedTime()))
             .mapTo[MatcherResponse]
-            .map(r => r.code -> r.json)
         } else InvalidSignature
       }
     }
@@ -295,7 +266,7 @@ case class MatcherApiRoute(wallet: Wallet,
       checkGetSignature(publicKey, ts, sig) match {
         case Success(address) =>
           withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
-            complete(StatusCodes.OK -> DBUtils.ordersByAddressAndPair(db, address, pair, false).map {
+            complete(StatusCodes.OK -> DBUtils.ordersByAddressAndPair(db, address, pair, matcherSettings.maxOrdersPerRequest).map {
               case (order, orderInfo) =>
                 orderJson(order, orderInfo)
             })
@@ -333,7 +304,7 @@ case class MatcherApiRoute(wallet: Wallet,
           case Success(_) =>
             complete(
               StatusCodes.OK -> DBUtils
-                .ordersByAddress(db, publicKey, Set.empty, activeOnly.getOrElse(false), matcherSettings.maxOrdersPerRequest)
+                .ordersByAddress(db, publicKey, activeOnly.getOrElse(false), matcherSettings.maxOrdersPerRequest)
                 .map {
                   case (order, orderInfo) =>
                     orderJson(order, orderInfo)
@@ -360,16 +331,7 @@ case class MatcherApiRoute(wallet: Wallet,
       new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
     ))
   def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth) { orderId =>
-    implicit val timeout: Timeout = Timeout(10.seconds)
-    val resp: Future[MatcherResponse] = (orderHistory ? ForceCancelOrderFromHistory(orderId)).flatMap {
-      case Some(order: Order) => (matcher ? ForceCancelOrder(order.assetPair, orderId)).mapTo[MatcherResponse]
-      case None =>
-        Future {
-          OrderCancelRejected("Order not found")
-        }
-    }
-
-    complete(resp.map(r => r.code -> r.json))
+    complete(cancelOrder(orderId, None))
   }
 
   @Path("/orders/{address}")
@@ -380,11 +342,10 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth) { address =>
     parameters('activeOnly.as[Boolean].?) { activeOnly =>
-      complete(
-        StatusCodes.OK -> DBUtils.ordersByAddress(db, address, Set.empty, activeOnly.getOrElse(true), matcherSettings.maxOrdersPerRequest).map {
-          case (order, orderInfo) =>
-            orderJson(order, orderInfo)
-        })
+      complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, address, activeOnly.getOrElse(true), matcherSettings.maxOrdersPerRequest).map {
+        case (order, orderInfo) =>
+          orderJson(order, orderInfo)
+      })
     }
   }
 
@@ -398,10 +359,7 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def getTradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
     withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
-      complete(
-        (orderHistory ? GetTradableBalance(pair, address, NTP.correctedTime()))
-          .mapTo[MatcherResponse]
-          .map(r => r.code -> r.json))
+      complete((orderHistory ? GetTradableBalance(pair, address, NTP.correctedTime())).mapTo[MatcherResponse])
     }
   }
 
@@ -438,9 +396,7 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def orderStatus: Route = (path("orderbook" / AssetPairPM / ByteStrPM) & get) { (p, orderId) =>
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
-      val status = DBUtils.orderInfo(db, orderId).status
-      val code   = if (status == LimitOrder.NotFound) StatusCodes.NotFound else StatusCodes.OK
-      complete(code -> status.json)
+      complete(StatusCodes.OK -> DBUtils.orderInfo(db, orderId).status.json)
     }
   }
 
@@ -448,10 +404,7 @@ case class MatcherApiRoute(wallet: Wallet,
   @ApiOperation(value = "Get the open trading markets", notes = "Get the open trading markets along with trading pairs meta data", httpMethod = "GET")
   def orderbooks: Route = path("orderbook") {
     (pathEndOrSingleSlash & get) {
-      complete(
-        (matcher ? GetMarkets)
-          .mapTo[GetMarketsResponse]
-          .map(r => r.json))
+      complete((matcher ? GetMarkets).mapTo[GetMarketsResponse])
     }
   }
 
@@ -464,10 +417,7 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
     withAssetPair(p) { pair =>
-      complete(
-        (matcher ? DeleteOrderBookRequest(pair))
-          .mapTo[MatcherResponse]
-          .map(r => r.code -> r.json))
+      complete((matcher ? DeleteOrderBookRequest(pair)).mapTo[MatcherResponse])
     }
   }
 
@@ -480,10 +430,7 @@ case class MatcherApiRoute(wallet: Wallet,
       new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
     ))
   def getTransactionsByOrder: Route = (path("transactions" / ByteStrPM) & get) { orderId =>
-    complete(
-      (txWriter ? GetTransactionsByOrder(orderId))
-        .mapTo[MatcherResponse]
-        .map(r => r.code -> r.json))
+    complete((txWriter ? GetTransactionsByOrder(orderId)).mapTo[MatcherResponse])
   }
 }
 
@@ -519,13 +466,6 @@ object MatcherApiRoute {
     } else {
       proc
     }
-  }
-
-  private def handleGetOrderBook(pair: AssetPair, orderBook: OrderBook, depth: Option[Int]): GetOrderBookResponse = {
-    def aggregateLevel(l: (Price, Level[LimitOrder])) = LevelAgg(l._1, l._2.foldLeft(0L)((b, o) => b + o.amount))
-
-    val d = Math.min(depth.getOrElse(MaxDepth), MaxDepth)
-    GetOrderBookResponse(pair, orderBook.bids.take(d).map(aggregateLevel).toSeq, orderBook.asks.take(d).map(aggregateLevel).toSeq)
   }
 
   def orderJson(order: Order, orderInfo: OrderInfo): JsObject =

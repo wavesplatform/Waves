@@ -222,6 +222,15 @@ package object database {
     ndo.toByteArray
   }
 
+  implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
+    import com.wavesplatform.crypto.DigestSize
+    def extractId(offset: Int = 2, length: Int = DigestSize): ByteStr = {
+      val id = ByteStr(new Array[Byte](length))
+      Array.copy(e.getKey, offset, id.arr, 0, length)
+      id
+    }
+  }
+
   implicit class DBExt(val db: DB) extends AnyVal {
     def readOnly[A](f: ReadOnlyDB => A): A = {
       val snapshot = db.getSnapshot
@@ -229,6 +238,9 @@ package object database {
       finally snapshot.close()
     }
 
+    /**
+      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
+      */
     def readWrite[A](f: RW => A): A = {
       val rw = new RW(db)
       try f(rw)
@@ -236,6 +248,9 @@ package object database {
     }
 
     def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
+
+    def iterateOver(prefix: Short)(f: JMap.Entry[Array[Byte], Array[Byte]] => Unit): Unit =
+      iterateOver(Shorts.toByteArray(prefix))(f)
 
     def iterateOver(prefix: Array[Byte])(f: JMap.Entry[Array[Byte], Array[Byte]] => Unit): Unit = {
       val iterator = db.iterator()

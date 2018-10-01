@@ -56,10 +56,7 @@ object MatcherTransactionWriter {
 
   case class GetTransactionsByOrder(orderId: ByteStr)
 
-  case class GetTransactionsResponse(txs: Seq[ExchangeTransaction]) extends MatcherResponse {
-    val json                      = JsArray(txs.map(_.json()))
-    val code: StatusCodes.Success = StatusCodes.OK
-  }
+  case class GetTransactionsResponse(txs: Seq[ExchangeTransaction]) extends MatcherResponse(StatusCodes.OK, JsArray(txs.map(_.json())))
 
   private def appendTxId(rw: RW, orderId: ByteStr, txId: ByteStr): Unit = {
     val key       = MatcherKeys.orderTxIdsSeqNr(orderId)

@@ -4,8 +4,9 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
-import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -16,6 +17,16 @@ import org.scalatest.{Matchers, PropSpec}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
 
+  property("simple let") {
+    val src =
+      """
+        |let a = 1
+        |let b = a + a
+        |b + b + b
+      """.stripMargin
+    eval[Long](src) shouldBe Right(6)
+  }
+
   property("proper error message") {
     val src =
       """
@@ -24,7 +35,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case _ => throw()
         |}
       """.stripMargin
-
     eval[Boolean](src) should produce("can't parse the expression")
   }
 
@@ -108,14 +118,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   private def eval[T](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
-    val untyped = Parser(code).get.value
-    require(untyped.size == 1)
+    val untyped                                      = Parser(code).get.value
     val lazyVal                                      = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, (FINAL, LazyVal)] = Map(("p", (pointType, lazyVal)))
     val ctx: CTX =
       Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Seq.empty))
-    val typed = CompilerV1(ctx.compilerContext, untyped.head)
-    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1)._2)
+    val typed = CompilerV1(ctx.compilerContext, untyped)
+    typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
 
   property("function call") {
@@ -250,14 +259,67 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("throw") {
     val script =
       """
-        |match p {
+        |let result = match p {
         |  case a: PointA => 0
         |  case b: PointB => throw()
         |  case c: PointC => throw("arrgh")
         |}
+        |result
       """.stripMargin
     eval[Long](script, Some(pointAInstance)) shouldBe Right(0)
     eval[Long](script, Some(pointBInstance)) shouldBe Left("Explicit script termination")
     eval[Long](script, Some(pointCInstance)) shouldBe Left("arrgh")
   }
+
+  property("context won't change after inner let") {
+    val script = "{ let x = 3; x } + { let x = 5; x}"
+    eval[Long](script, Some(pointAInstance)) shouldBe Right(8)
+  }
+
+  property("contexts of different if parts do not affect each other") {
+    val script = "if ({let x= 0; x > 0 }) then { let x = 3; x } else { let x = 5; x}"
+    eval[Long](script, Some(pointAInstance)) shouldBe Right(5)
+  }
+
+  ignore("context won't change after execution of a user function") {
+    val doubleFst = UserFunction("ID", LONG, "x" -> LONG) {
+      FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
+    }
+
+    val context = Monoid.combine(
+      PureContext.evalContext,
+      EvaluationContext(
+        typeDefs = Map.empty,
+        letDefs = Map("x"                -> LazyVal(EitherT.pure(3l))),
+        functions = Map(doubleFst.header -> doubleFst)
+      )
+    )
+
+    val expr = FUNCTION_CALL(PureContext.sumLong.header, List(FUNCTION_CALL(doubleFst.header, List(CONST_LONG(1000l))), REF("x")))
+    ev[Long](context, expr) shouldBe Right(2003l)
+  }
+
+  ignore("context won't change after execution of an inner block") {
+    val context = Monoid.combine(
+      PureContext.evalContext,
+      EvaluationContext(
+        typeDefs = Map.empty,
+        letDefs = Map("x" -> LazyVal(EitherT.pure(3l))),
+        functions = Map.empty
+      )
+    )
+
+    val expr = FUNCTION_CALL(
+      function = PureContext.sumLong.header,
+      args = List(
+        BLOCK(
+          let = LET("x", CONST_LONG(5l)),
+          body = REF("x")
+        ),
+        REF("x")
+      )
+    )
+    ev[Long](context, expr) shouldBe Right(8)
+  }
+
 }

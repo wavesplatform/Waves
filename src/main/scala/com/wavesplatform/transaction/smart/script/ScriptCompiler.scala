@@ -31,7 +31,7 @@ object ScriptCompiler extends ScorexLogging {
         case V1 => tryCompile(scriptWithoutDirectives, directives)
       }
       script     <- ScriptV1(expr)
-      complexity <- ScriptEstimator(functionCosts, expr)
+      complexity <- ScriptEstimator(utils.dummyVarNames, functionCosts, expr)
     } yield (script, complexity)
   }
 
@@ -47,7 +47,7 @@ object ScriptCompiler extends ScorexLogging {
   }
 
   def estimate(script: Script): Either[String, Long] = script match {
-    case Script.Expr(expr) => ScriptEstimator(functionCosts, expr)
+    case Script.Expr(expr) => ScriptEstimator(utils.dummyVarNames, functionCosts, expr)
   }
 
   private def extractVersion(directives: List[Directive]): Either[String, ScriptVersion] = {

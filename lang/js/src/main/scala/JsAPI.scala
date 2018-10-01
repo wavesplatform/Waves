@@ -46,9 +46,9 @@ object JsAPI {
   def compile(input: String): js.Dynamic = {
 
     val wavesContext = WavesContext.build(new Environment {
-      override def height: Int                                                                                     = ???
-      override def networkByte: Byte                                                                               = ???
-      override def transaction: Tx                                                                                 = ???
+      override def height: Int                                                                                     = 0
+      override def networkByte: Byte                                                                               = 1: Byte
+      override def transaction: Tx                                                                                 = null
       override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
       override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
       override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
@@ -69,7 +69,7 @@ object JsAPI {
     }
 
     (Parser(input) match {
-      case Success(value, _)    => Right[String, Expressions.EXPR](value.head)
+      case Success(value, _)    => Right[String, Expressions.EXPR](value)
       case Failure(_, _, extra) => Left[String, Expressions.EXPR](extra.traced.trace)
     }).flatMap(CompilerV1(compilerContext, _))
       .flatMap(ast => serialize(ast._1).map(x => (x, ast)))

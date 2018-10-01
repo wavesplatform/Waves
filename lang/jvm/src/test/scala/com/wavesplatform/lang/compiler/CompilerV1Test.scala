@@ -2,14 +2,14 @@ package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.v1.compiler
+import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
-import com.wavesplatform.lang.v1.parser.Expressions
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -187,6 +187,35 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
          )
        ),
        BOOLEAN))
+  )
+
+  treeTypeTest("pattern matching - nested matches increment tmp var name")(
+    ctx = compilerContext,
+    expr = {
+      val script =
+        """
+          | let a = match p {
+          |  case _ =>
+          |    match p {
+          |      case _ => 1
+          |    }
+          | }
+          | let b = match p {
+          |  case _ => 2
+          | }
+          | a + b
+      """.stripMargin
+      Parser.apply(script).get.value
+    },
+    expectedResult = {
+      Right(
+        (BLOCK(
+           LET("a", BLOCK(LET("$match0", REF("p")), BLOCK(LET("$match1", REF("p")), CONST_LONG(1)))),
+           BLOCK(LET("b", BLOCK(LET("$match0", REF("p")), CONST_LONG(2))), FUNCTION_CALL(FunctionHeader.Native(100), List(REF("a"), REF("b"))))
+         ),
+         LONG))
+
+    }
   )
 
   treeTypeTest("pattern matching - deny shadowing of other variable")(

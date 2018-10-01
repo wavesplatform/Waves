@@ -1,9 +1,11 @@
 package com.wavesplatform.it.sync.matcher
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -20,8 +22,6 @@ class MatcherMassOrdersTestSuite
     with BeforeAndAfterAll
     with CancelAfterFailure {
 
-  import MatcherMassOrdersTestSuite._
-
   override protected def nodeConfigs: Seq[Config] = Configs
 
   private def matcherNode = nodes.head
@@ -32,11 +32,11 @@ class MatcherMassOrdersTestSuite
 
     // Alice issues new assets
     val aliceAsset =
-      aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", AssetQuantity, 0, reissuable = false, 100000000L).id
+      aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceSecondAsset = aliceNode
-      .issue(aliceNode.address, "AliceSecondCoin", "AliceSecondCoin for matcher's tests", AssetQuantity, 0, reissuable = false, 100000000L)
+      .issue(aliceNode.address, "AliceSecondCoin", "AliceSecondCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L)
       .id
     nodes.waitForHeightAriseAndTxPresent(aliceSecondAsset)
 
@@ -44,18 +44,18 @@ class MatcherMassOrdersTestSuite
     val aliceSecondWavesPair = AssetPair(ByteStr.decodeBase58(aliceSecondAsset).toOption, None)
 
     // Check balances on Alice's account
-    aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, AssetQuantity)
-    aliceNode.assertAssetBalance(aliceNode.address, aliceSecondAsset, AssetQuantity)
+    aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, someAssetAmount)
+    aliceNode.assertAssetBalance(aliceNode.address, aliceSecondAsset, someAssetAmount)
     matcherNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
 
-    val transfer1ToBobId = aliceNode.transfer(aliceNode.address, bobNode.address, AssetQuantity / 2, 100000, Some(aliceAsset), None).id
+    val transfer1ToBobId = aliceNode.transfer(aliceNode.address, bobNode.address, someAssetAmount / 2, 100000, Some(aliceAsset), None).id
     nodes.waitForHeightAriseAndTxPresent(transfer1ToBobId)
 
-    val transfer2ToBobId = aliceNode.transfer(aliceNode.address, bobNode.address, AssetQuantity / 2, 100000, Some(aliceSecondAsset), None).id
+    val transfer2ToBobId = aliceNode.transfer(aliceNode.address, bobNode.address, someAssetAmount / 2, 100000, Some(aliceSecondAsset), None).id
     nodes.waitForHeightAriseAndTxPresent(transfer2ToBobId)
 
-    bobNode.assertAssetBalance(bobNode.address, aliceAsset, AssetQuantity / 2)
-    bobNode.assertAssetBalance(bobNode.address, aliceSecondAsset, AssetQuantity / 2)
+    bobNode.assertAssetBalance(bobNode.address, aliceAsset, someAssetAmount / 2)
+    bobNode.assertAssetBalance(bobNode.address, aliceSecondAsset, someAssetAmount / 2)
 
     // Alice places sell orders
     val aliceOrderIdFill = matcherNode
@@ -87,11 +87,10 @@ class MatcherMassOrdersTestSuite
     //check orders after filling
     matcherNode.waitOrderStatus(aliceSecondWavesPair, alicePartialOrderId, "PartiallyFilled")
 
-    orderStatus(aliceNode, aliceOrderIdFill) shouldBe "Filled"
-    orderStatus(aliceNode, alicePartialOrderId) shouldBe "PartiallyFilled"
+    orderStatus(aliceNode, aliceSecondWavesPair, aliceOrderIdFill, "Filled")
+    orderStatus(aliceNode, aliceSecondWavesPair, alicePartialOrderId, "PartiallyFilled")
 
     "Mass orders creation with random lifetime. Active orders still in list" in {
-
       matcherNode.ordersByAddress(aliceNode, activeOnly = false).length shouldBe 4
       matcherNode.ordersByAddress(aliceNode, activeOnly = true).length shouldBe 2
 
@@ -102,11 +101,12 @@ class MatcherMassOrdersTestSuite
 
       orderIds should contain(aliceActiveOrderId)
 
-      ordersRequestsGen(orderLimit, aliceNode, aliceWavesPair, OrderType.SELL, 3)
+      ordersRequestsGen(orderLimit + 1, aliceNode, aliceWavesPair, OrderType.SELL, 3)
+
       //wait for some orders cancelled
-      Thread.sleep(100000)
-      /*val bobsOrderIds = */
-      ordersRequestsGen(orderLimit, bobNode, aliceWavesPair, OrderType.BUY, 2)
+      Thread.sleep(5000)
+      val bobsOrderIds = ordersRequestsGen(orderLimit + 1, bobNode, aliceWavesPair, OrderType.BUY, 2)
+      Thread.sleep(5000)
 
       // Alice check that order Active order is still in list
       val orderIdsAfterMatching = matcherNode.fullOrderHistory(aliceNode).map(_.id)
@@ -117,8 +117,8 @@ class MatcherMassOrdersTestSuite
       matcherNode.waitOrderStatus(aliceSecondWavesPair, aliceActiveOrderId, "Accepted")
       matcherNode.waitOrderStatus(aliceSecondWavesPair, alicePartialOrderId, "PartiallyFilled")
 
-//      matcherNode.fullOrderHistory(bobNode).map(_.id) should contain(bobsOrderIds)
-//      matcherNode.orderHistoryByPair(bobNode, aliceWavesPair).map(_.id) should contain(bobsOrderIds)
+      matcherNode.fullOrderHistory(bobNode).map(_.id) should equal(bobsOrderIds.drop(1).reverse)
+      matcherNode.orderHistoryByPair(bobNode, aliceWavesPair).map(_.id) should equal(bobsOrderIds.drop(1).reverse)
     }
 
     "Filled and Cancelled orders should be after Partial And Accepted" in {
@@ -140,9 +140,11 @@ class MatcherMassOrdersTestSuite
       filledAndCancelledOrders.reverse shouldBe sorted
     }
 
-    "check order history orders count" in {
+    "check order history orders count after fill" in {
       val aliceOrderHistory = matcherNode.fullOrderHistory(aliceNode)
       aliceOrderHistory.size shouldBe orderLimit
+      val aliceOrderHistoryByPair = matcherNode.orderHistoryByPair(aliceNode, aliceWavesPair)
+      aliceOrderHistoryByPair.size shouldBe orderLimit
     }
 
   }
@@ -157,33 +159,8 @@ class MatcherMassOrdersTestSuite
     orderIds
   }
 
-  private def orderStatus(node: Node, orderId: String) = {
-    matcherNode.fullOrderHistory(node).filter(_.id == orderId).seq.head.status
+  private def orderStatus(node: Node, assetPair: AssetPair, orderId: String, expectedStatus: String) = {
+    matcherNode.waitOrderStatus(assetPair, orderId, expectedStatus)
+    matcherNode.fullOrderHistory(node).filter(_.id == orderId).seq.head.status shouldBe expectedStatus
   }
-}
-
-object MatcherMassOrdersTestSuite {
-  private val ForbiddenAssetId    = "FdbnAsset"
-  private val orderLimit          = 20
-  private val AssetQuantity: Long = 1000000000
-
-  import ConfigFactory._
-  import NodeConfigs.Default
-
-  private val matcherConfig = ConfigFactory.parseString(s"""
-       |waves.matcher {
-       |  enable = yes
-       |  account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
-       |  bind-address = "0.0.0.0"
-       |  order-match-tx-fee = 300000
-       |  blacklisted-assets = [$ForbiddenAssetId]
-       |  order-cleanup-interval = 20s
-       |  rest-order-limit=$orderLimit
-       |}""".stripMargin)
-
-  private val minerDisabled = parseString("waves.miner.enable = no")
-
-  private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
-    .map { case (n, o) => o.withFallback(n) }
 }

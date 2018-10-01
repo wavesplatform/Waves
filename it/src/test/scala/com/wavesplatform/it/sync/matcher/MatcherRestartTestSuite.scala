@@ -13,6 +13,8 @@ import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.util.Random
+import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 
 class MatcherRestartTestSuite
     extends FreeSpec
@@ -24,8 +26,6 @@ class MatcherRestartTestSuite
     with TransferSending
     with Eventually {
 
-  import MatcherRestartTestSuite._
-
   override protected def nodeConfigs: Seq[Config] = Configs
   private def matcherNode                         = nodes.head
   private def aliceNode                           = nodes(1)
@@ -33,12 +33,12 @@ class MatcherRestartTestSuite
   "check order execution" - {
     // Alice issues new asset
     val aliceAsset =
-      aliceNode.issue(aliceNode.address, "DisconnectCoin", "Alice's coin for disconnect tests", AssetQuantity, 0, reissuable = false, 100000000L).id
+      aliceNode.issue(aliceNode.address, "DisconnectCoin", "Alice's coin for disconnect tests", someAssetAmount, 0, reissuable = false, 100000000L).id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
     // check assets's balances
-    aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, AssetQuantity)
+    aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, someAssetAmount)
     aliceNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
 
     "make order and after matcher's restart try to cancel it" in {
@@ -48,8 +48,7 @@ class MatcherRestartTestSuite
       aliceOrder.status shouldBe "OrderAccepted"
       val firstOrder = aliceOrder.message.id
 
-      // check order status
-      matcherNode.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
+      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
 
       // check that order is correct
       eventually {
@@ -68,7 +67,7 @@ class MatcherRestartTestSuite
       val height = nodes.map(_.height).max
 
       matcherNode.waitForHeight(height + 1, 40.seconds)
-      matcherNode.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
+      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
 
       eventually {
@@ -94,43 +93,8 @@ class MatcherRestartTestSuite
         orders3.asks.head.amount shouldBe 500
       }
 
-      matcherNode.orderStatus(firstOrder, aliceWavesPair).status should be("Cancelled")
+      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Cancelled")
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
     }
-  }
-}
-
-object MatcherRestartTestSuite {
-  val ForbiddenAssetId = "FdbnAsset"
-  import NodeConfigs.Default
-  private val matcherConfig = ConfigFactory.parseString(s"""
-                                                           |waves {
-                                                           |  matcher {
-                                                           |    enable = yes
-                                                           |    account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
-                                                           |    bind-address = "0.0.0.0"
-                                                           |    order-match-tx-fee = 300000
-                                                           |    blacklisted-assets = [$ForbiddenAssetId]
-                                                           |    order-cleanup-interval = 20s
-                                                           |  }
-                                                           |  rest-api {
-                                                           |    enable = yes
-                                                           |    api-key-hash = 7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i
-                                                           |  }
-                                                           |  miner.enable=no
-                                                           |}""".stripMargin)
-  private val nonGeneratingPeersConfig = ConfigFactory.parseString(
-    """waves {
-      | matcher.order-cleanup-interval = 30s
-      | miner.enable=no
-      |}""".stripMargin
-  )
-  val AssetQuantity: Long  = 1000
-  val MatcherFee: Long     = 300000
-  val TransactionFee: Long = 300000
-  private val Configs: Seq[Config] = {
-    val notMatchingNodes = Random.shuffle(Default.init).take(3)
-    Seq(matcherConfig.withFallback(Default.last), notMatchingNodes.head) ++
-      notMatchingNodes.tail.map(nonGeneratingPeersConfig.withFallback)
   }
 }

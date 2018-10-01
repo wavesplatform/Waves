@@ -44,7 +44,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                                    |   }
                                    |   let txHeightId = extract(transactionHeightById(t.id)) > 0
                                    |   txId && txHeightId
-                                   | case t : CreateAliasTransaction => true
+                                   | case _ : CreateAliasTransaction => true
                                    | case other =>
                                    |   let oracle = Alias("${alias.name}")
                                    |   let long = extract(getInteger(oracle,"${long.key}")) == ${long.value}
@@ -55,8 +55,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                                    |}""".stripMargin
       setScript <- {
         val untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
-        assert(untypedAllFieldsRequiredScript.size == 1)
-        val typedAllFieldsRequiredScript = CompilerV1(dummyCompilerContext, untypedAllFieldsRequiredScript.head).explicitGet()._1
+        val typedAllFieldsRequiredScript   = CompilerV1(dummyCompilerContext, untypedAllFieldsRequiredScript).explicitGet()._1
         selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
       }
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)

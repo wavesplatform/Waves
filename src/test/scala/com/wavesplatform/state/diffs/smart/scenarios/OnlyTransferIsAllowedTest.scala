@@ -25,9 +25,8 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
          |     false
          | }
       """.stripMargin
-    val untyped = Parser(scriptText).get.value
-    assert(untyped.size == 1)
-    val transferAllowed = CompilerV1(dummyCompilerContext, untyped.head).explicitGet()._1
+    val untyped         = Parser(scriptText).get.value
+    val transferAllowed = CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
 
     forAll(preconditionsTransferAndLease(transferAllowed)) {
       case (genesis, script, lease, transfer) =>

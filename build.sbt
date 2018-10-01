@@ -13,7 +13,7 @@ val versionSource = Def.task {
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 14, 2)
+  val FallbackVersion = (0, 14, 5)
 
   val versionFile      = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
@@ -50,7 +50,10 @@ inThisBuild(
     scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
   ))
 
-resolvers += Resolver.bintrayRepo("ethereum", "maven")
+resolvers ++= Seq(
+  Resolver.bintrayRepo("ethereum", "maven"),
+  Resolver.bintrayRepo("dnvriend", "maven")
+)
 
 fork in run := true
 javaOptions in run ++= Seq(
@@ -277,3 +280,7 @@ lazy val generator = project
 lazy val benchmark = project
   .enablePlugins(JmhPlugin)
   .dependsOn(node % "compile->compile;test->test", langJVM % "compile->compile;test->test")
+
+lazy val dexgenerator = project
+  .dependsOn(it)
+  .settings(libraryDependencies += "com.github.scopt" %% "scopt" % "3.6.0")

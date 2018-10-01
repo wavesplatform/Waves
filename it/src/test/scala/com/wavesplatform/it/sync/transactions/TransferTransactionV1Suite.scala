@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.it.TransferSending
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -15,7 +14,7 @@ import com.wavesplatform.transaction.transfer._
 
 import scala.concurrent.duration._
 
-class TransferTransactionV1Suite extends BaseTransactionSuite with TransferSending with CancelAfterFailure {
+class TransferTransactionV1Suite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("asset transfer changes sender's and recipient's asset balance; issuer's.waves balance is decreased by fee") {
     val (firstBalance, firstEffBalance)   = notMiner.accountBalances(firstAddress)

@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import java.nio.charset.StandardCharsets
 
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -9,16 +10,15 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.transaction.assets.IssueTransactionV2
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 
 class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
@@ -57,11 +57,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
                     | }
         """.stripMargin
 
-      untypedScript = {
-        val r = Parser(assetScript).get.value
-        assert(r.size == 1)
-        r.head
-      }
+      untypedScript = Parser(assetScript).get.value
 
       typedScript = ScriptV1(CompilerV1(dummyCompilerContext, untypedScript).explicitGet()._1).explicitGet()
 
@@ -113,9 +109,8 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
 
   private def eval[T](code: String) = {
     val untyped = Parser(code).get.value
-    assert(untyped.size == 1)
-    val typed = CompilerV1(dummyCompilerContext, untyped.head).map(_._1)
-    typed.flatMap(EvaluatorV1[T](dummyEvaluationContext, _)._2)
+    val typed   = CompilerV1(dummyCompilerContext, untyped).map(_._1)
+    typed.flatMap(EvaluatorV1[T](dummyEvaluationContext, _))
   }
 
   property("Script toBase58String") {

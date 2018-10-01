@@ -43,8 +43,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
           case other => false
         }
         """.stripMargin).get.value
-      assert(sc.size == 1)
-      CompilerV1(dummyCompilerContext, sc.head).explicitGet()._1
+      CompilerV1(dummyCompilerContext, sc).explicitGet()._1
     }
 
     val script = ScriptV1(scriptText).explicitGet()

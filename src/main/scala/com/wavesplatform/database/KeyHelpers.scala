@@ -26,8 +26,8 @@ object KeyHelpers {
   def intKey(prefix: Short, default: Int = 0): Key[Int] =
     Key(Shorts.toByteArray(prefix), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
 
-  def bytesSeqNr(prefix: Short, b: Array[Byte]): Key[Int] =
-    Key(bytes(prefix, b), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+  def bytesSeqNr(prefix: Short, b: Array[Byte], default: Int = 0): Key[Int] =
+    Key(bytes(prefix, b), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
 
   def unsupported[A](message: String): A => Array[Byte] = _ => throw new UnsupportedOperationException(message)
 }
