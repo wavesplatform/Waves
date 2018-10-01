@@ -19,11 +19,19 @@ object WavesContext {
   import Bindings._
   import Types._
 
-  def build(env: Environment): CTX = {
+  def build(env: Environment, orderTypeVarsEnabled: Boolean = false): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "get data from the accaunt state", ("addressOrAlias", addressOrAliasType, "accaunt"), ("key", STRING, "key")) {
+      NativeFunction(
+        name,
+        100,
+        internalName,
+        UNION(dataType.innerType, UNIT),
+        "get data from the accaunt state",
+        ("addressOrAlias", addressOrAliasType, "accaunt"),
+        ("key", STRING, "key")
+      ) {
         case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)
         case _                                               => ???
       }
@@ -34,38 +42,51 @@ object WavesContext {
     val getStringFromStateF: BaseFunction  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String)
 
     def getDataFromArrayF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 10, internalName, UNION(dataType.innerType, UNIT), "Find and extract data by key", ("data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"), ("key", STRING, "key")) {
+      NativeFunction(
+        name,
+        10,
+        internalName,
+        UNION(dataType.innerType, UNIT),
+        "Find and extract data by key",
+        ("data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"),
+        ("key", STRING, "key")
+      ) {
         case (data: IndexedSeq[CaseObj] @unchecked) :: (key: String) :: Nil =>
           data.find(_.fields("key") == key).map(_.fields("value")) match {
-            case Some(n: Long) if dataType == DataType.Long => Right(n)
-            case Some(b: Boolean) if dataType == DataType.Boolean => Right(b)
+            case Some(n: Long) if dataType == DataType.Long            => Right(n)
+            case Some(b: Boolean) if dataType == DataType.Boolean      => Right(b)
             case Some(b: ByteVector) if dataType == DataType.ByteArray => Right(b)
-            case Some(s: String) if dataType == DataType.String => Right(s)
-            case _ => Right(())
+            case Some(s: String) if dataType == DataType.String        => Right(s)
+            case _                                                     => Right(())
           }
         case _ => ???
       }
 
     val getIntegerFromArrayF: BaseFunction = getDataFromArrayF("getInteger", DATA_LONG_FROM_ARRAY, DataType.Long)
     val getBooleanFromArrayF: BaseFunction = getDataFromArrayF("getBoolean", DATA_BOOLEAN_FROM_ARRAY, DataType.Boolean)
-    val getBinaryFromArrayF: BaseFunction = getDataFromArrayF("getBinary", DATA_BYTES_FROM_ARRAY, DataType.ByteArray)
-    val getStringFromArrayF: BaseFunction = getDataFromArrayF("getString", DATA_STRING_FROM_ARRAY, DataType.String)
+    val getBinaryFromArrayF: BaseFunction  = getDataFromArrayF("getBinary", DATA_BYTES_FROM_ARRAY, DataType.ByteArray)
+    val getStringFromArrayF: BaseFunction  = getDataFromArrayF("getString", DATA_STRING_FROM_ARRAY, DataType.String)
 
     def getDataByIndexF(name: String, dataType: DataType): BaseFunction =
-      UserFunction(name, UNION(dataType.innerType, UNIT), "Extract data by index", ("data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"), ("index", LONG, "index")) {
+      UserFunction(
+        name,
+        UNION(dataType.innerType, UNIT),
+        "Extract data by index",
+        ("data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"),
+        ("index", LONG, "index")
+      ) {
         case data :: index :: Nil =>
           BLOCK(
             LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(data, index)), "value")),
-            IF(FUNCTION_CALL(PureContext._isInstanceOf, List(REF("@val"), CONST_STRING(dataType.innerType.name))),
-              REF("@val"),
-              REF("unit")))
+            IF(FUNCTION_CALL(PureContext._isInstanceOf, List(REF("@val"), CONST_STRING(dataType.innerType.name))), REF("@val"), REF("unit"))
+          )
         case _ => ???
       }
 
     val getIntegerByIndexF: BaseFunction = getDataByIndexF("getInteger", DataType.Long)
     val getBooleanByIndexF: BaseFunction = getDataByIndexF("getBoolean", DataType.Boolean)
-    val getBinaryByIndexF: BaseFunction = getDataByIndexF("getBinary", DataType.ByteArray)
-    val getStringByIndexF: BaseFunction = getDataByIndexF("getString", DataType.String)
+    val getBinaryByIndexF: BaseFunction  = getDataByIndexF("getBinary", DataType.ByteArray)
+    val getStringByIndexF: BaseFunction  = getDataByIndexF("getString", DataType.String)
 
     def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
       FunctionHeader.Native(KECCAK256),
@@ -77,48 +98,49 @@ object WavesContext {
       )
     )
 
-    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to accaunt address", ("publicKey", BYTEVECTOR, "public key")) {
-      case pk :: Nil =>
-        FUNCTION_CALL(
-          FunctionHeader.User("Address"),
-          List(
-            BLOCK(
-              LET(
-                "@afpk_withoutChecksum",
-                FUNCTION_CALL(
-                  PureContext.sumByteVector,
-                  List(
-                    CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.networkByte)),
-                    // publicKeyHash
-                    FUNCTION_CALL(
-                      PureContext.takeBytes,
-                      List(
-                        secureHashExpr(pk),
-                        CONST_LONG(EnvironmentFunctions.HashLength)
+    val addressFromPublicKeyF: BaseFunction =
+      UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to accaunt address", ("publicKey", BYTEVECTOR, "public key")) {
+        case pk :: Nil =>
+          FUNCTION_CALL(
+            FunctionHeader.User("Address"),
+            List(
+              BLOCK(
+                LET(
+                  "@afpk_withoutChecksum",
+                  FUNCTION_CALL(
+                    PureContext.sumByteVector,
+                    List(
+                      CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.networkByte)),
+                      // publicKeyHash
+                      FUNCTION_CALL(
+                        PureContext.takeBytes,
+                        List(
+                          secureHashExpr(pk),
+                          CONST_LONG(EnvironmentFunctions.HashLength)
+                        )
                       )
                     )
                   )
-                )
-              ),
-              // bytes
-              FUNCTION_CALL(
-                PureContext.sumByteVector,
-                List(
-                  REF("@afpk_withoutChecksum"),
-                  FUNCTION_CALL(
-                    PureContext.takeBytes,
-                    List(
-                      secureHashExpr(REF("@afpk_withoutChecksum")),
-                      CONST_LONG(EnvironmentFunctions.ChecksumLength)
+                ),
+                // bytes
+                FUNCTION_CALL(
+                  PureContext.sumByteVector,
+                  List(
+                    REF("@afpk_withoutChecksum"),
+                    FUNCTION_CALL(
+                      PureContext.takeBytes,
+                      List(
+                        secureHashExpr(REF("@afpk_withoutChecksum")),
+                        CONST_LONG(EnvironmentFunctions.ChecksumLength)
+                      )
                     )
                   )
                 )
               )
             )
           )
-        )
-      case _ => ???
-    }
+        case _ => ???
+      }
 
     def removePrefixExpr(str: EXPR, prefix: String): EXPR = IF(
       FUNCTION_CALL(
@@ -148,59 +170,67 @@ object WavesContext {
       )
     )
 
-    val addressFromStringF: BaseFunction = UserFunction("addressFromString", optionAddress, "Decode accaunt address", ("string", STRING, "string address represntation")) {
-      case (str: EXPR) :: Nil =>
-        BLOCK(
-          LET("@afs_addrBytes", FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(str, EnvironmentFunctions.AddressPrefix)))),
-          IF(
-            FUNCTION_CALL(
-              PureContext.eq,
-              List(
-                FUNCTION_CALL(PureContext.sizeBytes, List(REF("@afs_addrBytes"))),
-                CONST_LONG(EnvironmentFunctions.AddressLength)
-              )
-            ),
+    val addressFromStringF: BaseFunction =
+      UserFunction("addressFromString", optionAddress, "Decode accaunt address", ("string", STRING, "string address represntation")) {
+        case (str: EXPR) :: Nil =>
+          BLOCK(
+            LET("@afs_addrBytes", FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(str, EnvironmentFunctions.AddressPrefix)))),
             IF(
-              // version
               FUNCTION_CALL(
                 PureContext.eq,
                 List(
-                  FUNCTION_CALL(PureContext.takeBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
-                  CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion))
+                  FUNCTION_CALL(PureContext.sizeBytes, List(REF("@afs_addrBytes"))),
+                  CONST_LONG(EnvironmentFunctions.AddressLength)
                 )
               ),
               IF(
-                // networkByte
+                // version
                 FUNCTION_CALL(
                   PureContext.eq,
                   List(
-                    FUNCTION_CALL(
-                      PureContext.takeBytes,
-                      List(
-                        FUNCTION_CALL(PureContext.dropBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
-                        CONST_LONG(1)
-                      )
-                    ),
-                    CONST_BYTEVECTOR(ByteVector(env.networkByte))
+                    FUNCTION_CALL(PureContext.takeBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                    CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion))
                   )
                 ),
                 IF(
-                  verifyAddressChecksumExpr(REF("@afs_addrBytes")),
-                  FUNCTION_CALL(FunctionHeader.User("Address"), List(REF("@afs_addrBytes"))),
+                  // networkByte
+                  FUNCTION_CALL(
+                    PureContext.eq,
+                    List(
+                      FUNCTION_CALL(
+                        PureContext.takeBytes,
+                        List(
+                          FUNCTION_CALL(PureContext.dropBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
+                          CONST_LONG(1)
+                        )
+                      ),
+                      CONST_BYTEVECTOR(ByteVector(env.networkByte))
+                    )
+                  ),
+                  IF(
+                    verifyAddressChecksumExpr(REF("@afs_addrBytes")),
+                    FUNCTION_CALL(FunctionHeader.User("Address"), List(REF("@afs_addrBytes"))),
+                    REF("unit")
+                  ),
                   REF("unit")
                 ),
                 REF("unit")
               ),
               REF("unit")
-            ),
-            REF("unit")
+            )
           )
-        )
-      case _ => ???
-    }
+        case _ => ???
+      }
 
     val addressFromRecipientF: BaseFunction =
-      NativeFunction("addressFromRecipient", 100, ADDRESSFROMRECIPIENT, addressType.typeRef, "Extract address or lookup alias", ("AddressOrAlias", addressOrAliasType, "address or alias, usally tx.recipient")) {
+      NativeFunction(
+        "addressFromRecipient",
+        100,
+        ADDRESSFROMRECIPIENT,
+        addressType.typeRef,
+        "Extract address or lookup alias",
+        ("AddressOrAlias", addressOrAliasType, "address or alias, usally tx.recipient")
+      ) {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
         case CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
@@ -239,32 +269,62 @@ object WavesContext {
     }
 
     val assetBalanceF: BaseFunction =
-      NativeFunction("assetBalance", 100, ACCOUNTASSETBALANCE, LONG, "get asset balance for account", ("addressOrAlias", addressOrAliasType, "account"), ("assetId", UNION(UNIT, BYTEVECTOR), "assetId (WAVES if none)")) {
+      NativeFunction(
+        "assetBalance",
+        100,
+        ACCOUNTASSETBALANCE,
+        LONG,
+        "get asset balance for account",
+        ("addressOrAlias", addressOrAliasType, "account"),
+        ("assetId", UNION(UNIT, BYTEVECTOR), "assetId (WAVES if none)")
+      ) {
         case (c: CaseObj) :: (()) :: Nil                  => env.accountBalanceOf(caseObjToRecipient(c), None)
         case (c: CaseObj) :: (assetId: ByteVector) :: Nil => env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray))
 
         case _ => ???
       }
 
-    val wavesBalanceF: UserFunction = UserFunction("wavesBalance", LONG, "get WAVES balanse for account", ("addressOrAlias", addressOrAliasType, "account")) {
-      case aoa :: Nil => FUNCTION_CALL(assetBalanceF.header, List(aoa, REF("unit")))
-      case _          => ???
-    }
+    val wavesBalanceF: UserFunction =
+      UserFunction("wavesBalance", LONG, "get WAVES balanse for account", ("addressOrAlias", addressOrAliasType, "account")) {
+        case aoa :: Nil => FUNCTION_CALL(assetBalanceF.header, List(aoa, REF("unit")))
+        case _          => ???
+      }
 
-    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "get height when transaction was stored to blockchain", ("id", BYTEVECTOR, "transaction Id")) {
+    val txHeightByIdF: BaseFunction = NativeFunction(
+      "transactionHeightById",
+      100,
+      TRANSACTIONHEIGHTBYID,
+      optionLong,
+      "get height when transaction was stored to blockchain",
+      ("id", BYTEVECTOR, "transaction Id")
+    ) {
       case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
       case _                       => ???
     }
 
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
-    val buyOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Buy)))
+    val buyOrdTypeCoeval: Coeval[Either[String, CaseObj]]  = Coeval(Right(ordType(OrdType.Buy)))
 
-    val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+    val defaultVars = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
-      ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
-      ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval)))),
       ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
     )
+
+    val orderTypeVars = Map(
+      ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
+      ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
+    )
+
+    implicit class BuilderOps[A](fa: A) {
+      def |>(cond: Boolean)(f: A => A): A = {
+        if (cond) f(fa)
+        else fa
+      }
+    }
+
+    val vars: Map[String, ((FINAL, String), LazyVal)] =
+      defaultVars
+        .|>(orderTypeVarsEnabled)(_ ++ orderTypeVars)
 
     val functions = Array(
       txByIdF,
