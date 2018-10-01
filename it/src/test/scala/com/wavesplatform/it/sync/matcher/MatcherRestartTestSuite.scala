@@ -46,8 +46,7 @@ class MatcherRestartTestSuite
       aliceOrder.status shouldBe "OrderAccepted"
       val firstOrder = aliceOrder.message.id
 
-      // check order status
-      matcherNode.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
+      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
 
       // check that order is correct
       val orders = matcherNode.orderBook(aliceWavesPair)
@@ -64,7 +63,7 @@ class MatcherRestartTestSuite
       val height = nodes.map(_.height).max
 
       matcherNode.waitForHeight(height + 1, 40.seconds)
-      matcherNode.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
+      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
 
       val orders1 = matcherNode.orderBook(aliceWavesPair)
@@ -85,7 +84,7 @@ class MatcherRestartTestSuite
       val orders3 = matcherNode.orderBook(aliceWavesPair)
       orders3.asks.head.amount shouldBe 500
 
-      matcherNode.orderStatus(firstOrder, aliceWavesPair).status should be("Cancelled")
+      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Cancelled")
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Accepted"
     }
   }

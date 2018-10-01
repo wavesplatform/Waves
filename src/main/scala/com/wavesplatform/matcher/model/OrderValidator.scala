@@ -3,8 +3,6 @@ package com.wavesplatform.matcher.model
 import cats.implicits._
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
-import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.matcher.model.OrderHistory.OrderInfoChange
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
@@ -34,9 +32,9 @@ trait OrderValidator {
 
     val b: Map[Option[ByteStr], Long] = Seq(lo.spentAcc, lo.feeAcc).map(a => a.assetId -> spendableBalance(a)).toMap
 
-    val change = OrderInfoChange(lo.order, None, OrderInfo(order.amount, 0L, canceled = false, None, order.matcherFee, Some(0L)))
+    val change = OrderInfoChange(lo.order, None, OrderInfo(order.amount, 0L, None, None, order.matcherFee, Some(0L)))
     val newOrder = OrderHistory
-      .diff(OrderAdded(lo), Map(lo.order.id() -> change))
+      .diff(Map(lo.order.id() -> change))
       .getOrElse(order.senderPublicKey.toAddress, OpenPortfolio.empty)
 
     val open  = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
@@ -71,24 +69,6 @@ trait OrderValidator {
             isBalanceWithOpenOrdersEnough(order)
         Either.cond(v, order, GenericError(v.messages()))
       }
-
-  def validateCancelOrder(cancel: CancelOrder): Either[GenericError, CancelOrder] = {
-    timer
-      .refine("action" -> "cancel", "pair" -> cancel.assetPair.toString)
-      .measure {
-        val status = orderHistory.orderInfo(cancel.orderId.arr).status
-        val v = status match {
-          case LimitOrder.NotFound  => Validation.failure("Order not found")
-          case LimitOrder.Filled(_) => Validation.failure("Order is already Filled")
-          case _ =>
-            orderHistory
-              .order(cancel.orderId.arr)
-              .fold(false)(_.senderPublicKey == cancel.sender) :| "Order not found"
-        }
-
-        Either.cond(v, cancel, GenericError(v.messages()))
-      }
-  }
 
   private def spendableBalance(a: AssetAcc): Long = {
     val portfolio = utxPool.portfolio(a.account)

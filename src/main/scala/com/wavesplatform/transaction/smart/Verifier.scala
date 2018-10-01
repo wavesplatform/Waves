@@ -73,9 +73,9 @@ object Verifier extends Instrumented with ScorexLogging {
                isTokenScript: Boolean): Either[ValidationError, Transaction] =
     Try {
       ScriptRunner[Boolean](height, Coproduct[TxOrd](transaction), blockchain, script) match {
-        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx.letDefs, isTokenScript))
-        case (ctx, Right(false)) =>
-          Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, isTokenScript))
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript))
+        case (log, Right(false)) =>
+          Left(TransactionNotAllowedByScript(log, script.text, isTokenScript))
         case (_, Right(true)) => Right(transaction)
       }
     }.getOrElse(Left(ScriptExecutionError(
@@ -84,16 +84,16 @@ object Verifier extends Instrumented with ScorexLogging {
       |Probably script does not return boolean, and can't validate any transaction or order.
     """.stripMargin,
       script.text,
-      Map.empty,
+      List.empty,
       isTokenScript
     )))
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] =
     Try {
       ScriptRunner[Boolean](height, Coproduct[TxOrd](order), blockchain, script) match {
-        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx.letDefs, false))
+        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx, false))
         case (ctx, Right(false)) =>
-          Left(TransactionNotAllowedByScript(ctx.letDefs, script.text, false))
+          Left(TransactionNotAllowedByScript(ctx, script.text, false))
         case (_, Right(true)) => Right(order)
       }
     }.getOrElse(Left(ScriptExecutionError(
@@ -102,7 +102,7 @@ object Verifier extends Instrumented with ScorexLogging {
       |Probably script does not return boolean, and can't validate any transaction or order.
     """.stripMargin,
       script.text,
-      Map.empty,
+      List.empty,
       false
     )))
 

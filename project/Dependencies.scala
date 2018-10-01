@@ -3,11 +3,11 @@ import sbt._
 
 object Dependencies {
 
-  def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.19"
+  def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.5.16"
 
   def swaggerModule(module: String) = ("io.swagger" % s"swagger-$module" % "1.5.21").exclude("com.google.guava", "guava")
 
-  def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.9"
+  def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.1.4"
 
   def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.24.Final"
 
@@ -56,7 +56,7 @@ object Dependencies {
 
   lazy val http = Seq("core", "annotations", "models", "jaxrs").map(swaggerModule) ++ Seq(
     "io.swagger"                   %% "swagger-scala-module" % "1.0.4",
-    "com.github.swagger-akka-http" %% "swagger-akka-http"    % "0.9.2",
+    "com.github.swagger-akka-http" %% "swagger-akka-http"    % "1.0.0",
     "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.6",
     "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",
     akkaHttpModule("akka-http")
@@ -65,21 +65,20 @@ object Dependencies {
   lazy val matcher = Seq(
     akkaModule("persistence"),
     akkaModule("persistence-tck") % "test",
-    "com.github.dnvriend"         %% "akka-persistence-inmemory" % "2.4.18.1" % "test",
     "org.ethereum"                % "leveldbjni-all" % "1.18.3"
   )
 
   lazy val metrics = Seq(
     kamonModule("core", "1.1.3"),
-    kamonModule("system-metrics", "1.0.0"),
-    kamonModule("akka-2.4", "1.1.1"),
-    kamonModule("influxdb", "1.0.1"),
+    kamonModule("system-metrics", "1.0.0").exclude("io.kamon", "kamon-core_2.12"),
+    kamonModule("akka-2.5", "1.1.1").exclude("io.kamon", "kamon-core_2.12"),
+    kamonModule("influxdb", "1.0.2"),
     "org.influxdb" % "influxdb-java" % "2.11"
   ).map(_.exclude("org.asynchttpclient", "async-http-client"))
 
   lazy val fp = Seq(
     "org.typelevel"       %% "cats-core"       % "1.1.0",
-    "org.typelevel"       %% "cats-mtl-core"   % "0.2.1",
+    "org.typelevel"       %% "cats-mtl-core"   % "0.3.0",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
   lazy val meta = Seq("com.chuusai" %% "shapeless" % "2.3.3")
@@ -98,8 +97,8 @@ object Dependencies {
       ExclusionRule("com.google.guava", "guava")
     ))
   lazy val commons_net = Seq("commons-net"   % "commons-net" % "3.+")
-  lazy val scalatest   = Seq("org.scalatest" %% "scalatest"  % "3.0.3")
-  lazy val scalactic   = Seq("org.scalactic" %% "scalactic"  % "3.0.3")
+  lazy val scalatest   = Seq("org.scalatest" %% "scalatest"  % "3.0.5")
+  lazy val scalactic   = Seq("org.scalactic" %% "scalactic"  % "3.0.5")
   lazy val cats        = Seq("org.typelevel" %% "cats-core"  % "1.1.0")
   lazy val scalacheck = Seq(
     "org.scalacheck"      %% "scalacheck"      % "1.13.5",

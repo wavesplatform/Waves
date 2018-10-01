@@ -43,7 +43,6 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
       // `version`  is not properly bound yet
-
       val result = runScript[Boolean](
         s"""
            |match tx {
@@ -401,7 +400,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val s = s"""
                  |match tx {
                  | case t : Order =>
-                 |   let id = t.id == base58'${ByteStr(t.id()).base58}'
+                 |   let id = t.id == base58'${t.id()}'
                  |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
                  |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
                  |   let matcherPublicKey = t.matcherPublicKey == base58'${ByteStr(t.matcherPublicKey.publicKey).base58}'

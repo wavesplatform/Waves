@@ -91,7 +91,12 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
           builder.validateAssetPair(AssetPair(Some(Asset2), Some(Asset1))) should produce("Invalid Asset ID")
         }
       }
-      "asset was not issued" in {}
+      "asset was not issued" in {
+        (blockchain.assetDescription _).when(Asset1).returns(None)
+        (blockchain.assetDescription _).when(Asset2).returns(mkAssetDescription())
+
+        builder.validateAssetPair(AssetPair(Some(Asset2), Some(Asset1))) should produce("Invalid Asset ID")
+      }
       "amount and price assets are the same" in {
         builder.validateAssetPair(AssetPair(Some(WUSD), Some(WUSD))) should produce("Amount and price assets must be different")
       }

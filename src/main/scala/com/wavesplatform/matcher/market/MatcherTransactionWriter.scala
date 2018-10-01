@@ -43,8 +43,8 @@ class MatcherTransactionWriter(db: DB) extends Actor with ScorexLogging {
   private def saveExchangeTx(tx: ExchangeTransaction): Unit = db.readWrite { rw =>
     log.trace(s"Appending ${tx.id()} to orders [${tx.buyOrder.idStr()}, ${tx.sellOrder.idStr()}]")
     rw.put(MatcherKeys.exchangeTransaction(tx.id()), Some(tx))
-    appendTxId(rw, ByteStr(tx.buyOrder.id()), tx.id())
-    appendTxId(rw, ByteStr(tx.sellOrder.id()), tx.id())
+    appendTxId(rw, tx.buyOrder.id(), tx.id())
+    appendTxId(rw, tx.sellOrder.id(), tx.id())
   }
 }
 
@@ -56,10 +56,7 @@ object MatcherTransactionWriter {
 
   case class GetTransactionsByOrder(orderId: ByteStr)
 
-  case class GetTransactionsResponse(txs: Seq[ExchangeTransaction]) extends MatcherResponse {
-    val json                      = JsArray(txs.map(_.json()))
-    val code: StatusCodes.Success = StatusCodes.OK
-  }
+  case class GetTransactionsResponse(txs: Seq[ExchangeTransaction]) extends MatcherResponse(StatusCodes.OK, JsArray(txs.map(_.json())))
 
   private def appendTxId(rw: RW, orderId: ByteStr, txId: ByteStr): Unit = {
     val key       = MatcherKeys.orderTxIdsSeqNr(orderId)

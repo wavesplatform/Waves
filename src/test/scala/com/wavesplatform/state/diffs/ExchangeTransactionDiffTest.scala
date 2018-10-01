@@ -24,6 +24,7 @@ import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
+import com.wavesplatform.OrderOps._
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
@@ -51,7 +52,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     } yield (gen1, gen2, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange) {
-      case ((gen1, gen2, issue1, issue2, exchange)) =>
+      case (gen1, gen2, issue1, issue2, exchange) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange)), fs) {
           case (blockDiff, state) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
@@ -81,7 +82,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
 
     forAll(preconditions) {
-      case ((gen1, gen2, issue1, exchange)) =>
+      case (gen1, gen2, issue1, exchange) =>
         whenever(exchange.amount > 300000) {
           assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange)), fs) {
             case (blockDiff, _) =>
@@ -357,13 +358,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       simpleTradePreconditions
         .filter(_._5.version == 2)
 
-    def changeOrderProofs(o: Order, newProofs: Proofs): Order = o match {
-      case o1 @ OrderV1(_, _, _, _, _, _, _, _, _, _) =>
-        o1.copy(proofs = newProofs)
-      case o2 @ OrderV2(_, _, _, _, _, _, _, _, _, _) =>
-        o2.copy(proofs = newProofs)
-    }
-
     forAll(exchangeWithV2Tx) {
       case (gen1, gen2, issue1, issue2, exchange) =>
         val newProofs = Proofs(
@@ -377,7 +371,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
           case e1 @ ExchangeTransactionV1(_, so, _, _, _, _, _, _, _) =>
             e1.copy(buyOrder = so.updateProofs(newProofs).asInstanceOf[OrderV1])
           case e2 @ ExchangeTransactionV2(_, so, _, _, _, _, _, _, _) =>
-            e2.copy(buyOrder = changeOrderProofs(so, newProofs))
+            e2.copy(buyOrder = so.updateProofs(newProofs))
         }
 
         val preconBlocks = Seq(
@@ -437,7 +431,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     for {
       expr       <- compiler.compile(scriptWithoutDirectives, directives)
       script     <- ScriptV1(expr)
-      complexity <- ScriptEstimator(functionCosts, expr)
+      complexity <- ScriptEstimator(ctx.varDefs.keySet, functionCosts, expr)
     } yield (script, complexity)
   }
 
