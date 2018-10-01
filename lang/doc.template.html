@@ -61,7 +61,7 @@
 </tr>
 {{/vars}}
 </table>
- <h1>Input variables</h1>
+ <h1>Functions</h1>
 <table border="1">
 {{#funcs}}
 <tr><td>{{name}}</td>
@@ -93,6 +93,25 @@
 {{/params}}
 </table>
 </td>
+<td>{{#type}}
+ {{#isComplex}}
+  {{name}}
+ {{/isComplex}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}{{#needLink}}<a href="#{{name}}">{{name}}</a>{{/needLink}}{{#noLink}}{{name}}{{/noLink}}{{/param}}]
+ {{/hasParam}}
+{{/type}}</td>
 </tr>
 {{/funcs}}
 </table>
