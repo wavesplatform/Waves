@@ -2,13 +2,13 @@ package com.wavesplatform.matcher
 
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 
 object MatcherKeys {
   import com.wavesplatform.database.KeyHelpers._
@@ -73,10 +73,4 @@ object MatcherKeys {
 
   def exchangeTransaction(txId: ByteStr): Key[Option[ExchangeTransaction]] =
     Key.opt(bytes(10, txId.arr), ExchangeTransaction.parseBytes(_).get, _.bytes())
-
-  def addressOrdersByPairSeqNr(address: Address, pair: AssetPair): Key[Int] = bytesSeqNr(11, address.bytes.arr ++ pair.bytes)
-  def addressOrdersByPair(address: Address, pair: AssetPair, seqNr: Int): Key[Option[Order.Id]] =
-    Key.opt(hBytes(12, seqNr, address.bytes.arr ++ pair.bytes), ByteStr(_), _.arr)
-
-  def addressOldestActiveOrderSeqNr(address: Address): Key[Option[Int]] = Key.opt(bytes(13, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
 }

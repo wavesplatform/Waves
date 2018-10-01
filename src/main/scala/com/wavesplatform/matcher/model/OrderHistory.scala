@@ -3,11 +3,11 @@ package com.wavesplatform.matcher.model
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
-import com.wavesplatform.database.{DBExt, Key, RW}
+import com.wavesplatform.database.{DBExt, RW}
+import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.matcher.model.LimitOrder._
-import com.wavesplatform.matcher.{MatcherKeys, MatcherSettings, OrderAssets}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.AssetId
@@ -52,31 +52,28 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   private def saveOrderInfo(rw: RW, event: Event): Unit = saveOrderInfoTimer.measure {
     val orderInfoDiffs = collectChanges(event)
 
-    val (_, changes) = orderInfoDiffs.foldLeft((Map.empty: ChangedKeys, Map.empty[Order.Id, OrderInfoChange])) {
-      case ((origChangedKeys, origChanges), (order, orderInfoDiff)) =>
-        val orderId = order.id()
-
-        val orderInfoOptKey = MatcherKeys.orderInfoOpt(orderId)
-        val origInfo        = changedOrElse(origChangedKeys, orderInfoOptKey, rw.get(orderInfoOptKey))
-        if (origInfo.exists(_.status.isFinal)) (origChangedKeys, origChanges)
+    val changes = orderInfoDiffs.foldLeft(Map.empty[Order.Id, OrderInfoChange]) {
+      case (origChanges, (order, orderInfoDiff)) =>
+        val orderId  = order.id()
+        val origInfo = rw.get(MatcherKeys.orderInfoOpt(orderId))
+        if (origInfo.exists(_.status.isFinal)) origChanges
         else {
           val combinedInfo = combine(order, origInfo, orderInfoDiff, event)
           val change       = OrderInfoChange(order, origInfo, combinedInfo)
 
           log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
-
-          rw.put(MatcherKeys.orderInfo(orderId), change.updatedInfo)
-          val changedKeys1 = origChangedKeys
-            .updated(MatcherKeys.orderInfo(orderId), change.updatedInfo)
-            .updated(orderInfoOptKey, Some(change.updatedInfo))
-
-          val changedKeys2 = if (origInfo.isEmpty) {
-            saveOrder(rw, order)
-            addOrderIndexes(rw, change, changedKeys1)
-          } else changedKeys1
-
-          (updateOldestActiveNr(rw, change, changedKeys2), origChanges.updated(orderId, change))
+          origChanges.updated(orderId, change)
         }
+    }
+
+    changes.foreach {
+      case (id, change) =>
+        rw.put(MatcherKeys.orderInfo(id), change.updatedInfo)
+
+        if (change.origInfo.isEmpty) {
+          saveOrder(rw, change.order)
+        }
+        updateOrderIndexes(rw, change)
     }
 
     val opDiff = diff(changes)
@@ -144,94 +141,21 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
 
   private def saveOrder(rw: RW, order: Order): Unit = rw.put(MatcherKeys.order(order.id()), Some(order))
 
-  private type ChangedKeys = Map[Key[_], Any]
-
-  private def changedOrElse[V](changedKeys: ChangedKeys, key: Key[V], orElse: => V): V = changedKeys.getOrElse(key, orElse).asInstanceOf[V]
-
-  private def addOrderIndexes(rw: RW, change: OrderInfoChange, changedKeys: ChangedKeys): ChangedKeys = {
+  private def updateOrderIndexes(rw: RW, change: OrderInfoChange): Unit = {
     import change.{order => o}
     val address = o.senderPublicKey.toAddress
+    val id      = o.id()
 
-    val commonSeqNrKey  = MatcherKeys.addressOrdersSeqNr(address)
-    val commonNextSeqNr = changedOrElse(changedKeys, commonSeqNrKey, rw.get(commonSeqNrKey)) + 1
+    // key + stale read issue
+    val activeOrdersIndex    = new ActiveOrdersIndex(address, 200)
+    val nonActiveCommonIndex = new NonActiveOrdersCommonIndex(address, 100)
+    val nonActivePairIndex   = new NonActiveOrdersPairIndex(address, o.assetPair, 100)
 
-    rw.put(
-      MatcherKeys.addressOrders(address, commonNextSeqNr),
-      Some(OrderAssets(o.id(), o.getSpendAssetId))
-    )
-
-    rw.put(commonSeqNrKey, commonNextSeqNr)
-
-    val pairSeqNrKey  = MatcherKeys.addressOrdersByPairSeqNr(address, o.assetPair)
-    val pairNextSeqNr = rw.get(pairSeqNrKey) + 1
-
-    rw.put(
-      MatcherKeys.addressOrdersByPair(address, o.assetPair, pairNextSeqNr),
-      Some(o.id())
-    )
-
-    log.trace(s"Adding order ${o.id()} to $address at $pairNextSeqNr")
-
-    rw.put(pairSeqNrKey, pairNextSeqNr)
-
-    changedKeys + (commonSeqNrKey -> commonNextSeqNr)
-  }
-
-  private def updateOldestActiveNr(rw: RW, change: OrderInfoChange, origKeys: ChangedKeys): ChangedKeys = {
-    lazy val address              = change.order.senderPublicKey.toAddress
-    lazy val oldestActiveSeqNrKey = MatcherKeys.addressOldestActiveOrderSeqNr(address)
-    lazy val oldestActiveSeqNr    = changedOrElse[Option[Int]](origKeys, oldestActiveSeqNrKey, rw.get(oldestActiveSeqNrKey))
-    lazy val lastSeqNr = changedOrElse(
-      origKeys,
-      MatcherKeys.addressOrdersSeqNr(address),
-      math.max(rw.get(MatcherKeys.addressOrdersSeqNr(address)), 1)
-    )
-
-    def findOldestActiveNr(afterNr: Int): Option[Int] =
-      (afterNr to lastSeqNr).view
-        .drop(1)
-        .find { i =>
-          val isActive = rw
-            .get(MatcherKeys.addressOrders(address, i))
-            .exists { orderAssets =>
-              !rw.get(MatcherKeys.orderInfo(orderAssets.orderId)).status.isFinal
-            }
-
-          isActive
-        }
-
-    def update(newOldestActiveNr: Int): ChangedKeys = {
-      rw.put(oldestActiveSeqNrKey, Some(newOldestActiveNr))
-      origKeys + (oldestActiveSeqNrKey -> newOldestActiveNr)
-    }
-
-    if (!change.updatedInfo.status.isFinal) {
-      // A new active order
-      if (oldestActiveSeqNr.isEmpty) update(lastSeqNr) else origKeys
-    } else if (change.origInfo.nonEmpty) {
-      // An active order was closed
-      oldestActiveSeqNr
-        .map { oldestActiveSeqNr =>
-          val shouldUpdateOldestActive = rw
-            .get(MatcherKeys.addressOrders(address, oldestActiveSeqNr))
-            .map(_.orderId == change.order.id())
-            .getOrElse {
-              // Hope, this is impossible case
-              log.warn(s"Can't find nr=$oldestActiveSeqNr order for $address, will update it")
-              true
-            }
-
-          if (shouldUpdateOldestActive) {
-            findOldestActiveNr(oldestActiveSeqNr) match {
-              case Some(x) => update(x)
-              case None =>
-                rw.delete(oldestActiveSeqNrKey)
-                origKeys + (oldestActiveSeqNrKey -> None)
-            }
-          } else origKeys
-        }
-        .getOrElse(origKeys)
-    } else origKeys
+    if (change.updatedInfo.status.isFinal) {
+      if (change.origInfo.nonEmpty) activeOrdersIndex.delete(rw, id)
+      nonActiveCommonIndex.add(rw, id)
+      nonActivePairIndex.add(rw, id)
+    } else if (change.origInfo.isEmpty) activeOrdersIndex.add(rw, o.assetPair, id)
   }
 
   def process(event: Event): Unit       = db.readWrite(saveOrderInfo(_, event))

@@ -22,6 +22,8 @@ class RW(db: DB) extends AutoCloseable {
 
   def iterator: DBIterator = db.iterator()
 
+  def ro: ReadOnlyDB = new ReadOnlyDB(db, readOptions)
+
   override def close(): Unit = {
     try { db.write(batch) } finally {
       batch.close()
