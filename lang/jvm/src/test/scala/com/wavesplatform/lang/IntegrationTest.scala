@@ -282,7 +282,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   ignore("context won't change after execution of a user function") {
-    val doubleFst = UserFunction("ID", LONG, "x" -> LONG) {
+    val doubleFst = UserFunction("ID", LONG, "D", ("x", LONG, "X")) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
     }
 

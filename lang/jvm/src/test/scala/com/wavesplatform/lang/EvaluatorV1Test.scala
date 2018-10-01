@@ -775,12 +775,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("each argument is evaluated maximum once for user function") {
     var functionEvaluated = 0
 
-    val f = NativeFunction("F", 1, 258, LONG, "_" -> LONG) { _ =>
+    val f = NativeFunction("F", 1, 258: Short, LONG, "", ("_", LONG, "")) { _ =>
       functionEvaluated = functionEvaluated + 1
       Right(1L)
     }
 
-    val doubleFst = UserFunction("ID", LONG, "x" -> LONG) {
+    val doubleFst = UserFunction("ID", LONG, "", ("x", LONG, "")) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
@@ -802,11 +802,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("function parameters (REF) in body should be taken from the arguments, not from the outer context") {
-    val doubleFn = UserFunction("doubleFn", LONG, "x" -> LONG) {
+    val doubleFn = UserFunction("doubleFn", LONG, "", ("x", LONG, "")) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
-    val subFn = UserFunction("mulFn", LONG, "y" -> LONG, "x" -> LONG) {
+    val subFn = UserFunction("mulFn", LONG, "", ("y", LONG, ""), ("x", LONG, "")) {
       FUNCTION_CALL(subLong.header, List(REF("y"), REF("x")))
     }
 
