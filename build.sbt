@@ -251,8 +251,9 @@ lazy val lang =
       scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
       developers := List(Developer("petermz", "Peter Zhelezniakov", "peterz@rambler.ru", url("https://wavesplatform.com"))),
       libraryDependencies ++= Seq(
-        "org.scala-js"                %% "scalajs-stubs" % "0.6.22" % "provided"
-      ) ++ Dependencies.logging.map(_ % "test") // scrypto logs an error if a signature verification was failed
+        "org.scala-js"                      %% "scalajs-stubs" % "0.6.22" % "provided",
+        "com.github.spullara.mustache.java" % "compiler" % "0.9.5"
+      ) ++ Dependencies.logging.map(_       % "test") // scrypto logs an error if a signature verification was failed
     )
 
 lazy val langJS  = lang.js
