@@ -41,6 +41,7 @@ object ScriptCompiler extends ScorexLogging {
     } catch {
       case ex: Throwable =>
         log.error("Error compiling script", ex)
+        log.error(src)
         val msg = Option(ex.getMessage).getOrElse("Parsing failed: Unknown error")
         Left(msg)
     }
