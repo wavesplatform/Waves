@@ -14,10 +14,14 @@ object Global extends BaseGlobal {
     if (input.length > limit) Left(s"base58Decode input exceeds $limit")
     else Base58.decode(input).toEither.left.map(_ => "can't parse Base58 string")
 
-  def base64Encode(input: Array[Byte]): Either[String, String] = Right(Base64.encode(input))
+  def base64Encode(input: Array[Byte]): Either[String, String] =
+    Either.cond(input.length <= MaxBase64Bytes, Base64.encode(input), s"base64Encode input exceeds $MaxBase64Bytes")
 
   def base64Decode(input: String, limit: Int): Either[String, Array[Byte]] =
-    Base64.decode(input).toEither.left.map(_ => "can't parse Base64 string")
+    for {
+      _      <- Either.cond(input.length <= limit, (), s"base64Decode input exceeds $limit")
+      result <- Base64.decode(input).toEither.left.map(_ => "can't parse Base64 string")
+    } yield result
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean = Curve25519.verify(Signature(sig), message, PublicKey(pub))
 
