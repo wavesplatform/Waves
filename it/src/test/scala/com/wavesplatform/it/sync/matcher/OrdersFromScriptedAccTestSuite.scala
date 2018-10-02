@@ -76,7 +76,7 @@ class OrdersFromScriptedAccTestSuite
     }
 
     "scripted account can trade once SmartAccountTrading is activated" in {
-      matcherNode.waitForHeight(ActivationHeight, 2.minutes)
+      matcherNode.waitForHeight(ActivationHeight, 3.minutes)
       val bobOrder = matcherNode
         .placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
       bobOrder.status shouldBe "OrderAccepted"
@@ -92,7 +92,7 @@ class OrdersFromScriptedAccTestSuite
       val orderId = aliceOrder.message.id
 
       // Alice checks that the order in order book
-      matcherNode.orderStatus(orderId, aliceWavesPair).status shouldBe "Filled"
+      matcherNode.waitOrderStatus(aliceWavesPair, orderId, "Filled")
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Filled"
 
       // sell order should be in the aliceNode orderbook
@@ -102,7 +102,7 @@ class OrdersFromScriptedAccTestSuite
 }
 
 object OrdersFromScriptedAccTestSuite {
-  val ActivationHeight = 9
+  val ActivationHeight = 15
 
   import NodeConfigs.Default
 

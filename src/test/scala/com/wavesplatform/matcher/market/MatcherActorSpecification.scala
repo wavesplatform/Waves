@@ -3,16 +3,13 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.http.scaladsl.model.StatusCodes
-import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import akka.testkit.{ImplicitSender, TestActorRef}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
+import com.wavesplatform.matcher.api.{MatcherResponse, OrderAccepted}
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
-import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherTestData}
@@ -22,29 +19,29 @@ import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.utils.NTP
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import org.scalatest.BeforeAndAfterEach
 
 class MatcherActorSpecification
-    extends TestKit(ActorSystem.apply("MatcherTest2"))
-    with WordSpecLike
-    with Matchers
-    with BeforeAndAfterAll
+    extends MatcherSpec("MatcherActor")
     with ImplicitSender
     with MatcherTestData
     with BeforeAndAfterEach
-    with ScorexLogging
     with PathMockFactory {
 
   val blockchain: Blockchain = stub[Blockchain]
+  (blockchain.assetDescription _)
+    .when(ByteStr.decodeBase58("BASE1").get)
+    .returns(Some(AssetDescription(PrivateKeyAccount(Array.empty), "Unknown".getBytes, Array.emptyByteArray, 8, false, 1, None, 0)))
+  (blockchain.assetDescription _)
+    .when(ByteStr.decodeBase58("BASE2").get)
+    .returns(Some(AssetDescription(PrivateKeyAccount(Array.empty), "Unknown".getBytes, Array.emptyByteArray, 8, false, 1, None, 0)))
 
-  val settings = matcherSettings.copy(
-    account = MatcherAccount.address,
-  )
+  val settings = matcherSettings.copy(account = MatcherAccount.address)
 
   val pairBuilder = new AssetPairBuilder(settings, blockchain)
 
@@ -54,7 +51,7 @@ class MatcherActorSpecification
 
   val orderHistoryRef = TestActorRef(new Actor {
     def receive: Receive = {
-      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(ByteStr(o.id()), Right(o))
+      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(o.id(), Right(o))
       case _                   =>
     }
   })
@@ -84,9 +81,6 @@ class MatcherActorSpecification
   (blockchain.portfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseBalance.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
 
   override protected def beforeEach(): Unit = {
-    val tp = TestProbe()
-    tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
-    tp.expectMsg(akka.actor.Status.Success(""))
     obc.clear()
     super.beforeEach()
 
@@ -123,7 +117,7 @@ class MatcherActorSpecification
 
       val invalidOrder = sameAssetsOrder()
       actor ! invalidOrder
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
+      expectMsg(MatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
     }
 
     "Reject order when script fails" in {
@@ -160,7 +154,7 @@ class MatcherActorSpecification
         .returns(None)
 
       actor ! order
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.Forbidden, "Order not allowed by sender script"))
+      expectMsg(MatcherResponse(StatusCodes.Forbidden, "Order not allowed by sender script"))
     }
 
     "return all open markets" in {
@@ -216,5 +210,6 @@ class MatcherActorSpecification
     }
   }
 
+  override protected def afterAll(): Unit          = shutdown()
   def strToSomeAssetId(s: String): Option[AssetId] = Some(ByteStr(s.getBytes()))
 }

@@ -78,7 +78,9 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
   private def sendTransactions(startStep: Int, channel: Channel): Result[Unit] = {
     def loop(step: Int): Result[Unit] = {
       log.info(s"[$node] Iteration $step")
-      val messages: Seq[RawBytes] = generator.next.map(RawBytes.from).toSeq
+      val txs = generator.next().toList
+      txs.foreach(println)
+      val messages: Seq[RawBytes] = txs.map(RawBytes.from).toSeq
 
       def next: Result[Unit] = {
         log.info(s"[$node] ${messages.size} transactions had been sent")

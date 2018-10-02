@@ -10,7 +10,8 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
 
 object SignedMassTransferRequest {
-  implicit val reads = Json.reads[SignedMassTransferRequest]
+  implicit val reads                                                       = Json.reads[SignedMassTransferRequest]
+  implicit val MassTransferRequestReads: Format[SignedMassTransferRequest] = Json.format
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")

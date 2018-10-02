@@ -3,7 +3,9 @@ package com.wavesplatform.matcher
 import java.io.File
 
 import com.typesafe.config.Config
+import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.NameMapper
 
 import scala.concurrent.duration.FiniteDuration
@@ -27,7 +29,8 @@ case class MatcherSettings(enable: Boolean,
                            blacklistedNames: Seq[Regex],
                            validationTimeout: FiniteDuration,
                            maxOrdersPerRequest: Int,
-                           blacklistedAddresses: Set[String])
+                           blacklistedAddresses: Set[String],
+                           orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings)
 
 object MatcherSettings {
 
@@ -54,7 +57,8 @@ object MatcherSettings {
     val validationTimeout = config.as[FiniteDuration](s"$configPath.validation-timeout")
     val blacklistedNames  = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
 
-    val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
+    val blacklistedAddresses       = config.as[List[String]](s"$configPath.blacklisted-addresses")
+    val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings](s"$configPath.order-book-snapshot-http-cache")
 
     val isMigrateToNewOrderHistoryStorage = !new File(dataDirectory).exists()
 
@@ -78,6 +82,7 @@ object MatcherSettings {
       validationTimeout,
       maxOrdersPerRequest,
       blacklistedAddresses.toSet,
+      orderBookSnapshotHttpCache
     )
   }
 }

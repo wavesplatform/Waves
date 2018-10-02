@@ -73,9 +73,9 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]]
   @ApiModelProperty(hidden = true)
-  val id: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(bodyBytes()))
+  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
   @ApiModelProperty(hidden = true)
-  val idStr: Coeval[String] = Coeval.evalOnce(Base58.encode(id()))
+  val idStr: Coeval[String] = Coeval.evalOnce(id().base58)
   @ApiModelProperty(hidden = true)
   val bytes: Coeval[Array[Byte]]
 
@@ -159,6 +159,8 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 }
 
 object Order {
+  type Id = ByteStr
+
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
   val PriceConstant     = 100000000L
   val MaxAmount: Long   = 100 * PriceConstant * PriceConstant

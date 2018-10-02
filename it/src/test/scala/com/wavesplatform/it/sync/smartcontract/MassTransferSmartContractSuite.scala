@@ -53,10 +53,10 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
                     let txToGov = (massTxSize && totalAmountToGov)
                     let txToGovComplete = (ttx.timestamp > mt2.timestamp + 30000) && sigVerify(mt2.bodyBytes,mt2.proofs[0], accountPK)
                     txToGovComplete && accSig && txToGov
-                  case other => false
+                  case _ => false
                 }
             else false
-        case other => false
+        case _ => false
         }
         """.stripMargin).get.value
       CompilerV1(dummyCompilerContext, untyped).explicitGet()._1

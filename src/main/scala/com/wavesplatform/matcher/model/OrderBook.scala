@@ -9,6 +9,7 @@ case class OrderBook(bids: TreeMap[Price, Level[BuyLimitOrder]], asks: TreeMap[P
   def bestBid: Option[BuyLimitOrder]  = bids.headOption.flatMap(_._2.headOption)
   def bestAsk: Option[SellLimitOrder] = asks.headOption.flatMap(_._2.headOption)
 
+  lazy val allOrderIds = bids.values.flatMap(_.map(_.order.id())).toSet ++ asks.values.flatMap(_.map(_.order.id())).toSet
 }
 
 object OrderBook {
@@ -37,11 +38,11 @@ object OrderBook {
 
   def cancelOrder(ob: OrderBook, orderId: ByteStr): Option[OrderCanceled] = {
     ob.bids
-      .find { case (_, v) => v.exists(_.order.id().sameElements(orderId.arr)) }
-      .orElse(ob.asks.find { case (_, v) => v.exists(_.order.id().sameElements(orderId.arr)) })
+      .find { case (_, v) => v.exists(_.order.id() == orderId) }
+      .orElse(ob.asks.find { case (_, v) => v.exists(_.order.id() == orderId) })
       .fold(Option.empty[OrderCanceled]) {
         case (_, v) =>
-          Some(OrderCanceled(v.find(_.order.id().sameElements(orderId.arr)).get, unmatchable = false))
+          Some(OrderCanceled(v.find(_.order.id() == orderId).get, unmatchable = false))
       }
   }
 

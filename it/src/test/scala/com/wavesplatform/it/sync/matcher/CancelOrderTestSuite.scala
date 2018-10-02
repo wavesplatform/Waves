@@ -48,6 +48,9 @@ class CancelOrderTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll
     matcherNode.orderBook(wavesUsdPair).bids shouldBe empty
     matcherNode.orderBook(wavesUsdPair).asks shouldBe empty
 
+    matcherNode.deleteOrder(bobNode, wavesUsdPair, Some(orderId))
+    matcherNode.orderStatus(orderId, wavesUsdPair, false).status shouldBe "NotFound"
+
   }
 
   "Alice and Bob trade WAVES-USD" - {
@@ -108,7 +111,7 @@ object CancelOrderTestSuite {
        |  order-match-tx-fee = 300000
        |  blacklisted-assets = ["$ForbiddenAssetId"]
        |  balance-watching.enable = yes
-       |}""".stripMargin)
+       |}""".stripMargin).withFallback(minerDisabled)
 
   private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
     .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))

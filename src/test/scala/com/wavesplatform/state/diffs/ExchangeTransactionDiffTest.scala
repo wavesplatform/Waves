@@ -12,18 +12,19 @@ import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Proofs, Transaction, ValidationError}
 import com.wavesplatform.utils.functionCosts
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
+import com.wavesplatform.OrderOps._
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
@@ -51,7 +52,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     } yield (gen1, gen2, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange) {
-      case ((gen1, gen2, issue1, issue2, exchange)) =>
+      case (gen1, gen2, issue1, issue2, exchange) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange)), fs) {
           case (blockDiff, state) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
@@ -81,7 +82,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
 
     forAll(preconditions) {
-      case ((gen1, gen2, issue1, exchange)) =>
+      case (gen1, gen2, issue1, exchange) =>
         whenever(exchange.amount > 300000) {
           assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange)), fs) {
             case (blockDiff, _) =>
@@ -227,6 +228,42 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         BlockchainFeatures.FairPoS.id             -> 0
       ))
 
+  property("Exchange transaction with scripted matcher needs extra fee") {
+    val allValidP = smartTradePreconditions(
+      scriptGen("Order", true),
+      scriptGen("Order", true),
+      scriptGen("ExchangeTransaction", true)
+    )
+
+    val matcher = PrivateKeyAccount.fromSeed("matcher").explicitGet()
+
+    forAll(allValidP) {
+      case (genesis, transfers, issueAndScripts, etx) =>
+        val smallFee = FeeCalculator.FeeConstants(ExchangeTransaction.typeId)
+        val exchangeWithSmallFee = ExchangeTransactionV2
+          .create(
+            matcher,
+            etx.buyOrder,
+            etx.sellOrder,
+            1000000,
+            1000000,
+            etx.sellMatcherFee,
+            etx.buyMatcherFee,
+            smallFee,
+            etx.timestamp
+          )
+          .explicitGet()
+
+        val preconBlocks = Seq(
+          TestBlock.create(Seq(genesis)),
+          TestBlock.create(transfers),
+          TestBlock.create(issueAndScripts)
+        )
+
+        assertLeft(preconBlocks, TestBlock.create(Seq(exchangeWithSmallFee)), fsV2)("InsufficientFee")
+    }
+  }
+
   property("ExchangeTransactions valid if all scripts succeeds") {
     val allValidP = smartTradePreconditions(
       scriptGen("Order", true),
@@ -321,13 +358,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       simpleTradePreconditions
         .filter(_._5.version == 2)
 
-    def changeOrderProofs(o: Order, newProofs: Proofs): Order = o match {
-      case o1 @ OrderV1(_, _, _, _, _, _, _, _, _, _) =>
-        o1.copy(proofs = newProofs)
-      case o2 @ OrderV2(_, _, _, _, _, _, _, _, _, _) =>
-        o2.copy(proofs = newProofs)
-    }
-
     forAll(exchangeWithV2Tx) {
       case (gen1, gen2, issue1, issue2, exchange) =>
         val newProofs = Proofs(
@@ -341,7 +371,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
           case e1 @ ExchangeTransactionV1(_, so, _, _, _, _, _, _, _) =>
             e1.copy(buyOrder = so.updateProofs(newProofs).asInstanceOf[OrderV1])
           case e2 @ ExchangeTransactionV2(_, so, _, _, _, _, _, _, _) =>
-            e2.copy(buyOrder = changeOrderProofs(so, newProofs))
+            e2.copy(buyOrder = so.updateProofs(newProofs))
         }
 
         val preconBlocks = Seq(
@@ -401,7 +431,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     for {
       expr       <- compiler.compile(scriptWithoutDirectives, directives)
       script     <- ScriptV1(expr)
-      complexity <- ScriptEstimator(functionCosts, expr)
+      complexity <- ScriptEstimator(ctx.varDefs.keySet, functionCosts, expr)
     } yield (script, complexity)
   }
 
@@ -417,8 +447,9 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     val chainId = AddressScheme.current.chainId
 
+    val master = PrivateKeyAccount.fromSeed("matcher").explicitGet()
+
     for {
-      master <- accountGen
       buyer  <- accountGen
       seller <- accountGen
       ts     <- timestampGen
