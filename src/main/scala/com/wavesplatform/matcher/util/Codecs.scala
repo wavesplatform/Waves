@@ -25,6 +25,7 @@ object Codecs {
         Some(ByteStr(arr))
     }
 
-    def getAssetPair: AssetPair = AssetPair(getAssetId, getAssetId)
+    def putAssetPair(x: AssetPair): ByteBuffer = putAssetId(x.amountAsset).putAssetId(x.priceAsset)
+    def getAssetPair: AssetPair                = AssetPair(getAssetId, getAssetId)
   }
 }

@@ -1,72 +1,93 @@
 package com.wavesplatform.matcher
 
+import java.nio.ByteBuffer
+
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
-import com.wavesplatform.database.{RW, ReadOnlyDB}
+import com.wavesplatform.crypto
+import com.wavesplatform.database.{Key, RW, ReadOnlyDB}
 import com.wavesplatform.matcher.ActiveOrdersIndex._
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.Order.Id
 
 class ActiveOrdersIndex(address: Address, elementsLimit: Int) {
   def add(rw: RW, pair: AssetPair, id: Id): Either[String, Unit] = {
-    val size = getSize
+    val size = rw.get(sizeKey).getOrElse(0)
+    println(s"ActiveOrdersIndex: size: $size")
     if (size >= elementsLimit) Left(s"The maximum orders limit of $size orders has been reached")
     else {
-      val newestIdx        = getNewestIdx
+      val newestIdx        = rw.get(newestIdxKey)
       val updatedNewestIdx = newestIdx.getOrElse(0) + 1
 
       // A new order
-      setNode(updatedNewestIdx, Node((pair, id), newestIdx, None))
-      setIdx(id, updatedNewestIdx)
+      rw.put(nodeKey(updatedNewestIdx), Node(newestIdx, (pair, id), None))
+      rw.put(orderIdxKey(id), Some(updatedNewestIdx))
+
+      println(
+        s"rw.put(nodeKey($updatedNewestIdx), Node($newestIdx, ($pair, $id), None))" +
+          s"rw.put(orderIdxKey($id), $updatedNewestIdx)")
 
       // A previous order in the index
-      newestIdx.foreach(updateNode(_, _.copy(newerIdx = Some(updatedNewestIdx))))
+      newestIdx.foreach(idx =>
+        rw.update(nodeKey(idx)) { x =>
+          val r = x.copy(newerIdx = Some(updatedNewestIdx))
+          println(s"$idx -> $r")
+          r
+      })
 
-      setNewestIdx(updatedNewestIdx)
-      setSize(size + 1)
+      rw.put(newestIdxKey, Some(updatedNewestIdx))
+      println(s"updatedNewestIdx: $updatedNewestIdx")
+      rw.put(sizeKey, Some(size + 1))
       Right(())
     }
   }
 
-  def delete(rw: RW, id: Id): Unit = {
-    val idx  = getIdx(id)
-    val node = getNode(idx)
+  def delete(rw: RW, id: Id): Unit = rw.get(orderIdxKey(id)).foreach { idx =>
+    val node = rw.get(nodeKey(idx))
 
-    node.olderIdx.foreach(updateNode(_, _.copy(newerIdx = node.newerIdx)))
-    node.newerIdx.foreach(updateNode(_, _.copy(olderIdx = node.olderIdx)))
+    node.olderIdx.foreach(idx => rw.update(nodeKey(idx))(_.copy(newerIdx = node.newerIdx)))
+    node.newerIdx.foreach(idx => rw.update(nodeKey(idx))(_.copy(olderIdx = node.olderIdx)))
 
     if (node.newerIdx.isEmpty) {
       node.olderIdx match {
-        case None    => deleteNewestIdx()
-        case Some(x) => setNewestIdx(x)
+        case None => rw.delete(newestIdxKey)
+        case x    => rw.put(newestIdxKey, x)
       }
     }
 
-    deleteIdx(id)
-    setSize(getSize - 1)
+    rw.delete(orderIdxKey(id))
+    rw.get(sizeKey).getOrElse(0) - 1 match {
+      case x if x <= 0 => rw.delete(sizeKey)
+      case x           => rw.put(sizeKey, Some(x))
+    }
   }
 
-  def iterator(ro: ReadOnlyDB): Iterator[NodeContent] = new NodeIterator(getNewestIdx.map(getNode)).take(elementsLimit).map(_.elem)
+  def iterator(ro: ReadOnlyDB): Iterator[NodeContent] = {
+    val newestIdx = ro.get(newestIdxKey)
+    val latest    = newestIdx.map(idx => ro.get(nodeKey(idx)))
+    println(s"iterator: newestIdx: $newestIdx, latest: $latest")
+    new NodeIterator(ro, latest)
+      .take(math.min(elementsLimit, ro.get(sizeKey).getOrElse(0)))
+      .map(_.elem)
+  }
 
-  private def getNode(idx: Index): Node                     = ???
-  private def setNode(idx: Index, node: Node): Unit         = ???
-  private def updateNode(idx: Index, f: Node => Node): Unit = setNode(idx, f(getNode(idx)))
+  private val sizeKey: Key[Option[Index]]             = MatcherKeys.activeOrdersSize(address)
+  private def nodeKey(idx: Index): Key[Node]          = MatcherKeys.activeOrders(address, idx)
+  private val newestIdxKey: Key[Option[Index]]        = MatcherKeys.activeOrdersSeqNr(address)
+  private def orderIdxKey(id: Id): Key[Option[Index]] = MatcherKeys.activeOrderSeqNr(address, id)
 
-  private def getIdx(id: Id): Int              = ???
-  private def setIdx(id: Id, idx: Index): Unit = ???
-  private def deleteIdx(id: Id): Unit          = ???
-
-  private def getNewestIdx: Option[Index]    = ???
-  private def setNewestIdx(idx: Index): Unit = ???
-  private def deleteNewestIdx(): Unit        = ???
-
-  private def getSize: Int                = ???
-  private def setSize(newSize: Int): Unit = ???
-
-  private class NodeIterator(private var currNode: Option[Node]) extends Iterator[Node] {
-    override def hasNext: Boolean = currNode.nonEmpty
+  private class NodeIterator(ro: ReadOnlyDB, private var currNode: Option[Node]) extends Iterator[Node] {
+    override def hasNext: Boolean = {
+      println(s"hasNext: $currNode")
+      currNode.nonEmpty
+    }
     override def next(): Node = currNode match {
       case Some(r) =>
-        currNode = r.olderIdx.map(getNode)
+        currNode = r.olderIdx.map(idx => ro.get(nodeKey(idx)))
+        println(s"next: ${r.olderIdx} ->  $currNode")
+        println(s"return: $r")
         r
       case None => throw new IllegalStateException("hasNext = false")
     }
@@ -77,5 +98,47 @@ object ActiveOrdersIndex {
   type NodeContent = (AssetPair, Id)
   type Index       = Int
 
-  private case class Node(elem: NodeContent, olderIdx: Option[Index], newerIdx: Option[Index])
+  case class Node(olderIdx: Option[Index], elem: (AssetPair, Id), newerIdx: Option[Index]) // can we read a previous with iterator?
+  object Node {
+    def read(xs: Array[Byte]): Node = {
+//      println(s"read: ${xs.mkString("|")}")
+      val bb = ByteBuffer.wrap(xs)
+      Node(indexFromBytes(bb), (assetPairFromBytes(bb), orderIdFromBytes(bb)), indexFromBytes(bb))
+    }
+
+    private def indexFromBytes(bb: ByteBuffer): Option[Index] = bb.get match {
+      case 0 => None
+      case 1 =>
+        val bytes = new Array[Byte](4)
+        bb.get(bytes)
+        Some(Ints.fromByteArray(bytes))
+    }
+
+    private def assetPairFromBytes(bb: ByteBuffer): AssetPair = AssetPair(assetIdFromBytes(bb), assetIdFromBytes(bb))
+    private def assetIdFromBytes(bb: ByteBuffer): Option[AssetId] = bb.get match {
+      case 0 => None
+      case 1 =>
+        val bytes = new Array[Byte](crypto.DigestSize)
+        bb.get(bytes)
+//        println(s"assetIdFromBytes: ${ByteStr(bytes)}")
+        Some(ByteStr(bytes))
+    }
+
+    private def orderIdFromBytes(bb: ByteBuffer): Id = {
+      val bytes = new Array[Byte](crypto.DigestSize)
+      bb.get(bytes)
+      ByteStr(bytes)
+    }
+
+    def write(x: Node): Array[Byte] = {
+      val r = indexToBytes(x.olderIdx) ++ toBytes(x.elem) ++ indexToBytes(x.newerIdx)
+//      println(s"write: ${r.mkString("|")}")
+      r
+    }
+
+    private def indexToBytes(x: Option[Index]): Array[Byte] = x.fold(Array[Byte](0))(x => (1: Byte) +: Ints.toByteArray(x))
+    private def toBytes(x: Option[AssetId]): Array[Byte]    = x.fold(Array[Byte](0))(x => (1: Byte) +: x.arr)
+    private def toBytes(x: AssetPair): Array[Byte]          = toBytes(x.amountAsset) ++ toBytes(x.priceAsset)
+    private def toBytes(x: (AssetPair, Id)): Array[Byte]    = toBytes(x._1) ++ x._2.arr
+  }
 }

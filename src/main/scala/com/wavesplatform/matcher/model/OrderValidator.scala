@@ -22,7 +22,7 @@ trait OrderValidator {
   val wallet: Wallet
 
   lazy val matcherPubKey: PublicKeyAccount = wallet.findPrivateKey(settings.account).explicitGet()
-  val MinExpiration                        = 60 * 1000L
+  val MinExpiration: Long                  = 60 * 1000L
 
   private val timer = Kamon.timer("matcher.validation")
 
@@ -33,7 +33,7 @@ trait OrderValidator {
 
     val change = OrderInfoChange(lo.order, None, OrderInfo(order.amount, 0L, None, None, order.matcherFee, Some(0L)))
     val newOrder = OrderHistory
-      .diff(Map(lo.order.id() -> change))
+      .diff(List(change))
       .getOrElse(order.senderPublicKey.toAddress, OpenPortfolio.empty)
 
     val open  = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap

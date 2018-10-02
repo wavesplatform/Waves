@@ -2,13 +2,13 @@ package com.wavesplatform.matcher
 
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 
 object MatcherKeys {
   import com.wavesplatform.database.KeyHelpers._
@@ -58,9 +58,9 @@ object MatcherKeys {
     }
   }
 
-  def addressOrdersSeqNr(address: Address): Key[Int] = bytesSeqNr(3, address.bytes.arr)
-  def addressOrders(address: Address, seqNr: Int): Key[Option[OrderAssets]] =
-    Key.opt(hBytes(4, seqNr, address.bytes.arr), OrderAssets.read, OrderAssets.write)
+  def activeOrdersSeqNr(address: Address): Key[Option[Int]] = Key.opt(bytes(3, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+  def activeOrders(address: Address, seqNr: Int): Key[ActiveOrdersIndex.Node] =
+    Key(bytes(4, address.bytes.arr ++ Ints.toByteArray(seqNr)), ActiveOrdersIndex.Node.read, ActiveOrdersIndex.Node.write)
 
   def openVolume(address: Address, assetId: Option[AssetId]): Key[Option[Long]] =
     Key.opt(bytes(5, address.bytes.arr ++ assetIdToBytes(assetId)), Longs.fromByteArray, Longs.toByteArray)
@@ -73,4 +73,19 @@ object MatcherKeys {
 
   def exchangeTransaction(txId: ByteStr): Key[Option[ExchangeTransaction]] =
     Key.opt(bytes(10, txId.arr), ExchangeTransaction.parseBytes(_).get, _.bytes())
+
+  def activeOrdersSize(address: Address): Key[Option[Int]] = Key.opt(bytes(11, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+  def activeOrderSeqNr(address: Address, orderId: Order.Id): Key[Option[Int]] =
+    Key.opt(bytes(12, address.bytes.arr ++ orderId.arr), Ints.fromByteArray, Ints.toByteArray)
+
+  def finalizedCommonSeqNr(address: Address): Key[Option[Int]] = Key.opt(bytes(13, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+  def finalizedCommon(address: Address, seqNr: Int): Key[Option[Order.Id]] =
+    Key.opt(bytes(14, address.bytes.arr ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
+
+  def finalizedPairSeqNr(address: Address, pair: AssetPair): Key[Option[Int]] =
+    Key.opt(bytes(15, address.bytes.arr ++ pair.bytes), Ints.fromByteArray, Ints.toByteArray)
+
+  def finalizedPair(address: Address, pair: AssetPair, seqNr: Int): Key[Option[Order.Id]] =
+    Key.opt(bytes(16, address.bytes.arr ++ pair.bytes ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
+
 }
