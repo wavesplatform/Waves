@@ -6,13 +6,14 @@ import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.CompilerV1
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.utils
-import com.wavesplatform.utils.functionCosts
+import com.wavesplatform.utils.{ScorexLogging, functionCosts}
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 
 import scala.util.{Failure, Success, Try}
 
-object ScriptCompiler {
+object ScriptCompiler extends ScorexLogging {
 
   private val v1Compiler = new CompilerV1(utils.dummyCompilerContext)
 
@@ -27,11 +28,23 @@ object ScriptCompiler {
     for {
       v <- extractVersion(directives)
       expr <- v match {
-        case V1 => v1Compiler.compile(scriptWithoutDirectives, directives)
+        case V1 => tryCompile(scriptWithoutDirectives, directives)
       }
       script     <- ScriptV1(expr)
       complexity <- ScriptEstimator(utils.dummyVarNames, functionCosts, expr)
     } yield (script, complexity)
+  }
+
+  def tryCompile(src: String, directives: List[Directive]): Either[String, EXPR] = {
+    try {
+      v1Compiler.compile(src, directives)
+    } catch {
+      case ex: Throwable =>
+        log.error("Error compiling script", ex)
+        log.error(src)
+        val msg = Option(ex.getMessage).getOrElse("Parsing failed: Unknown error")
+        Left(msg)
+    }
   }
 
   def estimate(script: Script): Either[String, Long] = script match {
