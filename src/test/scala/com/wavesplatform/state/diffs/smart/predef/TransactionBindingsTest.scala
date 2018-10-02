@@ -474,9 +474,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
     for {
       compileResult <- CompilerV1(ctx.compilerContext, expr)
-      (typedExpr, tpe) = compileResult
-      er               = EvaluatorV1[T](ctx.evaluationContext, typedExpr)
-      r <- er._2
+      (typedExpr, _) = compileResult
+      r <- EvaluatorV1[T](ctx.evaluationContext, typedExpr)
     } yield r
   }
 }
