@@ -5,6 +5,7 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
@@ -45,7 +46,12 @@ object DocExport {
   case class OptionOf(param: TypeDoc)                 extends TypeDoc { override val name: String      = "OPTION"; val hasParam: Boolean      = true }
   case class nativeTypeDoc(override val name: String) extends TypeDoc { override val isNative: Boolean = true; override val needLink: Boolean = true }
 
-  case class Doc(types: java.util.List[TypeDoc], vars: java.util.List[VarDoc], funcs: java.util.List[FuncDoc])
+  case class Name(name: String)
+  case class Doc(types: java.util.List[TypeDoc],
+                 vars: java.util.List[VarDoc],
+                 funcs: java.util.List[FuncDoc],
+                 transactionDoc: java.util.List[TransactionDoc],
+                 transactionFields: java.util.List[Name])
 
   def typeRepr(t: FINAL)(name: String = t.name): TypeDoc = t match {
     case UNION(Seq(UNIT, l)) => OptionOf(typeRepr(l)())
@@ -89,6 +95,23 @@ object DocExport {
             }).toList.asJava
         ))
 
+  val transactionsTypes =
+    fullContext.types.filter(v => v.name == "Transaction").flatMap({ case UnionType(_, union) => union })
+  val transactionsFields: Seq[String] =
+    transactionsTypes.flatMap(_.fields.map(_._1)).distinct
+  case class TransactionDoc(name: String, fields: java.util.List[TransactionField])
+  case class TransactionField(absend: Boolean, `type`: java.util.List[TypeDoc])
+  val transactionDocs = transactionsTypes.map { t =>
+    val fields = t.fields.toMap
+    TransactionDoc(
+      t.name,
+      transactionsFields
+        .map(field =>
+          fields.get(field).fold(TransactionField(true, List[TypeDoc]().asJava))(ft => TransactionField(false, List(typeRepr(ft)()).asJava)))
+        .asJava
+    )
+  }
+
   def main(args: Array[String]) {
     if (args.size != 3 || args(0) != "--gen-doc") {
       System.err.println("Expected args: --gen-doc <template> <output>")
@@ -96,7 +119,12 @@ object DocExport {
       val mf     = new DefaultMustacheFactory()
       val doc    = mf.compile(args(1))
       val output = new java.io.FileWriter(args(2)) //new java.io.StringWriter
-      val out    = doc.execute(output, Doc(getTypes().asJava, getVarsDoc().toList.asJava, getFunctionnsDoc().toList.asJava))
+      val out = doc.execute(output,
+                            Doc(getTypes().asJava,
+                                getVarsDoc().toList.asJava,
+                                getFunctionnsDoc().toList.asJava,
+                                transactionDocs.asJava,
+                                transactionsFields.map(Name).asJava))
       out.flush()
       out.close()
     }
