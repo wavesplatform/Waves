@@ -24,7 +24,6 @@ import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
-import com.wavesplatform.OrderOps._
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
@@ -246,8 +245,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(allValidP) {
       case (genesis, transfers, issueAndScripts, etx) =>
-        val smallFee = CommonValidation.ScriptExtraFee + FeeCalculator.FeeConstants(etx.builder.typeId) - 1
-
+        val smallFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(ExchangeTransaction.typeId)
         val exchangeWithSmallFee = ExchangeTransactionV2
           .create(
             MATCHER,

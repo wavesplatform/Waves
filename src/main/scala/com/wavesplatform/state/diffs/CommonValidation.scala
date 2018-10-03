@@ -23,6 +23,23 @@ object CommonValidation {
   val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
   val ScriptExtraFee                                      = 400000L
 
+  val FeeConstants: Map[Byte, Long] = Map(
+    GenesisTransaction.typeId      -> 0,
+    PaymentTransaction.typeId      -> 1,
+    IssueTransaction.typeId        -> 1000,
+    ReissueTransaction.typeId      -> 1000,
+    BurnTransaction.typeId         -> 1,
+    TransferTransaction.typeId     -> 1,
+    MassTransferTransaction.typeId -> 1,
+    LeaseTransaction.typeId        -> 1,
+    LeaseCancelTransaction.typeId  -> 1,
+    ExchangeTransaction.typeId     -> 3,
+    CreateAliasTransaction.typeId  -> 1,
+    DataTransaction.typeId         -> 1,
+    SetScriptTransaction.typeId    -> 10,
+    SponsorFeeTransaction.typeId   -> 1000
+  )
+
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
                                                           settings: FunctionalitySettings,
                                                           blockTime: Long,
@@ -135,24 +152,20 @@ object CommonValidation {
       case _ => Right(tx)
     }
 
-  private def feeInUnits(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Long] = tx match {
-    case _: GenesisTransaction       => Right(0)
-    case _: PaymentTransaction       => Right(1)
-    case _: IssueTransaction         => Right(1000)
-    case _: ReissueTransaction       => Right(1000)
-    case _: BurnTransaction          => Right(1)
-    case _: TransferTransaction      => Right(1)
-    case tx: MassTransferTransaction => Right(1 + (tx.transfers.size + 1) / 2)
-    case _: LeaseTransaction         => Right(1)
-    case _: LeaseCancelTransaction   => Right(1)
-    case _: ExchangeTransaction      => Right(3)
-    case _: CreateAliasTransaction   => Right(1)
-    case tx: DataTransaction =>
-      val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
-      Right(1 + (base.length - 1) / 1024)
-    case _: SetScriptTransaction  => Right(10)
-    case _: SponsorFeeTransaction => Right(1000)
-    case _                        => Left(UnsupportedTransactionType)
+  private def feeInUnits(blockchain: Blockchain, height: Int, tx: Transaction): Either[ValidationError, Long] = {
+    FeeConstants
+      .get(tx.builder.typeId)
+      .map { baseFee =>
+        tx match {
+          case tx: MassTransferTransaction =>
+            baseFee + (tx.transfers.size + 1) / 2
+          case tx: DataTransaction =>
+            val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts, height)) tx.bodyBytes() else tx.bytes()
+            baseFee + (base.length - 1) / 1024
+          case _ => baseFee
+        }
+      }
+      .toRight(UnsupportedTransactionType)
   }
 
   def getMinFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, (Option[AssetId], Long)] = {
