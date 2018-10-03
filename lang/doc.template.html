@@ -119,6 +119,70 @@
 </tr>
 {{/transactionDoc}}
 </table>
+{{#commonFields}}
+ <h1>Common fields</h1>
+<table border="1">
+<tr><td></td>{{#fields}}<td>{{name}}</td>{{/fields}}<tr>
+{{#types}}
+<tr><td>{{name}}</td>
+{{#fields}}
+<td>
+{{#absend}}-{{/absend}}
+{{#type}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}<a href="#{{name}}">{{name}}</a>{{/param}}]
+ {{/hasParam}}
+{{/type}}
+</td>
+{{/fields}}
+</tr>
+{{/types}}
+</table>
+{{/commonFields}}
+{{#specials}}
+ <h1>{{class}} fields</h1>
+{{#descr}}
+<table border="1">
+<tr><td></td>{{#types}}<td>{{name}}</td>{{/types}}<tr>
+{{#fields}}
+<tr><td>{{name}}</td>
+{{#types}}
+<td>
+{{#absend}}-{{/absend}}
+{{#type}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}<a href="#{{name}}">{{name}}</a>{{/param}}]
+ {{/hasParam}}
+{{/type}}
+</td>
+{{/types}}
+</tr>
+{{/fields}}
+</table>
+{{/descr}}
+{{/specials}}
  <h1>Functions</h1>
 <table border="1">
 {{#funcs}}

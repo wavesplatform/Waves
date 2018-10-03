@@ -52,12 +52,6 @@ object DocExport {
         override val isNative: Boolean = true; override val needLink: Boolean = true
       }
 
-      case class Doc(types: java.util.List[TypeDoc],
-                     vars: java.util.List[VarDoc],
-                     funcs: java.util.List[FuncDoc],
-                     transactionDoc: java.util.List[TransactionDoc],
-                     transactionFields: java.util.List[FieldTypes])
-
       def typeRepr(t: FINAL)(name: String = t.name): TypeDoc = t match {
         case UNION(Seq(UNIT, l)) => OptionOf(typeRepr(l)())
         case UNION(Seq(l, UNIT)) => OptionOf(typeRepr(l)())
@@ -107,16 +101,19 @@ object DocExport {
       case class TransactionDoc(name: String, fields: java.util.List[TransactionField])
       case class TransactionField(absend: Boolean, `type`: java.util.List[TypeDoc])
       case class FieldTypes(name: String, types: java.util.List[TransactionField])
-      val transactionsType = fullContext.types.filter(v => v.name == "Transaction")
-      def transactionDocs(types: Seq[DefinedType]) = {
+      val transactionsType       = fullContext.types.filter(v => v.name == "Transaction")
+      val transactionsTypesNames = transactionsType.flatMap({ case UnionType(_, union) => union.map(_.name) }).toSet
+      def transactionDocs(types: Seq[DefinedType], fieldsFlt: String => Boolean = (_ => true)) = {
         val transactionsTypes =
           types.flatMap({
             case UnionType(_, union) => union
             case t: CaseType         => Seq(t.typeRef)
+            case t                   => println(t.toString); Seq()
           })
         val transactionsFields =
           transactionsTypes
             .flatMap(_.fields.map(_._1))
+            .filter(fieldsFlt)
             .distinct
             .map(name =>
               FieldTypes(
@@ -144,10 +141,31 @@ object DocExport {
         (transactionDocs, transactionsFields)
       }
 
-      val mf     = new DefaultMustacheFactory()
-      val doc    = mf.compile(args(1))
-      val output = new java.io.FileWriter(args(2)) //new java.io.StringWriter
-      val (t, f) = transactionDocs(transactionsType)
+      val commonFields              = Set("id", "fee", "version", "timestamp", "sender", "senderPublicKey", "bodyBytes", "proofs")
+      def otherFields(name: String) = !commonFields(name)
+
+      case class CaseDoc(types: java.util.List[TransactionDoc], fields: java.util.List[FieldTypes])
+      def caseDoc(d: (Seq[TransactionDoc], Seq[FieldTypes])) = CaseDoc(d._1.asJava, d._2.asJava)
+      case class Special(`class`: String, descr: CaseDoc)
+      case class Doc(types: java.util.List[TypeDoc],
+                     vars: java.util.List[VarDoc],
+                     funcs: java.util.List[FuncDoc],
+                     transactionDoc: java.util.List[TransactionDoc],
+                     transactionFields: java.util.List[FieldTypes],
+                     commonFields: CaseDoc,
+                     specials: java.util.List[Special])
+
+      val mf      = new DefaultMustacheFactory()
+      val doc     = mf.compile(args(1))
+      val output  = new java.io.FileWriter(args(2)) //new java.io.StringWriter
+      val (t, f)  = transactionDocs(transactionsType)
+      val commons = transactionDocs(transactionsType, commonFields)
+      val transactionClasses = Seq(
+        "Transfers"      -> Set("TransferTransaction", "MassTransferTransaction", "PaymentTransaction"),
+        "Issuing assets" -> Set("IssueTransaction", "ReissueTransaction", "BurnTransaction", "SponsorFeeTransaction"),
+        "Leasing"        -> Set("LeaseTransaction", "LeaseCancelTransaction")
+      )
+      def otherTransactions(name: String) = transactionsTypesNames(name) && !transactionClasses.map(_._2).exists(_(name))
       val out = doc.execute(
         output,
         Doc(
@@ -155,7 +173,10 @@ object DocExport {
           getVarsDoc().toList.asJava,
           getFunctionnsDoc().toList.asJava,
           t.asJava,
-          f.asJava
+          f.asJava,
+          CaseDoc(commons._1.asJava, commons._2.asJava),
+          (transactionClasses.map(c => Special(c._1, caseDoc(transactionDocs(fullContext.types.filter(v => c._2(v.name)), otherFields))))
+            :+ Special("Other", caseDoc(transactionDocs(fullContext.types.filter(v => otherTransactions(v.name)), otherFields)))).asJava
         )
       )
       out.flush()
