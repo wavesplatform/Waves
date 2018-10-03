@@ -43,7 +43,7 @@ object CryptoContext {
     }
 
     def fromBase64StringF: BaseFunction = NativeFunction("fromBase64String", 10, FROMBASE64, BYTEVECTOR, "Base64 decode", ("str", STRING, "base64 encoded string")) {
-      case (str: String) :: Nil => global.base64Decode(str).map(ByteVector(_))
+      case (str: String) :: Nil => global.base64Decode(str, global.MaxBase64String).map(ByteVector(_))
       case xs                   => notImplemented("fromBase64String(str: String)", xs)
     }
 
