@@ -224,8 +224,23 @@ object CommonValidation {
 
   def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
     def restFeeAfterSponsorship(inputFee: (Option[AssetId], Long)): Either[ValidationError, (Option[AssetId], Long)] =
-      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(inputFee)
-      else {
+      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+        val (feeAssetId, feeAmount) = inputFee
+        for {
+          feeInUnits <- feeInUnits(blockchain, height, tx)
+          restFee <- feeAssetId match {
+            case Some(value) => Right(inputFee)
+            case None =>
+              val feeDiff = feeAmount - feeInUnits * Sponsorship.FeeUnit
+              Either
+                .cond(
+                  feeDiff > 0,
+                  (feeAssetId, feeDiff),
+                  GenericError("Fuck you!")
+                )
+          }
+        } yield restFee
+      } else {
         val (feeAssetId, feeAmount) = inputFee
         for {
           feeInUnits <- feeInUnits(blockchain, height, tx)
