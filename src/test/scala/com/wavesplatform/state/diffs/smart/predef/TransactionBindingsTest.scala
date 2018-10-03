@@ -244,7 +244,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("DataTransaction binding") {
-    forAll(dataTransactionGen(10)) { t =>
+    forAll(dataTransactionGen(10, useForScript = true)) { t =>
       def pg(i: Int) = {
         val v = t.data(i) match {
           case e: IntegerDataEntry => e.value.toString
