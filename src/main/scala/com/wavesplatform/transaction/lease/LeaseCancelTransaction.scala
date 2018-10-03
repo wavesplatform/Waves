@@ -7,7 +7,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
-import scorex.crypto.signatures.Curve25519.KeyLength
+import com.wavesplatform.crypto.KeyLength
 
 trait LeaseCancelTransaction extends ProvenTransaction with VersionedTransaction {
   def chainByte: Option[Byte]
@@ -28,6 +28,9 @@ trait LeaseCancelTransaction extends ProvenTransaction with VersionedTransaction
 }
 
 object LeaseCancelTransaction {
+
+  val typeId: Byte = 9
+
   def validateLeaseCancelParams(leaseId: ByteStr, fee: Long) =
     if (leaseId.arr.length != crypto.DigestSize) {
       Left(ValidationError.GenericError("Lease transaction id is invalid"))

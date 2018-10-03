@@ -214,7 +214,7 @@ lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
     .settings(
-      version := "0.0.1",
+      version := "1.0.0",
       // the following line forces scala version across all dependencies
       scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true))),
       test in assembly := {},
@@ -237,6 +237,19 @@ lazy val lang =
       }
     )
     .jvmSettings(
+      publishMavenStyle := true,
+      credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
+      publishTo := Some("Sonatype Nexus" at "https://oss.sonatype.org/service/local/staging/deploy/maven2"),
+      name := "RIDE Compiler",
+      normalizedName := "lang",
+      description := "The RIDE smart contract language compiler",
+      homepage := Some(url("https://docs.wavesplatform.com/en/technical-details/waves-contracts-language-description/maven-compiler-package.html")),
+      licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
+      organization := "com.wavesplatform",
+      organizationName := "Waves Platform",
+      organizationHomepage := Some(url("https://wavesplatform.com")),
+      scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
+      developers := List(Developer("petermz", "Peter Zhelezniakov", "peterz@rambler.ru", url("https://wavesplatform.com"))),
       libraryDependencies ++= Seq(
         "org.scala-js"                %% "scalajs-stubs" % "0.6.22" % "provided"
       ) ++ Dependencies.logging.map(_ % "test") // scrypto logs an error if a signature verification was failed

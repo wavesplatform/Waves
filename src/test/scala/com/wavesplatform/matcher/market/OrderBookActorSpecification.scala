@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
+import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.{OperationTimedOut, OrderAccepted, OrderCanceled}
@@ -49,7 +50,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 
-  val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
+  val wallet = Wallet(WalletSettings(None, Some("matcher"), Some(WalletSeed)))
   wallet.generateNewAccount()
 
   val orderHistoryRef = TestActorRef(new Actor {
@@ -268,7 +269,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
       val ts   = System.currentTimeMillis()
 
       (1 to 100).foreach({ i =>
-        actor ! ord1.copy(timestamp = ts + i)
+        actor ! ord1.updateTimestamp(ts + i)
       })
 
       within(10.seconds) {
@@ -279,7 +280,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
 
       within(10.seconds) {
         actor ! GetOrdersRequest
-        expectMsgType[GetOrdersResponse].orders.map(_.order.id()) should have size 100
+        expectMsgType[GetOrdersResponse].orders should have size 100
       }
     }
 
@@ -404,7 +405,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
       val price  = 34118
       val amount = 1
 
-      val expiredOrder = buy(pair, price, amount).copy(expiration = time)
+      val expiredOrder = buy(pair, price, amount).updateExpiration(time)
       actor ! expiredOrder
       receiveN(1)
       getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder.matcherFee, expiredOrder))

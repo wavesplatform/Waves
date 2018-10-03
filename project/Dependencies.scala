@@ -33,13 +33,13 @@ object Dependencies {
   lazy val itKit = scalatest ++ Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     ("com.spotify" % "docker-client" % "8.11.3").classifier("shaded").exclude("com.google.guava", "guava"),
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.9.5",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.9.6",
     asyncHttpClient.exclude("io.netty", "netty-handler")
   )
 
   lazy val serialization = Seq(
     "com.google.guava"  % "guava"      % "21.0",
-    "com.typesafe.play" %% "play-json" % "2.6.9"
+    "com.typesafe.play" %% "play-json" % "2.6.10"
   )
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
@@ -55,8 +55,10 @@ object Dependencies {
   )
 
   lazy val http = Seq("core", "annotations", "models", "jaxrs").map(swaggerModule) ++ Seq(
-    "io.swagger"                   %% "swagger-scala-module" % "1.0.4" exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12"),
+    "io.swagger"                   %% "swagger-scala-module" % "1.0.4",
     "com.github.swagger-akka-http" %% "swagger-akka-http"    % "1.0.0",
+    "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.6",
+    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",
     akkaHttpModule("akka-http")
   )
 

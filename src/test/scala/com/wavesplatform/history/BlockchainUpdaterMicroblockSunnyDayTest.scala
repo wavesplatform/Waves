@@ -10,7 +10,7 @@ import org.scalatest.prop.PropertyChecks
 import com.wavesplatform.account.{Address, AddressOrAlias, PrivateKeyAccount}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 class BlockchainUpdaterMicroblockSunnyDayTest
     extends PropSpec

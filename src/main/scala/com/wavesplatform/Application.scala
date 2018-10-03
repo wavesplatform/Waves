@@ -98,7 +98,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
 
-    val feeCalculator          = new FeeCalculator(settings.feesSettings, blockchainUpdater)
+    val feeCalculator          = new FeeCalculator(blockchainUpdater)
     val time: Time             = NTP
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)

@@ -1,6 +1,8 @@
 package com.wavesplatform.lang.impl
 
-import com.wavesplatform.lang.v1.traits.{DataType, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.DataType
+import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
+import shapeless.{:+:, CNil}
 
 import scala.scalajs.js.annotation.JSGlobalScope
 import scala.scalajs.{js => platform}
@@ -11,7 +13,7 @@ object Environment extends scalajs.js.Object {
   def height: Int       = platform.native
   def networkByte: Byte = platform.native
 
-  def transaction: Tx                                     = platform.native
+  def inputEntity: Tx :+: Ord :+: CNil                    = platform.native
   def transactionById(id: Array[Byte]): Option[Tx]        = platform.native
   def transactionHeightById(id: Array[Byte]): Option[Int] = platform.native
 

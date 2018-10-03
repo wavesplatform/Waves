@@ -31,7 +31,7 @@ case class LeaseTransactionV2 private (version: Byte,
 
 object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte                 = 8
+  override val typeId: Byte                 = LeaseTransaction.typeId
   override def supportedVersions: Set[Byte] = Set(2)
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =

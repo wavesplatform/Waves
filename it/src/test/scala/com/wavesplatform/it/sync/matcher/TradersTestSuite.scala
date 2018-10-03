@@ -13,6 +13,7 @@ import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import scala.util.Random
 
 class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with NodesFromDocker with ReportingTestName {
 
@@ -22,6 +23,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   private def aliceNode      = nodes(1)
   private def bobNode        = nodes(2)
   private val TransactionFee = 300000
+  private def orderVersion   = (Random.nextInt(2) + 1).toByte
 
   "Verifications of tricky ordering cases" - {
     // Alice issues new asset
@@ -213,7 +215,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   }
 
   def bobPlacesWaveOrder(assetPair: AssetPair, price: Price, amount: Long): String = {
-    val bobOrder = matcherNode.prepareOrder(bobNode, assetPair, OrderType.BUY, price, amount)
+    val bobOrder = matcherNode.prepareOrder(bobNode, assetPair, OrderType.BUY, price, amount, orderVersion)
     val order    = matcherNode.placeOrder(bobOrder).message.id
     matcherNode.waitOrderStatus(assetPair, order, "Accepted")
     order
@@ -222,9 +224,9 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   def bobPlacesAssetOrder(bobCoinAmount: Int, twoAssetsPair: AssetPair, assetId: String): String = {
     val decodedAsset = ByteStr.decodeBase58(assetId).get
     val bobOrder = if (twoAssetsPair.amountAsset.contains(decodedAsset)) {
-      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.SELL, 1 * Order.PriceConstant, bobCoinAmount)
+      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.SELL, 1 * Order.PriceConstant, bobCoinAmount, orderVersion)
     } else {
-      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.BUY, bobCoinAmount * Order.PriceConstant, 1)
+      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.BUY, bobCoinAmount * Order.PriceConstant, 1, orderVersion)
     }
     val order = matcherNode.placeOrder(bobOrder)
     matcherNode.waitOrderStatus(twoAssetsPair, order.message.id, "Accepted")

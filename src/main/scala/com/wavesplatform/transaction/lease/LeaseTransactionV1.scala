@@ -6,7 +6,7 @@ import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction._
-import scorex.crypto.signatures.Curve25519.SignatureLength
+import com.wavesplatform.crypto.SignatureLength
 import scala.util.{Failure, Success, Try}
 
 case class LeaseTransactionV1 private (sender: PublicKeyAccount,
@@ -27,7 +27,7 @@ case class LeaseTransactionV1 private (sender: PublicKeyAccount,
 
 object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = 8
+  override val typeId: Byte = LeaseTransaction.typeId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {

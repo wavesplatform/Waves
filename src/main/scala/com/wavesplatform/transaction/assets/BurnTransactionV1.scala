@@ -6,7 +6,7 @@ import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.util.{Failure, Success, Try}
 
 case class BurnTransactionV1 private (sender: PublicKeyAccount, assetId: ByteStr, quantity: Long, fee: Long, timestamp: Long, signature: ByteStr)

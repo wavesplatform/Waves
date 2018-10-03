@@ -71,7 +71,7 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.waitOrderStatusAndAmount(wavesUsdPair, bobOrder1Id, "PartiallyFilled", Some(420169L), 1.minute)
 
       // Each side get fair amount of assets
-      val exchangeTx = matcherNode.transactionsByOrder(aliceOrder.id().base58).headOption.getOrElse(fail("Expected an exchange transaction"))
+      val exchangeTx = matcherNode.transactionsByOrder(aliceOrder.idStr()).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
     }
 
@@ -159,7 +159,7 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrder1Id, "PartiallyFilled", 1.minute)
 
       // Each side get fair amount of assets
-      val exchangeTx = matcherNode.transactionsByOrder(aliceOrder.id().base58).headOption.getOrElse(fail("Expected an exchange transaction"))
+      val exchangeTx = matcherNode.transactionsByOrder(aliceOrder.idStr()).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
       matcherNode.cancelOrder(bobNode, wavesUsdPair, Some(bobOrder1Id))
     }
@@ -314,7 +314,7 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.reservedBalance(aliceNode) shouldBe empty
     }
 
-    val aliceOrders = matcherNode.ordersByAddress(aliceNode.address, activeOnly = false, 1.minute)
+    val aliceOrders = matcherNode.ordersByAddress(aliceNode, activeOnly = false, 1.minute)
     aliceOrders should not be empty
 
     val order = aliceOrders.find(_.id == aliceOrderId).getOrElse(throw new IllegalStateException(s"Alice should have the $aliceOrderId order"))

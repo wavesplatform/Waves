@@ -9,7 +9,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction.TransactionParsers._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.util.{Failure, Success, Try}
 
 case class PaymentTransaction private (sender: PublicKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)

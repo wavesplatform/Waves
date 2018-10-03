@@ -11,7 +11,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, EitherExt2}
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalatest.{FreeSpecLike, Matchers}
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 

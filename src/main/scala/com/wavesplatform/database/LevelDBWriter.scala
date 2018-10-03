@@ -26,6 +26,9 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.{immutable, mutable}
 
 object LevelDBWriter {
+
+  val MAX_DEPTH = 2000
+
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
     db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(leaseId)(h)))
 
@@ -222,7 +225,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       rw.put(Keys.idToAddress(id), address)
     }
 
-    val threshold = height - 2000
+    val threshold = height - MAX_DEPTH
 
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {

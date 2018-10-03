@@ -4,11 +4,11 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, _}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.utils.{Base58, NTP}
 import org.asynchttpclient.util.HttpConstants
@@ -290,39 +290,65 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
       usesProofs = false
     )
 
-    val buyer               = pkByAddress(firstAddress)
-    val seller              = pkByAddress(secondAddress)
-    val matcher             = pkByAddress(thirdAddress)
-    val time                = NTP.correctedTime()
-    val expirationTimestamp = time + Order.MaxLiveTime
-    val buyPrice            = 1 * Order.PriceConstant
-    val sellPrice           = (0.50 * Order.PriceConstant).toLong
-    val mf                  = 300000L
-    val buyAmount           = 2
-    val sellAmount          = 3
-    val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
-    val buy                 = Order.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, mf)
-    val sell                = Order.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, mf)
+    for ((o1ver, o2ver, tver) <- Seq(
+           (1: Byte, 1: Byte, 1: Byte),
+           (1: Byte, 1: Byte, 2: Byte),
+           (1: Byte, 2: Byte, 2: Byte),
+           (2: Byte, 1: Byte, 2: Byte),
+           (2: Byte, 2: Byte, 2: Byte)
+         )) {
+      val buyer               = pkByAddress(firstAddress)
+      val seller              = pkByAddress(secondAddress)
+      val matcher             = pkByAddress(thirdAddress)
+      val time                = NTP.correctedTime()
+      val expirationTimestamp = time + Order.MaxLiveTime
+      val buyPrice            = 1 * Order.PriceConstant
+      val sellPrice           = (0.50 * Order.PriceConstant).toLong
+      val mf                  = 300000L
+      val buyAmount           = 2
+      val sellAmount          = 3
+      val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
+      val buy                 = Order.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, mf, o1ver)
+      val sell                = Order.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, mf, o2ver)
 
-    val amount = math.min(buy.amount, sell.amount)
-    val tx = ExchangeTransaction
-      .create(
-        matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
-        price = sellPrice,
-        amount = amount,
-        buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
-        sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
-        fee = mf,
-        timestamp = NTP.correctedTime()
-      )
-      .explicitGet()
-      .json()
+      val amount = math.min(buy.amount, sell.amount)
+      val tx =
+        if (tver == 1) {
+          ExchangeTransactionV1
+            .create(
+              matcher = matcher,
+              buyOrder = buy.asInstanceOf[OrderV1],
+              sellOrder = sell.asInstanceOf[OrderV1],
+              price = sellPrice,
+              amount = amount,
+              buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
+              sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
+              fee = mf,
+              timestamp = NTP.correctedTime()
+            )
+            .explicitGet()
+            .json()
+        } else {
+          ExchangeTransactionV2
+            .create(
+              matcher = matcher,
+              buyOrder = buy,
+              sellOrder = sell,
+              price = sellPrice,
+              amount = amount,
+              buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
+              sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
+              fee = mf,
+              timestamp = NTP.correctedTime()
+            )
+            .explicitGet()
+            .json()
+        }
 
-    val txId = sender.signedBroadcast(tx).id
-    nodes.waitForHeightAriseAndTxPresent(txId)
-
+      val txId = sender.signedBroadcast(tx).id
+      nodes.waitForHeightAriseAndTxPresent(txId)
+      assertBadRequestAndMessage(sender.signedBroadcast(tx), "is already in the state on a height")
+    }
   }
 
   private def signBroadcastAndCalcFee(json: JsObject, usesProofs: Boolean, version: String = null): String = {
@@ -337,6 +363,12 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
       proofs.lengthCompare(1) == 0 && proofs.head.nonEmpty
     } else (body \ "signature").as[String].nonEmpty
     assert(signed)
+
+    val validation = sender.postJson("/debug/validate", body)
+    assert(validation.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
+    val validationTime = (Json.parse(validation.getResponseBody) \ "validationTime").as[Double]
+    log.debug(s"Validation time of tx is $validationTime ")
+
     val rb = sender.postJson("/transactions/broadcast", body)
     assert(rb.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val id = (Json.parse(rb.getResponseBody) \ "id").as[String]

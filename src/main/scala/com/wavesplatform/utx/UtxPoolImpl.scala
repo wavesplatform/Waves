@@ -5,24 +5,25 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
+import cats.implicits._
+import com.wavesplatform.account.Address
+import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
-import kamon.Kamon
-import kamon.metric.MeasurementUnit
-import monix.eval.Task
-import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
-import com.wavesplatform.account.Address
-import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.{ScorexLogging, Time}
+import kamon.Kamon
+import kamon.metric.MeasurementUnit
+import monix.eval.Task
+import monix.execution.schedulers.SchedulerService
+import monix.execution.{CancelableFuture, Scheduler}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong
@@ -42,13 +43,12 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
   private val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private val pessimisticPortfolios = new PessimisticPortfolios
 
-  private val removeInvalid = Task {
-    val b                    = blockchain
-    val transactionsToRemove = transactions.values.asScala.filter(t => b.containsTransaction(t.id()))
-    removeAll(transactionsToRemove)
-  }.delayExecution(utxSettings.cleanupInterval)
+  private val removeInvalidTask: Task[Unit] =
+    Task.eval(removeInvalid()) >>
+      Task.sleep(utxSettings.cleanupInterval) >>
+      removeInvalidTask
 
-  private val cleanup = removeInvalid.flatMap(_ => removeInvalid).runAsyncLogErr
+  private val cleanup: CancelableFuture[Unit] = removeInvalidTask.runAsyncLogErr
 
   override def close(): Unit = {
     cleanup.cancel()
@@ -104,6 +104,14 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculat
   private def remove(txId: ByteStr): Unit = {
     Option(transactions.remove(txId)).foreach(_ => utxPoolSizeStats.decrement())
     pessimisticPortfolios.remove(txId)
+  }
+
+  private def removeInvalid(): Unit = {
+    val b = blockchain
+    val transactionsToRemove = transactions.values.asScala.filter { t =>
+      TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
+    }
+    removeAll(transactionsToRemove)
   }
 
   override def accountPortfolio(addr: Address): Portfolio = blockchain.portfolio(addr)

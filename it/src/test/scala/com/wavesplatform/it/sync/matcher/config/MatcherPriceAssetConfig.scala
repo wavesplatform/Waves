@@ -61,7 +61,7 @@ object MatcherPriceAssetConfig {
 
   val IssueEthTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
-      sender = bobPk,
+      sender = alicePk,
       name = ethAssetName.getBytes(),
       description = "asset description".getBytes(),
       quantity = defaultAssetQuantity,
@@ -75,7 +75,7 @@ object MatcherPriceAssetConfig {
 
   val IssueBtcTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
-      sender = alicePk,
+      sender = bobPk,
       name = "BTC-X".getBytes(),
       description = "asset description".getBytes(),
       quantity = defaultAssetQuantity,
@@ -114,6 +114,11 @@ object MatcherPriceAssetConfig {
 
   val wavesUsdPair = AssetPair(
     amountAsset = None,
+    priceAsset = Some(UsdId)
+  )
+
+  val ethUsdPair = AssetPair(
+    amountAsset = Some(EthId),
     priceAsset = Some(UsdId)
   )
 

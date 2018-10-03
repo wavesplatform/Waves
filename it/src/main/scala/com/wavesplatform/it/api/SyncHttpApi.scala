@@ -38,9 +38,8 @@ object SyncHttpApi extends Assertions {
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Assertions.assert(
-        statusCode == BadRequest.intValue &&
-          responseBody.replace("\n", "").matches(s".*$errorRegex.*"))
+      Assertions.assert(statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
+                        s"\nexpected '$errorRegex'\nactual '$responseBody'")
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
   }
@@ -223,7 +222,9 @@ object SyncHttpApi extends Assertions {
 
     def blockAt(height: Int): Block = Await.result(async(n).blockAt(height), RequestAwaitTime)
 
-    def blockHeadersSeq(from: Int, to: Int): Seq[BlockHeaders] = Await.result(async(n).blockHeadersSeq(from, to), RequestAwaitTime)
+    def blockSeq(fromHeight: Int, toHeight: Int) = Await.result(async(n).blockSeq(fromHeight, toHeight), RequestAwaitTime)
+
+    def blockHeadersSeq(fromHeight: Int, toHeight: Int) = Await.result(async(n).blockHeadersSeq(fromHeight, toHeight), RequestAwaitTime)
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       Await.result(async(n).rollback(to, returnToUTX), RequestAwaitTime)
@@ -249,7 +250,7 @@ object SyncHttpApi extends Assertions {
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
       Await.result(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
 
-    def waitForHeightArise(): Unit =
+    def waitForHeightArise(): Int =
       Await.result(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)
 
     def waitForSameBlockHeadesAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Boolean =

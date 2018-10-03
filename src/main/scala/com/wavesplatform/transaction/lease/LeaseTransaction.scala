@@ -5,7 +5,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKeyAccount}
 import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.util.Try
 
 trait LeaseTransaction extends ProvenTransaction with VersionedTransaction {
@@ -28,6 +28,8 @@ trait LeaseTransaction extends ProvenTransaction with VersionedTransaction {
 }
 
 object LeaseTransaction {
+
+  val typeId: Byte = 8
 
   object Status {
     val Active   = "active"

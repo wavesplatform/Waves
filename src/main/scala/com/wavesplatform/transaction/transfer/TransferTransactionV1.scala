@@ -6,7 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 import scala.util.{Failure, Success, Try}
 
@@ -31,7 +31,7 @@ case class TransferTransactionV1 private (assetId: Option[AssetId],
 
 object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = 4
+  override val typeId: Byte = TransferTransaction.typeId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {

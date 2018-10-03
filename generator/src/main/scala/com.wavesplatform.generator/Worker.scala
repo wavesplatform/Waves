@@ -16,7 +16,8 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.control.NonFatal
 
-class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress, generator: TransactionGenerator)(implicit ec: ExecutionContext)
+class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress, generator: TransactionGenerator, initial: List[RawBytes])(
+    implicit ec: ExecutionContext)
     extends ScorexLogging {
 
   private type Result[T] = EitherT[Future, (Int, Throwable), T]
@@ -28,6 +29,15 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
 
   private def guardedSend(startStep: Int): Result[Unit] = {
     tryConnect
+      .flatTap { ch =>
+        initial match {
+          case Nil =>
+            ().pure[Result]
+          case _ =>
+            trySend(ch, initial)
+              .leftMap(e => -1 -> e)
+        }
+      }
       .flatMap(sendTransactions(startStep, _))
       .recoverWith {
         case (_, e) if !settings.autoReconnect =>
@@ -54,22 +64,23 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
       }
   }
 
+  private def trySend(channel: Channel, messages: Seq[RawBytes]): EitherT[Future, Throwable, Unit] = EitherT {
+    sender
+      .send(channel, messages: _*)
+      .map { _ =>
+        Right(())
+      }
+      .recover {
+        case NonFatal(e) => Left(e)
+      }
+  }
+
   private def sendTransactions(startStep: Int, channel: Channel): Result[Unit] = {
     def loop(step: Int): Result[Unit] = {
       log.info(s"[$node] Iteration $step")
       val txs = generator.next().toList
       txs.foreach(println)
       val messages: Seq[RawBytes] = txs.map(RawBytes.from).toSeq
-      def trySend: Result[Unit] = EitherT {
-        sender
-          .send(channel, messages: _*)
-          .map { _ =>
-            Right(())
-          }
-          .recover {
-            case NonFatal(e) => Left(step -> e)
-          }
-      }
 
       def next: Result[Unit] = {
         log.info(s"[$node] ${messages.size} transactions had been sent")
@@ -85,7 +96,9 @@ class Worker(settings: Settings, sender: NetworkSender, node: InetSocketAddress,
         }
       }
 
-      trySend.flatMap(_ => next)
+      trySend(channel, messages)
+        .leftMap(e => step -> e)
+        .flatMap(_ => next)
     }
 
     loop(startStep)

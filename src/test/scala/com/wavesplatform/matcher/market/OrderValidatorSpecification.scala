@@ -36,7 +36,7 @@ class OrderValidatorSpecification
   (bc.transactionInfo _).when(*).returns(Some((1, i1)))
 
   val s: MatcherSettings             = matcherSettings.copy(account = MatcherAccount.address)
-  val w                              = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
+  val w                              = Wallet(WalletSettings(None, Some("matcher"), Some(WalletSeed)))
   val acc: Option[PrivateKeyAccount] = w.generateNewAccount()
 
   val matcherPubKey: PublicKeyAccount = w.findPrivateKey(s.account).explicitGet()

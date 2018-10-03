@@ -24,9 +24,10 @@ class MatcherMassOrdersTestSuite
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private def matcherNode = nodes.head
-  private def aliceNode   = nodes(1)
-  private def bobNode     = nodes(2)
+  private def matcherNode  = nodes.head
+  private def aliceNode    = nodes(1)
+  private def bobNode      = nodes(2)
+  private def orderVersion = (Random.nextInt(2) + 1).toByte
 
   "Create orders with statuses FILL, PARTIAL, CANCELLED, ACTIVE" - {
 
@@ -59,23 +60,23 @@ class MatcherMassOrdersTestSuite
 
     // Alice places sell orders
     val aliceOrderIdFill = matcherNode
-      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 10.minutes)
+      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, orderVersion, 10.minutes)
       .message
       .id
 
     val alicePartialOrderId = matcherNode
-      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 10.minutes)
+      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, orderVersion, 10.minute)
       .message
       .id
 
     val aliceOrderToCancelId =
       matcherNode
-        .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 70.seconds)
+        .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, orderVersion, 70.second)
         .message
         .id
 
     val aliceActiveOrderId = matcherNode
-      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant + 1, 3, 10.minutes)
+      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant + 1, 3, orderVersion, 10.minute)
       .message
       .id
 
@@ -152,7 +153,7 @@ class MatcherMassOrdersTestSuite
   private def ordersRequestsGen(n: Int, node: Node, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[String] = {
     val orderIds = 1 to n map (_ => {
       matcherNode
-        .placeOrder(node, assetPair, orderType, Order.PriceConstant, amount, (120 + Random.nextInt(70)).seconds)
+        .placeOrder(node, assetPair, orderType, Order.PriceConstant, amount, orderVersion, (120 + Random.nextInt(70)).seconds)
         .message
         .id
     })

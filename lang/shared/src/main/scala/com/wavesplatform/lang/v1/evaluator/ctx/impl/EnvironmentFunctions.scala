@@ -3,8 +3,9 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
-import com.wavesplatform.lang.v1.traits.Recipient.{Address, Alias}
-import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient}
+import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import scodec.bits.ByteVector
 
 class EnvironmentFunctions(environment: Environment) {
@@ -37,9 +38,9 @@ class EnvironmentFunctions(environment: Environment) {
 }
 
 object EnvironmentFunctions {
-  val ChecksumLength       = 4
-  val HashLength           = 20
+  val ChecksumLength = 4
+  val HashLength = 20
   val AddressVersion: Byte = 1
-  val AddressLength: Int   = 1 + 1 + ChecksumLength + HashLength
-  val AddressPrefix        = "address:"
+  val AddressLength: Int = 1 + 1 + ChecksumLength + HashLength
+  val AddressPrefix = "address:"
 }

@@ -1,18 +1,20 @@
 package com.wavesplatform.state.diffs.smart.predef
 
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.smart.BlockchainContext.In
+import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
-import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
-import com.wavesplatform.transaction.assets.exchange.Order
-import play.api.libs.json.Json // For string escapes.
+import org.scalatest.{Matchers, PropSpec}
+import play.api.libs.json.Json
+import shapeless.{Coproduct} // For string escapes.
 
 class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   def letProof(p: Proofs, prefix: String)(i: Int) =
-    s"let ${prefix.replace(".", "")}proof$i = ${prefix}.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).base58}'"
+    s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).base58}'"
 
   def provenPart(t: ProvenTransaction): String = {
     val version = t match {
@@ -31,7 +33,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
      """.stripMargin
   }
 
-  def assertProofs(p: String) = {
+  def assertProofs(p: String): String = {
     val prefix = p.replace(".", "")
     s"${prefix}proof0 && ${prefix}proof1 && ${prefix}proof2 && ${prefix}proof3 && ${prefix}proof4 && ${prefix}proof5 && ${prefix}proof6 && ${prefix}proof7"
   }
@@ -62,7 +64,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case other => throw()
            | }
            |""".stripMargin,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -90,7 +92,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         s,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -110,7 +112,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -131,7 +133,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -150,7 +152,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -173,7 +175,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -192,7 +194,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -213,7 +215,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -234,7 +236,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case other => throw()
            | }
            |""".stripMargin,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -263,7 +265,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |match tx {
                  | case t : DataTransaction =>
                  |   ${provenPart(t)}
-                 |   ${Range(0, t.data.length).map(pg).mkString("\n")}
+                 |   ${t.data.indices.map(pg).mkString("\n")}
                  |   $resString
                  | case other => throw()
                  | }
@@ -271,7 +273,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         s,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -292,7 +294,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         if (t.transfers.isEmpty) assertProvenPart("t")
         else
           assertProvenPart("t") + s" &&" + {
-            Range(0, t.transfers.length)
+            t.transfers.indices
               .map(i => s"recipient$i && amount$i")
               .mkString(" && ")
           }
@@ -307,7 +309,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
                       |     let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'
-                      |     ${Range(0, t.transfers.length).map(pg).mkString("\n")}
+                      |     ${t.transfers.indices.map(pg).mkString("\n")}
                       |   ${provenPart(t)}
                       |   $resString && assetId && transferCount && totalAmount && attachment
                       | case other => throw()
@@ -316,7 +318,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         script,
-        t,
+        Coproduct(t),
         'T'
       )
       result shouldBe Right(true)
@@ -328,7 +330,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       def pg(ord: Order) = {
         val oType = ord.orderType.toString
         val script = s"""
-           |   let ${oType}Id = t.${oType}Order.id == base58'${ord.id.value}'
+           |   let ${oType}Id = t.${oType}Order.id == base58'${ord.idStr()}'
            |   let ${oType}Sender = t.${oType}Order.sender == addressFromPublicKey(base58'${ByteStr(ord.sender.publicKey).base58}')
            |   let ${oType}SenderPk = t.${oType}Order.senderPublicKey == base58'${ByteStr(ord.sender.publicKey).base58}'
            |   let ${oType}MatcherPk = t.${oType}Order.matcherPublicKey == base58'${ByteStr(ord.matcherPublicKey.publicKey).base58}'
@@ -348,7 +350,6 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                           .getOrElse(ByteStr.empty)
                           .base58}'
            |   else isDefined(t.${oType}Order.assetPair.priceAsset) == false
-           |   # let ${oType}OrderType = t.${oType}Order.orderType ==
          """.stripMargin
 
         val lets = List(
@@ -365,7 +366,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           "AssetPairAmount",
           "AssetPairPrice",
           "Proofs"
-        ).map(i => s"${oType}$i")
+        ).map(i => s"$oType$i")
           .mkString(" && ")
 
         (script, lets)
@@ -387,7 +388,46 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val result = runScript[Boolean](
         s,
-        t,
+        Coproduct(t),
+        'T'
+      )
+      result shouldBe Right(true)
+    }
+  }
+
+  property("Order binding") {
+    forAll(orderGen) { t =>
+      val s = s"""
+                 |match tx {
+                 | case t : Order =>
+                 |   let id = t.id == base58'${t.id()}'
+                 |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
+                 |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
+                 |   let matcherPublicKey = t.matcherPublicKey == base58'${ByteStr(t.matcherPublicKey.publicKey).base58}'
+                 |   let timestamp = t.timestamp == ${t.timestamp}
+                 |   let price = t.price == ${t.price}
+                 |   let amount = t.amount == ${t.amount}
+                 |   let expiration = t.expiration == ${t.expiration}
+                 |   let matcherFee = t.matcherFee == ${t.matcherFee}
+                 |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
+                 |   ${Range(0, 8).map(letProof(t.proofs, "t")).mkString("\n")}
+                 |  let assetPairAmount = if (${t.assetPair.amountAsset.isDefined}) then extract(t.assetPair.amountAsset) == base58'${t.assetPair.amountAsset
+                   .getOrElse(ByteStr.empty)
+                   .base58}'
+                 |   else isDefined(t.assetPair.amountAsset) == false
+                 |   let assetPairPrice = if (${t.assetPair.priceAsset.isDefined}) then extract(t.assetPair.priceAsset) == base58'${t.assetPair.priceAsset
+                   .getOrElse(ByteStr.empty)
+                   .base58}'
+                 |   else isDefined(t.assetPair.priceAsset) == false
+                 | id && sender && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee && bodyBytes && ${assertProofs(
+                   "t")} && assetPairAmount && assetPairPrice
+                 | case other => throw()
+                 | }
+                 |""".stripMargin
+
+      val result = runScript[Boolean](
+        s,
+        Coproduct[In](t),
         'T'
       )
       result shouldBe Right(true)

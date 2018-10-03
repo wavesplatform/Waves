@@ -2,11 +2,11 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.utils.base58Length
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import scorex.crypto.signatures.Curve25519
+import com.wavesplatform.crypto._
 
 import scala.util.{Failure, Success, Try}
 
@@ -15,7 +15,7 @@ object TransactionParsers {
   val TimestampLength            = 8
   val AmountLength               = 8
   val TypeLength                 = 1
-  val SignatureStringLength: Int = base58Length(Curve25519.SignatureLength)
+  val SignatureStringLength: Int = base58Length(SignatureLength)
 
   private val old: Map[Byte, TransactionParser] = Seq[TransactionParser](
     GenesisTransaction,
@@ -24,7 +24,7 @@ object TransactionParsers {
     TransferTransactionV1,
     ReissueTransactionV1,
     BurnTransactionV1,
-    ExchangeTransaction,
+    ExchangeTransactionV1,
     LeaseTransactionV1,
     LeaseCancelTransactionV1,
     CreateAliasTransactionV1,
@@ -41,6 +41,7 @@ object TransactionParsers {
     CreateAliasTransactionV2,
     ReissueTransactionV2,
     BurnTransactionV2,
+    ExchangeTransactionV2,
     LeaseTransactionV2,
     LeaseCancelTransactionV2,
     SponsorFeeTransaction
@@ -50,7 +51,7 @@ object TransactionParsers {
     }
   }(collection.breakOut)
 
-  private val all: Map[(Byte, Byte), TransactionParser] = old.flatMap {
+  val all: Map[(Byte, Byte), TransactionParser] = old.flatMap {
     case (typeId, builder) =>
       builder.supportedVersions.map { version =>
         ((typeId, version), builder)

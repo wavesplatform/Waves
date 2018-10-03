@@ -12,7 +12,7 @@ import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
@@ -644,7 +644,8 @@ object TransactionFactory {
           case DataTransaction          => jsv.as[SignedDataRequest].toTx
           case SetScriptTransaction     => jsv.as[SignedSetScriptRequest].toTx
           case SponsorFeeTransaction    => jsv.as[SignedSponsorFeeRequest].toTx
-          case ExchangeTransaction      => jsv.as[SignedExchangeRequest].toTx
+          case ExchangeTransactionV1    => jsv.as[SignedExchangeRequest].toTx
+          case ExchangeTransactionV2    => jsv.as[SignedExchangeRequestV2].toTx
         }
     }
   }

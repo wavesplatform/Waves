@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
 import com.wavesplatform.utils.Base58
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.collection.immutable.Stream
 import scala.util.{Failure, Success}
 

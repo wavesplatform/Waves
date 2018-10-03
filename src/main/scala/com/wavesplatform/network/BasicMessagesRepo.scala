@@ -11,7 +11,7 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.network.message.Message._
 import com.wavesplatform.network.message._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.util.Try
 
 object GetPeersSpec extends MessageSpec[GetPeers.type] {

@@ -40,7 +40,7 @@ case class IssueTransactionV2 private (version: Byte,
 
 object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte                 = 3
+  override val typeId: Byte                 = IssueTransaction.typeId
   override val supportedVersions: Set[Byte] = Set(2)
 
   private def networkByte = AddressScheme.current.chainId

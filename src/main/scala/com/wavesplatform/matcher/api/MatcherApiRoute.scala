@@ -12,11 +12,13 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http._
 import com.wavesplatform.crypto
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactionsByOrder
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor
-import com.wavesplatform.matcher.market.OrderHistoryActor._
+import com.wavesplatform.matcher.market.OrderHistoryActor.{DeleteOrderFromHistory, GetTradableBalance}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.metrics.TimerExt
@@ -62,7 +64,7 @@ case class MatcherApiRoute(wallet: Wallet,
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ getOrderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+      matcherPublicKey ~ getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ getTradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
         getSettings
@@ -118,6 +120,19 @@ case class MatcherApiRoute(wallet: Wallet,
     }
   }
 
+  @Path("/orderbook/{amountAsset}/{priceAsset}/status")
+  @ApiOperation(value = "Get Market Status", notes = "Get current market data such as last trade, best bid and ask", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+    ))
+  def marketStatus: Route = (path("orderbook" / AssetPairPM / "status") & get) { p =>
+    withAssetPair(p, redirectToInverse = true) { pair =>
+      complete((matcher ? GetMarketStatusRequest(pair)).mapTo[MatcherResponse])
+    }
+  }
+
   @Path("/orderbook")
   @ApiOperation(value = "Place order",
                 notes = "Place a new limit order (buy or sell)",
@@ -138,7 +153,8 @@ case class MatcherApiRoute(wallet: Wallet,
     (pathEndOrSingleSlash & post) {
       json[Order] { order =>
         placeTimer.measure {
-          if (blockchain.hasScript(order.senderPublicKey.toAddress)) {
+          if (blockchain.hasScript(order.senderPublicKey.toAddress) &&
+              !blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height)) {
             Future.successful[MatcherResponse](StatusCodes.BadRequest -> "Trading on scripted account isn't allowed yet.")
           } else {
             log.trace(s"Placing ${order.id()}")
@@ -470,7 +486,7 @@ object MatcherApiRoute {
 
   def orderJson(order: Order, orderInfo: OrderInfo): JsObject =
     Json.obj(
-      "id"        -> order.id(),
+      "id"        -> order.idStr(),
       "type"      -> order.orderType.toString,
       "amount"    -> order.amount,
       "price"     -> order.price,

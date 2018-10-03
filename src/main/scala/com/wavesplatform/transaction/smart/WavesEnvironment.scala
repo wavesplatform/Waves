@@ -1,19 +1,25 @@
 package com.wavesplatform.transaction.smart
 
-import com.wavesplatform.lang.v1.traits.Recipient.{Address, Alias}
-import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx => ContractTransaction}
+import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.traits.domain.Recipient._
+import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.assets.exchange.Order
 import monix.eval.Coeval
 import scodec.bits.ByteVector
-import com.wavesplatform.account.AddressOrAlias
-import com.wavesplatform.transaction.Transaction
+import shapeless._
 
-class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blockchain: Blockchain) extends Environment {
+class WavesEnvironment(nByte: Byte, in: Coeval[Transaction :+: Order :+: CNil], h: Coeval[Int], blockchain: Blockchain) extends Environment {
   override def height: Int = h()
 
-  override def transaction: ContractTransaction = RealTransactionWrapper(tx())
+  override def inputEntity: Tx :+: Ord :+: CNil = {
+    in.apply()
+      .map(InputPoly)
+  }
 
-  override def transactionById(id: Array[Byte]): Option[ContractTransaction] =
+  override def transactionById(id: Array[Byte]): Option[Tx] =
     blockchain
       .transactionInfo(ByteStr(id))
       .map(_._2)

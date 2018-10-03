@@ -5,7 +5,7 @@ import com.wavesplatform.wallet.Wallet
 
 trait TestWallet {
   protected val testWallet = {
-    val wallet = Wallet(WalletSettings(None, "123", None))
+    val wallet = Wallet(WalletSettings(None, Some("123"), None))
     wallet.generateNewAccounts(10)
     wallet
   }

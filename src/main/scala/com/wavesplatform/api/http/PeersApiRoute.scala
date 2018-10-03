@@ -3,13 +3,13 @@ package com.wavesplatform.api.http
 import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.ConcurrentMap
 import java.util.stream.Collectors
-import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json._
 
 import scala.collection.JavaConverters._
@@ -85,8 +85,7 @@ case class PeersApiRoute(settings: RestAPISettings,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "string",
-        defaultValue = "{\n\t\"host\":\"127.0.0.1\",\n\t\"port\":\"9084\"\n}"
+        dataType = "com.wavesplatform.api.http.ConnectReq"
       )
     ))
   def connect: Route = (path("connect") & post & withAuth) {
@@ -139,8 +138,4 @@ case class PeersApiRoute(settings: RestAPISettings,
 
 object PeersApiRoute {
   val MaxPeersInResponse = 1000
-
-  case class ConnectReq(host: String, port: Int)
-
-  implicit val connectFormat: Format[ConnectReq] = Json.format
 }

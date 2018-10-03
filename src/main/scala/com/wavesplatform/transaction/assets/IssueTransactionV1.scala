@@ -1,13 +1,14 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.common.primitives.Bytes
-import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
-import monix.eval.Coeval
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.crypto
+import com.wavesplatform.crypto.SignatureLength
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.Script
-import scorex.crypto.signatures.Curve25519.SignatureLength
+import monix.eval.Coeval
+
 import scala.util.{Failure, Success, Try}
 
 case class IssueTransactionV1 private (sender: PublicKeyAccount,
@@ -32,7 +33,7 @@ case class IssueTransactionV1 private (sender: PublicKeyAccount,
 
 object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = 3
+  override val typeId: Byte = IssueTransaction.typeId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {

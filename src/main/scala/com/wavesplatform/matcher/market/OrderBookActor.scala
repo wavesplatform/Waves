@@ -9,6 +9,7 @@ import com.wavesplatform.matcher.market.MatcherActor.{Shutdown, ShutdownComplete
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated}
+import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
@@ -65,6 +66,8 @@ class OrderBookActor(assetPair: AssetPair,
     oldSnapshotsDeleted = false,
     onComplete = () => ()
   )
+
+  private var lastTrade: Option[Order] = None
 
   val okCancel: java.lang.Boolean     = Boolean.box(true)
   val failedCancel: java.lang.Boolean = Boolean.box(false)
@@ -181,6 +184,8 @@ class OrderBookActor(assetPair: AssetPair,
       sender() ! GetOrdersResponse(orderBook.asks.values.flatten.toSeq)
     case GetBidOrdersRequest =>
       sender() ! GetOrdersResponse(orderBook.bids.values.flatten.toSeq)
+    case GetMarketStatusRequest(pair) =>
+      handleGetMarketStatus(pair)
   }
 
   private def onOrderCleanup(orderBook: OrderBook, ts: Long): Unit = {
@@ -209,6 +214,13 @@ class OrderBookActor(assetPair: AssetPair,
         sender() ! OrderCancelRejected("Order not found")
     }
 
+  private def handleGetMarketStatus(pair: AssetPair): Unit = {
+    if (pair == assetPair)
+      sender() ! GetMarketStatusResponse(pair, orderBook.bids.headOption, orderBook.asks.headOption, lastTrade)
+    else
+      sender() ! GetMarketStatusResponse(pair, None, None, None)
+  }
+
   private def onAddOrder(order: Order): Unit = {
     val msg = ValidateOrder(order, NTP.correctedTime())
     orderHistory ! msg
@@ -223,7 +235,7 @@ class OrderBookActor(assetPair: AssetPair,
         log.debug(s"Order $orderId rejected: ${err.err}")
         apiSender.foreach(_ ! OrderRejected(err.err))
       case Right(o) =>
-        log.debug(s"Order accepted: '${o.id()}' in '${o.assetPair.key}', trying to match ...")
+        log.debug(s"Order accepted: '${o.idStr()}' in '${o.assetPair.key}', trying to match ...")
         timer.measure(matchOrder(LimitOrder(o)))
         apiSender.foreach(_ ! OrderAccepted(o))
     }
@@ -307,10 +319,11 @@ class OrderBookActor(assetPair: AssetPair,
           tx <- createTransaction(event)
           _  <- utx.putIfNew(tx)
         } yield tx) match {
-          case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
+          case Right(tx) =>
+            lastTrade = Some(o.order)
             allChannels.broadcastTx(tx)
             processEvent(event)
-            context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
+            context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             (
               if (event.submittedRemainingAmount <= 0) None
               else
@@ -393,6 +406,10 @@ object OrderBookActor {
     def tryComplete(): Unit = if (completed) onComplete()
   }
 
+  case class GetOrderBookRequest(assetPair: AssetPair, depth: Option[Int])
+
+  case class GetMarketStatusRequest(assetPair: AssetPair)
+
   case class DeleteOrderBookRequest(assetPair: AssetPair)
 
   case class CancelOrder(orderId: ByteStr)
@@ -411,6 +428,22 @@ object OrderBookActor {
   object GetOrderBookResponse {
     def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(NTP.correctedTime(), pair, Seq(), Seq())
   }
+
+  case class GetMarketStatusResponse(pair: AssetPair,
+                                     bid: Option[(Price, Level[LimitOrder])],
+                                     ask: Option[(Price, Level[LimitOrder])],
+                                     last: Option[Order])
+      extends MatcherResponse(
+        StatusCodes.OK,
+        Json.obj(
+          "lastPrice" -> last.map(_.price),
+          "lastSide"  -> last.map(_.orderType.toString),
+          "bid"       -> bid.map(_._1),
+          "bidAmount" -> bid.map(_._2.map(_.amount).sum),
+          "ask"       -> ask.map(_._1),
+          "askAmount" -> ask.map(_._2.map(_.amount).sum)
+        )
+      )
 
   // Direct requests
   case object GetOrdersRequest

@@ -1,14 +1,17 @@
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.{Serde, CTX}
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.v1.traits.{DataType, Environment, Recipient, Tx}
-import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import fastparse.core.Parsed.{Failure, Success}
+import shapeless.{:+:, CNil}
 
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
@@ -42,24 +45,56 @@ object JsAPI {
     r(ast)
   }
 
+  val wavesContext = WavesContext.build(new Environment {
+    override def height: Int                                                                                     = 0
+    override def networkByte: Byte                                                                               = 1: Byte
+    override def inputEntity: Tx :+: Ord :+: CNil                                                                = null
+    override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+    override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
+    override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+  })
+
+  val cryptoContext = CryptoContext.build(Global)
+
+  def typeRepr(t: TYPE): js.Any = t match {
+    case UNION(l) => l.map(typeRepr).toJSArray
+    case CASETYPEREF(name, fields) =>
+      js.Dynamic.literal("typeName" -> name, "fields" -> fields.map(f => js.Dynamic.literal("name" -> f._1, "type" -> typeRepr(f._2))).toJSArray)
+    case LIST(t) => js.Dynamic.literal("listOf" -> typeRepr(t))
+    case t       => t.toString
+  }
+
+  @JSExportTopLevel("fullContext")
+  val fullContext: CTX = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext))
+
+  @JSExportTopLevel("getTypes")
+  def getTypes() = fullContext.types.map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v.typeRef))).toJSArray
+
+  @JSExportTopLevel("getVarsDoc")
+  def getVarsDoc() = fullContext.vars.map(v => js.Dynamic.literal("name" -> v._1, "type" -> typeRepr(v._2._1._1), "doc" -> v._2._1._2)).toJSArray
+
+  @JSExportTopLevel("getFunctionsDoc")
+  def getFunctionnsDoc() =
+    fullContext.functions
+      .map(
+        f =>
+          js.Dynamic.literal(
+            "name"       -> f.name,
+            "doc"        -> f.docString,
+            "resultType" -> typeRepr(f.signature.result),
+            "args" -> ((f.argsDoc zip f.signature.args) map { arg =>
+              js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._2), "doc" -> arg._1._2)
+            }).toJSArray
+        ))
+      .toJSArray
+
+  @JSExportTopLevel("compilerContext")
+  val compilerContext = fullContext.compilerContext
+
   @JSExportTopLevel("compile")
   def compile(input: String): js.Dynamic = {
-
-    val wavesContext = WavesContext.build(new Environment {
-      override def height: Int                                                                                     = 0
-      override def networkByte: Byte                                                                               = 1: Byte
-      override def transaction: Tx                                                                                 = null
-      override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-      override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
-      override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
-      override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-      override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    })
-
-    //comment
-    val cryptoContext = CryptoContext.build(Global)
-
-    val compilerContext = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext)).compilerContext
 
     def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
 

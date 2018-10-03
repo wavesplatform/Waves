@@ -9,6 +9,7 @@ import scodec.bits.ByteVector
 import com.wavesplatform.account.{Address, Alias}
 import org.scalacheck.Gen
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
+import shapeless.Coproduct
 
 class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -22,7 +23,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
             | case other => throw()
             | }
             |""".stripMargin,
-          transfer
+          Coproduct(transfer)
         )
         transfer.assetId match {
           case Some(v) => result.explicitGet().toArray sameElements v.arr
@@ -41,7 +42,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                                           | case other => throw()
                                           | }
                                           |""".stripMargin,
-          transfer
+          Coproduct(transfer)
         )
         transfer.assetId.isDefined shouldEqual result.explicitGet()
     }
@@ -75,7 +76,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
             | case other => throw()
             | }
             |""".stripMargin,
-          massTransfer
+          Coproduct(massTransfer)
         )
         resultAmount shouldBe Right(massTransfer.transfers(0).amount)
         val resultAddress = runScript[ByteVector](
@@ -89,7 +90,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                                                       | case other => throw()
                                                       | }
                                                       |""".stripMargin,
-          massTransfer
+          Coproduct(massTransfer)
         )
         resultAddress shouldBe Right(ByteVector(massTransfer.transfers(0).address.bytes.arr))
         val resultLen = runScript[Long](
@@ -99,7 +100,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                                            | case other => throw()
                                            | }
                                            |""".stripMargin,
-          massTransfer
+          Coproduct(massTransfer)
         )
         resultLen shouldBe Right(massTransfer.transfers.size.toLong)
     }
@@ -122,7 +123,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
             | case other => throw()
             | }
             |""".stripMargin,
-          transfer
+          Coproduct(transfer)
         )
         result shouldBe Right(true)
     }
@@ -142,7 +143,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                | case other => throw()
                | }
                |""".stripMargin,
-            transfer
+            Coproduct(transfer)
           )
         } catch {
           case ex: MatchError =>
@@ -184,7 +185,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                | case other => throw()
                |}
                |""".stripMargin,
-            transfer
+            Coproduct(transfer)
           )
         result shouldBe Right(true)
     }
@@ -230,7 +231,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
            |  case _ => throw()
            |}
            |""".stripMargin,
-        t
+        Coproduct(t)
       )
       transferResult shouldBe Right(true)
 
@@ -251,7 +252,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
            |  case _ => throw()
            |}
          """.stripMargin,
-        dataTx
+        Coproduct(dataTx)
       )
       dataResult shouldBe Right(true)
     }

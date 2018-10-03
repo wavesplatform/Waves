@@ -16,9 +16,9 @@ class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMat
     "The Web Interface to the Waves Full Node API",
     Version.VersionString,
     "Waves Full Node",
-    "License: Apache License, Version 2.0",
+    "License: MIT License",
     None,
-    Some(License("Apache License, Version 2.0", "https://github.com/wavesplatform/Waves/blob/master/LICENSE"))
+    Some(License("MIT License", "https://github.com/wavesplatform/Waves/blob/master/LICENSE"))
   )
 
   //Let swagger-ui determine the host and port

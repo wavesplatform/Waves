@@ -1,13 +1,15 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
+import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.fromOption
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
@@ -21,7 +23,7 @@ object WavesContext {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "addressOrAlias" -> addressOrAliasType, "key" -> STRING) {
+      NativeFunction(name, 100, internalName, UNION(dataType.innerType, UNIT), "get data from the accaunt state", ("addressOrAlias", addressOrAliasType, "accaunt"), ("key", STRING, "key")) {
         case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)
         case _                                               => ???
       }
@@ -32,7 +34,7 @@ object WavesContext {
     val getStringFromStateF: BaseFunction  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String)
 
     def getDataFromArrayF(name: String, internalName: Short, dataType: DataType): BaseFunction =
-      NativeFunction(name, 10, internalName, UNION(dataType.innerType, UNIT), "data" -> LIST(dataEntryType.typeRef), "key" -> STRING) {
+      NativeFunction(name, 10, internalName, UNION(dataType.innerType, UNIT), "Find and extract data by key", ("data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"), ("key", STRING, "key")) {
         case (data: IndexedSeq[CaseObj] @unchecked) :: (key: String) :: Nil =>
           data.find(_.fields("key") == key).map(_.fields("value")) match {
             case Some(n: Long) if dataType == DataType.Long            => Right(n)
@@ -50,7 +52,7 @@ object WavesContext {
     val getStringFromArrayF: BaseFunction  = getDataFromArrayF("getString", DATA_STRING_FROM_ARRAY, DataType.String)
 
     def getDataByIndexF(name: String, dataType: DataType): BaseFunction =
-      UserFunction(name, UNION(dataType.innerType, UNIT), "@data" -> LIST(dataEntryType.typeRef), "@index" -> LONG) {
+      UserFunction(name, UNION(dataType.innerType, UNIT), "Extract data by index", ("@data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"), ("@index", LONG, "index")) {
         BLOCK(
           LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(REF("@data"), REF("@index"))), "value")),
           IF(FUNCTION_CALL(PureContext._isInstanceOf, List(REF("@val"), CONST_STRING(dataType.innerType.name))), REF("@val"), REF("unit"))
@@ -72,7 +74,7 @@ object WavesContext {
       )
     )
 
-    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", addressType.typeRef, "@publicKey" -> BYTEVECTOR) {
+    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to accaunt address", ("@publicKey", BYTEVECTOR, "public key")) {
       FUNCTION_CALL(
         FunctionHeader.User("Address"),
         List(
@@ -141,10 +143,10 @@ object WavesContext {
       )
     )
 
-    val addressFromStringF: BaseFunction = UserFunction("addressFromString", optionAddress, "@string" -> STRING) {
+    val addressFromStringF: BaseFunction = UserFunction("addressFromString", optionAddress, "Decode accaunt address", ("@string", STRING, "string address represntation")) {
       BLOCK(
         LET("@afs_addrBytes",
-            FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(REF("@string"), EnvironmentFunctions.AddressPrefix)))),
+          FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(REF("@string"), EnvironmentFunctions.AddressPrefix)))),
         IF(
           FUNCTION_CALL(
             PureContext.eq,
@@ -192,7 +194,7 @@ object WavesContext {
     }
 
     val addressFromRecipientF: BaseFunction =
-      NativeFunction("addressFromRecipient", 100, ADDRESSFROMRECIPIENT, addressType.typeRef, "AddressOrAlias" -> addressOrAliasType) {
+      NativeFunction("addressFromRecipient", 100, ADDRESSFROMRECIPIENT, addressType.typeRef, "Extract address or lookup alias", ("AddressOrAlias", addressOrAliasType, "address or alias, usally tx.recipient")) {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
         case CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
@@ -201,12 +203,22 @@ object WavesContext {
         case _ => ???
       }
 
-    val txCoeval: Coeval[Either[String, CaseObj]]  = Coeval.evalOnce(Right(transactionObject(env.transaction)))
+    val inputEntityCoeval: Coeval[Either[String, CaseObj]] =
+      Coeval.evalOnce(
+        env.inputEntity
+          .eliminate(
+            tx => transactionObject(tx).asRight[String],
+            _.eliminate(
+              o => orderObject(o).asRight[String],
+              _ => "Expected Transaction or Order".asLeft[CaseObj]
+            )
+          ))
+
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Right(env.height))
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(com.wavesplatform.lang.v1.compiler.Types.UNIT +: anyTransactionType.l)
-      NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "id" -> BYTEVECTOR) {
+      NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTEVECTOR, "transaction Id")) {
         case (id: ByteVector) :: Nil =>
           val maybeDomainTx = env.transactionById(id.toArray).map(transactionObject)
           Right(fromOption(maybeDomainTx))
@@ -221,28 +233,28 @@ object WavesContext {
     }
 
     val assetBalanceF: BaseFunction =
-      NativeFunction("assetBalance", 100, ACCOUNTASSETBALANCE, LONG, "addressOrAlias" -> addressOrAliasType, "assetId" -> UNION(UNIT, BYTEVECTOR)) {
+      NativeFunction("assetBalance", 100, ACCOUNTASSETBALANCE, LONG, "get asset balance for account", ("addressOrAlias", addressOrAliasType, "account"), ("assetId", UNION(UNIT, BYTEVECTOR), "assetId (WAVES if none)")) {
         case (c: CaseObj) :: (()) :: Nil                  => env.accountBalanceOf(caseObjToRecipient(c), None)
         case (c: CaseObj) :: (assetId: ByteVector) :: Nil => env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray))
 
         case _ => ???
       }
 
-    val wavesBalanceF: UserFunction = UserFunction("wavesBalance", LONG, "@addressOrAlias" -> addressOrAliasType) {
+    val wavesBalanceF: UserFunction = UserFunction("wavesBalance", LONG, "get WAVES balanse for account", ("@addressOrAlias", addressOrAliasType, "account")) {
       FUNCTION_CALL(assetBalanceF.header, List(REF("@addressOrAlias"), REF("unit")))
     }
 
-    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
+    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "get height when transaction was stored to blockchain", ("id", BYTEVECTOR, "transaction Id")) {
       case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
       case _                       => ???
     }
 
-    val vars: Map[String, (FINAL, LazyVal)] = Map(
-      ("height", (com.wavesplatform.lang.v1.compiler.Types.LONG, LazyVal(EitherT(heightCoeval)))),
-      ("tx", (outgoingTransactionType, LazyVal(EitherT(txCoeval))))
+    val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+      ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
+      ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
     )
 
-    val functions = Seq(
+    val functions = Array(
       txByIdF,
       txHeightByIdF,
       getIntegerFromStateF,

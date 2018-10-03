@@ -32,7 +32,7 @@ class TransactionsRouteSpec
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
 
-  private val wallet      = Wallet(WalletSettings(None, "qwerty", None))
+  private val wallet      = Wallet(WalletSettings(None, Some("qwerty"), None))
   private val blockchain  = mock[Blockchain]
   private val utx         = mock[UtxPool]
   private val allChannels = mock[ChannelGroup]
@@ -284,7 +284,11 @@ class TransactionsRouteSpec
         Get(routePath("/unconfirmed")) ~> route ~> check {
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {
-            (r \ "signature").as[String] shouldEqual t.signature.base58
+            if ((r \ "version").as[Int] == 1) {
+              (r \ "signature").as[String] shouldEqual t.proofs.proofs(0).base58
+            } else {
+              (r \ "proofs").as[Seq[String]] shouldEqual t.proofs.proofs.map(_.base58)
+            }
           }
         }
       }

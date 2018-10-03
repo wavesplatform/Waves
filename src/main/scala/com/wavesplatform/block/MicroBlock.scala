@@ -10,7 +10,7 @@ import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.block.Block.{BlockId, transParseBytes}
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.util.{Failure, Try}
 
 case class MicroBlock(version: Byte,

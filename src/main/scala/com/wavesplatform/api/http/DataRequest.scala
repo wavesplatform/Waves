@@ -3,6 +3,7 @@ package com.wavesplatform.api.http
 import cats.implicits._
 import com.wavesplatform.state.DataEntry
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
+import scala.annotation.meta.field
 import play.api.libs.json.Json
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.transaction.{DataTransaction, Proofs, ValidationError}
@@ -12,20 +13,24 @@ object DataRequest {
   implicit val signedDataRequestReads   = Json.reads[SignedDataRequest]
 }
 
-case class DataRequest(version: Byte, sender: String, data: List[DataEntry[_]], fee: Long, timestamp: Option[Long] = None)
+case class DataRequest(@(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1") version: Byte,
+                       sender: String,
+                       @(ApiModelProperty @field)(required = true) data: List[DataEntry[_]],
+                       @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
+                       timestamp: Option[Long] = None)
 
 @ApiModel(value = "Signed Data transaction")
-case class SignedDataRequest(@ApiModelProperty(required = true)
+case class SignedDataRequest(@(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1")
                              version: Byte,
-                             @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+                             @(ApiModelProperty @field)(value = "Base58 encoded sender public key", required = true)
                              senderPublicKey: String,
-                             @ApiModelProperty(value = "Data to put into blockchain", required = true)
+                             @(ApiModelProperty @field)(value = "Data to put into blockchain", required = true)
                              data: List[DataEntry[_]],
-                             @ApiModelProperty(required = true)
+                             @(ApiModelProperty @field)(required = true)
                              fee: Long,
-                             @ApiModelProperty(required = true)
+                             @(ApiModelProperty @field)(required = true, value = "1000")
                              timestamp: Long,
-                             @ApiModelProperty(required = true)
+                             @(ApiModelProperty @field)(required = true)
                              proofs: List[String])
     extends BroadcastRequest {
   def toTx: Either[ValidationError, DataTransaction] =

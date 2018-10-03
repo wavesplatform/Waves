@@ -30,6 +30,12 @@ case object Validation {
 
   implicit def result2Boolean(x: Validation): Boolean = x.status
 
+  implicit def fromEi[A](ei: Either[String, Unit]): Validation =
+    ei match {
+      case Left(err) => Validation(false, Set(err))
+      case Right(_)  => Validation(true)
+    }
+
   val success             = Validation(status = true)
   val failure: Validation = Validation(status = false)
 

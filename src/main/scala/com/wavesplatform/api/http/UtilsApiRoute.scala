@@ -32,7 +32,14 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   @ApiOperation(value = "Compile", notes = "Compiles string code to base64 script representation", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "code", required = true, dataType = "string", paramType = "body", value = "Script code")
+      new ApiImplicitParam(
+        name = "code",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        value = "Script code",
+        example = "true"
+      )
     ))
   @ApiResponses(
     Array(
@@ -59,7 +66,14 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   @ApiOperation(value = "Estimate", notes = "Estimates compiled code in Base64 representation", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "code", required = true, dataType = "string", paramType = "body", value = "A compiled Base64 code")
+      new ApiImplicitParam(
+        name = "code",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        value = "A compiled Base64 code",
+        example = "AQa3b8tH"
+      )
     ))
   @ApiResponses(
     Array(
@@ -126,7 +140,13 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   @ApiOperation(value = "Hash", notes = "Return SecureCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "string")
+      new ApiImplicitParam(
+        name = "message",
+        value = "Message to hash",
+        required = true,
+        paramType = "body",
+        dataType = "string"
+      )
     ))
   @ApiResponses(
     Array(
@@ -142,7 +162,13 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   @ApiOperation(value = "Hash", notes = "Return FastCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "string")
+      new ApiImplicitParam(
+        name = "message",
+        value = "Message to hash",
+        required = true,
+        paramType = "body",
+        dataType = "string"
+      )
     ))
   @ApiResponses(
     Array(
@@ -157,8 +183,21 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   @ApiOperation(value = "Hash", notes = "Return FastCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "privateKey", value = "privateKey", required = true, paramType = "path", dataType = "string"),
-      new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "string")
+      new ApiImplicitParam(
+        name = "privateKey",
+        value = "privateKey",
+        required = true,
+        paramType = "path",
+        dataType = "string",
+        example = "3kMEhU5z3v8bmer1ERFUUhW58Dtuhyo9hE5vrhjqAWYT"
+      ),
+      new ApiImplicitParam(
+        name = "message",
+        value = "Message to hash (base58 string)",
+        required = true,
+        paramType = "body",
+        dataType = "string"
+      )
     ))
   @ApiResponses(
     Array(

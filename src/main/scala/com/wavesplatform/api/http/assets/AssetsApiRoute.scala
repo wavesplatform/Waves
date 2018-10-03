@@ -145,7 +145,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         required = true,
         paramType = "body",
         dataType = "com.wavesplatform.api.http.assets.IssueV1Request",
-        example =
+        defaultValue =
           "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
       )
     ))
@@ -201,7 +201,9 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         value = "Order Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.transaction.assets.exchange.Order"
+        dataType = "com.wavesplatform.transaction.assets.exchange.OrderV1",
+        defaultValue =
+          "{\n\"version\":1,\n\"id\":\"HEUQkBMZg6YZfpcruUkr8hL6nZBP7dhLZPZWD2tMn6Bz\",\n\"sender\":\"3MsNaJycGKRqVj8BUfBY8vMSP3xa7ijvhcw\",\n\"senderPublicKey\":\"42vzsPLYVZ6dZn4RbF5qUVNzKos6XFyYJse5UqX8shP7\",\n\"matcherPublicKey\":\"3pLCKEsdiuhv3qFFNk8QjudhWyNxKRJ4isnnDe5ANEpp\",\n\"assetPair\":{\n\"amountAsset\":null,\n\"priceAsset\":\"DA5T1QAypqkhe3n6ECSt12P3L9wxTBWp6SUzBB8vLixX\"\n},\n\"orderType\":\"buy\",\n\"price\":28841388924312,\n\"amount\":26871634763588,\n\"timestamp\":5639882736428729894,\n\"expiration\":1538944198284,\n  \"matcherFee\" : 16351880967675,\n\"signature\":\"3R2GhvQr6pSkXUKhfg95rZf6s4noMWrcnQjSxBeAY5Yu9UrfE93Y6mM8szUtwMeREFmT6g9mq7FDD27hyeiDukWm\",\n\"proofs\":[\"3R2GhvQr6pSkXUKhfg95rZf6s4noMWrcnQjSxBeAY5Yu9UrfE93Y6mM8szUtwMeREFmT6g9mq7FDD27hyeiDukWm\"]\n}"
       )
     ))
   def signOrder: Route =

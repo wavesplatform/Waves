@@ -8,16 +8,32 @@ import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange._
+
+import scala.util.Failure
 
 object MatcherKeys {
   import com.wavesplatform.database.KeyHelpers._
 
-  private def assetIdToBytes(assetId: Option[AssetId]) = assetId.fold(Array.emptyByteArray)(_.arr)
+  private def assetIdToBytes(assetId: Option[AssetId]): Array[Byte] = assetId.fold(Array.emptyByteArray)(_.arr)
 
-  val version = intKey(0, default = 1)
+  val version: Key[Int] = intKey(0, default = 1)
 
-  def order(orderId: ByteStr): Key[Option[Order]] = Key.opt(bytes(1, orderId.arr), Order.parseBytes(_).get, _.bytes())
+  def order(orderId: ByteStr): Key[Option[Order]] = Key.opt(
+    bytes(1, orderId.arr), { x =>
+      val r = x.head match {
+        case 1 => OrderV1.parseBytes(x.tail)
+        case 2 => OrderV2.parseBytes(x.tail)
+        case v => Failure(new NotImplementedError(s"Unknown version $v"))
+      }
+
+      r.recover {
+        case e => throw new IllegalArgumentException(s"Can't parse $orderId order: ${e.getMessage}", e)
+      }.get
+    }, { x =>
+      x.version +: x.bytes()
+    }
+  )
 
   val OrderInfoPrefix = 2.toShort
 
@@ -26,6 +42,7 @@ object MatcherKeys {
     decodeOrderInfo,
     unsupported("You can't write Option[OrderInfo] to the DB. Please use 'MatcherKeys.orderInfo' for this")
   )
+
   def orderInfo(orderId: ByteStr): Key[OrderInfo] = Key(
     bytes(OrderInfoPrefix, orderId.arr),
     Option(_).fold[OrderInfo](OrderInfo.empty)(decodeOrderInfo), { oi =>
@@ -72,7 +89,7 @@ object MatcherKeys {
   def orderTxId(orderId: ByteStr, seqNr: Int): Key[ByteStr] = Key(hBytes(9, seqNr, orderId.arr), ByteStr(_), _.arr)
 
   def exchangeTransaction(txId: ByteStr): Key[Option[ExchangeTransaction]] =
-    Key.opt(bytes(10, txId.arr), ExchangeTransaction.parseBytes(_).get, _.bytes())
+    Key.opt(bytes(10, txId.arr), ExchangeTransaction.parse(_).get, _.bytes())
 
   def addressOrdersByPairSeqNr(address: Address, pair: AssetPair): Key[Int] = bytesSeqNr(11, address.bytes.arr ++ pair.bytes)
   def addressOrdersByPair(address: Address, pair: AssetPair, seqNr: Int): Key[Option[Order.Id]] =

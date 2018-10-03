@@ -8,6 +8,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.utils.Base58
 import org.asynchttpclient.Dsl.{get => _get}
@@ -19,7 +20,7 @@ import play.api.libs.json.{Json, Writes}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object AsyncMatcherHttpApi extends Assertions {
@@ -78,6 +79,11 @@ object AsyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
       matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset").as[OrderBookResponse]
+    }
+
+    def marketStatus(assetPair: AssetPair): Future[MarketStatusResponse] = {
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset/status").as[MarketStatusResponse]
     }
 
     def parseAssetPair(assetPair: AssetPair): (String, String) = {
@@ -203,14 +209,15 @@ object AsyncMatcherHttpApi extends Assertions {
                      orderType: OrderType,
                      price: Long,
                      amount: Long,
-                     timeToLive: Duration = 30.days - 1.seconds): Order = {
+                     version: Byte,
+                     timeToLive: Duration = 30.days - 1.seconds,
+    ): Order = {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = matcherNode.publicKey
       val unsigned =
-        Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, DefaultMatcherFee, Array())
-      val signature = crypto.sign(sender.privateKey, unsigned.toSign)
-      unsigned.copy(signature = signature)
+        Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, 300000, Proofs.empty, version)
+      Order.sign(unsigned, sender.privateKey)
     }
 
     def placeOrder(order: Order): Future[MatcherResponse] =
@@ -221,8 +228,9 @@ object AsyncMatcherHttpApi extends Assertions {
                    orderType: OrderType,
                    price: Long,
                    amount: Long,
+                   version: Byte,
                    timeToLive: Duration = 30.days - 1.seconds): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, price, amount, timeToLive)
+      val order = prepareOrder(sender, pair, orderType, price, amount, version, timeToLive)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 

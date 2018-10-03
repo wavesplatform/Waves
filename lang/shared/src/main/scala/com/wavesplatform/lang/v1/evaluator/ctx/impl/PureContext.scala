@@ -16,50 +16,55 @@ import scodec.bits.ByteVector
 import scala.util.Try
 
 object PureContext {
-  private val defaultThrowMessage = "Explicit script termination"
-  val MaxStringResult             = Short.MaxValue
-  val MaxBytesResult              = 65536
+  private lazy val defaultThrowMessage = "Explicit script termination"
+  lazy val MaxStringResult             = Short.MaxValue
+  lazy val MaxBytesResult              = 65536
 
-  val mulLong: BaseFunction = createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val divLong: BaseFunction = createTryOp(DIV_OP, LONG, LONG, DIV_LONG)((a, b) => Math.floorDiv(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val modLong: BaseFunction = createTryOp(MOD_OP, LONG, LONG, MOD_LONG)((a, b) => Math.floorMod(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val sumLong: BaseFunction = createTryOp(SUM_OP, LONG, LONG, SUM_LONG)((a, b) => Math.addExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val subLong: BaseFunction = createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => Math.subtractExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
-  val sumString: BaseFunction = createRawOp(SUM_OP, STRING, STRING, SUM_STRING, 10)((a, b) => {
-    val astr = a.asInstanceOf[String]
-    val bstr = b.asInstanceOf[String]
-    val al   = astr.length
-    val bl   = bstr.length
+  lazy val mulLong: BaseFunction = createTryOp(MUL_OP, LONG, LONG, MUL_LONG, "Integer multiplication", "multiplyer", "multiplyer")((a, b) => Math.multiplyExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  lazy val divLong: BaseFunction = createTryOp(DIV_OP, LONG, LONG, DIV_LONG, "Integer devision", "divisible", "divisor")((a, b) => Math.floorDiv(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  lazy val modLong: BaseFunction = createTryOp(MOD_OP, LONG, LONG, MOD_LONG, "Modulo", "divisible", "divisor")((a, b) => Math.floorMod(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  lazy val sumLong: BaseFunction = createTryOp(SUM_OP, LONG, LONG, SUM_LONG, "Integer sum", "term", "term")((a, b) => Math.addExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  lazy val subLong: BaseFunction = createTryOp(SUB_OP, LONG, LONG, SUB_LONG, "Integer substitution", "term", "term")((a, b) => Math.subtractExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+  lazy val sumString: BaseFunction = createRawOp(SUM_OP, STRING, STRING, SUM_STRING, "Limited strings concatination", "prefix", "suffix", 10)((a, b) => {
+    lazy val astr = a.asInstanceOf[String]
+    lazy val bstr = b.asInstanceOf[String]
+    lazy val al   = astr.length
+    lazy val bl   = bstr.length
     Either.cond(al + bl <= MaxStringResult, astr + bstr, "String is too large")
   })
-  val sumByteVector: BaseFunction =
-    createRawOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES, 10)((a, b) => {
-      val avec = a.asInstanceOf[ByteVector]
-      val bvec = b.asInstanceOf[ByteVector]
-      val al   = avec.length
-      val bl   = bvec.length
+  lazy val sumByteVector: BaseFunction =
+    createRawOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES, "Limited bytes vectors concatination", "prefix", "suffix", 10)((a, b) => {
+      lazy val avec = a.asInstanceOf[ByteVector]
+      lazy val bvec = b.asInstanceOf[ByteVector]
+      lazy val al   = avec.length
+      lazy val bl   = bvec.length
       Either.cond(al + bl <= MaxBytesResult, ByteVector.concat(Seq(avec, bvec)), "ByteVector is too large")
     })
-  val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)((a, b) => a.asInstanceOf[Long] >= b.asInstanceOf[Long])
-  val gt: BaseFunction = createOp(GT_OP, LONG, BOOLEAN, GT_LONG)((a, b) => a.asInstanceOf[Long] > b.asInstanceOf[Long])
+  lazy val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG, "Integer grater or equal comparation", "term", "term")((a, b) => a.asInstanceOf[Long] >= b.asInstanceOf[Long])
+  lazy val gt: BaseFunction = createOp(GT_OP, LONG, BOOLEAN, GT_LONG, "Integer grater comparation", "term", "term")((a, b) => a.asInstanceOf[Long] > b.asInstanceOf[Long])
 
-  val eq: BaseFunction =
-    NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, "a" -> TYPEPARAM('T'), "b" -> TYPEPARAM('T')) {
+  lazy val eq: BaseFunction =
+    NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, "Equality", ("a", TYPEPARAM('T'), "value"), ("b", TYPEPARAM('T'), "value")) {
       case a :: b :: Nil => Right(a == b)
       case _             => ???
     }
 
-  val throwWithMessage: BaseFunction = NativeFunction("throw", 1, THROW, NOTHING, "err" -> STRING) {
+  lazy val ne: BaseFunction =
+    UserFunction(NE_OP.func, BOOLEAN, "Inequality", ("@a", TYPEPARAM('T'), "value"), ("@b", TYPEPARAM('T'), "value")) {
+      FUNCTION_CALL(uNot, List(FUNCTION_CALL(eq, List(REF("@a"), REF("@b")))))
+    }
+
+  lazy val throwWithMessage: BaseFunction = NativeFunction("throw", 1, THROW, NOTHING, "Fail script", ("err", STRING, "Error message")) {
     case (err: String) :: Nil => Left(err)
     case _                    => Left(defaultThrowMessage)
   }
 
-  val throwNoMessage: BaseFunction = UserFunction("throw", NOTHING) {
+  lazy val throwNoMessage: BaseFunction = UserFunction("throw", NOTHING, "Fail script") {
     FUNCTION_CALL(throwWithMessage, List(CONST_STRING(defaultThrowMessage)))
   }
 
-  val extract: BaseFunction =
-    UserFunction("extract", TYPEPARAM('T'), "@a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
+  lazy val extract: BaseFunction =
+    UserFunction("extract", TYPEPARAM('T'), "Extract value from option or fail", ("@a" , PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)),"Optional value")){
       IF(
         FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
         FUNCTION_CALL(throwWithMessage, List(CONST_STRING("extract() called on unit value"))),
@@ -67,9 +72,16 @@ object PureContext {
       )
     }
 
-  val fraction: BaseFunction = NativeFunction("fraction", 1, FRACTION, LONG, "value" -> LONG, "numerator" -> LONG, "denominator" -> LONG) {
+  val isDefined: BaseFunction =
+    UserFunction("isDefined", BOOLEAN, "Check the value is defined", ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Option value")) {
+      FUNCTION_CALL(ne, List(REF("@a"), REF("unit")))
+    }
+
+  lazy val fraction: BaseFunction = NativeFunction("fraction", 1, FRACTION, LONG,
+                        "Multiply and dividion with big integer intermediate representation",
+                        ("value", LONG, "multiplyer"), ("numerator", LONG, "multiplyer"), ("denominator", LONG, "divisor")) {
     case (v: Long) :: (n: Long) :: (d: Long) :: Nil =>
-      val result = BigInt(v) * n / d
+      lazy val result = BigInt(v) * n / d
       for {
         _ <- Either.cond(result < Long.MaxValue, (), s"Long overflow: value `$result` greater than 2^63-1")
         _ <- Either.cond(result > Long.MinValue, (), s"Long overflow: value `$result` less than -2^63-1")
@@ -77,7 +89,7 @@ object PureContext {
     case _ => ???
   }
 
-  val _isInstanceOf: BaseFunction = NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, "obj" -> TYPEPARAM('T'), "of" -> STRING) {
+  lazy val _isInstanceOf: BaseFunction = NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, "Internal function to check value type", ("obj", TYPEPARAM('T'), "value"), ("of", STRING, "type name")) {
     case (p: Boolean) :: ("Boolean") :: Nil       => Right(true)
     case (p: ByteVector) :: ("ByteVector") :: Nil => Right(true)
     case (p: String) :: ("String") :: Nil         => Right(true)
@@ -87,52 +99,52 @@ object PureContext {
     case _                                        => Right(false)
   }
 
-  val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "byteVector" -> BYTEVECTOR) {
+  lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes vector", ("byteVector", BYTEVECTOR, "vector")) {
     case (bv: ByteVector) :: Nil => Right(bv.size)
     case xs                      => notImplemented("size(byte[])", xs)
   }
 
-  val toBytesBoolean: BaseFunction = NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTEVECTOR, "b" -> BOOLEAN) {
+  lazy val toBytesBoolean: BaseFunction = NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("b", BOOLEAN, "value")) {
     case (b: Boolean) :: Nil => Right(ByteVector(if (b) 1 else 0))
     case _                   => ???
   }
 
-  val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTEVECTOR, "n" -> LONG) {
+  lazy val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("n", LONG, "value")) {
     case (n: Long) :: Nil => Right(ByteVector.fromLong(n))
     case _                => ???
   }
 
-  val toBytesString: BaseFunction = NativeFunction("toBytes", 1, STRING_TO_BYTES, BYTEVECTOR, "s" -> STRING) {
+  lazy val toBytesString: BaseFunction = NativeFunction("toBytes", 1, STRING_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("s", STRING, "value")) {
     case (s: String) :: Nil => Right(ByteVector(s.getBytes(StandardCharsets.UTF_8)))
     case _                  => ???
   }
 
-  val sizeString: BaseFunction = NativeFunction("size", 1, SIZE_STRING, LONG, "xs" -> STRING) {
+  lazy val sizeString: BaseFunction = NativeFunction("size", 1, SIZE_STRING, LONG, "Scting size in characters", ("xs", STRING, "string")) {
     case (bv: String) :: Nil => Right(bv.length.toLong)
     case xs                  => notImplemented("size(String)", xs)
   }
 
-  val toStringBoolean: BaseFunction = NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, "b" -> BOOLEAN) {
+  lazy val toStringBoolean: BaseFunction = NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, "String representation", ("b", BOOLEAN, "value")) {
     case (b: Boolean) :: Nil => Right(b.toString)
     case _                   => ???
   }
 
-  val toStringLong: BaseFunction = NativeFunction("toString", 1, LONG_TO_STRING, STRING, "n" -> LONG) {
+  lazy val toStringLong: BaseFunction = NativeFunction("toString", 1, LONG_TO_STRING, STRING, "String representation", ("n", LONG, "value")) {
     case (n: Long) :: Nil => Right(n.toString)
     case _                => ???
   }
 
-  val takeBytes: BaseFunction = NativeFunction("take", 1, TAKE_BYTES, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+  lazy val takeBytes: BaseFunction = NativeFunction("take", 1, TAKE_BYTES, BYTEVECTOR, "Take firsts bytes subvector", ("xs", BYTEVECTOR, "vector"), ("number", LONG, "Bytes number")) {
     case (xs: ByteVector) :: (number: Long) :: Nil => Right(xs.take(number))
     case xs                                        => notImplemented("take(xs: byte[], number: Long)", xs)
   }
 
-  val dropBytes: BaseFunction = NativeFunction("drop", 1, DROP_BYTES, BYTEVECTOR, "xs" -> BYTEVECTOR, "number" -> LONG) {
+  lazy val dropBytes: BaseFunction = NativeFunction("drop", 1, DROP_BYTES, BYTEVECTOR, "Skip firsts bytes", ("xs", BYTEVECTOR, "vector"), ("number", LONG, "Bytes number")) {
     case (xs: ByteVector) :: (number: Long) :: Nil => Right(xs.drop(number))
     case xs                                        => notImplemented("drop(xs: byte[], number: Long)", xs)
   }
 
-  val dropRightBytes: BaseFunction = UserFunction("dropRight", "dropRightBytes", BYTEVECTOR, "@xs" -> BYTEVECTOR, "@number" -> LONG) {
+  lazy val dropRightBytes: BaseFunction = UserFunction("dropRight", "dropRightBytes", BYTEVECTOR, "Cut vectors tail", ("@xs", BYTEVECTOR, "vector"), ("@number", LONG, "cuting size")) {
     FUNCTION_CALL(
       takeBytes,
       List(
@@ -145,10 +157,9 @@ object PureContext {
           )
         )
       )
-    )
-  }
+    )  }
 
-  val takeRightBytes: BaseFunction = UserFunction("takeRight", "takeRightBytes", BYTEVECTOR, "@xs" -> BYTEVECTOR, "@number" -> LONG) {
+  lazy val takeRightBytes: BaseFunction = UserFunction("takeRight", "takeRightBytes", BYTEVECTOR, "Take vector tail", ("@xs", BYTEVECTOR, "vector"), ("@number", LONG, "taking size")) {
     FUNCTION_CALL(
       dropBytes,
       List(
@@ -166,17 +177,17 @@ object PureContext {
 
   private def trimLongToInt(x: Long): Int = Math.toIntExact(Math.max(Math.min(x, Int.MaxValue), Int.MinValue))
 
-  val takeString: BaseFunction = NativeFunction("take", 1, TAKE_STRING, STRING, "xs" -> STRING, "number" -> LONG) {
+  lazy val takeString: BaseFunction = NativeFunction("take", 1, TAKE_STRING, STRING, "Take string prefix", ("xs", STRING, "sctring"), ("number", LONG, "prefix size in characters")) {
     case (xs: String) :: (number: Long) :: Nil => Right(xs.take(trimLongToInt(number)))
     case xs                                    => notImplemented("take(xs: String, number: Long)", xs)
   }
 
-  val dropString: BaseFunction = NativeFunction("drop", 1, DROP_STRING, STRING, "xs" -> STRING, "number" -> LONG) {
+  lazy val dropString: BaseFunction = NativeFunction("drop", 1, DROP_STRING, STRING, "Remmove sring prefix", ("xs",STRING, "string"), ("number", LONG, "prefix size")) {
     case (xs: String) :: (number: Long) :: Nil => Right(xs.drop(trimLongToInt(number)))
     case xs                                    => notImplemented("drop(xs: String, number: Long)", xs)
   }
 
-  val takeRightString: BaseFunction = UserFunction("takeRight", STRING, "@xs" -> STRING, "@number" -> LONG) {
+  lazy val takeRightString: BaseFunction = UserFunction("takeRight", STRING, "Take string suffix", ("@xs", STRING, "String"), ("@number", LONG, "suffix size in characters")) {
     FUNCTION_CALL(
       dropString,
       List(
@@ -189,10 +200,9 @@ object PureContext {
           )
         )
       )
-    )
-  }
+    )}
 
-  val dropRightString: BaseFunction = UserFunction("dropRight", STRING, "@xs" -> STRING, "@number" -> LONG) {
+  lazy val dropRightString: BaseFunction = UserFunction("dropRight", STRING, "Remove string suffix", ("@xs", STRING, "string"), ("@number", LONG, "suffix size in characters")) {
     FUNCTION_CALL(
       takeString,
       List(
@@ -205,23 +215,22 @@ object PureContext {
           )
         )
       )
-    )
-  }
+    )  }
 
-  def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complicity: Int = 1)(body: (Any, Any) => Either[String, Any]): BaseFunction =
-    NativeFunction(opsToFunctions(op), complicity, func, r, "a" -> t, "b" -> t) {
+  def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(body: (Any, Any) => Either[String, Any]): BaseFunction =
+    NativeFunction(opsToFunctions(op), complicity, func, r, docString, ("a", t, arg1Doc), ("b", t, arg2Doc)) {
       case a :: b :: Nil => body(a, b)
       case _             => ???
     }
 
-  def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complicity: Int = 1)(body: (Any, Any) => Any): BaseFunction =
-    NativeFunction(opsToFunctions(op), complicity, func, r, "a" -> t, "b" -> t) {
+  def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(body: (Any, Any) => Any): BaseFunction =
+    NativeFunction(opsToFunctions(op), complicity, func, r, docString, ("a", t, arg1Doc), ("b", t, arg2Doc)) {
       case a :: b :: Nil => Right(body(a, b))
       case _             => ???
     }
 
-  def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complicity: Int = 1)(body: (Any, Any) => Any): BaseFunction =
-    NativeFunction(opsToFunctions(op), complicity, func, r, "a" -> t, "b" -> t) {
+  def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(body: (Any, Any) => Any): BaseFunction =
+    NativeFunction(opsToFunctions(op), complicity, func, r, docString, ("a", t, arg1Doc), ("b", t, arg2Doc)) {
       case a :: b :: Nil =>
         try {
           Right(body(a, b))
@@ -231,36 +240,26 @@ object PureContext {
       case _ => ???
     }
 
-  val getElement: BaseFunction =
-    NativeFunction("getElement", 2, GET_LIST, TYPEPARAM('T'), "arr" -> PARAMETERIZEDLIST(TYPEPARAM('T')), "pos" -> LONG) {
+  lazy val getElement: BaseFunction =
+    NativeFunction("getElement", 2, GET_LIST, TYPEPARAM('T'), "Get list element by position", ("arr", PARAMETERIZEDLIST(TYPEPARAM('T')), "list"), ("pos", LONG, "element position")) {
       case (arr: IndexedSeq[_]) :: (pos: Long) :: Nil => Try(arr(pos.toInt)).toEither.left.map(_.toString)
       case _                                          => ???
     }
 
-  val getListSize: BaseFunction = NativeFunction("size", 2, SIZE_LIST, LONG, "arr" -> PARAMETERIZEDLIST(TYPEPARAM('T'))) {
+  lazy val getListSize: BaseFunction = NativeFunction("size", 2, SIZE_LIST, LONG, "Size of list", ("arr", PARAMETERIZEDLIST(TYPEPARAM('T')), "list")) {
     case (arr: IndexedSeq[_]) :: Nil => Right(arr.size.toLong)
     case _                           => ???
   }
 
-  val uMinus: BaseFunction = UserFunction("-", LONG, "@n" -> LONG) {
-    FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
-  }
+  lazy val uMinus: BaseFunction = UserFunction("-", LONG, "Change integer sign", ("@n", LONG, "value")) {
+    FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))  }
 
-  val uNot: BaseFunction = UserFunction("!", BOOLEAN, "@p" -> BOOLEAN) {
+  lazy val uNot: BaseFunction = UserFunction("!", BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
     IF(FUNCTION_CALL(eq, List(REF("@p"), FALSE)), TRUE, FALSE)
   }
 
-  val ne: BaseFunction =
-    UserFunction(NE_OP.func, BOOLEAN, "@a" -> TYPEPARAM('T'), "@b" -> TYPEPARAM('T')) {
-      FUNCTION_CALL(uNot, List(FUNCTION_CALL(eq, List(REF("@a"), REF("@b")))))
-    }
-
-  val isDefined: BaseFunction =
-    UserFunction("isDefined", BOOLEAN, "@a" -> PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))) {
-      FUNCTION_CALL(ne, List(REF("@a"), REF("unit")))
-    }
-
-  private val operators: Seq[BaseFunction] = Seq(
+  
+  private lazy val operators: Array[BaseFunction] = Array(
     mulLong,
     divLong,
     modLong,
@@ -278,8 +277,8 @@ object PureContext {
     uNot
   )
 
-  private val vars: Map[String, (Types.FINAL, LazyVal)] = Map(("unit", (Types.UNIT, LazyVal(EitherT.pure(())))))
-  private val functions = Seq(
+  private lazy val vars: Map[String, ((Types.FINAL, String), LazyVal)] = Map(("unit", ((Types.UNIT,"Single instance value"), LazyVal(EitherT.pure(())))))
+  private lazy val functions = Array(
     fraction,
     sizeBytes,
     toBytesBoolean,
@@ -305,11 +304,11 @@ object PureContext {
 
   lazy val ctx = CTX(
     Seq(
-      new DefinedType { val name = "Unit"; val typeRef       = Types.UNIT       },
-      new DefinedType { val name = "Int"; val typeRef        = Types.LONG       },
-      new DefinedType { val name = "Boolean"; val typeRef    = Types.BOOLEAN    },
-      new DefinedType { val name = "ByteVector"; val typeRef = Types.BYTEVECTOR },
-      new DefinedType { val name = "String"; val typeRef     = Types.STRING     }
+      new DefinedType { lazy val name = "Unit"; lazy val typeRef       = Types.UNIT       },
+      new DefinedType { lazy val name = "Int"; lazy val typeRef        = Types.LONG       },
+      new DefinedType { lazy val name = "Boolean"; lazy val typeRef    = Types.BOOLEAN    },
+      new DefinedType { lazy val name = "ByteVector"; lazy val typeRef = Types.BYTEVECTOR },
+      new DefinedType { lazy val name = "String"; lazy val typeRef     = Types.STRING     }
     ),
     vars,
     functions

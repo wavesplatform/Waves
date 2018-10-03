@@ -131,7 +131,7 @@ object CompilerV1 {
         .ensure(NonExistingType(p.start, p.end, letName, ctx.predefTypes.keys.toList))(_.forall(ctx.predefTypes.contains))
       typeUnion = if (letTypes.isEmpty) compiledLet._2 else UNION.create(letTypes.map(ctx.predefTypes).map(_.typeRef))
       compiledBody <- local {
-        modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> typeUnion)))
+        modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (typeUnion -> s"Defined at ${p.start}"))))
           .flatMap(_ => compileExpr(body))
       }
     } yield (BLOCK(LET(letName, compiledLet._1), compiledBody._1), compiledBody._2)
@@ -176,7 +176,7 @@ object CompilerV1 {
       result <- ctx.varDefs
         .get(key)
         .fold(raiseError[CompilerContext, CompilationError, (EXPR, FINAL)](DefNotFound(p.start, p.end, key)))(t =>
-          (REF(key): EXPR, t: FINAL).pure[CompileM])
+          (REF(key): EXPR, t._1: FINAL).pure[CompileM])
     } yield result
   }
 

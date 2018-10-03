@@ -34,6 +34,7 @@ class IssueTransactionV1Specification extends PropSpec with PropertyChecks with 
                        "timestamp": 1526287561757,
                        "version": 1,
                        "signature": "28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ",
+                       "proofs": ["28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ"],
                        "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
                        "name": "Gigacoin",
                        "quantity": 10000000000,

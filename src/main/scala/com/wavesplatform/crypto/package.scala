@@ -6,6 +6,7 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
 
 package object crypto {
   val SignatureLength: Int = Curve25519.SignatureLength
+  val KeyLength: Int       = Curve25519.KeyLength
 
   val DigestSize: Int = 32
 

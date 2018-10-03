@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Alias, PublicKeyAccount}
 import com.wavesplatform.serialization.Deser
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 import scala.util.{Failure, Success, Try}
 

@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
+import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
@@ -15,20 +16,21 @@ import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, NG, Portfolio}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
-import javax.ws.rs.Path
-
-import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.smart.Verifier
 import monix.eval.{Coeval, Task}
 import play.api.libs.json._
+import cats.implicits._
+import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.transaction.ValidationError.{GenericError, InvalidRequestSignature}
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
@@ -193,11 +195,15 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def rollback: Route = (path("rollback") & post & withAuth) {
     json[RollbackParams] { params =>
-      ng.blockAt(params.rollbackTo) match {
-        case Some(block) =>
-          rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
-        case None =>
-          (StatusCodes.BadRequest, "Block at height not found")
+      if (ng.height - params.rollbackTo > LevelDBWriter.MAX_DEPTH - 10)
+        (StatusCodes.BadRequest, s"Rollback of more than ${LevelDBWriter.MAX_DEPTH - 10} blocks is forbidden")
+      else {
+        ng.blockAt(params.rollbackTo) match {
+          case Some(block) =>
+            rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
+          case None =>
+            (StatusCodes.BadRequest, "Block at height not found")
+        }
       }
     } ~ complete(StatusCodes.BadRequest)
   }
@@ -278,12 +284,27 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
     (delete & withAuth) {
-      ByteStr.decodeBase58(signature) match {
-        case Success(sig) =>
-          complete(rollbackToBlock(sig, returnTransactionsToUtx = false))
-        case _ =>
-          complete(InvalidSignature)
-      }
+      val signatureEi: Either[ValidationError, ByteStr] = for {
+        signature <- ByteStr
+          .decodeBase58(signature)
+          .toEither
+          .leftMap(_ => InvalidRequestSignature)
+        height <- blockchain
+          .heightOf(signature)
+          .toRight(GenericError("Block with such signature not found"))
+        _ <- Either
+          .cond(
+            ng.height - height < (LevelDBWriter.MAX_DEPTH - 10),
+            (),
+            GenericError(s"Rollback of more than ${LevelDBWriter.MAX_DEPTH - 10} blocks is forbidden")
+          )
+      } yield signature
+
+      signatureEi
+        .fold(
+          err => complete(ApiError.fromValidationError(err)),
+          sig => complete(rollbackToBlock(sig, false))
+        )
     }
   }
 

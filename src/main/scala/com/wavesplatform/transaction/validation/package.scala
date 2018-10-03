@@ -2,6 +2,7 @@ package com.wavesplatform.transaction
 
 import cats.data.{Validated, ValidatedNel}
 import cats.implicits._
+import cats.{Order => _}
 import com.wavesplatform.transaction.transfer._
 
 import scala.util.Try

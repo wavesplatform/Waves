@@ -10,6 +10,7 @@ import com.wavesplatform.transaction.AssetAcc
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.assets.exchange.{Order, Validation}
+import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.utils.NTP
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -22,7 +23,7 @@ trait OrderValidator {
   val wallet: Wallet
 
   lazy val matcherPubKey: PublicKeyAccount = wallet.findPrivateKey(settings.account).explicitGet()
-  val MinExpiration                        = 60 * 1000L
+  val MinExpiration: Long                  = 60 * 1000L
 
   private val timer = Kamon.timer("matcher.validation")
 
@@ -52,16 +53,21 @@ trait OrderValidator {
     timer
       .refine("action" -> "place", "pair" -> order.assetPair.toString)
       .measure {
+        val orderSignatureVerification =
+          Verifier
+            .verifyAsEllipticCurveSignature(order)
+            .map(_ => ())
+            .leftMap(_.toString)
+
         val v =
           (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
             (order.expiration > NTP.correctedTime() + MinExpiration) :| "Order expiration should be > 1 min" &&
-            order.signaturesValid().isRight :| "signature should be valid" &&
+            orderSignatureVerification &&
             order.isValid(NTP.correctedTime()) &&
             (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
             (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order is already accepted" &&
             isBalanceWithOpenOrdersEnough(order)
-        Either
-          .cond(v, order, GenericError(v.messages()))
+        Either.cond(v, order, GenericError(v.messages()))
       }
 
   private def spendableBalance(a: AssetAcc): Long = {

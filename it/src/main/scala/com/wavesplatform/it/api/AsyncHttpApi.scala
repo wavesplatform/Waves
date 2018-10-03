@@ -4,11 +4,10 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
-import com.wavesplatform.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import com.wavesplatform.api.http.alias.CreateAliasV1Request
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
-import com.wavesplatform.api.http.{AddressApiRoute, DataRequest}
+import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq, DataRequest}
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugApiRoute._
 import com.wavesplatform.http.DebugMessage._
@@ -500,11 +499,11 @@ object AsyncHttpApi extends Assertions {
         finalHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
       } yield all(finalHeights).shouldBe(finalHeights.head)
 
-    def waitForHeightArise(): Future[Unit] =
+    def waitForHeightArise(): Future[Int] =
       for {
         height <- height.map(_.max)
         _      <- traverse(nodes)(_.waitForHeight(height + 1))
-      } yield ()
+      } yield (height + 1)
 
     def waitForSameBlockHeadesAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
 

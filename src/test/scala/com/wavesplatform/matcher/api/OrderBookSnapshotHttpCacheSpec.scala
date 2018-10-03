@@ -13,6 +13,7 @@ import org.scalatest.{FreeSpec, Matchers}
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration._
+import com.wavesplatform.OrderOps._
 
 class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase {
 
@@ -54,7 +55,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
       val askLimitOrders = Gen
         .containerOfN[Vector, Order](2, orderGen)
         .map { xs =>
-          val r = xs.head +: xs.tail.map(_.copy(price = xs.head.price - 1))
+          val r = xs.head +: xs.tail.map(_.updatePrice(price = xs.head.price - 1))
           r.map(x => SellLimitOrder(x.price, x.amount, x.matcherFee, x)).groupBy(_.price)
         }
         .sample
@@ -63,7 +64,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
       val bidLimitOrders = Gen
         .containerOfN[Vector, Order](2, orderGen)
         .map { xs =>
-          val r = xs.head +: xs.tail.map(_.copy(price = xs.head.price + 1))
+          val r = xs.head +: xs.tail.map(_.updatePrice(xs.head.price + 1))
           r.map(x => BuyLimitOrder(x.price, x.amount, x.matcherFee, x)).groupBy(_.price)
         }
         .sample

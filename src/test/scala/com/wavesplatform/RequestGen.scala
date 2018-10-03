@@ -10,7 +10,7 @@ import com.wavesplatform.api.http.leasing.{SignedLeaseCancelV1Request, SignedLea
 import com.wavesplatform.utils.Base58
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 trait RequestGen extends TransactionGen { _: Suite =>
   val nonPositiveLong: G[Long] = choose(Long.MinValue, 0).label("non-positive value")

@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 class BlockchainUpdaterMicroblockBadSignaturesTest
     extends PropSpec

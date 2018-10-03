@@ -18,6 +18,7 @@ import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBala
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.NTP
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -45,7 +46,7 @@ class MatcherActorSpecification
   val pairBuilder = new AssetPairBuilder(settings, blockchain)
 
   val functionalitySettings = TestFunctionalitySettings.Stub
-  val wallet                = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
+  val wallet                = Wallet(WalletSettings(None, Some("matcher"), Some(WalletSeed)))
   wallet.generateNewAccount()
 
   val orderHistoryRef = TestActorRef(new Actor {
@@ -110,7 +111,8 @@ class MatcherActorSpecification
           100L,
           1L,
           1000L,
-          100000L
+          100000L,
+          1: Byte
         )
 
       val invalidOrder = sameAssetsOrder()
@@ -118,23 +120,41 @@ class MatcherActorSpecification
       expectMsg(MatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
     }
 
-    "accept orders with AssetPair with same assets" in {
-      def sameAssetsOrder(): Order =
-        Order.apply(
-          PrivateKeyAccount("123".getBytes()),
-          MatcherAccount,
-          AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")),
-          OrderType.BUY,
-          100000000L,
-          100L,
-          1L,
-          1000L,
-          100000L
-        )
+    "Reject order when script fails" in {
+      val sender = PrivateKeyAccount("Trader#1".getBytes)
 
-      val invalidOrder = sameAssetsOrder()
-      actor ! invalidOrder
-      expectMsg(MatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
+      val script = ScriptCompiler(
+        """
+          |match tx {
+          |  case _: Order => false
+          |  case _ => false
+          |}
+        """.stripMargin
+      ).explicitGet()._1
+
+      val order = Order(
+        sender,
+        MatcherAccount,
+        AssetPair(strToSomeAssetId("asset#2"), strToSomeAssetId("asset#1")),
+        OrderType.BUY,
+        100000000L,
+        100L,
+        1L,
+        1000L,
+        100000L,
+        1: Byte
+      )
+
+      (blockchain.accountScript _)
+        .when(order.sender.toAddress)
+        .returns(Some(script))
+
+      (blockchain.accountScript _)
+        .when(MatcherAccount.toAddress)
+        .returns(None)
+
+      actor ! order
+      expectMsg(MatcherResponse(StatusCodes.Forbidden, "Order not allowed by sender script"))
     }
 
     "return all open markets" in {
@@ -143,6 +163,14 @@ class MatcherActorSpecification
 
       val pair  = AssetPair(a2, a1)
       val order = buy(pair, 1, 2000)
+
+      (blockchain.accountScript _)
+        .when(order.sender.toAddress)
+        .returns(None)
+
+      (blockchain.accountScript _)
+        .when(order.matcherPublicKey.toAddress)
+        .returns(None)
 
       actor ! order
       expectMsg(OrderAccepted(order))

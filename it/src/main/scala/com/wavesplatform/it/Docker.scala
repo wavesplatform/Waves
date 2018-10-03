@@ -527,6 +527,53 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
     log.debug(s"$label: $x")
   }
+
+  def runMigrationToolInsideContainer(node: DockerNode, nodeConfig: Config): DockerNode = {
+    val id = node.containerId
+    takeProfileSnapshot(node)
+    updateStartScript(node)
+    stopContainer(node)
+    saveProfile(node)
+    saveLog(node)
+    client.startContainer(id)
+    client.waitContainer(id)
+    client.startContainer(id)
+    node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+    Await.result(
+      node.waitForStartup().flatMap(_ => connectToAll(node)),
+      3.minutes
+    )
+    node
+  }
+
+  private def updateStartScript(node: DockerNode): Unit = {
+    val id = node.containerId
+
+    log.debug("Make backup copy of /opt/waves/start-waves.sh")
+    val cpCmd: Array[String] =
+      Array(
+        "sh",
+        "-c",
+        s"""cp /opt/waves/start-waves.sh /opt/waves/start-waves.sh.bk"""
+      )
+    val execCpCmd = client.execCreate(id, cpCmd).id()
+    client.execStart(execCpCmd)
+
+    log.debug("Change script for migration tool launch")
+    val scriptCmd: Array[String] =
+      Array(
+        "sh",
+        "-c",
+        s"""rm /opt/waves/start-waves.sh && echo '#!/bin/bash' >> /opt/waves/start-waves.sh &&
+             |echo 'java ${renderProperties(asProperties(genesisOverride))} -cp /opt/waves/waves.jar com.wavesplatform.matcher.MatcherTool /opt/waves/template.conf cb > /opt/waves/migration-tool.log' >> /opt/waves/start-waves.sh &&
+             |echo 'less /opt/waves/migration-tool.log | grep -ir completed && cp /opt/waves/start-waves.sh.bk /opt/waves/start-waves.sh && chmod +x /opt/waves/start-waves.sh' >> /opt/waves/start-waves.sh &&
+             |chmod +x /opt/waves/start-waves.sh
+           """.stripMargin
+      )
+    val execScriptCmd = client.execCreate(id, scriptCmd).id()
+    client.execStart(execScriptCmd)
+  }
+
 }
 
 object Docker {

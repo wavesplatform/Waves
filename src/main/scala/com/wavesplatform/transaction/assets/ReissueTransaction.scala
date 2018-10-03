@@ -8,7 +8,7 @@ import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, _}
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
   def assetId: ByteStr
@@ -41,6 +41,9 @@ trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
 }
 
 object ReissueTransaction {
+
+  val typeId: Byte = 5
+
   def validateReissueParams(quantity: Long, fee: Long): Either[ValidationError, Unit] =
     (validateAmount(quantity, "assets"), validateFee(fee))
       .mapN { case _ => () }

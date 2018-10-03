@@ -1,10 +1,11 @@
 package com.wavesplatform.transaction.api.http.assets
 
-import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.utils.Base58
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 import com.wavesplatform.api.http.assets._
+import com.wavesplatform.transaction.Proofs
 
 class SignedRequestsTest extends FunSuite with Matchers {
 
@@ -222,13 +223,14 @@ class SignedRequestsTest extends FunSuite with Matchers {
  }"""
 
     val req = Json.parse(js1).validate[SignedSponsorFeeRequest].get.toTx.right.get
-    //req.proofs shouldBe List("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7")
+    req.proofs shouldBe Proofs(
+      Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
     req.fee shouldBe 100000000L
     req.minSponsoredAssetFee shouldBe Some(100000)
 
     for (js <- Seq(js2, js3, js4)) {
       val req = Json.parse(js).validate[SignedSponsorFeeRequest].get.toTx.right.get
-      //req.proofs shouldBe List("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7")
+      Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
       req.fee shouldBe 100000000L
       req.minSponsoredAssetFee shouldBe None
     }

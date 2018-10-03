@@ -11,7 +11,7 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
-import scorex.crypto.signatures.Curve25519
+import com.wavesplatform.crypto._
 
 trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   def name: Array[Byte]
@@ -50,6 +50,8 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
 }
 object IssueTransaction {
 
+  val typeId: Byte = 3
+
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength   = 16
   val MinAssetNameLength   = 4
@@ -73,8 +75,8 @@ object IssueTransaction {
   }
 
   def parseBase(bytes: Array[Byte], start: Int) = {
-    val sender                        = PublicKeyAccount(bytes.slice(start, start + Curve25519.KeyLength))
-    val (assetName, descriptionStart) = Deser.parseArraySize(bytes, start + Curve25519.KeyLength)
+    val sender                        = PublicKeyAccount(bytes.slice(start, start + KeyLength))
+    val (assetName, descriptionStart) = Deser.parseArraySize(bytes, start + KeyLength)
     val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
     val quantity                      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
     val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head

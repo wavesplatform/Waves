@@ -8,6 +8,7 @@ import play.api.libs.json._
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.utils.Base58
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
+import com.wavesplatform.transaction.smart.Verifier
 
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -33,10 +34,9 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         } """)
 
     json.validate[Order] match {
-      case e: JsError =>
-        fail("Error: " + JsError.toJson(e).toString())
-      case s: JsSuccess[Order] =>
-        val o = s.get
+      case JsError(e) =>
+        fail("Error: " + e.toString())
+      case JsSuccess(o, _) =>
         o.senderPublicKey shouldBe PublicKeyAccount(pk.publicKey)
         o.matcherPublicKey shouldBe PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
@@ -112,7 +112,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         case s: JsSuccess[Order] =>
           val o = s.get
           o.json().toString() should be(json.toString())
-          o.signaturesValid().isRight should be(true)
+          Verifier.verifyAsEllipticCurveSignature(o) shouldBe 'right
       }
     }
   }

@@ -3,25 +3,35 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Props, Terminated}
-import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.StatusCodes
+import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
+import akka.util.Timeout
+import cats.implicits._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
-import com.wavesplatform.matcher.api.MatcherResponse
+import com.wavesplatform.matcher.api.{MatcherResponse, OrderRejected}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.OrderBook
+import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{AssetDescription, Blockchain}
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{AssetId, ValidationError}
 import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.utils._
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.Try
 
 class MatcherActor(orderHistory: ActorRef,
                    pairBuilder: AssetPairBuilder,
@@ -37,6 +47,8 @@ class MatcherActor(orderHistory: ActorRef,
     with ScorexLogging {
 
   import MatcherActor._
+
+  private implicit val timeout: Timeout = 5.seconds
 
   private var tradedPairs            = Map.empty[AssetPair, MarketData]
   private var lastSnapshotSequenceNr = 0L
@@ -91,10 +103,58 @@ class MatcherActor(orderHistory: ActorRef,
     if (v) f else sender() ! MatcherResponse(StatusCodes.Forbidden, v.messages())
   }
 
+  def verify(script: Script, order: Order): Either[ValidationError, Unit] =
+    Try {
+      MatcherScriptRunner[Boolean](script, order) match {
+        case (ctx, Left(execError)) => Left(ScriptExecutionError(script.text, execError, ctx, true))
+        case (ctx, Right(false)) =>
+          Left(TransactionNotAllowedByScript(ctx, script.text, true))
+        case (_, Right(true)) => Right(())
+      }
+    }.getOrElse(
+      Left(GenericError("""
+            |Uncaught execution error.
+            |Probably script does not return boolean, and can't validate any transaction or order.
+          """.stripMargin))
+    )
+
+  def checkOrderScript(o: Order)(f: => Unit): Unit = {
+    lazy val matcherScriptValidation: Either[String, Unit] =
+      blockchain
+        .accountScript(o.matcherPublicKey.toAddress)
+        .map(verify(_, o))
+        .getOrElse(Right(()))
+        .leftMap(_ => "Order not allowed by matcher script")
+
+    lazy val senderScriptValidation: Either[String, Unit] =
+      blockchain
+        .accountScript(o.sender.toAddress)
+        .map(verify(_, o))
+        .getOrElse(Right(()))
+        .leftMap(_ => "Order not allowed by sender script")
+
+    val validationResult = for {
+      _ <- matcherScriptValidation
+      _ <- senderScriptValidation
+    } yield ()
+
+    validationResult
+      .fold(
+        err => sender() ! MatcherResponse(StatusCodes.Forbidden, err),
+        _ => f
+      )
+  }
+
   def createAndForward(order: Order): Unit = {
-    val orderBook = createOrderBook(order.assetPair)
-    persistAsync(OrderBookCreated(order.assetPair)) { _ =>
-      forwardReq(order)(orderBook)
+    val pair      = order.assetPair
+    val orderBook = createOrderBook(pair)
+    val md        = tradedPairs(pair)
+    if (order.price % md.zeros == 0) {
+      persistAsync(OrderBookCreated(pair)) { _ =>
+        forwardReq(order)(orderBook)
+      }
+    } else {
+      sender() ! OrderRejected(s"Invalid price. Last ${md.decs} digits should be zero")
     }
   }
 
@@ -124,10 +184,26 @@ class MatcherActor(orderHistory: ActorRef,
     case GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
 
+    case req @ GetMarketStatusRequest(pair) =>
+      val snd = sender()
+      checkAssetPair(pair, req) {
+        context
+          .child(OrderBookActor.name(pair))
+          .fold {
+            snd ! MatcherResponse(StatusCodes.NotFound, "Market not found")
+          } { orderbook =>
+            (orderbook ? req)
+              .mapTo[GetMarketStatusResponse]
+              .foreach(snd ! _)
+          }
+      }
+
     case order: Order =>
       checkAssetPair(order.assetPair, order) {
         checkBlacklistedAddress(order.senderPublicKey) {
-          orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
+          checkOrderScript(order) {
+            orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
+          }
         }
       }
 
@@ -329,7 +405,16 @@ object MatcherActor {
                         priceAssetName: String,
                         created: Long,
                         amountAssetInfo: Option[AssetInfo],
-                        priceAssetinfo: Option[AssetInfo])
+                        priceAssetinfo: Option[AssetInfo]) {
+    val (decs, zeros) = {
+      val decs = priceAssetinfo.map(_.decimals).getOrElse(0) - amountAssetInfo.map(_.decimals).getOrElse(0)
+      if (decs > 0) {
+        (decs, BigInt(10).pow(decs).toLong)
+      } else {
+        (0, 1L)
+      }
+    }
+  }
 
   def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
     if (buffer1.isEmpty && buffer2.isEmpty) 0

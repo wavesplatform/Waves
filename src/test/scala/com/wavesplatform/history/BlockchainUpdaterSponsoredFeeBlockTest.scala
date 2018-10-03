@@ -12,7 +12,7 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.transfer._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 class BlockchainUpdaterSponsoredFeeBlockTest
     extends PropSpec

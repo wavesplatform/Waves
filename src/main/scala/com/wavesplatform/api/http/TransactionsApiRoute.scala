@@ -54,15 +54,13 @@ case class TransactionsApiRoute(settings: RestAPISettings,
 
   //TODO implement general pagination
   @Path("/address/{address}/limit/{limit}")
-  @ApiOperation(value = "Address", notes = "Get list of transactions where specified address has been involved", httpMethod = "GET")
+  @ApiOperation(value = "List of transactions by address",
+                notes = "Get list of transactions where specified address has been involved",
+                httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "limit",
-                           value = "Specified number of records to be returned",
-                           required = true,
-                           dataType = "integer",
-                           paramType = "path")
+      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "limit", value = "Number of transactions to be returned", required = true, dataType = "integer", paramType = "path")
     ))
   def addressLimit: Route = (pathPrefix("address") & get) {
     pathPrefix(Segment) { address =>
@@ -92,10 +90,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   @Path("/info/{id}")
-  @ApiOperation(value = "Info", notes = "Get transaction info", httpMethod = "GET")
+  @ApiOperation(value = "Transaction info", notes = "Get a transaction by its ID", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "id", value = "transaction id ", required = true, dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
     ))
   def info: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
@@ -114,7 +112,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   @Path("/unconfirmed")
-  @ApiOperation(value = "Unconfirmed", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
+  @ApiOperation(value = "Unconfirmed transactions", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
       complete(JsArray(utx.all.map(txToExtendedJson)))
@@ -122,16 +120,18 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   @Path("/unconfirmed/size")
-  @ApiOperation(value = "Size of UTX pool", notes = "Get number of unconfirmed transactions in the UTX pool", httpMethod = "GET")
+  @ApiOperation(value = "Number of unconfirmed transactions",
+                notes = "Get the number of unconfirmed transactions in the UTX pool",
+                httpMethod = "GET")
   def utxSize: Route = (pathPrefix("size") & get) {
     complete(Json.obj("size" -> JsNumber(utx.size)))
   }
 
   @Path("/unconfirmed/info/{id}")
-  @ApiOperation(value = "Transaction Info", notes = "Get transaction that is in the UTX", httpMethod = "GET")
+  @ApiOperation(value = "Unconfirmed transaction info", notes = "Get an unconfirmed transaction by its ID", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "id", value = "Transaction id ", required = true, dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
     ))
   def utxTransactionInfo: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
@@ -152,14 +152,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   @Path("/calculateFee")
-  @ApiOperation(value = "Calculate fee", notes = "Calculates a fee for a transaction", httpMethod = "POST")
+  @ApiOperation(value = "Calculate transaction fee", notes = "Calculates minimal fee for a transaction", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "json",
-                           required = true,
-                           dataType = "string",
-                           paramType = "body",
-                           value = "Transaction data including type and optional timestamp in milliseconds")
+      new ApiImplicitParam(name = "json", required = true, dataType = "string", paramType = "body", value = "Transaction data including type")
     ))
   def calculateFee: Route = (pathPrefix("calculateFee") & post) {
     pathEndOrSingleSlash {
@@ -186,14 +182,14 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   @Path("/sign")
-  @ApiOperation(value = "Sign a transaction", notes = "Sign a transaction", httpMethod = "POST")
+  @ApiOperation(value = "Sign a transaction", notes = "Sign a transaction with the sender's private key", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "json",
                            required = true,
                            dataType = "string",
                            paramType = "body",
-                           value = "Transaction data including type and optional timestamp in milliseconds")
+                           value = "Transaction data including <a href='transaction-types.html'>type</a>")
     ))
   def sign: Route = (pathPrefix("sign") & post & withAuth) {
     pathEndOrSingleSlash {
@@ -206,7 +202,11 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   @Path("/sign/{signerAddress}")
-  @ApiOperation(value = "Sign a transaction by a private key of signer address", notes = "Sign a transaction", httpMethod = "POST")
+  @ApiOperation(
+    value = "Sign a transaction with a non-default private key",
+    notes = "Sign a transaction with the private key corresponding to the given address",
+    httpMethod = "POST"
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "signerAddress", value = "Wallet address", required = true, dataType = "string", paramType = "path"),
@@ -214,7 +214,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                            required = true,
                            dataType = "string",
                            paramType = "body",
-                           value = "Transaction data including type and optional timestamp in milliseconds")
+                           value = "Transaction data including <a href='transaction-types.html'>type</a>")
     ))
   def signWithSigner: Route = pathPrefix(Segment) { signerAddress =>
     handleExceptions(jsonExceptionHandler) {
@@ -302,14 +302,16 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   @Path("/broadcast")
-  @ApiOperation(value = "Broadcasts a signed transaction", notes = "Broadcasts a signed transaction", httpMethod = "POST")
+  @ApiOperation(value = "Broadcast a signed transaction", notes = "Broadcast a signed transaction", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "json",
-                           value = "Transaction data including type and signature",
-                           required = true,
-                           dataType = "string",
-                           paramType = "body")
+      new ApiImplicitParam(
+        name = "json",
+        required = true,
+        paramType = "body",
+        dataType = "string",
+        value = "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs"
+      )
     ))
   def broadcast: Route = (pathPrefix("broadcast") & post) {
     handleExceptions(jsonExceptionHandler) {

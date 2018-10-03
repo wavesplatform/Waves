@@ -7,7 +7,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.wallet.Wallet
 
 trait ExchangeTransactionCreator extends ScorexLogging {
@@ -31,7 +31,14 @@ trait ExchangeTransactionCreator extends ScorexLogging {
         val price             = counter.price
         val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
         val (buyFee, sellFee) = calculateMatcherFee(buy, sell, event.executedAmount)
-        ExchangeTransaction.create(matcherPrivateKey, buy, sell, price, event.executedAmount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+        (buy, sell) match {
+          case (buy: OrderV1, sell: OrderV1) =>
+            ExchangeTransactionV1
+              .create(matcherPrivateKey, buy, sell, price, event.executedAmount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+          case _ =>
+            ExchangeTransactionV2
+              .create(matcherPrivateKey, buy, sell, price, event.executedAmount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+        }
       })
   }
 
