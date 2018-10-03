@@ -52,12 +52,11 @@ object DocExport {
         override val isNative: Boolean = true; override val needLink: Boolean = true
       }
 
-      case class Name(name: String)
       case class Doc(types: java.util.List[TypeDoc],
                      vars: java.util.List[VarDoc],
                      funcs: java.util.List[FuncDoc],
                      transactionDoc: java.util.List[TransactionDoc],
-                     transactionFields: java.util.List[Name])
+                     transactionFields: java.util.List[FieldTypes])
 
       def typeRepr(t: FINAL)(name: String = t.name): TypeDoc = t match {
         case UNION(Seq(UNIT, l)) => OptionOf(typeRepr(l)())
@@ -107,6 +106,7 @@ object DocExport {
 
       case class TransactionDoc(name: String, fields: java.util.List[TransactionField])
       case class TransactionField(absend: Boolean, `type`: java.util.List[TypeDoc])
+      case class FieldTypes(name: String, types: java.util.List[TransactionField])
       val transactionsType = fullContext.types.filter(v => v.name == "Transaction")
       def transactionDocs(types: Seq[DefinedType]) = {
         val transactionsTypes =
@@ -114,15 +114,30 @@ object DocExport {
             case UnionType(_, union) => union
             case t: CaseType         => Seq(t.typeRef)
           })
-        val transactionsFields: Seq[String] =
-          transactionsTypes.flatMap(_.fields.map(_._1)).distinct
+        val transactionsFields =
+          transactionsTypes
+            .flatMap(_.fields.map(_._1))
+            .distinct
+            .map(name =>
+              FieldTypes(
+                name,
+                transactionsTypes
+                  .map(t =>
+                    t.fields
+                      .find(_._1 == name)
+                      .fold(TransactionField(true, List[TypeDoc]().asJava))(ft => TransactionField(false, List(typeRepr(ft._2)()).asJava)))
+                  .asJava
+            ))
         val transactionDocs = transactionsTypes.map { t =>
           val fields = t.fields.toMap
           TransactionDoc(
             t.name,
             transactionsFields
-              .map(field =>
-                fields.get(field).fold(TransactionField(true, List[TypeDoc]().asJava))(ft => TransactionField(false, List(typeRepr(ft)()).asJava)))
+              .map(
+                field =>
+                  fields
+                    .get(field.name)
+                    .fold(TransactionField(true, List[TypeDoc]().asJava))(ft => TransactionField(false, List(typeRepr(ft)()).asJava)))
               .asJava
           )
         }
@@ -140,7 +155,7 @@ object DocExport {
           getVarsDoc().toList.asJava,
           getFunctionnsDoc().toList.asJava,
           t.asJava,
-          f.map(Name).asJava
+          f.asJava
         )
       )
       out.flush()
