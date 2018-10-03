@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.matcher
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config}
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -10,16 +10,12 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import com.wavesplatform.it.sync._
-import com.wavesplatform.lang.v1.compiler.CompilerV1
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.utils.dummyCompilerContext
 import play.api.libs.json.JsNumber
 
 import scala.concurrent.duration._
-import scala.util.Random
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class OrdersFromScriptedAccTestSuite
     extends FreeSpec
@@ -48,12 +44,9 @@ class OrdersFromScriptedAccTestSuite
     aliceNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
 
     "make Bob's address as scripted" in {
-      val scriptText = {
-        val sc = Parser(s"""true""".stripMargin).get.value
-        CompilerV1(dummyCompilerContext, sc).explicitGet()._1
-      }
+      val scriptText = s"""true""".stripMargin
 
-      val script = ScriptV1(scriptText).explicitGet()
+      val script = ScriptCompiler(scriptText).explicitGet()._1
       val setScriptTransaction = SetScriptTransaction
         .selfSigned(SetScriptTransaction.supportedVersions.head, bobNode.privateKey, Some(script), minFee, System.currentTimeMillis())
         .right
