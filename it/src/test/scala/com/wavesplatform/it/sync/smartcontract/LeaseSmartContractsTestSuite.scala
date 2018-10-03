@@ -6,14 +6,11 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v1.compiler.CompilerV1
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
 
@@ -31,8 +28,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
 
     notMiner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
 
-    val scriptText = {
-      val sc = Parser(s"""
+    val scriptText = s"""
         let pkA = base58'${ByteStr(acc0.publicKey)}'
         let pkB = base58'${ByteStr(acc1.publicKey)}'
         let pkC = base58'${ByteStr(acc2.publicKey)}'
@@ -42,11 +38,9 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
           case lctx : LeaseCancelTransaction => sigVerify(lctx.bodyBytes,lctx.proofs[1],pkA) && sigVerify(lctx.bodyBytes,lctx.proofs[2],pkB)
           case other => false
         }
-        """.stripMargin).get.value
-      CompilerV1(dummyCompilerContext, sc).explicitGet()._1
-    }
+        """.stripMargin
 
-    val script = ScriptV1(scriptText).explicitGet()
+    val script = ScriptCompiler(scriptText).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), minFee, System.currentTimeMillis())
       .explicitGet()
