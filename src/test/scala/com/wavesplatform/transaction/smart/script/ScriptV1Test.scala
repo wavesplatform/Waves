@@ -21,7 +21,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
 
   property("ScriptV1.apply should deny too complex scripts") {
     val byteVector = CONST_BYTEVECTOR(ByteVector(1))
-    val expr = (1 to 21)
+    val expr = (1 to 25)
       .map { _ =>
         FUNCTION_CALL(
           function = FunctionHeader.Native(SIGVERIFY),

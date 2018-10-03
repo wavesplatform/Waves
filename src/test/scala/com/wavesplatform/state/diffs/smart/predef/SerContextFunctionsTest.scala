@@ -1,23 +1,22 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.{NoShrink, TransactionGen}
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.{ScriptEstimator, Serde}
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.utils.{Base58, dummyCompilerContext}
+import com.wavesplatform.utils.{Base58, Base64, dummyCompilerContext, functionCosts}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import scorex.crypto.encode.Base64
 
 class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with NoShrink with TransactionGen {
   property("check serializion of script with all functions") {
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", true)
-    val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
+    val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=").get))
     val entry4 = StringDataEntry("str", "test")
 
     val dtx = DataTransaction
@@ -202,6 +201,8 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
       115, 116, 114, 54, 52, 7, 3, 5, 0, 0, 0, 3, 114, 110, 100, 3, 5, 0, 0, 0, 4, 112, 117, 114, 101, 5, 0, 0, 0, 5, 119, 97, 118, 101, 115, 7, 5, 0,
       0, 0, 6, 99, 114, 121, 112, 116, 111)
     Serde.serialize(compiledScript) shouldBe bytes
+
+    ScriptEstimator(functionCosts, compiledScript) shouldBe Right(1915)
   }
 
 }

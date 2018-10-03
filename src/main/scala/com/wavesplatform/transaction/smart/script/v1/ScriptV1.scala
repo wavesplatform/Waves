@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.smart.script.Script
 
 object ScriptV1 {
   private val checksumLength = 4
-  private val maxComplexity  = 20 * functionCosts(FunctionHeader.Native(SIGVERIFY))()
+  private val maxComplexity  = 25 * functionCosts(FunctionHeader.Native(SIGVERIFY))()
   private val maxSizeInBytes = 8 * 1024
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
