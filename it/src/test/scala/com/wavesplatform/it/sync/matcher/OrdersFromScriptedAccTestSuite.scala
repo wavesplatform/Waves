@@ -95,8 +95,6 @@ class OrdersFromScriptedAccTestSuite
       matcherNode.waitOrderStatus(aliceWavesPair, orderId, "Filled")
       matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Filled"
 
-      // sell order should be in the aliceNode orderbook
-      matcherNode.fullOrderHistory(aliceNode).head.status shouldBe "Filled"
     }
   }
 }

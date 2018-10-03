@@ -1,9 +1,11 @@
 package com.wavesplatform.it.sync.matcher
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -20,8 +22,6 @@ class MatcherMassOrdersTestSuite
     with BeforeAndAfterAll
     with CancelAfterFailure {
 
-  import MatcherMassOrdersTestSuite._
-
   override protected def nodeConfigs: Seq[Config] = Configs
 
   private def matcherNode  = nodes.head
@@ -33,11 +33,11 @@ class MatcherMassOrdersTestSuite
 
     // Alice issues new assets
     val aliceAsset =
-      aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", AssetQuantity, 0, reissuable = false, 100000000L).id
+      aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceSecondAsset = aliceNode
-      .issue(aliceNode.address, "AliceSecondCoin", "AliceSecondCoin for matcher's tests", AssetQuantity, 0, reissuable = false, 100000000L)
+      .issue(aliceNode.address, "AliceSecondCoin", "AliceSecondCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L)
       .id
     nodes.waitForHeightAriseAndTxPresent(aliceSecondAsset)
 
@@ -45,18 +45,18 @@ class MatcherMassOrdersTestSuite
     val aliceSecondWavesPair = AssetPair(ByteStr.decodeBase58(aliceSecondAsset).toOption, None)
 
     // Check balances on Alice's account
-    aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, AssetQuantity)
-    aliceNode.assertAssetBalance(aliceNode.address, aliceSecondAsset, AssetQuantity)
+    aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, someAssetAmount)
+    aliceNode.assertAssetBalance(aliceNode.address, aliceSecondAsset, someAssetAmount)
     matcherNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
 
-    val transfer1ToBobId = aliceNode.transfer(aliceNode.address, bobNode.address, AssetQuantity / 2, 100000, Some(aliceAsset), None).id
+    val transfer1ToBobId = aliceNode.transfer(aliceNode.address, bobNode.address, someAssetAmount / 2, 100000, Some(aliceAsset), None).id
     nodes.waitForHeightAriseAndTxPresent(transfer1ToBobId)
 
-    val transfer2ToBobId = aliceNode.transfer(aliceNode.address, bobNode.address, AssetQuantity / 2, 100000, Some(aliceSecondAsset), None).id
+    val transfer2ToBobId = aliceNode.transfer(aliceNode.address, bobNode.address, someAssetAmount / 2, 100000, Some(aliceSecondAsset), None).id
     nodes.waitForHeightAriseAndTxPresent(transfer2ToBobId)
 
-    bobNode.assertAssetBalance(bobNode.address, aliceAsset, AssetQuantity / 2)
-    bobNode.assertAssetBalance(bobNode.address, aliceSecondAsset, AssetQuantity / 2)
+    bobNode.assertAssetBalance(bobNode.address, aliceAsset, someAssetAmount / 2)
+    bobNode.assertAssetBalance(bobNode.address, aliceSecondAsset, someAssetAmount / 2)
 
     // Alice places sell orders
     val aliceOrderIdFill = matcherNode
@@ -164,29 +164,4 @@ class MatcherMassOrdersTestSuite
     matcherNode.waitOrderStatus(assetPair, orderId, expectedStatus)
     matcherNode.fullOrderHistory(node).filter(_.id == orderId).seq.head.status shouldBe expectedStatus
   }
-}
-
-object MatcherMassOrdersTestSuite {
-  private val ForbiddenAssetId    = "FdbnAsset"
-  private val orderLimit          = 20
-  private val AssetQuantity: Long = 1000000000
-
-  import ConfigFactory._
-  import NodeConfigs.Default
-
-  private val minerDisabled = parseString("waves.miner.enable = no")
-  private val matcherConfig = ConfigFactory.parseString(s"""
-       |waves.matcher {
-       |  enable = yes
-       |  account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
-       |  bind-address = "0.0.0.0"
-       |  order-match-tx-fee = 300000
-       |  blacklisted-assets = [$ForbiddenAssetId]
-       |  order-cleanup-interval = 20s
-       |  rest-order-limit=$orderLimit
-       |}""".stripMargin).withFallback(minerDisabled)
-
-  private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
-    .map { case (n, o) => o.withFallback(n) }
 }

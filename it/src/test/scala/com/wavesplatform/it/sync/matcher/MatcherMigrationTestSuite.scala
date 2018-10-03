@@ -1,18 +1,18 @@
 package com.wavesplatform.it.sync.matcher
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{TransferSending, _}
+import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.state.ByteStr
 import org.scalatest.concurrent.Eventually
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
-import scala.util.Random
 
 class MatcherMigrationTestSuite
     extends FreeSpec
@@ -23,8 +23,6 @@ class MatcherMigrationTestSuite
     with NodesFromDocker
     with TransferSending
     with Eventually {
-
-  import MatcherMigrationTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
   private def matcherNode                         = nodes.head
@@ -73,30 +71,9 @@ class MatcherMigrationTestSuite
       val tbAfter = matcherNode.tradableBalance(aliceNode, aliceWavesPair)
       val rbAfter = matcherNode.reservedBalance(aliceNode)
 
-//      TODO: @monroid uncomment this after merge with version-0.13.x
-//      assert(tbBefore == tbAfter)
-//      assert(rbBefore == rbAfter)
+      assert(tbBefore == tbAfter)
+      assert(rbBefore == rbAfter)
 
     }
   }
-}
-
-object MatcherMigrationTestSuite {
-  import ConfigFactory._
-  import com.wavesplatform.it.NodeConfigs._
-
-  val genesisTs             = System.currentTimeMillis()
-  private val minerDisabled = parseString("waves.miner.enable = no")
-  private val matcherConfig = parseString(s"""
-                                             |waves.matcher {
-                                             |  enable = yes
-                                             |  account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
-                                             |  bind-address = "0.0.0.0"
-                                             |  order-match-tx-fee = 300000
-                                             |}
-                                             |""".stripMargin)
-
-  private val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
-    .map { case (n, o) => o.withFallback(n) }
 }
