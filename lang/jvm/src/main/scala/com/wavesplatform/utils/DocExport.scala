@@ -105,32 +105,44 @@ object DocExport {
                 }
             ))
 
-      val transactionsTypes =
-        fullContext.types.filter(v => v.name == "Transaction").flatMap({ case UnionType(_, union) => union })
-      val transactionsFields: Seq[String] =
-        transactionsTypes.flatMap(_.fields.map(_._1)).distinct
       case class TransactionDoc(name: String, fields: java.util.List[TransactionField])
       case class TransactionField(absend: Boolean, `type`: java.util.List[TypeDoc])
-      val transactionDocs = transactionsTypes.map { t =>
-        val fields = t.fields.toMap
-        TransactionDoc(
-          t.name,
-          transactionsFields
-            .map(field =>
-              fields.get(field).fold(TransactionField(true, List[TypeDoc]().asJava))(ft => TransactionField(false, List(typeRepr(ft)()).asJava)))
-            .asJava
-        )
+      val transactionsType = fullContext.types.filter(v => v.name == "Transaction")
+      def transactionDocs(types: Seq[DefinedType]) = {
+        val transactionsTypes =
+          types.flatMap({
+            case UnionType(_, union) => union
+            case t: CaseType         => Seq(t.typeRef)
+          })
+        val transactionsFields: Seq[String] =
+          transactionsTypes.flatMap(_.fields.map(_._1)).distinct
+        val transactionDocs = transactionsTypes.map { t =>
+          val fields = t.fields.toMap
+          TransactionDoc(
+            t.name,
+            transactionsFields
+              .map(field =>
+                fields.get(field).fold(TransactionField(true, List[TypeDoc]().asJava))(ft => TransactionField(false, List(typeRepr(ft)()).asJava)))
+              .asJava
+          )
+        }
+        (transactionDocs, transactionsFields)
       }
 
       val mf     = new DefaultMustacheFactory()
       val doc    = mf.compile(args(1))
       val output = new java.io.FileWriter(args(2)) //new java.io.StringWriter
-      val out = doc.execute(output,
-                            Doc(getTypes().asJava,
-                                getVarsDoc().toList.asJava,
-                                getFunctionnsDoc().toList.asJava,
-                                transactionDocs.asJava,
-                                transactionsFields.map(Name).asJava))
+      val (t, f) = transactionDocs(transactionsType)
+      val out = doc.execute(
+        output,
+        Doc(
+          getTypes().asJava,
+          getVarsDoc().toList.asJava,
+          getFunctionnsDoc().toList.asJava,
+          t.asJava,
+          f.map(Name).asJava
+        )
+      )
       out.flush()
       out.close()
     }
