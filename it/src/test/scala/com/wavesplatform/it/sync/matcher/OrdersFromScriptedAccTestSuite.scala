@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.matcher
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config}
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -18,7 +18,6 @@ import com.wavesplatform.utils.dummyCompilerContext
 import play.api.libs.json.JsNumber
 
 import scala.concurrent.duration._
-import scala.util.Random
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 
 class OrdersFromScriptedAccTestSuite
