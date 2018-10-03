@@ -29,7 +29,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong
 import scala.util.{Left, Right}
 
-class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings, utxSettings: UtxSettings)
+class UtxPoolImpl(time: Time, blockchain: Blockchain, feeCalculator: FeeCalculator, fs: FunctionalitySettings, utxSettings: UtxSettings)
     extends ScorexLogging
     with Instrumented
     with AutoCloseable
@@ -189,6 +189,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
           _    <- checkScripted(b, tx)
           _    <- checkAlias(b, tx)
           _    <- canReissue(b, tx)
+          _    <- feeCalculator.enoughFee(tx, blockchain, fs)
           diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
         } yield {
           pessimisticPortfolios.add(tx.id(), diff)

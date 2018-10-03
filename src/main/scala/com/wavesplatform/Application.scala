@@ -29,6 +29,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time, forceStopApplication}
 import com.wavesplatform.utx.{MatcherUtxPool, UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
@@ -97,11 +98,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
 
+    val feeCalculator          = new FeeCalculator(blockchainUpdater)
     val time: Time             = NTP
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val innerUtxStorage =
-      new UtxPoolImpl(time, blockchainUpdater, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+      new UtxPoolImpl(time, blockchainUpdater, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
     matcher = if (settings.matcherSettings.enable) {
       val m = new Matcher(actorSystem,
