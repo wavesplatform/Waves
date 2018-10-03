@@ -5,11 +5,9 @@ import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.state.ByteStr
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{OrderType}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -66,24 +64,24 @@ class RoundingIssuesTestSuite
   }
 
   "reserved balance should not be negative" in {
-    val counter   = matcherNode.prepareOrder(aliceNode, ethBtcPair, OrderType.BUY, 31887L, 923431000L)
+    val counter   = matcherNode.prepareOrder(bobNode, ethBtcPair, OrderType.BUY, 31887L, 923431000L)
     val counterId = matcherNode.placeOrder(counter).message.id
 
-    val submitted   = matcherNode.prepareOrder(bobNode, ethBtcPair, OrderType.SELL, 31887L, 223345000L)
+    val submitted   = matcherNode.prepareOrder(aliceNode, ethBtcPair, OrderType.SELL, 31887L, 223345000L)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
     val filledAmount = 223344937L
     matcherNode.waitOrderStatusAndAmount(ethBtcPair, submittedId, "Filled", Some(filledAmount), 1.minute)
     matcherNode.waitOrderStatusAndAmount(ethBtcPair, counterId, "PartiallyFilled", Some(filledAmount), 1.minute)
 
-    withClue("Bob's reserved balance before cancel")(matcherNode.reservedBalance(bobNode) shouldBe empty)
+    withClue("Alice's reserved balance before cancel")(matcherNode.reservedBalance(aliceNode) shouldBe empty)
 
-    matcherNode.cancelOrder(aliceNode, ethBtcPair, Some(counterId))
+    matcherNode.cancelOrder(bobNode, ethBtcPair, Some(counterId))
     val tx = matcherNode.transactionsByOrder(counterId).head
 
     matcherNode.waitForTransaction(tx.id)
 
-    withClue("Alice's reserved balance after cancel")(matcherNode.reservedBalance(aliceNode) shouldBe empty)
+    withClue("Bob's reserved balance after cancel")(matcherNode.reservedBalance(bobNode) shouldBe empty)
   }
 
   "should correctly fill 2 counter orders" in {
