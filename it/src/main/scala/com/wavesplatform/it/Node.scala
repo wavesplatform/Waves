@@ -7,7 +7,7 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.EitherExt2
-import com.wavesplatform.transaction.FeeCalculator
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.utils.{Base58, LoggerFacade}
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
@@ -45,7 +45,7 @@ object Node {
 
     def publicKeyStr = Base58.encode(n.publicKey.publicKey)
 
-    def fee(txTypeId: Byte): Long = FeeCalculator.FeeConstants(txTypeId)
+    def fee(txTypeId: Byte): Long = CommonValidation.FeeConstants(txTypeId)
 
     def blockDelay: FiniteDuration = n.settings.blockchainSettings.genesisSettings.averageBlockDelay
   }
