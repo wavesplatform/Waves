@@ -30,7 +30,12 @@ abstract class FinalizedOrdersIndex(elementsLimit: Int) {
     val updatedNewestIdx = newestIdx + size
 
     (updatedNewestIdx to 1).slice(elementsLimit, elementsLimit + size).foreach { idx =>
-      rw.delete(itemKey(idx))
+      val k = itemKey(idx)
+      rw.get(k).foreach { id =>
+        rw.delete(MatcherKeys.order(id))
+        rw.delete(MatcherKeys.orderInfo(id))
+      }
+      rw.delete(k)
     }
 
     rw.put(newestKey, Some(updatedNewestIdx))

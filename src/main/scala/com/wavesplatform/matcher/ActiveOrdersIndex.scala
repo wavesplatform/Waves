@@ -115,8 +115,6 @@ object ActiveOrdersIndex {
     def write(x: Node): Array[Byte] = indexToBytes(x.olderIdx) ++ toBytes(x.elem) ++ indexToBytes(x.newerIdx)
 
     private def indexToBytes(x: Option[Index]): Array[Byte] = x.fold(Array[Byte](0))(x => (1: Byte) +: Ints.toByteArray(x))
-    private def toBytes(x: Option[AssetId]): Array[Byte]    = x.fold(Array[Byte](0))(x => (1: Byte) +: x.arr)
-    private def toBytes(x: AssetPair): Array[Byte]          = toBytes(x.amountAsset) ++ toBytes(x.priceAsset)
-    private def toBytes(x: (AssetPair, Id)): Array[Byte]    = toBytes(x._1) ++ x._2.arr
+    private def toBytes(x: (AssetPair, Id)): Array[Byte]    = x._1.bytes ++ x._2.arr
   }
 }

@@ -40,10 +40,6 @@ class CancelOrderTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll
     matcherNode.orderHistoryByPair(bobNode, wavesUsdPair).filter(_.id == orderId).head.status shouldBe "Cancelled"
     matcherNode.orderBook(wavesUsdPair).bids shouldBe empty
     matcherNode.orderBook(wavesUsdPair).asks shouldBe empty
-
-    matcherNode.deleteOrder(bobNode, wavesUsdPair, Some(orderId))
-    matcherNode.orderStatus(orderId, wavesUsdPair, false).status shouldBe "NotFound"
-
   }
 
   "Alice and Bob trade WAVES-USD" - {

@@ -4,7 +4,7 @@ import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{MatcherResponse, NotImplemented, OrderDeleted}
+import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ExpirableOrderHistoryRequest, _}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model._
@@ -40,16 +40,6 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       sender() ! ValidateOrderResult(o.id(), validateNewOrder(o))
     case GetTradableBalance(assetPair, addr, _) =>
       sender() ! getPairTradableBalance(assetPair, addr)
-    case DeleteOrderFromHistory(_, address, maybeId, _) =>
-      val result = for {
-        id <- maybeId.toRight[MatcherResponse](NotImplemented("Batch order deletion is not supported yet"))
-        _ <- orderHistory.deleteOrder(address, id).left.map[MatcherResponse] {
-          case LimitOrder.NotFound => StatusCodes.NotFound   -> s"Order $id not found"
-          case other               => StatusCodes.BadRequest -> s"Invalid status: $other"
-        }
-      } yield id
-
-      sender() ! result.fold[MatcherResponse](identity, id => OrderDeleted(id))
   }
 
   override def receive: Receive = {
@@ -106,8 +96,6 @@ object OrderHistoryActor {
   sealed trait ExpirableOrderHistoryRequest {
     def ts: Long
   }
-
-  case class DeleteOrderFromHistory(assetPair: AssetPair, address: Address, id: Option[ByteStr], ts: Long) extends ExpirableOrderHistoryRequest
 
   case class ValidateOrder(order: Order, ts: Long) extends ExpirableOrderHistoryRequest
 

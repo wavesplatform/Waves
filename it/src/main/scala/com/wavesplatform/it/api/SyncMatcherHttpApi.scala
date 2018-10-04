@@ -101,20 +101,6 @@ object SyncMatcherHttpApi extends Assertions {
                     waitTime: Duration): MatcherStatusResponse =
       Await.result(async(m).cancelOrder(sender, assetPair, orderId, timestamp), waitTime)
 
-    def deleteOrder(sender: Node,
-                    assetPair: AssetPair,
-                    orderId: Option[String],
-                    timestamp: Option[Long] = None,
-                    waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
-      deleteOrder(sender.privateKey, assetPair, orderId, timestamp, waitTime)
-
-    def deleteOrder(sender: PrivateKeyAccount,
-                    assetPair: AssetPair,
-                    orderId: Option[String],
-                    timestamp: Option[Long],
-                    waitTime: Duration): MatcherStatusResponse =
-      Await.result(async(m).deleteOrder(sender, assetPair, orderId, timestamp), waitTime)
-
     def cancelAllOrders(sender: Node, timestamp: Option[Long] = None, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).cancelAllOrders(sender, timestamp), waitTime)
 
