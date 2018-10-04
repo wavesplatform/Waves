@@ -1,11 +1,11 @@
 package com.wavesplatform.state.diffs
 
 import cats._
+import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.account.Address
 import com.wavesplatform.transaction.ValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -182,7 +182,9 @@ object CommonValidation {
             case None => Right((None, feeInUnits * Sponsorship.FeeUnit))
             case Some(assetId) =>
               for {
-                assetInfo <- blockchain.assetDescription(assetId).toRight(GenericError(s"Asset $assetId does not exist, cannot be used to pay fees"))
+                assetInfo <- blockchain
+                  .assetDescription(assetId)
+                  .toRight(InsufficientFee(s"Asset $assetId does not exist, cannot be used to pay fees"))
                 wavesFee <- Either.cond(
                   assetInfo.sponsorship > 0,
                   feeInUnits * Sponsorship.FeeUnit,
@@ -224,23 +226,8 @@ object CommonValidation {
 
   def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
     def restFeeAfterSponsorship(inputFee: (Option[AssetId], Long)): Either[ValidationError, (Option[AssetId], Long)] =
-      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
-        val (feeAssetId, feeAmount) = inputFee
-        for {
-          feeInUnits <- feeInUnits(blockchain, height, tx)
-          restFee <- feeAssetId match {
-            case Some(value) => Right(inputFee)
-            case None =>
-              val feeDiff = feeAmount - feeInUnits * Sponsorship.FeeUnit
-              Either
-                .cond(
-                  feeDiff > 0,
-                  (feeAssetId, feeDiff),
-                  GenericError("Fuck you!")
-                )
-          }
-        } yield restFee
-      } else {
+      if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(inputFee)
+      else {
         val (feeAssetId, feeAmount) = inputFee
         for {
           feeInUnits <- feeInUnits(blockchain, height, tx)
