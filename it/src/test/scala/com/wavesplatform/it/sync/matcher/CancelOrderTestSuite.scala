@@ -1,53 +1,42 @@
 package com.wavesplatform.it.sync.matcher
 
-import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
-import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
-import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.matcher.BaseMatcherSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.utils.Base58
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 
 import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
-import scala.util.{Random, Try}
-import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
+import scala.util.Try
+import com.typesafe.config.Config
 
-class CancelOrderTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with NodesFromDocker with ReportingTestName {
+class CancelOrderTestSuite extends BaseMatcherSuite {
 
   override protected def nodeConfigs: Seq[Config] = Configs
-
-  private def matcherNode = nodes.head
-
-  private def aliceNode = nodes(1)
-
-  private def bobNode = nodes(2)
 
   matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
   matcherNode.signedIssue(createSignedIssueRequest(IssueWctTx))
   nodes.waitForHeightArise()
+  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None)
+  bobNode.transfer(bobNode.address, bobAcc.address, defaultAssetQuantity, 100000, Some(WctId.toString), None)
+  nodes.waitForHeightArise()
 
   "cancel order using api-key" in {
-    val orderId = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
+    val orderId = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
     matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
 
     matcherNode.cancelOrderWithApiKey(orderId)
     matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
 
-    matcherNode.fullOrderHistory(bobNode).filter(_.id == orderId).head.status shouldBe "Cancelled"
-    matcherNode.orderHistoryByPair(bobNode, wavesUsdPair).filter(_.id == orderId).head.status shouldBe "Cancelled"
+    matcherNode.fullOrderHistory(bobAcc).filter(_.id == orderId).head.status shouldBe "Cancelled"
+    matcherNode.orderHistoryByPair(bobAcc, wavesUsdPair).filter(_.id == orderId).head.status shouldBe "Cancelled"
     matcherNode.orderBook(wavesUsdPair).bids shouldBe empty
     matcherNode.orderBook(wavesUsdPair).asks shouldBe empty
 
-    matcherNode.deleteOrder(bobNode, wavesUsdPair, Some(orderId))
+    matcherNode.deleteOrder(bobAcc, wavesUsdPair, Some(orderId))
     matcherNode.orderStatus(orderId, wavesUsdPair, false).status shouldBe "NotFound"
 
   }
@@ -55,26 +44,25 @@ class CancelOrderTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll
   "Alice and Bob trade WAVES-USD" - {
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves
-      val orderId1      = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
-      val orderId2      = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 700, 100.waves).message.id
-      val bobSellOrder3 = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 600, 100.waves).message.id
+      val orderId1      = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
+      val orderId2      = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 700, 100.waves).message.id
+      val bobSellOrder3 = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 600, 100.waves).message.id
 
-      matcherNode.fullOrderHistory(aliceNode)
-      matcherNode.fullOrderHistory(bobNode)
+      matcherNode.fullOrderHistory(aliceAcc)
+      matcherNode.fullOrderHistory(bobAcc)
 
       matcherNode.waitOrderStatus(wavesUsdPair, bobSellOrder3, "Accepted", 1.minute)
 
-      val aliceOrder = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 800, 0.00125.waves)
+      val aliceOrder = matcherNode.prepareOrder(aliceAcc, wavesUsdPair, OrderType.BUY, 800, 0.00125.waves)
       matcherNode.placeOrder(aliceOrder).message.id
 
       Thread.sleep(2000)
-      matcherNode.fullOrderHistory(aliceNode)
-      val orders = matcherNode.fullOrderHistory(bobNode)
+      matcherNode.fullOrderHistory(aliceAcc)
+      val orders = matcherNode.fullOrderHistory(bobAcc)
       for (orderId <- Seq(orderId1, orderId2)) {
         orders.filter(_.id == orderId).head.status shouldBe "Accepted"
       }
     }
-
   }
 
   def correctAmount(a: Long, price: Long): Long = {
