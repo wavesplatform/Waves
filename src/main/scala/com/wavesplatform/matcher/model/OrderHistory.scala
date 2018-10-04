@@ -19,6 +19,7 @@ import org.iq80.leveldb.DB
 class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   import OrderHistory._
   import com.wavesplatform.matcher.MatcherKeys._
+  import DBUtils.indexes
 
   private val timer               = Kamon.timer("matcher.order-history.impl")
   private val saveOpenVolumeTimer = timer.refine("action" -> "save-open-volume")
@@ -29,87 +30,56 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     val order    = event.order.order
     val orderId  = order.id()
     val origInfo = rw.get(MatcherKeys.orderInfoOpt(orderId))
-    println(s"saveOrderInfo: added: origInfo: $origInfo")
-    val change = OrderInfoChange(
-      order = order,
-      origInfo = origInfo,
-      updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(minAmount = Some(event.order.minAmountOfAmountAsset))
-    )
+    if (!origInfo.exists(_.status.isFinal)) {
+      val change = OrderInfoChange(
+        order = order,
+        origInfo = origInfo,
+        updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(minAmount = Some(event.order.minAmountOfAmountAsset))
+      )
 
-    log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
-
-    val can = !origInfo.exists(_.status.isFinal)
-    println(s"saveOrderInfo: added: can: $can (order.id=${change.order.id()})")
-    if (can) {
+      log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
       saveOpenVolume(rw, diff(List(change)))
 
-      rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
       if (change.origInfo.isEmpty) saveOrder(rw, change.order)
+      rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
 
-      //if (can) {
-      def activeIndex = new ActiveOrdersIndex(order.senderPublicKey.toAddress, 200)
-      activeIndex.add(rw, order.assetPair, orderId)
-      //}
+      indexes.active.add(rw, order.senderPublicKey.toAddress, order.assetPair, orderId)
     }
   }
 
   private def saveOrderInfo(rw: RW, event: OrderExecuted): Unit = {
-    def changesFor(lo: LimitOrder): OrderInfoChange = {
-      val origInfo = rw.get(MatcherKeys.orderInfoOpt(lo.order.id()))
-      collectChanges(event, lo, origInfo)
-    }
-
-    def getOpenVolume(change: OrderInfoChange): Map[Address, OpenPortfolio] = {
-      log.trace(s"${change.order.id()}: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
-
-      /*if (change.origInfo.exists(_.status.isFinal)) Map.empty
-      else */
-      diff(List(change))
-    }
+    def origInfo(lo: LimitOrder): Option[OrderInfo] = rw.get(MatcherKeys.orderInfoOpt(lo.order.id()))
+    def wasActive(x: Option[OrderInfo]): Boolean    = !x.exists(_.status.isFinal)
 
     saveOrderInfoTimer.measure {
-      import event.counter.{order => counterOrder}
+      lazy val counterOrigInfo   = origInfo(event.counterExecuted)
+      lazy val submittedOrigInfo = origInfo(event.submittedExecuted)
 
-      val counterChanges = changesFor(event.counterExecuted)
-      println(s"saveOrderInfo: executed: counterChanges=$counterChanges")
-      val submittedChanges = changesFor(event.submittedExecuted)
-      println(s"saveOrderInfo: executed: submittedChanges=$submittedChanges")
+      if (wasActive(counterOrigInfo) && wasActive(submittedOrigInfo)) {
+        val counterChanges   = collectChanges(event, event.counterExecuted, counterOrigInfo)
+        val submittedChanges = collectChanges(event, event.submittedExecuted, submittedOrigInfo)
+        val allChanges       = List(counterChanges, submittedChanges)
 
-      if (submittedChanges.origInfo.isEmpty) rw.put(MatcherKeys.order(submittedChanges.order.id()), Some(submittedChanges.order))
-
-      val allChanges = List(counterChanges, submittedChanges)
-
-      val canCounter   = !counterChanges.origInfo.exists(_.status.isFinal)
-      val canSubmitted = !submittedChanges.origInfo.exists(_.status.isFinal)
-      println(
-        s"saveOrderInfo: executed: canCounter=$canCounter (order.id=${counterChanges.order.id()}), " +
-          s"canSubmitted=$canSubmitted (order.id=${submittedChanges.order.id()})"
-      )
-      if (canCounter && canSubmitted) {
-        val mergedDiff = Monoid.combine(getOpenVolume(counterChanges), getOpenVolume(submittedChanges))
+        val mergedDiff = diff(List(counterChanges, submittedChanges))
         saveOpenVolume(rw, mergedDiff)
 
+        if (submittedChanges.origInfo.isEmpty) rw.put(MatcherKeys.order(submittedChanges.order.id()), Some(submittedChanges.order))
         allChanges.foreach { change =>
-          rw.put(MatcherKeys.orderInfo(change.order.id()), change.updatedInfo) // todo move
+          log.trace(s"${change.order.id()}: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
+          rw.put(MatcherKeys.orderInfo(change.order.id()), change.updatedInfo)
         }
 
-//        if (canCounter) {
-        def activeCounterIndex = new ActiveOrdersIndex(counterOrder.senderPublicKey.toAddress, 200)
-        if (counterChanges.updatedInfo.status.isFinal) activeCounterIndex.delete(rw, counterOrder.id())
-//        }
+        import event.counter.{order => counterOrder}
+        if (counterChanges.updatedInfo.status.isFinal) indexes.active.delete(rw, counterOrder.senderPublicKey.toAddress, counterOrder.id())
 
         allChanges
-//          .filter { x =>
-//            x == counterChanges && canCounter || x == submittedChanges && canSubmitted
-//          }
           .filter(_.updatedInfo.status.isFinal)
           .groupBy(_.order.senderPublicKey.toAddress)
           .foreach {
             case (address, changes) =>
               val ids = changes.map(_.order.id())
-              println(s"add to finalized index: $address -> ${ids.mkString(", ")}")
-              new FinalizedOrdersCommonIndex(address, 100).add(rw, ids: _*)
-              new FinalizedOrdersPairIndex(address, counterOrder.assetPair, 100).add(rw, ids: _*)
+              indexes.finalized.common.add(rw, address, ids)
+              indexes.finalized.pair.add(rw, address, counterOrder.assetPair, ids)
           }
       }
     }
@@ -119,42 +89,28 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     val order    = event.limitOrder.order
     val orderId  = order.id()
     val origInfo = rw.get(MatcherKeys.orderInfoOpt(orderId))
-    val change = OrderInfoChange(
-      order = order,
-      origInfo = origInfo,
-      updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(canceledByUser = Some(!event.unmatchable))
-    )
+    if (!origInfo.exists(_.status.isFinal)) {
+      val change = OrderInfoChange(
+        order = order,
+        origInfo = origInfo,
+        updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(canceledByUser = Some(!event.unmatchable))
+      )
 
-    log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
-
-    val can = !origInfo.exists(_.status.isFinal)
-    println(s"saveOrderInfo: canceled: can: $can (order.id=${change.order.id()})")
-    if (can) {
+      log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
       saveOpenVolume(rw, diff(List(change)))
 
       rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
       if (change.origInfo.isEmpty) saveOrder(rw, change.order)
 
-      def activeIndex          = new ActiveOrdersIndex(order.senderPublicKey.toAddress, 200)
-      def finalizedCommonIndex = new FinalizedOrdersCommonIndex(order.senderPublicKey.toAddress, 100)
-      def finalizedPairIndex   = new FinalizedOrdersPairIndex(order.senderPublicKey.toAddress, order.assetPair, 100)
-
-      println(s"saveOrderInfo: canceled: delete $orderId")
-
-      //if (can) {
-      activeIndex.delete(rw, orderId)
-
-      // TODO: cancel, add, cancel
-      finalizedCommonIndex.add(rw, orderId)
-      finalizedPairIndex.add(rw, orderId)
-      //}
+      val address = order.senderPublicKey.toAddress
+      indexes.active.delete(rw, address, orderId)
+      indexes.finalized.common.add(rw, address, orderId)
+      indexes.finalized.pair.add(rw, address, order.assetPair, orderId)
     }
   }
 
   private def collectChanges(event: OrderExecuted, loExecuted: LimitOrder, origInfoOpt: Option[OrderInfo]): OrderInfoChange = {
     val origInfo = origInfoOpt.getOrElse(OrderInfo.emptyFor(loExecuted.order))
-    println(
-      s"collectChanges: executed: loExecuted.order.id=${loExecuted.order.id()}, loExecuted.fee=${loExecuted.fee}, origInfo.remainingFee=${origInfo.remainingFee}")
     OrderInfoChange(
       order = loExecuted.order,
       origInfo = origInfoOpt,
@@ -203,8 +159,14 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   def process(event: OrderExecuted): Unit = db.readWrite(saveOrderInfo(_, event))
   def process(event: OrderCanceled): Unit = db.readWrite(saveOrderInfo(_, event))
 
-  def orderInfo(id: ByteStr): OrderInfo = DBUtils.orderInfo(db, id)
-  def order(id: ByteStr): Option[Order] = DBUtils.order(db, id)
+  def has(id: Order.Id): Boolean         = db.get(MatcherKeys.orderInfoOpt(id)).nonEmpty
+  def orderInfo(id: Order.Id): OrderInfo = DBUtils.orderInfo(db, id)
+  def order(id: Order.Id): Option[Order] = DBUtils.order(db, id)
+
+  def activeOrders(address: Address): Int = {
+    val key = MatcherKeys.activeOrdersSize(address)
+    key.parse(db.get(key.keyBytes)).getOrElse(0)
+  }
 
   def deleteOrder(address: Address, orderId: ByteStr): Either[OrderStatus, Unit] = db.readWrite { rw =>
     DBUtils.orderInfo(rw, orderId).status match {
@@ -221,15 +183,6 @@ object OrderHistory extends ScorexLogging {
   import OrderInfo.orderStatusOrdering
 
   case class OrderInfoChange(order: Order, origInfo: Option[OrderInfo], updatedInfo: OrderInfo)
-
-  case class IndexChanges(toAdd: Seq[Order], toDelete: Seq[Order]) {
-    def add(x: Order): IndexChanges    = ???
-    def delete(x: Order): IndexChanges = ???
-  }
-
-  object IndexChanges {
-    val empty = IndexChanges(Seq.empty, Seq.empty)
-  }
 
   object OrderHistoryOrdering extends Ordering[(ByteStr, OrderInfo, Option[Order])] {
     def orderBy(oh: (ByteStr, OrderInfo, Option[Order])): (OrderStatus, Long) = (oh._2.status, -oh._3.map(_.timestamp).getOrElse(0L))

@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.model
 import cats.implicits._
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.api.DBUtils.indexes.active.MaxElements
 import com.wavesplatform.matcher.model.OrderHistory.OrderInfoChange
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
@@ -58,7 +59,8 @@ trait OrderValidator {
             order.signaturesValid().isRight :| "signature should be valid" &&
             order.isValid(NTP.correctedTime()) &&
             (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
-            (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order is already accepted" &&
+            !orderHistory.has(order.id()) :| "Order was placed before" &&
+            (orderHistory.activeOrders(order.senderPublicKey) < MaxElements) :| s"Limit of $MaxElements active orders has been reached" &&
             isBalanceWithOpenOrdersEnough(order)
         Either
           .cond(v, order, GenericError(v.messages()))

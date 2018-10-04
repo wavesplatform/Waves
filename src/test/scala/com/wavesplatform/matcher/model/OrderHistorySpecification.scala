@@ -185,44 +185,11 @@ class OrderHistorySpecification
     withClue("orders list") {
       val expected = Seq(ord2.id(), ord1.id())
 
-      println("before")
       activeOrderIds(ord1.senderPublicKey) shouldBe expected
       allOrderIds(ord1.senderPublicKey) shouldBe expected
 
       activeOrderIdsByPair(ord1.senderPublicKey, pair) shouldBe expected
       allOrderIdsByPair(ord1.senderPublicKey, pair) shouldBe expected
-    }
-  }
-
-  ignore("allowed add, then cancel, then add the same order") {
-    val pair = AssetPair(mkAssetId("Alice"), None)
-
-    val counter   = sell(pair, 200000000L, 100, matcherFee = Some(300000))
-    val submitted = buy(pair, 200000000L, 130, matcherFee = Some(300000))
-
-    oh.processAll(OrderAdded(LimitOrder(counter)), OrderCanceled(LimitOrder(counter), unmatchable = false), OrderAdded(LimitOrder(counter)))
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.processAll(exec, OrderAdded(exec.submittedRemaining))
-
-    oh.orderInfo(submitted.id()).status shouldBe LimitOrder.PartiallyFilled(100)
-
-    withClue("orders list of counter owner") {
-      activeOrderIds(counter.senderPublicKey) shouldBe empty
-      allOrderIds(counter.senderPublicKey) shouldBe Seq(counter.id())
-
-      activeOrderIdsByPair(counter.senderPublicKey, pair) shouldBe empty
-      allOrderIdsByPair(counter.senderPublicKey, pair) shouldBe Seq(counter.id())
-    }
-
-    withClue("orders list of submitted owner") {
-      val expected = Seq(submitted.id())
-
-      println("before")
-      activeOrderIds(submitted.senderPublicKey) shouldBe expected
-      allOrderIds(submitted.senderPublicKey) shouldBe expected
-
-      activeOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe expected
-      allOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe expected
     }
   }
 
@@ -262,7 +229,6 @@ class OrderHistorySpecification
 
     withClue("orders list of submitted owner") {
       activeOrderIds(submitted.senderPublicKey) shouldBe empty
-      println("before")
       allOrderIds(submitted.senderPublicKey) shouldBe Seq(submitted.id())
 
       activeOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe empty
@@ -288,9 +254,6 @@ class OrderHistorySpecification
     exec.executedAmount shouldBe 420169L
 
     oh.process(exec)
-    // see OrderBookActor.handleMatchEvent
-    // oh.process(OrderAdded(exec.submittedRemaining)) ??????
-
     val counterOrderInfo = oh.orderInfo(counter.id())
     withClue(s"counter.order.id=${submitted.id()}") {
       counterOrderInfo.filled shouldBe exec.executedAmount
@@ -300,7 +263,6 @@ class OrderHistorySpecification
       exec.counterRemainingAmount shouldBe counterOrderInfo.remaining
 
       exec.counterRemainingFee shouldBe 150001L
-      println(counterOrderInfo)
       exec.counterRemainingFee shouldBe counterOrderInfo.remainingFee
 
       counterOrderInfo.status shouldBe LimitOrder.PartiallyFilled(exec.executedAmount)
@@ -315,6 +277,9 @@ class OrderHistorySpecification
       exec.submittedRemainingFee shouldBe 3781L
       submittedOrderInfo.status shouldBe LimitOrder.Filled(exec.executedAmount)
     }
+
+    // see OrderBookActor.handleMatchEvent
+    oh.process(OrderAdded(exec.submittedRemaining))
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       val remainingSpend = counter.amount - counterOrderInfo.totalSpend(LimitOrder(counter))
@@ -431,7 +396,6 @@ class OrderHistorySpecification
 
     val counterInfo2 = oh.orderInfo(counter.id())
     withClue(s"counter: ${counter.id()}") {
-      println(s"counterInfo2: $counterInfo2, exec2.counterRemainingAmount: ${exec2.counterRemainingAmount}")
       exec2.counterRemainingAmount shouldBe counterInfo2.remaining
       oh.orderInfo(counter.id()).status shouldBe LimitOrder.Filled(100000000)
     }

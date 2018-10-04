@@ -12,35 +12,22 @@ import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.Order.Id
 
-class ActiveOrdersIndex(address: Address, elementsLimit: Int) {
-  def add(rw: RW, pair: AssetPair, id: Id): Either[String, Unit] = {
-    val size = rw.get(sizeKey).getOrElse(0)
-    println(s"ActiveOrdersIndex: size: $size")
-    if (size >= elementsLimit) Left(s"The maximum orders limit of $size orders has been reached")
-    else {
-      val newestIdx        = rw.get(newestIdxKey)
-      val updatedNewestIdx = newestIdx.getOrElse(0) + 1
+class ActiveOrdersIndex(address: Address, maxElements: Int) {
+  def add(rw: RW, pair: AssetPair, id: Id): Unit = {
+    val newestIdx        = rw.get(newestIdxKey)
+    val updatedNewestIdx = newestIdx.getOrElse(0) + 1
 
-      // A new order
-      rw.put(nodeKey(updatedNewestIdx), Node(newestIdx, (pair, id), None))
-      rw.put(orderIdxKey(id), Some(updatedNewestIdx))
+    // A new order
+    rw.put(nodeKey(updatedNewestIdx), Node(newestIdx, (pair, id), None))
+    rw.put(orderIdxKey(id), Some(updatedNewestIdx))
 
-      println(
-        s"rw.put(nodeKey($updatedNewestIdx), Node($newestIdx, ($pair, $id), None))" +
-          s"rw.put(orderIdxKey($id), $updatedNewestIdx)")
+    // A previous order in the index
+    newestIdx.foreach(idx => rw.update(nodeKey(idx))(_.copy(newerIdx = Some(updatedNewestIdx))))
 
-      // A previous order in the index
-      newestIdx.foreach(idx =>
-        rw.update(nodeKey(idx)) { x =>
-          val r = x.copy(newerIdx = Some(updatedNewestIdx))
-          println(s"$idx -> $r")
-          r
-      })
-
-      rw.put(newestIdxKey, Some(updatedNewestIdx))
-      println(s"updatedNewestIdx: $updatedNewestIdx")
-      rw.put(sizeKey, Some(size + 1))
-      Right(())
+    rw.put(newestIdxKey, Some(updatedNewestIdx))
+    rw.update(sizeKey) { orig =>
+      val size = orig.getOrElse(0)
+      Some(size + 1)
     }
   }
 
@@ -64,12 +51,13 @@ class ActiveOrdersIndex(address: Address, elementsLimit: Int) {
     }
   }
 
+  def size(ro: ReadOnlyDB): Int = ro.get(sizeKey).getOrElse(0)
+
   def iterator(ro: ReadOnlyDB): Iterator[NodeContent] = {
     val newestIdx = ro.get(newestIdxKey)
     val latest    = newestIdx.map(idx => ro.get(nodeKey(idx)))
-    println(s"iterator: newestIdx: $newestIdx, latest: $latest")
     new NodeIterator(ro, latest)
-      .take(math.min(elementsLimit, ro.get(sizeKey).getOrElse(0)))
+      .take(math.min(maxElements, ro.get(sizeKey).getOrElse(0)))
       .map(_.elem)
   }
 
@@ -79,15 +67,10 @@ class ActiveOrdersIndex(address: Address, elementsLimit: Int) {
   private def orderIdxKey(id: Id): Key[Option[Index]] = MatcherKeys.activeOrderSeqNr(address, id)
 
   private class NodeIterator(ro: ReadOnlyDB, private var currNode: Option[Node]) extends Iterator[Node] {
-    override def hasNext: Boolean = {
-      println(s"hasNext: $currNode")
-      currNode.nonEmpty
-    }
+    override def hasNext: Boolean = currNode.nonEmpty
     override def next(): Node = currNode match {
       case Some(r) =>
         currNode = r.olderIdx.map(idx => ro.get(nodeKey(idx)))
-        println(s"next: ${r.olderIdx} ->  $currNode")
-        println(s"return: $r")
         r
       case None => throw new IllegalStateException("hasNext = false")
     }
@@ -98,10 +81,10 @@ object ActiveOrdersIndex {
   type NodeContent = (AssetPair, Id)
   type Index       = Int
 
-  case class Node(olderIdx: Option[Index], elem: (AssetPair, Id), newerIdx: Option[Index]) // can we read a previous with iterator?
+  // TODO: We could read the previous and next records by iterator, so newerIdx is not required
+  case class Node(olderIdx: Option[Index], elem: (AssetPair, Id), newerIdx: Option[Index])
   object Node {
     def read(xs: Array[Byte]): Node = {
-//      println(s"read: ${xs.mkString("|")}")
       val bb = ByteBuffer.wrap(xs)
       Node(indexFromBytes(bb), (assetPairFromBytes(bb), orderIdFromBytes(bb)), indexFromBytes(bb))
     }
@@ -120,7 +103,6 @@ object ActiveOrdersIndex {
       case 1 =>
         val bytes = new Array[Byte](crypto.DigestSize)
         bb.get(bytes)
-//        println(s"assetIdFromBytes: ${ByteStr(bytes)}")
         Some(ByteStr(bytes))
     }
 
@@ -130,11 +112,7 @@ object ActiveOrdersIndex {
       ByteStr(bytes)
     }
 
-    def write(x: Node): Array[Byte] = {
-      val r = indexToBytes(x.olderIdx) ++ toBytes(x.elem) ++ indexToBytes(x.newerIdx)
-//      println(s"write: ${r.mkString("|")}")
-      r
-    }
+    def write(x: Node): Array[Byte] = indexToBytes(x.olderIdx) ++ toBytes(x.elem) ++ indexToBytes(x.newerIdx)
 
     private def indexToBytes(x: Option[Index]): Array[Byte] = x.fold(Array[Byte](0))(x => (1: Byte) +: Ints.toByteArray(x))
     private def toBytes(x: Option[AssetId]): Array[Byte]    = x.fold(Array[Byte](0))(x => (1: Byte) +: x.arr)

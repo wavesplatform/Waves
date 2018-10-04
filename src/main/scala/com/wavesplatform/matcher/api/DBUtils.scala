@@ -14,12 +14,43 @@ import scala.collection.mutable
 object DBUtils {
   import OrderInfo.orderStatusOrdering
 
+  object indexes {
+    object active {
+      val MaxElements = 200
+
+      def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit                  = c(address).add(rw, pair, id)
+      def delete(rw: RW, address: Address, id: Order.Id): Unit                                = c(address).delete(rw, id)
+      def size(ro: ReadOnlyDB, address: Address): Int                                         = c(address).size(ro)
+      def iterator(ro: ReadOnlyDB, address: Address): Iterator[ActiveOrdersIndex.NodeContent] = c(address).iterator(ro)
+
+      private def c(address: Address) = new ActiveOrdersIndex(address, MaxElements)
+    }
+
+    object finalized {
+      object common {
+        def add(rw: RW, address: Address, id: Order.Id): Unit              = add(rw, address, List(id))
+        def add(rw: RW, address: Address, ids: Seq[Order.Id]): Unit        = c(address).add(rw, ids)
+        def iterator(ro: ReadOnlyDB, address: Address): Iterator[Order.Id] = c(address).iterator(ro)
+
+        private def c(address: Address) = new FinalizedOrdersCommonIndex(address, 100)
+      }
+
+      object pair {
+        def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit              = add(rw, address, pair, List(id))
+        def add(rw: RW, address: Address, pair: AssetPair, ids: Seq[Order.Id]): Unit        = c(address, pair).add(rw, ids)
+        def iterator(ro: ReadOnlyDB, address: Address, pair: AssetPair): Iterator[Order.Id] = c(address, pair).iterator(ro)
+
+        private def c(address: Address, pair: AssetPair) = new FinalizedOrdersPairIndex(address, pair, 100)
+      }
+    }
+  }
+
   def ordersByAddressAndPair(db: DB, address: Address, pair: AssetPair, maxOrders: Int): IndexedSeq[(Order, OrderInfo)] = db.readOnly { ro =>
     mergeOrders(
       ro,
       maxOrders,
-      activeIndex = new ActiveOrdersIndex(address, 200).iterator(ro).collect { case (`pair`, id) => id },
-      nonActiveIndex = new FinalizedOrdersPairIndex(address, pair, 100).iterator(ro)
+      activeIndex = indexes.active.iterator(ro, address).collect { case (`pair`, id) => id },
+      nonActiveIndex = indexes.finalized.pair.iterator(ro, address, pair)
     )
   }
 
@@ -30,8 +61,8 @@ object DBUtils {
     mergeOrders(
       ro,
       maxOrders,
-      activeIndex = new ActiveOrdersIndex(address, 200).iterator(ro).map { case (_, id) => id },
-      nonActiveIndex = if (activeOnly) Iterator.empty else new FinalizedOrdersCommonIndex(address, 100).iterator(ro)
+      activeIndex = indexes.active.iterator(ro, address).map { case (_, id) => id },
+      nonActiveIndex = if (activeOnly) Iterator.empty else indexes.finalized.common.iterator(ro, address)
     )
   }
 
@@ -42,7 +73,6 @@ object DBUtils {
     def get(id: Order.Id): (Option[Order], Option[OrderInfo]) = (ro.get(MatcherKeys.order(id)), ro.get(MatcherKeys.orderInfoOpt(id)))
 
     val active = activeIndex.take(maxOrders).map(get).collect { case (Some(o), Some(oi)) => (o, oi) }.toIndexedSeq
-    println(s"active (size=${active.size}): ${active.mkString(", ")}")
 
     val nonActive = nonActiveIndex
     // .take(maxOrders - active.size)
@@ -50,7 +80,6 @@ object DBUtils {
       .collect { case (Some(o), Some(oi)) => (o, oi) }
       .take(maxOrders - active.size)
       .toVector
-    println(s"nonActive (size=${nonActive.size}, took ${maxOrders - active.size}): ${nonActive.mkString(", ")}, nonActive: $nonActive")
 
     val d = mutable.Set.empty[Order.Id]
     (active ++ nonActive)

@@ -227,7 +227,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       addressId
     }
 
-    val changedAddresses = (addressTransactions.keys ++ updatedBalanceAddresses)
+    val changedAddresses = addressTransactions.keys ++ updatedBalanceAddresses
 
     if (newAddressesForWaves.nonEmpty) {
       val newSeqNr = rw.get(Keys.addressesForWavesSeqNr) + 1
