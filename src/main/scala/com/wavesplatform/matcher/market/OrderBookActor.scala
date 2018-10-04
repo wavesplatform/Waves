@@ -8,7 +8,7 @@ import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.MatcherActor.{Shutdown, ShutdownComplete}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
-import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated}
+import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
@@ -354,6 +354,18 @@ class OrderBookActor(assetPair: AssetPair,
     case RecoveryCompleted =>
       updateSnapshot(orderBook)
       log.debug(s"Recovery completed: $orderBook")
+
+      if (settings.recoverOrderHistory) {
+        val orders = (orderBook.asks.valuesIterator ++ orderBook.bids.valuesIterator).flatten
+        if (orders.nonEmpty) {
+          val ids = orders.map { limitOrder =>
+            context.system.eventStream.publish(OrderAdded(limitOrder))
+            limitOrder.order.id()
+          }.toSeq
+
+          log.info(s"Recovering an order history for orders: ${ids.mkString(", ")}")
+        }
+      }
 
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
       lastSnapshotSequenceNr = metadata.sequenceNr
