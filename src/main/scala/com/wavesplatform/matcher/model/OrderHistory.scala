@@ -17,41 +17,43 @@ import kamon.Kamon
 import org.iq80.leveldb.DB
 
 class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
+  import DBUtils.indexes
   import OrderHistory._
   import com.wavesplatform.matcher.MatcherKeys._
-  import DBUtils.indexes
 
   private val timer               = Kamon.timer("matcher.order-history.impl")
   private val saveOpenVolumeTimer = timer.refine("action" -> "save-open-volume")
   private val saveOrderInfoTimer  = timer.refine("action" -> "save-order-info")
   private val openVolumeTimer     = timer.refine("action" -> "open-volume")
 
-  private def saveOrderInfo(rw: RW, event: OrderAdded): Unit = saveOrderInfoTimer.measure {
-    val order    = event.order.order
-    val orderId  = order.id()
-    val origInfo = rw.get(MatcherKeys.orderInfoOpt(orderId))
-    if (!origInfo.exists(_.status.isFinal)) {
-      val change = OrderInfoChange(
-        order = order,
-        origInfo = origInfo,
-        updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(minAmount = Some(event.order.minAmountOfAmountAsset))
-      )
+  def process(event: OrderAdded): Unit = saveOrderInfoTimer.measure {
+    db.readWrite { rw =>
+      val order    = event.order.order
+      val orderId  = order.id()
+      val origInfo = rw.get(MatcherKeys.orderInfoOpt(orderId))
+      if (!origInfo.exists(_.status.isFinal)) {
+        val change = OrderInfoChange(
+          order = order,
+          origInfo = origInfo,
+          updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(minAmount = Some(event.order.minAmountOfAmountAsset))
+        )
 
-      log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
-      saveOpenVolume(rw, diff(List(change)))
+        log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
+        saveOpenVolume(rw, diff(List(change)))
 
-      if (change.origInfo.isEmpty) saveOrder(rw, change.order)
-      rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
+        if (change.origInfo.isEmpty) rw.put(MatcherKeys.order(order.id()), Some(order))
+        rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
 
-      indexes.active.add(rw, order.senderPublicKey.toAddress, order.assetPair, orderId)
+        indexes.active.add(rw, order.senderPublicKey.toAddress, order.assetPair, orderId)
+      }
     }
   }
 
-  private def saveOrderInfo(rw: RW, event: OrderExecuted): Unit = {
-    def origInfo(lo: LimitOrder): Option[OrderInfo] = rw.get(MatcherKeys.orderInfoOpt(lo.order.id()))
-    def wasActive(x: Option[OrderInfo]): Boolean    = !x.exists(_.status.isFinal)
+  def process(event: OrderExecuted): Unit = saveOrderInfoTimer.measure {
+    db.readWrite { rw =>
+      def origInfo(lo: LimitOrder): Option[OrderInfo] = rw.get(MatcherKeys.orderInfoOpt(lo.order.id()))
+      def wasActive(x: Option[OrderInfo]): Boolean    = !x.exists(_.status.isFinal)
 
-    saveOrderInfoTimer.measure {
       lazy val counterOrigInfo   = origInfo(event.counterExecuted)
       lazy val submittedOrigInfo = origInfo(event.submittedExecuted)
 
@@ -85,27 +87,29 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     }
   }
 
-  private def saveOrderInfo(rw: RW, event: OrderCanceled): Unit = saveOrderInfoTimer.measure {
-    val order    = event.limitOrder.order
-    val orderId  = order.id()
-    val origInfo = rw.get(MatcherKeys.orderInfoOpt(orderId))
-    if (!origInfo.exists(_.status.isFinal)) {
-      val change = OrderInfoChange(
-        order = order,
-        origInfo = origInfo,
-        updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(canceledByUser = Some(!event.unmatchable))
-      )
+  def process(event: OrderCanceled): Unit = saveOrderInfoTimer.measure {
+    db.readWrite { rw =>
+      val order    = event.limitOrder.order
+      val orderId  = order.id()
+      val origInfo = rw.get(MatcherKeys.orderInfoOpt(orderId))
+      if (!origInfo.exists(_.status.isFinal)) {
+        val change = OrderInfoChange(
+          order = order,
+          origInfo = origInfo,
+          updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(canceledByUser = Some(!event.unmatchable))
+        )
 
-      log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
-      saveOpenVolume(rw, diff(List(change)))
+        log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
+        saveOpenVolume(rw, diff(List(change)))
 
-      rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
-      if (change.origInfo.isEmpty) saveOrder(rw, change.order)
+        rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
+        if (change.origInfo.isEmpty) rw.put(MatcherKeys.order(order.id()), Some(order))
 
-      val address = order.senderPublicKey.toAddress
-      indexes.active.delete(rw, address, orderId)
-      indexes.finalized.common.add(rw, address, orderId)
-      indexes.finalized.pair.add(rw, address, order.assetPair, orderId)
+        val address = order.senderPublicKey.toAddress
+        indexes.active.delete(rw, address, orderId)
+        indexes.finalized.common.add(rw, address, orderId)
+        indexes.finalized.pair.add(rw, address, order.assetPair, orderId)
+      }
     }
   }
 
@@ -153,17 +157,10 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     }
   }
 
-  private def saveOrder(rw: RW, order: Order): Unit = rw.put(MatcherKeys.order(order.id()), Some(order))
-
-  def process(event: OrderAdded): Unit    = db.readWrite(saveOrderInfo(_, event))
-  def process(event: OrderExecuted): Unit = db.readWrite(saveOrderInfo(_, event))
-  def process(event: OrderCanceled): Unit = db.readWrite(saveOrderInfo(_, event))
-
-  def has(id: Order.Id): Boolean         = db.get(MatcherKeys.orderInfoOpt(id)).nonEmpty
   def orderInfo(id: Order.Id): OrderInfo = DBUtils.orderInfo(db, id)
   def order(id: Order.Id): Option[Order] = DBUtils.order(db, id)
 
-  def activeOrders(address: Address): Int = {
+  def activeOrderCount(address: Address): Int = {
     val key = MatcherKeys.activeOrdersSize(address)
     key.parse(db.get(key.keyBytes)).getOrElse(0)
   }

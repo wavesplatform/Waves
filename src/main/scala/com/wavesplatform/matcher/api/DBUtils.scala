@@ -2,14 +2,12 @@ package com.wavesplatform.matcher.api
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, RW, ReadOnlyDB}
-import com.wavesplatform.matcher.{ActiveOrdersIndex, FinalizedOrdersCommonIndex, FinalizedOrdersPairIndex, MatcherKeys}
 import com.wavesplatform.matcher.model.OrderInfo
+import com.wavesplatform.matcher.{ActiveOrdersIndex, FinalizedOrdersCommonIndex, FinalizedOrdersPairIndex, MatcherKeys}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.iq80.leveldb.DB
-
-import scala.collection.mutable
 
 object DBUtils {
   import OrderInfo.orderStatusOrdering
@@ -50,7 +48,7 @@ object DBUtils {
       ro,
       maxOrders,
       activeIndex = indexes.active.iterator(ro, address).collect { case (`pair`, id) => id },
-      nonActiveIndex = indexes.finalized.pair.iterator(ro, address, pair)
+      finalizedIndex = indexes.finalized.pair.iterator(ro, address, pair)
     )
   }
 
@@ -62,34 +60,25 @@ object DBUtils {
       ro,
       maxOrders,
       activeIndex = indexes.active.iterator(ro, address).map { case (_, id) => id },
-      nonActiveIndex = if (activeOnly) Iterator.empty else indexes.finalized.common.iterator(ro, address)
+      finalizedIndex = if (activeOnly) Iterator.empty else indexes.finalized.common.iterator(ro, address)
     )
   }
 
   private def mergeOrders(ro: ReadOnlyDB,
                           maxOrders: Int,
                           activeIndex: Iterator[Order.Id],
-                          nonActiveIndex: Iterator[Order.Id]): IndexedSeq[(Order, OrderInfo)] = {
+                          finalizedIndex: Iterator[Order.Id]): IndexedSeq[(Order, OrderInfo)] = {
     def get(id: Order.Id): (Option[Order], Option[OrderInfo]) = (ro.get(MatcherKeys.order(id)), ro.get(MatcherKeys.orderInfoOpt(id)))
 
     val active = activeIndex.take(maxOrders).map(get).collect { case (Some(o), Some(oi)) => (o, oi) }.toIndexedSeq
 
-    val nonActive = nonActiveIndex
-    // .take(maxOrders - active.size)
+    val nonActive = finalizedIndex
       .map(get)
       .collect { case (Some(o), Some(oi)) => (o, oi) }
       .take(maxOrders - active.size)
       .toVector
 
-    val d = mutable.Set.empty[Order.Id]
-    (active ++ nonActive)
-      .filter {
-        case (o, _) =>
-          val isNew = !d.contains(o.id())
-          if (isNew) d.add(o.id())
-          isNew
-      }
-      .sortBy { case (order, info) => (info.status, -order.timestamp) }
+    (active ++ nonActive).sortBy { case (order, info) => (info.status, -order.timestamp) }
   }
 
   def reservedBalance(db: DB, address: Address): Map[Option[AssetId], Long] = db.readOnly { ro =>

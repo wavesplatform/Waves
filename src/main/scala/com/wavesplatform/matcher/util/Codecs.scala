@@ -4,7 +4,6 @@ import java.nio.ByteBuffer
 
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 object Codecs {
   def len(assetId: Option[AssetId]): Int = assetId.fold(1)(1 + _.arr.length)
@@ -24,8 +23,5 @@ object Codecs {
         b.get(arr)
         Some(ByteStr(arr))
     }
-
-    def putAssetPair(x: AssetPair): ByteBuffer = putAssetId(x.amountAsset).putAssetId(x.priceAsset)
-    def getAssetPair: AssetPair                = AssetPair(getAssetId, getAssetId)
   }
 }

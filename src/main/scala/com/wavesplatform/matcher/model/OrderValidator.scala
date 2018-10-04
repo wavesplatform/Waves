@@ -59,8 +59,8 @@ trait OrderValidator {
             order.signaturesValid().isRight :| "signature should be valid" &&
             order.isValid(NTP.correctedTime()) &&
             (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
-            !orderHistory.has(order.id()) :| "Order was placed before" &&
-            (orderHistory.activeOrders(order.senderPublicKey) < MaxElements) :| s"Limit of $MaxElements active orders has been reached" &&
+            (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order was placed before" &&
+            (orderHistory.activeOrderCount(order.senderPublicKey) < MaxElements) :| s"Limit of $MaxElements active orders has been reached" &&
             isBalanceWithOpenOrdersEnough(order)
         Either
           .cond(v, order, GenericError(v.messages()))

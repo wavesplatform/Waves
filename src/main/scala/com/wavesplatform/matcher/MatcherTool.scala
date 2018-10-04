@@ -294,7 +294,7 @@ object MatcherTool extends ScorexLogging {
         } else {
           val xs = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), activeOnly = true, Int.MaxValue)
           println(s"""${xs.map { case (o, oi) => s"id: ${o.id()}\n  $o\n  $oi" }.mkString("\n")}""")
-          println(s"""Total orders: ${db.get(MatcherKeys.addressOrdersSeqNr(address))}""".stripMargin)
+          println(s"""Total active orders: ${db.get(MatcherKeys.activeOrdersSize(address))}""".stripMargin)
         }
       case "cb" => recalculateReservedBalance(db)
       case "rb" =>
