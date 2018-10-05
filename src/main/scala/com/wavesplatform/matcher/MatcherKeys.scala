@@ -2,7 +2,7 @@ package com.wavesplatform.matcher
 
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
@@ -30,7 +30,7 @@ object MatcherKeys {
       o => o.version +: o.bytes()
     )
 
-  val OrderInfoPrefix = 2.toShort
+  val OrderInfoPrefix: Short = 2
 
   def orderInfoOpt(orderId: ByteStr): Key[Option[OrderInfo]] = Key.opt(
     "matcher-order-info-opt",
@@ -74,8 +74,14 @@ object MatcherKeys {
 
   def activeOrdersSeqNr(address: Address): Key[Option[Int]] =
     Key.opt("matcher-active-orders-seq-nr", bytes(3, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+
+  val ActiveOrdersPrefix: Short            = 4
+  val ActiveOrdersPrefixBytes: Array[Byte] = Shorts.toByteArray(ActiveOrdersPrefix)
   def activeOrders(address: Address, seqNr: Int): Key[ActiveOrdersIndex.Node] =
-    Key("matcher-active-orders", bytes(4, address.bytes.arr ++ Ints.toByteArray(seqNr)), ActiveOrdersIndex.Node.read, ActiveOrdersIndex.Node.write)
+    Key("matcher-active-orders",
+        bytes(ActiveOrdersPrefix, address.bytes.arr ++ Ints.toByteArray(seqNr)),
+        ActiveOrdersIndex.Node.read,
+        ActiveOrdersIndex.Node.write)
 
   def openVolume(address: Address, assetId: Option[AssetId]): Key[Option[Long]] =
     Key.opt("matcher-open-volume", bytes(5, address.bytes.arr ++ assetIdToBytes(assetId)), Longs.fromByteArray, Longs.toByteArray)
@@ -96,14 +102,19 @@ object MatcherKeys {
 
   def finalizedCommonSeqNr(address: Address): Key[Option[Int]] =
     Key.opt("matcher-finalized-common-seq-nr", bytes(13, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+
+  val FinalizedCommonPrefix: Short            = 14
+  val FinalizedCommonPrefixBytes: Array[Byte] = Shorts.toByteArray(FinalizedCommonPrefix)
   def finalizedCommon(address: Address, seqNr: Int): Key[Option[Order.Id]] =
-    Key.opt("matcher-finalized-common", bytes(14, address.bytes.arr ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
+    Key.opt("matcher-finalized-common", bytes(FinalizedCommonPrefix, address.bytes.arr ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
 
   def finalizedPairSeqNr(address: Address, pair: AssetPair): Key[Option[Int]] =
     Key.opt("matcher-finalized-pair-seq-nr", bytes(15, address.bytes.arr ++ pair.bytes), Ints.fromByteArray, Ints.toByteArray)
 
+  val FinalizedPairPrefix: Short            = 16
+  val FinalizedPairPrefixBytes: Array[Byte] = Shorts.toByteArray(FinalizedPairPrefix)
   def finalizedPair(address: Address, pair: AssetPair, seqNr: Int): Key[Option[Order.Id]] =
-    Key.opt("matcher-finalized-pair", bytes(16, address.bytes.arr ++ pair.bytes ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
+    Key.opt("matcher-finalized-pair", bytes(FinalizedPairPrefix, address.bytes.arr ++ pair.bytes ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
 
   def lastCommandTimestamp(address: Address): Key[Option[Long]] =
     Key.opt("matcher-last-command-timestamp", bytes(17, address.bytes.arr), Longs.fromByteArray, Longs.toByteArray)
