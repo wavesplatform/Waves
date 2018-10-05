@@ -33,7 +33,7 @@ case class OrderInfo(amount: Long,
     else if (canceledByUser.contains(true)) LimitOrder.Cancelled(filled)
     else if (canceledByUser.contains(false)) LimitOrder.Filled(filled)
     else if (filled == 0) LimitOrder.Accepted
-    else if (filled < amount - minAmount.getOrElse(0L)) LimitOrder.PartiallyFilled(filled)
+    else if (amount - filled >= minAmount.getOrElse(0L)) LimitOrder.PartiallyFilled(filled)
     else LimitOrder.Filled(filled)
   }
 
