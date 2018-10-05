@@ -15,7 +15,7 @@ object MatcherModel {
   type OrderId   = String
 }
 
-case class LevelAgg(price: Long, amount: Long)
+case class LevelAgg(amount: Long, price: Long)
 
 sealed trait LimitOrder {
   def price: Price

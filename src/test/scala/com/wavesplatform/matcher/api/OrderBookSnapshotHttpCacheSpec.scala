@@ -87,7 +87,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         withClue("asks size")(ob.asks.size shouldBe 2)
 
         def checkHasAggregatedAmount(x: LevelAgg): Unit = withClue(s"${x.price} should have the aggregated amount") {
-          x shouldBe LevelAgg(x.price, askLimitOrders(x.price).map(_.amount).sum)
+          x shouldBe LevelAgg(askLimitOrders(x.price).map(_.amount).sum, x.price)
         }
 
         ob.asks.foreach(checkHasAggregatedAmount)
@@ -117,7 +117,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         withClue("asks size")(ob.asks shouldBe empty)
 
         def checkHasAggregatedAmount(x: LevelAgg): Unit = withClue(s"${x.price} should have the aggregated amount") {
-          x shouldBe LevelAgg(x.price, bidLimitOrders(x.price).map(_.amount).sum)
+          x shouldBe LevelAgg(bidLimitOrders(x.price).map(_.amount).sum, x.price)
         }
 
         ob.bids.foreach(checkHasAggregatedAmount)
