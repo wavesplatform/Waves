@@ -55,11 +55,11 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
 object AssetPairBuilder {
   private def errorMsg(assetId: String) = s"Invalid Asset ID: $assetId"
 
-  implicit val assetIdOrdering: Ordering[Option[ByteStr]] = (price: Option[ByteStr], amount: Option[ByteStr]) =>
-    (price, amount) match {
+  implicit val assetIdOrdering: Ordering[Option[ByteStr]] = (amount: Option[ByteStr], price: Option[ByteStr]) =>
+    (amount, price) match {
       case (None, None)                           => 0
-      case (_, None)                              => 1
-      case (None, _)                              => -1
-      case (Some(ByteStr(b1)), Some(ByteStr(b2))) => ByteArray.compare(b1, b2)
+      case (None, _)                              => 1
+      case (_, None)                              => -1
+      case (Some(ByteStr(b1)), Some(ByteStr(b2))) => ByteArray.compare(b2, b1)
   }
 }
