@@ -32,7 +32,8 @@ class ActiveOrdersIndex(address: Address, maxElements: Int) {
   }
 
   def delete(rw: RW, id: Id): Unit = rw.get(orderIdxKey(id)).foreach { idx =>
-    val node = rw.get(nodeKey(idx))
+    val nk   = nodeKey(idx)
+    val node = rw.get(nk)
 
     node.olderIdx.foreach(idx => rw.update(nodeKey(idx))(_.copy(newerIdx = node.newerIdx)))
     node.newerIdx.foreach(idx => rw.update(nodeKey(idx))(_.copy(olderIdx = node.olderIdx)))
@@ -44,6 +45,7 @@ class ActiveOrdersIndex(address: Address, maxElements: Int) {
       }
     }
 
+    rw.delete(nk)
     rw.delete(orderIdxKey(id))
     rw.get(sizeKey).getOrElse(0) - 1 match {
       case x if x <= 0 => rw.delete(sizeKey)
