@@ -40,7 +40,7 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
 
       val setScriptId = i
         .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
-        .idsetScriptFee
+        .id
 
       nodes.waitForHeightAriseAndTxPresent(setScriptId)
       acc
