@@ -9,14 +9,12 @@ import scala.annotation.meta.field
 case class ConnectReq(@(ApiModelProperty @field)(
                         dataType = "string",
                         example = "127.0.0.1",
-                        required = true,
-                        //allowEmptyValue = false
+                        required = true
                       ) host: String,
                       @(ApiModelProperty @field)(
                         dataType = "integer",
                         example = "6868",
-                        required = true,
-                        //allowEmptyValue = false
+                        required = true
                       ) port: Int)
 
 object ConnectReq {
