@@ -75,7 +75,7 @@ trait MatcherTestData {
       timestamp: Long           <- timestamp.map(Gen.const).getOrElse(createdTimeGen)
       expiration: Long          <- maxTimeGen
       matcherFee: Long          <- matcherFee.map(Gen.const).getOrElse(maxWavesAmountGen)
-    } yield (Order.buy(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee), sender)
+    } yield (Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee), sender)
 
   def sellGenerator(pair: AssetPair,
                     price: Long,
@@ -88,7 +88,7 @@ trait MatcherTestData {
       timestamp: Long           <- timestamp.map(Gen.const).getOrElse(createdTimeGen)
       expiration: Long          <- maxTimeGen
       matcherFee: Long          <- matcherFee.map(Gen.const).getOrElse(maxWavesAmountGen)
-    } yield (Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee), sender)
+    } yield (Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee), sender)
 
   def buy(pair: AssetPair,
           price: BigDecimal,
@@ -141,7 +141,7 @@ trait MatcherTestData {
     timestamp: Long           <- createdTimeGen
     expiration: Long          <- maxTimeGen
     matcherFee: Long          <- maxWavesAmountGen
-  } yield BuyLimitOrder(amount, price, matcherFee, Order.buy(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
+  } yield BuyLimitOrder(amount, price, matcherFee, Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee))
 
   val sellLimitOrderGenerator: Gen[SellLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -151,6 +151,6 @@ trait MatcherTestData {
     timestamp: Long           <- createdTimeGen
     expiration: Long          <- maxTimeGen
     matcherFee: Long          <- maxWavesAmountGen
-  } yield SellLimitOrder(amount, price, matcherFee, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
+  } yield SellLimitOrder(amount, price, matcherFee, Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee))
 
 }

@@ -33,8 +33,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val mf1                 = 1
         val mf2                 = 2
 
-        val buy  = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, time, expirationTimestamp, mf1)
-        val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, time, expirationTimestamp, mf2)
+        val buy  = Order.buy(sender1, matcher, pair, buyAmount, buyPrice, time, expirationTimestamp, mf1)
+        val sell = Order.sell(sender2, matcher, pair, sellAmount, sellPrice, time, expirationTimestamp, mf2)
 
         def create(matcher: PrivateKeyAccount = sender1,
                    buyOrder: Order = buy,
@@ -107,12 +107,12 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val sellPrice           = (0.50 * Order.PriceConstant).toLong
         val mf                  = 300000L
 
-        val sell = Order.sell(sender2, matcher, pair, sellPrice, 2, time, expirationTimestamp, mf)
-        val buy  = Order.buy(sender1, matcher, pair, buyPrice, 1, time, expirationTimestamp, mf)
+        val sell = Order.sell(sender2, matcher, pair, 2, sellPrice, time, expirationTimestamp, mf)
+        val buy  = Order.buy(sender1, matcher, pair, 1, buyPrice, time, expirationTimestamp, mf)
 
         createExTx(buy, sell, sellPrice, matcher) shouldBe an[Right[_, _]]
 
-        val sell1 = Order.sell(sender1, matcher, pair, buyPrice, 1, time, time - 1, mf)
+        val sell1 = Order.sell(sender1, matcher, pair, 1, buyPrice, time, time - 1, mf)
         createExTx(buy, sell1, buyPrice, matcher) shouldBe Left(OrderValidationError(sell1, "expiration should be > currentTime"))
     }
   }

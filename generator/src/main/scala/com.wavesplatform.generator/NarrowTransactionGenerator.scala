@@ -135,9 +135,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             val matcher   = randomFrom(accounts).get
             val seller    = randomFrom(accounts).get
             val pair      = AssetPair(None, Some(tradeAssetIssue.id()))
-            val sellOrder = Order.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
+            val sellOrder = Order.sell(seller, matcher, pair, 1, 100000000, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
             val buyer     = randomFrom(accounts).get
-            val buyOrder  = Order.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
+            val buyOrder  = Order.buy(buyer, matcher, pair, 1, 100000000, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
             logOption(ExchangeTransaction.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThatStandartFee * 3, ts))
           case LeaseTransactionV1 =>
             val sender   = randomFrom(accounts).get

@@ -59,7 +59,7 @@ class Worker(workerSettings: Settings,
   def buyOrder(amount: Long, price: Long, buyer: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
     to(matcherSettings.endpoint).orderHistory(buyer)
     to(matcherSettings.endpoint).orderBook(pair)
-    val order = Order.buy(buyer, matcherPublicKey, pair, price, amount, now, now + 29.day.toMillis, fee)
+    val order = Order.buy(buyer, matcherPublicKey, pair, amount, price, now, now + 29.day.toMillis, fee)
     log.info(s"[$tag] Buy ${order.id()}: $order")
     val response = to(matcherSettings.endpoint).placeOrder(order).andThen {
       case Failure(e) => log.error(s"[$tag] Can't place buy order ${order.id()}: $e")
@@ -74,7 +74,7 @@ class Worker(workerSettings: Settings,
   def sellOrder(amount: Long, price: Long, seller: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
     to(matcherSettings.endpoint).orderHistory(seller)
     to(matcherSettings.endpoint).orderBook(pair)
-    val order = Order.sell(seller, matcherPublicKey, pair, price, amount, now, now + 29.day.toMillis, fee)
+    val order = Order.sell(seller, matcherPublicKey, pair, amount, price, now, now + 29.day.toMillis, fee)
     log.info(s"[$tag] Sell ${order.id()}: $order")
     val response = to(matcherSettings.endpoint).placeOrder(order).andThen {
       case Failure(e) => log.error(s"[$tag] Can't place sell order ${order.id()}: $e")
