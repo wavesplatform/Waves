@@ -7,6 +7,7 @@ import sbtassembly.MergeStrategy
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 scalafmtOnCompile in ThisBuild := true
+Global / cancelable := true
 
 val versionSource = Def.task {
   // WARNING!!!
@@ -59,6 +60,13 @@ fork in run := true
 javaOptions in run ++= Seq(
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind"
+)
+
+Test / fork := true
+Test / javaOptions ++= Seq(
+  "-XX:+IgnoreUnrecognizedVMOptions",
+  "--add-modules=java.xml.bind",
+  "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
 )
 
 val aopMerge: MergeStrategy = new MergeStrategy {
