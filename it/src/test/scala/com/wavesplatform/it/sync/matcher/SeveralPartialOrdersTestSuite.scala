@@ -126,7 +126,7 @@ class SeveralPartialOrdersTestSuite
     (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }
 
-  def receiveAmount(ot: OrderType, matchPrice: Long, matchAmount: Long): Long =
+  def receiveAmount(ot: OrderType, matchAmount: Long, matchPrice: Long): Long =
     if (ot == BUY) correctAmount(matchAmount, matchPrice)
     else {
       (BigInt(matchAmount) * matchPrice / Order.PriceConstant).bigInteger.longValueExact()
