@@ -100,7 +100,7 @@ class RoundingIssuesTestSuite
     withClue("orderBook check") {
       val ob = matcherNode.orderBook(wavesUsdPair)
       ob.bids shouldBe empty
-      ob.asks shouldBe List(LevelResponse(70L, 97142857L)) // = 100000000 - 2857143
+      ob.asks shouldBe List(LevelResponse(97142857L, 70L)) // = 100000000 - 2857143
     }
   }
 

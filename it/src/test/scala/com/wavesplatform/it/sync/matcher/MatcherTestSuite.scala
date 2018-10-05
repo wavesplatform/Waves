@@ -147,7 +147,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
         // Bob checks that the order in the order book
         val orders = matcherNode.orderBook(aliceWavesPair)
-        orders.asks should contain(LevelResponse(19.waves / 10 * Order.PriceConstant, 150))
+        orders.asks should contain(LevelResponse(150, 19.waves / 10 * Order.PriceConstant))
       }
 
       "buy order should match on few price levels" in {
@@ -196,7 +196,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
         // Alice checks that the order is in the order book
         val orders2 = matcherNode.orderBook(aliceWavesPair)
-        orders2.asks should contain(LevelResponse(20.waves / 10 * Order.PriceConstant, 100))
+        orders2.asks should contain(LevelResponse(100, 20.waves / 10 * Order.PriceConstant))
       }
 
       "buy order should execute all open orders and put remaining in order book" in {
@@ -213,7 +213,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
         // Check that remaining part of the order is in the order book
         val orders = matcherNode.orderBook(aliceWavesPair)
-        orders.bids should contain(LevelResponse(2.waves * Order.PriceConstant, 30))
+        orders.bids should contain(LevelResponse(30, 2.waves * Order.PriceConstant))
 
         // Check balances
         nodes.waitForHeightArise()

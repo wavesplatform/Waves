@@ -221,7 +221,7 @@ object PairResponse {
   implicit val pairResponseFormat: Format[PairResponse] = Json.format
 }
 
-case class LevelResponse(price: Long, amount: Long)
+case class LevelResponse(amount: Long, price: Long)
 object LevelResponse {
   implicit val levelResponseFormat: Format[LevelResponse] = Json.format
 }

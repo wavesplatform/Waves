@@ -74,7 +74,7 @@ class SeveralPartialOrdersTestSuite
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Accepted", 1.minute)
 
       val orderBook2 = matcherNode.orderBook(wavesUsdPair)
-      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.price, bobOrder2.amount))
+      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
 
       matcherNode.cancelOrder(bobNode, wavesUsdPair, Some(bobOrder2Id))
@@ -116,7 +116,7 @@ class SeveralPartialOrdersTestSuite
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Accepted", 1.minute)
 
       val orderBook2 = matcherNode.orderBook(wavesUsdPair)
-      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.price, bobOrder2.amount))
+      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
     }
   }
