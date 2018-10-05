@@ -210,7 +210,7 @@ class TradeBalanceAndRoundingTestSuite
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
 
       val executedAmount         = correctAmount(wctUsdBuyAmount, wctUsdPrice) // 142
-      val bobReceiveUsdAmount    = receiveAmount(SELL, wctUsdPrice, wctUsdBuyAmount)
+      val bobReceiveUsdAmount    = receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
       val expectedReservedBobWct = wctUsdSellAmount - executedAmount // 205 = 347 - 142
 
       matcherNode.reservedBalance(bobNode)(s"$WctId") shouldBe expectedReservedBobWct
