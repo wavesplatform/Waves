@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.model
 import cats.implicits._
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.api.DBUtils.indexes.active.MaxElements
 import com.wavesplatform.matcher.model.OrderHistory.OrderInfoChange
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
@@ -22,7 +23,7 @@ trait OrderValidator {
   val wallet: Wallet
 
   lazy val matcherPubKey: PublicKeyAccount = wallet.findPrivateKey(settings.account).explicitGet()
-  val MinExpiration                        = 60 * 1000L
+  val MinExpiration: Long                  = 60 * 1000L
 
   private val timer = Kamon.timer("matcher.validation")
 
@@ -33,7 +34,7 @@ trait OrderValidator {
 
     val change = OrderInfoChange(lo.order, None, OrderInfo(order.amount, 0L, None, None, order.matcherFee, Some(0L)))
     val newOrder = OrderHistory
-      .diff(Map(lo.order.id() -> change))
+      .diff(List(change))
       .getOrElse(order.senderPublicKey.toAddress, OpenPortfolio.empty)
 
     val open  = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
@@ -58,7 +59,8 @@ trait OrderValidator {
             order.signaturesValid().isRight :| "signature should be valid" &&
             order.isValid(NTP.correctedTime()) &&
             (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
-            (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order is already accepted" &&
+            (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order was placed before" &&
+            (orderHistory.activeOrderCount(order.senderPublicKey) < MaxElements) :| s"Limit of $MaxElements active orders has been reached" &&
             isBalanceWithOpenOrdersEnough(order)
         Either
           .cond(v, order, GenericError(v.messages()))
