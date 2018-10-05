@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{minFee, transferAmount}
+import com.wavesplatform.it.sync.{minFee, transferAmount, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
@@ -50,7 +50,7 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
 
     val script = ScriptV1(scriptText).explicitGet()
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), minFee, System.currentTimeMillis())
+      .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender
@@ -86,7 +86,7 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
     nodes.waitForHeightArise()
     nodes(0).findTransactionInfo(leasingId) shouldBe None
 
-    notMiner.assertBalances(firstAddress, balance1 + 10 * transferAmount - minFee, eff1 + 10 * transferAmount - minFee)
+    notMiner.assertBalances(firstAddress, balance1 + 10 * transferAmount - setScriptFee, eff1 + 10 * transferAmount - setScriptFee)
     notMiner.assertBalances(thirdAddress, balance2, eff2)
 
   }
