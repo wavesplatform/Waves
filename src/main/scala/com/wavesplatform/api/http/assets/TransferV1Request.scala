@@ -10,13 +10,13 @@ case class TransferV1Request(@(ApiModelProperty @field)(
                                dataType = "string",
                                example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
                                required = false,
-                               allowEmptyValue = true
+                               //allowEmptyValue = true
                              ) assetId: Option[String],
                              @(ApiModelProperty @field)(
                                dataType = "string",
                                example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
                                required = false,
-                               allowEmptyValue = true
+                               //allowEmptyValue = true
                              ) feeAssetId: Option[String],
                              @(ApiModelProperty @field)(dataType = "long", example = "300000000") amount: Long,
                              @(ApiModelProperty @field)(dataType = "integer", example = "100000") fee: Long,
@@ -24,7 +24,8 @@ case class TransferV1Request(@(ApiModelProperty @field)(
                              @(ApiModelProperty @field)(dataType = "string",
                                                         example = "Thank you for your kindness",
                                                         required = false,
-                                                        allowEmptyValue = true) attachment: Option[String],
+                                                        //allowEmptyValue = true
+                             ) attachment: Option[String],
                              @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") recipient: String,
                              @(ApiModelProperty @field)(dataType = "long", example = "1533832573000", required = false) timestamp: Option[Long] = None)
 
