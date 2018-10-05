@@ -76,7 +76,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
-    isValidAmount(price, amount) &&
+    isValidAmount(amount, price) &&
     assetPair.isValid &&
     (matcherFee > 0) :| "matcherFee should be > 0" &&
     (matcherFee < MaxAmount) :| "matcherFee too large" &&
@@ -85,14 +85,14 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     (expiration >= atTime) :| "expiration should be > currentTime"
   }
 
-  def isValidAmount(matchPrice: Long, matchAmount: Long): Validation = {
+  def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
     (matchAmount > 0) :| "amount should be > 0" &&
     (matchPrice > 0) :| "price should be > 0" &&
     (matchAmount < MaxAmount) :| "amount too large" &&
-    getSpendAmount(matchPrice, matchAmount).isRight :| "SpendAmount too large" &&
-    (getSpendAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-    getReceiveAmount(matchPrice, matchAmount).isRight :| "ReceiveAmount too large" &&
-    (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
+    getSpendAmount(matchAmount, matchPrice).isRight :| "SpendAmount too large" &&
+    (getSpendAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
+    getReceiveAmount(matchAmount, matchPrice).isRight :| "ReceiveAmount too large" &&
+    (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
   def toSign: Array[Byte] =
@@ -124,7 +124,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   }
 
   @ApiModelProperty(hidden = true)
-  def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
+  def getSpendAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
       if (orderType == OrderType.SELL) matchAmount
@@ -137,7 +137,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     }.toEither.left.map(x => GenericError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
+  def getReceiveAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       if (orderType == OrderType.BUY) matchAmount
       else {
