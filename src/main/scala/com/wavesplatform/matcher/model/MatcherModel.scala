@@ -38,14 +38,14 @@ sealed trait LimitOrder {
 
   def minAmountOfAmountAsset: Long         = minimalAmountOfAmountAssetByPrice(price)
   def amountOfPriceAsset: Long             = (BigDecimal(amount) * price / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
-  def amountOfAmountAsset: Long            = correctedAmountOfAmountAsset(price, amount)
-  def executionAmount(o: LimitOrder): Long = correctedAmountOfAmountAsset(o.price, amount)
+  def amountOfAmountAsset: Long            = correctedAmountOfAmountAsset(amount, price)
+  def executionAmount(o: LimitOrder): Long = correctedAmountOfAmountAsset(amount, o.price)
 
   def isValid: Boolean =
     amount > 0 && amount >= minAmountOfAmountAsset && amount < Order.MaxAmount && getSpendAmount > 0 && getReceiveAmount > 0
 
   protected def minimalAmountOfAmountAssetByPrice(p: Long): Long = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
-  protected def correctedAmountOfAmountAsset(p: Long, a: Long): Long = {
+  protected def correctedAmountOfAmountAsset(a: Long, p: Long): Long = {
     val settledTotal = (BigDecimal(p) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
     (BigDecimal(settledTotal) / p * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }
@@ -112,7 +112,7 @@ object LimitOrder {
     }
   }
 
-  def limitOrder(price: Long, remainingAmount: Long, remainingFee: Long, o: Order): LimitOrder = {
+  def limitOrder(remainingAmount: Long, price: Long, remainingFee: Long, o: Order): LimitOrder = {
     o.orderType match {
       case OrderType.BUY  => BuyLimitOrder(price, remainingAmount, remainingFee, o)
       case OrderType.SELL => SellLimitOrder(price, remainingAmount, remainingFee, o)
