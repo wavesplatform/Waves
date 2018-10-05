@@ -1,9 +1,11 @@
 package com.wavesplatform.matcher.api
 
+import cats.mtl.syntax.empty._
+import cats.syntax.functor._
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, RW, ReadOnlyDB}
+import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.model.OrderInfo
-import com.wavesplatform.matcher.{ActiveOrdersIndex, FinalizedOrdersCommonIndex, FinalizedOrdersPairIndex, MatcherKeys}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -16,10 +18,10 @@ object DBUtils {
     object active {
       val MaxElements = 200
 
-      def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit                  = c(address).add(rw, pair, id)
-      def delete(rw: RW, address: Address, id: Order.Id): Unit                                = c(address).delete(rw, id)
-      def size(ro: ReadOnlyDB, address: Address): Int                                         = c(address).size(ro)
-      def iterator(ro: ReadOnlyDB, address: Address): Iterator[ActiveOrdersIndex.NodeContent] = c(address).iterator(ro)
+      def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit                          = c(address).add(rw, pair, id)
+      def delete(rw: RW, address: Address, id: Order.Id): Unit                                        = c(address).delete(rw, id)
+      def size(ro: ReadOnlyDB, address: Address): Int                                                 = c(address).size(ro)
+      def iterator(ro: ReadOnlyDB, address: Address): ClosableIterable[ActiveOrdersIndex.NodeContent] = c(address).iterator(ro)
 
       private def c(address: Address) = new ActiveOrdersIndex(address, MaxElements)
     }
@@ -66,19 +68,23 @@ object DBUtils {
 
   private def mergeOrders(ro: ReadOnlyDB,
                           maxOrders: Int,
-                          activeIndex: Iterator[Order.Id],
+                          activeIndex: ClosableIterable[Order.Id],
                           finalizedIndex: Iterator[Order.Id]): IndexedSeq[(Order, OrderInfo)] = {
     def get(id: Order.Id): (Option[Order], Option[OrderInfo]) = (ro.get(MatcherKeys.order(id)), ro.get(MatcherKeys.orderInfoOpt(id)))
 
-    val active = activeIndex.take(maxOrders).map(get).collect { case (Some(o), Some(oi)) => (o, oi) }.toIndexedSeq
+    try {
+      val active = activeIndex.iterator.take(maxOrders).map(get).collect { case (Some(o), Some(oi)) => (o, oi) }.toIndexedSeq
 
-    val nonActive = finalizedIndex
-      .map(get)
-      .collect { case (Some(o), Some(oi)) => (o, oi) }
-      .take(maxOrders - active.size)
-      .toVector
+      val nonActive = finalizedIndex
+        .map(get)
+        .collect { case (Some(o), Some(oi)) => (o, oi) }
+        .take(maxOrders - active.size)
+        .toVector
 
-    (active ++ nonActive).sortBy { case (order, info) => (info.status, -order.timestamp) }
+      (active ++ nonActive).sortBy { case (order, info) => (info.status, -order.timestamp) }
+    } finally {
+      activeIndex.close()
+    }
   }
 
   def reservedBalance(db: DB, address: Address): Map[Option[AssetId], Long] = db.readOnly { ro =>

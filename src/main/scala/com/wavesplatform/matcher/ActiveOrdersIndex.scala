@@ -2,6 +2,7 @@ package com.wavesplatform.matcher
 
 import java.nio.ByteBuffer
 
+import cats.syntax.functor._
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
 import com.wavesplatform.crypto
@@ -11,18 +12,22 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.Order.Id
+import org.iq80.leveldb.DBIterator
 
 class ActiveOrdersIndex(address: Address, maxElements: Int) {
   def add(rw: RW, pair: AssetPair, id: Id): Unit = {
     val newestIdx        = rw.get(newestIdxKey)
-    val updatedNewestIdx = newestIdx.getOrElse(0) + 1
+    val updatedNewestIdx = newestIdx.getOrElse(Int.MinValue) - 1
 
     // A new order
-    rw.put(nodeKey(updatedNewestIdx), Node(newestIdx, (pair, id), None))
+    rw.put(nodeKey(updatedNewestIdx), Node((pair, id), None))
     rw.put(orderIdxKey(id), Some(updatedNewestIdx))
 
     // A previous order in the index
-    newestIdx.foreach(idx => rw.update(nodeKey(idx))(_.copy(newerIdx = Some(updatedNewestIdx))))
+    newestIdx.foreach { idx =>
+      val n = rw.get(nodeKey(idx))
+      rw.put(nodeKey(idx), n.copy(newerIdx = Some(updatedNewestIdx)))
+    }
 
     rw.put(newestIdxKey, Some(updatedNewestIdx))
     rw.update(sizeKey) { orig =>
@@ -35,13 +40,15 @@ class ActiveOrdersIndex(address: Address, maxElements: Int) {
     val nk   = nodeKey(idx)
     val node = rw.get(nk)
 
-    node.olderIdx.foreach(idx => rw.update(nodeKey(idx))(_.copy(newerIdx = node.newerIdx)))
-    node.newerIdx.foreach(idx => rw.update(nodeKey(idx))(_.copy(olderIdx = node.olderIdx)))
+    val olderNode = findOlder(rw, idx)
+    olderNode.foreach {
+      case (olderIdx, n) => rw.put(nodeKey(olderIdx), n.copy(newerIdx = node.newerIdx))
+    }
 
     if (node.newerIdx.isEmpty) {
-      node.olderIdx match {
+      findOlder(rw, idx) match {
         case None => rw.delete(newestIdxKey)
-        case x    => rw.put(newestIdxKey, x)
+        case x    => rw.put(newestIdxKey, x.map(_._1))
       }
     }
 
@@ -55,28 +62,42 @@ class ActiveOrdersIndex(address: Address, maxElements: Int) {
 
   def size(ro: ReadOnlyDB): Int = ro.get(sizeKey).getOrElse(0)
 
-  def iterator(ro: ReadOnlyDB): Iterator[NodeContent] = {
-    val newestIdx = ro.get(newestIdxKey)
-    val latest    = newestIdx.map(idx => ro.get(nodeKey(idx)))
-    new NodeIterator(ro, latest)
-      .take(math.min(maxElements, ro.get(sizeKey).getOrElse(0)))
-      .map(_.elem)
+  def iterator(ro: ReadOnlyDB): ClosableIterable[NodeContent] =
+    ro.get(newestIdxKey).fold(ClosableIterable.empty: ClosableIterable[NodeContent])(safeIterator(ro, _).map(_._2.elem))
+
+  private def findOlder(ro: ReadOnlyDB, thanIdx: Int): Option[(Index, Node)] = {
+    val iter = safeIterator(ro, latestIdx = thanIdx)
+    try {
+      iter.iterator.drop(1).find(_ => true)
+    } finally {
+      iter.close()
+    }
+  }
+
+  private def safeIterator(ro: ReadOnlyDB, latestIdx: Int): ClosableIterable[(Index, Node)] = new ClosableIterable[(Index, Node)] {
+    import MatcherKeys.ActiveOrdersPrefixBytes
+
+    private val internal = ro.iterator
+    internal.seek(nodeKey(latestIdx).keyBytes)
+
+    override val iterator: Iterator[(Index, Node)] = new NodeIterator(internal, ActiveOrdersPrefixBytes ++ address.bytes.arr)
+    override def close(): Unit                     = internal.close()
+  }
+
+  private class NodeIterator(iterator: DBIterator, prefix: Array[Byte]) extends Iterator[(Index, Node)] {
+    override def hasNext: Boolean = iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)
+    override def next(): (Index, Node) = {
+      val e   = iterator.next()
+      val idx = ByteBuffer.wrap(e.getKey).position(prefix.length).asInstanceOf[ByteBuffer].getInt()
+      val r   = Node.read(e.getValue)
+      (idx, r)
+    }
   }
 
   private val sizeKey: Key[Option[Index]]             = MatcherKeys.activeOrdersSize(address)
   private def nodeKey(idx: Index): Key[Node]          = MatcherKeys.activeOrders(address, idx)
   private val newestIdxKey: Key[Option[Index]]        = MatcherKeys.activeOrdersSeqNr(address)
   private def orderIdxKey(id: Id): Key[Option[Index]] = MatcherKeys.activeOrderSeqNr(address, id)
-
-  private class NodeIterator(ro: ReadOnlyDB, private var currNode: Option[Node]) extends Iterator[Node] {
-    override def hasNext: Boolean = currNode.nonEmpty
-    override def next(): Node = currNode match {
-      case Some(r) =>
-        currNode = r.olderIdx.map(idx => ro.get(nodeKey(idx)))
-        r
-      case None => throw new IllegalStateException("hasNext = false")
-    }
-  }
 }
 
 object ActiveOrdersIndex {
@@ -84,11 +105,11 @@ object ActiveOrdersIndex {
   type Index       = Int
 
   // TODO: We could read the previous and next records by iterator, so newerIdx is not required
-  case class Node(olderIdx: Option[Index], elem: (AssetPair, Id), newerIdx: Option[Index])
+  case class Node(elem: (AssetPair, Id), newerIdx: Option[Index])
   object Node {
     def read(xs: Array[Byte]): Node = {
       val bb = ByteBuffer.wrap(xs)
-      Node(indexFromBytes(bb), (assetPairFromBytes(bb), orderIdFromBytes(bb)), indexFromBytes(bb))
+      Node((assetPairFromBytes(bb), orderIdFromBytes(bb)), indexFromBytes(bb))
     }
 
     private def indexFromBytes(bb: ByteBuffer): Option[Index] = bb.get match {
@@ -114,7 +135,7 @@ object ActiveOrdersIndex {
       ByteStr(bytes)
     }
 
-    def write(x: Node): Array[Byte] = indexToBytes(x.olderIdx) ++ toBytes(x.elem) ++ indexToBytes(x.newerIdx)
+    def write(x: Node): Array[Byte] = toBytes(x.elem) ++ indexToBytes(x.newerIdx)
 
     private def indexToBytes(x: Option[Index]): Array[Byte] = x.fold(Array[Byte](0))(x => (1: Byte) +: Ints.toByteArray(x))
     private def toBytes(x: (AssetPair, Id)): Array[Byte]    = x._1.bytes ++ x._2.arr
