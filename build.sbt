@@ -52,7 +52,8 @@ inThisBuild(
 
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
-  Resolver.bintrayRepo("dnvriend", "maven")
+  Resolver.bintrayRepo("dnvriend", "maven"),
+  Resolver.sbtPluginRepo("releases")
 )
 
 fork in run := true
@@ -229,7 +230,8 @@ lazy val lang =
           Dependencies.monix.value ++
           Dependencies.scodec.value ++
           Dependencies.fastparse.value,
-      resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins")
+      resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
+      resolvers += Resolver.sbtPluginRepo("releases")
     )
     .jsSettings(
       scalaJSLinkerConfig ~= {
