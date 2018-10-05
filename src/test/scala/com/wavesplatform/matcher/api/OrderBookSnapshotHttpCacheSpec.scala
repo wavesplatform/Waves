@@ -55,7 +55,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         .containerOfN[Vector, Order](2, orderGen)
         .map { xs =>
           val r = xs.head +: xs.tail.map(_.copy(price = xs.head.price - 1))
-          r.map(x => SellLimitOrder(x.price, x.amount, x.matcherFee, x)).groupBy(_.price)
+          r.map(x => SellLimitOrder(x.amount, x.price, x.matcherFee, x)).groupBy(_.price)
         }
         .sample
         .get
@@ -64,7 +64,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         .containerOfN[Vector, Order](2, orderGen)
         .map { xs =>
           val r = xs.head +: xs.tail.map(_.copy(price = xs.head.price + 1))
-          r.map(x => BuyLimitOrder(x.price, x.amount, x.matcherFee, x)).groupBy(_.price)
+          r.map(x => BuyLimitOrder(x.amount, x.price, x.matcherFee, x)).groupBy(_.price)
         }
         .sample
         .get
@@ -209,7 +209,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     Gen
       .containerOfN[Vector, Order](10, orderGen)
       .map { xs =>
-        xs.map(x => BuyLimitOrder(x.price, x.amount, x.matcherFee, x)).groupBy(_.price)
+        xs.map(x => BuyLimitOrder(x.amount, x.price, x.matcherFee, x)).groupBy(_.price)
       }
       .sample
       .get
