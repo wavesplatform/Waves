@@ -36,7 +36,7 @@ object AssetBalance {
   implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
 }
 
-case class CompiledScript(script: String)
+case class CompiledScript(script: String, complexity: Long, extraFee: Long)
 object CompiledScript {
   implicit val compiledScriptFormat: Format[CompiledScript] = Json.format
 }

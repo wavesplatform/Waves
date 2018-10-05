@@ -18,7 +18,7 @@ case class MatcherSettings(enable: Boolean,
                            minOrderFee: Long,
                            orderMatchTxFee: Long,
                            dataDir: String,
-                           isMigrateToNewOrderHistoryStorage: Boolean,
+                           recoverOrderHistory: Boolean,
                            journalDataDir: String,
                            snapshotsDataDir: String,
                            snapshotsInterval: FiniteDuration,
@@ -60,7 +60,7 @@ object MatcherSettings {
     val blacklistedAddresses       = config.as[List[String]](s"$configPath.blacklisted-addresses")
     val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings](s"$configPath.order-book-snapshot-http-cache")
 
-    val isMigrateToNewOrderHistoryStorage = !new File(dataDirectory).exists()
+    val recoverOrderHistory = !new File(dataDirectory).exists()
 
     MatcherSettings(
       enabled,
@@ -70,7 +70,7 @@ object MatcherSettings {
       minOrderFee,
       orderMatchTxFee,
       dataDirectory,
-      isMigrateToNewOrderHistoryStorage,
+      recoverOrderHistory,
       journalDirectory,
       snapshotsDirectory,
       snapshotsInterval,
