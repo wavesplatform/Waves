@@ -60,8 +60,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
                  @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
                  assetPair: AssetPair,
                  @ApiModelProperty(dataType = "java.lang.String", example = "buy") orderType: OrderType,
-                 @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
                  @ApiModelProperty("Amount in AssetPair.second") amount: Long,
+                 @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
                  @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
                  @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
                  @ApiModelProperty(example = "100000") matcherFee: Long,
@@ -216,7 +216,7 @@ object Order {
           timestamp: Long,
           expiration: Long,
           matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Array())
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
@@ -229,7 +229,7 @@ object Order {
            timestamp: Long,
            expiration: Long,
            matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Array())
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
@@ -243,7 +243,7 @@ object Order {
             timestamp: Long,
             expiration: Long,
             matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Array())
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
@@ -277,8 +277,8 @@ object Order {
       matcher,
       AssetPair(amountAssetId.map(ByteStr(_)), priceAssetId.map(ByteStr(_))),
       OrderType(orderType),
-      price,
       amount,
+      price,
       timestamp,
       expiration,
       matcherFee,

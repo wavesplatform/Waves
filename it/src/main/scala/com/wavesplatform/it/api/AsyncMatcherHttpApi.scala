@@ -195,7 +195,7 @@ object AsyncMatcherHttpApi extends Assertions {
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = matcherNode.publicKey
       val unsigned =
-        Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, DefaultMatcherFee, Array())
+        Order(sender.publicKey, matcherPublicKey, pair, orderType, amount, price, creationTime, timeToLiveTimestamp, DefaultMatcherFee, Array())
       val signature = crypto.sign(sender.privateKey, unsigned.toSign)
       unsigned.copy(signature = signature)
     }
