@@ -10,6 +10,7 @@ package object sync {
   val issueFee                   = 1.waves
   val burnFee                    = 1.waves
   val sponsorFee                 = 1.waves
+  val setScriptFee               = 0.01.waves
   val transferAmount             = 10.waves
   val leasingAmount              = transferAmount
   val issueAmount                = transferAmount

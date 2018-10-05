@@ -60,7 +60,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     // set script
     val script = ScriptCompiler(scriptText).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, sender.privateKey, Some(script), minFee, System.currentTimeMillis())
+      .selfSigned(SetScriptTransaction.supportedVersions.head, sender.privateKey, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender

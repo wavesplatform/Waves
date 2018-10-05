@@ -50,7 +50,7 @@ class OrdersFromScriptedAccTestSuite
 
       val script = ScriptCompiler(scriptText).explicitGet()._1
       val setScriptTransaction = SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, bobNode.privateKey, Some(script), minFee, System.currentTimeMillis())
+        .selfSigned(SetScriptTransaction.supportedVersions.head, bobNode.privateKey, Some(script), setScriptFee, System.currentTimeMillis())
         .right
         .get
 
