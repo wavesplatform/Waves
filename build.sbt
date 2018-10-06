@@ -7,13 +7,14 @@ import sbtassembly.MergeStrategy
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 scalafmtOnCompile in ThisBuild := true
+Global / cancelable := true
 
 val versionSource = Def.task {
   // WARNING!!!
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 14, 5)
+  val FallbackVersion = (0, 15, 0)
 
   val versionFile      = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
@@ -60,6 +61,13 @@ fork in run := true
 javaOptions in run ++= Seq(
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind"
+)
+
+Test / fork := true
+Test / javaOptions ++= Seq(
+  "-XX:+IgnoreUnrecognizedVMOptions",
+  "--add-modules=java.xml.bind",
+  "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
 )
 
 val aopMerge: MergeStrategy = new MergeStrategy {

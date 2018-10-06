@@ -1,24 +1,18 @@
 package com.wavesplatform.it.sync.matcher
 
-import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
+import com.typesafe.config.{Config}
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
-import scala.util.{Random, Try}
+import scala.util.{Try}
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 
 class CancelOrderTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with NodesFromDocker with ReportingTestName {
@@ -46,10 +40,6 @@ class CancelOrderTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll
     matcherNode.orderHistoryByPair(bobNode, wavesUsdPair).filter(_.id == orderId).head.status shouldBe "Cancelled"
     matcherNode.orderBook(wavesUsdPair).bids shouldBe empty
     matcherNode.orderBook(wavesUsdPair).asks shouldBe empty
-
-    matcherNode.deleteOrder(bobNode, wavesUsdPair, Some(orderId))
-    matcherNode.orderStatus(orderId, wavesUsdPair, false).status shouldBe "NotFound"
-
   }
 
   "Alice and Bob trade WAVES-USD" - {
