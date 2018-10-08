@@ -23,10 +23,22 @@ package object db extends ScorexLogging {
     LevelDBFactory.factory.open(file, options)
   }
 
-  def prefixIterator[T](iterator: DBIterator, prefix: Array[Byte])(deserialize: util.Map.Entry[Array[Byte], Array[Byte]] => T): Iterator[T] =
+  type PrefixIterator[T] = (DBIterator, Array[Byte]) => (util.Map.Entry[Array[Byte], Array[Byte]] => T) => Iterator[T]
+
+  def prefixForwardIterator[T](iterator: DBIterator, prefix: Array[Byte])(deserialize: util.Map.Entry[Array[Byte], Array[Byte]] => T): Iterator[T] =
     new Iterator[T] {
       override def hasNext: Boolean = iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)
       override def next(): T        = deserialize(iterator.next())
+    }
+
+  def prefixBackwardIterator[T](iterator: DBIterator, prefix: Array[Byte])(deserialize: util.Map.Entry[Array[Byte], Array[Byte]] => T): Iterator[T] =
+    new Iterator[T] {
+      override def hasNext: Boolean = {
+        val r = iterator.hasPrev && iterator.peekPrev().getKey.startsWith(prefix)
+        println(s"hasNext: $r")
+        r
+      }
+      override def next(): T = deserialize(iterator.prev())
     }
 
 }

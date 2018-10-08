@@ -4,7 +4,7 @@ import cats.mtl.syntax.empty._
 import cats.syntax.functor._
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, RW, ReadOnlyDB}
-import com.wavesplatform.matcher._
+import com.wavesplatform.matcher.{ActiveOrdersIndex, _}
 import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
@@ -18,10 +18,10 @@ object DBUtils {
     object active {
       val MaxElements = 200
 
-      def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit                          = c(address).add(rw, pair, id)
-      def delete(rw: RW, address: Address, id: Order.Id): Unit                                        = c(address).delete(rw, id)
-      def size(ro: ReadOnlyDB, address: Address): Int                                                 = c(address).size(ro)
-      def iterator(ro: ReadOnlyDB, address: Address): ClosableIterable[ActiveOrdersIndex.NodeContent] = c(address).iterator(ro)
+      def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit                   = c(address).add(rw, pair, id)
+      def delete(rw: RW, address: Address, id: Order.Id): Unit                                 = c(address).delete(rw, id)
+      def size(ro: ReadOnlyDB, address: Address): Int                                          = c(address).size(ro)
+      def iterator(ro: ReadOnlyDB, address: Address): ClosableIterable[ActiveOrdersIndex.Node] = c(address).iterator(ro)
 
       private def c(address: Address) = new ActiveOrdersIndex(address, MaxElements)
     }
@@ -49,7 +49,7 @@ object DBUtils {
     mergeOrders(
       ro,
       maxOrders,
-      activeIndex = indexes.active.iterator(ro, address).collect { case (`pair`, id) => id },
+      activeIndex = indexes.active.iterator(ro, address).collect { case ActiveOrdersIndex.Node(`pair`, id) => id },
       finalizedIndex = indexes.finalized.pair.iterator(ro, address, pair)
     )
   }
@@ -61,7 +61,7 @@ object DBUtils {
     mergeOrders(
       ro,
       maxOrders,
-      activeIndex = indexes.active.iterator(ro, address).map { case (_, id) => id },
+      activeIndex = indexes.active.iterator(ro, address).map { case ActiveOrdersIndex.Node(_, id) => id },
       finalizedIndex = if (activeOnly) ClosableIterable.empty else indexes.finalized.common.iterator(ro, address)
     )
   }
