@@ -7,8 +7,6 @@ import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
 
-import scala.concurrent.duration._
-
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
   "MatcherSettings" should "read values" in {
     val config = loadConfig(ConfigFactory.parseString("""waves {
@@ -20,7 +18,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    port: 6886
         |    min-order-fee: 100000
         |    order-match-tx-fee: 100000
-        |    snapshots-interval: 1d
+        |    snapshots-interval: 999
         |    order-cleanup-interval: 5m
         |    rest-order-limit: 100
         |    price-assets: [
@@ -49,7 +47,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.orderMatchTxFee should be(100000)
     settings.journalDataDir should be("/waves/matcher/journal")
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
-    settings.snapshotsInterval should be(1.day)
+    settings.snapshotsInterval should be(999)
     settings.orderCleanupInterval should be(5.minute)
     settings.maxOrdersPerRequest should be(100)
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
