@@ -18,7 +18,7 @@ import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResp
 import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactionsByOrder
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor
-import com.wavesplatform.matcher.market.OrderHistoryActor.{DeleteOrderFromHistory, GetTradableBalance}
+import com.wavesplatform.matcher.market.OrderHistoryActor.GetTradableBalance
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.metrics.TimerExt
@@ -230,9 +230,10 @@ case class MatcherApiRoute(wallet: Wallet,
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/delete")
+  @Deprecated
   @ApiOperation(
     value = "Delete Order from History by Id",
-    notes = "Delete Order from History by Id if it's in terminal status (Filled, Cancel)",
+    notes = "This method is deprecated and doesn't work anymore. Please don't use it.",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json"
@@ -250,14 +251,8 @@ case class MatcherApiRoute(wallet: Wallet,
       )
     ))
   def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { p =>
-    withAssetPair(p) { pair =>
-      json[CancelOrderRequest] { req =>
-        if (req.isSignatureValid()) {
-          log.trace(s"Deleting ${req.orderId.fold(s"all orders for ${req.sender}")(_.base58)}")
-          (orderHistory ? DeleteOrderFromHistory(pair, req.sender, req.orderId, NTP.correctedTime()))
-            .mapTo[MatcherResponse]
-        } else InvalidSignature
-      }
+    json[CancelOrderRequest] { req =>
+      req.orderId.fold[MatcherResponse](NotImplemented("Batch order deletion is not supported yet"))(OrderDeleted)
     }
   }
 

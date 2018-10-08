@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
-import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.Node
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -107,20 +106,6 @@ object SyncMatcherHttpApi extends Assertions {
                     timestamp: Option[Long] = None,
                     waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).cancelOrder(sender, assetPair, orderId, timestamp), waitTime)
-
-    def deleteOrder(sender: Node,
-                    assetPair: AssetPair,
-                    orderId: Option[String],
-                    timestamp: Option[Long] = None,
-                    waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
-      deleteOrder(sender.privateKey, assetPair, orderId, timestamp, waitTime)
-
-    def deleteOrder(sender: PrivateKeyAccount,
-                    assetPair: AssetPair,
-                    orderId: Option[String],
-                    timestamp: Option[Long],
-                    waitTime: Duration): MatcherStatusResponse =
-      Await.result(async(m).deleteOrder(sender, assetPair, orderId, timestamp), waitTime)
 
     def cancelAllOrders(sender: Node, timestamp: Option[Long] = None, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).cancelAllOrders(sender, timestamp), waitTime)
