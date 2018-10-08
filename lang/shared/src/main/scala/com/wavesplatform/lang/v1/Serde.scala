@@ -73,6 +73,9 @@ object Serde {
   implicit class ByteBufferOps(val self: ByteBuffer) extends AnyVal {
     def getBytes: Array[Byte] = {
       val len   = self.getInt
+      if(self.limit() < len || len < 0) {
+         throw new Exception(s"Invalid array size ($len)")
+      }
       val bytes = new Array[Byte](len)
       self.get(bytes)
       bytes
