@@ -268,7 +268,7 @@ object Parser {
 
     P(
       Index ~~
-        letP.repX(1) ~/
+        letP.rep(min = 1) ~/
         Pass ~~
         (
           ("" ~ ";") ~/ (baseExpr | invalid).? |

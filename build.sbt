@@ -7,13 +7,14 @@ import sbtassembly.MergeStrategy
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 scalafmtOnCompile in ThisBuild := true
+Global / cancelable := true
 
 val versionSource = Def.task {
   // WARNING!!!
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 14, 5)
+  val FallbackVersion = (0, 15, 0)
 
   val versionFile      = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
@@ -52,13 +53,21 @@ inThisBuild(
 
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
-  Resolver.bintrayRepo("dnvriend", "maven")
+  Resolver.bintrayRepo("dnvriend", "maven"),
+  Resolver.sbtPluginRepo("releases")
 )
 
 fork in run := true
 javaOptions in run ++= Seq(
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind"
+)
+
+Test / fork := true
+Test / javaOptions ++= Seq(
+  "-XX:+IgnoreUnrecognizedVMOptions",
+  "--add-modules=java.xml.bind",
+  "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
 )
 
 val aopMerge: MergeStrategy = new MergeStrategy {
@@ -229,7 +238,8 @@ lazy val lang =
           Dependencies.monix.value ++
           Dependencies.scodec.value ++
           Dependencies.fastparse.value,
-      resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins")
+      resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
+      resolvers += Resolver.sbtPluginRepo("releases")
     )
     .jsSettings(
       scalaJSLinkerConfig ~= {
@@ -251,8 +261,9 @@ lazy val lang =
       scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
       developers := List(Developer("petermz", "Peter Zhelezniakov", "peterz@rambler.ru", url("https://wavesplatform.com"))),
       libraryDependencies ++= Seq(
-        "org.scala-js"                %% "scalajs-stubs" % "0.6.22" % "provided"
-      ) ++ Dependencies.logging.map(_ % "test") // scrypto logs an error if a signature verification was failed
+        "org.scala-js"                      %% "scalajs-stubs" % "0.6.22" % "provided",
+        "com.github.spullara.mustache.java" % "compiler" % "0.9.5"
+      ) ++ Dependencies.logging.map(_       % "test") // scrypto logs an error if a signature verification was failed
     )
 
 lazy val langJS  = lang.js

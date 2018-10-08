@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.minFee
+import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
@@ -40,7 +40,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
     ).explicitGet()
 
     val tx = sender.signedBroadcast(
-      SetScriptTransaction.selfSigned(1, acc2, Some(compiled), minFee, ts).explicitGet().json() +
+      SetScriptTransaction.selfSigned(1, acc2, Some(compiled), setScriptFee, ts).explicitGet().json() +
         ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
@@ -63,7 +63,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     val tx = sender.signAndBroadcast(
       SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), minFee, ts)
+        .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), setScriptFee, ts)
         .explicitGet()
         .json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
     nodes.waitForHeightAriseAndTxPresent(tx.id)

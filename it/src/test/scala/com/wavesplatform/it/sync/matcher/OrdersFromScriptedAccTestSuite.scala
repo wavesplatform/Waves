@@ -11,8 +11,8 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import play.api.libs.json.JsNumber
 
 import scala.concurrent.duration._
@@ -35,12 +35,9 @@ class OrdersFromScriptedAccTestSuite extends BaseMatcherSuite {
       aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
       matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
 
-      val scriptText = {
-        val sc = Parser(s"""true""".stripMargin).get.value
-        CompilerV1(dummyCompilerContext, sc).explicitGet()._1
-      }
+      val scriptText = s"""true""".stripMargin
 
-      val script = ScriptV1(scriptText).explicitGet()
+      val script = ScriptCompiler(scriptText).explicitGet()._1
       val setScriptTransaction = SetScriptTransaction
         .selfSigned(SetScriptTransaction.supportedVersions.head, bobAcc, Some(script), minFee, System.currentTimeMillis())
         .right

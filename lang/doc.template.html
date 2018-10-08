@@ -1,0 +1,242 @@
+<html>
+<head>
+ <title>RIDE</title>
+</head>
+<body>
+ <h1>Types</h1>
+<table border="1">
+{{#types}}
+<tr><td><a id="{{name}}">{{name}}</a></td><td>
+{{#isNative}}Native{{/isNative}}
+{{#isUnion}}
+{{#union}}<a href="#{{name}}">{{name}}</a> {{/union}}
+{{/isUnion}}
+{{#isObj}}
+<table>
+{{#fields}}<tr><td>{{name}}</td><td>
+{{#type}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}<a href="#{{name}}">{{name}}</a>{{/param}}]
+ {{/hasParam}}
+{{/type}}
+</td></tr>{{/fields}}
+</table>
+{{/isObj}}
+</td></tr>
+{{/types}}
+</table>
+ <h1>Input variables</h1>
+<table border="1">
+{{#vars}}
+<tr>
+<td>{{name}}</td>
+<td>{{#type}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}<a href="#{{name}}">{{name}}</a>{{/param}}]
+ {{/hasParam}}
+{{/type}}</td>
+<td>{{doc}}</td>
+</tr>
+{{/vars}}
+</table>
+ <h1>Transaction fields</h1>
+<table border="1">
+<tr><td></td>{{#transactionDoc}}<td>{{name}}</td>{{/transactionDoc}}<tr>
+{{#transactionFields}}
+<tr><td>{{name}}</td>
+{{#types}}
+<td>
+{{#absend}}-{{/absend}}
+{{#type}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}<a href="#{{name}}">{{name}}</a>{{/param}}]
+ {{/hasParam}}
+{{/type}}
+</td>
+{{/types}}
+</tr>
+{{/transactionFields}}
+</table>
+ <h1>Transaction fields (reversed)</h1>
+<table border="1">
+<tr><td></td>{{#transactionFields}}<td>{{name}}</td>{{/transactionFields}}<tr>
+{{#transactionDoc}}
+<tr><td>{{name}}</td>
+{{#fields}}
+<td>
+{{#absend}}-{{/absend}}
+{{#type}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}<a href="#{{name}}">{{name}}</a>{{/param}}]
+ {{/hasParam}}
+{{/type}}
+</td>
+{{/fields}}
+</tr>
+{{/transactionDoc}}
+</table>
+{{#commonFields}}
+ <h1>Common fields</h1>
+<table border="1">
+<tr><td></td>{{#fields}}<td>{{name}}</td>{{/fields}}<tr>
+{{#types}}
+<tr><td>{{name}}</td>
+{{#fields}}
+<td>
+{{#absend}}-{{/absend}}
+{{#type}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}<a href="#{{name}}">{{name}}</a>{{/param}}]
+ {{/hasParam}}
+{{/type}}
+</td>
+{{/fields}}
+</tr>
+{{/types}}
+</table>
+{{/commonFields}}
+{{#specials}}
+ <h1>{{class}} fields</h1>
+{{#descr}}
+<table border="1">
+<tr><td></td>{{#types}}<td>{{name}}</td>{{/types}}<tr>
+{{#fields}}
+<tr><td>{{name}}</td>
+{{#types}}
+<td>
+{{#absend}}-{{/absend}}
+{{#type}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}<a href="#{{name}}">{{name}}</a>{{/param}}]
+ {{/hasParam}}
+{{/type}}
+</td>
+{{/types}}
+</tr>
+{{/fields}}
+</table>
+{{/descr}}
+{{/specials}}
+ <h1>Functions</h1>
+<table border="1">
+{{#funcs}}
+<tr><td>{{name}}</td>
+<td>{{cost}}</td>
+<td>{{doc}}</td>
+<td>
+<table>
+{{#params}}
+<tr><td>{{name}}</td>
+<td>{{#type}}
+ {{#isComplex}}
+  {{name}}
+ {{/isComplex}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}{{#needLink}}<a href="#{{name}}">{{name}}</a>{{/needLink}}{{#noLink}}{{name}}{{/noLink}}{{/param}}]
+ {{/hasParam}}
+{{/type}}</td>
+<td>{{doc}}</td></tr>
+{{/params}}
+</table>
+</td>
+<td>{{#type}}
+ {{#isComplex}}
+  {{name}}
+ {{/isComplex}}
+ {{#isNative}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isNative}}
+ {{#isObj}}
+  <a href="#{{name}}">{{name}}</a>
+ {{/isObj}}
+ {{#isUnion}}
+  {{#union}}
+   <a href="#{{name}}">{{name}}</a>
+  {{/union}}
+ {{/isUnion}}
+ {{#hasParam}}
+  {{name}}[{{#param}}{{#needLink}}<a href="#{{name}}">{{name}}</a>{{/needLink}}{{#noLink}}{{name}}{{/noLink}}{{/param}}]
+ {{/hasParam}}
+{{/type}}</td>
+</tr>
+{{/funcs}}
+</table>
+</body>
+</head>

@@ -111,6 +111,7 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest).as[MatcherStatusResponse]
     }
 
+
     def deleteOrder(sender: PrivateKeyAccount,
                     assetPair: AssetPair,
                     orderId: Option[String],

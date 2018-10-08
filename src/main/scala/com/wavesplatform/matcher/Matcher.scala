@@ -108,7 +108,7 @@ class Matcher(actorSystem: ActorSystem,
     sys.exit(1)
   }
 
-  def runMatcher() {
+  def runMatcher(): Unit = {
     val journalDir  = new File(matcherSettings.journalDataDir)
     val snapshotDir = new File(matcherSettings.snapshotsDataDir)
     journalDir.mkdirs()
