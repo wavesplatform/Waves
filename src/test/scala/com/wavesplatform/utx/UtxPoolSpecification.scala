@@ -75,7 +75,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val txs = for {
       version <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
-      minFee = CommonValidation.FeeConstants(TransferTransaction.typeId) + CommonValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
+      minFee = (CommonValidation.FeeConstants(TransferTransaction.typeId) + CommonValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size) * Sponsorship.FeeUnit
       fee <- chooseNum(minFee, amount)
     } yield MassTransferTransaction.selfSigned(version, None, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).explicitGet()
     txs.label("transferWithRecipient")

@@ -245,7 +245,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(allValidP) {
       case (genesis, transfers, issueAndScripts, etx) =>
-        val smallFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(ExchangeTransaction.typeId)
+        val smallFee = CommonValidation.ScriptExtraFee + (CommonValidation.FeeConstants(ExchangeTransaction.typeId) * Sponsorship.FeeUnit) - 1
         val exchangeWithSmallFee = ExchangeTransactionV2
           .create(
             MATCHER,

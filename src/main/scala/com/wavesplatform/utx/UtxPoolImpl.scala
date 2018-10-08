@@ -13,10 +13,13 @@ import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
-import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
+import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio, Sponsorship}
+import com.wavesplatform.transaction.ValidationError.{GenericError, InsufficientFee, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.ReissueTransaction
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
@@ -189,6 +192,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
           _    <- checkScripted(b, tx)
           _    <- checkAlias(b, tx)
           _    <- canReissue(b, tx)
+          _    <- enoughFee(tx, b, fs)
           diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
         } yield {
           pessimisticPortfolios.add(tx.id(), diff)
@@ -244,4 +248,47 @@ object UtxPoolImpl {
     }
   }
 
+  def enoughFee[T <: Transaction](tx: T, blockchain: Blockchain, fs: FunctionalitySettings): Either[ValidationError, T] =
+    if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) Right(tx)
+    else {
+      val (txFeeAssetId, txFeeValue) = tx.assetFee
+      val minFeeForTx = {
+        val baseFee = LegacyFeeConstants(tx.builder.typeId)
+        tx match {
+          case tx: DataTransaction =>
+            val sizeInKb = 1 + (tx.bytes().length - 1) / 1024
+            baseFee * sizeInKb
+          case tx: MassTransferTransaction =>
+            val transferFee = LegacyFeeConstants(TransferTransactionV1.typeId)
+            transferFee + baseFee * tx.transfers.size
+          case _ => baseFee
+        }
+      }
+      txFeeAssetId match {
+        case None =>
+          Either
+            .cond(
+              txFeeValue >= minFeeForTx,
+              tx,
+              InsufficientFee(s"Fee for ${tx.builder.classTag} transaction does not exceed minimal value of $minFeeForTx")
+            )
+        case Some(_) => Right(tx)
+      }
+    }
+
+  private val LegacyFeeConstants = Map(
+    PaymentTransaction.typeId      -> 100000,
+    IssueTransaction.typeId        -> 100000000,
+    TransferTransaction.typeId     -> 100000,
+    MassTransferTransaction.typeId -> 50000,
+    ReissueTransaction.typeId      -> 100000,
+    BurnTransaction.typeId         -> 100000,
+    ExchangeTransaction.typeId     -> 300000,
+    LeaseTransaction.typeId        -> 100000,
+    LeaseCancelTransaction.typeId  -> 100000,
+    CreateAliasTransaction.typeId  -> 100000,
+    DataTransaction.typeId         -> 100000,
+    SetScriptTransaction.typeId    -> 100000,
+    SponsorFeeTransaction.typeId   -> 100000000
+  )
 }

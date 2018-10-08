@@ -1,11 +1,11 @@
 package com.wavesplatform.state.diffs
 
 import cats._
+import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.account.Address
 import com.wavesplatform.transaction.ValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -182,7 +182,9 @@ object CommonValidation {
             case None => Right((None, feeInUnits * Sponsorship.FeeUnit))
             case Some(assetId) =>
               for {
-                assetInfo <- blockchain.assetDescription(assetId).toRight(GenericError(s"Asset $assetId does not exist, cannot be used to pay fees"))
+                assetInfo <- blockchain
+                  .assetDescription(assetId)
+                  .toRight(InsufficientFee(s"Asset $assetId does not exist, cannot be used to pay fees"))
                 wavesFee <- Either.cond(
                   assetInfo.sponsorship > 0,
                   feeInUnits * Sponsorship.FeeUnit,
