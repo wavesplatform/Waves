@@ -1,9 +1,10 @@
 package com.wavesplatform
 
 import java.io.File
+import java.util
 
 import com.wavesplatform.utils.ScorexLogging
-import org.iq80.leveldb.{DB, Options}
+import org.iq80.leveldb.{DB, DBIterator, Options}
 
 package object db extends ScorexLogging {
 
@@ -21,5 +22,11 @@ package object db extends ScorexLogging {
     file.getParentFile.mkdirs()
     LevelDBFactory.factory.open(file, options)
   }
+
+  def prefixIterator[T](iterator: DBIterator, prefix: Array[Byte])(deserialize: util.Map.Entry[Array[Byte], Array[Byte]] => T): Iterator[T] =
+    new Iterator[T] {
+      override def hasNext: Boolean = iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)
+      override def next(): T        = deserialize(iterator.next())
+    }
 
 }

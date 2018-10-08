@@ -28,17 +28,17 @@ object DBUtils {
 
     object finalized {
       object common {
-        def add(rw: RW, address: Address, id: Order.Id): Unit              = add(rw, address, List(id))
-        def add(rw: RW, address: Address, ids: Seq[Order.Id]): Unit        = c(address).add(rw, ids)
-        def iterator(ro: ReadOnlyDB, address: Address): Iterator[Order.Id] = c(address).iterator(ro)
+        def add(rw: RW, address: Address, id: Order.Id): Unit                      = add(rw, address, List(id))
+        def add(rw: RW, address: Address, ids: Seq[Order.Id]): Unit                = c(address).add(rw, ids)
+        def iterator(ro: ReadOnlyDB, address: Address): ClosableIterable[Order.Id] = c(address).iterator(ro)
 
         private def c(address: Address) = new FinalizedOrdersCommonIndex(address, 100)
       }
 
       object pair {
-        def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit              = add(rw, address, pair, List(id))
-        def add(rw: RW, address: Address, pair: AssetPair, ids: Seq[Order.Id]): Unit        = c(address, pair).add(rw, ids)
-        def iterator(ro: ReadOnlyDB, address: Address, pair: AssetPair): Iterator[Order.Id] = c(address, pair).iterator(ro)
+        def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit                      = add(rw, address, pair, List(id))
+        def add(rw: RW, address: Address, pair: AssetPair, ids: Seq[Order.Id]): Unit                = c(address, pair).add(rw, ids)
+        def iterator(ro: ReadOnlyDB, address: Address, pair: AssetPair): ClosableIterable[Order.Id] = c(address, pair).iterator(ro)
 
         private def c(address: Address, pair: AssetPair) = new FinalizedOrdersPairIndex(address, pair, 100)
       }
@@ -62,28 +62,29 @@ object DBUtils {
       ro,
       maxOrders,
       activeIndex = indexes.active.iterator(ro, address).map { case (_, id) => id },
-      finalizedIndex = if (activeOnly) Iterator.empty else indexes.finalized.common.iterator(ro, address)
+      finalizedIndex = if (activeOnly) ClosableIterable.empty else indexes.finalized.common.iterator(ro, address)
     )
   }
 
   private def mergeOrders(ro: ReadOnlyDB,
                           maxOrders: Int,
                           activeIndex: ClosableIterable[Order.Id],
-                          finalizedIndex: Iterator[Order.Id]): IndexedSeq[(Order, OrderInfo)] = {
+                          finalizedIndex: ClosableIterable[Order.Id]): IndexedSeq[(Order, OrderInfo)] = {
     def get(id: Order.Id): (Option[Order], Option[OrderInfo]) = (ro.get(MatcherKeys.order(id)), ro.get(MatcherKeys.orderInfoOpt(id)))
 
     try {
       val active = activeIndex.iterator.take(maxOrders).map(get).collect { case (Some(o), Some(oi)) => (o, oi) }.toIndexedSeq
 
-      val nonActive = finalizedIndex
+      val finalized = finalizedIndex.iterator
         .map(get)
         .collect { case (Some(o), Some(oi)) => (o, oi) }
         .take(maxOrders - active.size)
         .toVector
 
-      (active ++ nonActive).sortBy { case (order, info) => (info.status, -order.timestamp) }
+      (active ++ finalized).sortBy { case (order, info) => (info.status, -order.timestamp) }
     } finally {
       activeIndex.close()
+      finalizedIndex.close()
     }
   }
 

@@ -7,12 +7,12 @@ import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
 import com.wavesplatform.crypto
 import com.wavesplatform.database.{Key, RW, ReadOnlyDB}
+import com.wavesplatform.db.prefixIterator
 import com.wavesplatform.matcher.ActiveOrdersIndex._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.Order.Id
-import org.iq80.leveldb.DBIterator
 
 class ActiveOrdersIndex(address: Address, maxElements: Int) {
   def add(rw: RW, pair: AssetPair, id: Id): Unit = {
@@ -75,23 +75,15 @@ class ActiveOrdersIndex(address: Address, maxElements: Int) {
   }
 
   private def safeIterator(ro: ReadOnlyDB, latestIdx: Int): ClosableIterable[(Index, Node)] = new ClosableIterable[(Index, Node)] {
-    import MatcherKeys.ActiveOrdersPrefixBytes
-
+    private val prefix   = MatcherKeys.ActiveOrdersPrefixBytes ++ address.bytes.arr
     private val internal = ro.iterator
     internal.seek(nodeKey(latestIdx).keyBytes)
 
-    override val iterator: Iterator[(Index, Node)] = new NodeIterator(internal, ActiveOrdersPrefixBytes ++ address.bytes.arr)
-    override def close(): Unit                     = internal.close()
-  }
-
-  private class NodeIterator(iterator: DBIterator, prefix: Array[Byte]) extends Iterator[(Index, Node)] {
-    override def hasNext: Boolean = iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)
-    override def next(): (Index, Node) = {
-      val e   = iterator.next()
+    override val iterator: Iterator[(Index, Node)] = prefixIterator(internal, prefix) { e =>
       val idx = ByteBuffer.wrap(e.getKey).position(prefix.length).asInstanceOf[ByteBuffer].getInt()
-      val r   = Node.read(e.getValue)
-      (idx, r)
+      (idx, Node.read(e.getValue))
     }
+    override def close(): Unit = internal.close()
   }
 
   private val sizeKey: Key[Option[Index]]             = MatcherKeys.activeOrdersSize(address)
