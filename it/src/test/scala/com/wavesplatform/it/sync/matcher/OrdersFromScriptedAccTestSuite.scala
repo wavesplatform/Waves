@@ -3,21 +3,18 @@ package com.wavesplatform.it.sync.matcher
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.BaseMatcherSuite
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.it.sync._
-import com.wavesplatform.lang.v1.compiler.CompilerV1
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import play.api.libs.json.JsNumber
 
 import scala.concurrent.duration._
 
-class OrdersFromScriptedAccTestSuite extends BaseMatcherSuite {
+class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
   import OrdersFromScriptedAccTestSuite._
 
@@ -26,7 +23,7 @@ class OrdersFromScriptedAccTestSuite extends BaseMatcherSuite {
   "issue asset and run test" - {
     // Alice issues new asset
     val aliceAsset =
-      aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
+      aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, issueFee, 2).id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
@@ -39,7 +36,7 @@ class OrdersFromScriptedAccTestSuite extends BaseMatcherSuite {
 
       val script = ScriptCompiler(scriptText).explicitGet()._1
       val setScriptTransaction = SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, bobAcc, Some(script), minFee, System.currentTimeMillis())
+        .selfSigned(SetScriptTransaction.supportedVersions.head, bobAcc, Some(script), setScriptFee, System.currentTimeMillis())
         .right
         .get
 
@@ -83,7 +80,7 @@ class OrdersFromScriptedAccTestSuite extends BaseMatcherSuite {
 }
 
 object OrdersFromScriptedAccTestSuite {
-  val ActivationHeight = 15
+  val ActivationHeight = 25
 
   import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 

@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.matcher
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.BaseMatcherSuite
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -14,14 +14,14 @@ import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 
 import scala.util.Random
 
-class MatcherRestartTestSuite extends BaseMatcherSuite {
+class MatcherRestartTestSuite extends MatcherSuiteBase {
   override protected def nodeConfigs: Seq[Config] = Configs
   private def orderVersion                        = (Random.nextInt(2) + 1).toByte
 
   "check order execution" - {
     // Alice issues new asset
     val aliceAsset =
-      aliceNode.issue(aliceAcc.address, "DisconnectCoin", "Alice's coin for disconnect tests", someAssetAmount, 0, reissuable = false, 100000000L).id
+      aliceNode.issue(aliceAcc.address, "DisconnectCoin", "Alice's coin for disconnect tests", someAssetAmount, 0, reissuable = false, issueFee, 2).id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)

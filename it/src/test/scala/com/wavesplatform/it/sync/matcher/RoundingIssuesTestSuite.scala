@@ -4,21 +4,21 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.BaseMatcherSuite
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import scala.concurrent.duration._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 
-class RoundingIssuesTestSuite extends BaseMatcherSuite {
+class RoundingIssuesTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
   Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
   nodes.waitForHeightArise()
 
-  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None)
-  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(EthId.toString), None)
-  bobNode.transfer(bobNode.address, bobAcc.address, defaultAssetQuantity, 100000, Some(BtcId.toString), None)
+  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2)
+  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(EthId.toString), None, 2)
+  bobNode.transfer(bobNode.address, bobAcc.address, defaultAssetQuantity, 100000, Some(BtcId.toString), None, 2)
   nodes.waitForHeightArise()
 
   "should correctly fill an order with small amount" in {

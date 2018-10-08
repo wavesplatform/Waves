@@ -3,7 +3,7 @@ package com.wavesplatform.it.api
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import com.wavesplatform.api.http.AddressApiRoute
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
+import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
@@ -110,8 +110,15 @@ object SyncHttpApi extends Assertions {
     def assetsBalance(address: String): FullAssetsInfo =
       Await.result(async(n).assetsBalance(address), RequestAwaitTime)
 
-    def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Transaction =
-      Await.result(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee), RequestAwaitTime)
+    def issue(sourceAddress: String,
+              name: String,
+              description: String,
+              quantity: Long,
+              decimals: Byte,
+              reissuable: Boolean,
+              fee: Long,
+              version: Byte = 2): Transaction =
+      Await.result(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version), RequestAwaitTime)
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       Await.result(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee), RequestAwaitTime)
@@ -161,13 +168,14 @@ object SyncHttpApi extends Assertions {
                  amount: Long,
                  fee: Long,
                  assetId: Option[String] = None,
-                 feeAssetId: Option[String] = None): Transaction =
-      Await.result(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId), RequestAwaitTime)
+                 feeAssetId: Option[String] = None,
+                 version: Byte = 1): Transaction =
+      Await.result(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version), RequestAwaitTime)
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Transaction =
       Await.result(async(n).massTransfer(sourceAddress, transfers, fee, assetId), RequestAwaitTime)
 
-    def lease(sourceAddress: String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
+    def lease(sourceAddress: String, recipient: String, leasingAmount: Long, leasingFee: Long, version: Byte = 1): Transaction =
       Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
 
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Transaction =
@@ -185,13 +193,16 @@ object SyncHttpApi extends Assertions {
     def activeLeases(sourceAddress: String): Seq[Transaction] =
       Await.result(async(n).activeLeases(sourceAddress), RequestAwaitTime)
 
-    def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Transaction =
+    def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: Byte = 1): Transaction =
       Await.result(async(n).cancelLease(sourceAddress, leaseId, fee), RequestAwaitTime)
 
     def signedBroadcast(tx: JsObject): Transaction =
       Await.result(async(n).signedBroadcast(tx), RequestAwaitTime)
 
     def signedIssue(tx: SignedIssueV1Request): Transaction =
+      Await.result(async(n).signedIssue(tx), RequestAwaitTime)
+
+    def signedIssue(tx: SignedIssueV2Request): Transaction =
       Await.result(async(n).signedIssue(tx), RequestAwaitTime)
 
     def ensureTxDoesntExist(txId: String): Unit =

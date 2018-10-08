@@ -17,9 +17,9 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
   def aliceNode   = nodes(1)
   def bobNode     = nodes(2)
 
-  protected lazy val matcherAddress: String = matcherNode.createAddress
-  protected lazy val aliceAddress: String   = aliceNode.createAddress
-  protected lazy val bobAddress: String     = bobNode.createAddress
+  protected lazy val matcherAddress: String = matcherNode.createAddress()
+  protected lazy val aliceAddress: String   = aliceNode.createAddress()
+  protected lazy val bobAddress: String     = bobNode.createAddress()
 
   protected lazy val matcherAcc = PrivateKeyAccount.fromSeed(matcherNode.seed(matcherAddress)).right.get
   protected lazy val aliceAcc   = PrivateKeyAccount.fromSeed(aliceNode.seed(aliceAddress)).right.get
@@ -28,9 +28,9 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
   private val addresses = Seq(matcherAddress, aliceAddress, bobAddress)
 
   //really before all tests, because FreeSpec issue with "-" and "in"
-  initialBalances
+  initialBalances()
 
-  def initialBalances() = {
+  def initialBalances(): Unit = {
     for (i <- List(matcherNode, aliceNode, bobNode).indices) {
 
       val tx = nodes(i).transfer(nodes(i).address, addresses(i), 10000.waves, 0.001.waves).id
@@ -38,7 +38,7 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
     }
   }
 
-  def initialScripts() = {
+  def initialScripts(): Unit = {
     for (i <- List(matcherNode, aliceNode, bobNode).indices) {
 
       val scriptText = s"""true""".stripMargin
@@ -56,10 +56,5 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
 
       nodes.waitForHeightAriseAndTxPresent(setScriptId)
     }
-  }
-
-  abstract protected override def beforeAll(): Unit = {
-    super.beforeAll()
-    //initialScripts
   }
 }

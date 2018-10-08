@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.BaseMatcherSuite
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -13,20 +13,19 @@ import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import scala.concurrent.duration._
 import scala.util.Random
 
-class MatcherMassOrdersTestSuite extends BaseMatcherSuite {
+class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
   override protected def nodeConfigs: Seq[Config] = Configs
 
   private def orderVersion = (Random.nextInt(2) + 1).toByte
 
   "Create orders with statuses FILL, PARTIAL, CANCELLED, ACTIVE" - {
-
     // Alice issues new assets
     val aliceAsset =
-      aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
+      aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, issueFee, 2).id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceSecondAsset = aliceNode
-      .issue(aliceAcc.address, "AliceSecondCoin", "AliceSecondCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L)
+      .issue(aliceAcc.address, "AliceSecondCoin", "AliceSecondCoin for matcher's tests", someAssetAmount, 0, reissuable = false, issueFee, 2)
       .id
     nodes.waitForHeightAriseAndTxPresent(aliceSecondAsset)
 
@@ -38,10 +37,10 @@ class MatcherMassOrdersTestSuite extends BaseMatcherSuite {
     aliceNode.assertAssetBalance(aliceAcc.address, aliceSecondAsset, someAssetAmount)
     matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
 
-    val transfer1ToBobId = aliceNode.transfer(aliceAcc.address, bobAcc.address, someAssetAmount / 2, 100000, Some(aliceAsset), None).id
+    val transfer1ToBobId = aliceNode.transfer(aliceAcc.address, bobAcc.address, someAssetAmount / 2, minFee, Some(aliceAsset), None, 2).id
     nodes.waitForHeightAriseAndTxPresent(transfer1ToBobId)
 
-    val transfer2ToBobId = aliceNode.transfer(aliceAcc.address, bobAcc.address, someAssetAmount / 2, 100000, Some(aliceSecondAsset), None).id
+    val transfer2ToBobId = aliceNode.transfer(aliceAcc.address, bobAcc.address, someAssetAmount / 2, minFee, Some(aliceSecondAsset), None, 2).id
     nodes.waitForHeightAriseAndTxPresent(transfer2ToBobId)
 
     bobNode.assertAssetBalance(bobAcc.address, aliceAsset, someAssetAmount / 2)

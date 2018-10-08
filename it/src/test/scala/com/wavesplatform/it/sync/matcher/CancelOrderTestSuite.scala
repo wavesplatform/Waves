@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.matcher
 
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.BaseMatcherSuite
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
@@ -13,15 +13,15 @@ import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 import com.typesafe.config.Config
 
-class CancelOrderTestSuite extends BaseMatcherSuite {
+class CancelOrderTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
   matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
   matcherNode.signedIssue(createSignedIssueRequest(IssueWctTx))
   nodes.waitForHeightArise()
-  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None)
-  bobNode.transfer(bobNode.address, bobAcc.address, defaultAssetQuantity, 100000, Some(WctId.toString), None)
+  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2)
+  bobNode.transfer(bobNode.address, bobAcc.address, defaultAssetQuantity, 100000, Some(WctId.toString), None, 2)
   nodes.waitForHeightArise()
 
   "cancel order using api-key" in {
@@ -35,8 +35,6 @@ class CancelOrderTestSuite extends BaseMatcherSuite {
     matcherNode.orderHistoryByPair(bobAcc, wavesUsdPair).filter(_.id == orderId).head.status shouldBe "Cancelled"
     matcherNode.orderBook(wavesUsdPair).bids shouldBe empty
     matcherNode.orderBook(wavesUsdPair).asks shouldBe empty
-    matcherNode.deleteOrder(bobAcc, wavesUsdPair, Some(orderId))
-    matcherNode.orderStatus(orderId, wavesUsdPair, false).status shouldBe "NotFound"
   }
 
   "Alice and Bob trade WAVES-USD" - {

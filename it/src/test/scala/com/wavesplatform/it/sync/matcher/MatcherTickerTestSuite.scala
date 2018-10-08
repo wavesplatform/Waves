@@ -4,18 +4,18 @@ import com.typesafe.config.{Config}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.BaseMatcherSuite
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 
-class MatcherTickerTestSuite extends BaseMatcherSuite {
+class MatcherTickerTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
   matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
   nodes.waitForHeightArise()
-  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None)
+  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2)
   nodes.waitForHeightArise()
 
   "matcher ticker validation" - {
@@ -50,10 +50,10 @@ class MatcherTickerTestSuite extends BaseMatcherSuite {
     }
 
     "issue tokens" in {
-      matcherNode.signedIssue(createSignedIssueRequest(IssueWctTx))
-      nodes.waitForHeightArise()
-      bobNode.transfer(bobNode.address, bobAcc.address, defaultAssetQuantity, 100000, Some(WctId.toString), None)
-      nodes.waitForHeightArise()
+      val iTx = matcherNode.signedIssue(createSignedIssueRequest(IssueWctTx)).id
+      nodes.waitForHeightAriseAndTxPresent(iTx)
+      val bTx = bobNode.transfer(bobNode.address, bobAcc.address, defaultAssetQuantity, 100000, Some(WctId.toString), None, 2).id
+      nodes.waitForHeightAriseAndTxPresent(bTx)
     }
 
     val bidPrice  = 200000000

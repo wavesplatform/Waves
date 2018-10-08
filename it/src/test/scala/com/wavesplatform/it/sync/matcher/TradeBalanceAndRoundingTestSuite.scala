@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.AssetDecimalsInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.BaseMatcherSuite
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.model.LimitOrder
@@ -14,16 +14,16 @@ import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 
-class TradeBalanceAndRoundingTestSuite extends BaseMatcherSuite {
+class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
   Seq(IssueUsdTx, IssueEthTx, IssueWctTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
   nodes.waitForHeightArise()
 
-  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None)
-  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(EthId.toString), None)
-  bobNode.transfer(bobNode.address, bobAcc.address, defaultAssetQuantity, 100000, Some(WctId.toString), None)
+  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2)
+  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(EthId.toString), None, 2)
+  bobNode.transfer(bobNode.address, bobAcc.address, defaultAssetQuantity, 100000, Some(WctId.toString), None, 2)
   nodes.waitForHeightArise()
 
   "Alice and Bob trade WAVES-USD" - {
@@ -250,7 +250,7 @@ class TradeBalanceAndRoundingTestSuite extends BaseMatcherSuite {
 
     "bob lease all waves exact half matcher fee" in {
       val leasingAmount = bobNode.accountBalances(bobAcc.address)._1 - leasingFee - matcherFee / 2
-      val leaseTxId     = bobNode.lease(bobAcc.address, matcherAcc.address, leasingAmount, leasingFee).id
+      val leaseTxId     = bobNode.lease(bobAcc.address, matcherAcc.address, leasingAmount, leasingFee, 2).id
       nodes.waitForHeightAriseAndTxPresent(leaseTxId)
       val bobOrderId = matcherNode.placeOrder(bobAcc, wctWavesPair, SELL, wctWavesPrice, wctWavesSellAmount).message.id
       matcherNode.waitOrderStatus(wctWavesPair, bobOrderId, "Accepted", 1.minute)
@@ -261,7 +261,7 @@ class TradeBalanceAndRoundingTestSuite extends BaseMatcherSuite {
       assertBadRequestAndResponse(matcherNode.placeOrder(bobAcc, wctWavesPair, SELL, wctWavesPrice, wctWavesSellAmount / 2),
                                   "Not enough tradable balance")
 
-      val cancelLeaseTxId = bobNode.cancelLease(bobAcc.address, leaseTxId, leasingFee).id
+      val cancelLeaseTxId = bobNode.cancelLease(bobAcc.address, leaseTxId, leasingFee, 2).id
       nodes.waitForHeightAriseAndTxPresent(cancelLeaseTxId)
     }
   }

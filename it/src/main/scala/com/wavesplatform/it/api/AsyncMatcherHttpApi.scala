@@ -111,20 +111,6 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest).as[MatcherStatusResponse]
     }
 
-
-    def deleteOrder(sender: PrivateKeyAccount,
-                    assetPair: AssetPair,
-                    orderId: Option[String],
-                    timestamp: Option[Long]): Future[MatcherStatusResponse] = {
-      val privateKey                = sender.privateKey
-      val publicKey                 = PublicKeyAccount(sender.publicKey)
-      val request                   = CancelOrderRequest(publicKey, orderId.map(ByteStr.decodeBase58(_).get), timestamp, Array.emptyByteArray)
-      val sig                       = crypto.sign(privateKey, request.toSign)
-      val signedRequest             = request.copy(signature = sig)
-      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/delete", signedRequest).as[MatcherStatusResponse]
-    }
-
     def cancelAllOrders(sender: PrivateKeyAccount, timestamp: Option[Long]): Future[MatcherStatusResponse] = {
       val privateKey    = sender.privateKey
       val request       = CancelOrderRequest(PublicKeyAccount(sender.publicKey), None, timestamp, Array.emptyByteArray)

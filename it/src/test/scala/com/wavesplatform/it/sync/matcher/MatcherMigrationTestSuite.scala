@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.matcher
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.BaseMatcherSuite
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
@@ -11,19 +11,19 @@ import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 
 import scala.concurrent.duration._
 
-class MatcherMigrationTestSuite extends BaseMatcherSuite {
+class MatcherMigrationTestSuite extends MatcherSuiteBase {
   override protected def nodeConfigs: Seq[Config] = Configs
 
   "issue asset and run migration tool inside container" - {
     // Alice issues new asset
     val aliceAsset =
       aliceNode
-        .issue(aliceAcc.address, "DisconnectCoin", "Alice's coin for disconnect tests", 1000 * someAssetAmount, 8, reissuable = false, issueFee)
+        .issue(aliceAcc.address, "DisconnectCoin", "Alice's coin for disconnect tests", 1000 * someAssetAmount, 8, reissuable = false, issueFee, 2)
         .id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceBalance = aliceNode.accountBalances(aliceAcc.address)._2
-    val t1           = aliceNode.transfer(aliceAcc.address, matcherAcc.address, aliceBalance - minFee - 250000, minFee, None, None).id
+    val t1           = aliceNode.transfer(aliceAcc.address, matcherAcc.address, aliceBalance - minFee - 250000, minFee, None, None, 2).id
     nodes.waitForHeightAriseAndTxPresent(t1)
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)

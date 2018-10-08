@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.api.{AssetDecimalsInfo, LevelResponse}
-import com.wavesplatform.it.matcher.BaseMatcherSuite
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
@@ -14,9 +14,9 @@ import scala.concurrent.duration._
 import scala.util.Random
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 
-class MatcherTestSuite extends BaseMatcherSuite {
+class MatcherTestSuite extends MatcherSuiteBase {
   private val aliceSellAmount                     = 500
-  private val TransactionFee                      = 300000
+  private val exTxFee                             = 300000
   private val amountAssetName                     = "AliceCoin"
   private val AssetQuantity                       = 1000
   private val aliceCoinDecimals: Byte             = 0
@@ -27,7 +27,7 @@ class MatcherTestSuite extends BaseMatcherSuite {
   "Check cross ordering between Alice and Bob " - {
     // Alice issues new asset
     val aliceAsset = aliceNode
-      .issue(aliceAcc.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, 100000000L)
+      .issue(aliceAcc.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, issueFee, 2)
       .id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
@@ -83,7 +83,7 @@ class MatcherTestSuite extends BaseMatcherSuite {
 
       "and should match with buy order" in {
         val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
-        val matcherBalance = matcherNode.accountBalances(matcherAcc.address)._1
+        val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
         val aliceBalance   = aliceNode.accountBalances(aliceAcc.address)._1
 
         // Bob places a buy order
@@ -118,8 +118,8 @@ class MatcherTestSuite extends BaseMatcherSuite {
         updatedAliceBalance shouldBe (aliceBalance + 2.waves * 200 - (matcherFee * 200.0 / 500.0).toLong)
 
         // Matcher checks that it earn fees
-        val updatedMatcherBalance = matcherNode.accountBalances(matcherAcc.address)._1
-        updatedMatcherBalance shouldBe (matcherBalance + matcherFee + (matcherFee * 200.0 / 500.0).toLong - TransactionFee)
+        val updatedMatcherBalance = matcherNode.accountBalances(matcherNode.address)._1
+        updatedMatcherBalance shouldBe (matcherBalance + matcherFee + (matcherFee * 200.0 / 500.0).toLong - exTxFee)
       }
 
       "request activeOnly orders" in {
@@ -146,7 +146,7 @@ class MatcherTestSuite extends BaseMatcherSuite {
       }
 
       "buy order should match on few price levels" in {
-        val matcherBalance = matcherNode.accountBalances(matcherAcc.address)._1
+        val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
         val aliceBalance   = aliceNode.accountBalances(aliceAcc.address)._1
         val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
 
@@ -163,9 +163,9 @@ class MatcherTestSuite extends BaseMatcherSuite {
         aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, 950)
         bobNode.assertAssetBalance(bobAcc.address, aliceAsset, 50)
 
-        val updatedMatcherBalance = matcherNode.accountBalances(matcherAcc.address)._1
+        val updatedMatcherBalance = matcherNode.accountBalances(matcherNode.address)._1
         updatedMatcherBalance should be(
-          matcherBalance - 2 * TransactionFee + matcherFee + (matcherFee * 150.0 / 350.0).toLong + (matcherFee * 200.0 / 350.0).toLong + (matcherFee * 200.0 / 500.0).toLong)
+          matcherBalance - 2 * exTxFee + matcherFee + (matcherFee * 150.0 / 350.0).toLong + (matcherFee * 200.0 / 350.0).toLong + (matcherFee * 200.0 / 500.0).toLong)
 
         val updatedBobBalance = bobNode.accountBalances(bobAcc.address)._1
         updatedBobBalance should be(bobBalance - matcherFee + 150 * (19.waves / 10.0).toLong)
@@ -196,7 +196,7 @@ class MatcherTestSuite extends BaseMatcherSuite {
       }
 
       "buy order should execute all open orders and put remaining in order book" in {
-        val matcherBalance = matcherNode.accountBalances(matcherAcc.address)._1
+        val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
         val aliceBalance   = aliceNode.accountBalances(aliceAcc.address)._1
         val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
 
@@ -216,8 +216,8 @@ class MatcherTestSuite extends BaseMatcherSuite {
         aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, 850)
         bobNode.assertAssetBalance(bobAcc.address, aliceAsset, 150)
 
-        val updatedMatcherBalance = matcherNode.accountBalances(matcherAcc.address)._1
-        updatedMatcherBalance should be(matcherBalance - TransactionFee + matcherFee + (matcherFee * 100.0 / 130.0).toLong)
+        val updatedMatcherBalance = matcherNode.accountBalances(matcherNode.address)._1
+        updatedMatcherBalance should be(matcherBalance - exTxFee + matcherFee + (matcherFee * 100.0 / 130.0).toLong)
 
         val updatedBobBalance = bobNode.accountBalances(bobAcc.address)._1
         updatedBobBalance should be(bobBalance - (matcherFee * 100.0 / 130.0).toLong - 100 * 2.waves)
@@ -246,7 +246,7 @@ class MatcherTestSuite extends BaseMatcherSuite {
         // Bob issues new asset
         val bobAssetQuantity = 10000
         val bobAssetName     = "BobCoin"
-        val bobAsset         = bobNode.issue(bobAcc.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, false, 100000000L).id
+        val bobAsset         = bobNode.issue(bobAcc.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, false, issueFee, 2).id
         nodes.waitForHeightAriseAndTxPresent(bobAsset)
 
         aliceNode.assertAssetBalance(aliceAcc.address, bobAsset, 0)
@@ -272,7 +272,7 @@ class MatcherTestSuite extends BaseMatcherSuite {
         // Bob issues new asset
         val bobAssetQuantity = 10000
         val bobAssetName     = "BobCoin2"
-        val bobAsset         = bobNode.issue(bobAcc.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, false, 100000000L).id
+        val bobAsset         = bobNode.issue(bobAcc.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, false, issueFee, 2).id
         nodes.waitForHeightAriseAndTxPresent(bobAsset)
 
         val bobWavesPair = AssetPair(
@@ -293,8 +293,8 @@ class MatcherTestSuite extends BaseMatcherSuite {
         // Bob moves all waves to Alice
         val h1              = matcherNode.height
         val bobBalance      = matcherNode.accountBalances(bobAcc.address)._1
-        val transferAmount  = bobBalance - TransactionFee
-        val transferAliceId = bobNode.transfer(bobAcc.address, aliceAcc.address, transferAmount, TransactionFee, None, None).id
+        val transferAmount  = bobBalance - minFee
+        val transferAliceId = bobNode.transfer(bobAcc.address, aliceAcc.address, transferAmount, minFee, None, None, 2).id
         nodes.waitForHeightAriseAndTxPresent(transferAliceId)
 
         matcherNode.accountBalances(bobAcc.address)._1 shouldBe 0
@@ -307,12 +307,12 @@ class MatcherTestSuite extends BaseMatcherSuite {
         nodes.waitForHeightArise()
         matcherNode.cancelOrder(bobAcc, bobWavesPair, Some(order8.message.id)).status should be("OrderCanceled")
 
-        val transferBobId = aliceNode.transfer(aliceAcc.address, bobAcc.address, transferAmount, TransactionFee, None, None).id
+        val transferBobId = aliceNode.transfer(aliceAcc.address, bobAcc.address, transferAmount, minFee, None, None, 2).id
         nodes.waitForHeightAriseAndTxPresent(transferBobId)
       }
     }
 
-    "batch cancel" - {
+    "batch cancel" ignore {
       val ordersNum = 5
       def fileOrders(n: Int, pair: AssetPair): Seq[String] = 0 until n map { i =>
         val o =
@@ -322,7 +322,7 @@ class MatcherTestSuite extends BaseMatcherSuite {
       }
 
       val asset2 =
-        aliceNode.issue(aliceAcc.address, "AliceCoin2", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
+        aliceNode.issue(aliceAcc.address, "AliceCoin2", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, issueFee, 2).id
       nodes.waitForHeightAriseAndTxPresent(asset2)
       val aliceWavesPair2 = AssetPair(ByteStr.decodeBase58(asset2).toOption, None)
 

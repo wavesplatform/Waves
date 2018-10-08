@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.matcher
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.BaseMatcherSuite
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync.matcherFee
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
@@ -11,14 +11,14 @@ import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 
-class SeveralPartialOrdersTestSuite extends BaseMatcherSuite {
+class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
   matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
   nodes.waitForHeightArise()
 
-  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None)
+  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2)
   nodes.waitForHeightArise()
 
   "Alice and Bob trade WAVES-USD" - {
