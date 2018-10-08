@@ -8,8 +8,9 @@ import com.wavesplatform.crypto
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.utils.{Base58, Time}
+import com.wavesplatform.transaction.TransactionFactory
 import io.swagger.annotations._
-import play.api.libs.json.Json
+import play.api.libs.json._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 
 @Path("/utils")
@@ -25,7 +26,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   }
 
   override val route: Route = pathPrefix("utils") {
-    compile ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign
+    compile ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
   }
 
   @Path("/script/compile")
@@ -209,6 +210,26 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         Json.obj("message" -> message,
                  "signature" ->
                    Base58.encode(crypto.sign(Base58.decode(pk).get, Base58.decode(message).get))))
+    }
+  }
+
+  @Path("/transactionSerialize")
+  @ApiOperation(value = "Serialize transaction", notes = "Serialize transaction", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "json",
+        required = true,
+        paramType = "body",
+        dataType = "string",
+        value = "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs"
+      )
+    ))
+  def transactionSerialize: Route = (pathPrefix("transactionSerialize") & post) {
+    handleExceptions(jsonExceptionHandler) {
+      json[JsObject] { jsv =>
+        TransactionFactory.fromSignedRequest(jsv).fold(ApiError.fromValidationError, tx => Json.obj("bytes" -> tx.bytes()))
+      }
     }
   }
 }
