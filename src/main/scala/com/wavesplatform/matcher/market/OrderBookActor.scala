@@ -52,12 +52,12 @@ class OrderBookActor(assetPair: AssetPair,
       "type"  -> "timeout"
     )
 
-  private val snapshotCancellable    = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
   private val cleanupCancellable     = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
   private var orderBook              = OrderBook.empty
   private var apiSender              = Option.empty[ActorRef]
   private var cancellable            = Option.empty[Cancellable]
   private var lastSnapshotSequenceNr = 0L
+  private var addedEvents            = 0L
 
   private var shutdownStatus: ShutdownStatus = ShutdownStatus(
     initiated = false,
@@ -263,6 +263,15 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def processEvent(e: Event): Unit = {
     val st = Kamon.timer("matcher.orderbook.persist").refine("event" -> e.getClass.getSimpleName).start()
+    e match {
+      case _: OrderAdded =>
+        addedEvents += 1
+        if (addedEvents % settings.snapshotsInterval == 0) {
+          saveSnapshot(orderBook)
+          addedEvents = 0
+        }
+      case _ =>
+    }
     persist(e)(_ => st.stop())
     applyEvent(e)
     context.system.eventStream.publish(e)
@@ -380,7 +389,6 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   override def postStop(): Unit = {
-    snapshotCancellable.cancel()
     cleanupCancellable.cancel()
     cancellable.foreach(_.cancel())
   }
