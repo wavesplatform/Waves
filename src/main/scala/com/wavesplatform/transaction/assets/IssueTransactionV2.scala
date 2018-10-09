@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction.assets
 
+import java.nio.charset.StandardCharsets
+
 import com.google.common.primitives.Bytes
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
