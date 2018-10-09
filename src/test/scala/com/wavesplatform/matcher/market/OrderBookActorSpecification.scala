@@ -90,9 +90,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
   "OrderBookActor" should {
 
     "place buy orders" in obcTest { (pair, actor) =>
-      val ord1 = buy(pair, 34118, 1583290045643L)
-      val ord2 = buy(pair, 34120, 170484969L)
-      val ord3 = buy(pair, 34000, 44521418496L)
+      val ord1 = buy(pair, 1583290045643L, 34118)
+      val ord2 = buy(pair, 170484969L, 34120)
+      val ord3 = buy(pair, 44521418496L, 34000)
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))
@@ -106,9 +106,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "place sell orders" in obcTest { (pair, actor) =>
-      val ord1 = sell(pair, 34110, 1583290045643L)
-      val ord2 = sell(pair, 34220, 170484969L)
-      val ord3 = sell(pair, 34000, 44521418496L)
+      val ord1 = sell(pair, 1583290045643L, 34110)
+      val ord2 = sell(pair, 170484969L, 34220)
+      val ord3 = sell(pair, 44521418496L, 34000)
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))
@@ -122,8 +122,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "sell market" in obcTest { (pair, actor) =>
-      val ord1 = buy(pair, 100, 10 * Order.PriceConstant)
-      val ord2 = buy(pair, 105, 10 * Order.PriceConstant)
+      val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
+      val ord2 = buy(pair, 10 * Order.PriceConstant, 105)
 
       actor ! ord1
       actor ! ord2
@@ -133,7 +133,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
         GetOrdersResponse(
           Seq(BuyLimitOrder(ord2.amount, ord2.price, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.price, ord1.matcherFee, ord1))))
 
-      val ord3 = sell(pair, 100, 10 * Order.PriceConstant)
+      val ord3 = sell(pair, 10 * Order.PriceConstant, 100)
       actor ! ord3
       expectMsg(OrderAccepted(ord3))
 
@@ -142,8 +142,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "place buy and sell order to the order book and preserve it after restart" in obcTest { (pair, actor) =>
-      val ord1 = buy(pair, 100, 10 * Order.PriceConstant)
-      val ord2 = sell(pair, 150, 15 * Order.PriceConstant)
+      val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
+      val ord2 = sell(pair, 15 * Order.PriceConstant, 150)
 
       actor ! ord1
       actor ! ord2
@@ -156,8 +156,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "execute partial market orders and preserve remaining after restart" in obcTest { (pair, actor) =>
-      val ord1 = buy(pair, 100, 10 * Order.PriceConstant)
-      val ord2 = sell(pair, 100, 15 * Order.PriceConstant)
+      val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
+      val ord2 = sell(pair, 15 * Order.PriceConstant, 100)
 
       actor ! ord1
       expectMsgType[OrderAccepted]
@@ -179,9 +179,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "execute one order fully and other partially and restore after restart" in obcTest { (pair, actor) =>
-      val ord1 = buy(pair, 100, 10 * Order.PriceConstant)
-      val ord2 = buy(pair, 100, 5 * Order.PriceConstant)
-      val ord3 = sell(pair, 100, 12 * Order.PriceConstant)
+      val ord1 = buy(pair, 10 * Order.PriceConstant, 100)
+      val ord2 = buy(pair, 5 * Order.PriceConstant, 100)
+      val ord3 = sell(pair, 12 * Order.PriceConstant, 100)
 
       actor ! ord1
       actor ! ord2
@@ -207,10 +207,10 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "match multiple best orders at once and restore after restart" in obcTest { (pair, actor) =>
-      val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
-      val ord2 = sell(pair, 100, 5 * Order.PriceConstant)
-      val ord3 = sell(pair, 90, 5 * Order.PriceConstant)
-      val ord4 = buy(pair, 100, 19 * Order.PriceConstant)
+      val ord1 = sell(pair, 10 * Order.PriceConstant, 100)
+      val ord2 = sell(pair, 5 * Order.PriceConstant, 100)
+      val ord3 = sell(pair, 5 * Order.PriceConstant, 90)
+      val ord4 = buy(pair, 19 * Order.PriceConstant, 100)
 
       actor ! ord1
       actor ! ord2
@@ -238,10 +238,10 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "execute orders at different price levels" in obcTest { (pair, actor) =>
-      val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
-      val ord2 = sell(pair, 110, 5 * Order.PriceConstant)
-      val ord3 = sell(pair, 110, 10 * Order.PriceConstant)
-      val ord4 = buy(pair, 115, 22 * Order.PriceConstant)
+      val ord1 = sell(pair, 10 * Order.PriceConstant, 100)
+      val ord2 = sell(pair, 5 * Order.PriceConstant, 110)
+      val ord3 = sell(pair, 10 * Order.PriceConstant, 110)
+      val ord4 = buy(pair, 22 * Order.PriceConstant, 115)
 
       actor ! ord1
       actor ! ord2
@@ -266,7 +266,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "place orders and restart without waiting for response" in obcTest { (pair, actor) =>
-      val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
+      val ord1 = sell(pair, 10 * Order.PriceConstant, 100)
       val ts   = System.currentTimeMillis()
 
       (1 to 100).foreach({ i =>
@@ -289,9 +289,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
       val blockchain            = stub[Blockchain]
       val functionalitySettings = TestFunctionalitySettings.Stub
 
-      val ord1       = buy(pair, 100, 20 * Order.PriceConstant)
-      val invalidOrd = buy(pair, 5000, 1000 * Order.PriceConstant)
-      val ord2       = sell(pair, 100, 10 * Order.PriceConstant)
+      val ord1       = buy(pair, 20 * Order.PriceConstant, 100)
+      val invalidOrd = buy(pair, 1000 * Order.PriceConstant, 5000)
+      val ord2       = sell(pair, 10 * Order.PriceConstant, 100)
 
       val pool = stub[UtxPool]
       (pool.putIfNew _).when(*).onCall { tx: Transaction =>
@@ -332,9 +332,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "partially execute order with small remaining part" in obcTest { (pair, actor) =>
-      val ord1 = sell(pair, 0.00041, 200000000)
-      val ord2 = sell(pair, 0.0004, 100000000)
-      val ord3 = buy(pair, 0.00045, 100000001)
+      val ord1 = sell(pair, 200000000, 0.00041)
+      val ord2 = sell(pair, 100000000, 0.0004)
+      val ord3 = buy(pair, 100000001, 0.00045)
 
       actor ! ord1
       actor ! ord2
@@ -347,9 +347,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "partially execute order with zero fee remaining part" in obcTest { (pair, actor) =>
-      val ord1 = sell(pair, 0.0006999, 1500 * Constants.UnitsInWave)
-      val ord2 = sell(pair, 0.00067634, 3075248828L)
-      val ord3 = buy(pair, 0.00073697, 3075363900L)
+      val ord1 = sell(pair, 1500 * Constants.UnitsInWave, 0.0006999)
+      val ord2 = sell(pair, 3075248828L, 0.00067634)
+      val ord3 = buy(pair, 3075363900L, 0.00073697)
 
       actor ! ord1
       actor ! ord2
@@ -368,9 +368,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
 
     "partially execute order with price > 1 and zero fee remaining part " in obcTest { (pair, actor) =>
       val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("USD".getBytes)))
-      val ord1 = sell(pair, 1850, (0.1 * Constants.UnitsInWave).toLong)
-      val ord2 = sell(pair, 1840, (0.01 * Constants.UnitsInWave).toLong)
-      val ord3 = buy(pair, 2000, (0.0100001 * Constants.UnitsInWave).toLong)
+      val ord1 = sell(pair, (0.1 * Constants.UnitsInWave).toLong, 1850)
+      val ord2 = sell(pair, (0.01 * Constants.UnitsInWave).toLong, 1840)
+      val ord3 = buy(pair, (0.0100001 * Constants.UnitsInWave).toLong, 2000)
 
       actor ! ord1
       actor ! ord2
@@ -385,8 +385,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
 
     "buy small amount of pricey asset" in obcTest { (pair, actor) =>
       val p = AssetPair(Some(ByteStr("WAVES".getBytes)), Some(ByteStr("USD".getBytes)))
-      val b = rawBuy(p, 280, 700000L)
-      val s = rawSell(p, 280, 30000000000L)
+      val b = rawBuy(p, 700000L, 280)
+      val s = rawSell(p, 30000000000L, 280)
       actor ! s
       actor ! b
       receiveN(2)
@@ -403,10 +403,10 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
 
     "cancel expired orders after OrderCleanup command" in obcTest { (pair, actor) =>
       val time   = NTP.correctedTime()
-      val price  = 34118
       val amount = 1
+      val price  = 34118
 
-      val expiredOrder = buy(pair, price, amount).copy(expiration = time)
+      val expiredOrder = buy(pair, amount, price).copy(expiration = time)
       actor ! expiredOrder
       receiveN(1)
       getOrders(actor) shouldEqual Seq(BuyLimitOrder(amount, price * Order.PriceConstant, expiredOrder.matcherFee, expiredOrder))
@@ -416,10 +416,10 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "preserve valid orders after OrderCleanup command" in obcTest { (pair, actor) =>
-      val price  = 34118
       val amount = 1
+      val price  = 34118
 
-      val order          = buy(pair, price, amount)
+      val order          = buy(pair, amount, price)
       val expectedOrders = Seq(BuyLimitOrder(amount, price * Order.PriceConstant, order.matcherFee, order))
 
       actor ! order
@@ -446,7 +446,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
         val order = buy(defaultPair, 1, 1)
         actor ! order
 
-        val unexpectedOrder = buy(defaultPair, 1, 2)
+        val unexpectedOrder = buy(defaultPair, 2, 1)
         actor.tell(ValidateOrderResult(unexpectedOrder.id(), Right(unexpectedOrder)), historyActor.ref)
         expectNoMessage()
       }

@@ -115,8 +115,8 @@ class OrderValidatorSpecification
 
   private def newBuyOrder: Order = buy(
     pair = pairWavesBtc,
-    price = 0.0022,
     amount = 100 * Constants.UnitsInWave,
+    price = 0.0022,
     matcherFee = Some((0.003 * Constants.UnitsInWave).toLong)
   )
 

@@ -65,8 +65,8 @@ trait MatcherTestData {
   val maxWavesAmountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
 
   def buyGenerator(pair: AssetPair,
-                   price: Long,
                    amount: Long,
+                   price: Long,
                    sender: Option[PrivateKeyAccount] = None,
                    matcherFee: Option[Long] = None,
                    timestamp: Option[Long]): Gen[(Order, PrivateKeyAccount)] =
@@ -78,8 +78,8 @@ trait MatcherTestData {
     } yield (Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee), sender)
 
   def sellGenerator(pair: AssetPair,
-                    price: Long,
                     amount: Long,
+                    price: Long,
                     sender: Option[PrivateKeyAccount] = None,
                     matcherFee: Option[Long] = None,
                     timestamp: Option[Long]): Gen[(Order, PrivateKeyAccount)] =
@@ -91,34 +91,34 @@ trait MatcherTestData {
     } yield (Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee), sender)
 
   def buy(pair: AssetPair,
-          price: BigDecimal,
           amount: Long,
+          price: BigDecimal,
           sender: Option[PrivateKeyAccount] = None,
           matcherFee: Option[Long] = None,
-          ts: Option[Long] = None): Order = rawBuy(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts)
+          ts: Option[Long] = None): Order = rawBuy(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts)
 
   def rawBuy(pair: AssetPair,
-             price: Price,
              amount: Long,
+             price: Price,
              sender: Option[PrivateKeyAccount] = None,
              matcherFee: Option[Long] = None,
              ts: Option[Long] = None): Order =
-    valueFromGen(buyGenerator(pair, price, amount, sender, matcherFee, ts))._1
+    valueFromGen(buyGenerator(pair, amount, price, sender, matcherFee, ts))._1
 
   def sell(pair: AssetPair,
-           price: BigDecimal,
            amount: Long,
+           price: BigDecimal,
            sender: Option[PrivateKeyAccount] = None,
            matcherFee: Option[Long] = None,
-           ts: Option[Long] = None): Order = rawSell(pair, (price * Order.PriceConstant).toLong, amount, sender, matcherFee, ts)
+           ts: Option[Long] = None): Order = rawSell(pair, amount, (price * Order.PriceConstant).toLong, sender, matcherFee, ts)
 
   def rawSell(pair: AssetPair,
-              price: Long,
               amount: Long,
+              price: Long,
               sender: Option[PrivateKeyAccount] = None,
               matcherFee: Option[Long] = None,
               ts: Option[Long] = None): Order =
-    valueFromGen(sellGenerator(pair, price, amount, sender, matcherFee, ts))._1
+    valueFromGen(sellGenerator(pair, amount, price, sender, matcherFee, ts))._1
 
   val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 

@@ -142,7 +142,7 @@ class MatcherActorSpecification
       val a2 = strToSomeAssetId("234")
 
       val pair  = AssetPair(a2, a1)
-      val order = buy(pair, 1, 2000)
+      val order = buy(pair, 2000, 1)
 
       actor ! order
       expectMsg(OrderAccepted(order))

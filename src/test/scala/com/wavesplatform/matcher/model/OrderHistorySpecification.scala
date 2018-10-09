@@ -49,7 +49,7 @@ class OrderHistorySpecification
     DBUtils.ordersByAddressAndPair(db, address, pair, matcherSettings.maxOrdersPerRequest).map(_._1.id())
 
   property("New buy order added") {
-    val ord = buy(pair, 0.0007, 10000)
+    val ord = buy(pair, 10000, 0.0007)
 
     val lo = LimitOrder(ord)
     oh.process(OrderAdded(lo))
@@ -78,7 +78,7 @@ class OrderHistorySpecification
   }
 
   property("New sell order added") {
-    val ord = sell(pair, 0.0007, 10000)
+    val ord = sell(pair, 10000, 0.0007)
 
     val lo = LimitOrder(ord)
     oh.process(OrderAdded(LimitOrder(ord)))
@@ -108,7 +108,7 @@ class OrderHistorySpecification
 
   property("New buy WAVES order added") {
     val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord  = buy(pair, 0.008, 1000, matcherFee = Some(3000))
+    val ord  = buy(pair, 1000, 0.008, matcherFee = Some(3000))
     val lo   = LimitOrder(ord)
 
     oh.process(OrderAdded(lo))
@@ -129,7 +129,7 @@ class OrderHistorySpecification
 
   property("New sell WAVES order added") {
     val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord  = sell(pair, 0.0008, 10000)
+    val ord  = sell(pair, 10000, 0.0008)
     val lo   = LimitOrder(ord)
 
     oh.process(OrderAdded(lo))
@@ -142,7 +142,7 @@ class OrderHistorySpecification
 
   property("Should not reserve fee, if seller receives more WAVES than total fee in sell order") {
     val pair = AssetPair(mkAssetId("BTC"), None)
-    val ord  = sell(pair, 0.01, 100000, matcherFee = Some(1000L))
+    val ord  = sell(pair, 100000, 0.01, matcherFee = Some(1000L))
 
     oh.process(OrderAdded(LimitOrder(ord)))
 
@@ -154,7 +154,7 @@ class OrderHistorySpecification
 
   property("Should not reserve fee, if buyer receives more WAVES than total fee in buy order") {
     val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord  = buy(pair, 0.0007, 100000, matcherFee = Some(1000L))
+    val ord  = buy(pair, 100000, 0.0007, matcherFee = Some(1000L))
 
     oh.process(OrderAdded(LimitOrder(ord)))
 
@@ -167,8 +167,8 @@ class OrderHistorySpecification
   property("Two sell orders added") {
     val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord1 = sell(pair, 0.0005, 10000, Some(pk), matcherFee = Some(30000L), ts = Some(System.currentTimeMillis()))
-    val ord2 = sell(pair, 0.0008, 16000, Some(pk), matcherFee = Some(30000L), ts = Some(System.currentTimeMillis() + 1))
+    val ord1 = sell(pair, 10000, 0.0005, Some(pk), matcherFee = Some(30000L), ts = Some(System.currentTimeMillis()))
+    val ord2 = sell(pair, 16000, 0.0008, Some(pk), matcherFee = Some(30000L), ts = Some(System.currentTimeMillis() + 1))
 
     oh.processAll(OrderAdded(LimitOrder(ord1)), OrderAdded(LimitOrder(ord2)))
 
@@ -195,8 +195,8 @@ class OrderHistorySpecification
 
   property("Buy WAVES order filled exactly") {
     val pair      = AssetPair(None, mkAssetId("BTC"))
-    val counter   = buy(pair, 0.0008, 100000, matcherFee = Some(2000L))
-    val submitted = sell(pair, 0.0007, 100000, matcherFee = Some(1000L))
+    val counter   = buy(pair, 100000, 0.0008, matcherFee = Some(2000L))
+    val submitted = sell(pair, 100000, 0.0007, matcherFee = Some(1000L))
 
     oh.process(OrderAdded(LimitOrder(counter)))
 
@@ -238,8 +238,8 @@ class OrderHistorySpecification
 
   property("Buy WAVES order filled with remainder") {
     val pair      = AssetPair(None, mkAssetId("BTC"))
-    val counter   = sell(pair, 0.00000238, 840340L, matcherFee = Some(300000L))
-    val submitted = buy(pair, 0.00000238, 425532L, matcherFee = Some(300000L))
+    val counter   = sell(pair, 840340L, 0.00000238, matcherFee = Some(300000L))
+    val submitted = buy(pair, 425532L, 0.00000238, matcherFee = Some(300000L))
 
     val counterLo = LimitOrder(counter)
     oh.process(OrderAdded(counterLo))
@@ -313,8 +313,8 @@ class OrderHistorySpecification
 
   property("Sell WAVES order - filled, buy order - partial") {
     val pair      = AssetPair(None, mkAssetId("BTC"))
-    val counter   = sell(pair, 0.0008, 100000000, matcherFee = Some(2000L))
-    val submitted = buy(pair, 0.00085, 120000000, matcherFee = Some(1000L))
+    val counter   = sell(pair, 100000000, 0.0008, matcherFee = Some(2000L))
+    val submitted = buy(pair, 120000000, 0.00085, matcherFee = Some(1000L))
 
     oh.process(OrderAdded(LimitOrder(counter)))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
@@ -370,9 +370,9 @@ class OrderHistorySpecification
 
   property("Buy WAVES order - filled with 2 steps, sell order - partial") {
     val pair       = AssetPair(None, mkAssetId("BTC"))
-    val counter    = buy(pair, 0.0008, 100000000, matcherFee = Some(300001L))
-    val submitted1 = sell(pair, 0.00075, 50000000, matcherFee = Some(300001L))
-    val submitted2 = sell(pair, 0.0008, 80000000, matcherFee = Some(300001L))
+    val counter    = buy(pair, 100000000, 0.0008, matcherFee = Some(300001L))
+    val submitted1 = sell(pair, 50000000, 0.00075, matcherFee = Some(300001L))
+    val submitted2 = sell(pair, 80000000, 0.0008, matcherFee = Some(300001L))
 
     oh.process(OrderAdded(LimitOrder(counter)))
     val exec1 = OrderExecuted(LimitOrder(submitted1), LimitOrder(counter))
@@ -426,8 +426,8 @@ class OrderHistorySpecification
 
   property("WCT/BTC: sell - filled partially, buy - filled") {
     val pair      = AssetPair(mkAssetId("WCT"), mkAssetId("BTC"))
-    val counter   = sell(pair, 0.12739213, 347, matcherFee = Some(300000L))
-    val submitted = buy(pair, 0.12739213, 146, matcherFee = Some(300000L))
+    val counter   = sell(pair, 347, 0.12739213, matcherFee = Some(300000L))
+    val submitted = buy(pair, 146, 0.12739213, matcherFee = Some(300000L))
 
     oh.process(OrderAdded(LimitOrder(counter)))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
@@ -450,8 +450,8 @@ class OrderHistorySpecification
 
   property("Buy USD order - filled, sell BTC order - filled") {
     val pair      = AssetPair(mkAssetId("USD"), mkAssetId("BTC"))
-    val counter   = buy(pair, 0.001, 5000000, matcherFee = Some(1000L))
-    val submitted = sell(pair, 0.00099908, 5000000, matcherFee = Some(1000L))
+    val counter   = buy(pair, 5000000, 0.001, matcherFee = Some(1000L))
+    val submitted = sell(pair, 5000000, 0.00099908, matcherFee = Some(1000L))
 
     oh.process(OrderAdded(LimitOrder(counter)))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
@@ -466,9 +466,9 @@ class OrderHistorySpecification
 
   property("Sell ETH twice (filled, partial), buy WAVES order - filled") {
     val pair      = AssetPair(mkAssetId("ETH"), None)
-    val counter1  = sell(pair, 0.003, 2864310, matcherFee = Some(300000L))
-    val counter2  = sell(pair, 0.003, 7237977, matcherFee = Some(300000L))
-    val submitted = buy(pair, 0.003, 4373667, matcherFee = Some(300000L))
+    val counter1  = sell(pair, 2864310, 0.003, matcherFee = Some(300000L))
+    val counter2  = sell(pair, 7237977, 0.003, matcherFee = Some(300000L))
+    val submitted = buy(pair, 4373667, 0.003, matcherFee = Some(300000L))
 
     oh.processAll(OrderAdded(LimitOrder(counter1)), OrderAdded(LimitOrder(counter2)))
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter1))
@@ -486,8 +486,8 @@ class OrderHistorySpecification
 
   property("Sell EUR - partial, buy EUR order - filled") {
     val pair      = AssetPair(mkAssetId("EUR"), mkAssetId("USD"))
-    val counter   = sell(pair, 0.001356, 57918, matcherFee = Some(300000L))
-    val submitted = buy(pair, 0.003333, 46978, matcherFee = Some(300000L))
+    val counter   = sell(pair, 57918, 0.001356, matcherFee = Some(300000L))
+    val submitted = buy(pair, 46978, 0.003333, matcherFee = Some(300000L))
 
     oh.process(OrderAdded(LimitOrder(counter)))
 
@@ -508,9 +508,9 @@ class OrderHistorySpecification
   property("Total execution of two counter orders and the one submitted") {
     val pair = AssetPair(mkAssetId("Alice"), None)
 
-    val counter1  = buy(pair, 190000000L, 150, matcherFee = Some(300000))
-    val counter2  = buy(pair, 200000000L, 200, matcherFee = Some(300000))
-    val submitted = sell(pair, 210000000L, 350, matcherFee = Some(300000))
+    val counter1  = buy(pair, 150, 190000000L, matcherFee = Some(300000))
+    val counter2  = buy(pair, 200, 200000000L, matcherFee = Some(300000))
+    val submitted = sell(pair, 350, 210000000L, matcherFee = Some(300000))
 
     oh.processAll(OrderAdded(LimitOrder(counter1)), OrderAdded(LimitOrder(counter2)))
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter1))
@@ -523,9 +523,9 @@ class OrderHistorySpecification
     val pair = AssetPair(mkAssetId("BTC"), mkAssetId("ETH"))
 
     val alicePk   = PrivateKeyAccount("alice".getBytes("utf-8"))
-    val counter   = buy(pair, 0.00031887, 923431000L, matcherFee = Some(300000), sender = Some(alicePk))
+    val counter   = buy(pair, 923431000L, 0.00031887, matcherFee = Some(300000), sender = Some(alicePk))
     val bobPk     = PrivateKeyAccount("bob".getBytes("utf-8"))
-    val submitted = sell(pair, 0.00031887, 223345000L, matcherFee = Some(300000), sender = Some(bobPk))
+    val submitted = sell(pair, 223345000L, 0.00031887, matcherFee = Some(300000), sender = Some(bobPk))
 
     oh.process(OrderAdded(LimitOrder(counter)))
 
@@ -542,8 +542,8 @@ class OrderHistorySpecification
   property("Partially with own order") {
     val pk        = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair      = AssetPair(None, mkAssetId("BTC"))
-    val counter   = buy(pair, 0.0008, 100000000, Some(pk), Some(300000L))
-    val submitted = sell(pair, 0.00079, 210000000, Some(pk), Some(300000L))
+    val counter   = buy(pair, 100000000, 0.0008, Some(pk), Some(300000L))
+    val submitted = sell(pair, 210000000, 0.00079, Some(pk), Some(300000L))
 
     oh.process(OrderAdded(LimitOrder(counter)))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
@@ -588,8 +588,8 @@ class OrderHistorySpecification
     val pk = PrivateKeyAccount("private".getBytes("utf-8"))
 
     val pair      = AssetPair(None, mkAssetId("USD"))
-    val counter   = buy(pair, 0.1, 10000000L, matcherFee = Some(300000L))
-    val submitted = sell(pair, 10, 100000L, Some(pk), Some(300000L))
+    val counter   = buy(pair, 10000000L, 0.1, matcherFee = Some(300000L))
+    val submitted = sell(pair, 100000L, 10, Some(pk), Some(300000L))
 
     oh.processAll(OrderAdded(LimitOrder(counter)), OrderCanceled(LimitOrder(submitted), unmatchable = true))
 
@@ -606,7 +606,7 @@ class OrderHistorySpecification
   }
 
   property("Cancel buy order") {
-    val ord1 = buy(pair, 0.0008, 100000000, matcherFee = Some(300000L))
+    val ord1 = buy(pair, 100000000, 0.0008, matcherFee = Some(300000L))
 
     oh.processAll(OrderAdded(LimitOrder(ord1)), OrderCanceled(LimitOrder(ord1), unmatchable = false))
 
@@ -627,7 +627,7 @@ class OrderHistorySpecification
   }
 
   property("Cancel sell order") {
-    val ord1 = sell(pair, 0.0008, 100000000, matcherFee = Some(300000L))
+    val ord1 = sell(pair, 100000000, 0.0008, matcherFee = Some(300000L))
 
     oh.process(OrderAdded(LimitOrder(ord1)))
     oh.process(OrderCanceled(LimitOrder(ord1), unmatchable = false))
@@ -641,8 +641,8 @@ class OrderHistorySpecification
 
   property("Cancel partially executed order") {
     val pair      = AssetPair(None, mkAssetId("BTC"))
-    val counter   = sell(pair, 0.0008, 2100000000, matcherFee = Some(300000L))
-    val submitted = buy(pair, 0.00081, 1000000000, matcherFee = Some(300000L))
+    val counter   = sell(pair, 2100000000, 0.0008, matcherFee = Some(300000L))
+    val submitted = buy(pair, 1000000000, 0.00081, matcherFee = Some(300000L))
 
     oh.process(OrderAdded(LimitOrder(counter)))
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
@@ -670,8 +670,8 @@ class OrderHistorySpecification
   property("Delete order") {
     val pk        = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair      = AssetPair(None, mkAssetId("BTC"))
-    val counter   = buy(pair, 0.0008, 210000000, Some(pk), Some(300000L))
-    val submitted = sell(pair, 0.00079, 100000000, Some(pk), Some(300000L))
+    val counter   = buy(pair, 210000000, 0.0008, Some(pk), Some(300000L))
+    val submitted = sell(pair, 100000000, 0.00079, Some(pk), Some(300000L))
 
     oh.process(OrderAdded(LimitOrder(counter)))
     val exec1 = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
@@ -708,11 +708,11 @@ class OrderHistorySpecification
   property("Sorting by status then timestamp") {
     val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, mkAssetId("BTC"))
-    val ord1 = buy(pair, 0.0008, 110000000, Some(pk), Some(300000L), Some(1L)) // Filled
-    val ord2 = buy(pair, 0.0006, 120000000, Some(pk), Some(300000L), Some(2L)) // Accepted
-    val ord3 = buy(pair, 0.0005, 130000000, Some(pk), Some(300000L), Some(3L)) // Canceled
-    val ord4 = sell(pair, 0.00079, 2100000000, Some(pk), Some(300000L), Some(4L)) // Partial
-    val ord5 = buy(pair, 0.0004, 130000000, Some(pk), Some(300000L), Some(45)) // Accepted
+    val ord1 = buy(pair, 110000000, 0.0008, Some(pk), Some(300000L), Some(1L)) // Filled
+    val ord2 = buy(pair, 120000000, 0.0006, Some(pk), Some(300000L), Some(2L)) // Accepted
+    val ord3 = buy(pair, 130000000, 0.0005, Some(pk), Some(300000L), Some(3L)) // Canceled
+    val ord4 = sell(pair, 2100000000, 0.00079, Some(pk), Some(300000L), Some(4L)) // Partial
+    val ord5 = buy(pair, 130000000, 0.0004, Some(pk), Some(300000L), Some(45)) // Accepted
 
     oh.processAll(
       OrderAdded(LimitOrder(ord1)),
@@ -750,14 +750,14 @@ class OrderHistorySpecification
     val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, mkAssetId("BTC"))
     val origOrders = (0 until matcherSettings.maxOrdersPerRequest).map { i =>
-      val o = buy(pair, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(100L + i))
+      val o = buy(pair, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o)))
       o
     }.toVector
 
     oh.process(OrderCanceled(LimitOrder(origOrders.last), unmatchable = false))
 
-    val newOrder = buy(pair, 0.001, 100000000, Some(pk), Some(300000L), Some(1L))
+    val newOrder = buy(pair, 100000000, 0.001, Some(pk), Some(300000L), Some(1L))
 
     oh.process(OrderAdded(LimitOrder(newOrder)))
 
@@ -778,7 +778,7 @@ class OrderHistorySpecification
     val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, mkAssetId("BTC"))
     val origOrders = (0 to matcherSettings.maxOrdersPerRequest).map { i =>
-      val o = buy(pair, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(100L + i))
+      val o = buy(pair, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o)))
       o
     }.toVector
@@ -801,7 +801,7 @@ class OrderHistorySpecification
     val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, mkAssetId("BTC"))
     val orders = (0 to 3).map { i =>
-      val o = buy(pair, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(100 + i))
+      val o = buy(pair, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100 + i))
       oh.process(OrderAdded(LimitOrder(o)))
       o
     }
@@ -830,8 +830,8 @@ class OrderHistorySpecification
     val pair1      = AssetPair(ass1, None)
     val pair2      = AssetPair(ass2, None)
     val matcherFee = 300000L
-    val ord1       = sell(pair1, 0.0008, 10000, Some(pk), Some(matcherFee))
-    val ord2       = sell(pair2, 0.0009, 10001, Some(pk), Some(matcherFee))
+    val ord1       = sell(pair1, 10000, 0.0008, Some(pk), Some(matcherFee))
+    val ord2       = sell(pair2, 10001, 0.0009, Some(pk), Some(matcherFee))
 
     oh.processAll(OrderAdded(LimitOrder(ord1)), OrderAdded(LimitOrder(ord2)))
 
