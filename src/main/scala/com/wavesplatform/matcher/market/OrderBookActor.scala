@@ -5,7 +5,6 @@ import akka.http.scaladsl.model._
 import akka.persistence._
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api._
-import com.wavesplatform.matcher.market.MatcherActor.{Shutdown, ShutdownComplete}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded}
@@ -52,19 +51,10 @@ class OrderBookActor(assetPair: AssetPair,
       "type"  -> "timeout"
     )
 
-  private val snapshotCancellable    = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
-  private val cleanupCancellable     = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
-  private var orderBook              = OrderBook.empty
-  private var apiSender              = Option.empty[ActorRef]
-  private var cancellable            = Option.empty[Cancellable]
-  private var lastSnapshotSequenceNr = 0L
-
-  private var shutdownStatus: ShutdownStatus = ShutdownStatus(
-    initiated = false,
-    oldMessagesDeleted = false,
-    oldSnapshotsDeleted = false,
-    onComplete = () => ()
-  )
+  private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
+  private var orderBook          = OrderBook.empty
+  private var apiSender          = Option.empty[ActorRef]
+  private var cancellable        = Option.empty[Cancellable]
 
   val okCancel: java.lang.Boolean     = Boolean.box(true)
   val failedCancel: java.lang.Boolean = Boolean.box(false)
@@ -82,19 +72,12 @@ class OrderBookActor(assetPair: AssetPair,
       saveSnapshot(Snapshot(orderBook))
 
     case SaveSnapshotSuccess(metadata) =>
-      lastSnapshotSequenceNr = metadata.sequenceNr
+      log.debug(s"Snapshot has been saved: $metadata")
       deleteMessages(metadata.sequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
 
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata", reason)
-      if (shutdownStatus.initiated) {
-        shutdownStatus = shutdownStatus.copy(
-          oldSnapshotsDeleted = true,
-          oldMessagesDeleted = true
-        )
-        shutdownStatus.tryComplete()
-      }
 
     case DeleteOrderBookRequest(pair) =>
       updateSnapshot(OrderBook.empty)
@@ -109,49 +92,15 @@ class OrderBookActor(assetPair: AssetPair,
 
     case DeleteSnapshotsSuccess(criteria) =>
       log.info(s"$persistenceId DeleteSnapshotsSuccess with $criteria")
-      if (shutdownStatus.initiated) {
-        shutdownStatus = shutdownStatus.copy(oldSnapshotsDeleted = true)
-        shutdownStatus.tryComplete()
-      }
 
     case DeleteSnapshotsFailure(criteria, cause) =>
       log.error(s"$persistenceId DeleteSnapshotsFailure with $criteria, reason: $cause")
-      if (shutdownStatus.initiated) {
-        shutdownStatus = shutdownStatus.copy(oldSnapshotsDeleted = true)
-        shutdownStatus.tryComplete()
-      }
 
     case DeleteMessagesSuccess(toSequenceNr) =>
       log.info(s"$persistenceId DeleteMessagesSuccess up to $toSequenceNr")
-      if (shutdownStatus.initiated) {
-        shutdownStatus = shutdownStatus.copy(oldMessagesDeleted = true)
-        shutdownStatus.tryComplete()
-      }
 
     case DeleteMessagesFailure(cause: Throwable, toSequenceNr: Long) =>
       log.error(s"$persistenceId DeleteMessagesFailure up to $toSequenceNr, reason: $cause")
-      if (shutdownStatus.initiated) {
-        shutdownStatus = shutdownStatus.copy(oldMessagesDeleted = true)
-        shutdownStatus.tryComplete()
-      }
-
-    case Shutdown =>
-      if (!shutdownStatus.initiated) {
-        val s = sender()
-        shutdownStatus = shutdownStatus.copy(initiated = true, onComplete = { () =>
-          s ! ShutdownComplete
-          context.stop(self)
-        })
-
-        if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(orderBook))
-        else {
-          shutdownStatus = shutdownStatus.copy(
-            oldSnapshotsDeleted = true,
-            oldMessagesDeleted = true
-          )
-          shutdownStatus.tryComplete()
-        }
-      }
   }
 
   private def waitingValidation(sentMessage: ValidateOrder): Receive = readOnlyCommands orElse {
@@ -263,6 +212,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def processEvent(e: Event): Unit = {
     val st = Kamon.timer("matcher.orderbook.persist").refine("event" -> e.getClass.getSimpleName).start()
+    if (lastSequenceNr % settings.snapshotsInterval == 0) self ! SaveSnapshot
     persist(e)(_ => st.stop())
     applyEvent(e)
     context.system.eventStream.publish(e)
@@ -350,6 +300,7 @@ class OrderBookActor(assetPair: AssetPair,
   override def receiveRecover: Receive = {
     case evt: Event =>
       applyEvent(evt)
+      if (settings.recoverOrderHistory) context.system.eventStream.publish(evt)
 
     case RecoveryCompleted =>
       updateSnapshot(orderBook)
@@ -367,8 +318,7 @@ class OrderBookActor(assetPair: AssetPair,
         }
       }
 
-    case SnapshotOffer(metadata, snapshot: Snapshot) =>
-      lastSnapshotSequenceNr = metadata.sequenceNr
+    case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook
       updateSnapshot(orderBook)
       log.debug(s"Recovering $persistenceId from $snapshot")
@@ -380,7 +330,6 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   override def postStop(): Unit = {
-    snapshotCancellable.cancel()
     cleanupCancellable.cancel()
     cancellable.foreach(_.cancel())
   }
@@ -399,11 +348,6 @@ object OrderBookActor {
     Props(new OrderBookActor(assetPair, updateSnapshot, orderHistory, blockchain, wallet, utx, allChannels, settings, functionalitySettings))
 
   def name(assetPair: AssetPair): String = assetPair.toString
-
-  private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
-    def completed: Boolean  = initiated && oldMessagesDeleted && oldSnapshotsDeleted
-    def tryComplete(): Unit = if (completed) onComplete()
-  }
 
   case class DeleteOrderBookRequest(assetPair: AssetPair)
 
