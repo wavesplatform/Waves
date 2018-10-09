@@ -3,7 +3,6 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.RequestGen
-import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
