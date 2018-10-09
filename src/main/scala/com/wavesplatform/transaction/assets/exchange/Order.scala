@@ -238,8 +238,8 @@ object Order {
             matcher: PublicKeyAccount,
             pair: AssetPair,
             orderType: OrderType,
-            price: Long,
             amount: Long,
+            price: Long,
             timestamp: Long,
             expiration: Long,
             matcherFee: Long): Order = {

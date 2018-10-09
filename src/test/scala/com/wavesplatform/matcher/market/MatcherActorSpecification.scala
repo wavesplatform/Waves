@@ -106,8 +106,8 @@ class MatcherActorSpecification
           MatcherAccount,
           AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")),
           OrderType.BUY,
-          100000000L,
           100L,
+          100000000L,
           1L,
           1000L,
           100000L
@@ -125,8 +125,8 @@ class MatcherActorSpecification
           MatcherAccount,
           AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")),
           OrderType.BUY,
-          100000000L,
           100L,
+          100000000L,
           1L,
           1000L,
           100000L

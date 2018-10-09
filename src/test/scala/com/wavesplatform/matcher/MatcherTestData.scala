@@ -126,12 +126,12 @@ trait MatcherTestData {
     sender: PrivateKeyAccount <- accountGen
     pair                      <- assetPairGen
     orderType                 <- orderTypeGenerator
-    price: Long               <- maxWavesAmountGen
     amount: Long              <- maxWavesAmountGen
+    price: Long               <- maxWavesAmountGen
     timestamp: Long           <- createdTimeGen
     expiration: Long          <- maxTimeGen
     matcherFee: Long          <- maxWavesAmountGen
-  } yield (Order(sender, MatcherAccount, pair, orderType, price, amount, timestamp, expiration, matcherFee), sender)
+  } yield (Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee), sender)
 
   val buyLimitOrderGenerator: Gen[BuyLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen

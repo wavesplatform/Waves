@@ -515,25 +515,25 @@ trait TransactionGenBase extends ScriptGen {
     matcher    <- accountGen
     pair       <- assetPairGen
     orderType  <- orderTypeGen
-    price      <- priceGen
     amount     <- matcherAmountGen
+    price      <- priceGen
     timestamp  <- timestampGen
     expiration <- maxOrderTimeGen
     matcherFee <- matcherFeeAmountGen
-  } yield (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
+  } yield (sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee)
 
   val orderGen: Gen[Order] = for {
-    (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee) <- orderParamGen
-  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
+    (sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee) <- orderParamGen
+  } yield Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee)
 
   val arbitraryOrderGen: Gen[Order] = for {
     (sender, matcher, pair, orderType, _, _, _, _, _) <- orderParamGen
-    price                                             <- Arbitrary.arbitrary[Long]
     amount                                            <- Arbitrary.arbitrary[Long]
+    price                                             <- Arbitrary.arbitrary[Long]
     timestamp                                         <- Arbitrary.arbitrary[Long]
     expiration                                        <- Arbitrary.arbitrary[Long]
     matcherFee                                        <- Arbitrary.arbitrary[Long]
-  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
+  } yield Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee)
 
   val exchangeTransactionGen: Gen[ExchangeTransaction] = for {
     sender1: PrivateKeyAccount <- accountGen
@@ -548,7 +548,7 @@ trait TransactionGenBase extends ScriptGen {
                          priceAssetId: Option[ByteStr],
                          fixedMatcherFee: Option[Long] = None): Gen[ExchangeTransaction] =
     for {
-      (_, matcher, _, _, price, amount1, timestamp, expiration, genMatcherFee) <- orderParamGen
+      (_, matcher, _, _, amount1, price, timestamp, expiration, genMatcherFee) <- orderParamGen
       amount2: Long                                                            <- matcherAmountGen
       matchedAmount: Long                                                      <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
       assetPair = AssetPair(amountAssetId, priceAssetId)
