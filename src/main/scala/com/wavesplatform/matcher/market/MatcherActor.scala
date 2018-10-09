@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.market
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{Actor, ActorRef, Props, Terminated}
+import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
 import akka.http.scaladsl.model._
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
 import com.google.common.base.Charsets
@@ -139,11 +139,9 @@ class MatcherActor(orderHistory: ActorRef,
       }
 
     case Shutdown =>
-      val s = sender()
       shutdownStatus = shutdownStatus.copy(
         initiated = true,
         onComplete = { () =>
-          s ! ShutdownComplete
           context.stop(self)
         }
       )
@@ -339,7 +337,7 @@ object MatcherActor {
   }
 
   class GracefulShutdownActor(children: Vector[ActorRef], receiver: ActorRef) extends Actor {
-    children.map(context.watch).foreach(_ ! Shutdown)
+    children.map(context.watch).foreach(_ ! PoisonPill)
 
     override def receive: Receive = state(children.size)
 
