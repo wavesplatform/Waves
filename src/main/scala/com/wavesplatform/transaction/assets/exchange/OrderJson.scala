@@ -50,8 +50,8 @@ object OrderJson {
                 matcher: PublicKeyAccount,
                 assetPair: AssetPair,
                 orderType: OrderType,
-                price: Long,
                 amount: Long,
+                price: Long,
                 timestamp: Long,
                 expiration: Long,
                 matcherFee: Long,
@@ -77,8 +77,8 @@ object OrderJson {
       (JsPath \ "matcherPublicKey").read[PublicKeyAccount] and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
-      (JsPath \ "price").read[Long] and
       (JsPath \ "amount").read[Long] and
+      (JsPath \ "price").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "expiration").read[Long] and
       (JsPath \ "matcherFee").read[Long] and
