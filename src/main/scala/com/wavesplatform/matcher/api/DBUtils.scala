@@ -26,19 +26,23 @@ object DBUtils {
 
     object finalized {
       object common {
+        val MaxElements = 100
+
         def add(rw: RW, address: Address, id: Order.Id): Unit              = add(rw, address, List(id))
         def add(rw: RW, address: Address, ids: Seq[Order.Id]): Unit        = c(address).add(rw, ids)
         def iterator(ro: ReadOnlyDB, address: Address): Iterator[Order.Id] = c(address).iterator(ro)
 
-        private def c(address: Address) = new FinalizedOrdersCommonIndex(address, 100)
+        private def c(address: Address) = new FinalizedOrdersCommonIndex(address, MaxElements)
       }
 
       object pair {
+        val MaxElements = 100
+
         def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit              = add(rw, address, pair, List(id))
         def add(rw: RW, address: Address, pair: AssetPair, ids: Seq[Order.Id]): Unit        = c(address, pair).add(rw, ids)
         def iterator(ro: ReadOnlyDB, address: Address, pair: AssetPair): Iterator[Order.Id] = c(address, pair).iterator(ro)
 
-        private def c(address: Address, pair: AssetPair) = new FinalizedOrdersPairIndex(address, pair, 100)
+        private def c(address: Address, pair: AssetPair) = new FinalizedOrdersPairIndex(address, pair, MaxElements)
       }
     }
   }

@@ -3,12 +3,12 @@ package com.wavesplatform.matcher.model
 import com.google.common.base.Charsets
 import com.wavesplatform.WithDB
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
-import com.wavesplatform.matcher.MatcherTestData
+import com.wavesplatform.matcher.{MatcherKeys, MatcherTestData}
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.OrderHistorySpecification._
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 
@@ -34,19 +34,21 @@ class OrderHistorySpecification
     oh = new OrderHistory(db, matcherSettings)
   }
 
-  private def activeOrderIds(address: Address): Seq[ByteStr] =
+  private def activeOrderIds(address: Address): Seq[Order.Id] =
     DBUtils.ordersByAddress(db, address, activeOnly = true, matcherSettings.maxOrdersPerRequest).map(_._1.id())
 
-  private def allOrderIds(address: Address): Seq[ByteStr] =
+  private def allOrderIds(address: Address): Seq[Order.Id] =
     DBUtils.ordersByAddress(db, address, activeOnly = false, matcherSettings.maxOrdersPerRequest).map(_._1.id())
 
-  private def activeOrderIdsByPair(address: Address, pair: AssetPair): Seq[ByteStr] =
+  private def activeOrderIdsByPair(address: Address, pair: AssetPair): Seq[Order.Id] =
     DBUtils.ordersByAddressAndPair(db, address, pair, matcherSettings.maxOrdersPerRequest).collect {
       case (o, s) if !s.status.isFinal => o.id()
     }
 
-  private def allOrderIdsByPair(address: Address, pair: AssetPair): Seq[ByteStr] =
+  private def allOrderIdsByPair(address: Address, pair: AssetPair): Seq[Order.Id] =
     DBUtils.ordersByAddressAndPair(db, address, pair, matcherSettings.maxOrdersPerRequest).map(_._1.id())
+
+  private def selectOrders(xs: Seq[Order.Id]): Seq[Order] = xs.map(id => db.get(MatcherKeys.order(id))).flatten
 
   property("New buy order added") {
     val ord = buy(pair, 0.0007, 10000)
@@ -820,6 +822,67 @@ class OrderHistorySpecification
     withClue("orders list") {
       val orders = DBUtils.ordersByAddress(db, pk.toAddress, activeOnly = false, 3)
       orders should have size 3
+    }
+  }
+
+  property("History by pair contains more elements than in common") {
+    val pk    = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pair1 = AssetPair(None, mkAssetId("BTC"))
+    val pair2 = AssetPair(None, mkAssetId("ETH"))
+
+    // 1. Place and cancel active.MaxElements orders
+
+    val pair1Orders = (1 to DBUtils.indexes.active.MaxElements).map { i =>
+      val o = buy(pair1, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(100L + i))
+      oh.process(OrderAdded(LimitOrder(o)))
+      o
+    }.toVector
+
+    pair1Orders.foreach(o => oh.process(OrderCanceled(LimitOrder(o), unmatchable = false)))
+
+    withClue("after 1 step") {
+      activeOrderIds(pk) shouldBe empty
+      activeOrderIdsByPair(pk, pair1) shouldBe empty
+      activeOrderIdsByPair(pk, pair2) shouldBe empty
+
+      val allIds = allOrderIds(pk)
+      allIds should have length DBUtils.indexes.finalized.common.MaxElements
+      selectOrders(allIds) should have length DBUtils.indexes.finalized.common.MaxElements
+
+      val pair1Ids = allOrderIdsByPair(pk, pair1)
+      pair1Ids should have length DBUtils.indexes.finalized.pair.MaxElements
+      selectOrders(pair1Ids) should have length DBUtils.indexes.finalized.pair.MaxElements
+
+      val pair2Ids = allOrderIdsByPair(pk, pair2)
+      pair2Ids shouldBe empty
+    }
+
+    // 2. Place and cancel 10 orders in pair2
+
+    val pair2Orders = (1 to 10).map { i =>
+      val o = buy(pair2, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(1000L + i))
+      oh.process(OrderAdded(LimitOrder(o)))
+      o
+    }.toVector
+
+    pair2Orders.foreach(o => oh.process(OrderCanceled(LimitOrder(o), unmatchable = false)))
+
+    withClue("after 2 step") {
+      activeOrderIds(pk) shouldBe empty
+      activeOrderIdsByPair(pk, pair1) shouldBe empty
+      activeOrderIdsByPair(pk, pair2) shouldBe empty
+
+      val allIds = allOrderIds(pk)
+      allIds should have length DBUtils.indexes.finalized.common.MaxElements
+      selectOrders(allIds) should have length DBUtils.indexes.finalized.common.MaxElements
+
+      val pair1Ids = allOrderIdsByPair(pk, pair1)
+      pair1Ids should have length DBUtils.indexes.finalized.pair.MaxElements
+      selectOrders(pair1Ids) should have length DBUtils.indexes.finalized.pair.MaxElements
+
+      val pair2Ids = allOrderIdsByPair(pk, pair2)
+      pair2Ids should have length pair2Orders.size
+      selectOrders(pair2Ids) should have length pair2Orders.size
     }
   }
 
