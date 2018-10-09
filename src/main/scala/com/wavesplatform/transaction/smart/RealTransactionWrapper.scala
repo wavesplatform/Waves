@@ -43,8 +43,8 @@ object RealTransactionWrapper {
         case BUY  => OrdType.Buy
         case SELL => OrdType.Sell
       },
-      price = o.price,
       amount = o.amount,
+      price = o.price,
       timestamp = o.timestamp,
       expiration = o.expiration,
       matcherFee = o.matcherFee,

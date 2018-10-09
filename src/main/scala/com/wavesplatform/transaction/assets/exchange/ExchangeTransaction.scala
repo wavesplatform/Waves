@@ -43,8 +43,8 @@ case class ExchangeTransaction private (buyOrder: Order,
     jsonBase() ++ Json.obj(
       "order1"         -> buyOrder.json(),
       "order2"         -> sellOrder.json(),
-      "price"          -> price,
       "amount"         -> amount,
+      "price"          -> price,
       "buyMatcherFee"  -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
     ))
