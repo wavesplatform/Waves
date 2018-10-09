@@ -63,7 +63,7 @@ object EventSerializers {
     val OrderCancelled   = "event.OrderCancelled"
   }
 
-  private def dataToSerialize(lo: LimitOrder) = (lo.price, lo.amount, lo.fee, lo.order)
+  private def dataToSerialize(lo: LimitOrder) = (lo.amount, lo.price, lo.fee, lo.order)
 
   private def limitOrderFormatBuilder[T <: LimitOrder](limitOrderBuilder: (Long, Long, Long, Order) => T): Format[T] = Format(
     Reads[T] {
