@@ -13,11 +13,12 @@ object DataRequest {
   implicit val signedDataRequestReads   = Json.reads[SignedDataRequest]
 }
 
-case class DataRequest(@(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1") version: Byte,
-                       sender: String,
-                       @(ApiModelProperty @field)(required = true) data: List[DataEntry[_]],
-                       @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
-                       timestamp: Option[Long] = None)
+case class DataRequest(
+    @(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1") version: Byte,
+    sender: String,
+    @(ApiModelProperty @field)(required = true) data: List[DataEntry[_]],
+    @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
+    timestamp: Option[Long] = None)
 
 @ApiModel(value = "Signed Data transaction")
 case class SignedDataRequest(@(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1")
