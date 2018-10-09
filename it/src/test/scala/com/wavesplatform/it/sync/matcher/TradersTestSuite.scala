@@ -213,7 +213,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   }
 
   def bobPlacesWaveOrder(assetPair: AssetPair, amount: Long, price: Price): String = {
-    val bobOrder = matcherNode.prepareOrder(bobNode, assetPair, OrderType.BUY, price, amount)
+    val bobOrder = matcherNode.prepareOrder(bobNode, assetPair, OrderType.BUY, amount, price)
     val order    = matcherNode.placeOrder(bobOrder).message.id
     matcherNode.waitOrderStatus(assetPair, order, "Accepted")
     order
@@ -222,9 +222,9 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   def bobPlacesAssetOrder(bobCoinAmount: Int, twoAssetsPair: AssetPair, assetId: String): String = {
     val decodedAsset = ByteStr.decodeBase58(assetId).get
     val bobOrder = if (twoAssetsPair.amountAsset.contains(decodedAsset)) {
-      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.SELL, 1 * Order.PriceConstant, bobCoinAmount)
+      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant)
     } else {
-      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.BUY, bobCoinAmount * Order.PriceConstant, 1)
+      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.BUY, 1, bobCoinAmount * Order.PriceConstant)
     }
     val order = matcherNode.placeOrder(bobOrder)
     matcherNode.waitOrderStatus(twoAssetsPair, order.message.id, "Accepted")

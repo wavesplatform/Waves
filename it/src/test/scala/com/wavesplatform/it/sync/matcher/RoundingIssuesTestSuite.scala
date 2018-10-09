@@ -35,10 +35,10 @@ class RoundingIssuesTestSuite
     val aliceBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
     val bobBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
 
-    val counter   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 238, 3100000000L)
+    val counter   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 3100000000L, 238)
     val counterId = matcherNode.placeOrder(counter).message.id
 
-    val submitted   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 235, 425532L)
+    val submitted   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 425532L, 235)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
     val filledAmount = 420169L
@@ -64,10 +64,10 @@ class RoundingIssuesTestSuite
   }
 
   "reserved balance should not be negative" in {
-    val counter   = matcherNode.prepareOrder(bobNode, ethBtcPair, OrderType.BUY, 31887L, 923431000L)
+    val counter   = matcherNode.prepareOrder(bobNode, ethBtcPair, OrderType.BUY, 923431000L, 31887L)
     val counterId = matcherNode.placeOrder(counter).message.id
 
-    val submitted   = matcherNode.prepareOrder(aliceNode, ethBtcPair, OrderType.SELL, 31887L, 223345000L)
+    val submitted   = matcherNode.prepareOrder(aliceNode, ethBtcPair, OrderType.SELL, 223345000L, 31887L)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
     val filledAmount = 223344937L
@@ -85,13 +85,13 @@ class RoundingIssuesTestSuite
   }
 
   "should correctly fill 2 counter orders" in {
-    val counter1 = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 60L, 98333333L)
+    val counter1 = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 98333333L, 60L)
     matcherNode.placeOrder(counter1).message.id
 
-    val counter2   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 70L, 100000000L)
+    val counter2   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 100000000L, 70L)
     val counter2Id = matcherNode.placeOrder(counter2).message.id
 
-    val submitted   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 1000L, 100000000L)
+    val submitted   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 100000000L, 1000L)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
     matcherNode.waitOrderStatusAndAmount(wavesUsdPair, counter2Id, "PartiallyFilled", Some(2857143L), 1.minute)
