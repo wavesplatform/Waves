@@ -14,8 +14,8 @@ import scala.util.{Failure, Success, Try}
 
 case class ExchangeTransaction private (buyOrder: Order,
                                         sellOrder: Order,
-                                        price: Long,
                                         amount: Long,
+                                        price: Long,
                                         buyMatcherFee: Long,
                                         sellMatcherFee: Long,
                                         fee: Long,
@@ -112,7 +112,7 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
     } else if (!priceIsValid) {
       Left(GenericError("priceIsValid"))
     } else {
-      Right(ExchangeTransaction(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
+      Right(ExchangeTransaction(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
     }
   }
 
