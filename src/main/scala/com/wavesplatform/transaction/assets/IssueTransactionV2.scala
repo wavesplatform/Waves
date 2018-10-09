@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction.assets
 
-import java.nio.charset.StandardCharsets
-
 import com.google.common.primitives.Bytes
 import com.wavesplatform.crypto
 import com.wavesplatform.state.ByteStr
@@ -39,18 +37,7 @@ case class IssueTransactionV2 private (version: Byte,
     ))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override val json = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
-      "version"     -> version,
-      "assetId"     -> assetId().base58,
-      "name"        -> new String(name, StandardCharsets.UTF_8),
-      "quantity"    -> quantity,
-      "reissuable"  -> reissuable,
-      "decimals"    -> decimals,
-      "description" -> new String(description, StandardCharsets.UTF_8),
-      "script"      -> script.map(_.bytes().base64),
-    ))
-
+  override val json = Coeval.evalOnce(jsonBase() ++ Json.obj("script" -> script.map(_.bytes().base64)))
 }
 
 object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with TransactionParser.MultipleVersions {
