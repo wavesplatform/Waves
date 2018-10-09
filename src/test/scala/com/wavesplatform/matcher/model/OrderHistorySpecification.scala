@@ -833,7 +833,7 @@ class OrderHistorySpecification
     // 1. Place and cancel active.MaxElements orders
 
     val pair1Orders = (1 to DBUtils.indexes.active.MaxElements).map { i =>
-      val o = buy(pair1, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(100L + i))
+      val o = buy(pair1, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
       oh.process(OrderAdded(LimitOrder(o)))
       o
     }.toVector
@@ -860,7 +860,7 @@ class OrderHistorySpecification
     // 2. Place and cancel 10 orders in pair2
 
     val pair2Orders = (1 to 10).map { i =>
-      val o = buy(pair2, 0.0008 + 0.00001 * i, 100000000, Some(pk), Some(300000L), Some(1000L + i))
+      val o = buy(pair2, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(1000L + i))
       oh.process(OrderAdded(LimitOrder(o)))
       o
     }.toVector
