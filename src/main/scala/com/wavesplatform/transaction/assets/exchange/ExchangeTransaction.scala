@@ -59,21 +59,21 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
   def create(matcher: PrivateKeyAccount,
              buyOrder: Order,
              sellOrder: Order,
-             price: Long,
              amount: Long,
+             price: Long,
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
+    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))
     }
   }
 
   def create(buyOrder: Order,
              sellOrder: Order,
-             price: Long,
              amount: Long,
+             price: Long,
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
@@ -142,7 +142,7 @@ object ExchangeTransaction extends TransactionParserFor[ExchangeTransaction] wit
       val signature = ByteStr(bytes.slice(from, from + SignatureLength))
       from += SignatureLength
 
-      create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
+      create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
         .fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 

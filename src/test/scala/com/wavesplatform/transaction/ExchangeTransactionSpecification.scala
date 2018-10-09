@@ -39,8 +39,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         def create(matcher: PrivateKeyAccount = sender1,
                    buyOrder: Order = buy,
                    sellOrder: Order = sell,
-                   price: Long = sellPrice,
                    amount: Long = buyAmount,
+                   price: Long = sellPrice,
                    buyMatcherFee: Long = mf1,
                    sellMatcherFee: Long = 1,
                    fee: Long = 1,
@@ -49,8 +49,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
             matcher = sender1,
             buyOrder = buyOrder,
             sellOrder = sellOrder,
-            price = price,
             amount = amount,
+            price = price,
             buyMatcherFee = buyMatcherFee,
             sellMatcherFee = sellMatcherFee,
             fee = fee,
@@ -62,8 +62,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
 
         create(fee = -1) shouldBe an[Left[_, _]]
         create(amount = -1) shouldBe an[Left[_, _]]
-        create(price = -1) shouldBe an[Left[_, _]]
         create(amount = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
+        create(price = -1) shouldBe an[Left[_, _]]
         create(sellMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(buyMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
@@ -89,8 +89,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       matcher = matcher,
       buyOrder = buy,
       sellOrder = sell,
-      price = price,
       amount = amount,
+      price = price,
       buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
       sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
       fee = mf,
@@ -166,8 +166,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       .create(
         buy,
         sell,
-        5000000000L,
         2,
+        5000000000L,
         1,
         1,
         1,
