@@ -20,7 +20,7 @@ case class LevelAgg(amount: Long, price: Long)
 sealed trait LimitOrder {
   def amount: Long // could be remaining or executed, see OrderExecuted
   def price: Price
-  def fee: Long    // same
+  def fee: Long // same
   def order: Order
   def partial(amount: Long, fee: Long): LimitOrder
 

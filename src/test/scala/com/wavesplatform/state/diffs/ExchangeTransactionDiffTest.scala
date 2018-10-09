@@ -201,7 +201,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val assetPair                                          = AssetPair(None, Some(issue1.id()))
 
     val buy  = Order.buy(buyer, matcher, assetPair, 3100000000L, 238, Ts, Ts + 1, MatcherFee)
-    val sell = Order.sell(seller, matcher, assetPair, 235, 425532L, Ts, Ts + 1, MatcherFee)
+    val sell = Order.sell(seller, matcher, assetPair, 425532L, 235, Ts, Ts + 1, MatcherFee)
     val tx = ExchangeTransaction
       .create(
         matcher = matcher,
