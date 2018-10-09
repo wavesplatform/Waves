@@ -32,7 +32,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistribution ~ details ~ sponsorRoute
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ massTransfer ~ signOrder ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ sponsorRoute
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -59,6 +59,29 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) =>
             Json.toJson(blockchain.assetDistribution(ByteStr(byteArray)).map { case (a, b) => a.stringRepr -> b })
+          case Failure(_) =>
+            ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
+        }
+      }
+    }
+
+  @Path("/{assetId}/distribution/{height}")
+  @ApiOperation(
+    value = "Asset balance distribution at height",
+    notes = "Asset balance distribution by account at specified height",
+    httpMethod = "GET"
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "integer", paramType = "path"),
+    ))
+  def balanceDistributionAtHeight: Route =
+    (get & path(Segment / "distribution" / IntNumber)) { (assetId, height) =>
+      complete {
+        Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
+          case Success(byteArray) =>
+            Json.toJson(blockchain.assetDistributionAtHeight(ByteStr(byteArray), height).map { case (a, b) => a.stringRepr -> b })
           case Failure(_) =>
             ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
         }
