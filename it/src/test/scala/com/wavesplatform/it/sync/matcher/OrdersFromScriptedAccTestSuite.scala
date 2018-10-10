@@ -63,7 +63,7 @@ class OrdersFromScriptedAccTestSuite
     "Alice place sell order, but Bob cannot place order, because his acc is scripted" in {
       // Alice places sell order
       val aliceOrder = matcherNode
-        .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, 10.minutes)
+        .placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, 10.minutes)
 
       aliceOrder.status shouldBe "OrderAccepted"
 
@@ -84,7 +84,7 @@ class OrdersFromScriptedAccTestSuite
       // Bob gets error message
       assertBadRequestAndResponse(
         matcherNode
-          .placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, 10.minutes),
+          .placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, 10.minutes),
         "Trading on scripted account isn't allowed yet."
       )
 

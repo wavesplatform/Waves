@@ -30,10 +30,10 @@ object ExchangeTransactionDiff {
                        (),
                        GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script"))
       t                     <- enoughVolume(tx, blockchain)
-      buyPriceAssetChange   <- t.buyOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
-      buyAmountAssetChange  <- t.buyOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
-      sellPriceAssetChange  <- t.sellOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
-      sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
+      buyPriceAssetChange   <- t.buyOrder.getSpendAmount(t.amount, t.price).liftValidationError(tx).map(-_)
+      buyAmountAssetChange  <- t.buyOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
+      sellPriceAssetChange  <- t.sellOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
+      sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.amount, t.price).liftValidationError(tx).map(-_)
     } yield {
 
       def wavesPortfolio(amt: Long) = Portfolio(amt, LeaseBalance.empty, Map.empty)

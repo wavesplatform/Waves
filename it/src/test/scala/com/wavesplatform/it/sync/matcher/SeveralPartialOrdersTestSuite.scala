@@ -42,17 +42,17 @@ class SeveralPartialOrdersTestSuite
     val sellOrderAmount = 840340L
 
     "place two submitted orders and one counter" in {
-      val bobOrder1   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, price, sellOrderAmount)
+      val bobOrder1   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       val bobOrder1Id = matcherNode.placeOrder(bobOrder1).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Accepted", 1.minute)
       matcherNode.reservedBalance(bobNode)("WAVES") shouldBe sellOrderAmount + matcherFee
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobWavesBalanceBefore - (sellOrderAmount + matcherFee)
 
-      val aliceOrder1  = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, price, buyOrderAmount)
+      val aliceOrder1  = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
       val aliceOrderId = matcherNode.placeOrder(aliceOrder1).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, aliceOrderId, "Filled", 1.minute)
 
-      val aliceOrder2   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, price, buyOrderAmount)
+      val aliceOrder2   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
       val aliceOrder2Id = matcherNode.placeOrder(aliceOrder2).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, aliceOrder2Id, "Filled", 1.minute)
 
@@ -69,12 +69,12 @@ class SeveralPartialOrdersTestSuite
       orderBook1.asks shouldBe empty
       orderBook1.bids shouldBe empty
 
-      val bobOrder2   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, price, sellOrderAmount)
+      val bobOrder2   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       val bobOrder2Id = matcherNode.placeOrder(bobOrder2).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Accepted", 1.minute)
 
       val orderBook2 = matcherNode.orderBook(wavesUsdPair)
-      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.price, bobOrder2.amount))
+      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
 
       matcherNode.cancelOrder(bobNode, wavesUsdPair, Some(bobOrder2Id))
@@ -85,13 +85,13 @@ class SeveralPartialOrdersTestSuite
     }
 
     "place one submitted orders and two counter" in {
-      val aliceOrder1   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, price, buyOrderAmount)
+      val aliceOrder1   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
       val aliceOrder1Id = matcherNode.placeOrder(aliceOrder1).message.id
 
-      val aliceOrder2   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, price, buyOrderAmount)
+      val aliceOrder2   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, buyOrderAmount, price)
       val aliceOrder2Id = matcherNode.placeOrder(aliceOrder2).message.id
 
-      val bobOrder1   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, price, sellOrderAmount)
+      val bobOrder1   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       val bobOrder1Id = matcherNode.placeOrder(bobOrder1).message.id
 
       matcherNode.waitOrderStatus(wavesUsdPair, aliceOrder1Id, "Filled", 1.minute)
@@ -111,12 +111,12 @@ class SeveralPartialOrdersTestSuite
       orderBook1.asks shouldBe empty
       orderBook1.bids shouldBe empty
 
-      val bobOrder2   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, price, sellOrderAmount)
+      val bobOrder2   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       val bobOrder2Id = matcherNode.placeOrder(bobOrder2).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Accepted", 1.minute)
 
       val orderBook2 = matcherNode.orderBook(wavesUsdPair)
-      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.price, bobOrder2.amount))
+      orderBook2.asks shouldBe List(LevelResponse(bobOrder2.amount, bobOrder2.price))
       orderBook2.bids shouldBe empty
     }
   }
@@ -126,7 +126,7 @@ class SeveralPartialOrdersTestSuite
     (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }
 
-  def receiveAmount(ot: OrderType, matchPrice: Long, matchAmount: Long): Long =
+  def receiveAmount(ot: OrderType, matchAmount: Long, matchPrice: Long): Long =
     if (ot == BUY) correctAmount(matchAmount, matchPrice)
     else {
       (BigInt(matchAmount) * matchPrice / Order.PriceConstant).bigInteger.longValueExact()

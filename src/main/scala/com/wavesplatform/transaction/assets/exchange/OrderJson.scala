@@ -50,13 +50,13 @@ object OrderJson {
                 matcher: PublicKeyAccount,
                 assetPair: AssetPair,
                 orderType: OrderType,
-                price: Long,
                 amount: Long,
+                price: Long,
                 timestamp: Long,
                 expiration: Long,
                 matcherFee: Long,
                 signature: Option[Array[Byte]]): Order = {
-    Order(sender, matcher, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, signature.getOrElse(Array()))
+    Order(sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, signature.getOrElse(Array()))
   }
 
   def readAssetPair(amountAsset: Option[Option[Array[Byte]]], priceAsset: Option[Option[Array[Byte]]]): AssetPair = {
@@ -77,8 +77,8 @@ object OrderJson {
       (JsPath \ "matcherPublicKey").read[PublicKeyAccount] and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
-      (JsPath \ "price").read[Long] and
       (JsPath \ "amount").read[Long] and
+      (JsPath \ "price").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "expiration").read[Long] and
       (JsPath \ "matcherFee").read[Long] and

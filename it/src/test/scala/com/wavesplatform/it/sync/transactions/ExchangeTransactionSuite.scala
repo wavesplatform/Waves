@@ -43,8 +43,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
     val buyAmount           = 1
     val sellAmount          = 1
     val assetPair           = AssetPair.createAssetPair("WAVES", assetId).get
-    val buy                 = Order.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, matcherFee)
-    val sell                = Order.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, matcherFee)
+    val buy                 = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, time, expirationTimestamp, matcherFee)
+    val sell                = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, time, expirationTimestamp, matcherFee)
 
     val amount = 1
     val tx = ExchangeTransaction
@@ -52,8 +52,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
         matcher = matcher,
         buyOrder = buy,
         sellOrder = sell,
-        price = sellPrice,
         amount = amount,
+        price = sellPrice,
         buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
         sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
         fee = matcherFee,
@@ -72,8 +72,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
         Base58.encode(tx.sender.publicKey),
         tx.buyOrder,
         tx.sellOrder,
-        tx.price,
         tx.amount,
+        tx.price,
         matcherFee,
         tx.buyMatcherFee,
         tx.sellMatcherFee,

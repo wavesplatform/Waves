@@ -60,8 +60,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
                  @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
                  assetPair: AssetPair,
                  @ApiModelProperty(dataType = "java.lang.String", example = "buy") orderType: OrderType,
-                 @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
                  @ApiModelProperty("Amount in AssetPair.second") amount: Long,
+                 @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
                  @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
                  @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
                  @ApiModelProperty(example = "100000") matcherFee: Long,
@@ -76,7 +76,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
-    isValidAmount(price, amount) &&
+    isValidAmount(amount, price) &&
     assetPair.isValid &&
     (matcherFee > 0) :| "matcherFee should be > 0" &&
     (matcherFee < MaxAmount) :| "matcherFee too large" &&
@@ -85,14 +85,14 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     (expiration >= atTime) :| "expiration should be > currentTime"
   }
 
-  def isValidAmount(matchPrice: Long, matchAmount: Long): Validation = {
+  def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
     (matchAmount > 0) :| "amount should be > 0" &&
     (matchPrice > 0) :| "price should be > 0" &&
     (matchAmount < MaxAmount) :| "amount too large" &&
-    getSpendAmount(matchPrice, matchAmount).isRight :| "SpendAmount too large" &&
-    (getSpendAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-    getReceiveAmount(matchPrice, matchAmount).isRight :| "ReceiveAmount too large" &&
-    (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
+    getSpendAmount(matchAmount, matchPrice).isRight :| "SpendAmount too large" &&
+    (getSpendAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
+    getReceiveAmount(matchAmount, matchPrice).isRight :| "ReceiveAmount too large" &&
+    (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
   def toSign: Array[Byte] =
@@ -124,7 +124,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   }
 
   @ApiModelProperty(hidden = true)
-  def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
+  def getSpendAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
       if (orderType == OrderType.SELL) matchAmount
@@ -137,7 +137,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     }.toEither.left.map(x => GenericError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
+  def getReceiveAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       if (orderType == OrderType.BUY) matchAmount
       else {
@@ -154,8 +154,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
       "assetPair"        -> assetPair.json,
       "orderType"        -> orderType.toString,
-      "price"            -> price,
       "amount"           -> amount,
+      "price"            -> price,
       "timestamp"        -> timestamp,
       "expiration"       -> expiration,
       "matcherFee"       -> matcherFee,
@@ -211,12 +211,12 @@ object Order {
   def buy(sender: PrivateKeyAccount,
           matcher: PublicKeyAccount,
           pair: AssetPair,
-          price: Long,
           amount: Long,
+          price: Long,
           timestamp: Long,
           expiration: Long,
           matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Array())
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
@@ -224,12 +224,12 @@ object Order {
   def sell(sender: PrivateKeyAccount,
            matcher: PublicKeyAccount,
            pair: AssetPair,
-           price: Long,
            amount: Long,
+           price: Long,
            timestamp: Long,
            expiration: Long,
            matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Array())
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
@@ -238,12 +238,12 @@ object Order {
             matcher: PublicKeyAccount,
             pair: AssetPair,
             orderType: OrderType,
-            price: Long,
             amount: Long,
+            price: Long,
             timestamp: Long,
             expiration: Long,
             matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Array())
     val sig      = crypto.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
@@ -277,8 +277,8 @@ object Order {
       matcher,
       AssetPair(amountAssetId.map(ByteStr(_)), priceAssetId.map(ByteStr(_))),
       OrderType(orderType),
-      price,
       amount,
+      price,
       timestamp,
       expiration,
       matcherFee,

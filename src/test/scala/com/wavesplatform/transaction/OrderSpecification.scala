@@ -102,12 +102,12 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
 
   property("Buy and Sell orders") {
     forAll(orderParamGen) {
-      case (sender, matcher, pair, _, price, amount, timestamp, _, _) =>
+      case (sender, matcher, pair, _, amount, price, timestamp, _, _) =>
         val expiration = timestamp + Order.MaxLiveTime - 1000
-        val buy        = Order.buy(sender, matcher, pair, price, amount, timestamp, expiration, price)
+        val buy        = Order.buy(sender, matcher, pair, amount, price, timestamp, expiration, price)
         buy.orderType shouldBe OrderType.BUY
 
-        val sell = Order.sell(sender, matcher, pair, price, amount, timestamp, expiration, price)
+        val sell = Order.sell(sender, matcher, pair, amount, price, timestamp, expiration, price)
         sell.orderType shouldBe OrderType.SELL
     }
   }

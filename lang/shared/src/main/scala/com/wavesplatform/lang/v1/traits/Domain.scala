@@ -39,8 +39,8 @@ case class Ord(id: ByteVector,
                matcherPublicKey: ByteVector,
                assetPair: APair,
                orderType: OrdType,
-               price: Long,
                amount: Long,
+               price: Long,
                timestamp: Long,
                expiration: Long,
                matcherFee: Long,
@@ -80,6 +80,6 @@ object Tx {
                           attachment: ByteVector)
       extends Tx
   case class Sponsorship(p: Proven, assetId: ByteVector, minSponsoredAssetFee: Option[Long])                                          extends Tx
-  case class Exchange(p: Proven, price: Long, amount: Long, buyMatcherFee: Long, sellMatcherFee: Long, buyOrder: Ord, sellOrder: Ord) extends Tx
+  case class Exchange(p: Proven, amount: Long, price: Long, buyMatcherFee: Long, sellMatcherFee: Long, buyOrder: Ord, sellOrder: Ord) extends Tx
   case class Data(p: Proven, data: IndexedSeq[DataItem[_]])                                                                           extends Tx
 }

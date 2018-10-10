@@ -147,8 +147,8 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           // Amount of waves in order is smaller than fee
           val bobBalance = bobNode.accountBalances(bobNode.address)._1
 
-          val oldestOrderId = bobPlacesWaveOrder(bobWavesPair, 10.waves * Order.PriceConstant, 1)
-          val newestOrderId = bobPlacesWaveOrder(bobWavesPair, 10.waves * Order.PriceConstant, 1)
+          val oldestOrderId = bobPlacesWaveOrder(bobWavesPair, 1, 10.waves * Order.PriceConstant)
+          val newestOrderId = bobPlacesWaveOrder(bobWavesPair, 1, 10.waves * Order.PriceConstant)
 
           //      waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
           val leaseAmount = bobBalance - TransactionFee - 10.waves - matcherFee
@@ -172,7 +172,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         "leased waves, insufficient waves" in {
           val bobBalance = bobNode.accountBalances(bobNode.address)._1
           val price      = 1.waves
-          val order2     = bobPlacesWaveOrder(bobWavesPair, price * Order.PriceConstant, 1)
+          val order2     = bobPlacesWaveOrder(bobWavesPair, 1, price * Order.PriceConstant)
 
           val leaseAmount = bobBalance - TransactionFee - price / 2
           val leaseId     = bobNode.lease(bobNode.address, aliceNode.address, leaseAmount, TransactionFee).id
@@ -192,7 +192,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           // Amount of waves in order is smaller than fee
           val bobBalance = bobNode.accountBalances(bobNode.address)._1
           val price      = TransactionFee / 2
-          val order3     = bobPlacesWaveOrder(bobWavesPair, price * Order.PriceConstant, 1)
+          val order3     = bobPlacesWaveOrder(bobWavesPair, 1, price * Order.PriceConstant)
 
           val transferAmount = bobBalance - TransactionFee - price
           val txId           = bobNode.transfer(bobNode.address, aliceNode.address, transferAmount, TransactionFee, None, None).id
@@ -212,8 +212,8 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     }
   }
 
-  def bobPlacesWaveOrder(assetPair: AssetPair, price: Price, amount: Long): String = {
-    val bobOrder = matcherNode.prepareOrder(bobNode, assetPair, OrderType.BUY, price, amount)
+  def bobPlacesWaveOrder(assetPair: AssetPair, amount: Long, price: Price): String = {
+    val bobOrder = matcherNode.prepareOrder(bobNode, assetPair, OrderType.BUY, amount, price)
     val order    = matcherNode.placeOrder(bobOrder).message.id
     matcherNode.waitOrderStatus(assetPair, order, "Accepted")
     order
@@ -222,9 +222,9 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   def bobPlacesAssetOrder(bobCoinAmount: Int, twoAssetsPair: AssetPair, assetId: String): String = {
     val decodedAsset = ByteStr.decodeBase58(assetId).get
     val bobOrder = if (twoAssetsPair.amountAsset.contains(decodedAsset)) {
-      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.SELL, 1 * Order.PriceConstant, bobCoinAmount)
+      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant)
     } else {
-      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.BUY, bobCoinAmount * Order.PriceConstant, 1)
+      matcherNode.prepareOrder(bobNode, twoAssetsPair, OrderType.BUY, 1, bobCoinAmount * Order.PriceConstant)
     }
     val order = matcherNode.placeOrder(bobOrder)
     matcherNode.waitOrderStatus(twoAssetsPair, order.message.id, "Accepted")

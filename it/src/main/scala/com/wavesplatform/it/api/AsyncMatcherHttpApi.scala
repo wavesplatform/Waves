@@ -188,14 +188,14 @@ object AsyncMatcherHttpApi extends Assertions {
     def prepareOrder(sender: Node,
                      pair: AssetPair,
                      orderType: OrderType,
-                     price: Long,
                      amount: Long,
+                     price: Long,
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = matcherNode.publicKey
       val unsigned =
-        Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, DefaultMatcherFee, Array())
+        Order(sender.publicKey, matcherPublicKey, pair, orderType, amount, price, creationTime, timeToLiveTimestamp, DefaultMatcherFee, Array())
       val signature = crypto.sign(sender.privateKey, unsigned.toSign)
       unsigned.copy(signature = signature)
     }
@@ -206,10 +206,10 @@ object AsyncMatcherHttpApi extends Assertions {
     def placeOrder(sender: Node,
                    pair: AssetPair,
                    orderType: OrderType,
-                   price: Long,
                    amount: Long,
+                   price: Long,
                    timeToLive: Duration = 30.days - 1.seconds): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, price, amount, timeToLive)
+      val order = prepareOrder(sender, pair, orderType, amount, price, timeToLive)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 

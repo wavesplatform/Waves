@@ -301,8 +301,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     val buyAmount           = 2
     val sellAmount          = 3
     val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
-    val buy                 = Order.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, mf)
-    val sell                = Order.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, mf)
+    val buy                 = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, time, expirationTimestamp, mf)
+    val sell                = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, time, expirationTimestamp, mf)
 
     val amount = math.min(buy.amount, sell.amount)
     val tx = ExchangeTransaction
@@ -310,8 +310,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
         matcher = matcher,
         buyOrder = buy,
         sellOrder = sell,
-        price = sellPrice,
         amount = amount,
+        price = sellPrice,
         buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
         sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
         fee = mf,

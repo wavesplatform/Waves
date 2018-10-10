@@ -59,23 +59,23 @@ class MatcherMassOrdersTestSuite
 
     // Alice places sell orders
     val aliceOrderIdFill = matcherNode
-      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 10.minutes)
+      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant, 10.minutes)
       .message
       .id
 
     val alicePartialOrderId = matcherNode
-      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 10.minutes)
+      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant, 10.minutes)
       .message
       .id
 
     val aliceOrderToCancelId =
       matcherNode
-        .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, 70.seconds)
+        .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant, 70.seconds)
         .message
         .id
 
     val aliceActiveOrderId = matcherNode
-      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant + 1, 3, 10.minutes)
+      .placeOrder(aliceNode, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant + 1, 10.minutes)
       .message
       .id
 
@@ -152,7 +152,7 @@ class MatcherMassOrdersTestSuite
   private def ordersRequestsGen(n: Int, node: Node, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[String] = {
     val orderIds = 1 to n map (_ => {
       matcherNode
-        .placeOrder(node, assetPair, orderType, Order.PriceConstant, amount, (120 + Random.nextInt(70)).seconds)
+        .placeOrder(node, assetPair, orderType, amount, Order.PriceConstant, (120 + Random.nextInt(70)).seconds)
         .message
         .id
     })
