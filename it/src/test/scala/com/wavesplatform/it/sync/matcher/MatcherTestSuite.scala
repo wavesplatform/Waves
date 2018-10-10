@@ -41,7 +41,13 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
-    val order1 = matcherNode.placeOrder(aliceNode, aliceWavesPair, OrderType.SELL, aliceSellAmount, 2.waves * Order.PriceConstant, 2.minutes)
+    val order1         = matcherNode.prepareOrder(aliceNode, aliceWavesPair, OrderType.SELL, aliceSellAmount, 2.waves * Order.PriceConstant, 2.minutes)
+    val order1Response = matcherNode.placeOrder(order1)
+
+    "can't place an order with the same timestamp" in {
+      val order2 = Order.sign(order1.copy(amount = order1.amount + 1), aliceNode.privateKey)
+      matcherNode.expectIncorrectOrderPlacement(order2, 400, "OrderRejected") shouldBe true
+    }
 
     "assert addresses balances" in {
       aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, AssetQuantity)
@@ -67,10 +73,10 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     "sell order could be placed correctly" - {
       "alice places sell order" in {
-        order1.status shouldBe "OrderAccepted"
+        order1Response.status shouldBe "OrderAccepted"
 
         // Alice checks that the order in order book
-        matcherNode.waitOrderStatus(aliceWavesPair, order1.message.id, "Accepted")
+        matcherNode.waitOrderStatus(aliceWavesPair, order1Response.message.id, "Accepted")
 
         // Alice check that order is correct
         val orders = matcherNode.orderBook(aliceWavesPair)
@@ -85,7 +91,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
 
       "and should be listed by trader's publiс key via REST" in {
-        matcherNode.fullOrderHistory(aliceNode).map(_.id) should contain(order1.message.id)
+        matcherNode.fullOrderHistory(aliceNode).map(_.id) should contain(order1Response.message.id)
       }
 
       "and should match with buy order" in {
@@ -97,7 +103,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         val order2 = matcherNode.placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 200, 2.waves * Order.PriceConstant)
         order2.status shouldBe "OrderAccepted"
 
-        matcherNode.waitOrderStatus(aliceWavesPair, order1.message.id, "PartiallyFilled")
+        matcherNode.waitOrderStatus(aliceWavesPair, order1Response.message.id, "PartiallyFilled")
         matcherNode.waitOrderStatus(aliceWavesPair, order2.message.id, "Filled")
 
         matcherNode.orderHistoryByPair(bobNode, aliceWavesPair).map(_.id) should contain(order2.message.id)
@@ -131,7 +137,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
       "request activeOnly orders" in {
         val aliceOrders = matcherNode.activeOrderHistory(aliceNode)
-        aliceOrders.map(_.id) shouldBe Seq(order1.message.id)
+        aliceOrders.map(_.id) shouldBe Seq(order1Response.message.id)
         val bobOrders = matcherNode.activeOrderHistory(bobNode)
         bobOrders.map(_.id) shouldBe Seq()
       }
@@ -181,7 +187,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
       "order could be canceled and resubmitted again" in {
         // Alice cancels the very first order (100 left)
-        val status1 = matcherNode.cancelOrder(aliceNode, aliceWavesPair, Some(order1.message.id))
+        val status1 = matcherNode.cancelOrder(aliceNode, aliceWavesPair, Some(order1Response.message.id))
         status1.status should be("OrderCanceled")
 
         // Alice checks that the order book is empty

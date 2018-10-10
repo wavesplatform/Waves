@@ -88,4 +88,5 @@ object MatcherKeys {
   def finalizedPair(address: Address, pair: AssetPair, seqNr: Int): Key[Option[Order.Id]] =
     Key.opt(bytes(16, address.bytes.arr ++ pair.bytes ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
 
+  def lastOrderTimestamp(address: Address): Key[Option[Long]] = Key.opt(bytes(17, address.bytes.arr), Longs.fromByteArray, Longs.toByteArray)
 }
