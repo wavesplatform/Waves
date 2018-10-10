@@ -825,6 +825,69 @@ class OrderHistorySpecification
     }
   }
 
+  property("History by pair - added orders more than history by pair limit (200 active)") {
+    val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pair = AssetPair(None, mkAssetId("BTC"))
+
+    val orders = (1 to DBUtils.indexes.active.MaxElements).map { i =>
+      val o = buy(pair, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
+      oh.process(OrderAdded(LimitOrder(o)))
+      o
+    }.toVector
+
+    val expectedIds = orders.map(_.id()).reverse
+
+    withClue("common") {
+      val allIds = allOrderIds(pk)
+      allIds should have length expectedIds.size
+      selectOrders(allIds) should have length expectedIds.size
+      allIds shouldBe expectedIds
+      activeOrderIds(pk) shouldBe expectedIds
+    }
+
+    withClue("pair") {
+      // Even expectedIds.size < pair.MaxElements!
+      val pair1Ids = allOrderIdsByPair(pk, pair)
+      pair1Ids should have length expectedIds.size
+      selectOrders(pair1Ids) should have length expectedIds.size
+      pair1Ids shouldBe expectedIds.take(expectedIds.size)
+      activeOrderIdsByPair(pk, pair) shouldBe expectedIds
+    }
+  }
+
+  property("History by pair - added and canceled orders both more than history by pair limit (200 active, 10 canceled)") {
+    val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pair = AssetPair(None, mkAssetId("BTC"))
+
+    val allOrders = (1 to DBUtils.indexes.active.MaxElements + 10).map { i =>
+      val o = buy(pair, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100L + i))
+      oh.processAll(OrderAdded(LimitOrder(o)))
+      o
+    }.toVector
+
+    val (ordersToCancel, activeOrders) = allOrders.splitAt(DBUtils.indexes.active.MaxElements)
+    ordersToCancel.foreach(o => oh.process(OrderCanceled(LimitOrder(o), unmatchable = false)))
+    val expectedActiveOrderIds = activeOrders.map(_.id()).reverse
+
+    withClue("common") {
+      val expectedIds = allOrders.takeRight(DBUtils.indexes.finalized.common.MaxElements).map(_.id()).reverse
+      val allIds      = allOrderIds(pk)
+      allIds should have length expectedIds.size
+      selectOrders(allIds) should have length expectedIds.size
+      allIds shouldBe expectedIds
+      activeOrderIds(pk) shouldBe expectedActiveOrderIds
+    }
+
+    withClue("pair") {
+      val expectedIds = allOrders.takeRight(DBUtils.indexes.finalized.pair.MaxElements).map(_.id()).reverse
+      val pair1Ids    = allOrderIdsByPair(pk, pair)
+      pair1Ids should have length expectedIds.size
+      selectOrders(pair1Ids) should have length expectedIds.size
+      pair1Ids shouldBe expectedIds.take(expectedIds.size)
+      activeOrderIdsByPair(pk, pair) shouldBe expectedActiveOrderIds
+    }
+  }
+
   property("History by pair contains more elements than in common") {
     val pk    = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair1 = AssetPair(None, mkAssetId("BTC"))
@@ -845,16 +908,28 @@ class OrderHistorySpecification
       activeOrderIdsByPair(pk, pair1) shouldBe empty
       activeOrderIdsByPair(pk, pair2) shouldBe empty
 
-      val allIds = allOrderIds(pk)
-      allIds should have length DBUtils.indexes.finalized.common.MaxElements
-      selectOrders(allIds) should have length DBUtils.indexes.finalized.common.MaxElements
+      val expectedIds = pair1Orders.map(_.id()).reverse
 
-      val pair1Ids = allOrderIdsByPair(pk, pair1)
-      pair1Ids should have length DBUtils.indexes.finalized.pair.MaxElements
-      selectOrders(pair1Ids) should have length DBUtils.indexes.finalized.pair.MaxElements
+      withClue("common") {
+        import DBUtils.indexes.finalized.common.MaxElements
+        val allIds = allOrderIds(pk)
+        allIds should have length MaxElements
+        selectOrders(allIds) should have length MaxElements
+        allIds shouldBe expectedIds.take(MaxElements)
+      }
 
-      val pair2Ids = allOrderIdsByPair(pk, pair2)
-      pair2Ids shouldBe empty
+      withClue("pair1") {
+        import DBUtils.indexes.finalized.pair.MaxElements
+        val pair1Ids = allOrderIdsByPair(pk, pair1)
+        pair1Ids should have length MaxElements
+        selectOrders(pair1Ids) should have length MaxElements
+        pair1Ids shouldBe expectedIds.take(MaxElements)
+      }
+
+      withClue("pair2") {
+        val pair2Ids = allOrderIdsByPair(pk, pair2)
+        pair2Ids shouldBe empty
+      }
     }
 
     // 2. Place and cancel 10 orders in pair2
@@ -872,17 +947,29 @@ class OrderHistorySpecification
       activeOrderIdsByPair(pk, pair1) shouldBe empty
       activeOrderIdsByPair(pk, pair2) shouldBe empty
 
-      val allIds = allOrderIds(pk)
-      allIds should have length DBUtils.indexes.finalized.common.MaxElements
-      selectOrders(allIds) should have length DBUtils.indexes.finalized.common.MaxElements
+      withClue("common") {
+        import DBUtils.indexes.finalized.common.MaxElements
+        val allIds = allOrderIds(pk)
+        allIds should have length MaxElements
+        selectOrders(allIds) should have length MaxElements
+        val expectedIds = pair2Orders.map(_.id()).reverse ++ pair1Orders.map(_.id()).reverse.take(MaxElements - pair2Orders.size)
+        allIds shouldBe expectedIds
+      }
 
-      val pair1Ids = allOrderIdsByPair(pk, pair1)
-      pair1Ids should have length DBUtils.indexes.finalized.pair.MaxElements
-      selectOrders(pair1Ids) should have length DBUtils.indexes.finalized.pair.MaxElements
+      withClue("pair1") {
+        import DBUtils.indexes.finalized.pair.MaxElements
+        val pair1Ids = allOrderIdsByPair(pk, pair1)
+        pair1Ids should have length MaxElements
+        selectOrders(pair1Ids) should have length MaxElements
+        pair1Ids shouldBe pair1Orders.map(_.id()).reverse.take(MaxElements)
+      }
 
-      val pair2Ids = allOrderIdsByPair(pk, pair2)
-      pair2Ids should have length pair2Orders.size
-      selectOrders(pair2Ids) should have length pair2Orders.size
+      withClue("pair2") {
+        val pair2Ids = allOrderIdsByPair(pk, pair2)
+        pair2Ids should have length pair2Orders.size
+        selectOrders(pair2Ids) should have length pair2Orders.size
+        pair2Ids shouldBe pair2Orders.map(_.id()).reverse
+      }
     }
   }
 
