@@ -1,7 +1,7 @@
 package com.wavesplatform.it.api
 
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.StatusCodes.BadRequest
+import akka.http.javadsl.model.StatusCodes
+import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.features.api.ActivationStatus
@@ -44,16 +44,16 @@ object SyncHttpApi extends Assertions {
     case _          => Assertions.fail("Expecting bad request")
   }
 
-  def assertBadRequestAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
+  def assertBadRequestAndMessage[R](f: => R, errorMessage: String, statusCode: Int = BadRequest.intValue): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == BadRequest.intValue && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
+      Assertions.assert(statusCode == statusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting bad request")
   }
 
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].details.contains(errorMessage))
+      Assertions.assert(statusCode == NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].details.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting not found error")
   }

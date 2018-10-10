@@ -274,6 +274,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     val tx         = signedRequest.toTx.explicitGet()
     val privateKey = pkByAddress(thirdAddress)
     assert(crypto.verify(signature, tx.bodyBytes(), privateKey.publicKey))
+
   }
 
   test("/transactions/broadcast should produce ExchangeTransaction with custom asset") {
