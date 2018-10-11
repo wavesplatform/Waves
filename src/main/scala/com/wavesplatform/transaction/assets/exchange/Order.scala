@@ -27,9 +27,9 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 
   def orderType: OrderType
 
-  def price: Long
-
   def amount: Long
+
+  def price: Long
 
   def timestamp: Long
 
@@ -50,7 +50,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 
   @ApiModelProperty(hidden = true)
   def isValid(atTime: Long): Validation = {
-    isValidAmount(price, amount) &&
+    isValidAmount(amount, price) &&
     assetPair.isValid &&
     (matcherFee > 0) :| "matcherFee should be > 0" &&
     (matcherFee < MaxAmount) :| "matcherFee too large" &&
@@ -60,14 +60,14 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   }
 
   //  @ApiModelProperty(hidden = true)
-  def isValidAmount(matchPrice: Long, matchAmount: Long): Validation = {
+  def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
     (matchAmount > 0) :| "amount should be > 0" &&
     (matchPrice > 0) :| "price should be > 0" &&
     (matchAmount < MaxAmount) :| "amount too large" &&
-    getSpendAmount(matchPrice, matchAmount).isRight :| "SpendAmount too large" &&
-    (getSpendAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-    getReceiveAmount(matchPrice, matchAmount).isRight :| "ReceiveAmount too large" &&
-    (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
+    getSpendAmount(matchAmount, matchPrice).isRight :| "SpendAmount too large" &&
+    (getSpendAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
+    getReceiveAmount(matchAmount, matchPrice).isRight :| "ReceiveAmount too large" &&
+    (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
   @ApiModelProperty(hidden = true)
@@ -92,7 +92,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   }
 
   @ApiModelProperty(hidden = true)
-  def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
+  def getSpendAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
       if (orderType == OrderType.SELL) matchAmount
@@ -105,7 +105,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
     }.toEither.left.map(x => GenericError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
+  def getReceiveAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       if (orderType == OrderType.BUY) matchAmount
       else {
@@ -124,8 +124,8 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
       "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
       "assetPair"        -> assetPair.json,
       "orderType"        -> orderType.toString,
-      "price"            -> price,
       "amount"           -> amount,
+      "price"            -> price,
       "timestamp"        -> timestamp,
       "expiration"       -> expiration,
       "matcherFee"       -> matcherFee,
@@ -169,17 +169,17 @@ object Order {
             matcherPublicKey: PublicKeyAccount,
             assetPair: AssetPair,
             orderType: OrderType,
-            price: Long,
             amount: Long,
+            price: Long,
             timestamp: Long,
             expiration: Long,
             matcherFee: Long,
             proofs: Proofs,
             version: Byte = 1): Order = {
     if (version == 1) {
-      OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
+      OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
     } else {
-      OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, price, amount, timestamp, expiration, matcherFee, proofs)
+      OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
     }
   }
 
@@ -187,8 +187,8 @@ object Order {
             matcherPublicKey: PublicKeyAccount,
             assetPair: AssetPair,
             orderType: OrderType,
-            price: Long,
             amount: Long,
+            price: Long,
             timestamp: Long,
             expiration: Long,
             matcherFee: Long,
@@ -197,8 +197,8 @@ object Order {
             matcherPublicKey,
             assetPair,
             orderType,
-            price,
             amount,
+            price,
             timestamp,
             expiration,
             matcherFee,
@@ -215,26 +215,26 @@ object Order {
   def buy(sender: PrivateKeyAccount,
           matcher: PublicKeyAccount,
           pair: AssetPair,
-          price: Long,
           amount: Long,
+          price: Long,
           timestamp: Long,
           expiration: Long,
           matcherFee: Long,
           version: Byte = 1): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Proofs.empty, version)
+    val unsigned = Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
     sign(unsigned, sender)
   }
 
   def sell(sender: PrivateKeyAccount,
            matcher: PublicKeyAccount,
            pair: AssetPair,
-           price: Long,
            amount: Long,
+           price: Long,
            timestamp: Long,
            expiration: Long,
            matcherFee: Long,
            version: Byte = 1): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Proofs.empty, version)
+    val unsigned = Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
     sign(unsigned, sender)
   }
 
@@ -242,13 +242,13 @@ object Order {
             matcher: PublicKeyAccount,
             pair: AssetPair,
             orderType: OrderType,
-            price: Long,
             amount: Long,
+            price: Long,
             timestamp: Long,
             expiration: Long,
             matcherFee: Long,
             version: Byte): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Proofs.empty, version)
+    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
     sign(unsigned, sender)
   }
 

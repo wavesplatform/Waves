@@ -58,8 +58,8 @@ object Bindings {
         "matcherPublicKey" -> ord.matcherPublicKey,
         "assetPair"        -> assetPair(ord.assetPair),
         "orderType"        -> ordType(ord.orderType),
-        "price"            -> ord.price,
         "amount"           -> ord.amount,
+        "price"            -> ord.price,
         "timestamp"        -> ord.timestamp,
         "expiration"       -> ord.expiration,
         "matcherFee"       -> ord.matcherFee,
@@ -158,14 +158,14 @@ object Bindings {
           dataTransactionType.typeRef,
           Map("data" -> data.map(e => CaseObj(dataEntryType.typeRef, Map("key" -> e.key, "value" -> e.value)))) ++ provenTxPart(p)
         )
-      case Exchange(p, price, amount, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
+      case Exchange(p, amount, price, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
         CaseObj(
           exchangeTransactionType.typeRef,
           Map(
             "buyOrder"       -> orderObject(buyOrder),
             "sellOrder"      -> orderObject(sellOrder),
-            "price"          -> price,
             "amount"         -> amount,
+            "price"          -> price,
             "buyMatcherFee"  -> buyMatcherFee,
             "sellMatcherFee" -> sellMatcherFee,
           ) ++ provenTxPart(p)

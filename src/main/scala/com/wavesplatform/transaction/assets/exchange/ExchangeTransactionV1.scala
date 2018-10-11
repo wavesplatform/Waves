@@ -15,13 +15,13 @@ import scala.util.{Failure, Success, Try}
 
 case class ExchangeTransactionV1(buyOrder: OrderV1,
                                  sellOrder: OrderV1,
-                                 price: Long,
                                  amount: Long,
+                                 price: Long,
                                  buyMatcherFee: Long,
                                  sellMatcherFee: Long,
                                  fee: Long,
                                  timestamp: Long,
-                                 signature: ByteStr)
+                                 signature: AssetId)
     extends ExchangeTransaction
     with SignedTransaction {
 
@@ -51,47 +51,37 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
   def create(matcher: PrivateKeyAccount,
              buyOrder: OrderV1,
              sellOrder: OrderV1,
-             price: Long,
              amount: Long,
+             price: Long,
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
+    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))
     }
   }
 
   def create(buyOrder: OrderV1,
              sellOrder: OrderV1,
-             price: Long,
              amount: Long,
+             price: Long,
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long,
-             signature: ByteStr): Either[ValidationError, TransactionT] = {
+             signature: AssetId): Either[ValidationError, TransactionT] = {
     validateExchangeParams(
       buyOrder,
       sellOrder,
-      price,
       amount,
+      price,
       buyMatcherFee,
       sellMatcherFee,
       fee,
       timestamp
     ).map { _ =>
-      ExchangeTransactionV1(
-        buyOrder,
-        sellOrder,
-        price,
-        amount,
-        buyMatcherFee,
-        sellMatcherFee,
-        fee,
-        timestamp,
-        signature
-      )
+      ExchangeTransactionV1(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
     }
   }
 
@@ -115,7 +105,7 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
         timestamp      <- read(Longs.fromByteArray _, 8)
         signature      <- read(ByteStr.apply, SignatureLength)
       } yield {
-        create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
+        create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
           .fold(left => Failure(new Exception(left.toString)), right => Success(right))
       }
       makeTransaction.run(0).value._2

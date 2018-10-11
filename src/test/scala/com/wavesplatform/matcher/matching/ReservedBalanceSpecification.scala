@@ -96,8 +96,8 @@ class ReservedBalanceSpecification
       (SELL, p.amount(2), p.price(2.2), p.amount(2), p.price(2.3)),
     )) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(s"Reserves should be 0 when remains are 0: $counterType $counterAmount/$counterPrice:$submittedAmount/$submittedPrice") {
-      val counter   = if (counterType == BUY) buy(pair, counterPrice, counterAmount) else sell(pair, counterPrice, counterAmount)
-      val submitted = if (counterType == BUY) sell(pair, submittedPrice, submittedAmount) else buy(pair, submittedPrice, submittedAmount)
+      val counter   = if (counterType == BUY) rawBuy(pair, counterAmount, counterPrice) else rawSell(pair, counterAmount, counterPrice)
+      val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
       withClue("Both orders should be filled") {
@@ -133,8 +133,8 @@ class ReservedBalanceSpecification
     )) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
       s"Counter reserves should be 0 WHEN remain is (minAmount - 1): $counterType $counterAmount/$counterPrice:$submittedAmount/$submittedPrice") {
-      val counter   = if (counterType == BUY) rawBuy(pair, counterPrice, counterAmount) else rawSell(pair, counterPrice, counterAmount)
-      val submitted = if (counterType == BUY) rawSell(pair, submittedPrice, submittedAmount) else rawBuy(pair, submittedPrice, submittedAmount)
+      val counter   = if (counterType == BUY) rawBuy(pair, counterAmount, counterPrice) else rawSell(pair, counterAmount, counterPrice)
+      val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
       withClue("Both orders should be filled") {
@@ -170,8 +170,8 @@ class ReservedBalanceSpecification
     )) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
       s"Submitted reserves should be 0 WHEN remain is (minAmount - 1): $counterType $counterAmount/$counterPrice:$submittedAmount/$submittedPrice") {
-      val counter   = if (counterType == BUY) rawBuy(pair, counterPrice, counterAmount) else rawSell(pair, counterPrice, counterAmount)
-      val submitted = if (counterType == BUY) rawSell(pair, submittedPrice, submittedAmount) else rawBuy(pair, submittedPrice, submittedAmount)
+      val counter   = if (counterType == BUY) rawBuy(pair, counterAmount, counterPrice) else rawSell(pair, counterAmount, counterPrice)
+      val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
       withClue("Both orders should be filled") {
@@ -207,8 +207,8 @@ class ReservedBalanceSpecification
     )) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
       s"Counter reserve should be minAmount WHEN remain is minAmount: $counterType $counterAmount/$counterPrice:$submittedAmount/$submittedPrice") {
-      val counter   = if (counterType == BUY) rawBuy(pair, counterPrice, counterAmount) else rawSell(pair, counterPrice, counterAmount)
-      val submitted = if (counterType == BUY) rawSell(pair, submittedPrice, submittedAmount) else rawBuy(pair, submittedPrice, submittedAmount)
+      val counter   = if (counterType == BUY) rawBuy(pair, counterAmount, counterPrice) else rawSell(pair, counterAmount, counterPrice)
+      val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
       withClue("Counter should be partially filled:") {
@@ -245,8 +245,8 @@ class ReservedBalanceSpecification
     )) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
       s"Submitted reserve should be minAmount WHEN remain is minAmount: $counterType $counterAmount/$counterPrice:$submittedAmount/$submittedPrice") {
-      val counter   = if (counterType == BUY) rawBuy(pair, counterPrice, counterAmount) else rawSell(pair, counterPrice, counterAmount)
-      val submitted = if (counterType == BUY) rawSell(pair, submittedPrice, submittedAmount) else rawBuy(pair, submittedPrice, submittedAmount)
+      val counter   = if (counterType == BUY) rawBuy(pair, counterAmount, counterPrice) else rawSell(pair, counterAmount, counterPrice)
+      val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
       withClue("Submitted should be partially filled:") {
@@ -281,8 +281,8 @@ class ReservedBalanceSpecification
     )) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
       s"Counter and submitted reserves should be 0 WHEN both remains are (minAmount - 1): $counterType $counterAmount/$counterPrice:$submittedAmount/$submittedPrice") {
-      val counter   = if (counterType == BUY) rawBuy(pair, counterPrice, counterAmount) else rawSell(pair, counterPrice, counterAmount)
-      val submitted = if (counterType == BUY) rawSell(pair, submittedPrice, submittedAmount) else rawBuy(pair, submittedPrice, submittedAmount)
+      val counter   = if (counterType == BUY) rawBuy(pair, counterAmount, counterPrice) else rawSell(pair, counterAmount, counterPrice)
+      val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
       exec.executedAmount shouldBe p.amount(2)
@@ -312,8 +312,8 @@ class ReservedBalanceSpecification
     )) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
       s"Counter and submitted reserves should be 0 and minAmount WHEN their remains are (minAmount - 1) and minAmount: $counterType $counterAmount/$counterPrice:$submittedAmount/$submittedPrice") {
-      val counter   = if (counterType == BUY) rawBuy(pair, counterPrice, counterAmount) else rawSell(pair, counterPrice, counterAmount)
-      val submitted = if (counterType == BUY) rawSell(pair, submittedPrice, submittedAmount) else rawBuy(pair, submittedPrice, submittedAmount)
+      val counter   = if (counterType == BUY) rawBuy(pair, counterAmount, counterPrice) else rawSell(pair, counterAmount, counterPrice)
+      val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
       exec.executedAmount shouldBe p.amount(2)
@@ -344,8 +344,8 @@ class ReservedBalanceSpecification
     )) { (counterType: OrderType, counterAmount: Long, counterPrice: Long, submittedAmount: Long, submittedPrice: Long) =>
     property(
       s"Counter and submitted reserves should be minAmount and 0 WHEN their remains and minAmount are (minAmount - 1): $counterType $counterAmount/$counterPrice:$submittedAmount/$submittedPrice") {
-      val counter   = if (counterType == BUY) rawBuy(pair, counterPrice, counterAmount) else rawSell(pair, counterPrice, counterAmount)
-      val submitted = if (counterType == BUY) rawSell(pair, submittedPrice, submittedAmount) else rawBuy(pair, submittedPrice, submittedAmount)
+      val counter   = if (counterType == BUY) rawBuy(pair, counterAmount, counterPrice) else rawSell(pair, counterAmount, counterPrice)
+      val submitted = if (counterType == BUY) rawSell(pair, submittedAmount, submittedPrice) else rawBuy(pair, submittedAmount, submittedPrice)
       val exec      = execute(counter, submitted)
 
       exec.executedAmount shouldBe p.amount(2)

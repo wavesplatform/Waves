@@ -15,12 +15,12 @@ object MatcherModel {
   type OrderId   = String
 }
 
-case class LevelAgg(price: Long, amount: Long)
+case class LevelAgg(amount: Long, price: Long)
 
 sealed trait LimitOrder {
-  def price: Price
   def amount: Long // could be remaining or executed, see OrderExecuted
-  def fee: Long    // same
+  def price: Price
+  def fee: Long // same
   def order: Order
   def partial(amount: Long, fee: Long): LimitOrder
 
@@ -38,27 +38,27 @@ sealed trait LimitOrder {
 
   def minAmountOfAmountAsset: Long         = minimalAmountOfAmountAssetByPrice(price)
   def amountOfPriceAsset: Long             = (BigDecimal(amount) * price / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
-  def amountOfAmountAsset: Long            = correctedAmountOfAmountAsset(price, amount)
-  def executionAmount(o: LimitOrder): Long = correctedAmountOfAmountAsset(o.price, amount)
+  def amountOfAmountAsset: Long            = correctedAmountOfAmountAsset(amount, price)
+  def executionAmount(o: LimitOrder): Long = correctedAmountOfAmountAsset(amount, o.price)
 
   def isValid: Boolean =
     amount > 0 && amount >= minAmountOfAmountAsset && amount < Order.MaxAmount && getSpendAmount > 0 && getReceiveAmount > 0
 
   protected def minimalAmountOfAmountAssetByPrice(p: Long): Long = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
-  protected def correctedAmountOfAmountAsset(p: Long, a: Long): Long = {
+  protected def correctedAmountOfAmountAsset(a: Long, p: Long): Long = {
     val settledTotal = (BigDecimal(p) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
     (BigDecimal(settledTotal) / p * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }
 }
 
-case class BuyLimitOrder(price: Price, amount: Long, fee: Long, order: Order) extends LimitOrder {
+case class BuyLimitOrder(amount: Long, price: Price, fee: Long, order: Order) extends LimitOrder {
   def partial(amount: Long, fee: Long): LimitOrder = copy(amount = amount, fee = fee)
   def getReceiveAmount: Long                       = amountOfAmountAsset
   def getSpendAmount: Long                         = amountOfPriceAsset
   def getRawSpendAmount: Long                      = amountOfPriceAsset
 }
 
-case class SellLimitOrder(price: Price, amount: Long, fee: Long, order: Order) extends LimitOrder {
+case class SellLimitOrder(amount: Long, price: Price, fee: Long, order: Order) extends LimitOrder {
   def partial(amount: Long, fee: Long): LimitOrder = copy(amount = amount, fee = fee)
   def getReceiveAmount: Long                       = amountOfPriceAsset
   def getSpendAmount: Long                         = amountOfAmountAsset
@@ -107,15 +107,15 @@ object LimitOrder {
   def apply(o: Order): LimitOrder = {
     val partialFee = getPartialFee(o.matcherFee, o.amount, o.amount)
     o.orderType match {
-      case OrderType.BUY  => BuyLimitOrder(o.price, o.amount, partialFee, o)
-      case OrderType.SELL => SellLimitOrder(o.price, o.amount, partialFee, o)
+      case OrderType.BUY  => BuyLimitOrder(o.amount, o.price, partialFee, o)
+      case OrderType.SELL => SellLimitOrder(o.amount, o.price, partialFee, o)
     }
   }
 
-  def limitOrder(price: Long, remainingAmount: Long, remainingFee: Long, o: Order): LimitOrder = {
+  def limitOrder(remainingAmount: Long, price: Long, remainingFee: Long, o: Order): LimitOrder = {
     o.orderType match {
-      case OrderType.BUY  => BuyLimitOrder(price, remainingAmount, remainingFee, o)
-      case OrderType.SELL => SellLimitOrder(price, remainingAmount, remainingFee, o)
+      case OrderType.BUY  => BuyLimitOrder(remainingAmount, price, remainingFee, o)
+      case OrderType.SELL => SellLimitOrder(remainingAmount, price, remainingFee, o)
     }
   }
 

@@ -19,8 +19,8 @@ case class OrderV2(senderPublicKey: PublicKeyAccount,
                    matcherPublicKey: PublicKeyAccount,
                    assetPair: AssetPair,
                    orderType: OrderType,
-                   price: Long,
                    amount: Long,
+                   price: Long,
                    timestamp: Long,
                    expiration: Long,
                    matcherFee: Long,
@@ -48,12 +48,12 @@ object OrderV2 {
   def buy(sender: PrivateKeyAccount,
           matcher: PublicKeyAccount,
           pair: AssetPair,
-          price: Long,
           amount: Long,
+          price: Long,
           timestamp: Long,
           expiration: Long,
           matcherFee: Long): Order = {
-    val unsigned = OrderV2(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
+    val unsigned = OrderV2(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
@@ -61,12 +61,12 @@ object OrderV2 {
   def sell(sender: PrivateKeyAccount,
            matcher: PublicKeyAccount,
            pair: AssetPair,
-           price: Long,
            amount: Long,
+           price: Long,
            timestamp: Long,
            expiration: Long,
            matcherFee: Long): Order = {
-    val unsigned = OrderV2(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
+    val unsigned = OrderV2(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
@@ -75,12 +75,12 @@ object OrderV2 {
             matcher: PublicKeyAccount,
             pair: AssetPair,
             orderType: OrderType,
-            price: Long,
             amount: Long,
+            price: Long,
             timestamp: Long,
             expiration: Long,
             matcherFee: Long): Order = {
-    val unsigned = OrderV2(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Proofs.empty)
+    val unsigned = OrderV2(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
@@ -120,8 +120,8 @@ object OrderV2 {
         matcher,
         AssetPair(amountAssetId.map(ByteStr(_)), priceAssetId.map(ByteStr(_))),
         OrderType(orderType),
-        price,
         amount,
+        price,
         timestamp,
         expiration,
         matcherFee,

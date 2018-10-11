@@ -34,10 +34,10 @@ trait ExchangeTransactionCreator extends ScorexLogging {
         (buy, sell) match {
           case (buy: OrderV1, sell: OrderV1) =>
             ExchangeTransactionV1
-              .create(matcherPrivateKey, buy, sell, price, event.executedAmount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+              .create(matcherPrivateKey, buy, sell, event.executedAmount, price, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
           case _ =>
             ExchangeTransactionV2
-              .create(matcherPrivateKey, buy, sell, price, event.executedAmount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+              .create(matcherPrivateKey, buy, sell, event.executedAmount, price, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
         }
       })
   }
