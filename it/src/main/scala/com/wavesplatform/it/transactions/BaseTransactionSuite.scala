@@ -21,8 +21,8 @@ abstract class BaseTransactionSuite
 
   protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .overrideBase(_.quorum(3))
-      .withDefault(3)
+      .overrideBase(_.quorum(2))
+      .withDefault(2)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()
 

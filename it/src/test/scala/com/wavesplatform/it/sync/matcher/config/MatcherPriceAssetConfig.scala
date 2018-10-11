@@ -1,23 +1,23 @@
 package com.wavesplatform.it.sync.matcher.config
 
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory.{empty, parseString}
+import com.typesafe.config.ConfigFactory.parseString
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.api.http.assets.SignedIssueV2Request
-import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.NodeConfigs.{Default, randomMiner}
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.Base58
+import com.typesafe.config.{Config}
 
 import scala.util.Random
 
 object MatcherPriceAssetConfig {
 
-  private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
+  private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(2))
+    .zip(Seq(matcherConfig, randomMiner, minerDisabled))
     .map { case (n, o) => o.withFallback(n) }
 
   private val aliceSeed = _Configs(1).getString("account-seed")

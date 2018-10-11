@@ -27,7 +27,7 @@ abstract class MatcherSuiteBase
 
   protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .withDefault(4)
+      .withDefault(3)
       .buildNonConflicting()
 
   override protected def nodes: Seq[Node] = dockerNodes()
