@@ -78,11 +78,9 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   val MaxTransferCount = 100
 
   @ApiModel
-  case class Transfer(@(ApiModelProperty @field)(dataType = "string",
-                                                 example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk",
-                                                 required = true,
-                                                 allowEmptyValue = false) recipient: String,
-                      @(ApiModelProperty @field)(dataType = "long", example = "3000000000", required = true, allowEmptyValue = false) amount: Long)
+  case class Transfer(
+      @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk", required = true) recipient: String,
+      @(ApiModelProperty @field)(dataType = "long", example = "3000000000", required = true) amount: Long)
 
   case class ParsedTransfer(address: AddressOrAlias, amount: Long)
 

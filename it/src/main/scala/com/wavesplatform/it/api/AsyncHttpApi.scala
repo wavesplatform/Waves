@@ -186,17 +186,50 @@ object AsyncHttpApi extends Assertions {
                  amount: Long,
                  fee: Long,
                  assetId: Option[String] = None,
-                 feeAssetId: Option[String] = None): Future[Transaction] =
-      postJson("/assets/transfer", TransferV1Request(assetId, feeAssetId, amount, fee, sourceAddress, None, recipient)).as[Transaction]
+                 feeAssetId: Option[String] = None,
+                 version: Byte = 2): Future[Transaction] = {
+      version match {
+        case 2 =>
+          postJson("/assets/transfer", TransferV2Request(version, assetId, amount, feeAssetId, fee, sourceAddress, None, recipient)).as[Transaction]
+        case _ => postJson("/assets/transfer", TransferV1Request(assetId, feeAssetId, amount, fee, sourceAddress, None, recipient)).as[Transaction]
+      }
+    }
 
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
 
-    def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
-      postJson("/leasing/lease", LeaseV1Request(sourceAddress, amount, fee, recipient)).as[Transaction]
+    def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long, version: Byte = 2): Future[Transaction] = {
+      version match {
+        case 2 => { //TODO: @monroid refactor after https://wavesplatform.atlassian.net/browse/NODE-1222 fix
+          signAndBroadcast(
+            Json.obj(
+              "type"      -> 8,
+              "sender"    -> sourceAddress,
+              "amount"    -> amount,
+              "recipient" -> recipient,
+              "fee"       -> fee,
+              "version"   -> version
+            ))
+        }
+        case _ => postJson("/leasing/lease", LeaseV1Request(sourceAddress, amount, fee, recipient)).as[Transaction]
+      }
+    }
 
-    def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Future[Transaction] =
-      postJson("/leasing/cancel", LeaseCancelV1Request(sourceAddress, leaseId, fee)).as[Transaction]
+    def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: Byte = 2): Future[Transaction] = {
+      version match {
+        case 2 => { //TODO: @monroid refactor after https://wavesplatform.atlassian.net/browse/NODE-1222 fix
+          signAndBroadcast(
+            Json.obj(
+              "type"    -> 9,
+              "sender"  -> sourceAddress,
+              "txId"    -> leaseId,
+              "fee"     -> fee,
+              "version" -> version
+            ))
+        }
+        case _ => postJson("/leasing/cancel", LeaseCancelV1Request(sourceAddress, leaseId, fee)).as[Transaction]
+      }
+    }
 
     def activeLeases(sourceAddress: String) = get(s"/leasing/active/$sourceAddress").as[Seq[Transaction]]
 
@@ -206,8 +239,26 @@ object AsyncHttpApi extends Assertions {
               quantity: Long,
               decimals: Byte,
               reissuable: Boolean,
-              fee: Long): Future[Transaction] =
-      postJson("/assets/issue", IssueV1Request(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
+              fee: Long,
+              version: Byte = 2): Future[Transaction] = {
+      version match {
+        case 2 => { //TODO: @monroid refactor after https://wavesplatform.atlassian.net/browse/NODE-1222 fix
+          signAndBroadcast(
+            Json.obj(
+              "type"        -> 3,
+              "name"        -> name,
+              "quantity"    -> quantity,
+              "description" -> description,
+              "sender"      -> sourceAddress,
+              "decimals"    -> decimals,
+              "reissuable"  -> reissuable,
+              "fee"         -> fee,
+              "version"     -> version
+            ))
+        }
+        case _ => postJson("/assets/issue", IssueV1Request(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
+      }
+    }
 
     def scriptCompile(code: String) = post("/utils/script/compile", code).as[CompiledScript]
 
@@ -271,6 +322,9 @@ object AsyncHttpApi extends Assertions {
 
     def signedIssue(issue: SignedIssueV1Request): Future[Transaction] =
       postJson("/assets/broadcast/issue", issue).as[Transaction]
+
+    def signedIssue(issue: SignedIssueV2Request): Future[Transaction] =
+      signedBroadcast(issue.toTx.right.get.json())
 
     def batchSignedTransfer(transfers: Seq[SignedTransferV2Request], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")

@@ -5,7 +5,7 @@ object Dependencies {
 
   def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.5.16"
 
-  def swaggerModule(module: String) = ("io.swagger" % s"swagger-$module" % "1.5.21").exclude("com.google.guava", "guava")
+  def swaggerModule(module: String) = ("io.swagger.core.v3" % s"swagger-$module" % "2.0.5").exclude("com.google.guava", "guava")
 
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.1.4"
 
@@ -54,8 +54,8 @@ object Dependencies {
     "net.logstash.logback" % "logstash-logback-encoder" % "4.11"
   )
 
-  lazy val http = Seq("core", "annotations", "models", "jaxrs").map(swaggerModule) ++ Seq(
-    "io.swagger"                   %% "swagger-scala-module" % "1.0.4" exclude ("com.fasterxml.jackson.module", "jackson-module-scala_2.12"),
+  lazy val http = Seq("core", "annotations", "models", "jaxrs2").map(swaggerModule) ++ Seq(
+    "io.swagger"                   %% "swagger-scala-module" % "1.0.4",
     "com.github.swagger-akka-http" %% "swagger-akka-http"    % "1.0.0",
     "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.6",
     "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",

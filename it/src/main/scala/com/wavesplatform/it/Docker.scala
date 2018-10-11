@@ -528,7 +528,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     log.debug(s"$label: $x")
   }
 
-  def runMigrationToolInsideContainer(node: DockerNode, nodeConfig: Config): DockerNode = {
+  def runMigrationToolInsideContainer(node: DockerNode): DockerNode = {
     val id = node.containerId
     takeProfileSnapshot(node)
     updateStartScript(node)
