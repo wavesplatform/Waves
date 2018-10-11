@@ -28,9 +28,13 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
 
   def process(event: OrderAdded): Unit = saveOrderInfoTimer.measure {
     db.readWrite { rw =>
-      val order    = event.order.order
-      val orderId  = order.id()
-      val origInfo = rw.get(MatcherKeys.orderInfoOpt(orderId))
+      val order           = event.order.order
+      val k               = lastOrderTimestamp(order.sender)
+      val newestTimestamp = rw.get(k).fold(order.timestamp)(_.max(order.timestamp))
+
+      rw.put(k, Some(newestTimestamp))
+
+      val origInfo = rw.get(orderInfoOpt(order.id()))
       if (!origInfo.exists(_.status.isFinal)) {
         val change = OrderInfoChange(
           order = order,
@@ -38,20 +42,20 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
           updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(minAmount = Some(event.order.minAmountOfAmountAsset))
         )
 
-        log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
+        log.trace(s"${order.id()}: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
         saveOpenVolume(rw, diff(List(change)))
 
         if (change.origInfo.isEmpty) rw.put(MatcherKeys.order(order.id()), Some(order))
         rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
 
-        indexes.active.add(rw, order.senderPublicKey.toAddress, order.assetPair, orderId)
+        indexes.active.add(rw, order.senderPublicKey.toAddress, order.assetPair, order.id())
       }
     }
   }
 
   def process(event: OrderExecuted): Unit = saveOrderInfoTimer.measure {
     db.readWrite { rw =>
-      def origInfo(lo: LimitOrder): Option[OrderInfo] = rw.get(MatcherKeys.orderInfoOpt(lo.order.id()))
+      def origInfo(lo: LimitOrder): Option[OrderInfo] = rw.get(orderInfoOpt(lo.order.id()))
       def wasActive(x: Option[OrderInfo]): Boolean    = !x.exists(_.status.isFinal)
 
       lazy val counterOrigInfo   = origInfo(event.counterExecuted)
@@ -90,8 +94,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   def process(event: OrderCanceled): Unit = saveOrderInfoTimer.measure {
     db.readWrite { rw =>
       val order    = event.limitOrder.order
-      val orderId  = order.id()
-      val origInfo = rw.get(MatcherKeys.orderInfoOpt(orderId))
+      val origInfo = rw.get(orderInfoOpt(order.id()))
       if (!origInfo.exists(_.status.isFinal)) {
         val change = OrderInfoChange(
           order = order,
@@ -99,16 +102,16 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
           updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(canceledByUser = Some(!event.unmatchable))
         )
 
-        log.trace(s"$orderId: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
+        log.trace(s"${order.id()}: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
         saveOpenVolume(rw, diff(List(change)))
 
         rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
         if (change.origInfo.isEmpty) rw.put(MatcherKeys.order(order.id()), Some(order))
 
         val address = order.senderPublicKey.toAddress
-        indexes.active.delete(rw, address, orderId)
-        indexes.finalized.common.add(rw, address, orderId)
-        indexes.finalized.pair.add(rw, address, order.assetPair, orderId)
+        indexes.active.delete(rw, address, order.id())
+        indexes.finalized.common.add(rw, address, order.id())
+        indexes.finalized.pair.add(rw, address, order.assetPair, order.id())
       }
     }
   }
@@ -128,7 +131,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   }
 
   def openVolume(address: Address, assetId: Option[AssetId]): Long =
-    openVolumeTimer.measure(db.get(MatcherKeys.openVolume(address, assetId)).getOrElse(0L))
+    openVolumeTimer.measure(DBUtils.openVolume(db, address, assetId))
 
   private def saveOpenVolume(rw: RW, opDiff: Map[Address, OpenPortfolio]): Unit = saveOpenVolumeTimer.measure {
     for ((address, op) <- opDiff) {
@@ -160,16 +163,7 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   def orderInfo(id: Order.Id): OrderInfo = DBUtils.orderInfo(db, id)
   def order(id: Order.Id): Option[Order] = DBUtils.order(db, id)
 
-  def activeOrderCount(address: Address): Int = {
-    val key = MatcherKeys.activeOrdersSize(address)
-    key.parse(db.get(key.keyBytes)).getOrElse(0)
-  }
-
-  def lastOrderTimestamp(address: Address): Long = db.get(MatcherKeys.lastOrderTimestamp(address)).getOrElse(settings.defaultOrderTimestamp)
-  def setLastOrder(address: Address, o: Order): Unit = {
-    val k = MatcherKeys.lastOrderTimestamp(address)
-    db.put(k.keyBytes, k.encode(Some(o.timestamp)))
-  }
+  def activeOrderCount(address: Address): Int = DBUtils.activeOrderCount(db, address)
 
   def deleteOrder(address: Address, orderId: ByteStr): Either[OrderStatus, Unit] = db.readWrite { rw =>
     DBUtils.orderInfo(rw, orderId).status match {

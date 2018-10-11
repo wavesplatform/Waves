@@ -1,15 +1,14 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.matcher.ValidationMatcher
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.utils.NTP
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.{NTPTime, TransactionGen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
-class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher {
+class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher with NTPTime {
 
   property("Order transaction serialization roundtrip") {
     forAll(orderGen) { order =>
@@ -31,21 +30,21 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
 
   property("Order generator should generate valid orders") {
     forAll(orderGen) { order =>
-      order.isValid(NTP.correctedTime()) shouldBe valid
+      order.isValid(ntpTime.correctedTime()) shouldBe valid
     }
   }
 
   property("Order timestamp validation") {
     forAll(orderGen) { order =>
-      val time = NTP.correctedTime()
+      val time = ntpTime.correctedTime()
       order.copy(timestamp = -1).isValid(time) shouldBe not(valid)
     }
   }
 
   property("Order expiration validation") {
     forAll(arbitraryOrderGen) { order =>
-      val isValid = order.isValid(NTP.correctedTime())
-      val time    = NTP.correctedTime()
+      val isValid = order.isValid(ntpTime.correctedTime())
+      val time    = ntpTime.correctedTime()
       whenever(order.expiration < time || order.expiration > time + Order.MaxLiveTime) {
         isValid shouldBe not(valid)
       }
@@ -55,7 +54,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   property("Order amount validation") {
     forAll(arbitraryOrderGen) { order =>
       whenever(order.amount <= 0) {
-        order.isValid(NTP.correctedTime()) shouldBe not(valid)
+        order.isValid(ntpTime.correctedTime()) shouldBe not(valid)
       }
     }
   }
@@ -63,7 +62,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   property("Order matcherFee validation") {
     forAll(arbitraryOrderGen) { order =>
       whenever(order.matcherFee <= 0) {
-        order.isValid(NTP.correctedTime()) shouldBe not(valid)
+        order.isValid(ntpTime.correctedTime()) shouldBe not(valid)
       }
     }
   }
@@ -71,7 +70,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   property("Order price validation") {
     forAll(arbitraryOrderGen) { order =>
       whenever(order.price <= 0) {
-        order.isValid(NTP.correctedTime()) shouldBe not(valid)
+        order.isValid(ntpTime.correctedTime()) shouldBe not(valid)
       }
     }
   }

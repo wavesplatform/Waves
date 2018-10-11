@@ -1,6 +1,8 @@
 package com.wavesplatform
 
 import cats.syntax.semigroup._
+import com.wavesplatform.account.PublicKeyAccount._
+import com.wavesplatform.account._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -9,11 +11,6 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
-import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{BeforeAndAfterAll, Suite}
-import com.wavesplatform.account.PublicKeyAccount._
-import com.wavesplatform.account._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
@@ -21,21 +18,19 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
 import com.wavesplatform.transaction.transfer._
-import MassTransferTransaction.MaxTransferCount
-import com.wavesplatform.utils.TimeImpl
+import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
+import org.scalacheck.{Arbitrary, Gen}
+import org.scalatest.Suite
 
 import scala.util.Random
 
-trait TransactionGen extends BeforeAndAfterAll with TransactionGenBase with ScriptGen {
-  _: Suite =>
-  override protected def afterAll(): Unit = {
-    super.close()
-  }
+trait TransactionGen extends TransactionGenBase { _: Suite =>
+
 }
 
-trait TransactionGenBase extends ScriptGen {
+trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
 
   protected def waves(n: Float): Long = (n * 100000000L).toLong
 
@@ -56,13 +51,7 @@ trait TransactionGenBase extends ScriptGen {
     }
   }
 
-  private val time = new TimeImpl
-
-  def close(): Unit = {
-    time.close()
-  }
-
-  val ntpTimestampGen: Gen[Long] = Gen.choose(1, 1000).map(time.correctedTime() - _)
+  val ntpTimestampGen: Gen[Long] = Gen.choose(1, 1000).map(ntpTime.correctedTime() - _)
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
 
@@ -96,7 +85,7 @@ trait TransactionGenBase extends ScriptGen {
   val positiveIntGen: Gen[Int]   = Gen.choose(1, Int.MaxValue / 100)
   val smallFeeGen: Gen[Long]     = Gen.choose(400000, 100000000)
 
-  val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + time.correctedTime())
+  val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + ntpTime.correctedTime())
   val timestampGen: Gen[Long]    = Gen.choose(1, Long.MaxValue - 100)
 
   val wavesAssetGen: Gen[Option[ByteStr]] = Gen.const(None)
@@ -434,7 +423,6 @@ trait TransactionGenBase extends ScriptGen {
                                  sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
     for {
       (_, assetName, description, _, decimals, reissuable, iFee, timestamp) <- issueParamGen
-      burnAmount                                                            <- Gen.choose(0L, burnQuantity)
       reissuable2                                                           <- Arbitrary.arbitrary[Boolean]
       fee                                                                   <- smallFeeGen
       issue                                                                 <- createIssue(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp)
@@ -454,7 +442,7 @@ trait TransactionGenBase extends ScriptGen {
 
   def issueGen(sender: PrivateKeyAccount, fixedQuantity: Option[Long] = None): Gen[IssueTransactionV1] =
     for {
-      (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
+      (_, assetName, description, quantity, decimals, _, _, timestamp) <- issueParamGen
     } yield {
       IssueTransactionV1
         .selfSigned(sender,
