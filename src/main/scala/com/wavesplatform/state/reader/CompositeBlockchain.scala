@@ -172,10 +172,21 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   override def assetDistribution(assetId: ByteStr): Map[Address, Long] =
     inner.assetDistribution(assetId) ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Map[Address, Long] = {
-    val innerDistribution = inner.assetDistributionAtHeight(assetId, height)
-    if (height < this.height) innerDistribution
-    else innerDistribution ++ changedBalances(_.assets.getOrElse(assetId, 0) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
+  override def assetDistributionAtHeight(assetId: AssetId, height: Int, count: Int, from: Int): Map[Address, Long] = {
+    if (height < this.height) {
+      inner.assetDistributionAtHeight(assetId, height, count, from)
+    } else {
+      val distributionFromDiff =
+        changedBalances(_.assets.getOrElse(assetId, 0) != 0, portfolio(_).assets.getOrElse(assetId, 0))
+          .slice(from, from + count)
+      if (distributionFromDiff.size < count) {
+        inner
+          .assetDistributionAtHeight(assetId, height, count - distributionFromDiff.size, 0) ++
+          distributionFromDiff
+      } else {
+        distributionFromDiff
+      }
+    }
   }
 
   override def wavesDistribution(height: Int): Map[Address, Long] = {

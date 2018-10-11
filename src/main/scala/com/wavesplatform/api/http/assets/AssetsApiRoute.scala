@@ -65,7 +65,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       }
     }
 
-  @Path("/{assetId}/distribution/{height}")
+  @Path("/{assetId}/distribution/{height}/limit/{limit}")
   @ApiOperation(
     value = "Asset balance distribution at height",
     notes = "Asset balance distribution by account at specified height",
@@ -75,13 +75,21 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     Array(
       new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "integer", paramType = "path"),
+      new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "integer", paramType = "path"),
     ))
   def balanceDistributionAtHeight: Route =
-    (get & path(Segment / "distribution" / IntNumber)) { (assetId, height) =>
+    (get & path(Segment / "distribution" / IntNumber / "limit" / IntNumber)) { (assetId, height, limit) =>
       complete {
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) =>
-            Json.toJson(blockchain.assetDistributionAtHeight(ByteStr(byteArray), height).map { case (a, b) => a.stringRepr -> b })
+            if (limit > settings.assetDistributionAddressLimit || limit <= 0)
+              invalidLimit
+            else
+              Json
+                .toJson(
+                  blockchain
+                    .assetDistributionAtHeight(ByteStr(byteArray), height, limit, 0)
+                    .map { case (a, b) => a.stringRepr -> b })
           case Failure(_) =>
             ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
         }

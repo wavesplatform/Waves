@@ -643,15 +643,17 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
   }
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Map[Address, Long] = readOnly { db =>
-    (for {
+  override def assetDistributionAtHeight(assetId: AssetId, height: Int, count: Int, from: Int): Map[Address, Long] = readOnly { db =>
+    val distribution = (for {
       seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
       addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
       history = db.get(Keys.assetBalanceHistory(addressId, assetId))
       actualHeight <- history.partition(_ > height)._2.headOption
       balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
       if balance > 0
-    } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+    } yield db.get(Keys.idToAddress(addressId)) -> balance)
+
+    distribution.slice(from, count).toMap.seq
   }
 
   override def wavesDistribution(height: Int): Map[Address, Long] = readOnly { db =>

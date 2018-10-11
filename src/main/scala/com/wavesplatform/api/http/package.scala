@@ -1,10 +1,13 @@
 package com.wavesplatform.api
 
+import akka.http.scaladsl.model.StatusCodes
 import play.api.libs.json._
 
 import scala.util.{Success, Try}
 
 package object http {
+
+  val invalidLimit = StatusCodes.BadRequest -> Json.obj("message" -> "invalid.limit")
 
   val versionReads: Reads[Byte] = {
     val defaultByteReads = implicitly[Reads[Byte]]

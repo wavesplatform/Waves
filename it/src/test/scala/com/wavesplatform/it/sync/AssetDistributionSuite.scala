@@ -1,18 +1,13 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.PrivateKeyAccount
+import com.typesafe.config.Config
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import org.scalatest.CancelAfterFailure
 import com.wavesplatform.it.util._
-import com.wavesplatform.state._
-import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.utils.Base58
 import play.api.libs.json._
 
 class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -27,7 +22,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
   test("'Asset distribution at height' method works properly") {
 
-    val addresses = nodes.map(_.privateKey.toAddress).filter(_ != issuer.toAddress).toList
+    val addresses     = nodes.map(_.privateKey.toAddress).filter(_ != issuer.toAddress).toList
     val initialHeight = node.height
 
     val issueTx = node.issue(issuer.address, "TestCoin", "no description", issueAmount, 8, false, issueFee)
@@ -44,13 +39,13 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
     nodes.waitForHeightAriseAndTxPresent(massTransferTx.id)
 
     val r1 = node
-      .get(s"/assets/${issueTx.id}/distribution/$initialHeight")
+      .get(s"/assets/${issueTx.id}/distribution/$initialHeight/limit/${addresses.size}")
       .getResponseBody()
 
     Json.parse(r1).as[JsObject].value.toList shouldBe List.empty
 
     val r2 = node
-      .get(s"/assets/${issueTx.id}/distribution/${node.height}")
+      .get(s"/assets/${issueTx.id}/distribution/${node.height}/limit/${addresses.size}")
       .getResponseBody
 
     val jsonResponse = Json.parse(r2)

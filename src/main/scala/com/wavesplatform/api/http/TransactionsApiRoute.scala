@@ -43,14 +43,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     with BroadcastRoute
     with CommonApiFunctions {
 
-  import TransactionsApiRoute.MaxTransactionsPerRequest
-
   override lazy val route =
     pathPrefix("transactions") {
       unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ broadcast
     }
-
-  private val invalidLimit = StatusCodes.BadRequest -> Json.obj("message" -> "invalid.limit")
 
   //TODO implement general pagination
   @Path("/address/{address}/limit/{limit}")
@@ -73,12 +69,12 @@ case class TransactionsApiRoute(settings: RestAPISettings,
             } ~
               path(Segment) { limitStr =>
                 Exception.allCatch.opt(limitStr.toInt) match {
-                  case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
+                  case Some(limit) if limit > 0 && limit <= settings.transactionByAddressLimit =>
                     complete(
                       Json.arr(JsArray(blockchain
                         .addressTransactions(a, Set.empty, limit, 0)
                         .map({ case (h, tx) => txToCompactJson(a, tx) + ("height" -> JsNumber(h)) }))))
-                  case Some(limit) if limit > MaxTransactionsPerRequest =>
+                  case Some(limit) if limit > settings.transactionByAddressLimit =>
                     complete(TooBigArrayAllocation)
                   case _ =>
                     complete(invalidLimit)
@@ -346,8 +342,4 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       case _ => txToExtendedJson(tx)
     }
   }
-}
-
-object TransactionsApiRoute {
-  val MaxTransactionsPerRequest = 10000
 }
