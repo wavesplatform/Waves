@@ -58,7 +58,9 @@ object LevelDBWriter {
       } else if (lt.isEmpty) {
         recMerge(wt.head, wt.tail, lh, lt, buf)
       } else {
-        if (wh >= lh) {
+        if (wh == lh) {
+          recMerge(wt.head, wt.tail, lt.head, lt.tail, buf)
+        } else if (wh > lh) {
           recMerge(wt.head, wt.tail, lh, lt, buf)
         } else {
           recMerge(wh, wt, lt.head, lt.tail, buf)
