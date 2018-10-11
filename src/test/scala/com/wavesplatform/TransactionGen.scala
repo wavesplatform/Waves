@@ -121,6 +121,30 @@ trait TransactionGenBase extends ScriptGen {
       ScriptV1(typed._1).explicitGet()
   }
 
+  val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = for {
+    version                                                                  <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
+    (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
+    fee                                                                      <- smallFeeGen
+    timestamp                                                                <- timestampGen
+    proofs                                                                   <- proofsGen
+    script                                                                   <- Gen.option(scriptGen)
+    issue = IssueTransactionV2
+      .selfSigned(2: Byte,
+                  AddressScheme.current.chainId,
+                  sender,
+                  assetName,
+                  description,
+                  quantity,
+                  decimals,
+                  reissuable = true,
+                  script,
+                  iFee,
+                  timestamp)
+      .explicitGet()
+  } yield
+    (Seq(issue),
+     SetAssetScriptTransaction.create(version, AddressScheme.current.chainId, sender, issue.id(), script, fee, timestamp, proofs).explicitGet())
+
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
     version                   <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
     sender: PrivateKeyAccount <- accountGen
