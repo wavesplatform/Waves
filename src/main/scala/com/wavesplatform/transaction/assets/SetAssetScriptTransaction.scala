@@ -6,7 +6,7 @@ import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
-import com.wavesplatform.transaction.validation._
+//import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.{AssetId, FastHashId, ValidationError, _}
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.serialization.Deser
