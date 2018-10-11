@@ -39,9 +39,13 @@ class OrderValidatorSpecification
       .get
   (bc.transactionInfo _).when(*).returns(Some((1, i1)))
 
-  private val defaultTs: Long    = 1000
-  private val s: MatcherSettings = matcherSettings.copy(account = MatcherAccount.address, defaultOrderTimestamp = defaultTs)
-  private val w                  = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
+  private val defaultTs: Long = 1000
+  private val s: MatcherSettings = matcherSettings.copy(
+    account = MatcherAccount.address,
+    defaultOrderTimestamp = defaultTs,
+    orderTimestampDrift = 10
+  )
+  private val w = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   w.generateNewAccount()
 
   private var ov = new OrderValidator {
@@ -75,17 +79,17 @@ class OrderValidatorSpecification
                     ))) shouldBe an[Right[_, _]]
       }
 
-      "default ts < its ts for new users" in {
+      "default ts - drift < its ts for new users" in {
         setupEnoughPortfolio()
-        ov.validateNewOrder(newBuyOrder(defaultTs + 1)) shouldBe 'right
+        ov.validateNewOrder(newBuyOrder(defaultTs - s.orderTimestampDrift + 1)) shouldBe 'right
       }
 
-      "ts1 < ts2" in {
+      "ts1 - drift < ts2" in {
         setupEnoughPortfolio()
         val pk = PrivateKeyAccount(randomBytes())
 
-        ov.orderHistory.setLastOrder(pk, newBuyOrder(pk, defaultTs + 1))
-        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 2)) shouldBe 'right
+        ov.orderHistory.setLastOrder(pk, newBuyOrder(pk, defaultTs + 1000))
+        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 1001 - s.orderTimestampDrift)) shouldBe 'right
       }
     }
 
@@ -133,30 +137,30 @@ class OrderValidatorSpecification
         ov.validateNewOrder(newBuyOrder(pk, 1000)) shouldBe Left(GenericError(s"Limit of $MaxElements active orders has been reached"))
       }
 
-      "default ts > its for new users" in {
+      "default ts - drift > its for new users" in {
         setupEnoughPortfolio()
-        ov.validateNewOrder(newBuyOrder(defaultTs - 1)) should produce("Order should have a timestamp")
+        ov.validateNewOrder(newBuyOrder(defaultTs - s.orderTimestampDrift - 1)) should produce("Order should have a timestamp")
       }
 
-      "default ts = its ts for new users" in {
+      "default ts - drift = its ts for new users" in {
         setupEnoughPortfolio()
-        ov.validateNewOrder(newBuyOrder(defaultTs)) should produce("Order should have a timestamp")
+        ov.validateNewOrder(newBuyOrder(defaultTs - s.orderTimestampDrift)) should produce("Order should have a timestamp")
       }
 
-      "ts1 > ts2" in {
+      "ts1 - drift > ts2" in {
         setupEnoughPortfolio()
         val pk = PrivateKeyAccount(randomBytes())
 
-        ov.orderHistory.setLastOrder(pk, newBuyOrder(pk, defaultTs + 2))
-        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 1)) should produce("Order should have a timestamp")
+        ov.orderHistory.setLastOrder(pk, newBuyOrder(pk, defaultTs + 1000))
+        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 999 - s.orderTimestampDrift)) should produce("Order should have a timestamp")
       }
 
-      "ts1 = ts2" in {
+      "ts1 - drift = ts2" in {
         setupEnoughPortfolio()
         val pk = PrivateKeyAccount(randomBytes())
 
-        ov.orderHistory.setLastOrder(pk, newBuyOrder(pk, defaultTs + 1))
-        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 1)) should produce("Order should have a timestamp")
+        ov.orderHistory.setLastOrder(pk, newBuyOrder(pk, defaultTs + 1000))
+        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 1000 - s.orderTimestampDrift)) should produce("Order should have a timestamp")
       }
     }
   }

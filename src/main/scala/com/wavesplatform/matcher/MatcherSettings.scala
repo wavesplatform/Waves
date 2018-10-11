@@ -30,6 +30,7 @@ case class MatcherSettings(enable: Boolean,
                            validationTimeout: FiniteDuration,
                            maxOrdersPerRequest: Int,
                            defaultOrderTimestamp: Long,
+                           orderTimestampDrift: Long,
                            blacklistedAddresses: Set[String],
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings)
 
@@ -52,6 +53,7 @@ object MatcherSettings {
     val orderCleanupInterval  = config.as[FiniteDuration](s"$configPath.order-cleanup-interval")
     val maxOrdersPerRequest   = config.as[Int](s"$configPath.rest-order-limit")
     val defaultOrderTimestamp = config.as[Long](s"$configPath.default-order-timestamp")
+    val orderTimestampDrift   = config.as[FiniteDuration](s"$configPath.order-timestamp-drift")
     val baseAssets            = config.as[List[String]](s"$configPath.price-assets")
     val maxTimestampDiff      = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
 
@@ -84,6 +86,7 @@ object MatcherSettings {
       validationTimeout,
       maxOrdersPerRequest,
       defaultOrderTimestamp,
+      orderTimestampDrift.toMillis,
       blacklistedAddresses.toSet,
       orderBookSnapshotHttpCache
     )
