@@ -165,6 +165,12 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     key.parse(db.get(key.keyBytes)).getOrElse(0)
   }
 
+  def lastOrderTimestamp(address: Address): Long = db.get(MatcherKeys.lastOrderTimestamp(address)).getOrElse(settings.defaultOrderTimestamp)
+  def setLastOrder(address: Address, o: Order): Unit = {
+    val k = MatcherKeys.lastOrderTimestamp(address)
+    db.put(k.keyBytes, k.encode(Some(o.timestamp)))
+  }
+
   def deleteOrder(address: Address, orderId: ByteStr): Either[OrderStatus, Unit] = db.readWrite { rw =>
     DBUtils.orderInfo(rw, orderId).status match {
       case Filled(_) | LimitOrder.Cancelled(_) =>
