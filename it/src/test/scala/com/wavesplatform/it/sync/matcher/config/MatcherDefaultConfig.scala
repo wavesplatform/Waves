@@ -25,8 +25,8 @@ object MatcherDefaultConfig {
                                      |  rest-order-limit=$orderLimit
                                      |}""".stripMargin)
 
-  val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
+  val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(2))
+    .zip(Seq(matcherConfig, randomMiner, minerDisabled))
     .map { case (n, o) => o.withFallback(n) }
 
 }
