@@ -1,5 +1,8 @@
 package com.wavesplatform.api.http.assets
 
+import java.util.concurrent.Executors
+
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
@@ -12,12 +15,14 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
-import com.wavesplatform.utils.{Base58, Time}
+import com.wavesplatform.utils.{Base58, Time, _}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import monix.eval.Task
+import monix.execution.Scheduler
 import play.api.libs.json._
 
 import scala.concurrent.Future
@@ -28,7 +33,8 @@ import scala.util.{Failure, Success}
 case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)
     extends ApiRoute
     with BroadcastRoute {
-  val MaxAddressesPerRequest = 1000
+
+  import AssetsApiRoute._
 
   override lazy val route =
     pathPrefix("assets") {
@@ -55,17 +61,19 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     ))
   def balanceDistribution: Route =
     (get & path(Segment / "distribution")) { assetId =>
-      complete {
+      val distributionTask: Task[ToResponseMarshallable] =
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) =>
-            Json.toJson(blockchain.assetDistribution(ByteStr(byteArray)).map { case (a, b) => a.stringRepr -> b })
+            Task
+              .eval(blockchain.assetDistribution(ByteStr(byteArray)).map { case (a, b) => a.stringRepr -> b })
+              .map(dst => Json.toJson(dst): ToResponseMarshallable)
           case Failure(_) =>
-            ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
+            Task.pure(ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId")))
         }
-      }
+      complete(distributionTask.runAsyncLogErr(distributionTaskScheduler))
     }
 
-  @Path("/{assetId}/distribution/{height}/limit/{limit}")
+  @Path("/{assetId}/distribution/{height}")
   @ApiOperation(
     value = "Asset balance distribution at height",
     notes = "Asset balance distribution by account at specified height",
@@ -75,25 +83,24 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     Array(
       new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "integer", paramType = "path"),
-      new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "integer", paramType = "path"),
     ))
   def balanceDistributionAtHeight: Route =
-    (get & path(Segment / "distribution" / IntNumber / "limit" / IntNumber)) { (assetId, height, limit) =>
-      complete {
+    (get & path(Segment / "distribution" / IntNumber)) { (assetId, height) =>
+      val distributionTask: Task[ToResponseMarshallable] =
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) =>
-            if (limit > settings.assetDistributionAddressLimit || limit <= 0)
-              invalidLimit
-            else
-              Json
-                .toJson(
-                  blockchain
-                    .assetDistributionAtHeight(ByteStr(byteArray), height, limit, 0)
-                    .map { case (a, b) => a.stringRepr -> b })
+            Task
+              .eval(
+                blockchain
+                  .assetDistributionAtHeight(ByteStr(byteArray), height)
+                  .map { case (a, b) => a.stringRepr -> b })
+              .map(r => Json.toJson(r): ToResponseMarshallable)
+
           case Failure(_) =>
-            ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
+            Task.pure(ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId")))
         }
-      }
+
+      complete(distributionTask.runAsyncLogErr(distributionTaskScheduler))
     }
 
   @Path("/balance/{address}")
@@ -334,4 +341,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     ))
   def sponsorRoute: Route =
     processRequest("sponsor", (req: SponsorFeeRequest) => doBroadcast(TransactionFactory.sponsor(req, wallet, time)))
+}
+
+object AssetsApiRoute {
+  val distributionTaskScheduler = Scheduler(Executors.newSingleThreadExecutor())
 }

@@ -39,13 +39,13 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
     nodes.waitForHeightAriseAndTxPresent(massTransferTx.id)
 
     val r1 = node
-      .get(s"/assets/${issueTx.id}/distribution/$initialHeight/limit/${addresses.size}")
+      .get(s"/assets/${issueTx.id}/distribution/$initialHeight")
       .getResponseBody()
 
     Json.parse(r1).as[JsObject].value.toList shouldBe List.empty
 
     val r2 = node
-      .get(s"/assets/${issueTx.id}/distribution/${node.height}/limit/${addresses.size}")
+      .get(s"/assets/${issueTx.id}/distribution/${node.height}")
       .getResponseBody
 
     val jsonResponse = Json.parse(r2)
