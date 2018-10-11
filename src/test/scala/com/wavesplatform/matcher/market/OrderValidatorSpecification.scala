@@ -11,6 +11,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
@@ -104,6 +105,19 @@ class OrderValidatorSpecification
           ov.validateNewOrder(o) shouldBe Left(GenericError("Order was placed before"))
         }
       }
+
+      "the limit has been reached" in {
+        import DBUtils.indexes.active.MaxElements
+        setupEnoughPortfolio()
+
+        val pk = PrivateKeyAccount("foo".getBytes())
+        (1 to MaxElements).foreach { i =>
+          val o = newBuyOrder(pk, i)
+          ov.orderHistory.process(OrderAdded(LimitOrder(o)))
+        }
+
+        ov.validateNewOrder(newBuyOrder(pk, 1000)) shouldBe Left(GenericError(s"Limit of $MaxElements active orders has been reached"))
+      }
     }
   }
 
@@ -118,6 +132,15 @@ class OrderValidatorSpecification
     amount = 100 * Constants.UnitsInWave,
     price = 0.0022,
     matcherFee = Some((0.003 * Constants.UnitsInWave).toLong)
+  )
+
+  private def newBuyOrder(pk: PrivateKeyAccount, ts: Long): Order = buy(
+    pair = pairWavesBtc,
+    amount = 100 * Constants.UnitsInWave,
+    price = 0.0022,
+    matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+    sender = Some(pk),
+    ts = Some(ts)
   )
 
   private def setupEnoughPortfolio(): Unit = {

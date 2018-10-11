@@ -74,7 +74,8 @@ object DBUtils {
                           finalizedIndex: Iterator[Order.Id]): IndexedSeq[(Order, OrderInfo)] = {
     def get(id: Order.Id): (Option[Order], Option[OrderInfo]) = (ro.get(MatcherKeys.order(id)), ro.get(MatcherKeys.orderInfoOpt(id)))
 
-    val active = activeIndex.take(maxOrders).map(get).collect { case (Some(o), Some(oi)) => (o, oi) }.toIndexedSeq
+    // We show all active orders even they count exceeds the pair limit
+    val active = activeIndex.map(get).collect { case (Some(o), Some(oi)) => (o, oi) }.toIndexedSeq
 
     val nonActive = finalizedIndex
       .map(get)
