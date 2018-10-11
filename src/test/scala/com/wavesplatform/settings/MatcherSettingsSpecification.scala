@@ -22,6 +22,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    order-cleanup-interval: 5m
         |    rest-order-limit: 100
         |    default-order-timestamp: 9999
+        |    order-timestamp-drift: 10m
         |    price-assets: [
         |      "WAVES",
         |      "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
@@ -52,6 +53,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.orderCleanupInterval should be(5.minute)
     settings.maxOrdersPerRequest should be(100)
     settings.defaultOrderTimestamp should be(9999)
+    settings.orderTimestampDrift should be(10.minutes.toMillis)
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
     settings.blacklistedAssets shouldBe Set("a")
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
