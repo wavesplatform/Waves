@@ -36,7 +36,7 @@ class MatcherMigrationTestSuite extends MatcherSuiteBase {
       val firstOrder = aliceOrder.message.id
 
       // check order status
-      matcherNode.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
+      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
 
       // sell order should be in the aliceNode orderbook
       matcherNode.fullOrderHistory(aliceAcc).head.status shouldBe "Accepted"

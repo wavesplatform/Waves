@@ -515,31 +515,31 @@ trait TransactionGenBase extends ScriptGen {
     matcher    <- accountGen
     pair       <- assetPairGen
     orderType  <- orderTypeGen
-    price      <- priceGen
     amount     <- matcherAmountGen
+    price      <- priceGen
     timestamp  <- timestampGen
     expiration <- maxOrderTimeGen
     matcherFee <- matcherFeeAmountGen
-  } yield (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
+  } yield (sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee)
 
   val orderV1Gen: Gen[Order] = for {
     (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee) <- orderParamGen
   } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, 1: Byte)
 
   val orderV2Gen: Gen[Order] = for {
-    (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee) <- orderParamGen
-  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, 2: Byte)
+    (sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee) <- orderParamGen
+  } yield Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, 2: Byte)
 
   val orderGen: Gen[Order] = Gen.oneOf(orderV1Gen, orderV2Gen)
 
   val arbitraryOrderGen: Gen[Order] = for {
     (sender, matcher, pair, orderType, _, _, _, _, _) <- orderParamGen
-    price                                             <- Arbitrary.arbitrary[Long]
     amount                                            <- Arbitrary.arbitrary[Long]
+    price                                             <- Arbitrary.arbitrary[Long]
     timestamp                                         <- Arbitrary.arbitrary[Long]
     expiration                                        <- Arbitrary.arbitrary[Long]
     matcherFee                                        <- Arbitrary.arbitrary[Long]
-  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, 1: Byte)
+  } yield Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, 1: Byte)
 
   val exchangeTransactionGen: Gen[ExchangeTransaction] = for {
     sender1: PrivateKeyAccount <- accountGen
@@ -568,14 +568,14 @@ trait TransactionGenBase extends ScriptGen {
                            priceAssetId: Option[ByteStr],
                            fixedMatcherFee: Option[Long] = None): Gen[ExchangeTransaction] =
     for {
-      (_, matcher, _, _, price, amount1, timestamp, expiration, genMatcherFee) <- orderParamGen
+      (_, matcher, _, _, amount1, price, timestamp, expiration, genMatcherFee) <- orderParamGen
       amount2: Long                                                            <- matcherAmountGen
       matchedAmount: Long                                                      <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
       assetPair = AssetPair(amountAssetId, priceAssetId)
     } yield {
       val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
-      val o1         = Order.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee, 1: Byte)
-      val o2         = Order.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee, 1: Byte)
+      val o1         = Order.buy(buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee, 1: Byte)
+      val o2         = Order.sell(seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee, 1: Byte)
       val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
       val trans =
@@ -583,8 +583,8 @@ trait TransactionGenBase extends ScriptGen {
           .create(matcher,
                   o1.asInstanceOf[OrderV1],
                   o2.asInstanceOf[OrderV1],
-                  price,
                   matchedAmount,
+                  price,
                   buyFee,
                   sellFee,
                   (buyFee + sellFee) / 2,
@@ -606,29 +606,19 @@ trait TransactionGenBase extends ScriptGen {
       matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
       assetPair = AssetPair(amountAssetId, priceAssetId)
       o1 <- Gen.oneOf(
-        OrderV1.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee),
-        OrderV2.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
+        OrderV1.buy(buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee),
+        OrderV2.buy(buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee)
       )
       o2 <- Gen.oneOf(
-        OrderV1.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee),
-        OrderV2.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
+        OrderV1.sell(seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee),
+        OrderV2.sell(seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee)
       )
     } yield {
       val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
       val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
 
       ExchangeTransactionV2
-        .create(
-          matcher,
-          o1,
-          o2,
-          price,
-          matchedAmount,
-          buyFee,
-          sellFee,
-          (buyFee + sellFee) / 2,
-          expiration - 100
-        )
+        .create(matcher, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100)
         .explicitGet()
     }
   }

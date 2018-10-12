@@ -56,10 +56,10 @@ class Worker(workerSettings: Settings,
 
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(Random.nextInt(c.size))) else None
 
-  def buyOrder(price: Long, amount: Long, buyer: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
+  def buyOrder(amount: Long, price: Long, buyer: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
     to(matcherSettings.endpoint).orderHistory(buyer)
     to(matcherSettings.endpoint).orderBook(pair)
-    val order = Order.buy(buyer, matcherPublicKey, pair, price, amount, now, now + 29.day.toMillis, fee)
+    val order = Order.buy(buyer, matcherPublicKey, pair, amount, price, now, now + 29.day.toMillis, fee)
     log.info(s"[$tag] Buy ${order.id()}: $order")
     val response = to(matcherSettings.endpoint).placeOrder(order).andThen {
       case Failure(e) => log.error(s"[$tag] Can't place buy order ${order.id()}: $e")
@@ -71,10 +71,10 @@ class Worker(workerSettings: Settings,
     (order, response)
   }
 
-  def sellOrder(price: Long, amount: Long, seller: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
+  def sellOrder(amount: Long, price: Long, seller: PrivateKeyAccount, pair: AssetPair)(implicit tag: String): (Order, Future[MatcherResponse]) = {
     to(matcherSettings.endpoint).orderHistory(seller)
     to(matcherSettings.endpoint).orderBook(pair)
-    val order = Order.sell(seller, matcherPublicKey, pair, price, amount, now, now + 29.day.toMillis, fee)
+    val order = Order.sell(seller, matcherPublicKey, pair, amount, price, now, now + 29.day.toMillis, fee)
     log.info(s"[$tag] Sell ${order.id()}: $order")
     val response = to(matcherSettings.endpoint).placeOrder(order).andThen {
       case Failure(e) => log.error(s"[$tag] Can't place sell order ${order.id()}: $e")
@@ -154,30 +154,30 @@ class Worker(workerSettings: Settings,
     val work = orderType match {
       case GenOrderType.ActiveBuy =>
         val buyer = randomFrom(validAccounts).get
-        buyOrder(DefaultPrice - Random.nextInt(2, DefaultPrice / 10), DefaultAmount, buyer, pair)._2
+        buyOrder(DefaultAmount, DefaultPrice - Random.nextInt(2, DefaultPrice / 10), buyer, pair)._2
 
       case GenOrderType.ActiveSell =>
         val seller = randomFrom(validAccounts).get
-        sellOrder(DefaultPrice + Random.nextInt(2, DefaultPrice / 5), DefaultAmount, seller, pair)._2
+        sellOrder(DefaultAmount, DefaultPrice + Random.nextInt(2, DefaultPrice / 5), seller, pair)._2
 
       case GenOrderType.Buy =>
         val buyer = randomFrom(validAccounts).get
-        buyOrder(DefaultPrice + Random.nextInt(2, 1000), DefaultAmount, buyer, pair)._2
+        buyOrder(DefaultAmount, DefaultPrice + Random.nextInt(2, 1000), buyer, pair)._2
 
       case GenOrderType.Sell =>
         val seller = randomFrom(validAccounts).get
-        sellOrder(DefaultPrice - Random.nextInt(2, 1000), DefaultAmount, seller, pair)._2
+        sellOrder(DefaultAmount, DefaultPrice - Random.nextInt(2, 1000), seller, pair)._2
 
       case GenOrderType.Cancel =>
         val buyer = randomFrom(validAccounts).get
-        sellOrder(DefaultPrice * 15, DefaultAmount, buyer, pair)._2.flatMap { orderInfo =>
+        sellOrder(DefaultAmount, DefaultPrice * 15, buyer, pair)._2.flatMap { orderInfo =>
           cancelOrder(buyer, pair, orderInfo.message.id)
         }
 
       case GenOrderType.InvalidAmount =>
         val invalidBuyer = randomFrom(invalidAccounts).get
         val pair         = AssetPair(randomFrom(tradingAssets.takeRight(2)), None)
-        buyOrder(DefaultPrice, DefaultAmount, invalidBuyer, pair)._2
+        buyOrder(DefaultAmount, DefaultPrice, invalidBuyer, pair)._2
           .transformWith {
             case Success(x) => Future.failed(new IllegalStateException(s"Order should not be placed: $x"))
             case Failure(e: UnexpectedStatusCodeException) =>
@@ -192,9 +192,9 @@ class Worker(workerSettings: Settings,
         val pair                      = AssetPair(randomFrom(tradingAssets.takeRight(2)), None)
         for {
           _ <- cancelAllOrders(fakeAccounts)
-          _ <- sellOrder(DefaultPrice, DefaultAmount, seller, pair)._2
+          _ <- sellOrder(DefaultAmount, DefaultPrice, seller, pair)._2
           _ <- transfer(seller, pair.amountAsset, buyer, halfBalance = false)
-          _ <- buyOrder(DefaultPrice, DefaultAmount, buyer, pair)._2
+          _ <- buyOrder(DefaultAmount, DefaultPrice, buyer, pair)._2
           _ <- transfer(buyer, pair.amountAsset, seller, halfBalance = true)
           _ <- cancelAllOrders(fakeAccounts)
         } yield ()
@@ -205,9 +205,9 @@ class Worker(workerSettings: Settings,
         val pair                      = AssetPair(randomFrom(tradingAssets.takeRight(2)), None)
         for {
           _ <- cancelAllOrders(fakeAccounts)
-          _ <- buyOrder(DefaultPrice, DefaultAmount, buyer, pair)._2
+          _ <- buyOrder(DefaultAmount, DefaultPrice, buyer, pair)._2
           _ <- transfer(buyer, pair.amountAsset, seller, halfBalance = false)
-          _ <- sellOrder(DefaultPrice, DefaultAmount, seller, pair)._2
+          _ <- sellOrder(DefaultAmount, DefaultPrice, seller, pair)._2
           _ <- transfer(seller, pair.amountAsset, buyer, halfBalance = true)
         } yield ()
     }

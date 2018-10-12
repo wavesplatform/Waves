@@ -19,10 +19,10 @@ case class SignedExchangeRequest(@ApiModelProperty(value = "Base58 encoded sende
                                  order1: Order,
                                  @ApiModelProperty(value = "Sell Order")
                                  order2: Order,
-                                 @ApiModelProperty(required = true)
-                                 price: Long,
                                  @ApiModelProperty(required = true, example = "1000000")
                                  amount: Long,
+                                 @ApiModelProperty(required = true)
+                                 price: Long,
                                  @ApiModelProperty(required = true)
                                  fee: Long,
                                  @ApiModelProperty(required = true)
@@ -40,8 +40,8 @@ case class SignedExchangeRequest(@ApiModelProperty(value = "Base58 encoded sende
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _t <- ExchangeTransactionV1.create(order1.asInstanceOf[OrderV1],
                                          order2.asInstanceOf[OrderV1],
-                                         price,
                                          amount,
+                                         price,
                                          buyMatcherFee,
                                          sellMatcherFee,
                                          fee,
