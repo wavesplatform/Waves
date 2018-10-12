@@ -24,7 +24,6 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   private val timer               = Kamon.timer("matcher.order-history.impl")
   private val saveOpenVolumeTimer = timer.refine("action" -> "save-open-volume")
   private val saveOrderInfoTimer  = timer.refine("action" -> "save-order-info")
-  private val openVolumeTimer     = timer.refine("action" -> "open-volume")
 
   def process(event: OrderAdded): Unit = saveOrderInfoTimer.measure {
     db.readWrite { rw =>
@@ -130,9 +129,6 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
     )
   }
 
-  def openVolume(address: Address, assetId: Option[AssetId]): Long =
-    openVolumeTimer.measure(DBUtils.openVolume(db, address, assetId))
-
   private def saveOpenVolume(rw: RW, opDiff: Map[Address, OpenPortfolio]): Unit = saveOpenVolumeTimer.measure {
     for ((address, op) <- opDiff) {
       val newAssets = Set.newBuilder[Option[AssetId]]
@@ -162,8 +158,6 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
 
   def orderInfo(id: Order.Id): OrderInfo = DBUtils.orderInfo(db, id)
   def order(id: Order.Id): Option[Order] = DBUtils.order(db, id)
-
-  def activeOrderCount(address: Address): Int = DBUtils.activeOrderCount(db, address)
 
   def deleteOrder(address: Address, orderId: ByteStr): Either[OrderStatus, Unit] = db.readWrite { rw =>
     DBUtils.orderInfo(rw, orderId).status match {

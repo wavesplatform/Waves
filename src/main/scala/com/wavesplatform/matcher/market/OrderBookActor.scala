@@ -120,13 +120,13 @@ class OrderBookActor(assetPair: AssetPair,
     }
 
   private def onAddOrder(order: Order): Unit = {
-    log.debug(s"Order accepted: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
+    log.trace(s"Order accepted: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
     timer.measure(matchOrder(LimitOrder(order)))
     sender() ! OrderAccepted(order)
   }
 
   private def applyEvent(e: Event): Unit = {
-    log.debug(s"Apply event $e")
+    log.trace(s"Apply event $e")
     orderBook = OrderBook.updateState(orderBook, e)
     updateSnapshot(orderBook)
   }

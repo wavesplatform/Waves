@@ -103,8 +103,8 @@ class MatcherActorSpecification
           s.size shouldBe 1
       }
     }
-    "deletes order books" is pending
-    "forwards new orders to order books" is pending
+    "delete order books" is pending
+    "forward new orders to order books" is pending
   }
 
   override protected def afterAll(): Unit          = shutdown()

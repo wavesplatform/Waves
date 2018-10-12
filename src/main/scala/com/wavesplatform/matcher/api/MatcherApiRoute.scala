@@ -52,9 +52,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   override val settings = wavesSettings.restAPISettings
 
-  private val timer       = Kamon.timer("matcher.api-requests")
-  private val placeTimer  = timer.refine("action" -> "place")
-  private val cancelTimer = timer.refine("action" -> "cancel")
+  private val timer           = Kamon.timer("matcher.api-requests")
+  private val placeTimer      = timer.refine("action" -> "place")
+  private val cancelTimer     = timer.refine("action" -> "cancel")
+  private val openVolumeTimer = timer.refine("action" -> "open-volume")
 
   override lazy val route: Route =
     pathPrefix("matcher") {
@@ -367,7 +368,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
       checkGetSignature(publicKey, ts, sig) match {
         case Success(pk) =>
-          complete(StatusCodes.OK -> Json.toJson(DBUtils.reservedBalance(db, pk).map { case (k, v) => AssetPair.assetIdStr(k) -> v }))
+          complete(StatusCodes.OK -> Json.toJson(openVolumeTimer.measure(DBUtils.reservedBalance(db, pk).map {
+            case (k, v) => AssetPair.assetIdStr(k) -> v
+          })))
         case Failure(ex) =>
           complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
       }

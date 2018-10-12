@@ -23,8 +23,6 @@ class OrderValidator(db: DB,
                      time: Time) {
   import OrderValidator._
 
-  private val MinExpiration: Long = 60 * 1000L
-
   private val timer = Kamon.timer("matcher.validation")
 
   private def spendableBalance(a: AssetAcc): Long = {
@@ -87,6 +85,8 @@ class OrderValidator(db: DB,
 }
 
 object OrderValidator {
+  val MinExpiration: Long = 60 * 1000L
+
   private def formatPortfolio(m: Map[Option[AssetId], Long]): String =
     m.map {
       case (assetId, v) => s"${AssetPair.assetIdStr(assetId)} -> $v"
