@@ -1,9 +1,9 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.state.ByteStr
-import play.api.libs.json._
 import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.Base58
+import play.api.libs.json._
 
 import scala.util.{Failure, Success}
 
@@ -12,38 +12,32 @@ object OrderJson {
   import play.api.libs.functional.syntax._
   import play.api.libs.json.Reads._
 
-  implicit val byteArrayReads = new Reads[Array[Byte]] {
-    def reads(json: JsValue) = json match {
-      case JsString(s) =>
-        Base58.decode(s) match {
-          case Success(bytes) => JsSuccess(bytes)
-          case Failure(_)     => JsError(JsPath, JsonValidationError("error.incorrect.base58"))
-        }
-      case _ => JsError(JsPath, JsonValidationError("error.expected.jsstring"))
-    }
+  implicit val byteArrayReads: Reads[Array[Byte]] = {
+    case JsString(s) =>
+      Base58.decode(s) match {
+        case Success(bytes) => JsSuccess(bytes)
+        case Failure(_)     => JsError(JsPath, JsonValidationError("error.incorrect.base58"))
+      }
+    case _ => JsError(JsPath, JsonValidationError("error.expected.jsstring"))
   }
 
-  implicit val optionByteArrayReads = new Reads[Option[Array[Byte]]] {
-    def reads(json: JsValue) = json match {
-      case JsString(s) if s.isEmpty => JsSuccess(Option.empty[Array[Byte]])
-      case JsString(s) if s.nonEmpty =>
-        Base58.decode(s) match {
-          case Success(bytes) => JsSuccess(Some(bytes))
-          case Failure(_)     => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
-        }
-      case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
-    }
+  implicit val optionByteArrayReads: Reads[Option[Array[Byte]]] = {
+    case JsString(s) if s.isEmpty => JsSuccess(Option.empty[Array[Byte]])
+    case JsString(s) if s.nonEmpty =>
+      Base58.decode(s) match {
+        case Success(bytes) => JsSuccess(Some(bytes))
+        case Failure(_)     => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
+      }
+    case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }
 
-  implicit val publicKeyAccountReads = new Reads[PublicKeyAccount] {
-    def reads(json: JsValue) = json match {
-      case JsString(s) =>
-        Base58.decode(s) match {
-          case Success(bytes) if bytes.length == 32 => JsSuccess(PublicKeyAccount(bytes))
-          case _                                    => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.publicKeyAccount"))))
-        }
-      case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
-    }
+  implicit val publicKeyAccountReads: Reads[PublicKeyAccount] = {
+    case JsString(s) =>
+      Base58.decode(s) match {
+        case Success(bytes) if bytes.length == 32 => JsSuccess(PublicKeyAccount(bytes))
+        case _                                    => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.publicKeyAccount"))))
+      }
+    case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }
 
   def readOrder(sender: PublicKeyAccount,

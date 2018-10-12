@@ -1,22 +1,17 @@
 package com.wavesplatform.matcher.market
 
 import com.google.common.base.Charsets
-import com.wavesplatform.WithDB
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
-import com.wavesplatform.settings.{Constants, WalletSettings}
+import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.randomBytes
-import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{TestTime, WithDB}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -24,151 +19,107 @@ import org.scalatest.prop.PropertyChecks
 class OrderValidatorSpecification
     extends WordSpec
     with WithDB
-    with PropertyChecks
     with Matchers
     with MatcherTestData
     with BeforeAndAfterAll
-    with BeforeAndAfterEach
-    with PathMockFactory {
+    with PathMockFactory
+    with PropertyChecks {
 
-  private val bc: Blockchain = stub[Blockchain]
-  private val i1: IssueTransactionV1 =
-    IssueTransactionV1
-      .selfSigned(PrivateKeyAccount(Array.empty), "WBTC".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
-      .right
-      .get
-  (bc.transactionInfo _).when(*).returns(Some((1, i1)))
+  private val wbtc         = mkAssetId("WBTC")
+  private val pairWavesBtc = AssetPair(None, Some(wbtc))
+  private val bc           = stub[Blockchain]
+  private val defaultTs    = 1000
 
-  private val defaultTs: Long = 1000
-  private val s: MatcherSettings = matcherSettings.copy(
-    account = MatcherAccount.address,
-    defaultOrderTimestamp = defaultTs,
-    orderTimestampDrift = 10
-  )
-  private val w = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
-  w.generateNewAccount()
-
-  private var ov = new OrderValidator {
-    override val orderHistory: OrderHistory = new OrderHistory(db, s)
-    override val utxPool: UtxPool           = stub[UtxPool]
-    override val settings: MatcherSettings  = s
-    override val wallet: Wallet             = w
+  private def portfolioTest(p: Portfolio)(f: OrderValidator => Any): Unit = {
+    f(new OrderValidator(db, bc, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime))
   }
 
-  override def beforeEach(): Unit = {
-    super.beforeEach()
-    ov = new OrderValidator {
-      override val orderHistory: OrderHistory = new OrderHistory(db, s)
-      override val utxPool: UtxPool           = stub[UtxPool]
-      override val settings: MatcherSettings  = s
-      override val wallet: Wallet             = w
-    }
+  private def settingsTest(settings: MatcherSettings)(f: OrderValidator => Any): Unit = {
+    f(new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
   }
 
-  val wbtc: ByteStr = mkAssetId("WBTC")
-  val pairWavesBtc  = AssetPair(None, Some(wbtc))
+  private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
 
   "OrderValidator" should {
-    "allows a new order" when {
-      "buy WAVES for BTC without balance for order fee" in {
-        validateNewOrderTest(
-          Portfolio(0,
-                    LeaseBalance.empty,
-                    Map(
-                      wbtc -> 10 * Constants.UnitsInWave
-                    ))) shouldBe an[Right[_, _]]
+    "allow buying WAVES for BTC without balance for order fee" in
+      portfolioTest(defaultPortfolio) { ov =>
+        ov.validateNewOrder(newBuyOrder) shouldBe 'right
       }
 
-      "default ts - drift < its ts for new users" in {
-        setupEnoughPortfolio()
-        ov.validateNewOrder(newBuyOrder(defaultTs - s.orderTimestampDrift + 1)) shouldBe 'right
+    "reject new order" when {
+      "asset balance is negative" in {
+        portfolioTest(Portfolio(0, LeaseBalance.empty, Map(wbtc -> -10 * Constants.UnitsInWave))) { ov =>
+          ov.validateNewOrder(newBuyOrder) should produce("Not enough tradable balance")
+        }
       }
 
-      "ts1 - drift < ts2" in {
-        setupEnoughPortfolio()
-        val pk = PrivateKeyAccount(randomBytes())
+      "this order had already been accepted" in portfolioTest(defaultPortfolio) { ov =>
+        val o       = newBuyOrder
+        val history = new OrderHistory(db, matcherSettings)
+        history.process(OrderAdded(LimitOrder(o)))
+        ov.validateNewOrder(o) shouldBe Left("Order has already been placed")
+      }
 
-        ov.orderHistory.setLastOrder(pk, newBuyOrder(pk, defaultTs + 1000))
-        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 1001 - s.orderTimestampDrift)) shouldBe 'right
+      "this order had already been canceled" in portfolioTest(defaultPortfolio) { ov =>
+        val o       = newBuyOrder
+        val history = new OrderHistory(db, matcherSettings)
+        history.process(OrderAdded(LimitOrder(o)))
+        history.process(OrderCanceled(LimitOrder(o), unmatchable = false))
+
+        ov.validateNewOrder(o) shouldBe Left("Order has already been placed")
+      }
+
+      val blacklistedAccount = PrivateKeyAccount("3irbW78fffj5XDzAMjaEeo3kn8V".getBytes(Charsets.UTF_8))
+      "sender's address is blacklisted" in settingsTest(matcherSettings.copy(blacklistedAddresses = Set(blacklistedAccount.toAddress))) { ov =>
+        val o = newBuyOrder(blacklistedAccount)
+        ov.validateNewOrder(o) shouldBe Left("Invalid address")
+
+      }
+
+      "sender's address has a script" in forAll(accountGen, accountGen) {
+        case (scripted, nonScripted) =>
+          (bc.hasScript _).when(scripted.toAddress).returns(true).once()
+          (bc.hasScript _).when(nonScripted.toAddress).returns(false).once()
+          val ov = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
+          ov.validateNewOrder(newBuyOrder(scripted)) should produce("")
+          ov.validateNewOrder(newBuyOrder(nonScripted)) shouldBe 'right
+      }
+
+      "order expires too soon" in forAll(Gen.choose[Long](1, OrderValidator.MinExpiration), accountGen) { (offset, pk) =>
+        val tt       = new TestTime
+        val ov       = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, tt)
+        val unsigned = newBuyOrder
+        val signed   = Order.sign(unsigned.copy(senderPublicKey = pk, expiration = tt.getTimestamp() + offset), pk)
+        ov.validateNewOrder(signed) shouldBe Left("Order expiration should be > 1 min")
+      }
+
+      "order signature is invalid" in {
+        val ov = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
+        ov.validateNewOrder(newBuyOrder.copy(signature = Array.emptyByteArray)) shouldBe Left("Invalid signature")
+      }
+
+      "default ts - drift > its for new users" in portfolioTest(defaultPortfolio) { ov =>
+        ov.validateNewOrder(newBuyOrder(defaultTs - matcherSettings.orderTimestampDrift - 1)) should produce("Order should have a timestamp")
+      }
+
+      "default ts - drift = its ts for new users" in portfolioTest(defaultPortfolio) { ov =>
+        ov.validateNewOrder(newBuyOrder(defaultTs - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
+      }
+
+      "ts1 - drift > ts2" in portfolioTest(defaultPortfolio) { ov =>
+        val pk      = PrivateKeyAccount(randomBytes())
+        val history = new OrderHistory(db, matcherSettings)
+        history.process(OrderAdded(LimitOrder(newBuyOrder(pk, defaultTs + 1000))))
+        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 999 - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
+      }
+
+      "ts1 - drift = ts2" in portfolioTest(defaultPortfolio) { ov =>
+        val pk      = PrivateKeyAccount(randomBytes())
+        val history = new OrderHistory(db, matcherSettings)
+        history.process(OrderAdded(LimitOrder(newBuyOrder(pk, defaultTs + 1000))))
+        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 1000 - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
       }
     }
-
-    "does not allow to add an order" when {
-      "the assets number is negative" in {
-        validateNewOrderTest(
-          Portfolio(0,
-                    LeaseBalance.empty,
-                    Map(
-                      wbtc -> -10 * Constants.UnitsInWave
-                    ))) shouldBe a[Left[_, _]]
-      }
-
-      "it was added before" when {
-        "it accepted" in {
-          val o = newBuyOrder
-          setupEnoughPortfolio()
-
-          ov.orderHistory.process(OrderAdded(LimitOrder(o)))
-
-          ov.validateNewOrder(o) shouldBe Left(GenericError("Order was placed before"))
-        }
-
-        "it canceled" in {
-          val o = newBuyOrder
-          setupEnoughPortfolio()
-
-          ov.orderHistory.process(OrderAdded(LimitOrder(o)))
-          ov.orderHistory.process(OrderCanceled(LimitOrder(o), unmatchable = false))
-
-          ov.validateNewOrder(o) shouldBe Left(GenericError("Order was placed before"))
-        }
-      }
-
-      "the limit has been reached" in {
-        import DBUtils.indexes.active.MaxElements
-        setupEnoughPortfolio()
-
-        val pk = PrivateKeyAccount("foo".getBytes())
-        (1 to MaxElements).foreach { i =>
-          val o = newBuyOrder(pk, i)
-          ov.orderHistory.process(OrderAdded(LimitOrder(o)))
-        }
-
-        ov.validateNewOrder(newBuyOrder(pk, 1000)) shouldBe Left(GenericError(s"Limit of $MaxElements active orders has been reached"))
-      }
-
-      "default ts - drift > its for new users" in {
-        setupEnoughPortfolio()
-        ov.validateNewOrder(newBuyOrder(defaultTs - s.orderTimestampDrift - 1)) should produce("Order should have a timestamp")
-      }
-
-      "default ts - drift = its ts for new users" in {
-        setupEnoughPortfolio()
-        ov.validateNewOrder(newBuyOrder(defaultTs - s.orderTimestampDrift)) should produce("Order should have a timestamp")
-      }
-
-      "ts1 - drift > ts2" in {
-        setupEnoughPortfolio()
-        val pk = PrivateKeyAccount(randomBytes())
-
-        ov.orderHistory.setLastOrder(pk, newBuyOrder(pk, defaultTs + 1000))
-        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 999 - s.orderTimestampDrift)) should produce("Order should have a timestamp")
-      }
-
-      "ts1 - drift = ts2" in {
-        setupEnoughPortfolio()
-        val pk = PrivateKeyAccount(randomBytes())
-
-        ov.orderHistory.setLastOrder(pk, newBuyOrder(pk, defaultTs + 1000))
-        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 1000 - s.orderTimestampDrift)) should produce("Order should have a timestamp")
-      }
-    }
-  }
-
-  private def validateNewOrderTest(expectedPortfolio: Portfolio): Either[ValidationError.GenericError, Order] = {
-    (ov.utxPool.portfolio _).when(*).returns(expectedPortfolio)
-    val o = newBuyOrder
-    ov.validateNewOrder(o)
   }
 
   private def newBuyOrder: Order = buy(
@@ -186,7 +137,7 @@ class OrderValidatorSpecification
     ts = Some(ts)
   )
 
-  private def newBuyOrder(pk: PrivateKeyAccount, ts: Long): Order = buy(
+  private def newBuyOrder(pk: PrivateKeyAccount, ts: Long = System.currentTimeMillis()): Order = buy(
     pair = pairWavesBtc,
     amount = 100 * Constants.UnitsInWave,
     price = 0.0022,
@@ -194,17 +145,6 @@ class OrderValidatorSpecification
     sender = Some(pk),
     ts = Some(ts)
   )
-
-  private def setupEnoughPortfolio(): Unit = {
-    (ov.utxPool.portfolio _)
-      .when(*)
-      .returns(
-        Portfolio(0,
-                  LeaseBalance.empty,
-                  Map(
-                    wbtc -> 10 * Constants.UnitsInWave
-                  )))
-  }
 
   private def mkAssetId(prefix: String): ByteStr = {
     val prefixBytes = prefix.getBytes(Charsets.UTF_8)

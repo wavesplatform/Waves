@@ -2,65 +2,32 @@ package com.wavesplatform.matcher.market
 
 import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{Actor, ActorRef, Props}
-import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
-import com.wavesplatform.account.PrivateKeyAccount
+import akka.actor.{ActorRef, Props}
+import akka.testkit.ImplicitSender
+import com.wavesplatform.NTPTime
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.api.{OperationTimedOut, OrderAccepted, OrderCanceled}
+import com.wavesplatform.matcher.api.{OrderAccepted, OrderCanceled}
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
-import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, OrderBook, SellLimitOrder}
-import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings}
-import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.matcher.model._
+import com.wavesplatform.settings.Constants
+import com.wavesplatform.state.{ByteStr, Diff}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import com.wavesplatform.utils.NTP
 import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 
 import scala.concurrent.duration._
 import scala.util.Random
 
-class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with ImplicitSender with MatcherTestData with PathMockFactory {
+class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTPTime with ImplicitSender with MatcherTestData with PathMockFactory {
 
-  val defaultPair            = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
-  val blockchain: Blockchain = stub[Blockchain]
-  val hugeAmount             = Long.MaxValue / 2
-  (blockchain.portfolio _)
-    .when(*)
-    .returns(
-      Portfolio(hugeAmount,
-                LeaseBalance.empty,
-                Map(
-                  ByteStr("BTC".getBytes)   -> hugeAmount,
-                  ByteStr("WAVES".getBytes) -> hugeAmount
-                )))
-  val issueTransaction: IssueTransactionV1 = IssueTransactionV1
-    .selfSigned(PrivateKeyAccount("123".getBytes), "MinerReward".getBytes, Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
-    .right
-    .get
+  private val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime).createTransaction _
+  private val obc       = new ConcurrentHashMap[AssetPair, OrderBook]
 
-  (blockchain.transactionInfo _).when(*).returns(Some((1, issueTransaction)))
-
-  val settings = matcherSettings.copy(account = MatcherAccount.address)
-
-  val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
-  wallet.generateNewAccount()
-
-  val orderHistoryRef = TestActorRef(new Actor {
-    def receive: Receive = {
-      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(o.id(), Right(o))
-      case _                   =>
-    }
-  })
-
-  val obc                                              = new ConcurrentHashMap[AssetPair, OrderBook]()
-  def update(ap: AssetPair)(snapshot: OrderBook): Unit = obc.put(ap, snapshot)
+  private def update(ap: AssetPair)(snapshot: OrderBook): Unit = obc.put(ap, snapshot)
 
   private def getOrders(actor: ActorRef) = {
     actor ! GetOrdersRequest
@@ -72,17 +39,12 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     val b = ByteStr(new Array[Byte](32))
     Random.nextBytes(b.arr)
 
-    val pair                  = AssetPair(Some(b), None)
-    val blockchain            = stub[Blockchain]
-    val functionalitySettings = TestFunctionalitySettings.Stub
+    val pair = AssetPair(Some(b), None)
 
     val utx = stub[UtxPool]
     (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty)))
     val allChannels = stub[ChannelGroup]
-    val actor = system.actorOf(
-      Props(
-        new OrderBookActor(pair, update(pair), orderHistoryRef, blockchain, wallet, utx, allChannels, settings, functionalitySettings)
-        with RestartableActor))
+    val actor       = system.actorOf(Props(new OrderBookActor(pair, update(pair), utx, allChannels, matcherSettings, txFactory) with RestartableActor))
 
     f(pair, actor)
   }
@@ -286,9 +248,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "order matched with invalid order should keep matching with others, invalid is removed" in obcTest { (pair, _) =>
-      val blockchain            = stub[Blockchain]
-      val functionalitySettings = TestFunctionalitySettings.Stub
-
       val ord1       = buy(pair, 20 * Order.PriceConstant, 100)
       val invalidOrd = buy(pair, 1000 * Order.PriceConstant, 5000)
       val ord2       = sell(pair, 10 * Order.PriceConstant, 100)
@@ -301,9 +260,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
         }
       }
       val allChannels = stub[ChannelGroup]
-      val actor = system.actorOf(
-        Props(new OrderBookActor(pair, update(pair), orderHistoryRef, blockchain, wallet, pool, allChannels, settings, functionalitySettings)
-        with RestartableActor))
+      val actor       = system.actorOf(Props(new OrderBookActor(pair, update(pair), pool, allChannels, matcherSettings, txFactory) with RestartableActor))
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))
@@ -366,7 +323,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
       expectMsg(GetOrdersResponse(Seq(SellLimitOrder(restAmount, ord1.price, restFee, ord1))))
     }
 
-    "partially execute order with price > 1 and zero fee remaining part " in obcTest { (pair, actor) =>
+    "partially execute order with price > 1 and zero fee remaining part " in obcTest { (_, actor) =>
       val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("USD".getBytes)))
       val ord1 = sell(pair, (0.1 * Constants.UnitsInWave).toLong, 1850)
       val ord2 = sell(pair, (0.01 * Constants.UnitsInWave).toLong, 1840)
@@ -383,7 +340,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
       expectMsg(GetOrdersResponse(Seq(SellLimitOrder(restAmount, ord1.price, restFee, ord1))))
     }
 
-    "buy small amount of pricey asset" in obcTest { (pair, actor) =>
+    "buy small amount of pricey asset" in obcTest { (_, actor) =>
       val p = AssetPair(Some(ByteStr("WAVES".getBytes)), Some(ByteStr("USD".getBytes)))
       val b = rawBuy(p, 700000L, 280)
       val s = rawSell(p, 30000000000L, 280)
@@ -402,11 +359,11 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
     }
 
     "cancel expired orders after OrderCleanup command" in obcTest { (pair, actor) =>
-      val time   = NTP.correctedTime()
+      val ts     = ntpTime.correctedTime()
       val amount = 1
       val price  = 34118
 
-      val expiredOrder = buy(pair, amount, price).copy(expiration = time)
+      val expiredOrder = buy(pair, amount, price).copy(expiration = ts)
       actor ! expiredOrder
       receiveN(1)
       getOrders(actor) shouldEqual Seq(BuyLimitOrder(amount, price * Order.PriceConstant, expiredOrder.matcherFee, expiredOrder))
@@ -428,45 +385,5 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with Imp
       actor ! OrderCleanup
       getOrders(actor) shouldEqual expectedOrders
     }
-
-    "responsd with a error after timeout" in obcTest { (pair, actor) =>
-      val actor: ActorRef = createOrderBookActor(TestProbe().ref, 50.millis)
-
-      val order = buy(pair, 1, 1)
-      actor ! order
-      Thread.sleep(60)
-      expectMsg(OperationTimedOut)
-    }
-
-    "ignore an unexpected validation message" when {
-      "receives ValidateOrderResult of another order" in {
-        val historyActor = TestProbe()
-        val actor        = createOrderBookActor(historyActor.ref)
-
-        val order = buy(defaultPair, 1, 1)
-        actor ! order
-
-        val unexpectedOrder = buy(defaultPair, 2, 1)
-        actor.tell(ValidateOrderResult(unexpectedOrder.id(), Right(unexpectedOrder)), historyActor.ref)
-        expectNoMessage()
-      }
-    }
   }
-
-  private def createOrderBookActor(historyActor: ActorRef, validationTimeout: FiniteDuration = 10.minutes): ActorRef = system.actorOf(
-    Props(
-      new OrderBookActor(
-        defaultPair,
-        _ => (),
-        historyActor,
-        stub[Blockchain],
-        stub[Wallet],
-        stub[UtxPool],
-        stub[ChannelGroup],
-        settings.copy(validationTimeout = validationTimeout),
-        FunctionalitySettings.TESTNET
-      ) with RestartableActor
-    )
-  )
-
 }

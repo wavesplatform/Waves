@@ -1,16 +1,16 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.transaction.ValidationError.OrderValidationError
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
-import com.wavesplatform.utils.{Base58, NTP}
+import com.wavesplatform.utils.Base58
+import com.wavesplatform.{NTPTime, TransactionGen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
 
-class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with NTPTime {
 
   property("ExchangeTransaction transaction serialization roundtrip") {
     forAll(exchangeTransactionGen) { om =>
@@ -24,7 +24,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
   property("ExchangeTransaction balance changes") {
     forAll(accountGen, accountGen, accountGen, assetPairGen) {
       (sender1: PrivateKeyAccount, sender2: PrivateKeyAccount, matcher: PrivateKeyAccount, pair: AssetPair) =>
-        val time                = NTP.correctedTime()
+        val time                = ntpTime.correctedTime()
         val expirationTimestamp = time + Order.MaxLiveTime
         val buyPrice            = 60 * Order.PriceConstant
         val sellPrice           = 50 * Order.PriceConstant
@@ -94,14 +94,14 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
       sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
       fee = mf,
-      timestamp = NTP.correctedTime()
+      timestamp = ntpTime.correctedTime()
     )
   }
 
   property("Test transaction with small amount and expired order") {
     forAll(accountGen, accountGen, accountGen, assetPairGen) {
       (sender1: PrivateKeyAccount, sender2: PrivateKeyAccount, matcher: PrivateKeyAccount, pair: AssetPair) =>
-        val time                = NTP.correctedTime()
+        val time                = ntpTime.correctedTime()
         val expirationTimestamp = time + Order.MaxLiveTime
         val buyPrice            = 1 * Order.PriceConstant
         val sellPrice           = (0.50 * Order.PriceConstant).toLong

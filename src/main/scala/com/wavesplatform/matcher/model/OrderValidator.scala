@@ -1,78 +1,94 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.api.DBUtils.indexes.active.MaxElements
 import com.wavesplatform.matcher.model.OrderHistory.OrderInfoChange
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetAcc
-import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
-import com.wavesplatform.transaction.assets.exchange.{Order, Validation}
-import com.wavesplatform.utils.NTP
-import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.{AssetAcc, AssetId}
+import com.wavesplatform.utils.Time
 import kamon.Kamon
+import org.iq80.leveldb.DB
 
-trait OrderValidator {
-  val orderHistory: OrderHistory
-  val utxPool: UtxPool
-  val settings: MatcherSettings
-  val wallet: Wallet
-
-  lazy val matcherPubKey: PublicKeyAccount = wallet.findPrivateKey(settings.account).explicitGet()
-  val MinExpiration: Long                  = 60 * 1000L
+class OrderValidator(db: DB,
+                     blockchain: Blockchain,
+                     portfolio: Address => Portfolio,
+                     validatePair: AssetPair => Either[String, AssetPair],
+                     settings: MatcherSettings,
+                     val matcherPublicKey: PublicKeyAccount,
+                     time: Time) {
+  import OrderValidator._
 
   private val timer = Kamon.timer("matcher.validation")
 
-  private def isBalanceWithOpenOrdersEnough(order: Order): Validation = {
-    val lo = LimitOrder(order)
-
-    val b: Map[Option[ByteStr], Long] = Seq(lo.spentAcc, lo.feeAcc).map(a => a.assetId -> spendableBalance(a)).toMap
-
-    val change = OrderInfoChange(lo.order, None, OrderInfo(order.amount, 0L, None, None, order.matcherFee, Some(0L)))
-    val newOrder = OrderHistory
-      .diff(List(change))
-      .getOrElse(order.senderPublicKey.toAddress, OpenPortfolio.empty)
-
-    val open  = b.keySet.map(id => id -> orderHistory.openVolume(order.senderPublicKey, id)).toMap
-    val needs = OpenPortfolio(open).combine(newOrder)
-
-    val res: Boolean = b.combine(needs.orders.mapValues(-_)).forall(_._2 >= 0)
-
-    res :| s"Not enough tradable balance: ${b.combine(open.mapValues(-_))}, needs: $newOrder"
+  private def spendableBalance(a: AssetAcc): Long = {
+    val p = portfolio(a.account)
+    a.assetId match {
+      case Some(x) => p.assets.getOrElse(x, 0)
+      case None    => p.spendableBalance
+    }
   }
 
-  def getTradableBalance(acc: AssetAcc): Long = timer.refine("action" -> "tradableBalance").measure {
-    math.max(0l, spendableBalance(acc) - orderHistory.openVolume(acc.account, acc.assetId))
+  private def validateBalance(o: Order): Either[String, Order] = {
+    val senderAddress = o.sender.toAddress
+    val lo            = LimitOrder(o)
+    val actualBalance = Set(lo.feeAsset, lo.spentAsset).map(assetId => assetId -> spendableBalance(AssetAcc(senderAddress, assetId))).toMap
+    val openVolume    = actualBalance.map { case (assetId, _) => assetId -> DBUtils.openVolume(db, senderAddress, assetId) }
+    val change        = OrderInfoChange(o, None, OrderInfo(o.amount, 0L, None, None, o.matcherFee, Some(0L)))
+    val newOrder      = OrderHistory.diff(List(change)).getOrElse(senderAddress, OpenPortfolio.empty)
+    val needs         = OpenPortfolio(openVolume).combine(newOrder)
+
+    Either.cond(
+      actualBalance.combine(needs.orders.mapValues(-_)).forall(_._2 >= 0),
+      o,
+      s"Not enough tradable balance. Order requires ${formatPortfolio(newOrder.orders)}, " +
+        s"available balance is ${formatPortfolio(actualBalance.combine(openVolume.mapValues(-_)))}"
+    )
   }
 
-  def validateNewOrder(order: Order): Either[GenericError, Order] =
+  def tradableBalance(acc: AssetAcc): Long =
+    timer
+      .refine("action" -> "tradableBalance")
+      .measure {
+        math.max(0l, spendableBalance(acc) - DBUtils.openVolume(db, acc.account, acc.assetId))
+      }
+
+  def validateNewOrder(order: Order): Either[String, Order] =
     timer
       .refine("action" -> "place", "pair" -> order.assetPair.toString)
       .measure {
-        lazy val lowestOrderTs = orderHistory.lastOrderTimestamp(order.senderPublicKey) - settings.orderTimestampDrift
-        val v =
-          (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
-            (order.expiration > NTP.correctedTime() + MinExpiration) :| "Order expiration should be > 1 min" &&
-            order.signaturesValid().isRight :| "signature should be valid" &&
-            order.isValid(NTP.correctedTime()) &&
-            (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
-            (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order was placed before" &&
-            (orderHistory.activeOrderCount(order.senderPublicKey) < MaxElements) :| s"Limit of $MaxElements active orders has been reached" &&
-            (order.timestamp > lowestOrderTs) :| s"Order should have a timestamp after $lowestOrderTs, but it is ${order.timestamp}" &&
-            isBalanceWithOpenOrdersEnough(order)
-        Either
-          .cond(v, order, GenericError(v.messages()))
-      }
+        lazy val senderAddress = order.sender.toAddress
+        lazy val lowestOrderTs = DBUtils
+          .lastOrderTimestamp(db, order.senderPublicKey)
+          .getOrElse(settings.defaultOrderTimestamp) - settings.orderTimestampDrift
 
-  private def spendableBalance(a: AssetAcc): Long = {
-    val portfolio = utxPool.portfolio(a.account)
-    a.assetId match {
-      case Some(x) => portfolio.assets.getOrElse(x, 0)
-      case None    => portfolio.spendableBalance
-    }
-  }
+        for {
+          _ <- (Right(order): Either[String, Order])
+            .ensure("Incorrect matcher public key")(_.matcherPublicKey == matcherPublicKey)
+            .ensure("Invalid address")(_ => !settings.blacklistedAddresses.contains(senderAddress))
+            .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
+            .ensure(s"Order should have a timestamp after $lowestOrderTs, but it is ${order.timestamp}")(_.timestamp > 0)
+            .ensure(s"Order matcherFee should be >= ${settings.minOrderFee}")(_.matcherFee >= settings.minOrderFee)
+            .ensure("Invalid signature")(_.signatureValid())
+            .ensure("Invalid order")(_.isValid(time.correctedTime()))
+            .ensure("Order has already been placed")(o => DBUtils.orderInfo(db, o.id()).status == LimitOrder.NotFound)
+            .ensure(s"Limit of $MaxElements active orders has been reached")(o => DBUtils.activeOrderCount(db, o.senderPublicKey) < MaxElements)
+            .ensure("Trading on scripted account isn't allowed yet")(_ => !blockchain.hasScript(senderAddress))
+          _ <- validateBalance(order)
+          _ <- validatePair(order.assetPair)
+        } yield order
+      }
+}
+
+object OrderValidator {
+  val MinExpiration: Long = 60 * 1000L
+
+  private def formatPortfolio(m: Map[Option[AssetId], Long]): String =
+    m.map {
+      case (assetId, v) => s"${AssetPair.assetIdStr(assetId)} -> $v"
+    } mkString ("[", ", ", "]")
 }
