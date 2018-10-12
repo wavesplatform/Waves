@@ -268,7 +268,7 @@ object Parser {
 
     P(
       Index ~~
-        letP ~/
+        letP.rep(min = 1) ~/
         Pass ~~
         (
           ("" ~ ";") ~/ (baseExpr | invalid).? |
@@ -277,7 +277,12 @@ object Parser {
         ) ~~
         Index
     ).map {
-      case (start, l, body, end) => BLOCK(Pos(start, end), l, body.getOrElse(INVALID(Pos(end, end), "expected a body")))
+      case (start, ls, body, end) => {
+        ls.reverse
+          .foldLeft(body.getOrElse(INVALID(Pos(end, end), "expected a body"))) { (acc, l) =>
+            BLOCK(Pos(start, end), l, acc)
+          }
+      }
     }
   }
 

@@ -2,7 +2,6 @@ package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool

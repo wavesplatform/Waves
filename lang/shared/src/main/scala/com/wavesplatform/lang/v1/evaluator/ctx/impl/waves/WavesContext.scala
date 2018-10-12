@@ -28,8 +28,8 @@ object WavesContext {
         100,
         internalName,
         UNION(dataType.innerType, UNIT),
-        "get data from the accaunt state",
-        ("addressOrAlias", addressOrAliasType, "accaunt"),
+        "get data from the account state",
+        ("addressOrAlias", addressOrAliasType, "account"),
         ("key", STRING, "key")
       ) {
         case (addressOrAlias: CaseObj) :: (k: String) :: Nil => environmentFunctions.getData(addressOrAlias, k, dataType).map(fromOption)
@@ -90,7 +90,7 @@ object WavesContext {
       )
     )
 
-    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to accaunt address", ("@publicKey", BYTEVECTOR, "public key")) {
+    val addressFromPublicKeyF: BaseFunction = UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to account address", ("@publicKey", BYTEVECTOR, "public key")) {
 
         FUNCTION_CALL(
           FunctionHeader.User("Address"),
@@ -130,7 +130,6 @@ object WavesContext {
             )
           )
         )
-
     }
 
     def removePrefixExpr(str: EXPR, prefix: String): EXPR = IF(
@@ -161,7 +160,7 @@ object WavesContext {
       )
     )
 
-    val addressFromStringF: BaseFunction = UserFunction("addressFromString", optionAddress, "Decode accaunt address", ("@string", STRING, "string address represntation")) {
+    val addressFromStringF: BaseFunction = UserFunction("addressFromString", optionAddress, "Decode account address", ("@string", STRING, "string address represntation")) {
 
         BLOCK(
           LET("@afs_addrBytes", FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(REF("@string"), EnvironmentFunctions.AddressPrefix)))),
@@ -209,7 +208,6 @@ object WavesContext {
             REF("unit")
           )
         )
-
     }
 
     val addressFromRecipientF: BaseFunction =
@@ -219,7 +217,7 @@ object WavesContext {
         ADDRESSFROMRECIPIENT,
         addressType.typeRef,
         "Extract address or lookup alias",
-        ("AddressOrAlias", addressOrAliasType, "address or alias, usally tx.recipient")
+        ("AddressOrAlias", addressOrAliasType, "address or alias, usually tx.recipient")
       ) {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
         case CaseObj(aliasType.typeRef, fields) :: Nil =>

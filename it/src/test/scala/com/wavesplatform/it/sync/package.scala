@@ -4,17 +4,18 @@ import com.wavesplatform.state.DataEntry
 import com.wavesplatform.it.util._
 
 package object sync {
+  val smartFee                   = 0.004.waves
   val minFee                     = 0.001.waves
   val leasingFee                 = 0.002.waves
-  val smartFee                   = 0.004.waves
   val issueFee                   = 1.waves
   val burnFee                    = 1.waves
   val sponsorFee                 = 1.waves
+  val setScriptFee               = 0.01.waves
   val transferAmount             = 10.waves
   val leasingAmount              = transferAmount
   val issueAmount                = transferAmount
   val massTransferFeePerTransfer = 0.0005.waves
-  val someAssetAmount            = 100000
+  val someAssetAmount            = 9999999999999l
   val matcherFee                 = 0.003.waves
 
   def calcDataFee(data: List[DataEntry[_]]): Long = {

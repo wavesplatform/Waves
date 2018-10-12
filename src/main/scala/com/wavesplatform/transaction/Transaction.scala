@@ -19,6 +19,8 @@ trait Transaction extends BytesSerializable with JsonSerializable {
   }
 
   override def hashCode(): Int = id().hashCode()
+
+  val bodyBytes: Coeval[Array[Byte]]
 }
 
 object Transaction {

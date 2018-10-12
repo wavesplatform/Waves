@@ -12,7 +12,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
 import com.wavesplatform.utils.ScorexLogging
-import org.iq80.leveldb.ReadOptions
 
 import scala.concurrent.Future
 import scala.util._
@@ -26,17 +25,9 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
 
   private val writableDB = openDB(config.getString("dir"))
 
-  private def readOnly[A](f: ReadOnlyDB => A): A = {
-    val s = writableDB.getSnapshot
-    try f(new ReadOnlyDB(writableDB, new ReadOptions().snapshot(s)))
-    finally s.close()
-  }
+  private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
-  private def readWrite[A](f: RW => A): A = {
-    val rw = new RW(writableDB)
-    try f(rw)
-    finally rw.close()
-  }
+  private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
   private var pendingActions = Map.empty[String, Future[_]]
 
