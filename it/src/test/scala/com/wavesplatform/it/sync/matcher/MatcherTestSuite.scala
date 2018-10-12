@@ -211,7 +211,7 @@ class MatcherTestSuite extends MatcherSuiteBase {
         val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
 
         // Bob places buy order on amount bigger then left in sell orders
-        val order5 = matcherNode.placeOrder(aliceAcc, aliceWavesPair, OrderType.BUY, 130, 2.waves * Order.PriceConstant, orderVersion)
+        val order5 = matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 130, 2.waves * Order.PriceConstant, orderVersion)
         order5.status should be("OrderAccepted")
 
         // Check that the order is partially filled

@@ -4,12 +4,12 @@ import cats.data.State
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
-import com.wavesplatform.crypto._
 
 import scala.util.{Failure, Success, Try}
 
@@ -21,7 +21,7 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
                                  sellMatcherFee: Long,
                                  fee: Long,
                                  timestamp: Long,
-                                 signature: AssetId)
+                                 signature: ByteStr)
     extends ExchangeTransaction
     with SignedTransaction {
 
@@ -70,7 +70,7 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long,
-             signature: AssetId): Either[ValidationError, TransactionT] = {
+             signature: ByteStr): Either[ValidationError, TransactionT] = {
     validateExchangeParams(
       buyOrder,
       sellOrder,
