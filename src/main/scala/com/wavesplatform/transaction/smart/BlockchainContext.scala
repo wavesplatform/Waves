@@ -18,11 +18,9 @@ object BlockchainContext {
 
   type In = Transaction :+: Order :+: CNil
   def build(nByte: Byte, in: Coeval[In], h: Coeval[Int], blockchain: Blockchain): EvaluationContext = {
-    val typeVarsEnabled = Option(blockchain)
-      .map(
-        _.activatedFeatures
-          .contains(BlockchainFeatures.SmartAccountTrading.id))
-      .getOrElse(false)
+    val typeVarsEnabled =
+      blockchain.activatedFeatures
+        .contains(BlockchainFeatures.SmartAccountTrading.id)
 
     Monoid.combine(
       baseContext,
