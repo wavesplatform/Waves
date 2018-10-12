@@ -9,7 +9,7 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.{GenericError, UnsupportedVersion}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
@@ -37,7 +37,7 @@ case class IssueTransactionV2 private (version: Byte,
     ))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override val json = Coeval.evalOnce(jsonBase() ++ Json.obj("script" -> script.map(_.bytes().base64)))
+  override val json: Coeval[JsObject] = Coeval.evalOnce(issueJson() ++ Json.obj("script" -> script.map(_.bytes().base64)))
 }
 
 object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with TransactionParser.MultipleVersions {
