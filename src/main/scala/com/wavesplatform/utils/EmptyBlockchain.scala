@@ -87,6 +87,8 @@ object EmptyBlockchain extends Blockchain {
 
   override def allActiveLeases: Set[LeaseTransaction] = Set.empty
 
+  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Map[Address, Long] = Map.empty
+
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
