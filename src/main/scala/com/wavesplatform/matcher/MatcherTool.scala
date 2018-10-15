@@ -289,7 +289,7 @@ object MatcherTool extends ScorexLogging {
         val address = Address.fromString(args(2)).explicitGet()
         if (args.length == 5) {
           val pair = AssetPair.createAssetPair(args(3), args(4)).get
-          val xs   = DBUtils.ordersByAddressAndPair(db, address, pair, Int.MaxValue)
+          val xs   = DBUtils.ordersByAddressAndPair(db, address, pair, activeOnly = false, Int.MaxValue)
           println(s"""${xs.map { case (o, oi) => s"id: ${o.id()}\n  $o\n  $oi" }.mkString("\n")}""")
         } else {
           val xs = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), activeOnly = true, Int.MaxValue)
@@ -378,7 +378,7 @@ object MatcherTool extends ScorexLogging {
     val sb = new PrintWriter(to)
     try {
       getAddresses(db).asScala.toVector.sortBy(_.stringRepr).foreach { address =>
-        val activeInCommonIndex = DBUtils.ordersByAddress(db, address, activeOnly = false, maxOrders = Int.MaxValue)
+        val activeInCommonIndex = DBUtils.ordersByAddress(db, address, activeOnly = true, maxOrders = Int.MaxValue)
         if (activeInCommonIndex.nonEmpty) {
           sb.append("addr=")
           sb.append(address.toString)
@@ -398,13 +398,13 @@ object MatcherTool extends ScorexLogging {
             .sorted
 
           pairs.foreach { pair =>
-            val ordersInPairIndex = DBUtils.ordersByAddressAndPair(db, address, pair, maxOrders = Int.MaxValue)
+            val ordersInPairIndex = DBUtils.ordersByAddressAndPair(db, address, pair, activeOnly = true, maxOrders = Int.MaxValue)
             if (ordersInPairIndex.nonEmpty) {
               sb.append("  p=")
               sb.append(pair.key)
               sb.append(": ")
               ordersInPairIndex.foreach {
-                case (o, oi) if !oi.status.isFinal =>
+                case (o, oi) =>
                   sb.append(o.id().toString)
                   sb.append(", ")
 

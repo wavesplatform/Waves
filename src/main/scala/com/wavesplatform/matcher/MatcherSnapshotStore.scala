@@ -11,13 +11,18 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.Config
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
+import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.utils.ScorexLogging
+import kamon.Kamon
 
 import scala.concurrent.Future
 import scala.util._
 
 class MatcherSnapshotStore(config: Config) extends SnapshotStore {
   import MatcherSnapshotStore._
+
+  private val saveTimer      = Kamon.timer("matcher.snapshot.save")
+  private val serializeTimer = Kamon.timer("matcher.snapshot.serialize")
 
   private val streamDispatcher = context.system.dispatchers.lookup(config.getString("stream-dispatcher"))
 
@@ -97,7 +102,7 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
     case _: DeleteSnapshotsFailure ⇒ // ignore
   }
 
-  protected def save(metadata: SnapshotMetadata, snapshot: Any): Unit =
+  protected def save(metadata: SnapshotMetadata, snapshot: Any): Unit = saveTimer.refine("id" -> metadata.persistenceId).measure {
     readWrite { rw =>
       val historyKey      = kSMHistory(metadata.persistenceId)
       val previousHistory = rw.get(historyKey)
@@ -105,8 +110,11 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
       val nextHistory     = nextId +: previousHistory
       rw.put(historyKey, nextHistory)
       rw.put(kSM(metadata.persistenceId, nextId), SM(metadata.sequenceNr, metadata.timestamp))
-      rw.put(kSnapshot(metadata.persistenceId, nextId), serialize(snapshot))
+
+      val serialized = serializeTimer.refine("id" -> metadata.persistenceId).measure(serialize(snapshot))
+      rw.put(kSnapshot(metadata.persistenceId, nextId), serialized)
     }
+  }
 
   protected def deserialize(input: Array[Byte]): Snapshot =
     serializationExtension.deserialize(input, classOf[Snapshot]).get

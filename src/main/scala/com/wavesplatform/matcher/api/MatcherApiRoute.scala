@@ -239,6 +239,14 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "publicKey", value = "Public Key", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(
+        name = "activeOnly",
+        value = "Return active only orders (Accepted and PartiallyFilled)",
+        required = false,
+        dataType = "boolean",
+        paramType = "query",
+        defaultValue = "false"
+      ),
       new ApiImplicitParam(name = "Timestamp", value = "Timestamp", required = true, dataType = "integer", paramType = "header"),
       new ApiImplicitParam(name = "Signature",
                            value = "Signature of [Public Key ++ Timestamp] bytes",
@@ -247,17 +255,22 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            paramType = "header")
     ))
   def getAssetPairAndPublicKeyOrderHistory: Route = (path("orderbook" / AssetPairPM / "publicKey" / PublicKeyPM) & get) { (p, publicKey) =>
-    (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
-      checkGetSignature(publicKey, ts, sig) match {
-        case Success(address) =>
-          withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
-            complete(StatusCodes.OK -> DBUtils.ordersByAddressAndPair(db, address, pair, matcherSettings.maxOrdersPerRequest).map {
-              case (order, orderInfo) =>
-                orderJson(order, orderInfo)
-            })
-          }
-        case Failure(ex) =>
-          complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
+    parameters('activeOnly.as[Boolean].?) { activeOnly =>
+      (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
+        checkGetSignature(publicKey, ts, sig) match {
+          case Success(address) =>
+            withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
+              complete(
+                StatusCodes.OK -> DBUtils
+                  .ordersByAddressAndPair(db, address, pair, activeOnly.getOrElse(false), matcherSettings.maxOrdersPerRequest)
+                  .map {
+                    case (order, orderInfo) =>
+                      orderJson(order, orderInfo)
+                  })
+            }
+          case Failure(ex) =>
+            complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
+        }
       }
     }
   }
