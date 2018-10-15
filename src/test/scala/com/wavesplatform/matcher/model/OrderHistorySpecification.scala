@@ -42,12 +42,10 @@ class OrderHistorySpecification
     DBUtils.ordersByAddress(db, address, activeOnly = false, matcherSettings.maxOrdersPerRequest).map(_._1.id())
 
   private def activeOrderIdsByPair(address: Address, pair: AssetPair): Seq[Order.Id] =
-    DBUtils.ordersByAddressAndPair(db, address, pair, matcherSettings.maxOrdersPerRequest).collect {
-      case (o, s) if !s.status.isFinal => o.id()
-    }
+    DBUtils.ordersByAddressAndPair(db, address, pair, activeOnly = true, matcherSettings.maxOrdersPerRequest).map(_._1.id())
 
   private def allOrderIdsByPair(address: Address, pair: AssetPair): Seq[Order.Id] =
-    DBUtils.ordersByAddressAndPair(db, address, pair, matcherSettings.maxOrdersPerRequest).map(_._1.id())
+    DBUtils.ordersByAddressAndPair(db, address, pair, activeOnly = false, matcherSettings.maxOrdersPerRequest).map(_._1.id())
 
   private def selectOrders(xs: Seq[Order.Id]): Seq[Order] = xs.map(id => db.get(MatcherKeys.order(id))).flatten
 
