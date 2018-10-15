@@ -12,6 +12,6 @@ object LevelDBStats {
       h.refine("key", tag).record(Option(value).map(_.length.toLong).getOrElse(0))
   }
 
-  val read  = Kamon.histogram("db.read", MeasurementUnit.information.kilobytes)
-  val write = Kamon.histogram("db.write", MeasurementUnit.information.kilobytes)
+  val read  = Kamon.histogram("node.db.read", MeasurementUnit.information.bytes)
+  val write = Kamon.histogram("node.db.write", MeasurementUnit.information.bytes)
 }
