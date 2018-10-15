@@ -995,6 +995,49 @@ class OrderHistorySpecification
         ass2 -> ord2.amount
       )
   }
+
+  property("Wrong events - OrderCanceled for non-existed order") {
+    val ord1 = sell(pair, 100000000, 0.0008, matcherFee = Some(300000L))
+    val pk   = ord1.senderPublicKey
+
+    oh.process(OrderCanceled(LimitOrder(ord1), unmatchable = false))
+
+    oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Cancelled(0)
+
+    openVolume(pk, pair.amountAsset) shouldBe 0L
+    openVolume(pk, pair.priceAsset) shouldBe 0L
+
+    activeOrderIds(pk) shouldBe empty
+    activeOrderIdsByPair(pk, ord1.assetPair) shouldBe empty
+  }
+
+  property("Wrong events - OrderExecuted for non-existed orders") {
+    val pair      = AssetPair(None, mkAssetId("BTC"))
+    val counter   = buy(pair, 100000, 0.0008, matcherFee = Some(2000L))
+    val submitted = sell(pair, 100000, 0.0007, matcherFee = Some(1000L))
+
+    oh.process(OrderExecuted(LimitOrder(submitted), LimitOrder(counter)))
+
+    withClue(s"has no reserved assets, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
+      openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+    }
+
+    withClue(s"has no reserved assets, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
+      openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+    }
+
+    withClue("orders list of counter owner") {
+      activeOrderIds(counter.senderPublicKey) shouldBe empty
+      activeOrderIdsByPair(counter.senderPublicKey, pair) shouldBe empty
+    }
+
+    withClue("orders list of submitted owner") {
+      activeOrderIds(submitted.senderPublicKey) shouldBe empty
+      activeOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe empty
+    }
+  }
 }
 
 private object OrderHistorySpecification {

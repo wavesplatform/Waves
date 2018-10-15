@@ -34,7 +34,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
-  private val timer       = Kamon.timer("matcher.orderbook.match").refine("pair"    -> assetPair.toString)
+  private val matchTimer  = Kamon.timer("matcher.orderbook.match").refine("pair"    -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.persist").refine("event" -> "OrderCancelled")
 
   private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
@@ -50,10 +50,11 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def snapshotsCommands: Receive = {
     case SaveSnapshot =>
+      log.info("Starting saving a snapshot")
       saveSnapshot(Snapshot(orderBook))
 
     case SaveSnapshotSuccess(metadata) =>
-      log.debug(s"Snapshot has been saved: $metadata")
+      log.info(s"Snapshot has been saved: $metadata")
       deleteMessages(metadata.sequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
 
@@ -72,13 +73,13 @@ class OrderBookActor(assetPair: AssetPair,
       context.stop(self)
 
     case DeleteSnapshotsSuccess(criteria) =>
-      log.info(s"$persistenceId DeleteSnapshotsSuccess with $criteria")
+      log.debug(s"$persistenceId DeleteSnapshotsSuccess with $criteria")
 
     case DeleteSnapshotsFailure(criteria, cause) =>
       log.error(s"$persistenceId DeleteSnapshotsFailure with $criteria, reason: $cause")
 
     case DeleteMessagesSuccess(toSequenceNr) =>
-      log.info(s"$persistenceId DeleteMessagesSuccess up to $toSequenceNr")
+      log.debug(s"$persistenceId DeleteMessagesSuccess up to $toSequenceNr")
 
     case DeleteMessagesFailure(cause: Throwable, toSequenceNr: Long) =>
       log.error(s"$persistenceId DeleteMessagesFailure up to $toSequenceNr, reason: $cause")
@@ -97,10 +98,10 @@ class OrderBookActor(assetPair: AssetPair,
     orderBook.asks.values
       .++(orderBook.bids.values)
       .flatten
-      .filterNot(x => {
+      .filterNot { x =>
         val validation = x.order.isValid(ts)
         validation
-      })
+      }
       .map(_.order.id())
       .foreach(onCancelOrder)
   }
@@ -121,7 +122,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def onAddOrder(order: Order): Unit = {
     log.trace(s"Order accepted: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
-    timer.measure(matchOrder(LimitOrder(order)))
+    matchTimer.measure(matchOrder(LimitOrder(order)))
     sender() ! OrderAccepted(order)
   }
 
@@ -152,8 +153,10 @@ class OrderBookActor(assetPair: AssetPair,
 
   private def processEvent(e: Event): Unit = {
     val st = Kamon.timer("matcher.orderbook.persist").refine("event" -> e.getClass.getSimpleName).start()
-    if (lastSequenceNr % settings.snapshotsInterval == 0) self ! SaveSnapshot
-    persist(e)(_ => st.stop())
+    persist(e) { _ =>
+      st.stop()
+      if (lastSequenceNr % settings.snapshotsInterval == 0) self ! SaveSnapshot
+    }
     applyEvent(e)
     context.system.eventStream.publish(e)
   }
@@ -246,6 +249,8 @@ class OrderBookActor(assetPair: AssetPair,
       updateSnapshot(orderBook)
       log.debug(s"Recovery completed: $orderBook")
 
+    case SnapshotOffer(_, snapshot: Snapshot) =>
+      orderBook = snapshot.orderBook
       if (settings.recoverOrderHistory) {
         val orders = (orderBook.asks.valuesIterator ++ orderBook.bids.valuesIterator).flatten
         if (orders.nonEmpty) {
@@ -258,9 +263,6 @@ class OrderBookActor(assetPair: AssetPair,
         }
       }
 
-    case SnapshotOffer(_, snapshot: Snapshot) =>
-      orderBook = snapshot.orderBook
-      updateSnapshot(orderBook)
       log.debug(s"Recovering $persistenceId from $snapshot")
   }
 
