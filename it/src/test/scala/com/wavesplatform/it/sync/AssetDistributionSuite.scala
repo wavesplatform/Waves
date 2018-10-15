@@ -1,26 +1,21 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.Config
 import com.wavesplatform.it.Node
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import org.scalatest.CancelAfterFailure
-import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.it.api.SyncHttpApi._
 import play.api.libs.json._
+import com.wavesplatform.it.util._
 
 class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailure {
-
-  import AssetDistributionSuite._
-
-  override protected def nodeConfigs: Seq[Config] = Configs
 
   val node: Node = nodes.head
 
   val issuer = node.privateKey
 
   test("'Asset distribution at height' method works properly") {
+    val transferAmount = 0.01.waves
 
     val addresses     = nodes.map(_.privateKey.toAddress).filter(_ != issuer.toAddress).toList
     val initialHeight = node.height
@@ -32,7 +27,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
     val massTransferTx = node.massTransfer(
       issuer.address,
       addresses.map(addr => MassTransferTransaction.Transfer(addr.address, transferAmount)),
-      transferFee + (transferFee * addresses.size),
+      minFee + (minFee * addresses.size),
       Some(issueTx.id)
     )
 
@@ -57,15 +52,4 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
     } shouldBe true
   }
 
-}
-
-object AssetDistributionSuite {
-  case class Balance(address: String, balance: Long)
-
-  val Configs: Seq[Config] = Default.take(4)
-
-  val transferAmount: Long = 100000
-  val transferFee: Long    = 100000
-  val issueAmount: Long    = 100000000
-  val issueFee             = 1.waves
 }
