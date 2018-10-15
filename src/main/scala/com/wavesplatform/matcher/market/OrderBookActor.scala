@@ -1,25 +1,22 @@
 package com.wavesplatform.matcher.market
 
-import akka.actor.{ActorRef, Cancellable, Props, Stash}
+import akka.actor.Props
 import akka.http.scaladsl.model._
 import akka.persistence._
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.market.OrderHistoryActor._
-import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded}
+import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
-import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, GenericError, NegativeAmount, OrderValidationError}
+import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, NegativeAmount, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{NTP, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import play.api.libs.json._
@@ -29,38 +26,21 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class OrderBookActor(assetPair: AssetPair,
                      updateSnapshot: OrderBook => Unit,
-                     val orderHistory: ActorRef,
-                     val blockchain: Blockchain,
-                     val wallet: Wallet,
-                     val utx: UtxPool,
-                     val allChannels: ChannelGroup,
-                     val settings: MatcherSettings,
-                     val functionalitySettings: FunctionalitySettings)
+                     utx: UtxPool,
+                     allChannels: ChannelGroup,
+                     settings: MatcherSettings,
+                     createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction])
     extends PersistentActor
-    with Stash
-    with ScorexLogging
-    with ExchangeTransactionCreator {
+    with ScorexLogging {
+
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private val timer       = Kamon.timer("matcher.orderbook.match").refine("pair"    -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.persist").refine("event" -> "OrderCancelled")
-  private val validationTimeouts = Kamon
-    .counter("matcher.orderbook.error")
-    .refine(
-      "pair"  -> assetPair.toString,
-      "group" -> "validation",
-      "type"  -> "timeout"
-    )
 
   private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
   private var orderBook          = OrderBook.empty
-  private var apiSender          = Option.empty[ActorRef]
-  private var cancellable        = Option.empty[Cancellable]
-
-  private var lastTrade: Option[Order] = None
-
-  val okCancel: java.lang.Boolean     = Boolean.box(true)
-  val failedCancel: java.lang.Boolean = Boolean.box(false)
+  private var lastTrade          = Option.empty[Order]
 
   private def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
 
@@ -104,26 +84,6 @@ class OrderBookActor(assetPair: AssetPair,
 
     case DeleteMessagesFailure(cause: Throwable, toSequenceNr: Long) =>
       log.error(s"$persistenceId DeleteMessagesFailure up to $toSequenceNr, reason: $cause")
-  }
-
-  private def waitingValidation(sentMessage: ValidateOrder): Receive = readOnlyCommands orElse {
-    case ValidationTimeoutExceeded =>
-      validationTimeouts.increment()
-      log.warn(s"Validation timeout exceeded for $sentMessage")
-      apiSender.foreach(_ ! OperationTimedOut)
-      becomeFullCommands()
-
-    case ValidateOrderResult(validatedOrderId, res) =>
-      if (validatedOrderId == sentMessage.order.id()) {
-        cancellable.foreach(_.cancel())
-        handleValidateOrderResult(validatedOrderId, res)
-      } else {
-        log.warn(s"Unexpected ValidateOrderResult for order $validatedOrderId while waiting for ${sentMessage.order.id()}")
-      }
-
-    case ev =>
-      log.trace("Stashed: " + ev)
-      stash()
   }
 
   private def readOnlyCommands: Receive = {
@@ -171,34 +131,13 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def onAddOrder(order: Order): Unit = {
-    val msg = ValidateOrder(order, NTP.correctedTime())
-    orderHistory ! msg
-    apiSender = Some(sender())
-    cancellable = Some(context.system.scheduler.scheduleOnce(settings.validationTimeout, self, ValidationTimeoutExceeded))
-    context.become(waitingValidation(msg))
-  }
-
-  private def handleValidateOrderResult(orderId: ByteStr, res: Either[GenericError, Order]): Unit = {
-    res match {
-      case Left(err) =>
-        log.debug(s"Order $orderId rejected: ${err.err}")
-        apiSender.foreach(_ ! OrderRejected(err.err))
-      case Right(o) =>
-        log.debug(s"Order accepted: '${o.idStr()}' in '${o.assetPair.key}', trying to match ...")
-        timer.measure(matchOrder(LimitOrder(o)))
-        apiSender.foreach(_ ! OrderAccepted(o))
-    }
-
-    becomeFullCommands()
-  }
-
-  private def becomeFullCommands(): Unit = {
-    unstashAll()
-    context.become(fullCommands)
+    log.trace(s"Order accepted: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
+    timer.measure(matchOrder(LimitOrder(order)))
+    sender() ! OrderAccepted(order)
   }
 
   private def applyEvent(e: Event): Unit = {
-    log.debug(s"Apply event $e")
+    log.trace(s"Apply event $e")
     orderBook = OrderBook.updateState(orderBook, e)
     updateSnapshot(orderBook)
   }
@@ -344,21 +283,17 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def postStop(): Unit = {
     cleanupCancellable.cancel()
-    cancellable.foreach(_.cancel())
   }
 }
 
 object OrderBookActor {
   def props(assetPair: AssetPair,
             updateSnapshot: OrderBook => Unit,
-            orderHistory: ActorRef,
-            blockchain: Blockchain,
-            settings: MatcherSettings,
-            wallet: Wallet,
             utx: UtxPool,
             allChannels: ChannelGroup,
-            functionalitySettings: FunctionalitySettings): Props =
-    Props(new OrderBookActor(assetPair, updateSnapshot, orderHistory, blockchain, wallet, utx, allChannels, settings, functionalitySettings))
+            settings: MatcherSettings,
+            createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction]): Props =
+    Props(new OrderBookActor(assetPair, updateSnapshot, utx, allChannels, settings, createTransaction))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
@@ -411,6 +346,4 @@ object OrderBookActor {
   case object SaveSnapshot
 
   case class Snapshot(orderBook: OrderBook)
-
-  case object ValidationTimeoutExceeded
 }
