@@ -2,20 +2,16 @@ package com.wavesplatform.metrics
 
 import com.wavesplatform.database.Key
 import kamon.Kamon
-import kamon.metric.TimerMetric
-import supertagged._
+import kamon.metric.{HistogramMetric, MeasurementUnit}
 
 object LevelDBStats {
-  object DbTimer extends TaggedType[TimerMetric]
+  implicit class DbHistogramExt(val h: HistogramMetric) {
+    def recordTagged(key: Key[_], value: Array[Byte]): Unit = recordTagged(key.name, value)
 
-  type DbTimer = DbTimer.Type
-
-  implicit class DbTimerExt(val t: DbTimer) extends AnyVal {
-    def measureForKey[A](key: Key[_])(f: => A): A = measureForKey(key.name)(f)
-    def measureForKey[A](str: String)(f: => A): A = t.refine("key-type", str).measure(f)
+    def recordTagged(tag: String, value: Array[Byte]): Unit =
+      h.refine("key", tag).record(Option(value).map(_.length.toLong).getOrElse(0))
   }
 
-  val read: DbTimer   = DbTimer(Kamon.timer("db.read"))
-  val write: DbTimer  = DbTimer(Kamon.timer("db.write"))
-  val delete: DbTimer = DbTimer(Kamon.timer("db.delete"))
+  val read  = Kamon.histogram("db.read", MeasurementUnit.information.kilobytes)
+  val write = Kamon.histogram("db.write", MeasurementUnit.information.kilobytes)
 }
