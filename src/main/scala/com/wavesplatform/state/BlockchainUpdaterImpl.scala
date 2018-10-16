@@ -531,10 +531,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
   override def rollbackTo(targetBlockId: AssetId): Seq[Block] = blockchain.rollbackTo(targetBlockId)
 
-  override def transactionHeight(id: AssetId): Option[Int] = ngState match {
-    case Some(ng) => ng.bestLiquidDiff.transactions.get(id).map(_._1)
-    case None     => blockchain.transactionHeight(id)
-  }
+  override def transactionHeight(id: AssetId): Option[Int] =
+    ngState flatMap { ng =>
+      ng.bestLiquidDiff.transactions.get(id).map(_._1)
+    } orElse blockchain.transactionHeight(id)
 
   override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = ngState match {
     case Some(ng) =>

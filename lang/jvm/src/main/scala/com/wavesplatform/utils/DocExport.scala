@@ -19,11 +19,11 @@ object DocExport {
       System.err.println("Expected args: --gen-doc <template> <output>")
     } else {
       val wavesContext = WavesContext.build(new Environment {
-        override def height: Int                                                                                     = ???
+        override def height: Long                                                                                    = ???
         override def networkByte: Byte                                                                               = 66
         override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
         override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-        override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+        override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
         override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
         override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
         override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
