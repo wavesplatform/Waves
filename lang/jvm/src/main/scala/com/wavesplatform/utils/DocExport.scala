@@ -162,7 +162,7 @@ object DocExport {
       val commons = transactionDocs(transactionsType, commonFields)
       val transactionClasses = Seq(
         "Transfers"      -> Set("TransferTransaction", "MassTransferTransaction", "PaymentTransaction"),
-        "Issuing assets" -> Set("IssueTransaction", "ReissueTransaction", "BurnTransaction", "SponsorFeeTransaction"),
+        "Issuing assets" -> Set("IssueTransaction", "ReissueTransaction", "BurnTransaction", "SponsorFeeTransaction", "SetAssetScriptTransaction"),
         "Leasing"        -> Set("LeaseTransaction", "LeaseCancelTransaction")
       )
       def otherTransactions(name: String) = transactionsTypesNames(name) && !transactionClasses.map(_._2).exists(_(name))

@@ -191,6 +191,7 @@ object Types {
     massTransferTransactionType,
     createAliasTransactionType,
     setScriptTransactionType,
+    setAssetScriptTransactionType,
     sponsorFeeTransactionType,
     exchangeTransactionType,
     dataTransactionType
