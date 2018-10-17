@@ -14,19 +14,19 @@ import shapeless._
 
 object BlockchainContext {
 
-  private val baseContext = Monoid.combine(PureContext.ctx, CryptoContext.build(Global)).evaluationContext
-
   type In = Transaction :+: Order :+: CNil
-  def build(nByte: Byte, in: Coeval[In], h: Coeval[Int], blockchain: Blockchain): EvaluationContext = {
-    val typeVarsEnabled =
-      blockchain.activatedFeatures
-        .contains(BlockchainFeatures.SmartAccountTrading.id)
+  def build(version: Byte, nByte: Byte, in: Coeval[In], h: Coeval[Int], blockchain: Blockchain): EvaluationContext = {
+//    val typeVarsEnabled =///
+//      blockchain.activatedFeatures
+//        .contains(BlockchainFeatures.SmartAccountTrading.id)
 
-    Monoid.combine(
-      baseContext,
-      WavesContext
-        .build(new WavesEnvironment(nByte, in, h, blockchain), typeVarsEnabled)
-        .evaluationContext
-    )
+    Monoid
+      .combineAll(
+        Seq(
+          PureContext.ctx, ///build
+          CryptoContext.build(Global),
+          WavesContext.build(version, new WavesEnvironment(nByte, in, h, blockchain))
+        ))
+      .evaluationContext
   }
 }

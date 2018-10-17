@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
 import com.wavesplatform.lang.ScriptVersion
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
+import com.wavesplatform.lang.ScriptVersion.Versions.{V1, V2}
 import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.CompilerV1
@@ -28,9 +28,9 @@ object ScriptCompiler extends ScorexLogging {
     for {
       v <- extractVersion(directives)
       expr <- v match {
-        case V1 => tryCompile(scriptWithoutDirectives, directives)
+        case V1 | V2 => tryCompile(scriptWithoutDirectives, directives)
       }
-      script     <- ScriptV1(expr)
+      script     <- ScriptV1(v, expr)
       complexity <- ScriptEstimator(utils.dummyVarNames, functionCosts, expr)
     } yield (script, complexity)
   }

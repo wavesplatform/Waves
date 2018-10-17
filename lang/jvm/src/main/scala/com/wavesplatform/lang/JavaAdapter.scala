@@ -12,7 +12,7 @@ object JavaAdapter {
       Monoid.combineAll(
         Seq(
           CryptoContext.compilerContext(com.wavesplatform.lang.Global),
-          WavesContext.build(null).compilerContext,
+          WavesContext.build(1, null).compilerContext, ///v1?
           PureContext.compilerContext
         )))
 

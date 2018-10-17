@@ -1,14 +1,15 @@
 package com.wavesplatform.transaction.smart.script.v1
 
-import com.wavesplatform.{crypto, utils}
+import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.{DenyDuplicateVarNames, FunctionHeader, ScriptEstimator, Serde}
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.{crypto, utils}
 import com.wavesplatform.utils.functionCosts
 import monix.eval.Coeval
-import com.wavesplatform.transaction.smart.script.Script
 
 object ScriptV1 {
   private val checksumLength = 4
@@ -18,23 +19,24 @@ object ScriptV1 {
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
     Either.cond(bs.length <= maxSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $maxSizeInBytes bytes")
 
-  def apply(x: EXPR, checkSize: Boolean = true): Either[String, Script] =
+  def apply(x: EXPR): Either[String, Script] = apply(V1, x)
+
+  def apply(version: ScriptVersion, x: EXPR, checkSize: Boolean = true): Either[String, Script] =
     for {
-      _                <- DenyDuplicateVarNames(utils.dummyVarNames, x)
+      _                <- DenyDuplicateVarNames(version, utils.dummyVarNames, x)
       scriptComplexity <- ScriptEstimator(utils.dummyVarNames, functionCosts, x)
       _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
-      s = new ScriptV1(x)
+      s = new ScriptV1(version, x)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s
 
-  private class ScriptV1(override val expr: EXPR) extends Script {
-    override type V = V1.type
-    override val version: V   = V1
+  private class ScriptV1[V <: ScriptVersion](override val version: V, override val expr: EXPR) extends Script {
+    override type Ver = V
     override val text: String = expr.toString
     override val bytes: Coeval[ByteStr] =
       Coeval.evalOnce {
         val s = Array(version.value.toByte) ++ Serde.serialize(expr)
-        ByteStr(s ++ crypto.secureHash(s).take(ScriptV1.checksumLength))
+        ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
       }
   }
 }

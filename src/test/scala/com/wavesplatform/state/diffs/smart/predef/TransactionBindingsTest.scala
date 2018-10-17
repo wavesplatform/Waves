@@ -22,6 +22,8 @@ import play.api.libs.json.Json
 import shapeless.Coproduct // For string escapes.
 
 class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+  val T = 'T'.toByte
+
   def letProof(p: Proofs, prefix: String)(i: Int) =
     s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).base58}'"
 
@@ -74,7 +76,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | }
            |""".stripMargin,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -102,7 +104,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val result = runScript[Boolean](
         s,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -122,7 +124,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | }
           |""".stripMargin,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -143,7 +145,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | }
           |""".stripMargin,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -162,7 +164,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | }
           |""".stripMargin,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -185,7 +187,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | }
           |""".stripMargin,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -204,7 +206,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | }
           |""".stripMargin,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -225,7 +227,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | }
           |""".stripMargin,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -246,7 +248,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | }
            |""".stripMargin,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -283,7 +285,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val result = runScript[Boolean](
         s,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -328,7 +330,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val result = runScript[Boolean](
         script,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -398,7 +400,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val result = runScript[Boolean](
         s,
         Coproduct(t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -437,7 +439,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val result = runScript[Boolean](
         s,
         Coproduct[In](t),
-        'T'
+        T
       )
       result shouldBe Right(true)
     }
@@ -455,7 +457,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |}
        """.stripMargin
 
-      runScript[Boolean](src, Coproduct[In](ord), 'T') shouldBe an[Left[_, _]]
+      runScript[Boolean](src, Coproduct[In](ord), T) shouldBe an[Left[_, _]]
       runWithSmartTradingActivated[Boolean](src, Coproduct[In](ord), 'T') shouldBe Right(true)
     }
   }
@@ -470,7 +472,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(new WavesEnvironment(networkByte, Coeval(t), null, null), true)
+          .build(2, new WavesEnvironment(networkByte, Coeval(t), null, null))
 
     for {
       compileResult <- CompilerV1(ctx.compilerContext, expr)

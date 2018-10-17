@@ -88,7 +88,7 @@ package object utils extends ScorexLogging {
   }
 
   lazy val dummyNetworkByte: Byte                           = AddressScheme.current.chainId
-  lazy val dummyEvaluationContext: EvaluationContext        = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), EmptyBlockchain)
+  lazy val dummyEvaluationContext: EvaluationContext        = BlockchainContext.build(1, dummyNetworkByte, Coeval(???), Coeval(???), EmptyBlockchain) ///v1?
   lazy val functionCosts: Map[FunctionHeader, Coeval[Long]] = estimate(dummyEvaluationContext)
 
   def estimate(ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
@@ -113,7 +113,7 @@ package object utils extends ScorexLogging {
     Monoid.combineAll(
       Seq(
         CryptoContext.compilerContext(Global),
-        WavesContext.build(new WavesEnvironment(dummyNetworkByte, Coeval(???), Coeval(???), null)).compilerContext,
+        WavesContext.build(1, new WavesEnvironment(dummyNetworkByte, Coeval(???), Coeval(???), null)).compilerContext, ///v1?
         PureContext.compilerContext
       ))
 
