@@ -104,16 +104,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       new UtxPoolImpl(time, blockchainUpdater, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
     matcher = if (settings.matcherSettings.enable) {
-      val m = new Matcher(actorSystem,
-                          wallet,
-                          innerUtxStorage,
-                          allChannels,
-                          blockchainUpdater,
-                          settings.blockchainSettings,
-                          settings.restAPISettings,
-                          settings.matcherSettings)
-      m.runMatcher()
-      Some(m)
+      Matcher(actorSystem, wallet, innerUtxStorage, allChannels, blockchainUpdater, settings)
     } else None
 
     val utxStorage =
@@ -322,7 +313,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         upnp.deletePort(addr.getPort)
       }
 
-      matcher.foreach(_.shutdownMatcher())
+      matcher.foreach(_.shutdown())
 
       log.debug("Closing peer database")
       peerDatabase.close()

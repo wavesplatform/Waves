@@ -8,9 +8,9 @@ import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl}
-import com.wavesplatform.utils.{ScorexLogging, TimeImpl}
+import com.wavesplatform.utils.TimeImpl
 
-trait WithState extends ScorexLogging {
+trait WithState {
   private def withState[A](fs: FunctionalitySettings)(f: Blockchain => A): A = {
     val path = Files.createTempDirectory("leveldb-test")
     val db   = openDB(path.toAbsolutePath.toString)

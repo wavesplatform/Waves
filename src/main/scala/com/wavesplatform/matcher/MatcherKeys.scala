@@ -10,8 +10,6 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange._
 
-import scala.util.Failure
-
 object MatcherKeys {
   import com.wavesplatform.database.KeyHelpers._
 
@@ -19,22 +17,18 @@ object MatcherKeys {
 
   val version: Key[Int] = intKey("matcher-version", 0, default = 1)
 
-  def order(orderId: ByteStr): Key[Option[Order]] = Key.opt(
-    "matcher-order",
-    bytes(1, orderId.arr), { x =>
-      val r = x.head match {
-        case 1 => OrderV1.parseBytes(x.tail)
-        case 2 => OrderV2.parseBytes(x.tail)
-        case v => Failure(new NotImplementedError(s"Unknown version $v"))
-      }
-
-      r.recover {
-        case e => throw new IllegalArgumentException(s"Can't parse $orderId order: ${e.getMessage}", e)
-      }.get
-    }, { x =>
-      x.version +: x.bytes()
-    }
-  )
+  def order(orderId: ByteStr): Key[Option[Order]] =
+    Key.opt(
+      "matcher-order",
+      bytes(1, orderId.arr),
+      xs =>
+        xs.head match {
+          case 1     => OrderV1.parseBytes(xs.tail).get
+          case 2     => OrderV2.parseBytes(xs.tail).get
+          case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
+      },
+      o => o.version +: o.bytes()
+    )
 
   val OrderInfoPrefix = 2.toShort
 
