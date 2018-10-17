@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.kernel.Monoid
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -16,6 +17,16 @@ object BlockchainContext {
   private val baseContext = Monoid.combine(PureContext.ctx, CryptoContext.build(Global)).evaluationContext
 
   type In = Transaction :+: Order :+: CNil
-  def build(nByte: Byte, in: Coeval[In], h: Coeval[Int], blockchain: Blockchain): EvaluationContext =
-    Monoid.combine(baseContext, WavesContext.build(new WavesEnvironment(nByte, in, h, blockchain)).evaluationContext)
+  def build(nByte: Byte, in: Coeval[In], h: Coeval[Int], blockchain: Blockchain): EvaluationContext = {
+    val typeVarsEnabled =
+      blockchain.activatedFeatures
+        .contains(BlockchainFeatures.SmartAccountTrading.id)
+
+    Monoid.combine(
+      baseContext,
+      WavesContext
+        .build(new WavesEnvironment(nByte, in, h, blockchain), typeVarsEnabled)
+        .evaluationContext
+    )
+  }
 }

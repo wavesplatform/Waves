@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.utils.{Time, TimeImpl}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.{RequestGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
@@ -101,13 +101,12 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
   }
 
   def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = {
-    val time          = new TimeImpl
     val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, time)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
     try {
-      val (account, blocks) = gen(time).sample.get
+      val (account, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
         bcu.processBlock(block).explicitGet()
@@ -116,7 +115,6 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       bcu.shutdown()
       f(defaultWriter, account)
     } finally {
-      time.close()
       bcu.shutdown()
       db.close()
     }

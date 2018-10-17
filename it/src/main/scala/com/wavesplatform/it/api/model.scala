@@ -93,8 +93,8 @@ case class OrderInfo(id: String,
                      matcherPublicKey: String,
                      assetPair: AssetPairResponse,
                      orderType: String,
-                     price: Long,
                      amount: Long,
+                     price: Long,
                      timestamp: Long,
                      expiration: Long,
                      matcherFee: Long,
@@ -114,11 +114,11 @@ case class ExchangeTransaction(`type`: Int,
                                senderPublicKey: String,
                                fee: Long,
                                timestamp: Long,
-                               signature: String,
+                               signature: Option[String],
                                order1: OrderInfo,
                                order2: OrderInfo,
-                               price: Long,
                                amount: Long,
+                               price: Long,
                                buyMatcherFee: Long,
                                sellMatcherFee: Long,
                                height: Option[Int])
@@ -221,7 +221,7 @@ object PairResponse {
   implicit val pairResponseFormat: Format[PairResponse] = Json.format
 }
 
-case class LevelResponse(price: Long, amount: Long)
+case class LevelResponse(amount: Long, price: Long)
 object LevelResponse {
   implicit val levelResponseFormat: Format[LevelResponse] = Json.format
 }

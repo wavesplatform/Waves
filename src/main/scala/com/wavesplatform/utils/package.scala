@@ -88,7 +88,7 @@ package object utils extends ScorexLogging {
   }
 
   lazy val dummyNetworkByte: Byte                           = AddressScheme.current.chainId
-  lazy val dummyEvaluationContext: EvaluationContext        = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
+  lazy val dummyEvaluationContext: EvaluationContext        = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), EmptyBlockchain)
   lazy val functionCosts: Map[FunctionHeader, Coeval[Long]] = estimate(dummyEvaluationContext)
 
   def estimate(ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {

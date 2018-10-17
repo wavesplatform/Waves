@@ -14,6 +14,7 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
         |    api-key-hash: "BASE58APIKEYHASH"
         |    cors: yes
         |    api-key-different-host: yes
+        |    transactions-by-address-limit = 10000
         |  }
         |}
       """.stripMargin)
@@ -25,6 +26,7 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
     settings.apiKeyHash should be("BASE58APIKEYHASH")
     settings.cors should be(true)
     settings.apiKeyDifferentHost should be(true)
+    settings.transactionByAddressLimit should be(10000)
   }
 
 }

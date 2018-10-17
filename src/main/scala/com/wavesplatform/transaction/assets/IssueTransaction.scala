@@ -4,14 +4,14 @@ import java.nio.charset.StandardCharsets
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
-import monix.eval.Coeval
-import play.api.libs.json.Json
 import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
-import com.wavesplatform.crypto._
+import monix.eval.Coeval
+import play.api.libs.json.Json
 
 trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   def name: Array[Byte]
@@ -25,7 +25,7 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   final lazy val assetId                               = id
   override final val assetFee: (Option[AssetId], Long) = (None, fee)
 
-  override val json = Coeval.evalOnce(
+  val issueJson = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
       "version"     -> version,
       "assetId"     -> assetId().base58,

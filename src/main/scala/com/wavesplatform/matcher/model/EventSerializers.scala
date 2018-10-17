@@ -63,20 +63,20 @@ object EventSerializers {
     val OrderCancelled   = "event.OrderCancelled"
   }
 
-  private def dataToSerialize(lo: LimitOrder) = (lo.price, lo.amount, lo.fee, lo.order)
+  private def dataToSerialize(lo: LimitOrder) = (lo.amount, lo.price, lo.fee, lo.order)
 
   private def limitOrderFormatBuilder[T <: LimitOrder](limitOrderBuilder: (Long, Long, Long, Order) => T): Format[T] = Format(
     Reads[T] {
       case js: JsObject =>
-        val price  = (js \ "price").as[Long]
         val amount = (js \ "amount").as[Long]
+        val price  = (js \ "price").as[Long]
         val order  = (js \ "order").as[Order]
         val fee    = (js \ "fee").asOpt[Long].getOrElse(LimitOrder.getPartialFee(order.matcherFee, order.amount, amount))
-        JsSuccess(limitOrderBuilder(price, amount, fee, order))
+        JsSuccess(limitOrderBuilder(amount, price, fee, order))
       case _ => JsError("failed to deserialize LimitOrder")
     },
-    ((__ \ "price").format[Long] and
-      (__ \ "amount").format[Long] and
+    ((__ \ "amount").format[Long] and
+      (__ \ "price").format[Long] and
       (__ \ "fee").format[Long] and
       (__ \ "order").format[Order])(limitOrderBuilder, dataToSerialize)
   )

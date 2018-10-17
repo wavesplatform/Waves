@@ -367,7 +367,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     rw.put(Keys.transactionIdsAtHeight(height), transactions.keys.toSeq)
 
-    expiredKeys.foreach(rw.delete)
+    expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
       DisableHijackedAliases(rw)
@@ -661,6 +661,17 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
       addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
       balance   <- db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId))
+      if balance > 0
+    } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+  }
+
+  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Map[Address, Long] = readOnly { db =>
+    (for {
+      seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
+      addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
+      history = db.get(Keys.assetBalanceHistory(addressId, assetId))
+      actualHeight <- history.partition(_ > height)._2.headOption
+      balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
   }
