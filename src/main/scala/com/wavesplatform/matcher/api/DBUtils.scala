@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.matcher.{ActiveOrdersIndex, FinalizedOrdersCommonIndex, FinalizedOrdersPairIndex, MatcherKeys}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import org.iq80.leveldb.DB
 
 object DBUtils {
@@ -99,4 +99,20 @@ object DBUtils {
 
   def orderInfo(db: DB, orderId: ByteStr): OrderInfo = db.get(MatcherKeys.orderInfo(orderId))
   def orderInfo(rw: RW, orderId: ByteStr): OrderInfo = rw.get(MatcherKeys.orderInfo(orderId))
+
+  def transactionsForOrder(db: DB, orderId: ByteStr): Seq[ExchangeTransaction] = db.readOnly { ro =>
+    for {
+      seqNr <- 1 to ro.get(MatcherKeys.orderTxIdsSeqNr(orderId))
+      txId = ro.get(MatcherKeys.orderTxId(orderId, seqNr))
+      tx <- ro.get(MatcherKeys.exchangeTransaction(txId))
+    } yield tx
+  }
+
+  def openVolume(db: DB, address: Address, assetId: Option[AssetId]): Long = db.get(MatcherKeys.openVolume(address, assetId)).getOrElse(0L)
+  def activeOrderCount(db: DB, address: Address): Int = {
+    val key = MatcherKeys.activeOrdersSize(address)
+    key.parse(db.get(key.keyBytes)).getOrElse(0)
+  }
+
+  def lastOrderTimestamp(db: DB, address: Address): Option[Long] = db.get(MatcherKeys.lastOrderTimestamp(address))
 }

@@ -2,11 +2,14 @@ package com.wavesplatform.matcher.matching
 
 import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.WithDB
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, PartiallyFilled}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderHistory}
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -75,6 +78,8 @@ class ReservedBalanceSpecification
 
   var oh = new OrderHistory(db, matcherSettings)
 
+  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]) = DBUtils.openVolume(db, senderPublicKey, assetId)
+
   def execute(counter: Order, submitted: Order): OrderExecuted = {
     oh.process(OrderAdded(LimitOrder(counter)))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
@@ -112,13 +117,13 @@ class ReservedBalanceSpecification
       }
 
       withClue(s"Counter sender should not have reserves") {
-        oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
+        DBUtils.openVolume(db, counter.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
       }
 
       withClue(s"Submitted sender should not have reserves") {
-        oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
       }
     }
   }
@@ -149,13 +154,13 @@ class ReservedBalanceSpecification
       }
 
       withClue(s"Counter sender should not have reserves:") {
-        oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
       }
 
       withClue(s"Submitted sender should not have reserves:") {
-        oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
       }
     }
   }
@@ -186,13 +191,13 @@ class ReservedBalanceSpecification
       }
 
       withClue(s"Counter sender should not have reserves:") {
-        oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
       }
 
       withClue(s"Submitted sender should not have reserves:") {
-        oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
       }
     }
   }
@@ -224,13 +229,13 @@ class ReservedBalanceSpecification
 
       withClue(s"Counter sender should have reserved asset:") {
         val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (0, 1) else (p.minAmountFor(counterPrice), 0)
-        oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
-        oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
+        openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
+        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
       }
 
       withClue(s"Submitted sender should not have reserves:") {
-        oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
       }
     }
   }
@@ -261,14 +266,14 @@ class ReservedBalanceSpecification
       }
 
       withClue(s"Counter sender should not have reserves:") {
-        oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
       }
 
       withClue(s"Submitted sender should have reserved asset:") {
         val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (p.minAmountFor(submittedPrice), 0) else (0, 1)
-        oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
-        oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
+        openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
+        openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
       }
     }
   }
@@ -293,13 +298,13 @@ class ReservedBalanceSpecification
       exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice) - 1
 
       withClue(s"Counter sender should not have reserves:") {
-        oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
       }
 
       withClue(s"Submitted sender should not have reserves:") {
-        oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
       }
     }
   }
@@ -324,14 +329,14 @@ class ReservedBalanceSpecification
       exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice)
 
       withClue(s"Counter sender should not have reserves:") {
-        oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
       }
 
       withClue(s"Submitted sender should have reserved asset:") {
         val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (p.minAmountFor(submittedPrice), 0) else (0, 1)
-        oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
-        oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
+        openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
+        openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
       }
     }
   }
@@ -357,13 +362,13 @@ class ReservedBalanceSpecification
 
       withClue(s"Counter sender should have reserved asset:") {
         val (expectedAmountReserve, expectedPriceReserve) = if (counterType == BUY) (0, 1) else (p.minAmountFor(submittedPrice), 0)
-        oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
-        oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
+        openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe expectedAmountReserve
+        openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe expectedPriceReserve
       }
 
       withClue(s"Submitted sender should not have reserves:") {
-        oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
-        oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0
       }
     }
   }

@@ -13,7 +13,7 @@ abstract class MatcherSpec(actorSystemName: String) extends TestKitBase with Wor
   import MatcherSpec._
   implicit lazy val system: ActorSystem = ActorSystem(
     actorSystemName,
-    loadConfig(ConfigFactory.parseString(s"$SnapshotStorePath = ${Files.createTempDirectory("order-book-actor-spec")}"))
+    loadConfig(ConfigFactory.parseString(s"$SnapshotStorePath = ${Files.createTempDirectory(actorSystemName)}"))
   )
   override protected def afterAll(): Unit = {
     super.afterAll()
