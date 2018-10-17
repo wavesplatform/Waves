@@ -54,6 +54,8 @@ trait OrderValidator {
     timer
       .refine("action" -> "place", "pair" -> order.assetPair.toString)
       .measure {
+        lazy val lastOrderTs = orderHistory.lastOrderTimestamp(order.senderPublicKey)
+
         val orderSignatureVerification =
           Verifier
             .verifyAsEllipticCurveSignature(order)
@@ -68,6 +70,7 @@ trait OrderValidator {
             (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
             (orderHistory.orderInfo(order.id()).status == LimitOrder.NotFound) :| "Order was placed before" &&
             (orderHistory.activeOrderCount(order.senderPublicKey) < MaxElements) :| s"Limit of $MaxElements active orders has been reached" &&
+            (order.timestamp > lastOrderTs) :| s"Order should have a timestamp after $lastOrderTs, but it is ${order.timestamp}" &&
             isBalanceWithOpenOrdersEnough(order)
         Either.cond(v, order, GenericError(v.messages()))
       }

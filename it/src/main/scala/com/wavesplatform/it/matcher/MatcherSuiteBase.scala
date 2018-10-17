@@ -5,7 +5,6 @@ import com.wavesplatform.it._
 import com.wavesplatform.it.transactions.{MatcherNode, NodesFromDocker}
 import org.scalatest._
 import com.wavesplatform.it.util._
-
 import scala.concurrent.ExecutionContext
 
 abstract class MatcherSuiteBase
@@ -36,5 +35,4 @@ abstract class MatcherSuiteBase
   protected override def beforeAll(): Unit = {
     super.beforeAll()
   }
-
 }

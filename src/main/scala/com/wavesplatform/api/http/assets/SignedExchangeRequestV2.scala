@@ -41,6 +41,6 @@ case class SignedExchangeRequestV2(@ApiModelProperty(value = "Base58 encoded sen
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      _t          <- ExchangeTransactionV2.create(order1, order2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, _proofs)
+      _t          <- ExchangeTransactionV2.create(order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, _proofs)
     } yield _t
 }

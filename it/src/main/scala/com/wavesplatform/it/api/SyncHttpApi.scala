@@ -1,6 +1,5 @@
 package com.wavesplatform.it.api
 
-import akka.http.javadsl.model.StatusCodes
 import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}

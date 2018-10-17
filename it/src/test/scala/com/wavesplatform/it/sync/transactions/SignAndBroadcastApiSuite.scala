@@ -274,7 +274,6 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     val tx         = signedRequest.toTx.explicitGet()
     val privateKey = pkByAddress(thirdAddress)
     assert(crypto.verify(signature, tx.bodyBytes(), privateKey.publicKey))
-
   }
 
   test("/transactions/broadcast should produce ExchangeTransaction with custom asset") {
@@ -309,8 +308,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
       val buyAmount           = 2
       val sellAmount          = 3
       val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
-      val buy                 = Order.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, mf, o1ver)
-      val sell                = Order.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, mf, o2ver)
+      val buy                 = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, time, expirationTimestamp, mf, o1ver)
+      val sell                = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, time, expirationTimestamp, mf, o2ver)
 
       val amount = math.min(buy.amount, sell.amount)
       val tx =
@@ -320,8 +319,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
               matcher = matcher,
               buyOrder = buy.asInstanceOf[OrderV1],
               sellOrder = sell.asInstanceOf[OrderV1],
-              price = sellPrice,
               amount = amount,
+              price = sellPrice,
               buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
               sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
               fee = mf,
@@ -335,8 +334,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
               matcher = matcher,
               buyOrder = buy,
               sellOrder = sell,
-              price = sellPrice,
               amount = amount,
+              price = sellPrice,
               buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
               sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
               fee = mf,

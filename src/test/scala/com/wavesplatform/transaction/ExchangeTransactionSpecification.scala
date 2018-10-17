@@ -42,14 +42,14 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val mf2                  = 2
         val (o1ver, o2ver, tver) = versions
 
-        val buy  = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, time, expirationTimestamp, mf1, o1ver)
-        val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, time, expirationTimestamp, mf2, o2ver)
+        val buy  = Order.buy(sender1, matcher, pair, buyAmount, buyPrice, time, expirationTimestamp, mf1, o1ver)
+        val sell = Order.sell(sender2, matcher, pair, sellAmount, sellPrice, time, expirationTimestamp, mf2, o2ver)
 
         def create(matcher: PrivateKeyAccount = sender1,
                    buyOrder: Order = buy,
                    sellOrder: Order = sell,
-                   price: Long = sellPrice,
                    amount: Long = buyAmount,
+                   price: Long = sellPrice,
                    buyMatcherFee: Long = mf1,
                    sellMatcherFee: Long = 1,
                    fee: Long = 1,
@@ -59,8 +59,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
               matcher = sender1,
               buyOrder = buyOrder.asInstanceOf[OrderV1],
               sellOrder = sellOrder.asInstanceOf[OrderV1],
-              price = price,
               amount = amount,
+              price = price,
               buyMatcherFee = buyMatcherFee,
               sellMatcherFee = sellMatcherFee,
               fee = fee,
@@ -71,8 +71,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
               matcher = sender1,
               buyOrder = buyOrder,
               sellOrder = sellOrder,
-              price = price,
               amount = amount,
+              price = price,
               buyMatcherFee = buyMatcherFee,
               sellMatcherFee = sellMatcherFee,
               fee = fee,
@@ -90,8 +90,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
 
         create(fee = -1) shouldBe an[Left[_, _]]
         create(amount = -1) shouldBe an[Left[_, _]]
-        create(price = -1) shouldBe an[Left[_, _]]
         create(amount = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
+        create(price = -1) shouldBe an[Left[_, _]]
         create(sellMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(buyMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
@@ -135,8 +135,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         matcher = matcher,
         buyOrder = buy.asInstanceOf[OrderV1],
         sellOrder = sell.asInstanceOf[OrderV1],
-        price = price,
         amount = amount,
+        price = price,
         buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
         sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
         fee = mf,
@@ -147,8 +147,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         matcher = matcher,
         buyOrder = buy,
         sellOrder = sell,
-        price = price,
         amount = amount,
+        price = price,
         buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
         sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
         fee = mf,
@@ -176,12 +176,12 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       val mf                   = 300000L
       val (o1ver, o2ver, tver) = versions
 
-      val sell = Order.sell(sender2, matcher, pair, sellPrice, 2, time, expirationTimestamp, mf, o1ver)
-      val buy  = Order.buy(sender1, matcher, pair, buyPrice, 1, time, expirationTimestamp, mf, o2ver)
+      val sell = Order.sell(sender2, matcher, pair, 2, sellPrice, time, expirationTimestamp, mf, o1ver)
+      val buy  = Order.buy(sender1, matcher, pair, 1, buyPrice, time, expirationTimestamp, mf, o2ver)
 
       createExTx(buy, sell, sellPrice, matcher, tver) shouldBe an[Right[_, _]]
 
-      val sell1 = Order.sell(sender1, matcher, pair, buyPrice, 1, time, time - 1, mf, o1ver)
+      val sell1 = Order.sell(sender1, matcher, pair, 1, buyPrice, time, time - 1, mf, o1ver)
       createExTx(buy, sell1, buyPrice, matcher, tver) shouldBe Left(OrderValidationError(sell1, "expiration should be > currentTime"))
     }
   }
@@ -241,8 +241,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
-      6000000000L,
       2,
+      6000000000L,
       1526992336241L,
       1529584336241L,
       1,
@@ -254,8 +254,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
-      5000000000L,
       3,
+      5000000000L,
       1526992336241L,
       1529584336241L,
       2,
@@ -266,16 +266,15 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       .create(
         buy,
         sell,
-        5000000000L,
         2,
+        5000000000L,
         1,
         1,
         1,
         1526992336241L,
         ByteStr.decodeBase58("5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa").get
       )
-      .right
-      .get
+      .explicitGet()
 
     js shouldEqual tx.json()
   }
@@ -334,8 +333,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
-      6000000000L,
       2,
+      6000000000L,
       1526992336241L,
       1529584336241L,
       1,
@@ -347,8 +346,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
-      5000000000L,
       3,
+      5000000000L,
       1526992336241L,
       1529584336241L,
       2,
@@ -359,16 +358,15 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       .create(
         buy,
         sell,
-        5000000000L,
         2,
+        5000000000L,
         1,
         1,
         1,
         1526992336241L,
         Proofs(Seq(ByteStr.decodeBase58("5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa").get))
       )
-      .right
-      .get
+      .explicitGet()
 
     js shouldEqual tx.json()
   }

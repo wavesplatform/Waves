@@ -44,8 +44,8 @@ object RealTransactionWrapper {
         case BUY  => OrdType.Buy
         case SELL => OrdType.Sell
       },
-      price = o.price,
       amount = o.amount,
+      price = o.price,
       timestamp = o.timestamp,
       expiration = o.expiration,
       matcherFee = o.matcherFee,
@@ -94,7 +94,7 @@ object RealTransactionWrapper {
         )
       case ss: SetScriptTransaction => Tx.SetScript(proven(ss), ss.script.map(_.bytes()).map(toByteVector))
       case p: PaymentTransaction    => Tx.Payment(proven(p), p.amount, p.recipient)
-      case e: ExchangeTransaction   => Tx.Exchange(proven(e), e.price, e.amount, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder)
+      case e: ExchangeTransaction   => Tx.Exchange(proven(e), e.amount, e.price, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder)
       case s: SponsorFeeTransaction => Tx.Sponsorship(proven(s), s.assetId, s.minSponsoredAssetFee)
       case d: DataTransaction =>
         Tx.Data(

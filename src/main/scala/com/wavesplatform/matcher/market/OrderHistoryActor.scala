@@ -37,7 +37,9 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
 
   def processExpirableRequest(r: Any): Unit = r match {
     case ValidateOrder(o, _) =>
-      sender() ! ValidateOrderResult(o.id(), validateNewOrder(o))
+      val r = validateNewOrder(o)
+      r.foreach(o => orderHistory.setLastOrder(o.senderPublicKey, o))
+      sender() ! ValidateOrderResult(o.id(), r)
     case GetTradableBalance(assetPair, addr, _) =>
       sender() ! getPairTradableBalance(assetPair, addr)
   }
