@@ -48,7 +48,7 @@ object OrderBook {
 
   private def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): OrderBook = {
     (limitOrder match {
-      case oo @ BuyLimitOrder(p, _, _, _) =>
+      case oo @ BuyLimitOrder(_, p, _, _) =>
         ob.bids.get(p).map { lvl =>
           val updatedQ = lvl.filter(_ != oo)
           ob.copy(bids = if (updatedQ.nonEmpty) {
@@ -57,7 +57,7 @@ object OrderBook {
             ob.bids - p
           })
         }
-      case oo @ SellLimitOrder(p, _, _, _) =>
+      case oo @ SellLimitOrder(_, p, _, _) =>
         ob.asks.get(p).map { lvl =>
           val updatedQ = lvl.filter(_ != oo)
           ob.copy(asks = if (updatedQ.nonEmpty) {

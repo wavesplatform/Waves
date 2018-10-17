@@ -14,8 +14,8 @@ import scala.util.{Failure, Success, Try}
 
 case class ExchangeTransactionV2(buyOrder: Order,
                                  sellOrder: Order,
-                                 price: Long,
                                  amount: Long,
+                                 price: Long,
                                  buyMatcherFee: Long,
                                  sellMatcherFee: Long,
                                  fee: Long,
@@ -49,21 +49,21 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
   def create(matcher: PrivateKeyAccount,
              buyOrder: Order,
              sellOrder: Order,
-             price: Long,
              amount: Long,
+             price: Long,
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
+    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
       unverified.copy(proofs = Proofs(Seq(ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))))
     }
   }
 
   def create(buyOrder: Order,
              sellOrder: Order,
-             price: Long,
              amount: Long,
+             price: Long,
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
@@ -72,24 +72,14 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
     validateExchangeParams(
       buyOrder,
       sellOrder,
-      price,
       amount,
+      price,
       buyMatcherFee,
       sellMatcherFee,
       fee,
       timestamp
     ).map { _ =>
-      ExchangeTransactionV2(
-        buyOrder,
-        sellOrder,
-        price,
-        amount,
-        buyMatcherFee,
-        sellMatcherFee,
-        fee,
-        timestamp,
-        proofs
-      )
+      ExchangeTransactionV2(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs)
     }
   }
 
@@ -121,7 +111,7 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
         timestamp      <- read(Longs.fromByteArray _, 8)
         proofs         <- readEnd(Proofs.fromBytes)
       } yield {
-        create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs.right.get)
+        create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs.right.get)
           .fold(left => Failure(new Exception(left.toString)), right => Success(right))
       }
       makeTransaction.run(0).value._2

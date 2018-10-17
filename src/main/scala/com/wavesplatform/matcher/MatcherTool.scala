@@ -74,7 +74,7 @@ object MatcherTool extends ScorexLogging {
 
     db.iterateOver("matcher:".getBytes(UTF_8))(e => keysToDelete += e.getKey)
 
-    db.readWrite(rw => keysToDelete.result().foreach(rw.delete))
+    db.readWrite(rw => keysToDelete.result().foreach(rw.delete(_, "matcher-legacy-entries")))
   }
 
   private def recalculateReservedBalance(db: DB): Unit = {

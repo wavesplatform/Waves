@@ -25,7 +25,7 @@ class OrderBookSnapshotHttpCache(settings: Settings, orderBookSnapshot: AssetPai
     .expireAfterAccess(settings.cacheTimeout.length, settings.cacheTimeout.unit)
     .build[Key, HttpResponse](new CacheLoader[Key, HttpResponse] {
       override def load(key: Key): HttpResponse = {
-        def aggregateLevel(l: (Price, Level[LimitOrder])) = LevelAgg(l._1, l._2.foldLeft(0L)((b, o) => b + o.amount))
+        def aggregateLevel(l: (Price, Level[LimitOrder])) = LevelAgg(l._2.foldLeft(0L)((b, o) => b + o.amount), l._1)
 
         val orderBook = orderBookSnapshot(key.pair).getOrElse(OrderBook.empty)
         GetOrderBookResponse(

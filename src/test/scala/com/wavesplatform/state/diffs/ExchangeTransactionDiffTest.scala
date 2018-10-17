@@ -105,8 +105,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       matcher = matcher,
       buyOrder = buy.asInstanceOf[OrderV1],
       sellOrder = sell.asInstanceOf[OrderV1],
-      price = price,
       amount = amount,
+      price = price,
       buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
       sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
       fee = buy.matcherFee,
@@ -132,8 +132,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     forAll(preconditions, priceGen) {
       case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
         val assetPair = AssetPair(Some(issue1.id()), None)
-        val buy       = Order.buy(buyer, matcher, assetPair, price, 1000000L, Ts, Ts + 1, MatcherFee)
-        val sell      = Order.sell(seller, matcher, assetPair, price, 1L, Ts, Ts + 1, MatcherFee)
+        val buy       = Order.buy(buyer, matcher, assetPair, 1000000L, price, Ts, Ts + 1, MatcherFee)
+        val sell      = Order.sell(seller, matcher, assetPair, 1L, price, Ts, Ts + 1, MatcherFee)
         val tx        = createExTx(buy, sell, price, matcher, Ts).explicitGet()
         assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx)), fs) {
           case (blockDiff, state) =>
@@ -161,8 +161,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     forAll(preconditions, priceGen) {
       case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
         val assetPair = AssetPair(Some(issue1.id()), None)
-        val buy       = Order.buy(buyer, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
-        val sell      = Order.sell(seller, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
+        val buy       = Order.buy(buyer, matcher, assetPair, issue1.quantity + 1, price, Ts, Ts + 1, MatcherFee)
+        val sell      = Order.sell(seller, matcher, assetPair, issue1.quantity + 1, price, Ts, Ts + 1, MatcherFee)
         val tx        = createExTx(buy, sell, price, matcher, Ts).explicitGet()
         assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx)), fs) { totalDiffEi =>
           inside(totalDiffEi) {
@@ -193,20 +193,18 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val (buyer, seller, matcher, gen1, gen2, gen3, issue1) = preconditions.sample.get
     val assetPair                                          = AssetPair(None, Some(issue1.id()))
 
-    val buy  = Order.buy(buyer, matcher, assetPair, 238, 3100000000L, Ts, Ts + 1, MatcherFee, version = 1: Byte).asInstanceOf[OrderV1]
-    val sell = Order.sell(seller, matcher, assetPair, 235, 425532L, Ts, Ts + 1, MatcherFee, version = 1: Byte).asInstanceOf[OrderV1]
+    val buy  = Order.buy(buyer, matcher, assetPair, 3100000000L, 238, Ts, Ts + 1, MatcherFee, version = 1: Byte).asInstanceOf[OrderV1]
+    val sell = Order.sell(seller, matcher, assetPair, 425532L, 235, Ts, Ts + 1, MatcherFee, version = 1: Byte).asInstanceOf[OrderV1]
     val tx = ExchangeTransactionV1
-      .create(
-        matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
-        price = 238,
-        amount = 425532,
-        buyMatcherFee = 41,
-        sellMatcherFee = 300000,
-        fee = buy.matcherFee,
-        timestamp = Ts
-      )
+      .create(matcher = matcher,
+              buyOrder = buy,
+              sellOrder = sell,
+              amount = 425532,
+              price = 238,
+              buyMatcherFee = 41,
+              sellMatcherFee = 300000,
+              fee = buy.matcherFee,
+              timestamp = Ts)
       .explicitGet()
 
     assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1))), TestBlock.create(Seq(tx))) { totalDiffEi =>
@@ -247,17 +245,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (genesis, transfers, issueAndScripts, etx) =>
         val smallFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(ExchangeTransaction.typeId)
         val exchangeWithSmallFee = ExchangeTransactionV2
-          .create(
-            MATCHER,
-            etx.buyOrder,
-            etx.sellOrder,
-            1000000,
-            1000000,
-            0,
-            0,
-            smallFee,
-            etx.timestamp
-          )
+          .create(MATCHER, etx.buyOrder, etx.sellOrder, 1000000, 1000000, 0, 0, smallFee, etx.timestamp)
           .explicitGet()
 
         val preconBlocks = Seq(

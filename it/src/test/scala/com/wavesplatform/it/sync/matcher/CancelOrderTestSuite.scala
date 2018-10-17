@@ -25,7 +25,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   nodes.waitForHeightArise()
 
   "cancel order using api-key" in {
-    val orderId = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
+    val orderId = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves, 800).message.id
     matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
 
     matcherNode.cancelOrderWithApiKey(orderId)
@@ -40,9 +40,9 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
   "Alice and Bob trade WAVES-USD" - {
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves
-      val orderId1      = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 800, 100.waves).message.id
-      val orderId2      = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 700, 100.waves).message.id
-      val bobSellOrder3 = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 600, 100.waves).message.id
+      val orderId1      = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves, 800).message.id
+      val orderId2      = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves, 700).message.id
+      val bobSellOrder3 = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves, 600).message.id
 
       matcherNode.fullOrderHistory(aliceAcc)
       matcherNode.fullOrderHistory(bobAcc)
@@ -69,7 +69,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       a
   }
 
-  def receiveAmount(ot: OrderType, matchPrice: Long, matchAmount: Long): Long =
+  def receiveAmount(ot: OrderType, matchAmount: Long, matchPrice: Long): Long =
     if (ot == BUY) correctAmount(matchAmount, matchPrice)
     else {
       (BigInt(matchAmount) * matchPrice / Order.PriceConstant).bigInteger.longValueExact()

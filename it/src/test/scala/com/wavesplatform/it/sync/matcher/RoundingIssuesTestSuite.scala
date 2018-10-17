@@ -25,10 +25,10 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     val aliceBalanceBefore = matcherNode.accountBalances(aliceAcc.address)._1
     val bobBalanceBefore   = matcherNode.accountBalances(bobAcc.address)._1
 
-    val counter   = matcherNode.prepareOrder(aliceAcc, wavesUsdPair, OrderType.BUY, 238, 3100000000L)
+    val counter   = matcherNode.prepareOrder(aliceAcc, wavesUsdPair, OrderType.BUY, 3100000000L, 238)
     val counterId = matcherNode.placeOrder(counter).message.id
 
-    val submitted   = matcherNode.prepareOrder(bobAcc, wavesUsdPair, OrderType.SELL, 235, 425532L)
+    val submitted   = matcherNode.prepareOrder(bobAcc, wavesUsdPair, OrderType.SELL, 425532L, 235)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
     val filledAmount = 420169L
@@ -54,10 +54,10 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
   }
 
   "reserved balance should not be negative" in {
-    val counter   = matcherNode.prepareOrder(bobAcc, ethBtcPair, OrderType.BUY, 31887L, 923431000L)
+    val counter   = matcherNode.prepareOrder(bobAcc, ethBtcPair, OrderType.BUY, 923431000L, 31887L)
     val counterId = matcherNode.placeOrder(counter).message.id
 
-    val submitted   = matcherNode.prepareOrder(aliceAcc, ethBtcPair, OrderType.SELL, 31887L, 223345000L)
+    val submitted   = matcherNode.prepareOrder(aliceAcc, ethBtcPair, OrderType.SELL, 223345000L, 31887L)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
     val filledAmount = 223344937L
@@ -75,13 +75,13 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
   }
 
   "should correctly fill 2 counter orders" in {
-    val counter1 = matcherNode.prepareOrder(bobAcc, wavesUsdPair, OrderType.SELL, 60L, 98333333L)
+    val counter1 = matcherNode.prepareOrder(bobAcc, wavesUsdPair, OrderType.SELL, 98333333L, 60L)
     matcherNode.placeOrder(counter1).message.id
 
-    val counter2   = matcherNode.prepareOrder(bobAcc, wavesUsdPair, OrderType.SELL, 70L, 100000000L)
+    val counter2   = matcherNode.prepareOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100000000L, 70L)
     val counter2Id = matcherNode.placeOrder(counter2).message.id
 
-    val submitted   = matcherNode.prepareOrder(aliceAcc, wavesUsdPair, OrderType.BUY, 1000L, 100000000L)
+    val submitted   = matcherNode.prepareOrder(aliceAcc, wavesUsdPair, OrderType.BUY, 100000000L, 1000L)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
     matcherNode.waitOrderStatusAndAmount(wavesUsdPair, counter2Id, "PartiallyFilled", Some(2857143L), 1.minute)
@@ -90,7 +90,7 @@ class RoundingIssuesTestSuite extends MatcherSuiteBase {
     withClue("orderBook check") {
       val ob = matcherNode.orderBook(wavesUsdPair)
       ob.bids shouldBe empty
-      ob.asks shouldBe List(LevelResponse(70L, 97142857L)) // = 100000000 - 2857143
+      ob.asks shouldBe List(LevelResponse(97142857L, 70L)) // = 100000000 - 2857143
     }
   }
 

@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.utils.{EmptyBlockchain, dummyCompilerContext}
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 
@@ -20,7 +20,7 @@ package object predef {
     for {
       compileResult <- CompilerV1(dummyCompilerContext, expr)
       (typedExpr, _) = compileResult
-      er             = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(t), Coeval(???), null), typedExpr)
+      er             = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(t), Coeval(???), EmptyBlockchain), typedExpr)
       r <- er
     } yield r
   }
