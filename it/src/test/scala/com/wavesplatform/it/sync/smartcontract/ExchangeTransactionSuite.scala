@@ -1,13 +1,10 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.account.{PrivateKeyAccount}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.NTP
 import org.scalatest.CancelAfterFailure
 import com.wavesplatform.it.util._
@@ -167,22 +164,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     val changedTx = tx + ("version" -> JsNumber(1)) + ("signature" -> sig)
     println(changedTx)
     assertBadRequest(sender.signedBroadcast(changedTx).id, 500) //TODO: change to correct error message
-  }
-
-  def setContract(contractText: String, acc: PrivateKeyAccount) = {
-    val script = if (Option(contractText).isDefined) {
-      val scriptText = contractText.stripMargin
-      Some(ScriptCompiler(scriptText).explicitGet()._1)
-    } else None
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, acc, script, 0.014.waves, System.currentTimeMillis())
-      .right
-      .get
-    val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
-      .id
-    nodes.waitForHeightAriseAndTxPresent(setScriptId)
-
   }
 
   def exchangeTx() = {

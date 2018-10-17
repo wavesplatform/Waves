@@ -117,8 +117,9 @@ object SyncHttpApi extends Assertions {
               decimals: Byte,
               reissuable: Boolean,
               fee: Long,
-              version: Byte = 2): Transaction =
-      Await.result(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version), RequestAwaitTime)
+              version: Byte = 1,
+              script: Option[String] = None): Transaction =
+      Await.result(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script), RequestAwaitTime)
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       Await.result(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee), RequestAwaitTime)
