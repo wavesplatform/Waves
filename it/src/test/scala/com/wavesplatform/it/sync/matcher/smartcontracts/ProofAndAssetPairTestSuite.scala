@@ -136,13 +136,13 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           setContract(i, aliceAcc)
 
           val aliceOrd1 = matcherNode
-            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
+            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 2.waves, 500, version = 1, 10.minutes)
             .message
             .id
           matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
 
           val aliceOrd2 = matcherNode
-            .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
+            .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 2.waves, 500, version = 1, 10.minutes)
             .message
             .id
           matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
@@ -168,7 +168,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
               matcherNode.publicKey,
               predefAssetPair,
               OrderType.BUY,
-              2.waves * Order.PriceConstant,
+              2.waves,
               500,
               currTime,
               (30.days - 1.seconds).toMillis + currTime,
@@ -316,9 +316,9 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
       "place order and then set contract" in {
         for (i <- Seq(sc2, sc7, sc8, sc9)) {
-          val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
-          val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
-          val aliceBalance   = aliceNode.accountBalances(aliceAcc.address)._1
+//          val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
+//          val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
+          val aliceBalance = aliceNode.accountBalances(aliceAcc.address)._1
 
           val aliceOrd1 = matcherNode
             .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 2, 10.minutes)

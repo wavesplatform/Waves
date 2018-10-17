@@ -353,7 +353,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     rw.put(Keys.transactionIdsAtHeight(height), transactions.keys.toSeq)
 
-    expiredKeys.foreach(rw.delete)
+    expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
       DisableHijackedAliases(rw)
