@@ -1,6 +1,6 @@
 import cats.kernel.Monoid
 import shapeless.{:+:, CNil}
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{Global, ScriptVersion}
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -18,7 +18,7 @@ object DocExport {
     if (args.size != 4 || args(0) != "--gen-doc") {
       System.err.println("Expected args: --gen-doc <version> <template> <output>")
     } else {
-      val version = args(1).toByte
+      val version = ScriptVersion.fromInt(args(1).toByte).get
       val wavesContext = WavesContext.build(
         version,
         new Environment {
@@ -66,7 +66,7 @@ object DocExport {
         case t       => nativeTypeDoc(t.toString)
       }
 
-      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext))
+      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(version), cryptoContext, wavesContext))
 
       def getTypes() = fullContext.types.map(v => typeRepr(v.typeRef)(v.name))
 

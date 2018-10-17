@@ -6,6 +6,7 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.ExprEvaluator.Log
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -30,17 +31,21 @@ import scala.util.Try
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
+  private val pureContext = PureContext.build(V1)
+
   private val defaultCryptoContext = CryptoContext.build(Global)
 
   private def defaultFullContext(environment: Environment): CTX = Monoid.combineAll(
     Seq(
       defaultCryptoContext,
-      PureContext.ctx,
-      WavesContext.build(1, environment) ///v1?
+      pureContext,
+      WavesContext.build(V1, environment)
     )
   )
 
-  private def ev[T](context: EvaluationContext = PureContext.evalContext, expr: EXPR): Either[ExecutionError, T] = EvaluatorV1[T](context, expr)
+  private val pureEvalContext: EvaluationContext = PureContext.build(V1).evaluationContext
+
+  private def ev[T](context: EvaluationContext = pureEvalContext, expr: EXPR): Either[ExecutionError, T] = EvaluatorV1[T](context, expr)
 
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x"))
 
@@ -52,7 +57,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("return error and log of failed evaluation") {
     val (log, Left(err)) = EvaluatorV1.applywithLogging[Boolean](
-      PureContext.evalContext,
+      pureEvalContext,
       expr = BLOCK(
         LET("x", CONST_LONG(3)),
         BLOCK(
@@ -135,7 +140,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointType     = CaseType("Point", List("X"         -> LONG, "Y" -> LONG))
     val pointInstance = CaseObj(pointType.typeRef, Map("X" -> 3L, "Y"   -> 4L))
     ev[Long](
-      context = Monoid.combine(PureContext.evalContext,
+      context = Monoid.combine(pureEvalContext,
                                EvaluationContext(
                                  typeDefs = Map.empty,
                                  letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance)))),
@@ -159,7 +164,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointType     = CaseType("Point", List(("X", LONG), ("Y", LONG)))
     val pointInstance = CaseObj(pointType.typeRef, Map("X" -> 3L, "Y" -> 4L))
     val context = Monoid.combine(
-      PureContext.evalContext,
+      pureEvalContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map(("p", LazyVal(EitherT.pure(pointInstance))), ("badVal", LazyVal(EitherT.leftT("Error")))),
@@ -180,7 +185,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       Right(1L)
     }
 
-    val context = Monoid.combine(PureContext.evalContext,
+    val context = Monoid.combine(pureEvalContext,
                                  EvaluationContext(
                                    typeDefs = Map.empty,
                                    letDefs = Map.empty,
@@ -328,7 +333,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.dropBytes.header, List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
-        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)
+        val actual = ev[ByteVector](pureEvalContext, expr)
         actual shouldBe Right(xs.drop(number))
     }
   }
@@ -337,7 +342,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
-        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)
+        val actual = ev[ByteVector](pureEvalContext, expr)
         actual shouldBe Right(xs.take(number))
     }
   }
@@ -346,7 +351,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.dropRightBytes.header, List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
-        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)
+        val actual = ev[ByteVector](pureEvalContext, expr)
         actual shouldBe Right(xs.dropRight(number))
     }
   }
@@ -355,7 +360,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.takeRightBytes.header, List(CONST_BYTEVECTOR(xs), CONST_LONG(number)))
-        val actual = ev[ByteVector](PureContext.ctx.evaluationContext, expr)
+        val actual = ev[ByteVector](pureEvalContext, expr)
         actual shouldBe Right(xs.takeRight(number))
     }
   }
@@ -369,7 +374,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(CONST_STRING(xs), CONST_LONG(number)))
-        val actual = ev[String](PureContext.ctx.evaluationContext, expr)
+        val actual = ev[String](pureEvalContext, expr)
         actual shouldBe Right(xs.drop(number))
     }
   }
@@ -378,7 +383,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(CONST_STRING(xs), CONST_LONG(number)))
-        val actual = ev[String](PureContext.ctx.evaluationContext, expr)
+        val actual = ev[String](pureEvalContext, expr)
         actual shouldBe Right(xs.take(number))
     }
   }
@@ -387,7 +392,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.dropRightString.header, List(CONST_STRING(xs), CONST_LONG(number)))
-        val actual = ev[String](PureContext.ctx.evaluationContext, expr)
+        val actual = ev[String](pureEvalContext, expr)
         actual shouldBe Right(xs.dropRight(number))
     }
   }
@@ -396,7 +401,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.takeRightString.header, List(CONST_STRING(xs), CONST_LONG(number)))
-        val actual = ev[String](PureContext.ctx.evaluationContext, expr)
+        val actual = ev[String](pureEvalContext, expr)
         actual shouldBe Right(xs.takeRight(number))
     }
   }
@@ -404,7 +409,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("size(String) works as the native one") {
     forAll(Arbitrary.arbString.arbitrary) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(CONST_STRING(xs)))
-      val actual = ev[Int](PureContext.ctx.evaluationContext, expr)
+      val actual = ev[Int](pureEvalContext, expr)
       actual shouldBe Right(xs.length)
     }
   }
@@ -622,7 +627,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val context = Monoid.combineAll(
       Seq(
-        PureContext.evalContext,
+        pureEvalContext,
         defaultCryptoContext.evaluationContext,
         EvaluationContext.build(
           typeDefs = Map.empty,
@@ -678,7 +683,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val context = Monoid.combineAll(
       Seq(
-        PureContext.ctx,
+        pureContext,
         defaultCryptoContext,
         CTX(Seq(txType), vars, Array.empty)
       ))
@@ -704,7 +709,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   private def hashFuncTest(bodyBytes: Array[Byte], funcName: Short): Either[ExecutionError, ByteVector] = {
-    val context = Monoid.combineAll(Seq(PureContext.evalContext, defaultCryptoContext.evaluationContext))
+    val context = Monoid.combineAll(Seq(pureEvalContext, defaultCryptoContext.evaluationContext))
 
     ev[ByteVector](
       context = context,
@@ -784,7 +789,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
-    val context = Monoid.combine(PureContext.evalContext,
+    val context = Monoid.combine(pureEvalContext,
                                  EvaluationContext(
                                    typeDefs = Map.empty,
                                    letDefs = Map.empty,
@@ -813,7 +818,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     // let x = 3
     // let y = 100
     val context = Monoid.combine(
-      PureContext.evalContext,
+      pureEvalContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map(

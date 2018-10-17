@@ -20,7 +20,7 @@ object ScriptRunner {
     script match {
       case Script.Expr(expr) =>
         val ctx = BlockchainContext.build(
-          script.version.value.toByte, ///V1 object?
+          script.version,
           AddressScheme.current.chainId,
           Coeval.evalOnce(in),
           Coeval.evalOnce(height),

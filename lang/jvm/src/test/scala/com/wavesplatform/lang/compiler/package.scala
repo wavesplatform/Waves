@@ -3,6 +3,7 @@ package com.wavesplatform.lang
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.multiplierFunction
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -28,7 +29,7 @@ package object compiler {
 
   val compilerContext = Monoid
     .combine(
-      PureContext.ctx,
+      PureContext.build(V1),
       CTX(
         Seq(pointType, Common.pointTypeA, Common.pointTypeB),
         Map(

@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.ScriptVersion.Versions.V2
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -468,11 +469,11 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
     val Success(expr, _) = Parser(script)
     val ctx =
-      PureContext.ctx |+|
+      PureContext.build(V2) |+|
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(2, new WavesEnvironment(networkByte, Coeval(t), null, null))
+          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, null))
 
     for {
       compileResult <- CompilerV1(ctx.compilerContext, expr)

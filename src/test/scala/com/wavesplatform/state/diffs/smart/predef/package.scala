@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.smart
 
+import com.wavesplatform.lang.ScriptVersion
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
@@ -8,7 +10,7 @@ import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.{EmptyBlockchain, dummyCompilerContext}
+import com.wavesplatform.utils.{EmptyBlockchain, compilerContext}
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -17,24 +19,24 @@ package object predef {
   val networkByte: Byte = 'u'
 
   private def runScriptImpl[T](script: String,
-                               version: Byte,
+                               version: ScriptVersion,
                                t: In,
                                blockchain: Blockchain = EmptyBlockchain,
                                networkByte: Byte = networkByte): Either[String, T] = {
-    val context          = BlockchainContext.build(version, networkByte, Coeval.evalOnce(t), Coeval.evalOnce(blockchain.height), blockchain)
     val Success(expr, _) = Parser(script)
     for {
-      compileResult <- CompilerV1(dummyCompilerContext, expr)
+      compileResult <- CompilerV1(compilerContext(version), expr)
       (typedExpr, _) = compileResult
-      r <- EvaluatorV1[T](context, typedExpr)
+      evalContext    = BlockchainContext.build(version, networkByte, Coeval.evalOnce(t), Coeval.evalOnce(blockchain.height), blockchain)
+      r <- EvaluatorV1[T](evalContext, typedExpr)
     } yield r
   }
 
-  def runScript[T](script: String, t: In = null): Either[String, T] = runScriptImpl(script, 1, t)
+  def runScript[T](script: String, t: In = null): Either[String, T] = runScriptImpl(script, V1, t)
 
-  def runScript[T](script: String, t: In, networkByte: Byte): Either[String, T] = runScriptImpl(script, 1, t, EmptyBlockchain, networkByte)
+  def runScript[T](script: String, t: In, networkByte: Byte): Either[String, T] = runScriptImpl(script, V1, t, EmptyBlockchain, networkByte)
 
-  def runScript[T](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] = runScriptImpl(script, 1, Coproduct(tx), blockchain)
+  def runScript[T](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] = runScriptImpl(script, V1, Coproduct(tx), blockchain)
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 

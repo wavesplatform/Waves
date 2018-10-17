@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
 import cats.implicits._
+import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -19,7 +20,7 @@ object WavesContext {
   import Bindings._
   import Types._
 
-  def build(version: Byte, env: Environment): CTX = {
+  def build(version: ScriptVersion, env: Environment): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction =
@@ -327,6 +328,6 @@ object WavesContext {
       wavesBalanceF
     )
 
-    CTX(Types.wavesTypes, commonVars ++ vars(version), functions)
+    CTX(Types.wavesTypes, commonVars ++ vars(version.value), functions)
   }
 }

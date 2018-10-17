@@ -3,6 +3,7 @@ package com.wavesplatform.lang
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LONG}
@@ -122,7 +123,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
-      Monoid.combine(PureContext.ctx, CTX(sampleTypes, stringToTuple, Array.empty))
+      Monoid.combine(PureContext.build(V1), CTX(sampleTypes, stringToTuple, Array.empty))
     val typed = CompilerV1(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
@@ -287,7 +288,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     val context = Monoid.combine(
-      PureContext.evalContext,
+      PureContext.build(V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map("x"                -> LazyVal(EitherT.pure(3l))),
@@ -301,7 +302,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   ignore("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.evalContext,
+      PureContext.build(V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal(EitherT.pure(3l))),

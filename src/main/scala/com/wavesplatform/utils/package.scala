@@ -6,10 +6,9 @@ import cats.kernel.Monoid
 import com.google.common.base.Throwables
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{Global, ScriptVersion}
 import com.wavesplatform.state._
 import com.wavesplatform.lang.v1.compiler.CompilerContext
-import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -87,9 +86,15 @@ package object utils extends ScorexLogging {
     }
   }
 
-  lazy val dummyNetworkByte: Byte                           = AddressScheme.current.chainId
-  lazy val dummyEvaluationContext: EvaluationContext        = BlockchainContext.build(1, dummyNetworkByte, Coeval(???), Coeval(???), EmptyBlockchain) ///v1?
-  lazy val functionCosts: Map[FunctionHeader, Coeval[Long]] = estimate(dummyEvaluationContext)
+  private val lazyDummyContexts: Stream[EvaluationContext] = Stream.tabulate(2) { v =>
+    BlockchainContext.build(ScriptVersion.fromInt(v + 1).get, AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain)
+  }
+
+  def dummyEvalContext(version: ScriptVersion): EvaluationContext = lazyDummyContexts(version.value)
+
+  private val lazyFunctionCosts: Stream[Map[FunctionHeader, Coeval[Long]]] = lazyDummyContexts.map(estimate)
+
+  def functionCosts(version: ScriptVersion): Map[FunctionHeader, Coeval[Long]] = lazyFunctionCosts(version.value)
 
   def estimate(ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
@@ -109,15 +114,23 @@ package object utils extends ScorexLogging {
     costs.toMap
   }
 
-  lazy val dummyCompilerContext: CompilerContext =
-    Monoid.combineAll(
-      Seq(
-        CryptoContext.compilerContext(Global),
-        WavesContext.build(1, new WavesEnvironment(dummyNetworkByte, Coeval(???), Coeval(???), null)).compilerContext, ///v1?
-        PureContext.compilerContext
-      ))
+  private val lazyCompilerContexts: Stream[CompilerContext] = Stream.tabulate(2) { v =>
+    val ver = ScriptVersion.fromInt(v + 1).get
+    Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(ver),
+          CryptoContext.build(Global),
+          WavesContext.build(ver, new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), null))
+        ))
+      .compilerContext
+  }
 
-  lazy val dummyVarNames = dummyCompilerContext.varDefs.keySet
+  def compilerContext(version: ScriptVersion): CompilerContext = lazyCompilerContexts(version.value)
+
+  private val lazyVarNames: Stream[Set[String]] = lazyCompilerContexts.map(_.varDefs.keySet)
+
+  def varNames(version: ScriptVersion) = lazyVarNames(version.value)
 
   @tailrec
   final def untilTimeout[T](timeout: FiniteDuration, delay: FiniteDuration = 100.milliseconds, onFailure: => Unit = {})(fn: => T): T = {

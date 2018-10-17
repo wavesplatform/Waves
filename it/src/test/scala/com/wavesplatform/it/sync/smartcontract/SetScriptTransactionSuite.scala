@@ -5,6 +5,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
@@ -12,7 +13,7 @@ import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.utils.compilerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, Json}
 
@@ -61,7 +62,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         }
 
       """.stripMargin).get.value
-      CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
+      CompilerV1(compilerContext(V1), untyped).explicitGet()._1
     }
 
     val script = ScriptV1(scriptText).explicitGet()

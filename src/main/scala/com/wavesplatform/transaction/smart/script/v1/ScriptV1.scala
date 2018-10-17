@@ -7,13 +7,13 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.{DenyDuplicateVarNames, FunctionHeader, ScriptEstimator, Serde}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.{crypto, utils}
-import com.wavesplatform.utils.functionCosts
+import com.wavesplatform.crypto
+import com.wavesplatform.utils.{functionCosts, varNames}
 import monix.eval.Coeval
 
 object ScriptV1 {
   private val checksumLength = 4
-  private val maxComplexity  = 20 * functionCosts(FunctionHeader.Native(SIGVERIFY))()
+  private val maxComplexity  = 20 * functionCosts(V1)(FunctionHeader.Native(SIGVERIFY))()
   private val maxSizeInBytes = 8 * 1024
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
@@ -23,8 +23,8 @@ object ScriptV1 {
 
   def apply(version: ScriptVersion, x: EXPR, checkSize: Boolean = true): Either[String, Script] =
     for {
-      _                <- DenyDuplicateVarNames(version, utils.dummyVarNames, x)
-      scriptComplexity <- ScriptEstimator(utils.dummyVarNames, functionCosts, x)
+      _                <- DenyDuplicateVarNames(version, varNames(version), x)
+      scriptComplexity <- ScriptEstimator(varNames(version), functionCosts(version), x)
       _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
       s = new ScriptV1(version, x)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())

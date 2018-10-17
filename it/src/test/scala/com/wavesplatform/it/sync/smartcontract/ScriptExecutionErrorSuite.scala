@@ -4,6 +4,7 @@ import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
 import com.wavesplatform.state._
@@ -11,7 +12,7 @@ import com.wavesplatform.transaction.CreateAliasTransactionV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.utils.compilerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
 
@@ -35,7 +36,8 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
       """.stripMargin
 
     val compiled = ScriptV1(
-      new CompilerV1(dummyCompilerContext).compile(scriptSrc, Nil).explicitGet(),
+      V1,
+      new CompilerV1(compilerContext(V1)).compile(scriptSrc, Nil).explicitGet(),
       checkSize = false
     ).explicitGet()
 
