@@ -7,7 +7,7 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.{TestTime, WithDB}
@@ -30,12 +30,18 @@ class OrderValidatorSpecification
   private val bc           = stub[Blockchain]
   private val defaultTs    = 1000
 
+  (bc.assetDescription _).when(wbtc).returns(mkAssetDescritpion(8)).anyNumberOfTimes()
+
   private def portfolioTest(p: Portfolio)(f: OrderValidator => Any): Unit = {
     f(new OrderValidator(db, bc, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime))
   }
 
   private def settingsTest(settings: MatcherSettings)(f: OrderValidator => Any): Unit = {
     f(new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
+  }
+
+  private def test(f: OrderValidator => Any): Unit = {
+    f(new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime))
   }
 
   private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
@@ -93,8 +99,7 @@ class OrderValidatorSpecification
         ov.validateNewOrder(signed) shouldBe Left("Order expiration should be > 1 min")
       }
 
-      "order signature is invalid" in {
-        val ov = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
+      "order signature is invalid" in test { ov =>
         ov.validateNewOrder(newBuyOrder.copy(signature = Array.emptyByteArray)) shouldBe Left("Invalid signature")
       }
 
@@ -119,8 +124,26 @@ class OrderValidatorSpecification
         history.process(OrderAdded(LimitOrder(newBuyOrder(pk, defaultTs + 1000))))
         ov.validateNewOrder(newBuyOrder(pk, defaultTs + 1000 - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
       }
+
+      "order price has invalid non-zero trailing decimals" in forAll(assetIdGen(1), accountGen, Gen.choose(1, 7)) {
+        case (Some(amountAsset), sender, amountDecimals) =>
+          portfolioTest(Portfolio(11 * Constants.UnitsInWave, LeaseBalance.empty, Map.empty)) { ov =>
+            (bc.hasScript _).when(sender.toAddress).returns(false)
+            (bc.assetDescription _).when(amountAsset).returns(mkAssetDescritpion(amountDecimals))
+
+            val price = BigDecimal(10).pow(-amountDecimals - 1)
+            ov.validateNewOrder(buy(AssetPair(Some(amountAsset), None),
+                                    10 * Constants.UnitsInWave,
+                                    price,
+                                    matcherFee = Some((0.003 * Constants.UnitsInWave).toLong))) should produce("Invalid price")
+
+          }
+      }
     }
   }
+
+  private def mkAssetDescritpion(decimals: Int) =
+    Some(AssetDescription(MatcherAccount, Array.emptyByteArray, Array.emptyByteArray, decimals, false, BigInt(0), None, 0))
 
   private def newBuyOrder: Order = buy(
     pair = pairWavesBtc,
