@@ -10,7 +10,7 @@ import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.utils.Base58
-import org.asynchttpclient.Dsl.{get => _get}
+import org.asynchttpclient.Dsl.{get => _get, delete => _delete}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.Assertions
@@ -78,6 +78,12 @@ object AsyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
       matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset").as[OrderBookResponse]
+    }
+
+    def deleteOrderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
+      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
+      retrying(_delete(s"${matcherNode.matcherApiEndpoint}/matcher/orderbook/$amountAsset/$priceAsset").withApiKey(matcherNode.apiKey).build())
+        .as[OrderBookResponse]
     }
 
     def parseAssetPair(assetPair: AssetPair): (String, String) = {

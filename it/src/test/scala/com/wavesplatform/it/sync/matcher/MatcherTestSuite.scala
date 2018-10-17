@@ -380,5 +380,11 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         assertBadRequest(matcherNode.cancelAllOrders(aliceNode, ts))
       }
     }
+
+    "can delete an order book and orders are canceled" in {
+      val order = matcherNode.placeOrder(bobNode, aliceWavesPair, OrderType.BUY, 130, 2.waves * Order.PriceConstant)
+      matcherNode.deleteOrderBook(aliceWavesPair)
+      matcherNode.waitOrderStatus(aliceWavesPair, order.message.id, "Cancelled")
+    }
   }
 }
