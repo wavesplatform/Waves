@@ -125,7 +125,12 @@ object CommonValidation {
       case _: CreateAliasTransactionV1 => Right(tx)
       case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
-      case _: SetScriptTransaction     => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case sst: SetScriptTransaction =>
+        sst.script.map(_.version.value) match { ///how to use V1/V2 here?
+          case Some(2)        => activationBarrier(BlockchainFeatures.SmartAccountTrading)
+          case Some(1) | None => activationBarrier(BlockchainFeatures.SmartAccounts)
+          case Some(v)        => Left(GenericError(s"Bad script version $v"))
+        }
       case _: TransferTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
       case it: IssueTransactionV2      => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
       case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
