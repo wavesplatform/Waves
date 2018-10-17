@@ -74,6 +74,15 @@ object Types {
       "assetId"  -> BYTEVECTOR
     ) ++ header ++ proven
   )
+
+  val setAssetScriptTransactionType = CaseType(
+    "SetAssetScriptTransaction",
+    List(
+      "script" -> optionByteVector,
+      "assetId"  -> BYTEVECTOR
+    ) ++ header ++ proven
+  )
+
   val leaseTransactionType = CaseType(
     "LeaseTransaction",
     List(
