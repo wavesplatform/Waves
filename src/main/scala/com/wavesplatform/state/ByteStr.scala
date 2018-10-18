@@ -13,6 +13,8 @@ case class ByteStr(arr: Array[Byte]) {
 
   override def hashCode(): Int = java.util.Arrays.hashCode(arr)
 
+  lazy val isEmpty: Boolean = equals(ByteStr.empty)
+
   lazy val base58: String = Base58.encode(arr)
 
   lazy val base64: String = "base64:" + Base64.encode(arr)

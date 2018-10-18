@@ -76,20 +76,23 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = {
-    val transactionsFromDiff = diff.transactions.values.view
-      .collect {
-        case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
-      }
-      .slice(from, from + count)
-      .toSeq
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: ByteStr): Either[String, Seq[(Int, Transaction)]] = {
+//    val transactionsFromDiff = diff.transactions.values.view
+//      .collect {
+//        case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
+//      }
+//      .slice(from, from + count)
+//      .toSeq
+//
+//    val actualTxCount = transactionsFromDiff.length
+//
+//    if (actualTxCount == count) transactionsFromDiff
+//    else {
+//      transactionsFromDiff ++ inner.addressTransactions(address, types, count - actualTxCount, 0)
+//    }
 
-    val actualTxCount = transactionsFromDiff.length
-
-    if (actualTxCount == count) transactionsFromDiff
-    else {
-      transactionsFromDiff ++ inner.addressTransactions(address, types, count - actualTxCount, 0)
-    }
+    // @todo implement
+    inner.addressTransactions(address, types, count, fromId)
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {

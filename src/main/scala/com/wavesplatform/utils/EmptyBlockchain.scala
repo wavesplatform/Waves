@@ -52,7 +52,7 @@ object EmptyBlockchain extends Blockchain {
 
   override def transactionHeight(id: ByteStr): Option[Int] = None
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = Seq.empty
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: ByteStr): Either[String, Seq[(Int, Transaction)]] = Right(Seq.empty)
 
   override def containsTransaction(id: ByteStr): Boolean = false
 
@@ -86,7 +86,7 @@ object EmptyBlockchain extends Blockchain {
   override def wavesDistribution(height: Int): Map[Address, Long] = Map.empty
 
   override def allActiveLeases: Set[LeaseTransaction] = Set.empty
-  
+
   override def assetDistributionAtHeight(assetId: AssetId, height: Int): Map[Address, Long] = Map.empty
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.

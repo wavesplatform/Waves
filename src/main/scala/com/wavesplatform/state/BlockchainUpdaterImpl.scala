@@ -388,21 +388,28 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       .map(t => (t._1, t._2))
       .orElse(blockchain.transactionInfo(id))
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] =
-    ngState.fold(blockchain.addressTransactions(address, types, count, from)) { ng =>
-      val transactionsFromDiff = ng.bestLiquidDiff.transactions.values.view
-        .collect {
-          case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
-        }
-        .slice(from, from + count)
-        .toSeq
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: ByteStr): Either[String, Seq[(Int, Transaction)]] =
+    ngState.fold(blockchain.addressTransactions(address, types, count, fromId)) { ng =>
+      val transactionsFromDiff = ng.bestLiquidDiff.transactions
 
-      val actualTxCount = transactionsFromDiff.length
+      // shortcut: if fromId is given, but no such tx in ngState
+      if (!fromId.isEmpty && !transactionsFromDiff.contains(fromId)) blockchain.addressTransactions(address, types, count, fromId)
+      // @todo implement
+      else blockchain.addressTransactions(address, types, count, fromId)
 
-      if (actualTxCount == count) transactionsFromDiff
-      else {
-        transactionsFromDiff ++ blockchain.addressTransactions(address, types, count - actualTxCount, 0)
-      }
+////      val transactionsFromDiff = ng.bestLiquidDiff.transactions.values.view
+////        .collect {
+////          case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
+////        }
+////        .take(count)
+////        .toSeq
+//
+//      val actualTxCount = transactionsFromDiff.length
+//
+//      if (actualTxCount == count) transactionsFromDiff
+//      else {
+//        transactionsFromDiff ++ blockchain.addressTransactions(address, types, count - actualTxCount, 0)
+//      }
     }
 
   override def containsTransaction(id: AssetId): Boolean = ngState.fold(blockchain.containsTransaction(id)) { ng =>

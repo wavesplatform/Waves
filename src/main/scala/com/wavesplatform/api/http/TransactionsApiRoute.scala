@@ -71,10 +71,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case Some(t) => complete(Json.obj("limit" -> JsNumber(limit), "after" -> JsString(t)))
               // @todo remove non-paginated mock response
               case None => complete(Json.obj("limit" -> JsNumber(limit)))
-                            case None => complete(
-                              Json.arr(JsArray(blockchain
-                                .addressTransactions(a, Set.empty, limit, 0)
-                                .map({ case (h, tx) => txToCompactJson(a, tx) + ("height" -> JsNumber(h)) }))))
+//                            case None => complete(
+//                              Json.arr(JsArray(blockchain
+//                                .addressTransactions(a, Set.empty, limit, 0)
+//                                .map({ case (h, tx) => txToCompactJson(a, tx) + ("height" -> JsNumber(h)) }))))
             }
           } ~ complete(invalidLimit)
       }

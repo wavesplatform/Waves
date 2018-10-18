@@ -8,7 +8,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdaterImpl, EitherExt2}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, ByteStr, EitherExt2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
@@ -101,11 +101,11 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
   }
 
   def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = {
-    val time          = new TimeImpl
+    val time = new TimeImpl
     val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
-    val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
-    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, time)
+    val settings0 = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+    val settings = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val bcu = new BlockchainUpdaterImpl(defaultWriter, settings, time)
     try {
       val (account, blocks) = gen(time).sample.get
 
@@ -126,7 +126,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
     "return txs in correct ordering" in {
       val preconditions = (ts: Long) => {
         for {
-          master    <- accountGen
+          master <- accountGen
           recipient <- accountGen
           genesisBlock = TestBlock
             .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
@@ -145,7 +145,8 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
 
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, 0)
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, ByteStr.empty)
+          .getOrElse(Seq.empty)
 
         val ordering = Ordering
           .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
