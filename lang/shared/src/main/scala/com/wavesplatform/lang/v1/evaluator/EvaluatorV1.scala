@@ -44,7 +44,7 @@ object EvaluatorV1 extends ExprEvaluator {
     get[LoggedEvaluationContext, ExecutionError] flatMap { ctx =>
       lets.get(ctx).get(key) match {
         case Some(lzy) => liftTER[Any](lzy.value.value)
-        case None      => raiseError[LoggedEvaluationContext, ExecutionError, Any](s"EV: A definition of '$key' not found")
+        case None      => raiseError[LoggedEvaluationContext, ExecutionError, Any](s"A definition of '$key' not found")
       }
     }
 

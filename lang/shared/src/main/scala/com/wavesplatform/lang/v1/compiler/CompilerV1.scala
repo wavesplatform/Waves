@@ -129,13 +129,19 @@ object CompilerV1 {
   private def handleTypeUnion(types: List[String], f: FINAL, ctx: CompilerContext) =
     if (types.isEmpty) f else UNION.create(types.map(ctx.predefTypes).map(_.typeRef))
 
-  private def compileLetBlock(p: Pos, let: Expressions.LET, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
+  private def validateShadowing(p: Pos, dec: Expressions.Declaration): CompileM[String] =
     for {
       ctx <- get[CompilerContext, CompilationError]
-      letName <- handlePart(let.name)
-        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = false))(n => !ctx.varDefs.contains(n) || let.allowShadowing)
+      letName <- handlePart(dec.name)
+        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = false))(n => !ctx.varDefs.contains(n) || dec.allowShadowing)
         .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = true))(n => !ctx.functionDefs.contains(n))
+    } yield letName
+
+  private def compileLetBlock(p: Pos, let: Expressions.LET, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
+    for {
+      letName     <- validateShadowing(p, let)
       compiledLet <- compileExpr(let.value)
+      ctx         <- get[CompilerContext, CompilationError]
       letTypes <- let.types.toList
         .traverse[CompileM, String](handlePart)
         .ensure(NonExistingType(p.start, p.end, letName, ctx.predefTypes.keys.toList))(_.forall(ctx.predefTypes.contains))
@@ -149,20 +155,24 @@ object CompilerV1 {
 
   private def compileFuncBlock(p: Pos, func: Expressions.FUNC, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
     for {
-      ctx <- get[CompilerContext, CompilationError]
-      funcName <- handlePart(func.name)
-        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = false))(n => !ctx.varDefs.contains(n) || func.allowShadowing)
-        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = true))(n => !ctx.functionDefs.contains(n))
-      argTypes <- func.args.toList
-        .traverse[CompileM, (String, FINAL)] {
-          case (argName, argType) =>
-            for {
-              a <- handlePart(argName)
-              t <- handlePart(argType)
-                .ensure(NonExistingType(p.start, p.end, funcName, ctx.predefTypes.keys.toList))(ctx.predefTypes.contains)
-              f = UNION.create(flat(ctx.predefTypes, List(t)))
-            } yield (a, f)
+      funcName <- validateShadowing(p, func)
+      _ <- func.args.toList
+        .pure[CompileM]
+        .ensure(BadFunctionSignatureSameArgNames(p.start, p.end, funcName)) { l =>
+          val names = l.map(_._1)
+          names.toSet.size == names.size
         }
+      ctx <- get[CompilerContext, CompilationError]
+      argTypes <- func.args.toList.traverse[CompileM, (String, FINAL)] {
+        case (argName, argType) =>
+          for {
+            a <- handlePart(argName)
+            t <- argType.toList
+              .traverse[CompileM, String](handlePart)
+              .ensure(NonExistingType(p.start, p.end, funcName, ctx.predefTypes.keys.toList))(_.forall(ctx.predefTypes.contains))
+              .map(tl => UNION.reduce(UNION.create(flat(ctx.predefTypes, tl))))
+          } yield (a, t)
+      }
       compiledFuncBody <- local {
         val newArgs: VariableTypes = argTypes.map {
           case (a, t) => (a, (t, s"Defined at ${p.start}"))

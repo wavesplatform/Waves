@@ -221,11 +221,30 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("block: func") {
     val s =
-      """func q(x: Int) = { 42 }
+      """func q(x: Int, y: Boolean) = { 42 }
         |c""".stripMargin
     parse(s) shouldBe BLOCK(
       AnyPos,
-      FUNC(AnyPos, PART.VALID(AnyPos, "q"), Seq((PART.VALID(AnyPos, "x"), PART.VALID(AnyPos, "Int"))), CONST_LONG(AnyPos, 42)),
+      FUNC(
+        AnyPos,
+        PART.VALID(AnyPos, "q"),
+        Seq((PART.VALID(AnyPos, "x"), Seq(PART.VALID(AnyPos, "Int"))), (PART.VALID(AnyPos, "y"), Seq(PART.VALID(AnyPos, "Boolean")))),
+        CONST_LONG(AnyPos, 42)
+      ),
+      REF(AnyPos, PART.VALID(AnyPos, "c"))
+    )
+  }
+
+  property("block: func with union") {
+    val s =
+      """func q(x: Int | String) = { 42 }
+        |c""".stripMargin
+    parse(s) shouldBe BLOCK(
+      AnyPos,
+      FUNC(AnyPos,
+           PART.VALID(AnyPos, "q"),
+           Seq((PART.VALID(AnyPos, "x"), Seq(PART.VALID(AnyPos, "Int"), PART.VALID(AnyPos, "String")))),
+           CONST_LONG(AnyPos, 42)),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )
   }

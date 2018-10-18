@@ -385,20 +385,24 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     expectedResult = Left("Compilation failed: Can't find a function 'dropRight'(Boolean, Int) in -1--1")
   )
 
-
-  treeTypeTest("com")(
+  treeTypeTest("user function definition and usage")(
     ctx = compilerContext,
     expr = Expressions.BLOCK(
       AnyPos,
-      Expressions.FUNC(AnyPos, Expressions.PART.VALID(AnyPos, "id"),Seq((Expressions.PART.VALID(AnyPos, "x"),Expressions.PART.VALID(AnyPos, "Int"))),
-        Expressions.REF(AnyPos,Expressions.PART.VALID(AnyPos, "x"))
+      Expressions.FUNC(
+        AnyPos,
+        Expressions.PART.VALID(AnyPos, "id"),
+        Seq((Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int")))),
+        Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
       ),
-      Expressions.CONST_LONG(AnyPos, 1)
+      Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.CONST_LONG(AnyPos, 1L)))
     ),
-    expectedResult = Right((BLOCK(
-      FUNC("id",List("x"), REF("x")),
-      CONST_LONG(1L)
-    ),LONG))
+    expectedResult = Right(
+      (BLOCK(
+         FUNC("id", List("x"), REF("x")),
+         FUNCTION_CALL(FunctionHeader.User("id"), List(CONST_LONG(1L)))
+       ),
+       LONG))
   )
 
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)], ctx: CompilerContext): Unit =

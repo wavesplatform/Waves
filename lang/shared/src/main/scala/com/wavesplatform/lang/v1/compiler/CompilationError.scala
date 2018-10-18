@@ -47,6 +47,11 @@ object CompilationError {
   final case class NonExistingType(start: Int, end: Int, name: String, existing: List[String]) extends CompilationError {
     val message = s"Value '$name' declared as non-existing type, while all possible types are $existing"
   }
+
+  final case class BadFunctionSignatureSameArgNames(start: Int, end: Int, name: String) extends CompilationError {
+    val message = s"Function'$name' declared with duplicating argument names"
+  }
+
   final case class FunctionNotFound(start: Int, end: Int, name: String, argTypes: List[String]) extends CompilationError {
     val message = s"Can't find a function '$name'(${argTypes.mkString(", ")})"
   }

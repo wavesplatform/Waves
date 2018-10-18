@@ -165,11 +165,11 @@ object Parser {
   abstract class Accessor
   case class Getter(name: PART[String]) extends Accessor
   case class ListIndex(index: EXPR)     extends Accessor
-
+  val typesP: P[Seq[PART[String]]]     = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
   val funcP: P[FUNC] = {
     val funcname    = anyVarName
-    val argWithType = anyVarName ~ ":" ~ anyVarName
-    val args        = "(" ~ argWithType.rep() ~ ")"
+    val argWithType = anyVarName ~ ":" ~ typesP
+    val args        = "(" ~ argWithType.rep(sep = "," ) ~ ")"
     val funcHeader  = "func" ~ funcname ~ args ~ "=" ~ "{" ~ baseExpr ~ "}"
     funcHeader.map {
       case (name, args, expr) => FUNC(AnyPos, name, args, expr)
@@ -179,7 +179,7 @@ object Parser {
   val matchCaseP: P[MATCH_CASE] = {
     val restMatchCaseInvalidP: P[String] = P((!"=>" ~~ AnyChars(1).!).repX.map(_.mkString))
     val varDefP: P[Option[PART[String]]] = anyVarName.map(Some(_)) | "_".!.map(_ => None)
-    val typesP: P[Seq[PART[String]]]     = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
+
     val typesDefP = (
       ":" ~ comment ~
         (typesP | (Index ~~ restMatchCaseInvalidP ~~ Index).map {

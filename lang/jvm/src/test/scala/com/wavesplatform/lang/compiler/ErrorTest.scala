@@ -46,7 +46,47 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
       AnyPos,
       PART.VALID(AnyPos, functionWithTwoPrarmsOfTheSameType.name),
       List(CONST_LONG(AnyPos, 1), CONST_BYTEVECTOR(AnyPos, PART.VALID(AnyPos, ByteVector.empty)))
-    )
+    ),
+    "User functions: wrong arg type" -> "Non-matching types" ->
+      Expressions.BLOCK(
+        AnyPos,
+        Expressions.FUNC(
+          AnyPos,
+          Expressions.PART.VALID(AnyPos, "id"),
+          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int")))),
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+        ),
+        Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.TRUE(AnyPos)))
+      ),
+    "User functions: wrong arg amount" -> "requires 1 arguments" ->
+      Expressions.BLOCK(
+        AnyPos,
+        Expressions.FUNC(
+          AnyPos,
+          Expressions.PART.VALID(AnyPos, "id"),
+          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int")))),
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+        ),
+        Expressions.FUNCTION_CALL(
+          AnyPos,
+          Expressions.PART.VALID(AnyPos, "id"),
+          List(Expressions.CONST_LONG(AnyPos, 1L), Expressions.CONST_LONG(AnyPos, 1L))
+        )
+      ),
+    "User functions: can't use same arg names" -> "argument names" ->
+      Expressions.BLOCK(
+        AnyPos,
+        Expressions.FUNC(
+          AnyPos,
+          Expressions.PART.VALID(AnyPos, "id"),
+          Seq(
+            (Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int"))),
+            (Expressions.PART.VALID(AnyPos, "x"), Seq(Expressions.PART.VALID(AnyPos, "Int")))
+          ),
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+        ),
+        CONST_LONG(AnyPos, 1)
+      ),
   )
 
   private def errorTests(exprs: ((String, String), Expressions.EXPR)*): Unit = exprs.foreach {

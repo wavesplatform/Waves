@@ -47,7 +47,7 @@ object Expressions {
     def allowShadowing: Boolean
   }
   case class LET(position: Pos, name: PART[String], value: EXPR, types: Seq[PART[String]], allowShadowing: Boolean = false) extends Declaration
-  case class FUNC(position: Pos, name: PART[String], args: Seq[(PART[String], PART[String])], expr: EXPR) extends Declaration {
+  case class FUNC(position: Pos, name: PART[String], args: Seq[(PART[String], Seq[PART[String]])], expr: EXPR) extends Declaration {
     val allowShadowing = false
   }
   sealed trait EXPR                                                             extends Positioned
