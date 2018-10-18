@@ -126,10 +126,10 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherGetWithSignature(s"/matcher/orderbook/${sender.publicKeyStr}", ts, signature(sender, ts)).as[Seq[OrderbookHistory]]
     }
 
-    def orderHistoryByPair(sender: Node, assetPair: AssetPair): Future[Seq[OrderbookHistory]] = {
+    def orderHistoryByPair(sender: Node, assetPair: AssetPair, activeOnly: Boolean = false): Future[Seq[OrderbookHistory]] = {
       val ts                        = System.currentTimeMillis()
       val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherGetWithSignature(s"/matcher/orderbook/$amountAsset/$priceAsset/publicKey/${sender.publicKeyStr}", ts, signature(sender, ts))
+      matcherGetWithSignature(s"/matcher/orderbook/$amountAsset/$priceAsset/publicKey/${sender.publicKeyStr}?activeOnly=$activeOnly", ts, signature(sender, ts))
         .as[Seq[OrderbookHistory]]
     }
 

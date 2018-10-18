@@ -30,7 +30,7 @@ object SyncMatcherHttpApi extends Assertions {
     def fullOrderHistory(sender: Node): Seq[OrderbookHistory] =
       Await.result(async(m).fullOrdersHistory(sender), RequestAwaitTime)
 
-    def orderHistoryByPair(sender: Node, assetPair: AssetPair): Seq[OrderbookHistory] =
+    def orderHistoryByPair(sender: Node, assetPair: AssetPair, activeOnly: Boolean = false): Seq[OrderbookHistory] =
       Await.result(async(m).orderHistoryByPair(sender, assetPair), RequestAwaitTime)
 
     def activeOrderHistory(sender: Node): Seq[OrderbookHistory] =
