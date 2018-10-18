@@ -5,6 +5,7 @@ import cats.implicits._
 import com.wavesplatform.lang.ExprCompiler
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.Directive
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -44,7 +45,7 @@ object CompilerV1 {
       case _: Expressions.TRUE                      => (TRUE: EXPR, BOOLEAN: FINAL).pure[CompileM]
       case _: Expressions.FALSE                     => (FALSE: EXPR, BOOLEAN: FINAL).pure[CompileM]
       case Expressions.GETTER(p, ref, field)        => compileGetter(p, field, ref)
-      case Expressions.BLOCK(p, let, body)          => compileBlock(p, let, body)
+      case Expressions.BLOCK(p, dec, body)          => compileBlock(p, dec, body)
       case Expressions.IF(p, cond, ifTrue, ifFalse) => compileIf(p, cond, ifTrue, ifFalse)
       case Expressions.REF(p, key)                  => compileRef(p, key)
       case Expressions.FUNCTION_CALL(p, name, args) => compileFunctionCall(p, name, args)
@@ -90,7 +91,7 @@ object CompilerV1 {
         case u: UNION => u.pure[CompileM]
         case _        => raiseError[CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
       }
-      tmpArgId       = ctx.tmpArgsIdx
+      tmpArgId  = ctx.tmpArgsIdx
       refTmpKey = "$match" + tmpArgId
       _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId + 1))
       allowShadowVarName = typedExpr._1 match {
@@ -100,7 +101,7 @@ object CompilerV1 {
       ifCases <- inspectFlat[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx => {
         mkIfCases(updatedCtx, cases, Expressions.REF(p, PART.VALID(AnyPos, refTmpKey)), allowShadowVarName).toCompileM
       })
-      compiledMatch <- compileBlock(p, Expressions.LET(AnyPos, PART.VALID(AnyPos, refTmpKey), expr, Seq.empty), ifCases)
+      compiledMatch <- compileLetBlock(p, Expressions.LET(AnyPos, PART.VALID(AnyPos, refTmpKey), expr, Seq.empty), ifCases)
       _ <- cases
         .flatMap(_.types)
         .traverse[CompileM, String](handlePart)
@@ -119,7 +120,16 @@ object CompilerV1 {
     } yield compiledMatch
   }
 
-  private def compileBlock(p: Pos, let: Expressions.LET, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
+  private def compileBlock(pos: Expressions.Pos, declaration: Expressions.Declaration, expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] =
+    declaration match {
+      case l: Expressions.LET  => compileLetBlock(pos, l, expr)
+      case f: Expressions.FUNC => compileFuncBlock(pos, f, expr)
+    }
+
+  private def handleTypeUnion(types: List[String], f: FINAL, ctx: CompilerContext) =
+    if (types.isEmpty) f else UNION.create(types.map(ctx.predefTypes).map(_.typeRef))
+
+  private def compileLetBlock(p: Pos, let: Expressions.LET, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
     for {
       ctx <- get[CompilerContext, CompilationError]
       letName <- handlePart(let.name)
@@ -129,7 +139,7 @@ object CompilerV1 {
       letTypes <- let.types.toList
         .traverse[CompileM, String](handlePart)
         .ensure(NonExistingType(p.start, p.end, letName, ctx.predefTypes.keys.toList))(_.forall(ctx.predefTypes.contains))
-      typeUnion = if (letTypes.isEmpty) compiledLet._2 else UNION.create(letTypes.map(ctx.predefTypes).map(_.typeRef))
+      typeUnion = handleTypeUnion(letTypes, compiledLet._2, ctx)
       compiledBody <- local {
         modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (typeUnion -> s"Defined at ${p.start}"))))
           .flatMap(_ => compileExpr(body))
@@ -137,12 +147,44 @@ object CompilerV1 {
     } yield (BLOCK(LET(letName, compiledLet._1), compiledBody._1), compiledBody._2)
   }
 
+  private def compileFuncBlock(p: Pos, func: Expressions.FUNC, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
+    for {
+      ctx <- get[CompilerContext, CompilationError]
+      funcName <- handlePart(func.name)
+        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = false))(n => !ctx.varDefs.contains(n) || func.allowShadowing)
+        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = true))(n => !ctx.functionDefs.contains(n))
+      argTypes <- func.args.toList
+        .traverse[CompileM, (String, FINAL)] {
+          case (argName, argType) =>
+            for {
+              a <- handlePart(argName)
+              t <- handlePart(argType)
+                .ensure(NonExistingType(p.start, p.end, funcName, ctx.predefTypes.keys.toList))(ctx.predefTypes.contains)
+              f = UNION.create(flat(ctx.predefTypes, List(t)))
+            } yield (a, f)
+        }
+      compiledFuncBody <- local {
+        val newArgs: VariableTypes = argTypes.map {
+          case (a, t) => (a, (t, s"Defined at ${p.start}"))
+        }.toMap
+        modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ newArgs))
+          .flatMap(_ => compileExpr(func.expr))
+      }
+      func    = FUNC(funcName, argTypes.map(_._1), compiledFuncBody._1)
+      typeSig = FunctionTypeSignature(compiledFuncBody._2, argTypes, FunctionHeader.User(funcName))
+      compiledBody <- local {
+        modify[CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> List(typeSig))))
+          .flatMap(_ => compileExpr(body))
+      }
+    } yield (BLOCK(func, compiledBody._1), compiledBody._2)
+  }
+
   private def compileGetter(p: Pos, fieldPart: PART[String], refExpr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
     for {
       ctx         <- get[CompilerContext, CompilationError]
       field       <- handlePart(fieldPart)
       compiledRef <- compileExpr(refExpr)
-      result <-  mkGetter(p, ctx, compiledRef._2.l, field, compiledRef._1).toCompileM
+      result      <- mkGetter(p, ctx, compiledRef._2.l, field, compiledRef._1).toCompileM
     } yield result
   }
 

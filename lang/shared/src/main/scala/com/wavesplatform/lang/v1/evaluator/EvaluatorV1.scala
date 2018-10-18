@@ -17,7 +17,7 @@ object EvaluatorV1 extends ExprEvaluator {
   override type V = V1.type
   override val version: V = V1
 
-  private def evalBlock(let: LET, inner: EXPR): EvalM[Any] =
+  private def evalLetBlock(let: LET, inner: EXPR): EvalM[Any] =
     for {
       ctx <- get[LoggedEvaluationContext, ExecutionError]
       blockEvaluation = evalExpr(let.value)
@@ -28,11 +28,23 @@ object EvaluatorV1 extends ExprEvaluator {
       }
     } yield result
 
+  private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Any] = {
+    val funcHeader = FunctionHeader.User(func.name)
+    val function   = UserFunction(func.name, null, s"user defined function '${func.name}'", func.args.map(n => (n, null, n)): _*)(func.body)
+    for {
+      ctx <- get[LoggedEvaluationContext, ExecutionError]
+      result <- id {
+        modify[LoggedEvaluationContext, ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
+          .flatMap(_ => evalExpr(inner))
+      }
+    } yield result
+  }
+
   private def evalRef(key: String) =
     get[LoggedEvaluationContext, ExecutionError] flatMap { ctx =>
       lets.get(ctx).get(key) match {
         case Some(lzy) => liftTER[Any](lzy.value.value)
-        case None      => raiseError[LoggedEvaluationContext, ExecutionError, Any](s"A definition of '$key' not found")
+        case None      => raiseError[LoggedEvaluationContext, ExecutionError, Any](s"EV: A definition of '$key' not found")
       }
     }
 
@@ -92,7 +104,11 @@ object EvaluatorV1 extends ExprEvaluator {
   private def pureAny[A](v: A): EvalM[Any] = v.pure[EvalM].map(_.asInstanceOf[Any])
 
   private def evalExpr(t: EXPR): EvalM[Any] = t match {
-    case BLOCK(let, inner)           => evalBlock(let, inner)
+    case BLOCK(dec, inner) =>
+      dec match {
+        case l: LET => evalLetBlock(l, inner)
+        case f:FUNC      => evalFuncBlock(f, inner)
+      }
     case REF(str)                    => evalRef(str)
     case CONST_LONG(v)               => pureAny(v)
     case CONST_BYTEVECTOR(v)         => pureAny(v)

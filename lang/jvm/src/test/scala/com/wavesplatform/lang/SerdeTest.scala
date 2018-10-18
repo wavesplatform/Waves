@@ -23,7 +23,7 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
 
     "BLOCK" in roundTripTest(
       BLOCK(
-        let = LET("foo", TRUE),
+        dec = LET("foo", TRUE),
         body = FALSE
       )
     )

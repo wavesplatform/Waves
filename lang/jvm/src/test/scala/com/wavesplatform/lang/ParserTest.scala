@@ -4,7 +4,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
-import com.wavesplatform.lang.v1.parser.{BinaryOperation, Parser}
+import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
@@ -48,17 +48,17 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   private def cleanOffsets(expr: EXPR): EXPR = expr match {
-    case x: CONST_LONG       => x.copy(position = Pos(0, 0))
-    case x: REF              => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
-    case x: CONST_STRING     => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: CONST_BYTEVECTOR => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: TRUE             => x.copy(position = Pos(0, 0))
-    case x: FALSE            => x.copy(position = Pos(0, 0))
-    case x: BINARY_OP        => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
-    case x: IF               => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
-    case x: BLOCK            => x.copy(position = Pos(0, 0), let = cleanOffsets(x.let), body = cleanOffsets(x.body))
-    case x: FUNCTION_CALL    => x.copy(position = Pos(0, 0), name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
-    case _                   => throw new NotImplementedError(s"toString for ${expr.getClass.getSimpleName}")
+    case x: CONST_LONG                       => x.copy(position = Pos(0, 0))
+    case x: REF                              => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
+    case x: CONST_STRING                     => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: CONST_BYTEVECTOR                 => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: TRUE                             => x.copy(position = Pos(0, 0))
+    case x: FALSE                            => x.copy(position = Pos(0, 0))
+    case x: BINARY_OP                        => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
+    case x: IF                               => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
+    case x @ BLOCK(_, l: Expressions.LET, _) => x.copy(position = Pos(0, 0), let = cleanOffsets(l), body = cleanOffsets(x.body))
+    case x: FUNCTION_CALL                    => x.copy(position = Pos(0, 0), name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
+    case _                                   => throw new NotImplementedError(s"toString for ${expr.getClass.getSimpleName}")
   }
 
   private def genElementCheck(gen: Gen[EXPR]): Unit = {
@@ -215,6 +215,17 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse(s) shouldBe BLOCK(
       AnyPos,
       LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1), List.empty),
+      REF(AnyPos, PART.VALID(AnyPos, "c"))
+    )
+  }
+
+  property("block: func") {
+    val s =
+      """func q(x: Int) = { 42 }
+        |c""".stripMargin
+    parse(s) shouldBe BLOCK(
+      AnyPos,
+      FUNC(AnyPos, PART.VALID(AnyPos, "q"), Seq((PART.VALID(AnyPos, "x"), PART.VALID(AnyPos, "Int"))), CONST_LONG(AnyPos, 42)),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )
   }

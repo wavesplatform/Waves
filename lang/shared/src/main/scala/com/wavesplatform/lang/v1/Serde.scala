@@ -44,7 +44,7 @@ object Serde {
             body     <- aux()
           } yield
             BLOCK(
-              let = LET(name, letValue),
+              dec = LET(name, letValue),
               body = body
             )
         case E_REF    => Coeval.now(REF(bb.getString))
