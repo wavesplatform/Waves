@@ -280,6 +280,22 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[Long](script, Some(pointAInstance)) shouldBe Right(1)
   }
 
+  property("func in func") {
+    val script =
+      """
+        |func maxx(x:Int, y: Int) = {
+        |  let z = 11
+        |  func max(i: Int, j:Int) = { if(i>j) then i else j }
+        |  max(x,max(y,z))
+        |}
+        |maxx(0,10)
+      """.stripMargin
+    eval[Long](script, Some(pointAInstance)) shouldBe Right(11)
+  }
+
+
+
+
   property("context won't change after inner let") {
     val script = "{ let x = 3; x } + { let x = 5; x}"
     eval[Long](script, Some(pointAInstance)) shouldBe Right(8)
