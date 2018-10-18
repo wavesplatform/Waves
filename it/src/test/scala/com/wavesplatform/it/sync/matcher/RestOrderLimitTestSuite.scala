@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import com.wavesplatform.it.util._
 
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
 class RestOrderLimitTestSuite
@@ -31,16 +30,6 @@ class RestOrderLimitTestSuite
   private def alice   = nodes(1)
   private def bob     = nodes(2)
 
-  //TODO только для отладки. Удалить по готовности теста
-  private var _orders = new ListBuffer[(String, String)]()
-  def orders(order: (String, String)*): Unit = {
-    val (vals, values) = (new ListBuffer[String], new ListBuffer[String])
-    order.foreach(o => _orders.append((o._1, o._2)))
-    val result = new StringBuilder()
-    _orders.foreach(o => result.append(".replace(\"").append(o._2).append("\", \"").append(o._1).append("\")"))
-    info(result.toString())
-  }
-
   "Order History REST API methods should have limit for orders in response" in {
     val aliceAsset = alice
       .issue(alice.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L)
@@ -56,6 +45,7 @@ class RestOrderLimitTestSuite
     val bobPair   = AssetPair(decodeBase58(bobAsset).toOption, None)
 
     info("'fullOrderHistory' and 'ordersByAddress' (activeOnly=false) must return no more 'rest-order-limit' orders")
+
     val active0 = matcher.placeOrder(alice, alicePair, SELL, 1, 15.waves).message.id
 
     val active1    = matcher.placeOrder(alice, alicePair, SELL, 1, 10.waves).message.id
@@ -66,17 +56,6 @@ class RestOrderLimitTestSuite
     val filled2    = matcher.placeOrder(alice, bobPair, BUY, 1, 4.waves).message.id
     val partial2   = matcher.placeOrder(alice, bobPair, BUY, 2, 3.waves).message.id
     val cancelled2 = matcher.placeOrder(alice, bobPair, BUY, 1, 2.waves, 70.seconds).message.id
-    orders(
-      ("active0", active0),
-      ("active1", active1),
-      ("filled1", filled1),
-      ("partial1", partial1),
-      ("cancelled1", cancelled1),
-      ("active2", active2),
-      ("filled2", filled2),
-      ("partial2", partial2),
-      ("cancelled2", cancelled2)
-    )
 
     // orders for matching Alice's orders
     matcher.placeOrder(bob, alicePair, BUY, 1, 8.waves).message.id // fill filled1
@@ -93,19 +72,17 @@ class RestOrderLimitTestSuite
 
     matcher.fullOrderHistory(alice).map(_.id) should equal(allOrdersExceptTheFilled1)
     matcher.ordersByAddress(alice, activeOnly = false).map(_.id) should equal(allOrdersExceptTheFilled1)
-
     matcher.activeOrderHistory(alice).map(_.id) should equal(activeOrders)
     matcher.ordersByAddress(alice, activeOnly = true).map(_.id) should equal(activeOrders)
-
     matcher.orderHistoryByPair(alice, alicePair).map(_.id) should equal(ordersByAlicePair)
     matcher.orderHistoryByPair(alice, bobPair).map(_.id) should equal(ordersByBobPair)
 
     info("'fullOrderHistory' and 'ordersByAddress' must return all active orders, even if they are more than the limit")
+
     val active3 = matcher.placeOrder(alice, alicePair, SELL, 1, 10.waves).message.id
     val active4 = matcher.placeOrder(alice, alicePair, SELL, 1, 10.waves).message.id
     val active5 = matcher.placeOrder(alice, bobPair, BUY, 1, 2.waves).message.id
     val active6 = matcher.placeOrder(alice, bobPair, BUY, 1, 2.waves).message.id
-    orders(("active3", active3), ("active4", active4), ("active5", active5), ("active6", active6))
 
     matcher.waitOrderStatus(bobPair, active6, "Accepted", 1.minutes)
 
@@ -115,19 +92,17 @@ class RestOrderLimitTestSuite
 
     matcher.fullOrderHistory(alice).map(_.id) should equal(activeOrdersAllNine)
     matcher.ordersByAddress(alice, activeOnly = false).map(_.id) should equal(activeOrdersAllNine)
-
     matcher.activeOrderHistory(alice).map(_.id) should equal(activeOrdersAllNine)
     matcher.ordersByAddress(alice, activeOnly = true).map(_.id) should equal(activeOrdersAllNine)
-
     matcher.orderHistoryByPair(alice, alicePair).map(_.id) should equal(ordersByAlicePairWithTwoNew)
     matcher.orderHistoryByPair(alice, bobPair).map(_.id) should equal(ordersByBobPairWithTwoNew)
 
     info("'orderHistoryByPair' must return no more 'rest-order-limit' orders")
+
     val active7  = matcher.placeOrder(alice, alicePair, SELL, 1, 9.waves).message.id
     val active8  = matcher.placeOrder(alice, alicePair, SELL, 1, 10.waves).message.id
     val active9  = matcher.placeOrder(alice, bobPair, BUY, 1, 1.waves).message.id
     val active10 = matcher.placeOrder(alice, bobPair, BUY, 1, 1.waves).message.id
-    orders(("active7", active7), ("active8", active8), ("active9", active9), ("active10", active10))
 
     matcher.waitOrderStatus(bobPair, active10, "Accepted", 1.minutes)
 
@@ -137,10 +112,8 @@ class RestOrderLimitTestSuite
 
     matcher.fullOrderHistory(alice).map(_.id) should equal(activeOrdersAllThirteen)
     matcher.ordersByAddress(alice, activeOnly = false).map(_.id) should equal(activeOrdersAllThirteen)
-
     matcher.activeOrderHistory(alice).map(_.id) should equal(activeOrdersAllThirteen)
     matcher.ordersByAddress(alice, activeOnly = true).map(_.id) should equal(activeOrdersAllThirteen)
-
     matcher.orderHistoryByPair(alice, alicePair).map(_.id) should equal(ordersByAlicePairWithTwoNewExceptOneOld)
     matcher.orderHistoryByPair(alice, bobPair).map(_.id) should equal(ordersByBobPairWithTwoMoreNew)
 
@@ -159,10 +132,8 @@ class RestOrderLimitTestSuite
 
     matcher.fullOrderHistory(alice).map(_.id) should equal(allOrdersWithOneFilled)
     matcher.ordersByAddress(alice, activeOnly = false).map(_.id) should equal(allOrdersWithOneFilled)
-
     matcher.activeOrderHistory(alice).map(_.id) should equal(activeOrdersAllSeven)
     matcher.ordersByAddress(alice, activeOnly = true).map(_.id) should equal(activeOrdersAllSeven)
-
     matcher.orderHistoryByPair(alice, alicePair).map(_.id) should equal(ordersByAlicePairWithTwoFilled)
     matcher.orderHistoryByPair(alice, bobPair).map(_.id) should equal(ordersByBobPairWithTwoFilled)
 
@@ -172,13 +143,6 @@ class RestOrderLimitTestSuite
     val active13 = matcher.placeOrder(alice, alicePair, SELL, 1, 10.waves).message.id
     val active14 = matcher.placeOrder(alice, alicePair, SELL, 1, 10.waves).message.id
     val active15 = matcher.placeOrder(alice, alicePair, SELL, 1, 10.waves).message.id
-    orders(
-      ("active11", active11),
-      ("active12", active12),
-      ("active13", active13),
-      ("active14", active14),
-      ("active15", active15)
-    )
 
     matcher.waitOrderStatus(bobPair, active15, "Accepted", 1.minutes)
 
@@ -187,10 +151,8 @@ class RestOrderLimitTestSuite
 
     matcher.fullOrderHistory(alice).map(_.id) should equal(activeOrdersAllTwelve)
     matcher.ordersByAddress(alice, activeOnly = false).map(_.id) should equal(activeOrdersAllTwelve)
-
     matcher.activeOrderHistory(alice).map(_.id) should equal(activeOrdersAllTwelve)
     matcher.ordersByAddress(alice, activeOnly = true).map(_.id) should equal(activeOrdersAllTwelve)
-
     matcher.orderHistoryByPair(alice, alicePair).map(_.id) should equal(ordersByAlicePairAllNineActive)
   }
 
