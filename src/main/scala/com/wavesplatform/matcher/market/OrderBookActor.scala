@@ -7,6 +7,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
+import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
@@ -39,6 +40,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
   private var orderBook          = OrderBook.empty
+  private var lastTrade          = Option.empty[Order]
 
   private def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
 
@@ -92,6 +94,8 @@ class OrderBookActor(assetPair: AssetPair,
       sender() ! GetOrdersResponse(orderBook.asks.values.flatten.toSeq)
     case GetBidOrdersRequest =>
       sender() ! GetOrdersResponse(orderBook.bids.values.flatten.toSeq)
+    case GetMarketStatusRequest(pair) =>
+      handleGetMarketStatus(pair)
   }
 
   private def onOrderCleanup(orderBook: OrderBook, ts: Long): Unit = {
@@ -119,6 +123,11 @@ class OrderBookActor(assetPair: AssetPair,
         log.debug(s"Error cancelling $orderIdToCancel: order not found")
         sender() ! OrderCancelRejected("Order not found")
     }
+
+  private def handleGetMarketStatus(pair: AssetPair): Unit = sender() ! {
+    if (pair == assetPair) GetMarketStatusResponse(pair, orderBook.bids.headOption, orderBook.asks.headOption, lastTrade)
+    else GetMarketStatusResponse(pair, None, None, None)
+  }
 
   private def onAddOrder(order: Order): Unit = {
     log.trace(s"Order accepted: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
@@ -201,6 +210,7 @@ class OrderBookActor(assetPair: AssetPair,
           _  <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
+            lastTrade = Some(o.order)
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
@@ -293,6 +303,8 @@ object OrderBookActor {
 
   case object OrderCleanup
 
+  case class GetMarketStatusRequest(assetPair: AssetPair)
+
   case class GetOrderBookResponse(ts: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) {
     def toHttpResponse: HttpResponse = HttpResponse(
       entity = HttpEntity(
@@ -305,6 +317,22 @@ object OrderBookActor {
   object GetOrderBookResponse {
     def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(NTP.correctedTime(), pair, Seq(), Seq())
   }
+
+  case class GetMarketStatusResponse(pair: AssetPair,
+                                     bid: Option[(Price, Level[LimitOrder])],
+                                     ask: Option[(Price, Level[LimitOrder])],
+                                     last: Option[Order])
+      extends MatcherResponse(
+        StatusCodes.OK,
+        Json.obj(
+          "lastPrice" -> last.map(_.price),
+          "lastSide"  -> last.map(_.orderType.toString),
+          "bid"       -> bid.map(_._1),
+          "bidAmount" -> bid.map(_._2.map(_.amount).sum),
+          "ask"       -> ask.map(_._1),
+          "askAmount" -> ask.map(_._2.map(_.amount).sum)
+        )
+      )
 
   // Direct requests
   case object GetOrdersRequest

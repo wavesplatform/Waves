@@ -59,7 +59,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ getOrderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+      matcherPublicKey ~ getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ getTradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
         getSettings
@@ -107,6 +107,19 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       withAssetPair(p, redirectToInverse = true) { pair =>
         complete(orderBookSnapshot.get(pair, depth))
       }
+    }
+  }
+
+  @Path("/orderbook/{amountAsset}/{priceAsset}/status")
+  @ApiOperation(value = "Get Market Status", notes = "Get current market data such as last trade, best bid and ask", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+    ))
+  def marketStatus: Route = (path("orderbook" / AssetPairPM / "status") & get) { p =>
+    withAssetPair(p, redirectToInverse = true) { pair =>
+      complete((matcher ? GetMarketStatusRequest(pair)).mapTo[MatcherResponse])
     }
   }
 

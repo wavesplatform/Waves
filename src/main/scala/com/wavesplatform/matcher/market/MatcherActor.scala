@@ -97,12 +97,16 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
   def forwardToOrderBook: Receive = {
     case GetMarkets => sender() ! tradedPairs.values.toSeq
 
+    case req @ GetMarketStatusRequest(pair) =>
+      context
+        .child(OrderBookActor.name(pair))
+        .fold(sender() ! MatcherResponse(StatusCodes.NotFound, "Market not found"))(forwardReq(req))
+
     case order: Order =>
       orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
 
     case ob: DeleteOrderBookRequest =>
-      orderBook(ob.assetPair)
-        .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
+      orderBook(ob.assetPair).fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
       removeOrderBook(ob.assetPair)
 
     case Shutdown =>
