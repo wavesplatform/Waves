@@ -44,6 +44,8 @@ case class SponsorFeeTransaction private (version: Byte,
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte, builder.typeId, version), bodyBytes(), proofs.bytes()))
+
+  override def checkedAssets(): Seq[AssetId] = Seq(assetId)
 }
 
 object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction] with TransactionParser.MultipleVersions {
