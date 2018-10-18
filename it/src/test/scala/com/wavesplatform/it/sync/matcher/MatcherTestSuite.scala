@@ -8,7 +8,7 @@ import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange._
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -34,7 +34,18 @@ class MatcherTestSuite extends MatcherSuiteBase {
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
     val order1 =
-      matcherNode.placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, aliceSellAmount, orderVersion, 2.minutes)
+      matcherNode.prepareOrder(aliceAcc, aliceWavesPair, OrderType.SELL, aliceSellAmount, 2.waves * Order.PriceConstant, orderVersion, 2.minutes)
+    val order1Response = matcherNode.placeOrder(order1)
+
+    "can't place an order with the same timestamp" in {
+      val rawOrder2 = order1 match {
+        case x: OrderV1 => x.copy(amount = x.amount + 1)
+        case x: OrderV2 => x.copy(amount = x.amount + 1)
+      }
+
+      val order2 = Order.sign(rawOrder2, aliceAcc)
+      matcherNode.expectIncorrectOrderPlacement(order2, 400, "OrderRejected") shouldBe true
+    }
 
     "assert addresses balances" in {
       aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, AssetQuantity)
@@ -60,10 +71,10 @@ class MatcherTestSuite extends MatcherSuiteBase {
 
     "sell order could be placed correctly" - {
       "alice places sell order" in {
-        order1.status shouldBe "OrderAccepted"
+        order1Response.status shouldBe "OrderAccepted"
 
         // Alice checks that the order in order book
-        matcherNode.waitOrderStatus(aliceWavesPair, order1.message.id, "Accepted")
+        matcherNode.waitOrderStatus(aliceWavesPair, order1Response.message.id, "Accepted")
 
         // Alice check that order is correct
         val orders = matcherNode.orderBook(aliceWavesPair)
@@ -78,7 +89,7 @@ class MatcherTestSuite extends MatcherSuiteBase {
       }
 
       "and should be listed by trader's publiс key via REST" in {
-        matcherNode.fullOrderHistory(aliceAcc).map(_.id) should contain(order1.message.id)
+        matcherNode.fullOrderHistory(aliceAcc).map(_.id) should contain(order1Response.message.id)
       }
 
       "and should match with buy order" in {
@@ -87,10 +98,10 @@ class MatcherTestSuite extends MatcherSuiteBase {
         val aliceBalance   = aliceNode.accountBalances(aliceAcc.address)._1
 
         // Bob places a buy order
-        val order2 = matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 200, orderVersion)
+        val order2 = matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 200, 2.waves * Order.PriceConstant, orderVersion)
         order2.status shouldBe "OrderAccepted"
 
-        matcherNode.waitOrderStatus(aliceWavesPair, order1.message.id, "PartiallyFilled")
+        matcherNode.waitOrderStatus(aliceWavesPair, order1Response.message.id, "PartiallyFilled")
         matcherNode.waitOrderStatus(aliceWavesPair, order2.message.id, "Filled")
 
         matcherNode.orderHistoryByPair(bobAcc, aliceWavesPair).map(_.id) should contain(order2.message.id)
@@ -124,7 +135,7 @@ class MatcherTestSuite extends MatcherSuiteBase {
 
       "request activeOnly orders" in {
         val aliceOrders = matcherNode.activeOrderHistory(aliceAcc)
-        aliceOrders.map(_.id) shouldBe Seq(order1.message.id)
+        aliceOrders.map(_.id) shouldBe Seq(order1Response.message.id)
         val bobOrders = matcherNode.activeOrderHistory(bobAcc)
         bobOrders.map(_.id) shouldBe Seq()
       }
@@ -132,17 +143,16 @@ class MatcherTestSuite extends MatcherSuiteBase {
       "submitting sell orders should check availability of asset" in {
         // Bob trying to place order on more assets than he has - order rejected
         val badOrder =
-          matcherNode.prepareOrder(bobAcc, aliceWavesPair, OrderType.SELL, (19.waves / 10.0 * Order.PriceConstant).toLong, 300, orderVersion)
+          matcherNode.prepareOrder(bobAcc, aliceWavesPair, OrderType.SELL, 300, (19.waves / 10.0 * Order.PriceConstant).toLong, orderVersion)
         matcherNode.expectIncorrectOrderPlacement(badOrder, 400, "OrderRejected") should be(true)
 
         // Bob places order on available amount of assets - order accepted
-        val order3 =
-          matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.SELL, (19.waves / 10.0 * Order.PriceConstant).toLong, 150, orderVersion)
+        val order3 = matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.SELL, 150, (19.waves / 10.0 * Order.PriceConstant).toLong, orderVersion)
         order3.status should be("OrderAccepted")
 
         // Bob checks that the order in the order book
         val orders = matcherNode.orderBook(aliceWavesPair)
-        orders.asks should contain(LevelResponse(19.waves / 10 * Order.PriceConstant, 150))
+        orders.asks should contain(LevelResponse(150, 19.waves / 10 * Order.PriceConstant))
       }
 
       "buy order should match on few price levels" in {
@@ -152,7 +162,7 @@ class MatcherTestSuite extends MatcherSuiteBase {
 
         // Alice places a buy order
         val order4 =
-          matcherNode.placeOrder(aliceAcc, aliceWavesPair, OrderType.BUY, (21.waves / 10.0 * Order.PriceConstant).toLong, 350, orderVersion)
+          matcherNode.placeOrder(aliceAcc, aliceWavesPair, OrderType.BUY, 350, (21.waves / 10.0 * Order.PriceConstant).toLong, orderVersion)
         order4.status should be("OrderAccepted")
 
         // Where were 2 sells that should fulfill placed order
@@ -177,7 +187,7 @@ class MatcherTestSuite extends MatcherSuiteBase {
 
       "order could be canceled and resubmitted again" in {
         // Alice cancels the very first order (100 left)
-        val status1 = matcherNode.cancelOrder(aliceAcc, aliceWavesPair, Some(order1.message.id))
+        val status1 = matcherNode.cancelOrder(aliceAcc, aliceWavesPair, Some(order1Response.message.id))
         status1.status should be("OrderCanceled")
 
         // Alice checks that the order book is empty
@@ -187,12 +197,12 @@ class MatcherTestSuite extends MatcherSuiteBase {
 
         // Alice places a new sell order on 100
         val order4 =
-          matcherNode.placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 100, orderVersion)
+          matcherNode.placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 100, 2.waves * Order.PriceConstant, orderVersion)
         order4.status should be("OrderAccepted")
 
         // Alice checks that the order is in the order book
         val orders2 = matcherNode.orderBook(aliceWavesPair)
-        orders2.asks should contain(LevelResponse(20.waves / 10 * Order.PriceConstant, 100))
+        orders2.asks should contain(LevelResponse(100, 20.waves / 10 * Order.PriceConstant))
       }
 
       "buy order should execute all open orders and put remaining in order book" in {
@@ -201,7 +211,7 @@ class MatcherTestSuite extends MatcherSuiteBase {
         val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
 
         // Bob places buy order on amount bigger then left in sell orders
-        val order5 = matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 130, orderVersion)
+        val order5 = matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 130, 2.waves * Order.PriceConstant, orderVersion)
         order5.status should be("OrderAccepted")
 
         // Check that the order is partially filled
@@ -209,7 +219,7 @@ class MatcherTestSuite extends MatcherSuiteBase {
 
         // Check that remaining part of the order is in the order book
         val orders = matcherNode.orderBook(aliceWavesPair)
-        orders.bids should contain(LevelResponse(2.waves * Order.PriceConstant, 30))
+        orders.bids should contain(LevelResponse(30, 2.waves * Order.PriceConstant))
 
         // Check balances
         nodes.waitForHeightArise()
@@ -254,14 +264,14 @@ class MatcherTestSuite extends MatcherSuiteBase {
         bobNode.assertAssetBalance(bobAcc.address, bobAsset, bobAssetQuantity)
         val bobWavesPair = AssetPair(ByteStr.decodeBase58(bobAsset).toOption, None)
 
-        def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, OrderType.SELL, 1.waves * Order.PriceConstant, bobAssetQuantity, orderVersion)
+        def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, OrderType.SELL, bobAssetQuantity, 1.waves * Order.PriceConstant, orderVersion)
 
         val order6 = matcherNode.placeOrder(bobOrder)
         matcherNode.waitOrderStatus(bobWavesPair, order6.message.id, "Accepted")
 
         // Alice wants to buy all Bob's assets for 1 Wave
         val order7 =
-          matcherNode.placeOrder(aliceAcc, bobWavesPair, OrderType.BUY, 1.waves * Order.PriceConstant, bobAssetQuantity, orderVersion)
+          matcherNode.placeOrder(aliceAcc, bobWavesPair, OrderType.BUY, bobAssetQuantity, 1.waves * Order.PriceConstant, orderVersion)
         matcherNode.waitOrderStatus(bobWavesPair, order7.message.id, "Filled")
 
         // Bob tries to do the same operation, but at now he have no assets
@@ -285,7 +295,7 @@ class MatcherTestSuite extends MatcherSuiteBase {
         bobNode.assertAssetBalance(bobAcc.address, bobAsset, bobAssetQuantity)
 
         // Bob wants to sell all own assets for 1 Wave
-        def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, OrderType.SELL, 1.waves * Order.PriceConstant, bobAssetQuantity, orderVersion)
+        def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, OrderType.SELL, bobAssetQuantity, 1.waves * Order.PriceConstant, orderVersion)
 
         val order8 = matcherNode.placeOrder(bobOrder)
         matcherNode.waitOrderStatus(bobWavesPair, order8.message.id, "Accepted")
@@ -316,7 +326,7 @@ class MatcherTestSuite extends MatcherSuiteBase {
       val ordersNum = 5
       def fileOrders(n: Int, pair: AssetPair): Seq[String] = 0 until n map { i =>
         val o =
-          matcherNode.placeOrder(matcherNode.prepareOrder(aliceAcc, pair, OrderType.BUY, 1.waves * Order.PriceConstant, 100, (1 + (i & 1)).toByte))
+          matcherNode.placeOrder(matcherNode.prepareOrder(aliceAcc, pair, OrderType.BUY, 100, 1.waves * Order.PriceConstant, (1 + (i & 1)).toByte))
         o.status should be("OrderAccepted")
         o.message.id
       }

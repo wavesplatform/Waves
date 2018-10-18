@@ -30,8 +30,6 @@ class TransactionsRouteSpec
     with PropertyChecks
     with NoShrink {
 
-  import TransactionsApiRoute.MaxTransactionsPerRequest
-
   private val wallet      = Wallet(WalletSettings(None, Some("qwerty"), None))
   private val blockchain  = mock[Blockchain]
   private val utx         = mock[UtxPool]

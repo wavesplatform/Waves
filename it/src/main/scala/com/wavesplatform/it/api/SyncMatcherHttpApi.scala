@@ -61,11 +61,11 @@ object SyncMatcherHttpApi extends Assertions {
     def placeOrder(sender: PrivateKeyAccount,
                    pair: AssetPair,
                    orderType: OrderType,
-                   price: Long,
                    amount: Long,
+                   price: Long,
                    version: Byte = 1: Byte,
                    timeToLive: Duration = 30.days - 1.seconds): MatcherResponse =
-      Await.result(async(m).placeOrder(sender, pair, orderType, price, amount, version, timeToLive), RequestAwaitTime)
+      Await.result(async(m).placeOrder(sender, pair, orderType, amount, price, version, timeToLive), RequestAwaitTime)
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       Await.result(async(m).orderStatus(orderId, assetPair, waitForStatus), RequestAwaitTime)
@@ -132,8 +132,8 @@ object SyncMatcherHttpApi extends Assertions {
     def prepareOrder(sender: PrivateKeyAccount,
                      pair: AssetPair,
                      orderType: OrderType,
-                     price: Long,
                      amount: Long,
+                     price: Long,
                      version: Byte = 1: Byte,
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val creationTime        = System.currentTimeMillis()
@@ -144,8 +144,8 @@ object SyncMatcherHttpApi extends Assertions {
               matcherPublicKey,
               pair,
               orderType,
-              price,
               amount,
+              price,
               creationTime,
               timeToLiveTimestamp,
               300000,

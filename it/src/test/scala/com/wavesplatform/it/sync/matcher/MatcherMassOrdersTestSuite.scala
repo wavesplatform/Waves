@@ -48,23 +48,23 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
 
     // Alice places sell orders
     val aliceOrderIdFill = matcherNode
-      .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, orderVersion, 10.minutes)
+      .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant, orderVersion, 10.minutes)
       .message
       .id
 
     val alicePartialOrderId = matcherNode
-      .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, orderVersion, 10.minute)
+      .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant, orderVersion, 10.minutes)
       .message
       .id
 
     val aliceOrderToCancelId =
       matcherNode
-        .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant, 3, orderVersion, 70.second)
+        .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant, orderVersion, 70.seconds)
         .message
         .id
 
     val aliceActiveOrderId = matcherNode
-      .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, Order.PriceConstant + 1, 3, orderVersion, 10.minute)
+      .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant + 1, orderVersion, 10.minutes)
       .message
       .id
 
@@ -141,15 +141,13 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
   private def ordersRequestsGen(n: Int, sender: PrivateKeyAccount, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[String] = {
     val orderIds = 1 to n map (_ => {
       matcherNode
-        .placeOrder(sender, assetPair, orderType, Order.PriceConstant, amount, orderVersion, (120 + Random.nextInt(70)).seconds)
+        .placeOrder(sender, assetPair, orderType, amount, Order.PriceConstant, orderVersion, (120 + Random.nextInt(70)).seconds)
         .message
         .id
     })
     orderIds
   }
 
-  private def orderStatus(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, expectedStatus: String) = {
+  private def orderStatus(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, expectedStatus: String) =
     matcherNode.waitOrderStatus(assetPair, orderId, expectedStatus)
-    matcherNode.fullOrderHistory(sender).filter(_.id == orderId).seq.head.status shouldBe expectedStatus
-  }
 }

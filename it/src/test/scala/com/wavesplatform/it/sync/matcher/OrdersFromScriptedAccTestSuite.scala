@@ -4,10 +4,10 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.it.sync._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json.JsNumber
@@ -50,7 +50,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     "trading is deprecated" in {
       assertBadRequestAndResponse(
         matcherNode
-          .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes),
+          .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes),
         "Trading on scripted account isn't allowed yet."
       )
     }
@@ -58,14 +58,14 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     "scripted account can trade once SmartAccountTrading is activated" in {
       matcherNode.waitForHeight(ActivationHeight, 3.minutes)
       val bobOrder = matcherNode
-        .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
+        .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
       bobOrder.status shouldBe "OrderAccepted"
     }
 
     "can trade from non-scripted account" in {
       // Alice places sell order
       val aliceOrder = matcherNode
-        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
+        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
 
       aliceOrder.status shouldBe "OrderAccepted"
 
