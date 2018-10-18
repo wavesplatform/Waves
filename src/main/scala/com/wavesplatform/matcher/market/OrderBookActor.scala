@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher.market
 
-import akka.actor.Props
+import akka.actor.{Props, Status}
 import akka.http.scaladsl.model._
 import akka.persistence._
 import com.wavesplatform.matcher.MatcherSettings
@@ -61,7 +61,7 @@ class OrderBookActor(assetPair: AssetPair,
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata", reason)
 
-    case DeleteOrderBookRequest(pair) =>
+    case _: DeleteOrderBookRequest =>
       updateSnapshot(OrderBook.empty)
       orderBook.asks.values
         .++(orderBook.bids.values)
@@ -69,7 +69,7 @@ class OrderBookActor(assetPair: AssetPair,
         .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x, unmatchable = false)))
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
-      sender() ! GetOrderBookResponse(NTP.correctedTime(), pair, Seq(), Seq())
+      sender() ! Status.Success(0)
       context.stop(self)
 
     case DeleteSnapshotsSuccess(criteria) =>

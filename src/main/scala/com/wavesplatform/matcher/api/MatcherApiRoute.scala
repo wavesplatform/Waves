@@ -435,7 +435,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
     withAssetPair(p) { pair =>
-      complete((matcher ? DeleteOrderBookRequest(pair)).mapTo[MatcherResponse])
+      complete((matcher ? DeleteOrderBookRequest(pair)).map { _ =>
+        GetOrderBookResponse(NTP.correctedTime(), pair, Seq(), Seq()).toHttpResponse
+      })
     }
   }
 
