@@ -23,6 +23,7 @@ import scorex.utils._
 class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
                    orderBooks: AtomicReference[Map[AssetPair, ActorRef]],
                    updateSnapshot: AssetPair => OrderBook => Unit,
+                   updateMarketStatus: AssetPair => MarketStatus => Unit,
                    utx: UtxPool,
                    allChannels: ChannelGroup,
                    settings: MatcherSettings,
@@ -69,7 +70,7 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
   }
 
   private def createOrderBookActor(pair: AssetPair): ActorRef = context.actorOf(
-    OrderBookActor.props(pair, updateSnapshot(pair), utx, allChannels, settings, createTransaction),
+    OrderBookActor.props(pair, updateSnapshot(pair), updateMarketStatus(pair), utx, allChannels, settings, createTransaction),
     OrderBookActor.name(pair)
   )
 
@@ -96,11 +97,6 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
 
   def forwardToOrderBook: Receive = {
     case GetMarkets => sender() ! tradedPairs.values.toSeq
-
-    case req @ GetMarketStatusRequest(pair) =>
-      context
-        .child(OrderBookActor.name(pair))
-        .fold(sender() ! MatcherResponse(StatusCodes.NotFound, "Market not found"))(forwardReq(req))
 
     case order: Order =>
       orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
@@ -225,12 +221,24 @@ object MatcherActor {
   def props(validateAssetPair: AssetPair => Either[String, AssetPair],
             orderBooks: AtomicReference[Map[AssetPair, ActorRef]],
             updateSnapshot: AssetPair => OrderBook => Unit,
+            updateMarketStatus: AssetPair => MarketStatus => Unit,
             utx: UtxPool,
             allChannels: ChannelGroup,
             settings: MatcherSettings,
             assetDescription: ByteStr => Option[AssetDescription],
             createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction]): Props =
-    Props(new MatcherActor(validateAssetPair, orderBooks, updateSnapshot, utx, allChannels, settings, assetDescription, createTransaction))
+    Props(
+      new MatcherActor(
+        validateAssetPair,
+        orderBooks,
+        updateSnapshot,
+        updateMarketStatus,
+        utx,
+        allChannels,
+        settings,
+        assetDescription,
+        createTransaction
+      ))
 
   private case class ShutdownStatus(initiated: Boolean,
                                     oldMessagesDeleted: Boolean,
