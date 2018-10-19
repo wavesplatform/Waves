@@ -336,7 +336,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "All Order History by address", notes = "Get All Order History for a given address", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(
+        name = "activeOnly",
+        value = "Return active only orders (Accepted and PartiallyFilled)",
+        required = false,
+        dataType = "boolean",
+        paramType = "query",
+        defaultValue = "false"
+      ),
     ))
   def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth) { address =>
     parameters('activeOnly.as[Boolean].?) { activeOnly =>
