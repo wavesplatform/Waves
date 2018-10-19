@@ -43,8 +43,8 @@ object Serde {
             letValue <- aux()
             body     <- aux()
           } yield
-            BLOCK(
-              dec = LET(name, letValue),
+            BLOCKV1(
+              let = LET(name, letValue),
               body = body
             )
         case E_REF    => Coeval.now(REF(bb.getString))
@@ -142,7 +142,7 @@ object Serde {
           }
         case IF(cond, ifTrue, ifFalse) =>
           List(cond, ifTrue, ifFalse).foldLeft(Coeval.now(out.write(E_IF)))(aux)
-        case BLOCK(LET(name, value), body) =>
+        case BLOCKV1(LET(name, value), body) =>
           val n = Coeval.now[Unit] {
             out.write(E_BLOCK)
             out.writeString(name)

@@ -21,8 +21,15 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
 
     "IF" in roundTripTest(IF(TRUE, CONST_LONG(0), CONST_LONG(1)))
 
-    "BLOCK" in roundTripTest(
-      BLOCK(
+    "BLOCKV1" in roundTripTest(
+      BLOCKV1(
+        let = LET("foo", TRUE),
+        body = FALSE
+      )
+    )
+    
+    "BLOCKV2" in roundTripTest(
+      BLOCKV2(
         dec = LET("foo", TRUE),
         body = FALSE
       )

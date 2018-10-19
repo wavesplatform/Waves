@@ -104,7 +104,8 @@ object EvaluatorV1 extends ExprEvaluator {
   private def pureAny[A](v: A): EvalM[Any] = v.pure[EvalM].map(_.asInstanceOf[Any])
 
   private def evalExpr(t: EXPR): EvalM[Any] = t match {
-    case BLOCK(dec, inner) =>
+    case BLOCKV1(let, inner) => evalLetBlock(let, inner)
+    case BLOCKV2(dec, inner) =>
       dec match {
         case l: LET => evalLetBlock(l, inner)
         case f:FUNC      => evalFuncBlock(f, inner)

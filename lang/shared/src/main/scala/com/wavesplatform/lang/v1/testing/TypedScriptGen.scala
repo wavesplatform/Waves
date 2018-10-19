@@ -19,7 +19,7 @@ trait TypedScriptGen {
     for {
       let  <- LETgen((gas - 3) / 3)
       body <- Gen.oneOf(BOOLEANgen((gas - 3) / 3), BLOCK_BOOLEANgen((gas - 3) / 3))
-    } yield BLOCK(let, body)
+    } yield BLOCKV2(let, body)
 
   def IF_BOOLEANgen(gas: Int): Gen[EXPR] =
     for {
@@ -37,7 +37,7 @@ trait TypedScriptGen {
     for {
       let  <- LETgen((gas - 3) / 3)
       body <- Gen.oneOf(LONGgen((gas - 3) / 3), BLOCK_LONGgen((gas - 3) / 3))
-    } yield BLOCK(let, body)
+    } yield BLOCKV1(let, body)
 
   def IF_LONGgen(gas: Int): Gen[EXPR] =
     for {

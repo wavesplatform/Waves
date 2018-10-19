@@ -150,7 +150,7 @@ object CompilerV1 {
         modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (typeUnion -> s"Defined at ${p.start}"))))
           .flatMap(_ => compileExpr(body))
       }
-    } yield (BLOCK(LET(letName, compiledLet._1), compiledBody._1), compiledBody._2)
+    } yield (BLOCKV2(LET(letName, compiledLet._1), compiledBody._1), compiledBody._2)
   }
 
   private def compileFuncBlock(p: Pos, func: Expressions.FUNC, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
@@ -186,7 +186,7 @@ object CompilerV1 {
         modify[CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> List(typeSig))))
           .flatMap(_ => compileExpr(body))
       }
-    } yield (BLOCK(func, compiledBody._1), compiledBody._2)
+    } yield (BLOCKV2(func, compiledBody._1), compiledBody._2)
   }
 
   private def compileGetter(p: Pos, fieldPart: PART[String], refExpr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {

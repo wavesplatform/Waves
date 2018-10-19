@@ -77,7 +77,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
 
   property("recursive let statement") {
     // let v = v; v
-    val expr = BLOCK(LET("v", REF("v")), REF("v"))
+    val expr = BLOCKV2(LET("v", REF("v")), REF("v"))
     estimate(Map.empty, expr) shouldBe 'right
   }
 

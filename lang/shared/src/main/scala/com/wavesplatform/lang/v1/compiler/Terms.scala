@@ -13,7 +13,8 @@ object Terms {
   case class GETTER(expr: EXPR, field: String)                         extends EXPR
   case class CONST_BYTEVECTOR(bs: ByteVector)                          extends EXPR
   case class CONST_STRING(s: String)                                   extends EXPR
-  case class BLOCK(dec: DECLARATION, body: EXPR)                       extends EXPR
+  case class BLOCKV1(let: LET, body: EXPR)                             extends EXPR
+  case class BLOCKV2(dec: DECLARATION, body: EXPR)                     extends EXPR
   case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)               extends EXPR
   case class REF(key: String)                                          extends EXPR
   case object TRUE                                                     extends EXPR
