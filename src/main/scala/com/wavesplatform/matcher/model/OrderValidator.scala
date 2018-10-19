@@ -14,6 +14,10 @@ import com.wavesplatform.utils.Time
 import kamon.Kamon
 import org.iq80.leveldb.DB
 
+/**
+  * @param db matcher LevelDB instance
+  * @param portfolio "pessimistic" portfolio, which includes pending spendings from UTX pool!
+  */
 class OrderValidator(db: DB,
                      blockchain: Blockchain,
                      portfolio: Address => Portfolio,
@@ -50,6 +54,20 @@ class OrderValidator(db: DB,
     )
   }
 
+  @inline private def decimals(assetId: Option[AssetId]): Either[String, Int] = assetId.fold[Either[String, Int]](Right(8)) { aid =>
+    blockchain.assetDescription(aid).map(_.decimals).toRight(s"Invalid asset id $aid")
+  }
+
+  private def validateDecimals(o: Order): Either[String, Order] =
+    for {
+      pd <- decimals(o.assetPair.priceAsset)
+      ad <- decimals(o.assetPair.amountAsset)
+      insignificantDecimals = (pd - ad).max(0)
+      _ <- Either.cond(o.price % BigDecimal(10).pow(insignificantDecimals).toLongExact == 0,
+                       o,
+                       s"Invalid price, last $insignificantDecimals digits must be 0")
+    } yield o
+
   def tradableBalance(acc: AssetAcc): Long =
     timer
       .refine("action" -> "tradableBalance")
@@ -71,15 +89,16 @@ class OrderValidator(db: DB,
             .ensure("Incorrect matcher public key")(_.matcherPublicKey == matcherPublicKey)
             .ensure("Invalid address")(_ => !settings.blacklistedAddresses.contains(senderAddress))
             .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
-            .ensure(s"Order should have a timestamp after $lowestOrderTs, but it is ${order.timestamp}")(_.timestamp >= lowestOrderTs)
+            .ensure(s"Order should have a timestamp after $lowestOrderTs, but it is ${order.timestamp}")(_.timestamp > lowestOrderTs)
             .ensure(s"Order matcherFee should be >= ${settings.minOrderFee}")(_.matcherFee >= settings.minOrderFee)
             .ensure("Invalid signature")(_.signatureValid())
             .ensure("Invalid order")(_.isValid(time.correctedTime()))
             .ensure("Order has already been placed")(o => DBUtils.orderInfo(db, o.id()).status == LimitOrder.NotFound)
-            .ensure(s"Limit of $MaxElements active orders has been reached")(o => DBUtils.activeOrderCount(db, o.senderPublicKey) <= MaxElements)
+            .ensure(s"Limit of $MaxElements active orders has been reached")(o => DBUtils.activeOrderCount(db, o.senderPublicKey) < MaxElements)
             .ensure("Trading on scripted account isn't allowed yet")(_ => !blockchain.hasScript(senderAddress))
           _ <- validateBalance(order)
           _ <- validatePair(order.assetPair)
+          _ <- validateDecimals(order)
         } yield order
       }
 }
