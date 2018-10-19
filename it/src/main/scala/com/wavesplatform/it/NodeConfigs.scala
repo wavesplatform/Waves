@@ -7,7 +7,7 @@ import scala.util.Random
 
 object NodeConfigs {
 
-  private val NonConflictingNodes = Set(1, 4, 6)
+  private val NonConflictingNodes = Set(1, 4, 6, 7)
 
   val Default: Seq[Config] = ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala
   val Miners: Seq[Config]  = Default.init

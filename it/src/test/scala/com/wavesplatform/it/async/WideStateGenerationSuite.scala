@@ -41,9 +41,9 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matcher
   )
 
   override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
-    .overrideBase(_.quorum(3))
+    .overrideBase(_.quorum(2))
     .withDefault(2)
-    .withSpecial(2, _.nonMiner)
+    .withSpecial(1, _.nonMiner)
     .buildNonConflicting()
 
   private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet

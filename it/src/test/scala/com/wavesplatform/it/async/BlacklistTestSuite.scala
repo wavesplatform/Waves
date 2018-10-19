@@ -17,7 +17,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(2))
-      .withDefault(3)
+      .withDefault(2)
       .withSpecial(_.quorum(0))
       .buildNonConflicting()
 

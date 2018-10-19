@@ -41,10 +41,10 @@ class NotActivateFeatureTestSuite
          |    }
          |  }
          |  features.supported=[$nonVotingFeatureNum]
-         |  miner.quorum = 3
+         |  miner.quorum = 2
          |}""".stripMargin
         ))
-      .withDefault(4)
+      .withDefault(3)
       .buildNonConflicting()
 
   private var activationStatusInfoBefore = Option.empty[FeatureActivationStatus]
