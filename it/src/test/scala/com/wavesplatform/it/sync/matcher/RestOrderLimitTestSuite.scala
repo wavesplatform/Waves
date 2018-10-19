@@ -84,7 +84,7 @@ class RestOrderLimitTestSuite
 
     matcher.cancelOrder(alice, alicePair, Some(cancelled1))
     matcher.cancelOrder(alice, alicePair, Some(cancelled2))
-    matcher.waitOrderStatus(bobPair, cancelled2, "Cancelled", 2.minutes)
+    matcher.waitOrderStatus(bobPair, cancelled2, "Cancelled", 1.minutes)
 
     val activeOrdersAllFive       = Seq(partial2, active2, partial1, active1, active0)
     val allOrdersExceptTheFilled1 = activeOrdersAllFive ++ Seq(cancelled2, filled2, cancelled1)
