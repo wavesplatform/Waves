@@ -24,20 +24,21 @@ object CommonValidation {
   val ScriptExtraFee                                      = 400000L
 
   val FeeConstants: Map[Byte, Long] = Map(
-    GenesisTransaction.typeId      -> 0,
-    PaymentTransaction.typeId      -> 1,
-    IssueTransaction.typeId        -> 1000,
-    ReissueTransaction.typeId      -> 1000,
-    BurnTransaction.typeId         -> 1,
-    TransferTransaction.typeId     -> 1,
-    MassTransferTransaction.typeId -> 1,
-    LeaseTransaction.typeId        -> 1,
-    LeaseCancelTransaction.typeId  -> 1,
-    ExchangeTransaction.typeId     -> 3,
-    CreateAliasTransaction.typeId  -> 1,
-    DataTransaction.typeId         -> 1,
-    SetScriptTransaction.typeId    -> 10,
-    SponsorFeeTransaction.typeId   -> 1000
+    GenesisTransaction.typeId        -> 0,
+    PaymentTransaction.typeId        -> 1,
+    IssueTransaction.typeId          -> 1000,
+    ReissueTransaction.typeId        -> 1000,
+    BurnTransaction.typeId           -> 1,
+    TransferTransaction.typeId       -> 1,
+    MassTransferTransaction.typeId   -> 1,
+    LeaseTransaction.typeId          -> 1,
+    LeaseCancelTransaction.typeId    -> 1,
+    ExchangeTransaction.typeId       -> 3,
+    CreateAliasTransaction.typeId    -> 1,
+    DataTransaction.typeId           -> 1,
+    SetScriptTransaction.typeId      -> 10,
+    SponsorFeeTransaction.typeId     -> 1000,
+    SetAssetScriptTransaction.typeId -> 1000
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
