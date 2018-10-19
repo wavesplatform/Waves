@@ -32,13 +32,13 @@ class RestOrderLimitTestSuite
 
   private def activeOrders: Seq[String] = {
     val activeOrders = matcher.activeOrderHistory(alice).map(_.id)
-    matcher.ordersByAddress(alice, activeOnly = true).map(_.id) should equal (activeOrders)
+    matcher.ordersByAddress(alice, activeOnly = true).map(_.id) should equal(activeOrders)
     activeOrders
   }
 
   private def allOrders: Seq[String] = {
     val allOrders = matcher.fullOrderHistory(alice).map(_.id)
-    matcher.ordersByAddress(alice, activeOnly = false).map(_.id) should equal (allOrders)
+    matcher.ordersByAddress(alice, activeOnly = false).map(_.id) should equal(allOrders)
     allOrders
   }
 
@@ -46,10 +46,8 @@ class RestOrderLimitTestSuite
 
   private def allOrdersBy(pair: AssetPair, n: Node = alice): Seq[String] = matcher.orderHistoryByPair(n, pair).map(_.id)
 
-  markup("""
-          |Test suite checks only Alice's OrderHistory.
-          |Bob places orders only for matching Alice's orders.
-         """)
+  markup("""Test suite checks only Alice's OrderHistory.
+          |Bob places orders only for matching Alice's orders.""".stripMargin)
 
   "Order History REST API methods should have limit for orders in response" in {
     val aliceAsset = alice
@@ -72,11 +70,11 @@ class RestOrderLimitTestSuite
     val active1    = matcher.placeOrder(alice, alicePair, SELL, 1, 10.waves).message.id
     val partial1   = matcher.placeOrder(alice, alicePair, SELL, 2, 9.waves).message.id
     val filled1    = matcher.placeOrder(alice, alicePair, SELL, 1, 8.waves).message.id
-    val cancelled1 = matcher.placeOrder(alice, alicePair, SELL, 1, 11.waves, 70.seconds).message.id
+    val cancelled1 = matcher.placeOrder(alice, alicePair, SELL, 1, 11.waves).message.id
     val active2    = matcher.placeOrder(alice, bobPair, BUY, 1, 2.waves).message.id
     val filled2    = matcher.placeOrder(alice, bobPair, BUY, 1, 4.waves).message.id
     val partial2   = matcher.placeOrder(alice, bobPair, BUY, 2, 3.waves).message.id
-    val cancelled2 = matcher.placeOrder(alice, bobPair, BUY, 1, 2.waves, 70.seconds).message.id
+    val cancelled2 = matcher.placeOrder(alice, bobPair, BUY, 1, 2.waves).message.id
 
     // orders for matching Alice's orders
     matcher.placeOrder(bob, alicePair, BUY, 1, 8.waves).message.id // fill filled1
@@ -85,14 +83,15 @@ class RestOrderLimitTestSuite
     matcher.placeOrder(bob, bobPair, SELL, 1, 3.waves).message.id  // part fill partial2
 
     matcher.cancelOrder(alice, alicePair, Some(cancelled1))
+    matcher.cancelOrder(alice, alicePair, Some(cancelled2))
     matcher.waitOrderStatus(bobPair, cancelled2, "Cancelled", 2.minutes)
 
-    val activeOrders              = Seq(partial2, active2, partial1, active1, active0)
-    val allOrdersExceptTheFilled1 = activeOrders ++ Seq(cancelled2, filled2, cancelled1)
+    val activeOrdersAllFive       = Seq(partial2, active2, partial1, active1, active0)
+    val allOrdersExceptTheFilled1 = activeOrdersAllFive ++ Seq(cancelled2, filled2, cancelled1)
     val activeOrdersByPair        = Seq(partial1, active1, active0)
     val allOrdersByPair           = activeOrdersByPair ++ Seq(cancelled1, filled1)
 
-    activeOrders should equal(activeOrders)
+    activeOrders should equal(activeOrdersAllFive)
     allOrders should equal(allOrdersExceptTheFilled1)
     activeOrdersBy(alicePair) should equal(activeOrdersByPair)
     allOrdersBy(alicePair) should equal(allOrdersByPair)
@@ -106,11 +105,11 @@ class RestOrderLimitTestSuite
 
     matcher.waitOrderStatus(bobPair, active6, "Accepted", 1.minutes)
 
-    val activeOrdersAllNine         = Seq(active6, active5, active4, active3) ++ activeOrders
-    val activeOrdersByPairWithTwoNew   = Seq(active4, active3) ++ activeOrdersByPair
-    val allOrdersByPairWithTwoNew = Seq(active4, active3) ++ allOrdersByPair
+    val activeOrdersAllNine          = Seq(active6, active5, active4, active3) ++ activeOrdersAllFive
+    val activeOrdersByPairWithTwoNew = Seq(active4, active3) ++ activeOrdersByPair
+    val allOrdersByPairWithTwoNew    = Seq(active4, active3) ++ allOrdersByPair
 
-    activeOrdersAllNine should (equal (activeOrders) and equal (allOrders))
+    activeOrders should (equal(allOrders) and equal(activeOrdersAllNine))
     activeOrdersBy(alicePair) should equal(activeOrdersByPairWithTwoNew)
     allOrdersBy(alicePair) should equal(allOrdersByPairWithTwoNew)
 
@@ -127,11 +126,11 @@ class RestOrderLimitTestSuite
     val activeOrdersByPairWithTwoMoreNew      = Seq(active8, active7) ++ activeOrdersByPairWithTwoNew
     val allOrdersByPairWithTwoNewExceptOneOld = Seq(active8, active7) ++ allOrdersByPairWithTwoNew.dropRight(1)
 
-    activeOrdersAllThirteen should (equal (activeOrders) and equal (allOrders))
+    activeOrders should (equal(allOrders) and equal(activeOrdersAllThirteen))
     activeOrdersBy(alicePair) should equal(activeOrdersByPairWithTwoMoreNew)
     allOrdersBy(alicePair) should equal(allOrdersByPairWithTwoNewExceptOneOld)
 
-    info("All the methods move active orders that were filled")
+    info("all the methods move active orders that were filled")
 
     matcher.placeOrder(bob, bobPair, SELL, 1, 3.waves).message.id   // fill partial2
     matcher.placeOrder(bob, bobPair, SELL, 2, 2.waves).message.id   // fill active2, active5
@@ -141,9 +140,9 @@ class RestOrderLimitTestSuite
     matcher.waitOrderStatus(bobPair, active1, "Filled", 1.minutes)
 
     val activeOrdersAllSeven            = Seq(active10, active9, active8, active6, active4, active3, active0)
-    val allOrdersWithOneFilled          = activeOrdersAllSeven ++ Seq(active7)
+    val allOrdersWithOneFilled          = activeOrdersAllSeven ++ Seq(active1)
     val activeOrdersByPairWithTwoFilled = Seq(active8, active4, active3, active0)
-    val allOrdersByPairWithTwoFilled    = activeOrdersByPairWithTwoFilled ++ Seq(active7, cancelled1, filled1, partial1)
+    val allOrdersByPairWithTwoFilled    = activeOrdersByPairWithTwoFilled ++ Seq(active7, cancelled1, partial1, active1)
 
     activeOrders should equal(activeOrdersAllSeven)
     allOrders should equal(allOrdersWithOneFilled)
@@ -160,12 +159,11 @@ class RestOrderLimitTestSuite
 
     matcher.waitOrderStatus(bobPair, active15, "Accepted", 1.minutes)
 
-    val activeOrdersAllTwelve          = Seq(active15, active14, active13, active12, active11) ++ activeOrdersAllSeven
+    val activeOrdersAllTwelve     = Seq(active15, active14, active13, active12, active11) ++ activeOrdersAllSeven
     val activeOrdersByPairAllNine = Seq(active15, active14, active13, active12, active11) ++ allOrdersByPairWithTwoFilled.take(4)
 
-    activeOrdersAllTwelve should (equal (activeOrders) and equal (allOrders))
-    activeOrdersBy(alicePair) should equal(activeOrdersByPairAllNine)
-    allOrdersBy(alicePair) should equal(activeOrdersByPairAllNine)
+    activeOrders should (equal(allOrders) and equal(activeOrdersAllTwelve))
+    activeOrdersBy(alicePair) should (equal(allOrdersBy(alicePair)) and equal(activeOrdersByPairAllNine))
   }
 
 }
