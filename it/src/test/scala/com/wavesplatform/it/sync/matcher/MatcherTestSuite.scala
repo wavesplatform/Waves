@@ -209,8 +209,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         orders1.bids.size should be(0)
 
         // Alice places a new sell order on 100
-        val order4 =
-          matcherNode.placeOrder(aliceNode, aliceWavesPair, SELL, 100, 2.waves * PriceConstant)
+        val order4 = matcherNode.placeOrder(aliceNode, aliceWavesPair, SELL, 100, 2.waves * PriceConstant)
         order4.status should be("OrderAccepted")
 
         // Alice checks that the order is in the order book
@@ -407,12 +406,17 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     "when delete an order book then orders should be canceled and reserved balances should be released" in {
       val sellOrder           = matcherNode.placeOrder(aliceNode, aliceWavesPair, SELL, 10, 2.waves * PriceConstant).message.id
+      val anotherSellOrder    = matcherNode.placeOrder(aliceNode, aliceWavesPair, SELL, 10, 2.waves * PriceConstant).message.id
       val buyOrder            = matcherNode.placeOrder(bobNode, aliceWavesPair, BUY, 15, 1.waves * PriceConstant).message.id
       val orderForAnotherPair = matcherNode.placeOrder(aliceNode, aliceWavesPair2, SELL, 777, 2.waves * PriceConstant).message.id
 
-      matcherNode.waitOrderStatus(aliceWavesPair, sellOrder, "Accepted")
-      matcherNode.waitOrderStatus(aliceWavesPair, buyOrder, "Accepted")
-      matcherNode.waitOrderStatus(aliceWavesPair, orderForAnotherPair, "Accepted")
+      val submitted = matcherNode.placeOrder(bobNode, aliceWavesPair, BUY, 5, 2.waves * PriceConstant).message.id
+      matcherNode.waitOrderStatus(aliceWavesPair, submitted, "Filled")
+
+      matcherNode.orderStatus(sellOrder, aliceWavesPair).status shouldBe "PartiallyFilled"
+      matcherNode.orderStatus(anotherSellOrder, aliceWavesPair).status shouldBe "Accepted"
+      matcherNode.orderStatus(buyOrder, aliceWavesPair).status shouldBe "Accepted"
+      matcherNode.orderStatus(orderForAnotherPair, aliceWavesPair).status shouldBe "Accepted"
 
       matcherNode.reservedBalance(aliceNode)(aliceAsset) should be > 0L
       matcherNode.reservedBalance(bobNode)("WAVES") should be > 0L
