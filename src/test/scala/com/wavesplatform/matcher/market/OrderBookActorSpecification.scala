@@ -26,6 +26,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
   private val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime).createTransaction _
   private val obc       = new ConcurrentHashMap[AssetPair, OrderBook]
+  private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   private def update(ap: AssetPair)(snapshot: OrderBook): Unit = obc.put(ap, snapshot)
 
@@ -36,6 +37,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
   private def obcTest(f: (AssetPair, ActorRef) => Unit): Unit = {
     obc.clear()
+    md.clear()
     val b = ByteStr(new Array[Byte](32))
     Random.nextBytes(b.arr)
 
@@ -44,7 +46,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
     val utx = stub[UtxPool]
     (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty)))
     val allChannels = stub[ChannelGroup]
-    val actor       = system.actorOf(Props(new OrderBookActor(pair, update(pair), utx, allChannels, matcherSettings, txFactory) with RestartableActor))
+    val actor = system.actorOf(
+      Props(new OrderBookActor(pair, update(pair), p => Option(md.get(p)), utx, allChannels, matcherSettings, txFactory) with RestartableActor))
 
     f(pair, actor)
   }
@@ -260,7 +263,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
         }
       }
       val allChannels = stub[ChannelGroup]
-      val actor       = system.actorOf(Props(new OrderBookActor(pair, update(pair), pool, allChannels, matcherSettings, txFactory) with RestartableActor))
+      val actor = system.actorOf(
+        Props(new OrderBookActor(pair, update(pair), m => md.put(pair, m), pool, allChannels, matcherSettings, txFactory) with RestartableActor))
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))

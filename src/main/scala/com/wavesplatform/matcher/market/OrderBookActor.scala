@@ -7,6 +7,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
+import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
@@ -25,6 +26,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class OrderBookActor(assetPair: AssetPair,
                      updateSnapshot: OrderBook => Unit,
+                     updateMarketStatus: MarketStatus => Unit,
                      utx: UtxPool,
                      allChannels: ChannelGroup,
                      settings: MatcherSettings,
@@ -39,6 +41,16 @@ class OrderBookActor(assetPair: AssetPair,
 
   private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
   private var orderBook          = OrderBook.empty
+
+  private var lastMarketStatus = MarketStatus(assetPair, orderBook.bids.headOption, orderBook.asks.headOption, None)
+  private def refreshMarketStatus(newLastOrder: Option[Order] = None): Unit = {
+    lastMarketStatus = lastMarketStatus.copy(
+      bid = orderBook.bids.headOption,
+      ask = orderBook.asks.headOption,
+      last = newLastOrder.orElse(lastMarketStatus.last)
+    )
+    updateMarketStatus(lastMarketStatus)
+  }
 
   private def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
 
@@ -129,6 +141,7 @@ class OrderBookActor(assetPair: AssetPair,
   private def applyEvent(e: Event): Unit = {
     log.trace(s"Apply event $e")
     orderBook = OrderBook.updateState(orderBook, e)
+    refreshMarketStatus()
     updateSnapshot(orderBook)
   }
 
@@ -201,6 +214,7 @@ class OrderBookActor(assetPair: AssetPair,
           _  <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
+            refreshMarketStatus(Some(o.order))
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
@@ -251,6 +265,7 @@ class OrderBookActor(assetPair: AssetPair,
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook
+      refreshMarketStatus()
       if (settings.recoverOrderHistory) {
         val orders = (orderBook.asks.valuesIterator ++ orderBook.bids.valuesIterator).flatten
         if (orders.nonEmpty) {
@@ -279,11 +294,12 @@ class OrderBookActor(assetPair: AssetPair,
 object OrderBookActor {
   def props(assetPair: AssetPair,
             updateSnapshot: OrderBook => Unit,
+            updateMarketStatus: MarketStatus => Unit,
             utx: UtxPool,
             allChannels: ChannelGroup,
             settings: MatcherSettings,
             createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction]): Props =
-    Props(new OrderBookActor(assetPair, updateSnapshot, utx, allChannels, settings, createTransaction))
+    Props(new OrderBookActor(assetPair, updateSnapshot, updateMarketStatus, utx, allChannels, settings, createTransaction))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
@@ -305,6 +321,8 @@ object OrderBookActor {
   object GetOrderBookResponse {
     def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(NTP.correctedTime(), pair, Seq(), Seq())
   }
+
+  case class MarketStatus(pair: AssetPair, bid: Option[(Price, Level[LimitOrder])], ask: Option[(Price, Level[LimitOrder])], last: Option[Order])
 
   // Direct requests
   case object GetOrdersRequest

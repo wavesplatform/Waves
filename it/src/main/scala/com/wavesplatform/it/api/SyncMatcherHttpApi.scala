@@ -27,6 +27,9 @@ object SyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): OrderBookResponse =
       Await.result(async(m).orderBook(assetPair), RequestAwaitTime)
 
+    def marketStatus(assetPair: AssetPair): MarketStatusResponse =
+      Await.result(async(m).marketStatus(assetPair), RequestAwaitTime)
+
     def deleteOrderBook(assetPair: AssetPair): OrderBookResponse =
       Await.result(async(m).deleteOrderBook(assetPair), RequestAwaitTime)
 

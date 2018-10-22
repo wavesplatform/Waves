@@ -13,6 +13,7 @@ import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
+import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.settings.WavesSettings
@@ -49,20 +50,25 @@ class Matcher(actorSystem: ActorSystem,
     p => Option(orderBookCache.get(p))
   )
 
+  private val marketStatuses = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
+
   private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook): Unit = {
     orderBookCache.put(assetPair, newSnapshot)
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
   lazy val matcherApiRoutes = Seq(
-    MatcherApiRoute(pairBuilder,
-                    orderValidator,
-                    matcher,
-                    orderHistory,
-                    p => Option(orderBooks.get()).flatMap(_.get(p)),
-                    orderBooksSnapshotCache,
-                    settings,
-                    db)
+    MatcherApiRoute(
+      pairBuilder,
+      orderValidator,
+      matcher,
+      orderHistory,
+      p => Option(orderBooks.get()).flatMap(_.get(p)),
+      p => Option(marketStatuses.get(p)),
+      orderBooksSnapshotCache,
+      settings,
+      db
+    )
   )
 
   lazy val matcherApiTypes: Set[Class[_]] = Set(
@@ -74,6 +80,7 @@ class Matcher(actorSystem: ActorSystem,
       pairBuilder.validateAssetPair,
       orderBooks,
       updateOrderBookCache,
+      p => ms => marketStatuses.put(p, ms),
       utx,
       allChannels,
       matcherSettings,

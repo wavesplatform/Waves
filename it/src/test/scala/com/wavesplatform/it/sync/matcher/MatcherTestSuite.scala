@@ -236,6 +236,17 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         updatedAliceBalance should be(aliceBalance - matcherFee + 2.waves * 100)
       }
 
+      "market status" in {
+        val resp = matcherNode.marketStatus(aliceWavesPair)
+
+        resp.lastPrice shouldBe Some(2.waves * Order.PriceConstant)
+        resp.lastSide shouldBe Some("buy") // Same type as order5
+        resp.bid shouldBe Some(2.waves * Order.PriceConstant)
+        resp.bidAmount shouldBe Some(30)
+        resp.ask shouldBe None
+        resp.askAmount shouldBe None
+      }
+
       "request order book for blacklisted pair" in {
         val f = matcherNode.matcherGetStatusCode(s"/matcher/orderbook/$ForbiddenAssetId/WAVES", 404)
         f.message shouldBe s"Invalid Asset ID: $ForbiddenAssetId"

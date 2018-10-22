@@ -9,6 +9,7 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.matcher.api.OrderAccepted
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData}
+import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook}
 import com.wavesplatform.matcher.{AssetPairBuilder, MatcherTestData}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
@@ -39,19 +40,24 @@ class MatcherActorSpecification
   private val txFactory   = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime).createTransaction _
   private val obc         = new ConcurrentHashMap[AssetPair, OrderBook]
   private val ob          = new AtomicReference(Map.empty[AssetPair, ActorRef])
+  private val md          = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   def update(ap: AssetPair)(snapshot: OrderBook): Unit = obc.put(ap, snapshot)
 
-  private var actor: ActorRef = system.actorOf(
-    Props(
-      new MatcherActor(pairBuilder.validateAssetPair,
-                       ob,
-                       update,
-                       mock[UtxPool],
-                       mock[ChannelGroup],
-                       matcherSettings,
-                       blockchain.assetDescription,
-                       txFactory) with RestartableActor))
+  private def defaultActor: ActorRef =
+    system.actorOf(
+      Props(
+        new MatcherActor(pairBuilder.validateAssetPair,
+                         ob,
+                         update,
+                         p => m => md.put(p, m),
+                         mock[UtxPool],
+                         mock[ChannelGroup],
+                         matcherSettings,
+                         blockchain.assetDescription,
+                         txFactory) with RestartableActor))
+
+  private var actor: ActorRef = defaultActor
 
   val i1 = IssueTransactionV1
     .selfSigned(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
@@ -71,18 +77,9 @@ class MatcherActorSpecification
 
   override protected def beforeEach(): Unit = {
     obc.clear()
+    md.clear()
     super.beforeEach()
-
-    actor = system.actorOf(
-      Props(
-        new MatcherActor(pairBuilder.validateAssetPair,
-                         ob,
-                         update,
-                         mock[UtxPool],
-                         mock[ChannelGroup],
-                         matcherSettings,
-                         blockchain.assetDescription,
-                         txFactory) with RestartableActor))
+    actor = defaultActor
   }
 
   "MatcherActor" should {

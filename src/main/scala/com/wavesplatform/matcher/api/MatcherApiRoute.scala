@@ -40,6 +40,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcher: ActorRef,
                            orderHistory: ActorRef,
                            orderBook: AssetPair => Option[ActorRef],
+                           getMarketStatus: AssetPair => Option[MarketStatus],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            wavesSettings: WavesSettings,
                            db: DB)
@@ -59,7 +60,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ getOrderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+      matcherPublicKey ~ getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ getTradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
         getSettings
@@ -106,6 +107,29 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     parameters('depth.as[Int].?) { depth =>
       withAssetPair(p, redirectToInverse = true) { pair =>
         complete(orderBookSnapshot.get(pair, depth))
+      }
+    }
+  }
+
+  @Path("/orderbook/{amountAsset}/{priceAsset}/status")
+  @ApiOperation(value = "Get Market Status", notes = "Get current market data such as last trade, best bid and ask", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+    ))
+  def marketStatus: Route = (path("orderbook" / AssetPairPM / "status") & get) { p =>
+    withAssetPair(p, redirectToInverse = true) { pair =>
+      getMarketStatus(pair).fold(complete(StatusCodes.NotFound -> Json.obj("message" -> "Invalid asset pair"))) { ms =>
+        complete(
+          StatusCodes.OK -> Json.obj(
+            "lastPrice" -> ms.last.map(_.price),
+            "lastSide"  -> ms.last.map(_.orderType.toString),
+            "bid"       -> ms.bid.map(_._1),
+            "bidAmount" -> ms.bid.map(_._2.map(_.amount).sum),
+            "ask"       -> ms.ask.map(_._1),
+            "askAmount" -> ms.ask.map(_._2.map(_.amount).sum)
+          ))
       }
     }
   }
