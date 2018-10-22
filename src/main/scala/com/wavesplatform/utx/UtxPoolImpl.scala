@@ -22,8 +22,8 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
 import monix.execution.{CancelableFuture, Scheduler}
+import monix.execution.schedulers.SchedulerService
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong

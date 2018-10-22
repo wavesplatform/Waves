@@ -1,10 +1,8 @@
 package com.wavesplatform.matcher.api
 
-import java.util.concurrent.Executors
-
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directive1, Route}
 import akka.pattern.ask
 import akka.util.Timeout
@@ -12,22 +10,18 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http._
 import com.wavesplatform.crypto
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
-import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactionsByOrder
+import com.wavesplatform.matcher.AssetPairBuilder
+import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor
-import com.wavesplatform.matcher.market.OrderHistoryActor.GetTradableBalance
 import com.wavesplatform.matcher.model._
-import com.wavesplatform.matcher.{AssetPairBuilder, MatcherSettings}
 import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.AssetAcc
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
-import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import kamon.Kamon
@@ -35,32 +29,33 @@ import org.iq80.leveldb.DB
 import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(wallet: Wallet,
-                           assetPairBuilder: AssetPairBuilder,
+case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
+                           orderValidator: OrderValidator,
                            matcher: ActorRef,
                            orderHistory: ActorRef,
                            orderBook: AssetPair => Option[ActorRef],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
-                           txWriter: ActorRef,
-                           settings: RestAPISettings,
-                           matcherSettings: MatcherSettings,
-                           blockchain: Blockchain,
+                           wavesSettings: WavesSettings,
                            db: DB)
     extends ApiRoute
     with ScorexLogging {
 
   import MatcherApiRoute._
   import PathMatchers._
+  import wavesSettings._
 
-  private val timer       = Kamon.timer("matcher.api-requests")
-  private val placeTimer  = timer.refine("action" -> "place")
-  private val cancelTimer = timer.refine("action" -> "cancel")
+  override val settings = wavesSettings.restAPISettings
+
+  private val timer           = Kamon.timer("matcher.api-requests")
+  private val placeTimer      = timer.refine("action" -> "place")
+  private val cancelTimer     = timer.refine("action" -> "cancel")
+  private val openVolumeTimer = timer.refine("action" -> "open-volume")
 
   override lazy val route: Route =
     pathPrefix("matcher") {
@@ -86,18 +81,13 @@ case class MatcherApiRoute(wallet: Wallet,
   @Path("/")
   @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET")
   def matcherPublicKey: Route = (pathEndOrSingleSlash & get) {
-    complete(
-      wallet
-        .findPrivateKey(matcherSettings.account)
-        .map(a => JsString(Base58.encode(a.publicKey)))
-        .getOrElse[JsValue](JsString("")))
+    complete(JsString(Base58.encode(orderValidator.matcherPublicKey.publicKey)))
   }
 
   @Path("/settings")
   @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET")
   def getSettings: Route = (path("settings") & get) {
-    val priceAssets = matcherSettings.priceAssets
-    complete(StatusCodes.OK -> Json.obj("priceAssets" -> priceAssets))
+    complete(StatusCodes.OK -> Json.obj("priceAssets" -> matcherSettings.priceAssets))
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}")
@@ -153,12 +143,9 @@ case class MatcherApiRoute(wallet: Wallet,
     (pathEndOrSingleSlash & post) {
       json[Order] { order =>
         placeTimer.measure {
-          if (blockchain.hasScript(order.senderPublicKey.toAddress) &&
-              !blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height)) {
-            Future.successful[MatcherResponse](StatusCodes.BadRequest -> "Trading on scripted account isn't allowed yet.")
-          } else {
-            log.trace(s"Placing ${order.id()}")
-            (matcher ? order).mapTo[MatcherResponse]
+          orderValidator.validateNewOrder(order) match {
+            case Left(e)  => Future.successful[MatcherResponse](OrderRejected(e))
+            case Right(_) => (matcher ? order).mapTo[MatcherResponse]
           }
         }
       }
@@ -250,7 +237,7 @@ case class MatcherApiRoute(wallet: Wallet,
         dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
       )
     ))
-  def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { p =>
+  def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { _ =>
     json[CancelOrderRequest] { req =>
       req.orderId.fold[MatcherResponse](NotImplemented("Batch order deletion is not supported yet"))(OrderDeleted)
     }
@@ -370,7 +357,11 @@ case class MatcherApiRoute(wallet: Wallet,
     ))
   def getTradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
     withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
-      complete((orderHistory ? GetTradableBalance(pair, address, NTP.correctedTime())).mapTo[MatcherResponse])
+      complete(
+        StatusCodes.OK -> Json.obj(
+          pair.amountAssetStr -> orderValidator.tradableBalance(AssetAcc(address, pair.amountAsset)),
+          pair.priceAssetStr  -> orderValidator.tradableBalance(AssetAcc(address, pair.priceAsset))
+        ))
     }
   }
 
@@ -390,7 +381,9 @@ case class MatcherApiRoute(wallet: Wallet,
     (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
       checkGetSignature(publicKey, ts, sig) match {
         case Success(pk) =>
-          complete(StatusCodes.OK -> Json.toJson(DBUtils.reservedBalance(db, pk).map { case (k, v) => AssetPair.assetIdStr(k) -> v }))
+          complete(StatusCodes.OK -> Json.toJson(openVolumeTimer.measure(DBUtils.reservedBalance(db, pk).map {
+            case (k, v) => AssetPair.assetIdStr(k) -> v
+          })))
         case Failure(ex) =>
           complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
       }
@@ -415,7 +408,21 @@ case class MatcherApiRoute(wallet: Wallet,
   @ApiOperation(value = "Get the open trading markets", notes = "Get the open trading markets along with trading pairs meta data", httpMethod = "GET")
   def orderbooks: Route = path("orderbook") {
     (pathEndOrSingleSlash & get) {
-      complete((matcher ? GetMarkets).mapTo[GetMarketsResponse])
+      complete((matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
+        StatusCodes.OK -> Json.obj(
+          "matcherPublicKey" -> Base58.encode(orderValidator.matcherPublicKey.publicKey),
+          "markets" -> JsArray(markets.map(m =>
+            Json.obj(
+              "amountAsset"     -> m.pair.amountAssetStr,
+              "amountAssetName" -> m.amountAssetName,
+              "amountAssetInfo" -> m.amountAssetInfo,
+              "priceAsset"      -> m.pair.priceAssetStr,
+              "priceAssetName"  -> m.priceAssetName,
+              "priceAssetInfo"  -> m.priceAssetinfo,
+              "created"         -> m.created
+          )))
+        )
+      })
     }
   }
 
@@ -441,43 +448,12 @@ case class MatcherApiRoute(wallet: Wallet,
       new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
     ))
   def getTransactionsByOrder: Route = (path("transactions" / ByteStrPM) & get) { orderId =>
-    complete((txWriter ? GetTransactionsByOrder(orderId)).mapTo[MatcherResponse])
+    complete(StatusCodes.OK -> Json.toJson(DBUtils.transactionsForOrder(db, orderId)))
   }
 }
 
 object MatcherApiRoute {
   private implicit val timeout: Timeout = 5.seconds
-
-  val cancelExecutor: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
-
-  val expiration = 15.minutes
-
-  val cancelRequestsTimestamps: scala.collection.mutable.Map[String, Duration] =
-    scala.collection.mutable.Map().withDefaultValue(NTP.correctedTime().millis)
-
-  def checkReuse(address: String, timestamp: Duration) = synchronized {
-    val old = cancelRequestsTimestamps(address)
-    if (old >= timestamp) {
-      true
-    } else {
-      cancelRequestsTimestamps(address) = timestamp
-      false
-    }
-  }
-
-  def checkTimestamp(address: String, timestamp: Duration)(proc: => Future[(StatusCode, JsValue)]): Future[(StatusCode, JsValue)] = {
-    val correct = NTP.correctedTime().millis
-    val delta   = timestamp - correct
-    if (delta < -60.second) {
-      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp is from future"))
-    } else if (delta > expiration) {
-      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp is too old"))
-    } else if (checkReuse(address, timestamp)) {
-      Future.successful(StatusCodes.BadRequest -> Json.obj("message" -> "Timestamp has already been used"))
-    } else {
-      proc
-    }
-  }
 
   def orderJson(order: Order, orderInfo: OrderInfo): JsObject =
     Json.obj(
