@@ -202,7 +202,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         // Alice cancels the very first order (100 left)
         val status1 = matcherNode.cancelOrder(aliceNode, aliceWavesPair, Some(order1Response.message.id))
         status1.status should be("OrderCanceled")
-        matcherNode.deleteOrderBook(aliceWavesPair)
+
         // Alice checks that the order book is empty
         val orders1 = matcherNode.orderBook(aliceWavesPair)
         orders1.asks.size should be(0)

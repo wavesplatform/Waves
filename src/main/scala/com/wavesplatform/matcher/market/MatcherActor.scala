@@ -3,11 +3,10 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
-import akka.http.scaladsl.model._
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
 import com.google.common.base.Charsets
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.MatcherResponse
+import com.wavesplatform.matcher.api.DuringShutdown
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.OrderExecuted
 import com.wavesplatform.matcher.model.OrderBook
@@ -45,7 +44,8 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
     onComplete = () => ()
   )
 
-  private def orderBook(pair: AssetPair) = Option(orderBooks.get()).flatMap(_.get(pair))
+  private def orderBook(pair: AssetPair)           = Option(orderBooks.get()).flatMap(_.get(pair))
+  private def removeOrderBook(ref: ActorRef): Unit = orderBooks.getAndUpdate(_.filterNot(_._2 == ref))
 
   def getAssetName(asset: Option[AssetId], desc: Option[AssetDescription]): String =
     asset.fold(AssetPair.WavesName) { _ =>
@@ -79,15 +79,18 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
     val orderBook = createOrderBookActor(pair)
     orderBooks.updateAndGet(_ + (pair -> orderBook))
     tradedPairs += pair -> createMarketData(pair)
+    context.watch(orderBook)
     orderBook
   }
 
-  def createAndForward(order: Order): Unit = {
-    val orderBook = createOrderBook(order.assetPair)
-    persistAsync(OrderBookCreated(order.assetPair)) { _ =>
-      forwardReq(order)(orderBook)
+  def createAndForward(order: Order): Unit =
+    if (shutdownStatus.initiated) sender() ! DuringShutdown
+    else {
+      val orderBook = createOrderBook(order.assetPair)
+      persistAsync(OrderBookCreated(order.assetPair)) { _ =>
+        forwardReq(order)(orderBook)
+      }
     }
-  }
 
   def returnEmptyOrderBook(pair: AssetPair): Unit = {
     sender() ! GetOrderBookResponse.empty(pair)
@@ -102,8 +105,13 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
       orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
 
     case ob: DeleteOrderBookRequest =>
-      orderBook(ob.assetPair).fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
-      removeOrderBook(ob.assetPair)
+      orderBook(ob.assetPair).fold(returnEmptyOrderBook(ob.assetPair)) { ref =>
+        forwardReq(ob)(ref)
+        removeOrderBook(ref)
+        tradedPairs -= ob.assetPair
+        deleteMessages(lastSequenceNr)
+        saveSnapshot(Snapshot(tradedPairs.keySet))
+      }
 
     case Shutdown =>
       shutdownStatus = shutdownStatus.copy(
@@ -130,14 +138,8 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
       } else {
         context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, self))
       }
-  }
 
-  private def removeOrderBook(pair: AssetPair): Unit = {
-    if (tradedPairs.contains(pair)) {
-      tradedPairs -= pair
-      deleteMessages(lastSequenceNr)
-      saveSnapshot(Snapshot(tradedPairs.keySet))
-    }
+    case Terminated(ref) => removeOrderBook(ref)
   }
 
   override def receiveRecover: Receive = {
@@ -207,7 +209,9 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
       shutdownStatus = shutdownStatus.copy(orderBooksStopped = true)
       shutdownStatus.tryComplete()
 
-    case _ if shutdownStatus.initiated => sender() ! MatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
+    case Terminated(ref) => removeOrderBook(ref)
+
+    case _ if shutdownStatus.initiated => sender() ! DuringShutdown
   }
 
   override def receiveCommand: Receive = forwardToOrderBook orElse snapshotsCommands
