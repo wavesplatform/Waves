@@ -54,7 +54,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     val aliceWavesPair  = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
     val aliceWavesPair2 = AssetPair(ByteStr.decodeBase58(aliceAsset2).toOption, None)
 
-    val order1         = matcherNode.prepareOrder(aliceNode, aliceWavesPair, SELL, aliceSellAmount, 2.waves * PriceConstant, 2.minutes)
+    val order1         = matcherNode.prepareOrder(aliceNode, aliceWavesPair, SELL, aliceSellAmount, 2.waves * PriceConstant)
     val order1Response = matcherNode.placeOrder(order1)
 
     "can't place an order with the same timestamp" in {
