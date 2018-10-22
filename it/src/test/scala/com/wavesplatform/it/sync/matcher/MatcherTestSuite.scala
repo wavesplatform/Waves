@@ -35,24 +35,12 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   "Check cross ordering between Alice and Bob " - {
     // Alice issues new asset
-
     val aliceAsset = aliceNode
       .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, 100000000L)
       .id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
-    val aliceAsset2 = aliceNode
-      .issue(aliceNode.address,
-             amountAssetName + "2",
-             "AliceCoin2 for matcher's tests",
-             AssetQuantity,
-             aliceCoinDecimals,
-             reissuable = false,
-             100000000L)
-      .id
-    nodes.waitForHeightAriseAndTxPresent(aliceAsset2)
 
-    val aliceWavesPair  = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
-    val aliceWavesPair2 = AssetPair(ByteStr.decodeBase58(aliceAsset2).toOption, None)
+    val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
     val order1         = matcherNode.prepareOrder(aliceNode, aliceWavesPair, SELL, aliceSellAmount, 2.waves * PriceConstant)
     val order1Response = matcherNode.placeOrder(order1)
@@ -402,38 +390,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         // timestamp reuse shouldn't be allowed
         assertBadRequest(matcherNode.cancelAllOrders(aliceNode, ts))
       }
-    }
-
-    "when delete an order book then orders should be canceled and reserved balances should be released" in {
-      val sellOrder           = matcherNode.placeOrder(aliceNode, aliceWavesPair, SELL, 10, 2.waves * PriceConstant).message.id
-      val anotherSellOrder    = matcherNode.placeOrder(aliceNode, aliceWavesPair, SELL, 10, 2.waves * PriceConstant).message.id
-      val buyOrder            = matcherNode.placeOrder(bobNode, aliceWavesPair, BUY, 15, 1.waves * PriceConstant).message.id
-      val orderForAnotherPair = matcherNode.placeOrder(aliceNode, aliceWavesPair2, SELL, 777, 2.waves * PriceConstant).message.id
-
-      val submitted = matcherNode.placeOrder(bobNode, aliceWavesPair, BUY, 5, 2.waves * PriceConstant).message.id
-      matcherNode.waitOrderStatus(aliceWavesPair, submitted, "Filled")
-
-      matcherNode.orderStatus(sellOrder, aliceWavesPair).status shouldBe "PartiallyFilled"
-      matcherNode.orderStatus(anotherSellOrder, aliceWavesPair).status shouldBe "Accepted"
-      matcherNode.orderStatus(buyOrder, aliceWavesPair).status shouldBe "Accepted"
-      matcherNode.orderStatus(orderForAnotherPair, aliceWavesPair).status shouldBe "Accepted"
-
-      matcherNode.reservedBalance(aliceNode)(aliceAsset) should be > 0L
-      matcherNode.reservedBalance(bobNode)("WAVES") should be > 0L
-      matcherNode.reservedBalance(aliceNode)(aliceAsset2) should be > 0L
-
-      matcherNode.deleteOrderBook(aliceWavesPair)
-
-      matcherNode.waitOrderStatus(aliceWavesPair, sellOrder, "Cancelled")
-      matcherNode.waitOrderStatus(aliceWavesPair, buyOrder, "Cancelled")
-      matcherNode.orderStatus(orderForAnotherPair, aliceWavesPair2).status shouldBe "Accepted"
-
-      matcherNode.orderBook(aliceWavesPair).asks shouldBe empty
-      matcherNode.orderBook(aliceWavesPair).bids shouldBe empty
-      matcherNode.orderBook(aliceWavesPair2).asks shouldNot be(empty)
-
-      matcherNode.reservedBalance(aliceNode) shouldBe Map(aliceAsset2 -> 777)
-      matcherNode.reservedBalance(bobNode) shouldBe empty
     }
   }
 }
