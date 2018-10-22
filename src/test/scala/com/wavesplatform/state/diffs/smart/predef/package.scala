@@ -18,11 +18,7 @@ import shapeless.Coproduct
 package object predef {
   val networkByte: Byte = 'u'
 
-  private def runScriptImpl[T](script: String,
-                               version: ScriptVersion,
-                               t: In,
-                               blockchain: Blockchain = EmptyBlockchain,
-                               networkByte: Byte = networkByte): Either[String, T] = {
+  def runScript[T](script: String, version: ScriptVersion, t: In, blockchain: Blockchain, networkByte: Byte): Either[String, T] = {
     val Success(expr, _) = Parser(script)
     for {
       compileResult <- CompilerV1(compilerContext(version), expr)
@@ -32,11 +28,14 @@ package object predef {
     } yield r
   }
 
-  def runScript[T](script: String, t: In = null): Either[String, T] = runScriptImpl(script, V1, t)
+  def runScript[T](script: String, t: In = null): Either[String, T] =
+    runScript(script, V1, t, EmptyBlockchain, networkByte)
 
-  def runScript[T](script: String, t: In, networkByte: Byte): Either[String, T] = runScriptImpl(script, V1, t, EmptyBlockchain, networkByte)
+  def runScript[T](script: String, t: In, networkByte: Byte): Either[String, T] =
+    runScript(script, V1, t, EmptyBlockchain, networkByte)
 
-  def runScript[T](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] = runScriptImpl(script, V1, Coproduct(tx), blockchain)
+  def runScript[T](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] =
+    runScript(script, V1, Coproduct(tx), blockchain, networkByte)
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 

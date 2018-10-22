@@ -84,7 +84,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       case (genesis, issue, sponsor) =>
         val setupBlocks = Seq(block(Seq(genesis, issue)))
         assertDiffEi(setupBlocks, block(Seq(sponsor)), s) { blockDiffEi =>
-          blockDiffEi should produce("SponsorFeeTransaction transaction has not been activated")
+          blockDiffEi should produce("SponsorFeeTransaction has not been activated")
         }
     }
   }
