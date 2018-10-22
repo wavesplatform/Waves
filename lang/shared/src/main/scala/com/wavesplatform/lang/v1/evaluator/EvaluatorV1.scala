@@ -109,11 +109,11 @@ object EvaluatorV1 extends ExprEvaluator {
         case f: FUNC => evalFuncBlock(f, inner)
       }
     case REF(str)                    => evalRef(str)
-    case c @ CONST_LONG(v)           => c.pure[EvalM]
-    case c @ CONST_BYTEVECTOR(v)     => c.pure[EvalM]
-    case c @ CONST_STRING(v)         => c.pure[EvalM]
-    case c @ TRUE                    => c.pure[EvalM]
-    case c @ FALSE                   => c.pure[EvalM]
+    case c @ CONST_LONG(v)           => c.pure[EvalM].map(_.asInstanceOf[EVALUATED])
+    case c @ CONST_BYTEVECTOR(v)     => c.pure[EvalM].map(_.asInstanceOf[EVALUATED])
+    case c @ CONST_STRING(v)         => c.pure[EvalM].map(_.asInstanceOf[EVALUATED])
+    case c if c == TRUE              => c.pure[EvalM].map(_.asInstanceOf[EVALUATED])
+    case c if c == FALSE             => c.pure[EvalM].map(_.asInstanceOf[EVALUATED])
     case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
     case GETTER(expr, field)         => evalGetter(expr, field)
     case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
