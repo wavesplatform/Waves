@@ -290,7 +290,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       PureContext.evalContext,
       EvaluationContext(
         typeDefs = Map.empty,
-        letDefs = Map("x"                -> LazyVal(EitherT.pure(3l))),
+        letDefs = Map("x"                -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
         functions = Map(doubleFst.header -> doubleFst)
       )
     )
@@ -304,7 +304,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       PureContext.evalContext,
       EvaluationContext(
         typeDefs = Map.empty,
-        letDefs = Map("x" -> LazyVal(EitherT.pure(3l))),
+        letDefs = Map("x" -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
         functions = Map.empty
       )
     )

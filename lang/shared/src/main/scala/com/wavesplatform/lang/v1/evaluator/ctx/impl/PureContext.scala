@@ -23,19 +23,20 @@ object PureContext {
   lazy val mulLong: BaseFunction =
     createTryOp(MUL_OP, LONG, LONG, MUL_LONG, "Integer multiplication", "multiplyer", "multiplyer")((a, b) => Math.multiplyExact(a, b))
   lazy val divLong: BaseFunction = createTryOp(DIV_OP, LONG, LONG, DIV_LONG, "Integer devision", "divisible", "divisor")((a, b) =>
-    Math.floorDiv(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+    Math.floorDiv(a, b))
   lazy val modLong: BaseFunction =
-    createTryOp(MOD_OP, LONG, LONG, MOD_LONG, "Modulo", "divisible", "divisor")((a, b) => Math.floorMod(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+    createTryOp(MOD_OP, LONG, LONG, MOD_LONG, "Modulo", "divisible", "divisor")((a, b) => Math.floorMod(a, b))
   lazy val sumLong: BaseFunction =
-    createTryOp(SUM_OP, LONG, LONG, SUM_LONG, "Integer sum", "term", "term")((a, b) => Math.addExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+    createTryOp(SUM_OP, LONG, LONG, SUM_LONG, "Integer sum", "term", "term")((a, b) => Math.addExact(a, b))
   lazy val subLong: BaseFunction = createTryOp(SUB_OP, LONG, LONG, SUB_LONG, "Integer substitution", "term", "term")((a, b) =>
-    Math.subtractExact(a.asInstanceOf[Long], b.asInstanceOf[Long]))
+    Math.subtractExact(a, b))
   lazy val sumString: BaseFunction =
     createRawOp(SUM_OP, STRING, STRING, SUM_STRING, "Limited strings concatination", "prefix", "suffix", 10) {
       case (CONST_STRING(a), CONST_STRING(b)) =>
         lazy val al = a.length
         lazy val bl = b.length
         Either.cond(al + bl <= MaxStringResult, CONST_STRING(a + b), "String is too large")
+      case _ => ???
     }
   lazy val sumByteVector: BaseFunction =
     createRawOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES, "Limited bytes vectors concatination", "prefix", "suffix", 10) {
@@ -43,6 +44,7 @@ object PureContext {
         lazy val al = a.length
         lazy val bl = b.length
         Either.cond(al + bl <= MaxBytesResult, CONST_BYTEVECTOR(ByteVector.concat(Seq(a, b))), "ByteVector is too large")
+      case _ => ???
     }
   lazy val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG, "Integer grater or equal comparation", "term", "term")(_ >= _)
   lazy val gt: BaseFunction =
@@ -264,14 +266,14 @@ object PureContext {
   def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
       body: (Long, Long) => Boolean): BaseFunction =
     NativeFunction(opsToFunctions(op), complicity, func, r, docString, ("a", t, arg1Doc), ("b", t, arg2Doc)) {
-      case a :: b :: Nil => Right(B.fromBoolean(body(a, b)))
-      case _             => ???
+      case CONST_LONG(a) :: CONST_LONG(b) :: Nil => Right(B.fromBoolean(body(a, b)))
+      case _                                     => ???
     }
 
   def createTryOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
       body: (Long, Long) => Long): BaseFunction =
     NativeFunction(opsToFunctions(op), complicity, func, r, docString, ("a", t, arg1Doc), ("b", t, arg2Doc)) {
-      case a :: b :: Nil =>
+      case CONST_LONG(a) :: CONST_LONG(b) :: Nil =>
         try {
           Right(CONST_LONG(body(a, b)))
         } catch {
@@ -326,8 +328,10 @@ object PureContext {
     uNot
   )
 
+  lazy val unit: EVALUATED = CaseObj(CASETYPEREF("Unit", List.empty), Map.empty)
+
   private lazy val vars: Map[String, ((Types.FINAL, String), LazyVal)] = Map(
-    ("unit", ((Types.UNIT, "Single instance value"), LazyVal(EitherT.pure(CaseObj(???, Map.empty))))))
+    ("unit", ((Types.UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))))
   private lazy val functions = Array(
     fraction,
     sizeBytes,
@@ -366,7 +370,10 @@ object PureContext {
   lazy val evalContext: EvaluationContext   = ctx.evaluationContext
   lazy val compilerContext: CompilerContext = ctx.compilerContext
 
-  def fromOption[T](v: Option[T]): Any = {
-    v.getOrElse((): Any)
-  }
+  implicit def fromOptionBV[T](v: Option[ByteVector]): EVALUATED = v.map(CONST_BYTEVECTOR).getOrElse(unit)
+  implicit def fromOptionL[T](v: Option[Long]): EVALUATED       = v.map(CONST_LONG).getOrElse(unit)
+  implicit def fromOptionS[T](v: Option[String]): EVALUATED     = v.map(CONST_STRING).getOrElse(unit)
+  implicit def fromOptionB[T](v: Option[Boolean]): EVALUATED    = v.map(B.fromBoolean).getOrElse(unit)
+  implicit def fromOptionCO[T](v: Option[CaseObj]): EVALUATED    = v.getOrElse(unit)
+
 }
