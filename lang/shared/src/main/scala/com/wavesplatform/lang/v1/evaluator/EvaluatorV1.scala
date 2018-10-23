@@ -29,18 +29,6 @@ object EvaluatorV1 extends ExprEvaluator {
       }
     } yield result
 
-  private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[EVALUATED] = {
-    val funcHeader = FunctionHeader.User(func.name)
-    val function   = UserFunction(func.name, null, s"user defined function '${func.name}'", func.args.map(n => (n, null, n)): _*)(func.body)
-    for {
-      ctx <- get[LoggedEvaluationContext, ExecutionError]
-      result <- id {
-        modify[LoggedEvaluationContext, ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
-          .flatMap(_ => evalExpr(inner))
-      }
-    } yield result
-  }
-
   private def evalRef(key: String): EvalM[EVALUATED] =
     get[LoggedEvaluationContext, ExecutionError] flatMap { ctx =>
       lets.get(ctx).get(key) match {

@@ -6,7 +6,6 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.{OrdType, Recipient}
@@ -16,8 +15,9 @@ import scodec.bits.ByteVector
 
 object WavesContext {
 
-  import Bindings._
   import Types._
+  import Bindings._
+  import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
   def build(env: Environment, orderTypeVarsEnabled: Boolean = false): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)

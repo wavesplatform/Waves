@@ -16,7 +16,7 @@ import shapeless.{:+:, CNil}
 import scala.util.{Left, Right, Try}
 
 object Common {
-  import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings._
+  import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
   def ev[T](context: EvaluationContext = PureContext.evalContext, expr: EXPR): Either[ExecutionError, T] = EvaluatorV1[T](context, expr)
 

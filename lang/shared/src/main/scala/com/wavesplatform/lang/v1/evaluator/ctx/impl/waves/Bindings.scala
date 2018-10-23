@@ -2,18 +2,14 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.{ARR, CaseObj}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters
 import com.wavesplatform.lang.v1.traits.domain.Tx._
 import com.wavesplatform.lang.v1.traits.domain._
 import scodec.bits.ByteVector
 
 object Bindings {
 
- implicit def c(b: ByteVector): EVALUATED             = CONST_BYTEVECTOR(b)
- implicit def c(b: String): EVALUATED                 = CONST_STRING(b)
- implicit def c(b: Long): EVALUATED                   = CONST_LONG(b)
- implicit def c(b: Boolean): EVALUATED                = B.fromBoolean(b)
- implicit def c(is: IndexedSeq[EVALUATED]): EVALUATED = ARR(is)
+  import converters._
 
   private def combine(m0: Map[String, EVALUATED], m1: Map[String, EVALUATED]*) = m1.toList.fold(m0)(_ ++ _)
 

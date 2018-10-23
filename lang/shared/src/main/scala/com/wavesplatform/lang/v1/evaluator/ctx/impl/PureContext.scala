@@ -16,6 +16,7 @@ import scodec.bits.ByteVector
 import scala.util.Try
 
 object PureContext {
+
   private lazy val defaultThrowMessage = "Explicit script termination"
   lazy val MaxStringResult             = Short.MaxValue
   lazy val MaxBytesResult              = 65536
@@ -369,11 +370,5 @@ object PureContext {
   )
   lazy val evalContext: EvaluationContext   = ctx.evaluationContext
   lazy val compilerContext: CompilerContext = ctx.compilerContext
-
-  implicit def fromOptionBV[T](v: Option[ByteVector]): EVALUATED = v.map(CONST_BYTEVECTOR).getOrElse(unit)
-  implicit def fromOptionL[T](v: Option[Long]): EVALUATED       = v.map(CONST_LONG).getOrElse(unit)
-  implicit def fromOptionS[T](v: Option[String]): EVALUATED     = v.map(CONST_STRING).getOrElse(unit)
-  implicit def fromOptionB[T](v: Option[Boolean]): EVALUATED    = v.map(B.fromBoolean).getOrElse(unit)
-  implicit def fromOptionCO[T](v: Option[CaseObj]): EVALUATED    = v.getOrElse(unit)
 
 }
