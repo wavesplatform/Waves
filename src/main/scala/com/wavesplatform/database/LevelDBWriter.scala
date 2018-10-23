@@ -95,7 +95,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   import LevelDBWriter._
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
-
   private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
   override protected def loadMaxAddressId(): BigInt = readOnly(db => db.get(Keys.lastAddressId).getOrElse(BigInt(0)))
