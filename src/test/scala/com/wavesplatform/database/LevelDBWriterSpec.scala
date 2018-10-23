@@ -101,11 +101,11 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
   }
 
   def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = {
-    val time = new TimeImpl
+    val time          = new TimeImpl
     val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
-    val settings0 = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
-    val settings = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, settings, time)
+    val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, time)
     try {
       val (account, blocks) = gen(time).sample.get
 
@@ -125,7 +125,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
   "addressTransactions" - {
     def preconditions(ts: Long): Gen[(PrivateKeyAccount, List[Block])] = {
       for {
-        master <- accountGen
+        master    <- accountGen
         recipient <- accountGen
         genesisBlock = TestBlock
           .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
@@ -170,7 +170,6 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
 
     "return txs in correct ordering starting from a given id" in {
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-
         // using pagination
         val firstTx = writer
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, None)
@@ -193,7 +192,6 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
 
     "return an empty Seq when paginating from the last transaction" in {
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-
         val txs = writer
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
           .getOrElse(Seq.empty)
