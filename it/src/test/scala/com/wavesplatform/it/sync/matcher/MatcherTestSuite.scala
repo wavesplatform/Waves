@@ -10,7 +10,7 @@ import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.assets.exchange.Order._
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}

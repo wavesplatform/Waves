@@ -121,6 +121,7 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
         }
       )
 
+      context.children.foreach(context.unwatch)
       context.become(snapshotsCommands orElse shutdownFallback)
 
       if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(tradedPairs.keySet))
@@ -208,8 +209,6 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
     case ShutdownComplete =>
       shutdownStatus = shutdownStatus.copy(orderBooksStopped = true)
       shutdownStatus.tryComplete()
-
-    case Terminated(ref) => removeOrderBook(ref)
 
     case _ if shutdownStatus.initiated => sender() ! DuringShutdown
   }
