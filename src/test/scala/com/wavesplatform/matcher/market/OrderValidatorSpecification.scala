@@ -5,6 +5,7 @@ import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
@@ -12,7 +13,7 @@ import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.{TestTime, WithDB}
@@ -36,14 +37,6 @@ class OrderValidatorSpecification
   private val defaultTs    = 1000
 
   (bc.accountScript _).when(MatcherAccount.toAddress).returns(None).anyNumberOfTimes()
-
-  private def portfolioTest(p: Portfolio)(f: OrderValidator => Any): Unit = {
-    f(new OrderValidator(db, bc, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime))
-  }
-
-  private def settingsTest(settings: MatcherSettings)(f: OrderValidator => Any): Unit = {
-    f(new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
-  }
 
   private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
 
@@ -140,6 +133,42 @@ class OrderValidatorSpecification
         ov.validateNewOrder(newBuyOrder(pk, defaultTs + 1000 - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
       }
     }
+
+    "validate order with any number of signatures from a scripted account" in forAll(Gen.choose(0, 5)) { proofsNumber =>
+      validateOrderProofsTest((1 to proofsNumber).map(x => ByteStr(Array(x.toByte))))
+    }
+  }
+
+  private def portfolioTest(p: Portfolio)(f: OrderValidator => Any): Unit = {
+    f(new OrderValidator(db, bc, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime))
+  }
+
+  private def settingsTest(settings: MatcherSettings)(f: OrderValidator => Any): Unit = {
+    f(new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
+  }
+
+  private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = portfolioTest(defaultPortfolio) { ov =>
+    val pk            = PrivateKeyAccount(randomBytes())
+    val accountScript = ScriptV1(TRUE, checkSize = false).explicitGet()
+
+    (bc.accountScript _).when(pk.toAddress).returns(Some(accountScript)).anyNumberOfTimes()
+    (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
+    (bc.height _).when().returns(1).anyNumberOfTimes()
+
+    val order = OrderV2(
+      senderPublicKey = pk,
+      matcherPublicKey = MatcherAccount,
+      assetPair = pairWavesBtc,
+      amount = 100 * Constants.UnitsInWave,
+      price = (0.0022 * Order.PriceConstant).toLong,
+      timestamp = System.currentTimeMillis(),
+      expiration = System.currentTimeMillis() + 60 * 60 * 1000L,
+      matcherFee = (0.003 * Constants.UnitsInWave).toLong,
+      orderType = OrderType.BUY,
+      proofs = Proofs.empty
+    )
+
+    ov.validateNewOrder(order) shouldBe 'right
   }
 
   private def newBuyOrder: Order = buy(
