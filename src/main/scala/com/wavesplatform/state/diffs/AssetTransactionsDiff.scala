@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{AssetInfo, Blockchain, ByteStr, Diff, LeaseBalance, Portfolio, SponsorshipValue}
+import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
@@ -29,7 +29,7 @@ object AssetTransactionsDiff {
       val oldInfo = blockchain.assetDescription(tx.assetId).get
 
       def wasBurnt = blockchain
-        .addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, ByteStr.empty)
+        .addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, None)
         .getOrElse(Seq.empty)
         .exists {
           case (_, t: BurnTransaction) if t.assetId == tx.assetId => true

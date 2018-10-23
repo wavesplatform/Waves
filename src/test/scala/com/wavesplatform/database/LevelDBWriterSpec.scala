@@ -8,7 +8,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdaterImpl, ByteStr, EitherExt2}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, EitherExt2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
@@ -145,7 +145,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
     "return txs in correct ordering without fromId" in {
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, ByteStr.empty)
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, None)
           .getOrElse(Seq.empty)
 
         val ordering = Ordering
@@ -159,10 +159,10 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
 
     "return Left if fromId argument is a non-existent transaction" in {
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val nonExistentTxId = ByteStr(GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().bytes())
+        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
 
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, nonExistentTxId)
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, Some(nonExistentTxId))
 
         txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
       }
@@ -173,18 +173,18 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
 
         // using pagination
         val firstTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, ByteStr.empty)
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, None)
           .getOrElse(Seq.empty)
           .head
 
         val secondTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, firstTx._2.id())
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, Some(firstTx._2.id()))
           .getOrElse(Seq.empty)
           .head
 
         // without pagination
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, ByteStr.empty)
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
           .getOrElse(Seq.empty)
 
         txs shouldBe Seq(firstTx, secondTx)
@@ -195,11 +195,11 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
 
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, ByteStr.empty)
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
           .getOrElse(Seq.empty)
 
         val txsFromLast = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, txs.last._2.id())
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, Some(txs.last._2.id()))
           .getOrElse(txs) // should never return this value
 
         txs.length shouldBe 2

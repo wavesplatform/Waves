@@ -2,7 +2,7 @@ package com.wavesplatform.api.http.leasing
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -73,7 +73,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
         case Left(e) => ApiError.fromValidationError(e)
         case Right(a) =>
           blockchain
-            .addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, ByteStr.empty)
+            .addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
             .getOrElse(Seq.empty)
             .collect {
               case (h, lt: LeaseTransaction) if blockchain.leaseDetails(lt.id()).exists(_.isActive) =>

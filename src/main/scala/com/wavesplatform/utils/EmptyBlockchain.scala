@@ -52,7 +52,7 @@ object EmptyBlockchain extends Blockchain {
 
   override def transactionHeight(id: ByteStr): Option[Int] = None
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: ByteStr): Either[String, Seq[(Int, Transaction)]] = Right(Seq.empty)
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] = Right(Seq.empty)
 
   override def containsTransaction(id: ByteStr): Boolean = false
 
