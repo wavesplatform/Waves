@@ -517,22 +517,20 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: ByteStr): Either[String, Seq[(Int, Transaction)]] =
     readOnly { db =>
-      if (!fromId.isEmpty && db.get(Keys.transactionInfo(fromId)).isEmpty) Left(s"Transactions $fromId does not exist")
+      if (!fromId.isEmpty && db.get(Keys.transactionInfo(fromId)).isEmpty) Left(s"Transaction $fromId does not exist")
       else Right {
         db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
           val txs = for {
             seqNr <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).view
             (txType, txId) <- db.get(Keys.addressTransactionIds(addressId, seqNr))
-          } yield (txType, txId)
+              // Pagination: drop until fromId encountered, and then drop one more
+              .dropWhile { case (_, txId) => !fromId.isEmpty && txId != fromId }
+              .dropWhile { case (_, txId) => txId == fromId }
+            if types.isEmpty || types.contains(txType.toByte)
+            (h, tx) <- db.get(Keys.transactionInfo(txId))
+          } yield (h, tx)
 
-          txs
-            // paginating from fromId if provided
-            .dropWhile { case (_, txId) => !fromId.isEmpty && txId != fromId }
-            .dropWhile { case (_, txId) => txId == fromId }
-            .filter { case (txType, _) => types.isEmpty || types.contains(txType.toByte) }
-            .take(count)
-            .flatMap { case (_, txId) => db.get(Keys.transactionInfo(txId)) }
-            .force
+          txs.take(count).force
         }
       }
     }
