@@ -74,17 +74,17 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       nodes.waitForHeightAriseAndTxPresent(txId)
       //TODO : add assert balances
     }
-    setContract(null, acc0)
-    setContract(null, acc1)
-    setContract(null, acc2)
+    setContract(None, acc0)
+    setContract(None, acc1)
+    setContract(None, acc2)
   }
 
   test("negative: set simple contracts and put exchange transaction in blockchain") {
     for ((contr1, contr2, mcontr) <- Seq(
            (sc1, sc2, sc1),
            (sc1, sc1, sc2),
-           (null, null, sc2),
-           (null, sc2, null)
+           (None, None, sc2),
+           (None, sc2, None)
          )) {
       setContract(contr1, acc0)
       setContract(contr2, acc1)
@@ -94,9 +94,9 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       assertBadRequestAndMessage(sender.signedBroadcast(tx), "Transaction not allowed by account-script")
       //TODO : add assert balances
     }
-    setContract(null, acc0)
-    setContract(null, acc1)
-    setContract(null, acc2)
+    setContract(None, acc0)
+    setContract(None, acc1)
+    setContract(None, acc2)
   }
 
   test("negative: check custom exception") {
@@ -111,16 +111,16 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       assertBadRequestAndMessage(sender.signedBroadcast(tx), "Error while executing account-script: Some generic error")
       //TODO : add assert balances
     }
-    setContract(null, acc0)
-    setContract(null, acc1)
-    setContract(null, acc2)
+    setContract(None, acc0)
+    setContract(None, acc1)
+    setContract(None, acc2)
   }
 
   test("positive: versioning verification") {
     for ((contr1, contr2, mcontr) <- Seq(
-           (null, null, null),
-           (sc1, null, null),
-           (null, null, sc1)
+           (None, None, None),
+           (sc1, None, None),
+           (None, None, sc1)
          )) {
       setContract(contr1, acc0)
       setContract(contr2, acc1)
@@ -153,16 +153,15 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
 
       //TODO : add assert balances
     }
-    setContract(null, acc0)
-    setContract(null, acc1)
-    setContract(null, acc2)
+    setContract(None, acc0)
+    setContract(None, acc1)
+    setContract(None, acc2)
   }
 
   test("negative: check orders v2 with exchange tx v1") {
     val tx        = exchangeTx()
     val sig       = (Json.parse(tx.toString()) \ "proofs").as[Seq[JsString]].head
     val changedTx = tx + ("version" -> JsNumber(1)) + ("signature" -> sig)
-    println(changedTx)
     assertBadRequest(sender.signedBroadcast(changedTx).id, 500) //TODO: change to correct error message
   }
 
