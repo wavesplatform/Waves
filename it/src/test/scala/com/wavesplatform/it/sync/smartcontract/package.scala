@@ -3,7 +3,7 @@ import com.wavesplatform.transaction.DataTransaction
 
 package object smartcontract {
   def cryptoContext(dtx: DataTransaction) =
-    s"""
+    Some(s"""
        |match tx {
        |  case ext : ExchangeTransaction =>
        |    # Crypto context
@@ -15,19 +15,19 @@ package object smartcontract {
        |  case s : SetScriptTransaction => true
        |  case _ => false
        |}
-     """.stripMargin
+     """.stripMargin)
 
   def checkExtract(dtx: DataTransaction) =
-    s"""
+    Some(s"""
        |match tx {
        |  case ext : ExchangeTransaction =>
        |     extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
        |  case _ => false
        |}
-     """.stripMargin
+     """.stripMargin)
 
   def pureContext(dtx: DataTransaction) =
-    s"""
+    Some(s"""
        | match tx {
        |  case ext : ExchangeTransaction =>
        |    # Pure context
@@ -69,10 +69,10 @@ package object smartcontract {
        |  case s : SetScriptTransaction => true
        |  case _ => false
        | }
-     """.stripMargin
+     """.stripMargin)
 
   def wavesContext(dtx: DataTransaction) =
-    s"""
+    Some(s"""
        | match tx {
        |  case ext : ExchangeTransaction =>
        |    # Waves context
@@ -114,5 +114,5 @@ package object smartcontract {
        |  case s : SetScriptTransaction => true
        |  case _ => false
        | }
-     """.stripMargin
+     """.stripMargin)
 }

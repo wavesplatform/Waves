@@ -85,11 +85,11 @@ trait IntegrationSuiteWithThreeAddresses
     }
   }
 
-  def setContract(contractText: String, acc: PrivateKeyAccount) = {
-    val script = if (Option(contractText).isDefined) {
-      val scriptText = contractText.stripMargin
-      Some(ScriptCompiler(scriptText).explicitGet()._1)
-    } else None
+  def setContract(contractText: Option[String], acc: PrivateKeyAccount) = {
+    val script = contractText.map { x =>
+      val scriptText = x.stripMargin
+      ScriptCompiler(scriptText).explicitGet()._1
+    }
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(SetScriptTransaction.supportedVersions.head, acc, script, 0.014.waves, System.currentTimeMillis())
       .right

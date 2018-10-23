@@ -20,17 +20,17 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   var exchAsset: String    = null
   var dtx: DataTransaction = null
 
-  val sc1 = s"""true"""
-  val sc2 = s"""
+  val sc1 = Some(s"""true""")
+  val sc2 = Some(s"""
                |match tx {
                |  case s : SetScriptTransaction => true
                |  case _ => false
-               |}""".stripMargin
-  val sc3 = s"""
+               |}""".stripMargin)
+  val sc3 = Some(s"""
                |match tx {
                |  case s : SetScriptTransaction => true
                |  case _ => throw("Some generic error")
-               |}""".stripMargin
+               |}""".stripMargin)
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -56,11 +56,11 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
 
     for ((contr1, contr2, mcontr) <- Seq(
            (sc1, sc1, sc1),
-           (null, sc1, null),
-           (null, null, sc1),
-           (null, null, sc4),
-           (null, null, sc5),
-           (null, null, sc6)
+           (None, sc1, None),
+           (None, None, sc1),
+           (None, None, sc4),
+           (None, None, sc5),
+           (None, None, sc6)
          )) {
       setContract(contr1, acc0)
       setContract(contr2, acc1)
