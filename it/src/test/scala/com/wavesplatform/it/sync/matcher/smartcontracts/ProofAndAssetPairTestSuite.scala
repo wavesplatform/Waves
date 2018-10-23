@@ -260,7 +260,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             val sigAlice = ByteStr(crypto.sign(aliceAcc, unsigned.bodyBytes()))
             val sigMat   = ByteStr(crypto.sign(matcherNode.privateKey, unsigned.bodyBytes()))
 
-            val signed = unsigned.copy(proofs = Proofs(Seq(sigAlice, sigMat)))
+            val signed = unsigned.copy(proofs = Proofs(Seq(sigAlice, ByteStr.empty, sigMat)))
 
             val ord = matcherNode
               .placeOrder(signed)
