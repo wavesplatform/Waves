@@ -4,6 +4,7 @@ import cats.data.EitherT
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -23,7 +24,7 @@ object MatcherContext {
     val inputEntityCoeval: Coeval[Either[String, CaseObj]] =
       Coeval.defer(in.map(o => Right(orderObject(RealTransactionWrapper.ord(o)))))
 
-    val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Left("height is inaccessible when running script on matcher"))
+    val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Left("height is inaccessible when running script on matcher"))
 
     val matcherTypes = Seq(addressType, aliasType, orderType, assetPairType)
 
