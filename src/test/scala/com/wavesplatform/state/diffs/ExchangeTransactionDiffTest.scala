@@ -256,7 +256,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
         val blockWithEx = TestBlock.create(Seq(exchangeWithSmallFee))
 
-        assertLeft(preconBlocks, blockWithEx, fsV2)("InsufficientFee")
+        assertLeft(preconBlocks, blockWithEx, fsV2)("does not exceed minimal value of")
     }
   }
 
