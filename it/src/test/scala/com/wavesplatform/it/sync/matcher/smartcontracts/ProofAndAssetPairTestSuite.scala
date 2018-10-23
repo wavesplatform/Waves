@@ -28,7 +28,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
     nodes.waitForHeightAriseAndTxPresent(transferTx.id)
   }
 
-  private val predefAssetPair    = wavesUsdPair
+  private val predefAssetPair = wavesUsdPair
   // private val unallowedAssetPair = wctWavesPair
 
   private val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
@@ -232,15 +232,15 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           matcherNode.reservedBalance(bobAcc) shouldBe empty
         }
-
-        setContract(Some("true"), aliceAcc)
       }
 
       "place order and then set contract with many proofs" in {
-        for ((i, step) <- Seq(sc5, sc6).zipWithIndex) {
-          for (assetP <- Seq(predefAssetPair, aliceWavesPair)) {
-            markup(s"step $step, assetP $assetP")
+        setContract(Some("true"), aliceAcc)
 
+        for ((i, step) <- Seq(sc5, sc6).zipWithIndex) {
+          markup(s"step $step started")
+
+          for (assetP <- Seq(predefAssetPair, aliceWavesPair)) {
             val currTime = System.currentTimeMillis()
 
             val unsigned =
@@ -260,7 +260,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             val sigAlice = ByteStr(crypto.sign(aliceAcc, unsigned.bodyBytes()))
             val sigMat   = ByteStr(crypto.sign(matcherNode.privateKey, unsigned.bodyBytes()))
 
-            val signed = unsigned.copy(proofs = Proofs(Seq(sigAlice, sigMat)))
+            val signed = unsigned.copy(proofs = Proofs(Seq(sigAlice, ByteStr.empty, sigMat)))
 
             val ord = matcherNode
               .placeOrder(signed)
@@ -276,7 +276,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             .message
             .id
           val bobOrd2 = matcherNode
-            .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(bobAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
             .message
             .id
 
@@ -291,7 +291,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           matcherNode.reservedBalance(bobAcc) shouldBe empty
         }
-        setContract(None, aliceAcc)
       }
     }
 

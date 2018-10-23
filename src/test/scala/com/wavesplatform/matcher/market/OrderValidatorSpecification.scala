@@ -33,36 +33,31 @@ class OrderValidatorSpecification
 
   private val wbtc         = mkAssetId("WBTC")
   private val pairWavesBtc = AssetPair(None, Some(wbtc))
-  private val bc           = stub[Blockchain]
   private val defaultTs    = 1000
-
-  (bc.accountScript _).when(MatcherAccount.toAddress).returns(None).anyNumberOfTimes()
 
   private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
 
   "OrderValidator" should {
     "allow buying WAVES for BTC without balance for order fee" in
-      portfolioTest(defaultPortfolio) { ov =>
+      portfolioTest(defaultPortfolio) { (ov, bc) =>
         val o = newBuyOrder
         (bc.accountScript _).when(o.sender.toAddress).returns(None)
         ov.validateNewOrder(o) shouldBe 'right
       }
 
     "reject new order" when {
-      "asset balance is negative" in {
-        portfolioTest(Portfolio(0, LeaseBalance.empty, Map(wbtc -> -10 * Constants.UnitsInWave))) { ov =>
-          ov.validateNewOrder(newBuyOrder) should produce("Not enough tradable balance")
-        }
+      "asset balance is negative" in portfolioTest(Portfolio(0, LeaseBalance.empty, Map(wbtc -> -10 * Constants.UnitsInWave))) { (ov, _) =>
+        ov.validateNewOrder(newBuyOrder) should produce("Not enough tradable balance")
       }
 
-      "this order had already been accepted" in portfolioTest(defaultPortfolio) { ov =>
+      "this order had already been accepted" in portfolioTest(defaultPortfolio) { (ov, _) =>
         val o       = newBuyOrder
         val history = new OrderHistory(db, matcherSettings)
         history.process(OrderAdded(LimitOrder(o)))
         ov.validateNewOrder(o) shouldBe Left("Order has already been placed")
       }
 
-      "this order had already been canceled" in portfolioTest(defaultPortfolio) { ov =>
+      "this order had already been canceled" in portfolioTest(defaultPortfolio) { (ov, _) =>
         val o       = newBuyOrder
         val history = new OrderHistory(db, matcherSettings)
         history.process(OrderAdded(LimitOrder(o)))
@@ -75,10 +70,10 @@ class OrderValidatorSpecification
       "sender's address is blacklisted" in settingsTest(matcherSettings.copy(blacklistedAddresses = Set(blacklistedAccount.toAddress))) { ov =>
         val o = newBuyOrder(blacklistedAccount)
         ov.validateNewOrder(o) shouldBe Left("Invalid address")
-
       }
 
       "sender's address has a script, but trading from smart accounts hasn't been activated" in forAll(accountGen) { scripted =>
+        val bc = stub[Blockchain]
         (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
         (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 100))
         (bc.height _).when().returns(50).once()
@@ -88,6 +83,7 @@ class OrderValidatorSpecification
       }
 
       "sender's address has a script returning FALSE" in forAll(accountGen) { scripted =>
+        val bc = stub[Blockchain]
         (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.FALSE).explicitGet()))
         (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 100))
         (bc.height _).when().returns(150).once()
@@ -97,6 +93,7 @@ class OrderValidatorSpecification
       }
 
       "order expires too soon" in forAll(Gen.choose[Long](1, OrderValidator.MinExpiration), accountGen) { (offset, pk) =>
+        val bc       = stub[Blockchain]
         val tt       = new TestTime
         val ov       = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, tt)
         val unsigned = newBuyOrder
@@ -105,28 +102,29 @@ class OrderValidatorSpecification
       }
 
       "order signature is invalid" in {
-        val o = newBuyOrder.updateProofs(Proofs(List(ByteStr(new Array[Byte](32)))))
+        val bc = stub[Blockchain]
+        val o  = newBuyOrder.updateProofs(Proofs(List(ByteStr(new Array[Byte](32)))))
         (bc.accountScript _).when(o.senderPublicKey.toAddress).returns(None)
         val ov = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
         ov.validateNewOrder(o) should produce("Script doesn't exist and proof doesn't validate as signature")
       }
 
-      "default ts - drift > its for new users" in portfolioTest(defaultPortfolio) { ov =>
+      "default ts - drift > its for new users" in portfolioTest(defaultPortfolio) { (ov, _) =>
         ov.validateNewOrder(newBuyOrder(defaultTs - matcherSettings.orderTimestampDrift - 1)) should produce("Order should have a timestamp")
       }
 
-      "default ts - drift = its ts for new users" in portfolioTest(defaultPortfolio) { ov =>
+      "default ts - drift = its ts for new users" in portfolioTest(defaultPortfolio) { (ov, _) =>
         ov.validateNewOrder(newBuyOrder(defaultTs - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
       }
 
-      "ts1 - drift > ts2" in portfolioTest(defaultPortfolio) { ov =>
+      "ts1 - drift > ts2" in portfolioTest(defaultPortfolio) { (ov, _) =>
         val pk      = PrivateKeyAccount(randomBytes())
         val history = new OrderHistory(db, matcherSettings)
         history.process(OrderAdded(LimitOrder(newBuyOrder(pk, defaultTs + 1000))))
         ov.validateNewOrder(newBuyOrder(pk, defaultTs + 999 - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
       }
 
-      "ts1 - drift = ts2" in portfolioTest(defaultPortfolio) { ov =>
+      "ts1 - drift = ts2" in portfolioTest(defaultPortfolio) { (ov, _) =>
         val pk      = PrivateKeyAccount(randomBytes())
         val history = new OrderHistory(db, matcherSettings)
         history.process(OrderAdded(LimitOrder(newBuyOrder(pk, defaultTs + 1000))))
@@ -139,15 +137,16 @@ class OrderValidatorSpecification
     }
   }
 
-  private def portfolioTest(p: Portfolio)(f: OrderValidator => Any): Unit = {
-    f(new OrderValidator(db, bc, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime))
+  private def portfolioTest(p: Portfolio)(f: (OrderValidator, Blockchain) => Any): Unit = {
+    val bc = stub[Blockchain]
+    f(new OrderValidator(db, bc, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime), bc)
   }
 
   private def settingsTest(settings: MatcherSettings)(f: OrderValidator => Any): Unit = {
-    f(new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
+    f(new OrderValidator(db, stub[Blockchain], _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
   }
 
-  private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = portfolioTest(defaultPortfolio) { ov =>
+  private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = portfolioTest(defaultPortfolio) { (ov, bc) =>
     val pk            = PrivateKeyAccount(randomBytes())
     val accountScript = ScriptV1(TRUE, checkSize = false).explicitGet()
 
