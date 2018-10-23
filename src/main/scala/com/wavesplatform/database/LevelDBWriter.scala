@@ -87,7 +87,6 @@ object LevelDBWriter {
         lastChange <- db.get(historyKey).headOption
       } yield db.get(valueKey(lastChange))
   }
-
 }
 
 class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int = 100000) extends Caches with ScorexLogging {
@@ -95,7 +94,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   import LevelDBWriter._
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
-  private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
+  private def readWrite[A](f: RW => A): A        = writableDB.readWrite(f)
 
   override protected def loadMaxAddressId(): BigInt = readOnly(db => db.get(Keys.lastAddressId).getOrElse(BigInt(0)))
 
@@ -604,9 +603,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       (_, tx) <- db.get(Keys.transactionInfo(id))
     } yield tx
 
-    txs.collect {
-      case lt: LeaseTransaction => lt
-    }.toSet
+    txs.collect { case lt: LeaseTransaction => lt }.toSet
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]) = readOnly { db =>

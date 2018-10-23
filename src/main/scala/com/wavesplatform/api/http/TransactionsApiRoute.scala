@@ -273,13 +273,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
-
     import com.wavesplatform.transaction.lease.LeaseTransaction
-
     tx match {
       case lease: LeaseTransaction =>
         import com.wavesplatform.transaction.lease.LeaseTransaction.Status._
-
         lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
       case leaseCancel: LeaseCancelTransaction =>
         leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
@@ -292,9 +289,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     * Currently implemented for MassTransfer transaction only.
     */
   private def txToCompactJson(address: Address, tx: Transaction): JsObject = {
-
     import com.wavesplatform.transaction.transfer._
-
     tx match {
       case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
         val addresses = blockchain.aliasesOfAddress(address) :+ address
