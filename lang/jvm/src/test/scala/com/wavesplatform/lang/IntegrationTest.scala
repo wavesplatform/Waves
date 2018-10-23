@@ -24,7 +24,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |let b = a + a
         |b + b + b
       """.stripMargin
-    eval[Long](src) shouldBe Right(6)
+    eval[Long](src) shouldBe evaluated(6)
   }
 
   property("proper error message") {
@@ -45,8 +45,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pa: PointB => 1
         |  case pa: PointC => 2
         |}""".stripMargin
-    eval[Long](sampleScript, Some(pointAInstance)) shouldBe Right(0)
-    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
   }
 
   property("patternMatching with named union types") {
@@ -55,8 +55,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pa: PointA => 0
         |  case pa: PointBC => 1
         |}""".stripMargin
-    eval[Long](sampleScript, Some(pointAInstance)) shouldBe Right(0)
-    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
   }
 
   property("union types have fields") {
@@ -65,9 +65,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pa: PointA => pa.X
         |  case pb: PointBC => pb.YB
         |}""".stripMargin
-    eval[Long](sampleScript, Some(pointAInstance)) shouldBe Right(3)
-    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(41)
-    eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
+    eval[Long](sampleScript, Some(pointAInstance)) shouldBe evaluated(3)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe evaluated(41)
+    eval[Long](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
   }
 
   property("union types have  only common fields") {
@@ -89,8 +89,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |}
          |
       """.stripMargin
-    eval[Long](sampleScript, Some(pointAInstance)) shouldBe Right(0)
-    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
   }
 
   property("patternMatching any type") {
@@ -102,8 +102,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |}
          |
       """.stripMargin
-    eval[Long](sampleScript, Some(pointAInstance)) shouldBe Right(0)
-    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
   }
 
   property("patternMatching block") {
@@ -114,7 +114,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          |}
          |
       """.stripMargin
-    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
   }
 
   private def eval[T](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
@@ -128,7 +128,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("function call") {
-    eval[Long]("10 + 2") shouldBe Right(12)
+    eval[Long]("10 + 2") shouldBe evaluated(12)
   }
 
   property("max values and operation order") {
@@ -136,48 +136,48 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val longMin = Long.MinValue
     eval(s"$longMax + 1 - 1") shouldBe Left("long overflow")
     eval(s"$longMin - 1 + 1") shouldBe Left("long overflow")
-    eval(s"$longMax - 1 + 1") shouldBe Right(longMax)
-    eval(s"$longMin + 1 - 1") shouldBe Right(longMin)
-    eval(s"$longMax / $longMin + 1") shouldBe Right(0)
-    eval(s"($longMax / 2) * 2") shouldBe Right(longMax - 1)
+    eval(s"$longMax - 1 + 1") shouldBe evaluated(longMax)
+    eval(s"$longMin + 1 - 1") shouldBe evaluated(longMin)
+    eval(s"$longMax / $longMin + 1") shouldBe evaluated(0)
+    eval(s"($longMax / 2) * 2") shouldBe evaluated(longMax - 1)
     eval[Long]("fraction(9223372036854775807, 3, 2)") shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
     eval[Long]("fraction(-9223372036854775807, 3, 2)") shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
     eval[Long](s"$longMax + fraction(-9223372036854775807, 3, 2)") shouldBe Left(
       s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
-    eval[Long](s"2 + 2 * 2") shouldBe Right(6)
-    eval("2 * 3 == 2 + 4") shouldBe Right(true)
+    eval[Long](s"2 + 2 * 2") shouldBe evaluated(6)
+    eval("2 * 3 == 2 + 4") shouldBe evaluated(true)
   }
 
   property("equals works on primitive types") {
-    eval[Boolean]("base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8'") shouldBe Right(true)
-    eval[Boolean]("1 == 2") shouldBe Right(false)
-    eval[Boolean]("3 == 3") shouldBe Right(true)
-    eval[Boolean]("false == false") shouldBe Right(true)
-    eval[Boolean]("true == false") shouldBe Right(false)
-    eval[Boolean]("true == true") shouldBe Right(true)
-    eval[Boolean]("""   "x" == "x"     """) shouldBe Right(true)
-    eval[Boolean]("""   "x" == "y"     """) shouldBe Right(false)
-    eval[Boolean]("""   "x" != "y"     """) shouldBe Right(true)
+    eval[Boolean]("base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8'") shouldBe evaluated(true)
+    eval[Boolean]("1 == 2") shouldBe evaluated(false)
+    eval[Boolean]("3 == 3") shouldBe evaluated(true)
+    eval[Boolean]("false == false") shouldBe evaluated(true)
+    eval[Boolean]("true == false") shouldBe evaluated(false)
+    eval[Boolean]("true == true") shouldBe evaluated(true)
+    eval[Boolean]("""   "x" == "x"     """) shouldBe evaluated(true)
+    eval[Boolean]("""   "x" == "y"     """) shouldBe evaluated(false)
+    eval[Boolean]("""   "x" != "y"     """) shouldBe evaluated(true)
     eval[Boolean]("""   "x" == 3     """) should produce("Can't match inferred types")
     eval[Boolean]("""   "x" != 3     """) should produce("Can't match inferred types")
-    eval[Boolean](""" let union = if(true) then "x" else 3; union == "x"   """) shouldBe Right(true)
+    eval[Boolean](""" let union = if(true) then "x" else 3; union == "x"   """) shouldBe evaluated(true)
   }
 
   property("equals some lang structure") {
-    eval[Boolean]("let x = (-7763390488025868909>-1171895536391400041); let v = false; (v&&true)") shouldBe Right(false)
-    eval[Boolean]("let mshUmcl = (if(true) then true else true); true || mshUmcl") shouldBe Right(true)
-    eval[Long]("""if(((1+-1)==-1)) then 1 else (1+1)""") shouldBe Right(2)
+    eval[Boolean]("let x = (-7763390488025868909>-1171895536391400041); let v = false; (v&&true)") shouldBe evaluated(false)
+    eval[Boolean]("let mshUmcl = (if(true) then true else true); true || mshUmcl") shouldBe evaluated(true)
+    eval[Long]("""if(((1+-1)==-1)) then 1 else (1+1)""") shouldBe evaluated(2)
     eval[Boolean]("""((((if(true) then 1 else 1)==2)||((if(true)
         |then true else true)&&(true||true)))||(if(((1>1)||(-1>=-1)))
-        |then (-1>=1) else false))""".stripMargin) shouldBe Right(true)
+        |then (-1>=1) else false))""".stripMargin) shouldBe evaluated(true)
   }
 
   property("sum/mul/div/mod/fraction functions") {
-    eval[Long]("(10 + 10)#jhk\n ") shouldBe Right(20)
-    eval[Long]("(10 * 10)") shouldBe Right(100)
-    eval[Long]("(10 / 3)") shouldBe Right(3)
-    eval[Long]("(10 % 3)") shouldBe Right(1)
-    eval[Long]("fraction(9223372036854775807, -2, -4)") shouldBe Right(Long.MaxValue / 2)
+    eval[Long]("(10 + 10)#jhk\n ") shouldBe evaluated(20)
+    eval[Long]("(10 * 10)") shouldBe evaluated(100)
+    eval[Long]("(10 / 3)") shouldBe evaluated(3)
+    eval[Long]("(10 % 3)") shouldBe evaluated(1)
+    eval[Long]("fraction(9223372036854775807, -2, -4)") shouldBe evaluated(Long.MaxValue / 2)
   }
 
   def compile(script: String): Either[String, Terms.EXPR] = {
@@ -199,7 +199,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       } yield (str, res)) {
         case (str, res) =>
           withClue(str) {
-            eval[Long](str) shouldBe Right(res)
+            eval[Long](str) shouldBe evaluated(res)
           }
     })
 
@@ -209,7 +209,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     } yield (str, res)) {
       case (str, res) =>
         withClue(str) {
-          eval[Boolean](str) shouldBe Right(res)
+          eval[Boolean](str) shouldBe evaluated(res)
         }
     }
   }
@@ -222,7 +222,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |match a {
         | case x: Int => x 
         | case y: String => 2
-        |}""".stripMargin) shouldBe Right(1)
+        |}""".stripMargin) shouldBe evaluated(1)
   }
 
   property("allow unions in pattern matching") {
@@ -236,8 +236,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  }
         |  case other => throw()
         |}""".stripMargin
-    eval[Long](sampleScript, Some(pointBInstance)) shouldBe Right(3)
-    eval[Long](sampleScript, Some(pointCInstance)) shouldBe Right(42)
+    eval[Long](sampleScript, Some(pointBInstance)) shouldBe evaluated(3)
+    eval[Long](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
   }
 
   property("different types, same name of field") {
@@ -247,13 +247,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         | case u: Unit => 1
         | }
       """.stripMargin
-    eval[Long](sampleScript, Some(pointCInstance), CorD) shouldBe Right(42)
-    eval[Long](sampleScript, Some(pointDInstance1), CorD) shouldBe Right(43)
-    eval[Long](sampleScript, Some(pointDInstance2), CorD) shouldBe Right(1)
+    eval[Long](sampleScript, Some(pointCInstance), CorD) shouldBe evaluated(42)
+    eval[Long](sampleScript, Some(pointDInstance1), CorD) shouldBe evaluated(43)
+    eval[Long](sampleScript, Some(pointDInstance2), CorD) shouldBe evaluated(1)
 
-    eval[Long]("p.YB", Some(pointCInstance), CorD) shouldBe Right(42)
-    eval[Long]("p.YB", Some(pointDInstance1), CorD) shouldBe Right(43)
-    eval[Unit]("p.YB", Some(pointDInstance2), CorD) shouldBe Right(())
+    eval[Long]("p.YB", Some(pointCInstance), CorD) shouldBe evaluated(42)
+    eval[Long]("p.YB", Some(pointDInstance1), CorD) shouldBe evaluated(43)
+    eval[Unit]("p.YB", Some(pointDInstance2), CorD) shouldBe evaluated(PureContext.unit)
   }
 
   property("throw") {
@@ -266,19 +266,19 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |}
         |result
       """.stripMargin
-    eval[Long](script, Some(pointAInstance)) shouldBe Right(0)
+    eval[Long](script, Some(pointAInstance)) shouldBe evaluated(0)
     eval[Long](script, Some(pointBInstance)) shouldBe Left("Explicit script termination")
     eval[Long](script, Some(pointCInstance)) shouldBe Left("arrgh")
   }
 
   property("context won't change after inner let") {
     val script = "{ let x = 3; x } + { let x = 5; x}"
-    eval[Long](script, Some(pointAInstance)) shouldBe Right(8)
+    eval[Long](script, Some(pointAInstance)) shouldBe evaluated(8)
   }
 
   property("contexts of different if parts do not affect each other") {
     val script = "if ({let x= 0; x > 0 }) then { let x = 3; x } else { let x = 5; x}"
-    eval[Long](script, Some(pointAInstance)) shouldBe Right(5)
+    eval[Long](script, Some(pointAInstance)) shouldBe evaluated(5)
   }
 
   ignore("context won't change after execution of a user function") {
@@ -296,7 +296,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     )
 
     val expr = FUNCTION_CALL(PureContext.sumLong.header, List(FUNCTION_CALL(doubleFst.header, List(CONST_LONG(1000l))), REF("x")))
-    ev[Long](context, expr) shouldBe Right(2003l)
+    ev[Long](context, expr) shouldBe evaluated(2003l)
   }
 
   ignore("context won't change after execution of an inner block") {
@@ -319,7 +319,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         REF("x")
       )
     )
-    ev[Long](context, expr) shouldBe Right(8)
+    ev[Long](context, expr) shouldBe evaluated(8)
   }
 
 }

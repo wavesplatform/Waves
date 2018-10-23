@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
-class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class EvaluatorV1CaseObjField extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   def context(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.evalContext, sampleUnionContext(p))
 
@@ -19,7 +19,7 @@ class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matcher
     ev[Long](
       context = context(pointAInstance),
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), "X"), CONST_LONG(2L)))
-    ) shouldBe Right(5)
+    ) shouldBe evaluated(5)
   }
 
   property("case custom type field access over union") {
@@ -29,9 +29,9 @@ class EvaluattorV1CaseObjField extends PropSpec with PropertyChecks with Matcher
         expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), field), CONST_LONG(2L)))
       )
 
-    testAccess(pointAInstance, "X") shouldBe Right(5)
-    testAccess(pointBInstance, "X") shouldBe Right(5)
-    testAccess(pointAInstance, "YA") shouldBe Right(42)
-    testAccess(pointBInstance, "YB") shouldBe Right(43)
+    testAccess(pointAInstance, "X") shouldBe evaluated(5)
+    testAccess(pointBInstance, "X") shouldBe evaluated(5)
+    testAccess(pointAInstance, "YA") shouldBe evaluated(42)
+    testAccess(pointBInstance, "YB") shouldBe evaluated(43)
   }
 }

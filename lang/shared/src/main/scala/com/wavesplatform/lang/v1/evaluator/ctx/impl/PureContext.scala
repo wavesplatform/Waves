@@ -213,13 +213,13 @@ object PureContext {
 
   lazy val takeString: BaseFunction =
     NativeFunction("take", 1, TAKE_STRING, STRING, "Take string prefix", ("xs", STRING, "sctring"), ("number", LONG, "prefix size in characters")) {
-      case CONST_BYTEVECTOR(xs) :: CONST_LONG(number) :: Nil => Right(CONST_BYTEVECTOR(xs.take(trimLongToInt(number))))
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => Right(CONST_STRING(xs.take(trimLongToInt(number))))
       case xs                                                => notImplemented("take(xs: String, number: Long)", xs)
     }
 
   lazy val dropString: BaseFunction =
     NativeFunction("drop", 1, DROP_STRING, STRING, "Remmove sring prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
-      case CONST_BYTEVECTOR(xs) :: CONST_LONG(number) :: Nil => Right(CONST_BYTEVECTOR(xs.drop(trimLongToInt(number))))
+      case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => Right(CONST_STRING(xs.drop(trimLongToInt(number))))
       case xs                                                => notImplemented("drop(xs: String, number: Long)", xs)
     }
 
