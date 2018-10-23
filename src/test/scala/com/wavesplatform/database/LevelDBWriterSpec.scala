@@ -191,6 +191,22 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       }
     }
 
+    "return an empty Seq when paginating from the last transaction" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, ByteStr.empty)
+          .getOrElse(Seq.empty)
+
+        val txsFromLast = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, txs.last._2.id())
+          .getOrElse(txs) // should never return this value
+
+        txs.length shouldBe 2
+        txsFromLast shouldBe Seq.empty
+      }
+    }
+
     def createTransfer(master: PrivateKeyAccount, recipient: Address, ts: Long): TransferTransaction = {
       TransferTransactionV1
         .selfSigned(None, master, recipient, ENOUGH_AMT / 5, ts, None, 1000000, Array.emptyByteArray)
