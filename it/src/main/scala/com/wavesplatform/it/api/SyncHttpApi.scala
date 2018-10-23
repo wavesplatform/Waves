@@ -253,6 +253,12 @@ object SyncHttpApi extends Assertions {
 
     def calculateFee(tx: JsObject): FeeInfo =
       sync(async(n).calculateFee(tx))
+
+    def blacklistedPeers: Seq[BlacklistedPeer] =
+      sync(async(n).blacklistedPeers)
+
+    def waitForBlackList(blackList: Int): Seq[BlacklistedPeer] =
+      sync(async(n).waitForBlackList(blackList))
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
