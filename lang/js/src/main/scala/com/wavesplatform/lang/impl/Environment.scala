@@ -13,7 +13,7 @@ object Environment extends scalajs.js.Object {
 
   def transaction: Tx                                     = platform.native
   def transactionById(id: Array[Byte]): Option[Tx]        = platform.native
-  def transactionHeightById(id: Array[Byte]): Option[Int] = platform.native
+//  def transactionHeightById(id: Array[Byte]): Option[Int] = platform.native
 
   def data(addressBytes: Recipient, key: String, dataType: DataType): Option[Any] = platform.native
 
