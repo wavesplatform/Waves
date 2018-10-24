@@ -314,10 +314,8 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
       }
 
       "place order and then set contract" in {
-        for (i <- Seq(sc2, sc7, sc8 /*, sc9 */ )) {
+        for (i <- Seq(sc2, sc7, sc8, sc9)) {
           log.debug(s"contract: $i")
-//          val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
-//          val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
           val aliceBalance = aliceNode.accountBalances(aliceAcc.address)._1
 
           val aliceOrd1 = matcherNode

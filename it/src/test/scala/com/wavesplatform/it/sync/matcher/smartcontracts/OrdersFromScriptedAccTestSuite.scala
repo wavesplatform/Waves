@@ -59,7 +59,6 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       // Alice checks that the order in order book
       matcherNode.waitOrderStatus(aliceWavesPair, orderId, "Filled")
       matcherNode.fullOrderHistory(aliceAcc).head.status shouldBe "Filled"
-
     }
   }
 }
