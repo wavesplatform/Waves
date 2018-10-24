@@ -7,7 +7,7 @@ case class SetAssetScriptRequest(version: Byte, sender: String, assetId: String,
 
 object SetAssetScriptRequest {
   implicit val jsonFormat: Format[SetAssetScriptRequest] = Json.format
-  implicit class SetAssetScriptRequestExt(val self: SetScriptRequest) extends AnyVal {
+  implicit class SetAssetScriptRequestExt(val self: SetAssetScriptRequest) extends AnyVal {
     def toJsObject: JsObject = Json.toJson(self).as[JsObject] + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))
   }
 }
