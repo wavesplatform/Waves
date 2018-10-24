@@ -6,7 +6,9 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertions, Matchers, PropSpec}
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTEVECTOR
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import org.scalacheck.Gen
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import shapeless.Coproduct
@@ -44,25 +46,25 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                                           |""".stripMargin,
           Coproduct(transfer)
         )
-        transfer.assetId.isDefined shouldEqual result.explicitGet()
+        result shouldEqual evaluated(transfer.assetId.isDefined)
     }
   }
 
   property("Some/None/extract/isDefined") {
     val some3 = "if true then 3 else unit"
     val none  = "if false then 3 else unit"
-    runScript(some3) shouldBe Right(3L)
-    runScript(none) shouldBe Right(())
-    runScript(s"isDefined($some3)") shouldBe Right(true)
-    runScript(s"isDefined($none)") shouldBe Right(false)
-    runScript(s"extract($some3)") shouldBe Right(3L)
+    runScript(some3) shouldBe evaluated(3L)
+    runScript(none) shouldBe evaluated(PureContext.unit)
+    runScript(s"isDefined($some3)") shouldBe evaluated(true)
+    runScript(s"isDefined($none)") shouldBe evaluated(false)
+    runScript(s"extract($some3)") shouldBe evaluated(3L)
     runScript(s"extract($none)") should produce("extract() called on unit")
   }
 
   property("size()") {
     val arr = Array(1: Byte, 2: Byte, 3: Byte)
-    runScript("size(base58'')".stripMargin) shouldBe Right(0L)
-    runScript(s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe Right(3L)
+    runScript("size(base58'')".stripMargin) shouldBe evaluated(0L)
+    runScript(s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe evaluated(3L)
   }
 
   property("getTransfer should extract MassTransfer transfers") {
@@ -78,7 +80,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
             |""".stripMargin,
           Coproduct(massTransfer)
         )
-        resultAmount shouldBe Right(massTransfer.transfers(0).amount)
+        resultAmount shouldBe evaluated(massTransfer.transfers(0).amount)
         val resultAddress = runScript(
           """
                                                       |match tx {
@@ -92,7 +94,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                                                       |""".stripMargin,
           Coproduct(massTransfer)
         )
-        resultAddress shouldBe Right(ByteVector(massTransfer.transfers(0).address.bytes.arr))
+        resultAddress shouldBe evaluated(ByteVector(massTransfer.transfers(0).address.bytes.arr))
         val resultLen = runScript(
           """
                                            |match tx {
@@ -102,12 +104,12 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                                            |""".stripMargin,
           Coproduct(massTransfer)
         )
-        resultLen shouldBe Right(massTransfer.transfers.size.toLong)
+        resultLen shouldBe evaluated(massTransfer.transfers.size.toLong)
     }
   }
 
   property("+ should check overflow") {
-    runScript("2 + 3") shouldBe Right(5L)
+    runScript("2 + 3") shouldBe evaluated(5L)
     runScript(s"1 + ${Long.MaxValue}") should produce("long overflow")
   }
 
@@ -125,7 +127,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
             |""".stripMargin,
           Coproduct(transfer)
         )
-        result shouldBe Right(true)
+        result shouldBe evaluated(true)
     }
   }
 
@@ -187,7 +189,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                |""".stripMargin,
             Coproduct(transfer)
           )
-        result shouldBe Right(true)
+        result shouldBe evaluated(true)
     }
   }
 
@@ -233,7 +235,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
            |""".stripMargin,
         Coproduct(t)
       )
-      transferResult shouldBe Right(true)
+      transferResult shouldBe evaluated(true)
 
       val dataTx = DataTransaction.create(1: Byte, t.sender, List(entry), 100000L, t.timestamp, Proofs(Seq.empty)).explicitGet()
       val dataResult = runScript(
@@ -254,7 +256,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
          """.stripMargin,
         Coproduct(dataTx)
       )
-      dataResult shouldBe Right(true)
+      dataResult shouldBe evaluated(true)
     }
   }
 

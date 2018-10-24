@@ -33,7 +33,17 @@ object WavesContext {
         ("key", STRING, "key")
       ) {
         case (addressOrAlias: CaseObj) :: CONST_STRING(k) :: Nil =>
-          environmentFunctions.getData(addressOrAlias, k, dataType).map(_ => ??? /*fromOption*/ )
+          environmentFunctions.getData(addressOrAlias, k, dataType).map {
+            case None => PureContext.unit
+            case Some(a) =>
+              a match {
+                case b: ByteVector => CONST_BYTEVECTOR(b)
+                case b: Long       => CONST_LONG(b)
+                case b: String     => CONST_STRING(b)
+                case true          => TRUE
+                case false         => FALSE
+              }
+          }
         case _ => ???
       }
 
@@ -233,7 +243,7 @@ object WavesContext {
         case (c @ CaseObj(addressType.typeRef, _)) :: Nil => Right(c)
         case CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
-            .addressFromAlias(fields("alias").asInstanceOf[String])
+            .addressFromAlias(fields("alias").asInstanceOf[CONST_STRING].s)
             .map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> CONST_BYTEVECTOR(resolved.bytes))))
         case _ => ???
       }

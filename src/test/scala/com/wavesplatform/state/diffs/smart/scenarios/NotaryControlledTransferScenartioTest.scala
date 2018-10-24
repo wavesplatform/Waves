@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.lang.{Testing, Global}
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -116,12 +116,12 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
 
   property("Script toBase58String") {
     val s = "AXiXp5CmwVaq4Tp6h6"
-    eval(s"""toBase58String(base58'$s') == \"$s\"""").explicitGet() shouldBe Common.evaluated(true)
+    eval(s"""toBase58String(base58'$s') == \"$s\"""").explicitGet() shouldBe Testing.evaluated(true)
   }
 
   property("Script toBase64String") {
     val s = "Kl0pIkOM3tRikA=="
-    eval(s"""toBase64String(base64'$s') == \"$s\"""").explicitGet() shouldBe Common.evaluated(true)
+    eval(s"""toBase64String(base64'$s') == \"$s\"""").explicitGet() shouldBe Testing.evaluated(true)
   }
 
   property("addressFromString() returns None when address is too long") {

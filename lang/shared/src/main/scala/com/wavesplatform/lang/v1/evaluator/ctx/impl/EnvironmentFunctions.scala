@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTEVECTOR, CONST_STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -18,14 +19,14 @@ class EnvironmentFunctions(environment: Environment) {
         addressOrAlias.fields
           .get("bytes")
           .toRight("Can't find 'bytes'")
-          .map(_.asInstanceOf[ByteVector])
-          .map(Address)
+          .map(_.asInstanceOf[CONST_BYTEVECTOR])
+          .map(a => Address(a.bs))
       } else if (objTypeName == Types.aliasType.name) {
         addressOrAlias.fields
           .get("alias")
           .toRight("Can't find alias")
-          .map(_.asInstanceOf[String])
-          .map(Alias)
+          .map(_.asInstanceOf[CONST_STRING])
+          .map(a => Alias(a.s))
       } else {
         Left(s"$addressOrAlias neither Address nor alias")
       }

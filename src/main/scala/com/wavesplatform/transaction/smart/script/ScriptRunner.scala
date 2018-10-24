@@ -15,9 +15,9 @@ import shapeless._
 object ScriptRunner {
 
   def apply[A <: EVALUATED](height: Int,
-               in: Transaction :+: Order :+: CNil,
-               blockchain: Blockchain,
-               script: Script): (ExprEvaluator.Log, Either[ExecutionError, A]) =
+                            in: Transaction :+: Order :+: CNil,
+                            blockchain: Blockchain,
+                            script: Script): (ExprEvaluator.Log, Either[ExecutionError, A]) =
     script match {
       case Script.Expr(expr) =>
         val ctx = BlockchainContext.build(

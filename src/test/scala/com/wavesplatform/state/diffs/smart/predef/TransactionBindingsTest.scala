@@ -1,7 +1,9 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.lang.{Global}
+import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.Testing.evaluated
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -77,7 +79,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe (true)
     }
   }
 
@@ -105,7 +107,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -125,7 +127,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -146,7 +148,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -165,7 +167,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -188,7 +190,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -207,7 +209,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -228,7 +230,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -249,7 +251,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -286,7 +288,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -331,7 +333,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -401,7 +403,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -440,7 +442,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct[In](t),
         'T'
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -457,7 +459,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        """.stripMargin
 
       runScript(src, Coproduct[In](ord), 'T') shouldBe an[Left[_, _]]
-      runWithSmartTradingActivated(src, Coproduct[In](ord), 'T') shouldBe Common.evaluated(true)
+      runWithSmartTradingActivated(src, Coproduct[In](ord), 'T') shouldBe evaluated(true)
     }
   }
 

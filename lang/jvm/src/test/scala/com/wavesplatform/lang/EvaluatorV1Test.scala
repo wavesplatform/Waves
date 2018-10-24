@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import cats.data.EitherT
 import cats.kernel.Monoid
+import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.ExprEvaluator.Log
 import com.wavesplatform.lang.v1.compiler.CompilerV1

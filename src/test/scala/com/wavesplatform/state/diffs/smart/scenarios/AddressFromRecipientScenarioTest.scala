@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTEVECTOR
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import com.wavesplatform.lang.v1.parser.Parser
@@ -54,11 +55,11 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
       case (gen, aliasTx, transferViaAddress, transferViaAlias) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(aliasTx))) {
           case (_, state) =>
-            val addressBytes = evalScript(transferViaAddress, state).explicitGet().fields("bytes").asInstanceOf[ByteVector]
-            addressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
-            val resolvedAddressBytes = evalScript(transferViaAlias, state).explicitGet().fields("bytes").asInstanceOf[ByteVector]
+            val addressBytes = evalScript(transferViaAddress, state).explicitGet().fields("bytes").asInstanceOf[CONST_BYTEVECTOR]
+            addressBytes.bs.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
+            val resolvedAddressBytes = evalScript(transferViaAlias, state).explicitGet().fields("bytes").asInstanceOf[CONST_BYTEVECTOR]
 
-            resolvedAddressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
+            resolvedAddressBytes.bs.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
         }
     }
   }
