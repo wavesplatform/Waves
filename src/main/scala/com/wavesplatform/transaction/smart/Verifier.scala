@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.smart
 
 import cats.implicits._
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
@@ -72,11 +73,15 @@ object Verifier extends Instrumented with ScorexLogging {
                transaction: Transaction,
                isTokenScript: Boolean): Either[ValidationError, Transaction] =
     Try {
-      ScriptRunner[Boolean](height, Coproduct[TxOrd](transaction), blockchain, script) match {
+      ScriptRunner[EVALUATED](height, Coproduct[TxOrd](transaction), blockchain, script) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript))
-        case (log, Right(false)) =>
+        case (log, Right(FALSE)) =>
           Left(TransactionNotAllowedByScript(log, script.text, isTokenScript))
-        case (_, Right(true)) => Right(transaction)
+        case (_, Right(TRUE)) => Right(transaction)
+        case (_,x) => {
+          println(x)
+          ???
+        }
       }
     }.getOrElse(Left(ScriptExecutionError(
       """
@@ -90,11 +95,11 @@ object Verifier extends Instrumented with ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] =
     Try {
-      ScriptRunner[Boolean](height, Coproduct[TxOrd](order), blockchain, script) match {
+      ScriptRunner[EVALUATED](height, Coproduct[TxOrd](order), blockchain, script) match {
         case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx, false))
-        case (ctx, Right(false)) =>
+        case (ctx, Right(FALSE)) =>
           Left(TransactionNotAllowedByScript(ctx, script.text, false))
-        case (_, Right(true)) => Right(order)
+        case (_, Right(TRUE)) => Right(order)
       }
     }.getOrElse(Left(ScriptExecutionError(
       """

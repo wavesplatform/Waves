@@ -16,7 +16,7 @@ class EvaluatorV1CaseObjField extends PropSpec with PropertyChecks with Matchers
   def context(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.evalContext, sampleUnionContext(p))
 
   property("case custom type field access") {
-    ev[Long](
+    ev[CONST_LONG](
       context = context(pointAInstance),
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), "X"), CONST_LONG(2L)))
     ) shouldBe evaluated(5)
@@ -24,7 +24,7 @@ class EvaluatorV1CaseObjField extends PropSpec with PropertyChecks with Matchers
 
   property("case custom type field access over union") {
     def testAccess(instance: CaseObj, field: String) =
-      ev[Long](
+      ev[CONST_LONG](
         context = context(instance),
         expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), field), CONST_LONG(2L)))
       )

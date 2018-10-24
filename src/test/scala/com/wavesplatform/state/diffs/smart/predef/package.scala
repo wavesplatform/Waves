@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.ByteStr
@@ -15,12 +16,12 @@ import monix.eval.Coeval
 package object predef {
   val networkByte: Byte = 'u'
 
-  def runScript[T](script: String, t: In = null, networkByte: Byte = networkByte): Either[String, T] = {
+  def runScript(script: String, t: In = null, networkByte: Byte = networkByte): Either[String, EVALUATED] = {
     val Success(expr, _) = Parser(script)
     for {
       compileResult <- CompilerV1(dummyCompilerContext, expr)
       (typedExpr, _) = compileResult
-      er             = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(t), Coeval(???), EmptyBlockchain), typedExpr)
+      er             = EvaluatorV1[EVALUATED](BlockchainContext.build(networkByte, Coeval(t), Coeval(???), EmptyBlockchain), typedExpr)
       r <- er
     } yield r
   }

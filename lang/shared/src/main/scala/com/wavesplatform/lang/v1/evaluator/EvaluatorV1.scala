@@ -99,13 +99,13 @@ object EvaluatorV1 extends ExprEvaluator {
     case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
   }
 
-  def applywithLogging[A](c: EvaluationContext, expr: EXPR): (Log, Either[ExecutionError, A]) = {
+  def applywithLogging[A <: EVALUATED](c: EvaluationContext, expr: EXPR): (Log, Either[ExecutionError, A]) = {
     val log = ListBuffer[LogItem]()
     val r   = ap(c, expr, (str: String) => (v: LetExecResult) => log.append((str, v)))
     (log.toList, r)
   }
 
-  def apply[A](c: EvaluationContext, expr: EXPR): Either[ExecutionError, A] = ap(c, expr, _ => _ => ())
+  def apply[A <: EVALUATED](c: EvaluationContext, expr: EXPR): Either[ExecutionError, A] = ap(c, expr, _ => _ => ())
 
   private def ap[A <: EVALUATED](c: EvaluationContext, expr: EXPR, llc: LetLogCallback): Either[ExecutionError, A] = {
     val lec = LoggedEvaluationContext(llc, c)

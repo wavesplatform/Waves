@@ -75,7 +75,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         val bool = tx.data(1)
         val bin  = tx.data(2)
         val str  = tx.data(3)
-        val result = runScript[Boolean](
+        val result = runScript(
           s"""
                |match tx {
                | case tx: DataTransaction => {
@@ -118,7 +118,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         val bool = tx.data(1)
         val bin  = tx.data(2)
         val str  = tx.data(3)
-        val ok = runScript[Boolean](
+        val ok = runScript(
           s"""
                |match tx {
                | case tx: DataTransaction => {
@@ -150,7 +150,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         )
         ok shouldBe Right(true)
 
-        val outOfBounds = runScript[Boolean](
+        val outOfBounds = runScript(
           s"""
              |match tx {
              | case d: DataTransaction => isDefined(getInteger(d.data, $badIndex))
@@ -243,6 +243,6 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         |let dd = toBase64String( dc ); let de = toBytes( dd )
         |sha256( de ) != base58'123'
       """.stripMargin
-    runScript[Boolean](script) shouldBe Left(s"base64Encode input exceeds ${Global.MaxBase64Bytes}")
+    runScript(script) shouldBe Left(s"base64Encode input exceeds ${Global.MaxBase64Bytes}")
   }
 }

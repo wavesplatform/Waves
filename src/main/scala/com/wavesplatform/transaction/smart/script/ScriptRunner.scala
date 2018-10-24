@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.{ExecutionError, ExprEvaluator}
 import com.wavesplatform.state._
@@ -13,7 +14,7 @@ import shapeless._
 
 object ScriptRunner {
 
-  def apply[A](height: Int,
+  def apply[A <: EVALUATED](height: Int,
                in: Transaction :+: Order :+: CNil,
                blockchain: Blockchain,
                script: Script): (ExprEvaluator.Log, Either[ExecutionError, A]) =
