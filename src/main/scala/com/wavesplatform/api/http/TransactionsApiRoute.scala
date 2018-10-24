@@ -28,7 +28,6 @@ import javax.ws.rs.Path
 import play.api.libs.json._
 
 import scala.util.Success
-import scala.util.control.Exception
 
 @Path("/transactions")
 @Api(value = "/transactions")
@@ -58,7 +57,13 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "limit", value = "Number of transactions to be returned", required = true, dataType = "integer", paramType = "path")
     ))
-  def addressLimit: Route =
+  def addressLimit: Route = {
+    def getResponse(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] =
+      blockchain
+        .addressTransactions(address, Set.empty, limit, fromId)
+        .map(txs => txs.map({ case (h, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(h)) }))
+        .map(txs => Json.arr(JsArray(txs)))
+
     (get & pathPrefix("address" / Segment)) { address =>
       Address.fromString(address) match {
         case Left(e) => complete(ApiError.fromValidationError(e))
@@ -67,19 +72,20 @@ case class TransactionsApiRoute(settings: RestAPISettings,
             if (limit > settings.transactionByAddressLimit) complete(TooBigArrayAllocation)
             else
               after match {
-                // transactionInfo / transactionHeight — to check if tx exists
-                // @todo put pagination here
-                case Some(t) => complete(Json.obj("limit" -> JsNumber(limit), "after" -> JsString(t)))
-                // @todo remove non-paginated mock response
-                case None => complete(Json.obj("limit" -> JsNumber(limit)))
-//                            case None => complete(
-//                              Json.arr(JsArray(blockchain
-//                                .addressTransactions(a, Set.empty, limit, 0)
-//                                .map({ case (h, tx) => txToCompactJson(a, tx) + ("height" -> JsNumber(h)) }))))
+                case Some(t) =>
+                  ByteStr
+                    .decodeBase58(t)
+                    .toEither
+                    .flatMap(id => getResponse(a, limit, Some(id)))
+                    .fold(_ => complete(StatusCodes.NotFound), complete(_))
+                case None =>
+                  getResponse(a, limit, None)
+                    .fold(_ => complete(StatusCodes.NotFound), complete(_))
               }
           } ~ complete(invalidLimit)
       }
     } ~ complete(StatusCodes.NotFound)
+  }
 
   @Path("/info/{id}")
   @ApiOperation(value = "Transaction info", notes = "Get a transaction by its ID", httpMethod = "GET")
