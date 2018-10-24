@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
@@ -107,7 +108,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                |""".stripMargin,
           Coproduct(tx)
         )
-        result shouldBe Right(true)
+        result shouldBe evaluated(true)
     }
   }
 
@@ -148,7 +149,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                |""".stripMargin,
           Coproduct(tx)
         )
-        ok shouldBe Right(true)
+        ok shouldBe evaluated(true)
 
         val outOfBounds = runScript(
           s"""

@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.state._
+import com.wavesplatform.lang.Testing._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
@@ -16,7 +17,7 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
            | let address = addressFromPublicKey(pk)
            | address.bytes
         """.stripMargin
-      runScript(script) shouldBe Right(ByteVector(Address.fromPublicKey(acc.publicKey, networkByte).bytes.arr))
+      runScript(script) shouldBe evaluated(ByteVector(Address.fromPublicKey(acc.publicKey, networkByte).bytes.arr))
     }
   }
 
@@ -30,7 +31,7 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
            | let address = extract(maybeAddress)
            | address.bytes
         """.stripMargin
-      runScript(script) shouldBe Right(ByteVector(Address.fromBytes(addressBytes.arr, networkByte).explicitGet().bytes.arr))
+      runScript(script) shouldBe evaluated(ByteVector(Address.fromBytes(addressBytes.arr, networkByte).explicitGet().bytes.arr))
     }
   }
 
@@ -43,7 +44,7 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
            | let maybeAddress = addressFromString(addressString)
            | extract(maybeAddress).bytes
         """.stripMargin
-      runScript(script) shouldBe Right(ByteVector(Address.fromBytes(addressBytes.arr, networkByte).explicitGet().bytes.arr))
+      runScript(script) shouldBe evaluated(ByteVector(Address.fromBytes(addressBytes.arr, networkByte).explicitGet().bytes.arr))
     }
   }
 }

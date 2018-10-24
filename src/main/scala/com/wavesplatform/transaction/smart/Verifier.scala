@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.implicits._
+import com.google.common.base.Throwables
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.metrics._
@@ -86,7 +87,7 @@ object Verifier extends Instrumented with ScorexLogging {
           ScriptExecutionError(
             s"""
       |Uncaught execution error.
-      |Probably script does not return boolean, and can't validate any transaction or order: $e
+      |Probably script does not return boolean, and can't validate any transaction or order: ${Throwables.getStackTraceAsString(e)}
     """.stripMargin,
             script.text,
             List.empty,

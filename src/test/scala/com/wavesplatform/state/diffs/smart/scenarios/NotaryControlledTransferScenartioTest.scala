@@ -116,12 +116,12 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
 
   property("Script toBase58String") {
     val s = "AXiXp5CmwVaq4Tp6h6"
-    eval(s"""toBase58String(base58'$s') == \"$s\"""").explicitGet() shouldBe Testing.evaluated(true)
+    eval(s"""toBase58String(base58'$s') == \"$s\"""") shouldBe Testing.evaluated(true)
   }
 
   property("Script toBase64String") {
     val s = "Kl0pIkOM3tRikA=="
-    eval(s"""toBase64String(base64'$s') == \"$s\"""").explicitGet() shouldBe Testing.evaluated(true)
+    eval(s"""toBase64String(base64'$s') == \"$s\"""") shouldBe Testing.evaluated(true)
   }
 
   property("addressFromString() returns None when address is too long") {

@@ -264,7 +264,7 @@ object WavesContext {
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(com.wavesplatform.lang.v1.compiler.Types.UNIT +: anyTransactionType.l)
       NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTEVECTOR, "transaction Id")) {
-        case (id: ByteVector) :: Nil =>
+        case CONST_BYTEVECTOR(id: ByteVector) :: Nil =>
           val maybeDomainTx: Option[CaseObj] = env.transactionById(id.toArray).map(transactionObject)
           Right(fromOptionCO(maybeDomainTx))
         case _ => ???
@@ -272,8 +272,8 @@ object WavesContext {
     }
 
     def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
-      case addressType.typeRef.name => Recipient.Address(c.fields("bytes").asInstanceOf[ByteVector])
-      case aliasType.typeRef.name   => Recipient.Alias(c.fields("alias").asInstanceOf[String])
+      case addressType.typeRef.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTEVECTOR].bs)
+      case aliasType.typeRef.name   => Recipient.Alias(c.fields("alias").asInstanceOf[CONST_STRING].s)
       case _                        => ???
     }
 

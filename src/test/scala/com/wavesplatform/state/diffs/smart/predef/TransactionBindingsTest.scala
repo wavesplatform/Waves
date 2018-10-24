@@ -79,7 +79,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         'T'
       )
-      result shouldBe (true)
+      result shouldBe evaluated(true)
     }
   }
 
