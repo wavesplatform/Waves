@@ -1,9 +1,8 @@
-package com.wavesplatform.it.transactions
+package com.wavesplatform.it
 
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.it.Nodes
-import com.wavesplatform.it.util._
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.ScorexLogging
@@ -40,10 +39,7 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
 
   def initialScripts(): Unit = {
     for (i <- List(matcherNode, aliceNode, bobNode).indices) {
-
-      val scriptText = s"""true""".stripMargin
-
-      val script = ScriptCompiler(scriptText).explicitGet()._1
+      val script = ScriptCompiler("true").explicitGet()._1
       val pk     = PrivateKeyAccount.fromSeed(nodes(i).seed(addresses(i))).right.get
       val setScriptTransaction = SetScriptTransaction
         .selfSigned(SetScriptTransaction.supportedVersions.head, pk, Some(script), 0.01.waves, System.currentTimeMillis())
