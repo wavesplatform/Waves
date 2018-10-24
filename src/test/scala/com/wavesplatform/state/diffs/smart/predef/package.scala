@@ -67,7 +67,7 @@ package object predef {
        |
        | let neOptionAndExtractHeight = match tx {
        |   case _: DataTransaction => true
-       |   case _: TransferTransaction => extract(transactionHeightById(tx.id)) != 0
+       |   case _: TransferTransaction => true
        |   case _ => false
        | }
        |
