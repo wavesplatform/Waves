@@ -118,6 +118,9 @@ object AsyncHttpApi extends Assertions {
     def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] =
       waitFor[Seq[Peer]](s"connectedPeers.size >= $targetPeersCount")(_.connectedPeers, _.lengthCompare(targetPeersCount) >= 0, 1.second)
 
+    def waitForBlackList(blackListSize: Int): Future[Seq[BlacklistedPeer]] =
+      waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers > ${blackListSize}")(_.blacklistedPeers, _.lengthCompare(blackListSize) > 0, 500.millis)
+
     def height: Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
 
     def blockAt(height: Int) = get(s"/blocks/at/$height").as[Block]

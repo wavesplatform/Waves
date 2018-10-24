@@ -46,7 +46,7 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
       val script = ScriptCompiler(scriptText).explicitGet()._1
       val pk     = PrivateKeyAccount.fromSeed(nodes(i).seed(addresses(i))).right.get
       val setScriptTransaction = SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, pk, Some(script), 1.waves, System.currentTimeMillis())
+        .selfSigned(SetScriptTransaction.supportedVersions.head, pk, Some(script), 0.01.waves, System.currentTimeMillis())
         .right
         .get
 
@@ -56,5 +56,22 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
 
       nodes.waitForHeightAriseAndTxPresent(setScriptId)
     }
+  }
+
+  def setContract(contractText: Option[String], acc: PrivateKeyAccount) = {
+    val script = contractText.map { x =>
+      val scriptText = x.stripMargin
+      ScriptCompiler(scriptText).explicitGet()._1
+    }
+    val setScriptTransaction = SetScriptTransaction
+      .selfSigned(SetScriptTransaction.supportedVersions.head, acc, script, 0.014.waves, System.currentTimeMillis())
+      .right
+      .get
+
+    val setScriptId = matcherNode
+      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .id
+
+    nodes.waitForHeightAriseAndTxPresent(setScriptId)
   }
 }
