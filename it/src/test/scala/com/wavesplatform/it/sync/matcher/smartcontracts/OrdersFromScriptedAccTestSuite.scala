@@ -29,7 +29,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
       matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
 
-      setContract(s"""true""", bobAcc)
+      setContract(Some("true"), bobAcc)
     }
 
     "trading is deprecated" in {
