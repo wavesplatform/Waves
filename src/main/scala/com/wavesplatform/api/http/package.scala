@@ -21,9 +21,6 @@ import play.api.libs.json._
 import scala.util.{Success, Try}
 
 package object http extends ApiMarshallers {
-
-  val invalidLimit = StatusCodes.BadRequest -> Json.obj("message" -> "invalid.limit")
-
   val versionReads: Reads[Byte] = {
     val defaultByteReads = implicitly[Reads[Byte]]
     val intToByteReads   = implicitly[Reads[Int]].map(_.toByte)

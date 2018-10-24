@@ -47,7 +47,6 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ broadcast
     }
 
-  //TODO implement general pagination
   @Path("/address/{address}/limit/{limit}")
   @ApiOperation(value = "List of transactions by address",
                 notes = "Get list of transactions where specified address has been involved",
@@ -73,16 +72,15 @@ case class TransactionsApiRoute(settings: RestAPISettings,
             else
               after match {
                 case Some(t) =>
-                  ByteStr
-                    .decodeBase58(t)
-                    .toEither
-                    .flatMap(id => getResponse(a, limit, Some(id)))
-                    .fold(_ => complete(StatusCodes.NotFound), complete(_))
+                  ByteStr.decodeBase58(t) match {
+                    case Success(id) => getResponse(a, limit, Some(id)).fold(_ => complete(StatusCodes.NotFound), complete(_))
+                    case _           => complete(CustomValidationError(s"Unable to decode transaction id $t"))
+                  }
                 case None =>
                   getResponse(a, limit, None)
                     .fold(_ => complete(StatusCodes.NotFound), complete(_))
               }
-          } ~ complete(invalidLimit)
+          } ~ complete(CustomValidationError("invalid.limit"))
       }
     } ~ complete(StatusCodes.NotFound)
   }
