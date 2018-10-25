@@ -7,7 +7,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import scodec.bits.ByteVector
 
 class EnvironmentFunctions(environment: Environment) {
 
