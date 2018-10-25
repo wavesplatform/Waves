@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import com.wavesplatform.features.BlockchainFeatures
@@ -8,12 +9,14 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.utils.Base58
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
 import io.netty.channel.group.ChannelGroup
+import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Assertion, Matchers}
@@ -35,6 +38,8 @@ class TransactionsRouteSpec
   private val utx         = mock[UtxPool]
   private val allChannels = mock[ChannelGroup]
   private val route       = TransactionsApiRoute(restAPISettings, TestFunctionalitySettings.Stub, wallet, blockchain, utx, allChannels, new TestTime).route
+
+  private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
   routePath("/calculateFee") - {
     "transfer with Waves fee" - {
@@ -219,83 +224,92 @@ class TransactionsRouteSpec
   }
 
   routePath("/address/{address}/limit/{limit}") - {
+    val bytes32StrGen = bytes32gen.map(Base58.encode)
+    val addressGen    = accountGen.map(_.address)
 
-    "handles incorrect address" in {
-      forAll(bytes32gen) { bytes =>
-        Get(routePath(s"/address/${Base58.encode(bytes)}")) ~> route should produce(InvalidAddress)
-      }
-    }
-
-    "returns 400 BadRequest in case" - {
-      def assertBadRequest(p: String): Assertion = forAll(accountGen) { a =>
-        Get(routePath(p)) ~> route ~> check {
-          status shouldEqual StatusCodes.BadRequest
-          (responseAs[JsObject] \ "message").as[String] shouldEqual "invalid.limit"
+    "handles parameter errors with corresponding responses" - {
+      "invalid address" in {
+        forAll(bytes32StrGen) { badAddress =>
+          Get(routePath(s"/address/$badAddress")) ~> route should produce(InvalidAddress)
         }
       }
 
-      "of a missing limit" in {
-        forAll(accountGen) { a =>
-          assertBadRequest(s"/address/${a.address}")
-        }
-      }
-
-      "of a trailing slash after address" in {
-        forAll(accountGen) { a =>
-          assertBadRequest(s"/address/${a.address}/")
-        }
-      }
-
-      "limit could not be parsed as int" in {
-        forAll(accountGen) { a =>
-          assertBadRequest(s"/address/${a.address}/qwe")
-        }
-      }
-    }
-
-    "returns a correct error if limit is too big" in {
-      forAll(accountGen, choose(MaxTransactionsPerRequest + 1, Int.MaxValue).label("limitExceeded")) {
-        case (account, limit) =>
-          Get(routePath(s"/address/${account.address}/limit/$limit")) ~> route should produce(TooBigArrayAllocation)
-      }
-    }
-
-    "returns 200 in case of all correct params" in {
-      forAll(accountGen, "1") {
-        case (account, limit) =>
-          Get(routePath(s"/address/${account.address}/limit/$limit")) ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-          }
-      }
-    }
-
-    "returns 400 Bad Request in case after param could not be decoded" in {
-      forAll(accountGen, "1") {
-        case (account, limit) => {
-          val badAfter = "BAD_AFTER_VALUE"
-          Get(routePath(s"/address/${account.address}/limit/$limit?after=$badAfter")) ~> route ~> check {
+      "invalid limit" - {
+        def assertInvalidLimit(p: String): Assertion = forAll(accountGen) { a =>
+          Get(routePath(p)) ~> route ~> check {
             status shouldEqual StatusCodes.BadRequest
-            (responseAs[JsObject] \ "message").as[String] shouldEqual s"Unable to decode transaction id $badAfter"
+            (responseAs[JsObject] \ "message").as[String] shouldEqual "invalid.limit"
           }
+        }
+
+        "limit missing" in {
+          forAll(addressGen) { a =>
+            assertInvalidLimit(s"/address/$a")
+          }
+        }
+
+        "only trailing slash after address" in {
+          forAll(addressGen) { a =>
+            assertInvalidLimit(s"/address/$a/")
+          }
+        }
+
+        "limit could not be parsed as int" in {
+          forAll(addressGen) { a =>
+            assertInvalidLimit(s"/address/$a/qwe")
+          }
+        }
+
+        "limit is too big" in {
+          forAll(addressGen, choose(MaxTransactionsPerRequest + 1, Int.MaxValue).label("limitExceeded")) {
+            case (address, limit) =>
+              Get(routePath(s"/address/$address/limit/$limit")) ~> route should produce(TooBigArrayAllocation)
+          }
+        }
+      }
+
+      "invalid after" in {
+        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), invalidBase58Gen) {
+          case (address, limit, invalidBase58) =>
+            Get(routePath(s"/address/$address/limit/$limit?after=$invalidBase58")) ~> route ~> check {
+              status shouldEqual StatusCodes.BadRequest
+              (responseAs[JsObject] \ "message").as[String] shouldEqual s"Unable to decode transaction id $invalidBase58"
+            }
         }
       }
     }
 
-    // @todo add pagination tests
-//    "pagination params gets parsed correctly" in {
-//      forAll(accountGen) { a =>
-//        Get(routePath(s"/address/${a.address}/limit/10?after=qwerty")) ~> route ~> check {
-//          status shouldEqual StatusCodes.OK
-//          (responseAs[JsObject] \ "limit").as[Int] shouldEqual 10
-//          (responseAs[JsObject] \ "after").as[String] shouldEqual "qwerty"
-//        }
-//      }
-//    }
+    "returns 200 if correct params provided" - {
+      def routeGen: Gen[Route] =
+        Gen.const({
+          val b = mock[Blockchain]
+          (b.addressTransactions _).expects(*, *, *, *).returning(Right(Seq.empty[(Int, Transaction)])).anyNumberOfTimes()
+          TransactionsApiRoute(restAPISettings, TestFunctionalitySettings.Stub, wallet, b, utx, allChannels, new TestTime).route
+        })
+
+      "address and limit" in {
+        forAll(routeGen, addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) {
+          case (r, address, limit) =>
+            Get(routePath(s"/address/$address/limit/$limit")) ~> r ~> check {
+              status shouldEqual StatusCodes.OK
+            }
+        }
+      }
+
+      "address, limit and after" in {
+        forAll(routeGen, addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) {
+          case (r, address, limit, txId) =>
+            Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> r ~> check {
+              status shouldEqual StatusCodes.OK
+            }
+        }
+      }
+    }
   }
 
   routePath("/info/{signature}") - {
     "handles invalid signature" in {
-      forAll(alphaNumStr.map(_ + "O")) { invalidBase58 =>
+      forAll(invalidBase58Gen) { invalidBase58 =>
         Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidSignature)
       }
 
@@ -362,7 +376,7 @@ class TransactionsRouteSpec
 
   routePath("/unconfirmed/info/{signature}") - {
     "handles invalid signature" in {
-      forAll(alphaNumStr.map(_ + "O")) { invalidBase58 =>
+      forAll(invalidBase58Gen) { invalidBase58 =>
         Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidSignature)
       }
 

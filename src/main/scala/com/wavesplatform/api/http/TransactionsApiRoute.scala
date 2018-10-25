@@ -44,23 +44,28 @@ case class TransactionsApiRoute(settings: RestAPISettings,
 
   override lazy val route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ broadcast
+      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ broadcast ~ complete(StatusCodes.NotFound)
     }
 
-  @Path("/address/{address}/limit/{limit}")
+  @Path("/address/{address}/limit/{limit}?after={after}")
   @ApiOperation(value = "List of transactions by address",
                 notes = "Get list of transactions where specified address has been involved",
                 httpMethod = "GET")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "limit", value = "Number of transactions to be returned", required = true, dataType = "integer", paramType = "path")
+      new ApiImplicitParam(name = "limit",
+                           value = "Number of transactions to be returned",
+                           required = true,
+                           dataType = "integer",
+                           paramType = "path"),
+      new ApiImplicitParam(name = "after", value = "Id of transaction to paginate after", required = false, dataType = "string", paramType = "query")
     ))
   def addressLimit: Route = {
     def getResponse(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] =
       blockchain
         .addressTransactions(address, Set.empty, limit, fromId)
-        .map(txs => txs.map({ case (h, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(h)) }))
+        .map(_.map { case (h, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(h)) })
         .map(txs => Json.arr(JsArray(txs)))
 
     (get & pathPrefix("address" / Segment)) { address =>
@@ -73,8 +78,11 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               after match {
                 case Some(t) =>
                   ByteStr.decodeBase58(t) match {
-                    case Success(id) => getResponse(a, limit, Some(id)).fold(_ => complete(StatusCodes.NotFound), complete(_))
-                    case _           => complete(CustomValidationError(s"Unable to decode transaction id $t"))
+                    case Success(id) =>
+                      getResponse(a, limit, Some(id)).fold(
+                        _ => complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain")),
+                        complete(_))
+                    case _ => complete(CustomValidationError(s"Unable to decode transaction id $t"))
                   }
                 case None =>
                   getResponse(a, limit, None)
@@ -82,7 +90,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               }
           } ~ complete(CustomValidationError("invalid.limit"))
       }
-    } ~ complete(StatusCodes.NotFound)
+    }
   }
 
   @Path("/info/{id}")
