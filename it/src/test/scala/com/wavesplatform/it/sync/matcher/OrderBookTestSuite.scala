@@ -51,6 +51,8 @@ class OrderBookTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
 
     val (aliceReservesForBothPairs, bobReservesForBothPairs) = (reservesOf(aliceNode), reservesOf(bobNode))
 
+    val marketStatusBeforeDeletion = matcherNode.marketStatus(wctUsdPair)
+
     matcherNode.deleteOrderBook(wctUsdPair)
 
     "orders by the pair should be canceled" in {
@@ -80,6 +82,10 @@ class OrderBookTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
       val orderBook = matcherNode.orderBook(wctWavesPair)
       orderBook.bids shouldNot be(empty)
       orderBook.asks shouldNot be(empty)
+    }
+
+    "it should not affect market status" in {
+      matcherNode.marketStatus(wctUsdPair) shouldEqual marketStatusBeforeDeletion
     }
   }
 
