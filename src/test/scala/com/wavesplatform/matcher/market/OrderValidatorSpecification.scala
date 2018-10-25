@@ -79,7 +79,6 @@ class OrderValidatorSpecification
       "sender's address is blacklisted" in settingsTest(matcherSettings.copy(blacklistedAddresses = Set(blacklistedAccount.toAddress))) { ov =>
         val o = newBuyOrder(blacklistedAccount)
         ov.validateNewOrder(o) shouldBe Left("Invalid address")
-
       }
 
       "sender's address has a script" in forAll(accountGen, accountGen) {
@@ -97,6 +96,13 @@ class OrderValidatorSpecification
         val unsigned = newBuyOrder
         val signed   = Order.sign(unsigned.copy(senderPublicKey = pk, expiration = tt.getTimestamp() + offset), pk)
         ov.validateNewOrder(signed) shouldBe Left("Order expiration should be > 1 min")
+      }
+
+      "amount is invalid" in test { ov =>
+        val pk       = PrivateKeyAccount(randomBytes())
+        val unsigned = newBuyOrder(pk)
+        val signed   = Order.sign(unsigned.copy(amount = 0L), pk)
+        ov.validateNewOrder(signed) should produce("amount should be > 0")
       }
 
       "order signature is invalid" in test { ov =>
