@@ -2,7 +2,7 @@ package com.wavesplatform.it.matcher
 
 import com.typesafe.config.Config
 import com.wavesplatform.it._
-import com.wavesplatform.it.transactions.{MatcherNode, NodesFromDocker}
+import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest._
 import com.wavesplatform.it.util._
 import scala.concurrent.ExecutionContext
