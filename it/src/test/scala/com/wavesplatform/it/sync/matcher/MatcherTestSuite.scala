@@ -188,7 +188,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
       "order could be canceled and resubmitted again" in {
         // Alice cancels the very first order (100 left)
-        val status1 = matcherNode.cancelOrder(aliceNode, aliceWavesPair, Some(order1Response.message.id))
+        val status1 = matcherNode.cancelOrder(aliceNode, aliceWavesPair, order1Response.message.id)
         status1.status should be("OrderCanceled")
 
         // Alice checks that the order book is empty
@@ -315,80 +315,10 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
         // Cleanup
         nodes.waitForHeightArise()
-        matcherNode.cancelOrder(bobNode, bobWavesPair, Some(order8.message.id)).status should be("OrderCanceled")
+        matcherNode.cancelOrder(bobNode, bobWavesPair, order8.message.id).status should be("OrderCanceled")
 
         val transferBobId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
         nodes.waitForHeightAriseAndTxPresent(transferBobId)
-      }
-    }
-
-    "batch cancel" - {
-      val ordersNum = 5
-      def fileOrders(n: Int, pair: AssetPair): Seq[String] = 0 until n map { _ =>
-        val o = matcherNode.placeOrder(matcherNode.prepareOrder(aliceNode, pair, BUY, 100, 1.waves))
-        o.status should be("OrderAccepted")
-        o.message.id
-      }
-
-      val asset2 =
-        aliceNode.issue(aliceNode.address, "AliceCoin2", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
-      nodes.waitForHeightAriseAndTxPresent(asset2)
-      val aliceWavesPair2 = AssetPair(ByteStr.decodeBase58(asset2).toOption, None)
-
-      "canceling an order doesn't affect other orders for the same pair" in {
-        val orders                          = fileOrders(ordersNum, aliceWavesPair)
-        val (orderToCancel, ordersToRetain) = (orders.head, orders.tail)
-
-        val cancel = matcherNode.cancelOrder(aliceNode, aliceWavesPair, Some(orderToCancel))
-        cancel.status should be("OrderCanceled")
-
-        ordersToRetain foreach {
-          matcherNode.waitOrderStatus(aliceWavesPair, _, "Accepted")
-        }
-      }
-
-      "cancel orders by pair" ignore {
-        val ordersToCancel = fileOrders(orderLimit + ordersNum, aliceWavesPair)
-        val ordersToRetain = fileOrders(ordersNum, aliceWavesPair2)
-        val ts             = Some(System.currentTimeMillis)
-
-        val cancel = matcherNode.cancelOrder(aliceNode, aliceWavesPair, None, ts)
-        cancel.status should be("Cancelled")
-
-        ordersToCancel foreach {
-          matcherNode.waitOrderStatus(aliceWavesPair, _, "Cancelled")
-        }
-        ordersToRetain foreach {
-          matcherNode.waitOrderStatus(aliceWavesPair2, _, "Accepted")
-        }
-
-        // signed timestamp is mandatory
-        assertBadRequestAndMessage(matcherNode.cancelOrder(aliceNode, aliceWavesPair, None, None), "invalid signature")
-
-        // timestamp reuse shouldn't be allowed
-        assertBadRequest(matcherNode.cancelOrder(aliceNode, aliceWavesPair, None, ts))
-      }
-
-      "cancel all orders" ignore {
-        val orders1 = fileOrders(orderLimit + ordersNum, aliceWavesPair)
-        val orders2 = fileOrders(orderLimit + ordersNum, aliceWavesPair2)
-        val ts      = Some(System.currentTimeMillis)
-
-        val cancel = matcherNode.cancelAllOrders(aliceNode, ts)
-        cancel.status should be("Cancelled")
-
-        orders1 foreach {
-          matcherNode.waitOrderStatus(aliceWavesPair, _, "Cancelled")
-        }
-        orders2 foreach {
-          matcherNode.waitOrderStatus(aliceWavesPair2, _, "Cancelled")
-        }
-
-        // signed timestamp is mandatory
-        assertBadRequestAndMessage(matcherNode.cancelAllOrders(aliceNode, None), "invalid signature")
-
-        // timestamp reuse shouldn't be allowed
-        assertBadRequest(matcherNode.cancelAllOrders(aliceNode, ts))
       }
     }
   }
