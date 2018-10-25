@@ -26,25 +26,25 @@ import scala.util.Random
 @Measurement(iterations = 10)
 class ScriptEvaluatorBenchmark {
   @Benchmark
-  def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Boolean](PureContext.evalContext, st.expr))
+  def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(EvaluatorV1[EVALUATED](PureContext.evalContext, st.expr))
 
   @Benchmark
-  def nestedBlocks(st: NestedBlocks, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Boolean](st.context, st.expr))
+  def nestedBlocks(st: NestedBlocks, bh: Blackhole): Unit = bh.consume(EvaluatorV1[EVALUATED](st.context, st.expr))
 
   @Benchmark
-  def signatures(st: Signatures, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Boolean](st.context, st.expr))
+  def signatures(st: Signatures, bh: Blackhole): Unit = bh.consume(EvaluatorV1[EVALUATED](st.context, st.expr))
 
   @Benchmark
-  def base58encode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Long](st.context, st.encode))
+  def base58encode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(EvaluatorV1[EVALUATED](st.context, st.encode))
 
   @Benchmark
-  def base58decode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(EvaluatorV1[Long](st.context, st.decode))
+  def base58decode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(EvaluatorV1[EVALUATED](st.context, st.decode))
 
   @Benchmark
-  def stringConcat(st: Concat, bh: Blackhole): Unit = bh.consume(EvaluatorV1[String](st.context, st.strings))
+  def stringConcat(st: Concat, bh: Blackhole): Unit = bh.consume(EvaluatorV1[EVALUATED](st.context, st.strings))
 
   @Benchmark
-  def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(EvaluatorV1[String](st.context, st.bytes))
+  def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(EvaluatorV1[EVALUATED](st.context, st.bytes))
 }
 
 @State(Scope.Benchmark)
