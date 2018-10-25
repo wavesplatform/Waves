@@ -74,6 +74,15 @@ trait Caches extends Blockchain {
   override def hasScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).flatten.isDefined || hasScriptBytes(address)
 
+  private val assetScriptCache: LoadingCache[AssetId, Option[Script]] = cache(maxCacheSize, loadAssetScript)
+  protected def loadAssetScript(asset: AssetId): Option[Script]
+  protected def hasAssetScriptBytes(asset: AssetId): Boolean
+  protected def discardAssetScript(asset: AssetId): Unit = assetScriptCache.invalidate(asset)
+
+  override def assetScript(asset: AssetId): Option[Script] = assetScriptCache.get(asset)
+  override def hasAssetScript(asset: AssetId): Boolean =
+    Option(assetScriptCache.getIfPresent(asset)).flatten.isDefined || hasAssetScriptBytes(asset)
+
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): BigInt
 
@@ -103,6 +112,7 @@ trait Caches extends Blockchain {
                          reissuedAssets: Map[ByteStr, AssetInfo],
                          filledQuantity: Map[ByteStr, VolumeAndFee],
                          scripts: Map[BigInt, Option[Script]],
+                         assetScripts: Map[ByteStr, Option[Script]],
                          data: Map[BigInt, AccountDataInfo],
                          aliases: Map[Alias, BigInt],
                          sponsorship: Map[AssetId, Sponsorship]): Unit
@@ -173,7 +183,8 @@ trait Caches extends Blockchain {
       diff.accountTransactionIds.map({ case (addr, txs) => addressId(addr) -> txs }),
       diff.issuedAssets,
       newFills,
-      diff.scripts.map { case (address, s)        => addressId(address) -> s },
+      diff.scripts.map { case (address, s) => addressId(address) -> s },
+      diff.assetScripts,
       diff.accountData.map { case (address, data) => addressId(address) -> data },
       diff.aliases.map { case (a, address)        => a                  -> addressId(address) },
       diff.sponsorship

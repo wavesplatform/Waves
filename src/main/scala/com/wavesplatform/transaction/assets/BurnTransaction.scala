@@ -41,6 +41,7 @@ trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
       Longs.toByteArray(timestamp)
     )
   }
+  override def checkedAssets(): Seq[AssetId] = Seq(assetId)
 }
 
 object BurnTransaction {

@@ -148,6 +148,8 @@ object Bindings {
         )
       case SetScript(p, scriptOpt) =>
         CaseObj(setScriptTransactionType.typeRef, Map("script" -> fromOption(scriptOpt)) ++ provenTxPart(p))
+      case SetAssetScript(p, assetId, scriptOpt) =>
+        CaseObj(setScriptTransactionType.typeRef, Map("script" -> fromOption(scriptOpt), "assetId" -> assetId) ++ provenTxPart(p))
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
         CaseObj(
           sponsorFeeTransactionType.typeRef,

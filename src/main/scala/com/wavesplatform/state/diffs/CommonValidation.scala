@@ -24,20 +24,21 @@ object CommonValidation {
   val ScriptExtraFee                                      = 400000L
 
   val FeeConstants: Map[Byte, Long] = Map(
-    GenesisTransaction.typeId      -> 0,
-    PaymentTransaction.typeId      -> 1,
-    IssueTransaction.typeId        -> 1000,
-    ReissueTransaction.typeId      -> 1000,
-    BurnTransaction.typeId         -> 1,
-    TransferTransaction.typeId     -> 1,
-    MassTransferTransaction.typeId -> 1,
-    LeaseTransaction.typeId        -> 1,
-    LeaseCancelTransaction.typeId  -> 1,
-    ExchangeTransaction.typeId     -> 3,
-    CreateAliasTransaction.typeId  -> 1,
-    DataTransaction.typeId         -> 1,
-    SetScriptTransaction.typeId    -> 10,
-    SponsorFeeTransaction.typeId   -> 1000
+    GenesisTransaction.typeId        -> 0,
+    PaymentTransaction.typeId        -> 1,
+    IssueTransaction.typeId          -> 1000,
+    ReissueTransaction.typeId        -> 1000,
+    BurnTransaction.typeId           -> 1,
+    TransferTransaction.typeId       -> 1,
+    MassTransferTransaction.typeId   -> 1,
+    LeaseTransaction.typeId          -> 1,
+    LeaseCancelTransaction.typeId    -> 1,
+    ExchangeTransaction.typeId       -> 3,
+    CreateAliasTransaction.typeId    -> 1,
+    DataTransaction.typeId           -> 1,
+    SetScriptTransaction.typeId      -> 10,
+    SponsorFeeTransaction.typeId     -> 1000,
+    SetAssetScriptTransaction.typeId -> 1000
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
@@ -128,6 +129,12 @@ object CommonValidation {
       case _: SetScriptTransaction     => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: TransferTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
       case it: IssueTransactionV2      => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
+      case it: SetAssetScriptTransaction =>
+        if (it.script.isEmpty) {
+          Left(GenericError("Empty script is disabled."))
+        } else {
+          activationBarrier(BlockchainFeatures.SmartAssets)
+        }
       case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)

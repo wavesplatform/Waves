@@ -13,15 +13,32 @@ import scala.util.{Left, Right}
 
 object AssetTransactionsDiff {
   def issue(height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
-    val info = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity, script = tx.script)
+    val info = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
     Right(
       Diff(
         height = height,
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.id() -> tx.quantity))),
-        assetInfos = Map(tx.id()             -> info)
+        assetInfos = Map(tx.id()             -> info),
+        assetScripts = Map(tx.id()           -> tx.script)
       ))
   }
+
+  def setAssetScript(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
+      tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
+    validateAsset(tx, blockchain, tx.assetId, issuerOnly = true).flatMap { _ =>
+      //val isActivated = blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height)
+      if (blockchain.hasAssetScript(tx.assetId)) {
+        Right(
+          Diff(
+            height = height,
+            tx = tx,
+            assetScripts = Map(tx.assetId -> tx.script)
+          ))
+      } else {
+        Left(GenericError("Asset is not scripted."))
+      }
+    }
 
   def reissue(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
       tx: ReissueTransaction): Either[ValidationError, Diff] =
@@ -42,7 +59,7 @@ object AssetTransactionsDiff {
               tx = tx,
               portfolios =
                 Map(tx.sender.toAddress   -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.assetId -> tx.quantity))),
-              assetInfos = Map(tx.assetId -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable, script = None))
+              assetInfos = Map(tx.assetId -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable))
             ))
         }
       } else {
@@ -58,7 +75,7 @@ object AssetTransactionsDiff {
         height = height,
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.assetId -> -tx.quantity))),
-        assetInfos = Map(tx.assetId          -> AssetInfo(isReissuable = true, volume = -tx.quantity, None))
+        assetInfos = Map(tx.assetId          -> AssetInfo(isReissuable = true, volume = -tx.quantity))
       )
     }
   }

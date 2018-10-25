@@ -41,6 +41,10 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
       "buyMatcherFee"  -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
     ))
+  override def checkedAssets(): Seq[AssetId] = {
+    val pair = buyOrder.assetPair
+    (pair.priceAsset ++ pair.amountAsset).toSeq
+  }
 }
 
 object ExchangeTransaction {

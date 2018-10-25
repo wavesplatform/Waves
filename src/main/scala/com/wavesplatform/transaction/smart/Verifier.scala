@@ -7,10 +7,8 @@ import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
-import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon
 import shapeless.{:+:, CNil, Coproduct}
@@ -50,22 +48,15 @@ object Verifier extends Instrumented with ScorexLogging {
             stats.signatureVerification
               .measureForType(tx.builder.typeId)(verifyAsEllipticCurveSignature(pt))
         }
-    }).flatMap(tx => {
-      for {
-        assetId <- tx match {
-          case t: TransferTransaction     => t.assetId
-          case t: MassTransferTransaction => t.assetId
-          case t: BurnTransaction         => Some(t.assetId)
-          case t: ReissueTransaction      => Some(t.assetId)
-          case _                          => None
-        }
-
-        script <- blockchain.assetDescription(assetId).flatMap(_.script)
-      } yield {
-        stats.assetScriptExecution
-          .measureForType(tx.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, tx, true))
-      }
-    }.getOrElse(Either.right(tx)))
+    }).flatMap(
+      tx =>
+        tx.checkedAssets
+          .flatMap(assetId => blockchain.assetDescription(assetId).flatMap(_.script))
+          .foldRight(Either.right[ValidationError, Transaction](tx)) { (script, txr) =>
+            txr.right.flatMap(tx =>
+              stats.assetScriptExecution
+                .measureForType(tx.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, tx, true)))
+        })
 
   def verifyTx(blockchain: Blockchain,
                script: Script,

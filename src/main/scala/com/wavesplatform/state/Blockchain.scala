@@ -60,6 +60,9 @@ trait Blockchain {
   def accountScript(address: Address): Option[Script]
   def hasScript(address: Address): Boolean
 
+  def assetScript(id: ByteStr): Option[Script]
+  def hasAssetScript(id: ByteStr): Boolean
+
   def accountData(acc: Address): AccountDataInfo
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
 

@@ -51,6 +51,7 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
       Deser.serializeArray(attachment)
     )
   }
+  override def checkedAssets(): Seq[AssetId] = assetId.toSeq
 }
 
 object TransferTransaction {

@@ -109,4 +109,8 @@ object Keys {
 
   def carryFeeHistory: Key[Seq[Int]]   = historyKey("carry-fee-history", 44, Array())
   def carryFee(height: Int): Key[Long] = Key("carry-fee", h(45, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+
+  def assetScriptHistory(assetId: ByteStr): Key[Seq[Int]] = historyKey("asset-script-history", 46, assetId.arr)
+  def assetScript(assetId: ByteStr)(height: Int): Key[Option[Script]] =
+    Key.opt("asset-script", hBytes(47, height, assetId.arr), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
 }
