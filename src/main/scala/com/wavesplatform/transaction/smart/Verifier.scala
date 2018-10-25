@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.smart
 
 import cats.implicits._
 import com.wavesplatform.crypto
+import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
@@ -90,11 +91,10 @@ object Verifier extends Instrumented with ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] =
     Try {
-      ScriptRunner[Boolean](height, Coproduct[TxOrd](order), blockchain, script) match {
-        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx, false))
-        case (ctx, Right(false)) =>
-          Left(TransactionNotAllowedByScript(ctx, script.text, false))
-        case (_, Right(true)) => Right(order)
+      MatcherScriptRunner[Boolean](script, order) match {
+        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx, isTokenScript = false))
+        case (ctx, Right(false))    => Left(TransactionNotAllowedByScript(ctx, script.text, isTokenScript = false))
+        case (_, Right(true))       => Right(order)
       }
     }.getOrElse(Left(ScriptExecutionError(
       """
