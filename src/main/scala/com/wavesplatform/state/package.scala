@@ -41,8 +41,8 @@ package object state {
         case _              => s.take(count)
       }
 
-    def transactions(d: Diff): Seq[(Int, Transaction)] =
-      withRestFromBlockchain(withFilterAndLimit(withPagination(transactionsFromDiff(d))))
+    def transactions: Diff => Seq[(Int, Transaction)] =
+      withRestFromBlockchain _ compose withFilterAndLimit compose withPagination compose transactionsFromDiff
 
     d.fold(b.addressTransactions(address, types, count, fromId)) { diff =>
       fromId match {
