@@ -46,3 +46,5 @@ case class OrderDeleted(orderId: ByteStr) extends MatcherResponse(C.OK, Json.obj
 
 case class OrderCancelRejected(message: String)
     extends MatcherResponse(C.BadRequest, Json.obj("status" -> "OrderCancelRejected", "message" -> message))
+
+case object DuringShutdown extends MatcherResponse(C.ServiceUnavailable, "System is going shutdown")

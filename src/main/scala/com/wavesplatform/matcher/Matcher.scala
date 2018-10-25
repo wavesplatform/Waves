@@ -98,13 +98,13 @@ class Matcher(actorSystem: ActorSystem,
 
   def shutdown(): Unit = {
     log.info("Shutting down matcher")
+    Await.result(matcherServerBinding.unbind(), 10.seconds)
     val stopMatcherTimeout = 5.minutes
     orderBooksSnapshotCache.close()
     Await.result(gracefulStop(matcher, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
     log.debug("Matcher's actor system has been shut down")
     db.close()
     log.debug("Matcher's database closed")
-    Await.result(matcherServerBinding.unbind(), 10.seconds)
     log.info("Matcher shutdown successful")
   }
 
