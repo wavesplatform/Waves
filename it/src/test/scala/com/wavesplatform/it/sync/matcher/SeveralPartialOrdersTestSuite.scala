@@ -31,17 +31,19 @@ class SeveralPartialOrdersTestSuite
 
   private def bobNode = nodes(2)
 
-  matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
-  nodes.waitForHeightArise()
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    matcherNode.waitForTransaction(matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx)).id)
+  }
 
   "Alice and Bob trade WAVES-USD" - {
-    val bobWavesBalanceBefore = matcherNode.accountBalances(bobNode.address)._1
-
     val price           = 238
     val buyOrderAmount  = 425532L
     val sellOrderAmount = 840340L
 
     "place two submitted orders and one counter" in {
+      val bobWavesBalanceBefore = matcherNode.accountBalances(bobNode.address)._1
+
       val bobOrder1   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       val bobOrder1Id = matcherNode.placeOrder(bobOrder1).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, bobOrder1Id, "Accepted", 1.minute)
@@ -78,7 +80,7 @@ class SeveralPartialOrdersTestSuite
       orderBook2.bids shouldBe empty
 
       matcherNode.cancelOrder(bobNode, wavesUsdPair, bobOrder2Id)
-      nodes.waitForHeightArise()
+      matcherNode.waitOrderStatus(wavesUsdPair, bobOrder2Id, "Cancelled", 1.minute)
 
       matcherNode.reservedBalance(bobNode) shouldBe empty
       matcherNode.reservedBalance(aliceNode) shouldBe empty

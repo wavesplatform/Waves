@@ -42,7 +42,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            orderValidator: OrderValidator,
                            matcher: ActorRef,
                            orderHistory: ActorRef,
-                           orderBook: AssetPair => Option[ActorRef],
+                           orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            wavesSettings: WavesSettings,
@@ -170,9 +170,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def doCancel(order: Order): Future[MatcherResponse] = orderBook(order.assetPair) match {
-    case Some(orderBookRef) =>
+    case Some(Right(orderBookRef)) =>
       log.trace(s"Canceling ${order.id()} for ${order.sender.address}")
       (orderBookRef ? CancelOrder(order.id())).mapTo[MatcherResponse]
+    case Some(Left(_)) => Future.successful(OrderBookUnavailable)
     case None =>
       log.debug(s"Order book for ${order.assetPair} was not found, canceling ${order.id()} anyway")
       (orderHistory ? OrderHistoryActor.ForceCancelOrderFromHistory(order.id()))

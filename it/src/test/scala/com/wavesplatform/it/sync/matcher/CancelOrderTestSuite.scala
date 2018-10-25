@@ -24,17 +24,19 @@ class CancelOrderTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
-    matcherNode.signedIssue(createSignedIssueRequest(IssueBtcTx))
-    nodes.waitForHeightArise()
+    Seq(IssueUsdTx, IssueBtcTx).map(createSignedIssueRequest).map(matcherNode.signedIssue).foreach { x =>
+      matcherNode.waitForTransaction(x.id)
+    }
   }
 
   "Order can be canceled" - {
     "by sender" in {
       val orderId = matcherNode.placeOrder(bobNode, wavesUsdPair, OrderType.SELL, 100.waves, 800).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
+
       matcherNode.cancelOrder(bobNode, wavesUsdPair, orderId)
       matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
+
       matcherNode.orderHistoryByPair(bobNode, wavesUsdPair).collectFirst {
         case o if o.id == orderId => o.status shouldEqual "Cancelled"
       }
