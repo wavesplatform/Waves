@@ -155,7 +155,7 @@ class MinerImpl(allChannels: ChannelGroup,
           s"Forging with ${account.address}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID")
         _ = log.debug(s"Previous block ID $refBlockID at $height with target $refBlockBT")
         consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
-        estimators                         = MiningConstraints(minerSettings, blockchainUpdater, height)
+        estimators                         = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
         mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
         (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, isSortingRequired())
         _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
