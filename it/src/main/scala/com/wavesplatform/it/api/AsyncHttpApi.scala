@@ -243,21 +243,24 @@ object AsyncHttpApi extends Assertions {
               decimals: Byte,
               reissuable: Boolean,
               fee: Long,
-              version: Byte = 2): Future[Transaction] = {
+              version: Byte = 2,
+              script: Option[String] = None): Future[Transaction] = {
       version match {
         case 2 => { //TODO: @monroid refactor after https://wavesplatform.atlassian.net/browse/NODE-1222 fix
-          signAndBroadcast(
-            Json.obj(
-              "type"        -> 3,
-              "name"        -> name,
-              "quantity"    -> quantity,
-              "description" -> description,
-              "sender"      -> sourceAddress,
-              "decimals"    -> decimals,
-              "reissuable"  -> reissuable,
-              "fee"         -> fee,
-              "version"     -> version
-            ))
+          val js = Json.obj(
+            "type"        -> 3,
+            "name"        -> name,
+            "quantity"    -> quantity,
+            "description" -> description,
+            "sender"      -> sourceAddress,
+            "decimals"    -> decimals,
+            "reissuable"  -> reissuable,
+            "fee"         -> fee,
+            "version"     -> version
+          )
+
+          val jsUpdated = if (script.isDefined) js ++ Json.obj("script" -> JsString(script.get)) else js
+          signAndBroadcast(jsUpdated)
         }
         case _ => postJson("/assets/issue", IssueV1Request(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
       }
