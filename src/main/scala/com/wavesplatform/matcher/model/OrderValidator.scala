@@ -92,7 +92,8 @@ class OrderValidator(db: DB,
             .ensure(s"Order should have a timestamp after $lowestOrderTs, but it is ${order.timestamp}")(_.timestamp > lowestOrderTs)
             .ensure(s"Order matcherFee should be >= ${settings.minOrderFee}")(_.matcherFee >= settings.minOrderFee)
             .ensure("Invalid signature")(_.signatureValid())
-            .ensure("Invalid order")(_.isValid(time.correctedTime()))
+          _ <- order.isValid(time.correctedTime()).toEither
+          _ <- (Right(order): Either[String, Order])
             .ensure("Order has already been placed")(o => DBUtils.orderInfo(db, o.id()).status == LimitOrder.NotFound)
             .ensure(s"Limit of $MaxElements active orders has been reached")(o => DBUtils.activeOrderCount(db, o.senderPublicKey) < MaxElements)
             .ensure("Trading on scripted account isn't allowed yet")(_ => !blockchain.hasScript(senderAddress))
