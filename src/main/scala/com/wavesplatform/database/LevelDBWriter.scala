@@ -123,7 +123,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override protected def hasAssetScriptBytes(asset: AssetId): Boolean = readOnly { db =>
-    db.hasInHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset))
+    db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScriptPresent(asset)).flatten.nonEmpty
   }
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))

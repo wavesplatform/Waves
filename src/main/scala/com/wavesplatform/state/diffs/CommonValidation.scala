@@ -204,11 +204,26 @@ object CommonValidation {
 
     def isSmartToken(input: FeeInfo): Boolean = input._1.map(_._1).flatMap(blockchain.assetDescription).exists(_.script.isDefined)
 
-    def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = Right {
+//    def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = Right {
+//      if (isSmartToken(inputFee)) {
+//        val (feeAssetInfo, feeAmount) = inputFee
+//        (feeAssetInfo, feeAmount + ScriptExtraFee)
+//      } else inputFee
+//    }
+
+    def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = {
+      val (feeAssetInfo, feeAmount) = inputFee
+//      val assetsCount               = 0
+      val assetsCount = tx match {
+        case tx: ExchangeTransaction => tx.checkedAssets().count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
+        case tx                      => tx.checkedAssets().count(blockchain.hasAssetScript)
+      }
       if (isSmartToken(inputFee)) {
-        val (feeAssetInfo, feeAmount) = inputFee
-        (feeAssetInfo, feeAmount + ScriptExtraFee)
-      } else inputFee
+        //Left(GenericError("Using smart asset for sponsorship is disabled."))
+        Right { (feeAssetInfo, feeAmount + ScriptExtraFee * (1 + assetsCount)) }
+      } else {
+        Right { (feeAssetInfo, feeAmount + ScriptExtraFee * assetsCount) }
+      }
     }
 
     def hasSmartAccountScript: Boolean = tx match {

@@ -124,14 +124,27 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         .explicitGet()
 
       val transferAssetTx = TransferTransactionV1
-        .selfSigned(Some(issueTx.id()), richAcc, recipientAcc, 100, ts, None, 1 * Constants.UnitsInWave, Array.emptyByteArray)
+        .selfSigned(
+          Some(issueTx.id()),
+          richAcc,
+          recipientAcc,
+          100,
+          ts,
+          None,
+          if (smartToken) { 1 * Constants.UnitsInWave + ScriptExtraFee } else { 1 * Constants.UnitsInWave },
+          Array.emptyByteArray
+        )
         .explicitGet()
 
       val sponsorTx =
         if (sponsorship)
           Seq(
             SponsorFeeTransaction
-              .selfSigned(1, richAcc, issueTx.id(), Some(10), Constants.UnitsInWave, ts)
+              .selfSigned(1, richAcc, issueTx.id(), Some(10), if (smartToken) {
+                Constants.UnitsInWave + ScriptExtraFee
+              } else {
+                Constants.UnitsInWave
+              }, ts)
               .explicitGet()
           )
         else Seq.empty
@@ -181,7 +194,8 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       BlockchainFeatures.SmartAccounts  -> 0,
       BlockchainFeatures.SmartAssets    -> 0,
     )
-    val gen = sponsorAndSetScriptGen(sponsorship = true, smartToken = true, smartAccount = true, feeInAssets = true, 90)
+    val gen =
+      sponsorAndSetScriptGen(sponsorship = true, smartToken = true, smartAccount = true, feeInAssets = true, 900 /* Need to bu more accurate */ )
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>

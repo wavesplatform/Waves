@@ -20,7 +20,7 @@ object AssetTransactionsDiff {
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.id() -> tx.quantity))),
         assetInfos = Map(tx.id()             -> info),
-        assetScripts = Map(tx.id()           -> tx.script)
+        assetScripts = if (tx.script.isEmpty) { Map() } else { Map(tx.id() -> tx.script) }
       ))
   }
 

@@ -32,6 +32,7 @@ trait TransactionGen extends TransactionGenBase { _: Suite =>
 
 trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
 
+  val ScriptExtraFee                  = 400000L
   protected def waves(n: Float): Long = (n * 100000000L).toLong
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
@@ -132,7 +133,9 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
       .explicitGet()
   } yield
     (Seq(issue),
-     SetAssetScriptTransaction.create(version, AddressScheme.current.chainId, sender, issue.id(), script, fee, timestamp, proofs).explicitGet())
+     SetAssetScriptTransaction
+       .create(version, AddressScheme.current.chainId, sender, issue.id(), script, 1 * Constants.UnitsInWave + ScriptExtraFee, timestamp, proofs)
+       .explicitGet())
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
     version                   <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
