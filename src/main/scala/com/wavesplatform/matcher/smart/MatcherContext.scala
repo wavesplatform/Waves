@@ -25,7 +25,7 @@ object MatcherContext {
 
     val heightCoeval: Coeval[Either[String, Long]] = Coeval.evalOnce(Left("height is inaccessible when running script on matcher"))
 
-    val matcherTypes = Seq(addressType, aliasType, orderType, assetPairType)
+    val matcherTypes = Seq(addressType, orderType, assetPairType)
 
     val matcherVars: Map[String, ((FINAL, String), LazyVal)] = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "undefined height placeholder"), LazyVal(EitherT(heightCoeval)))),
@@ -33,23 +33,17 @@ object MatcherContext {
     )
 
     def inaccessibleFunction(name: String, internalName: Short): BaseFunction = {
-      val msg = s"Function ${name} is inaccessible when running script on matcher"
-      NativeFunction(name, 1, internalName, UNIT, msg, Seq.empty: _*) {
-        case _ =>
-          msg.asLeft
-      }
+      val msg = s"Function $name is inaccessible when running script on matcher"
+      NativeFunction(name, 1, internalName, UNIT, msg, Seq.empty: _*)(_ => msg.asLeft)
     }
 
     def inaccessibleUserFunction(name: String): BaseFunction = {
-      val msg = s"Function ${name} is inaccessible when running script on matcher"
+      val msg = s"Function $name is inaccessible when running script on matcher"
       NativeFunction(
         name,
         1,
         FunctionTypeSignature(UNIT, Seq.empty, FunctionHeader.User(name)),
-        ({
-          case _ =>
-            msg.asLeft
-        }),
+        _ => msg.asLeft,
         msg,
         Array.empty
       )
