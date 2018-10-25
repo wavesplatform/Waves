@@ -3,10 +3,10 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import java.nio.charset.StandardCharsets
 
 import cats.data.EitherT
+import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, Types}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
@@ -72,7 +72,7 @@ object PureContext {
       )
     }
 
-  val isDefined: BaseFunction =
+  lazy val isDefined: BaseFunction =
     UserFunction("isDefined", BOOLEAN, "Check the value is defined", ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Option value")) {
       FUNCTION_CALL(ne, List(REF("@a"), REF("unit")))
     }
@@ -277,7 +277,7 @@ object PureContext {
     uNot
   )
 
-  private lazy val vars: Map[String, ((Types.FINAL, String), LazyVal)] = Map(("unit", ((Types.UNIT,"Single instance value"), LazyVal(EitherT.pure(())))))
+  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(("unit", ((UNIT,"Single instance value"), LazyVal(EitherT.pure(())))))
   private lazy val functions = Array(
     fraction,
     sizeBytes,
@@ -302,19 +302,19 @@ object PureContext {
     throwNoMessage
   ) ++ operators
 
-  lazy val ctx = CTX(
+  private lazy val ctx = CTX(
     Seq(
-      new DefinedType { lazy val name = "Unit"; lazy val typeRef       = Types.UNIT       },
-      new DefinedType { lazy val name = "Int"; lazy val typeRef        = Types.LONG       },
-      new DefinedType { lazy val name = "Boolean"; lazy val typeRef    = Types.BOOLEAN    },
-      new DefinedType { lazy val name = "ByteVector"; lazy val typeRef = Types.BYTEVECTOR },
-      new DefinedType { lazy val name = "String"; lazy val typeRef     = Types.STRING     }
+      new DefinedType { lazy val name = "Unit"; lazy val typeRef       = UNIT       },
+      new DefinedType { lazy val name = "Int"; lazy val typeRef        = LONG       },
+      new DefinedType { lazy val name = "Boolean"; lazy val typeRef    = BOOLEAN    },
+      new DefinedType { lazy val name = "ByteVector"; lazy val typeRef = BYTEVECTOR },
+      new DefinedType { lazy val name = "String"; lazy val typeRef     = STRING     }
     ),
     vars,
     functions
   )
-  lazy val evalContext: EvaluationContext   = ctx.evaluationContext
-  lazy val compilerContext: CompilerContext = ctx.compilerContext
+
+  def build(version: ScriptVersion): CTX = ctx
 
   def fromOption[T](v: Option[T]): Any = {
     v.getOrElse((): Any)

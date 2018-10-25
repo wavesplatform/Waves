@@ -5,6 +5,7 @@ import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.DirectiveParser
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
@@ -490,7 +491,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     for {
       expr       <- compiler.compile(scriptWithoutDirectives, directives)
       script     <- ScriptV1(expr)
-      complexity <- ScriptEstimator(ctx.varDefs.keySet, functionCosts, expr)
+      complexity <- ScriptEstimator(ctx.varDefs.keySet, functionCosts(V1), expr)
     } yield (script, complexity)
   }
 

@@ -105,11 +105,11 @@ object CommonValidation {
 
   def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, height: Int, tx: T): Either[ValidationError, T] = {
 
-    def activationBarrier(b: BlockchainFeature) =
+    def activationBarrier(b: BlockchainFeature, msg: Option[String] = None) =
       Either.cond(
         blockchain.isFeatureActivated(b, height),
         tx,
-        ValidationError.ActivationError(s"${tx.getClass.getSimpleName} transaction has not been activated yet")
+        ValidationError.ActivationError(msg.getOrElse(tx.getClass.getSimpleName) + " has not been activated yet")
       )
 
     tx match {
@@ -126,7 +126,12 @@ object CommonValidation {
       case _: CreateAliasTransactionV1 => Right(tx)
       case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
-      case _: SetScriptTransaction     => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case sst: SetScriptTransaction =>
+        sst.script.map(_.version.value) match {
+          case Some(1) | None => activationBarrier(BlockchainFeatures.SmartAccounts)
+          case Some(2)        => activationBarrier(BlockchainFeatures.SmartAccountTrading, Some("Script version 2"))
+          case Some(v)        => Left(GenericError(s"Bad script version $v"))
+        }
       case _: TransferTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
       case it: IssueTransactionV2      => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
       case it: SetAssetScriptTransaction =>

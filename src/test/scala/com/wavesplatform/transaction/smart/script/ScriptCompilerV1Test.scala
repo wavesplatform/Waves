@@ -23,7 +23,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("fails on unsupported version") {
-    val script = scriptWithVersion("2".some)
+    val script = scriptWithVersion("8".some)
     ScriptCompiler(script) shouldBe Left("Unsupported language version")
   }
 
