@@ -22,10 +22,14 @@ class OrderBookTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
   matcherNode.signedIssue(createSignedIssueRequest(IssueWctTx))
   nodes.waitForHeightArise()
 
-  case class Reserves(wct: Long, usd: Long, waves: Long)
-  def reservesOf(node: Node): Reserves = {
-    val reserves = matcherNode.reservedBalance(node)
-    Reserves(reserves.getOrElse(WctId.toString, 0), reserves.getOrElse(UsdId.toString, 0), reserves.getOrElse("WAVES", 0))
+  case class ReservedBalances(wct: Long, usd: Long, waves: Long)
+  def reservedBalancesOf(node: Node): ReservedBalances = {
+    val reservedBalances = matcherNode.reservedBalance(node)
+    ReservedBalances(
+      reservedBalances.getOrElse(WctId.toString, 0),
+      reservedBalances.getOrElse(UsdId.toString, 0),
+      reservedBalances.getOrElse("WAVES", 0)
+    )
   }
 
   val (amount, price) = (1000L, PriceConstant)
@@ -41,7 +45,7 @@ class OrderBookTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
     matcherNode.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
     matcherNode.waitOrderStatus(wctUsdPair, submitted, "Filled")
 
-    val (aliceReservesForOnePair, bobReservesForOnePair) = (reservesOf(aliceNode), reservesOf(bobNode))
+    val (aliceRBForOnePair, bobRBForOnePair) = (reservedBalancesOf(aliceNode), reservedBalancesOf(bobNode))
 
     val buyOrderForAnotherPair  = matcherNode.placeOrder(aliceNode, wctWavesPair, BUY, amount, price).message.id
     val sellOrderForAnotherPair = matcherNode.placeOrder(bobNode, wctWavesPair, SELL, amount, 2 * price).message.id
@@ -49,7 +53,7 @@ class OrderBookTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
     matcherNode.waitOrderStatus(wctWavesPair, buyOrderForAnotherPair, "Accepted")
     matcherNode.waitOrderStatus(wctWavesPair, sellOrderForAnotherPair, "Accepted")
 
-    val (aliceReservesForBothPairs, bobReservesForBothPairs) = (reservesOf(aliceNode), reservesOf(bobNode))
+    val (aliceRBForBothPairs, bobRBForBothPairs) = (reservedBalancesOf(aliceNode), reservedBalancesOf(bobNode))
 
     val marketStatusBeforeDeletion = matcherNode.marketStatus(wctUsdPair)
 
@@ -68,11 +72,11 @@ class OrderBookTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
     }
 
     "reserved balances should be released for the pair" in {
-      val (aliceReserves, bobReserves) = (reservesOf(aliceNode), reservesOf(bobNode))
-      aliceReserves.usd shouldBe 0
-      aliceReserves.waves shouldBe (aliceReservesForBothPairs.waves - aliceReservesForOnePair.waves)
-      bobReserves.wct shouldBe (bobReservesForBothPairs.wct - bobReservesForOnePair.wct)
-      bobReserves.waves shouldBe (bobReservesForBothPairs.waves - bobReservesForOnePair.waves)
+      val (aliceReservedBalances, bobReservedBalances) = (reservedBalancesOf(aliceNode), reservedBalancesOf(bobNode))
+      aliceReservedBalances.usd shouldBe 0
+      aliceReservedBalances.waves shouldBe (aliceRBForBothPairs.waves - aliceRBForOnePair.waves)
+      bobReservedBalances.wct shouldBe (bobRBForBothPairs.wct - bobRBForOnePair.wct)
+      bobReservedBalances.waves shouldBe (bobRBForBothPairs.waves - bobRBForOnePair.waves)
     }
 
     "it should not affect other pairs and their orders" in {
