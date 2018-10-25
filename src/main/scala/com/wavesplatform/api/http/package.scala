@@ -1,6 +1,5 @@
 package com.wavesplatform.api
 
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import com.wavesplatform.http.ApiMarshallers
 import com.wavesplatform.api.http.DataRequest._
