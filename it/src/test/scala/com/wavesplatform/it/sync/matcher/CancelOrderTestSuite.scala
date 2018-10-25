@@ -5,6 +5,7 @@ import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}

@@ -226,12 +226,26 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 
-    def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
+    def expectIncorrectOrderPlacement(order: Order,
+                                      expectedStatusCode: Int,
+                                      expectedStatus: String,
+                                      expectedMessage: Option[String]): Future[Boolean] =
       matcherPost("/matcher/orderbook", order.json()) transform {
         case Failure(UnexpectedStatusCodeException(_, `expectedStatusCode`, responseBody)) =>
-          Try(parse(responseBody).as[MatcherStatusResponse]) match {
-            case Success(mr) if mr.status == expectedStatus => Success(true)
-            case Failure(f)                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+          expectedMessage match {
+            case None =>
+              Try(parse(responseBody).as[MatcherStatusResponse]) match {
+                case Success(mr) if mr.status == expectedStatus => Success(true)
+                case Failure(f)                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+              }
+            case _ =>
+              Try(parse(responseBody).as[MatcherErrorResponse]) match {
+                case Success(mr) if mr.status.get == expectedStatus && mr.message == expectedMessage =>
+                  Success(true)
+                case Failure(f) =>
+                  Failure(new RuntimeException(s"Failed to parse response: $f"))
+              }
+
           }
         case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
         case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))

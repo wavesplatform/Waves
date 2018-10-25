@@ -3,14 +3,13 @@ package com.wavesplatform.it.sync.matcher.config
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.{empty, parseString}
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
+
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.Base58
 
 import scala.util.Random
 
@@ -132,20 +131,5 @@ object MatcherPriceAssetConfig {
      """.stripMargin)
 
   val Configs: Seq[Config] = _Configs.map(updatedMatcherConfig.withFallback(_))
-
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
-    import tx._
-    SignedIssueV1Request(
-      Base58.encode(tx.sender.publicKey),
-      new String(name),
-      new String(description),
-      quantity,
-      decimals,
-      reissuable,
-      fee,
-      timestamp,
-      signature.base58
-    )
-  }
 
 }

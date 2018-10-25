@@ -6,10 +6,8 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{EitherExt2, Sponsorship}
-import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -107,19 +105,4 @@ object CustomFeeTransactionSuite {
     notMinerConfig.withFallback(Default(2)),
     notMinerConfig.withFallback(Default(3))
   )
-
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
-    import tx._
-    SignedIssueV1Request(
-      Base58.encode(tx.sender.publicKey),
-      new String(name),
-      new String(description),
-      quantity,
-      decimals,
-      reissuable,
-      issueFee,
-      timestamp,
-      signature.base58
-    )
-  }
 }

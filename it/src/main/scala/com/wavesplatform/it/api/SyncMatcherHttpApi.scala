@@ -13,9 +13,6 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 object SyncMatcherHttpApi extends Assertions {
-  case class ErrorMessage(error: Int, message: String)
-
-  implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
   implicit class MatcherNodeExtSync(m: Node) extends Matchers {
 
@@ -90,8 +87,9 @@ object SyncMatcherHttpApi extends Assertions {
     def expectIncorrectOrderPlacement(order: Order,
                                       expectedStatusCode: Int,
                                       expectedStatus: String,
+                                      expectedMessage: Option[String] = None,
                                       waitTime: Duration = OrderRequestAwaitTime): Boolean =
-      Await.result(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus), waitTime)
+      Await.result(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus, expectedMessage), waitTime)
 
     def cancelOrder(sender: Node,
                     assetPair: AssetPair,

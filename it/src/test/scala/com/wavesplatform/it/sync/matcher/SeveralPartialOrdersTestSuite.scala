@@ -6,7 +6,6 @@ import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
-import com.wavesplatform.it.sync.matcherFee
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.transaction.assets.exchange.OrderType.BUY
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
@@ -14,6 +13,7 @@ import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
+import com.wavesplatform.it.sync._
 
 class SeveralPartialOrdersTestSuite
     extends FreeSpec

@@ -177,6 +177,11 @@ object MarketData {
   implicit val marketData: Format[MarketData] = Json.format
 }
 
+case class MatcherErrorResponse(status: Option[String], message: Option[String])
+object MatcherErrorResponse {
+  implicit val matcherErrorResponseFormat: Format[MatcherErrorResponse] = Json.format
+}
+
 case class MatcherStatusResponse(status: String, filledAmount: Option[Long])
 object MatcherStatusResponse {
   implicit val matcherStatusResponseFormat: Format[MatcherStatusResponse] = Json.format

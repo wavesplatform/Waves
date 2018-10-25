@@ -6,6 +6,7 @@ import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.transaction.assets.exchange.{OrderType}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
