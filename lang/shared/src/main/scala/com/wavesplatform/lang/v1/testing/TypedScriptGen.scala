@@ -11,9 +11,9 @@ trait TypedScriptGen {
 
   def BOOLEANgen(gas: Int): Gen[EXPR] =
     if (gas > 0) Gen.oneOf(CONST_BOOLEANgen, BLOCK_BOOLEANgen(gas - 1), IF_BOOLEANgen(gas - 1), FUNCTION_CALLgen(BOOLEAN))
-    else Gen.const(TRUE)
+    else Gen.const(CONST_BOOLEAN(true))
 
-  def CONST_BOOLEANgen: Gen[EXPR] = Gen.oneOf(FALSE, TRUE)
+  def CONST_BOOLEANgen: Gen[EXPR] = Gen.oneOf(CONST_BOOLEAN(false), CONST_BOOLEAN(true))
 
   def BLOCK_BOOLEANgen(gas: Int): Gen[EXPR] =
     for {

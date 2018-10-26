@@ -644,9 +644,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         )
       )
     ).map {
-      case TRUE  => true
-      case FALSE => false
-      case _     => ???
+      case CONST_BOOLEAN(b) => b
+      case _                => ???
     }
   }
 
@@ -703,9 +702,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
                                      .compile(script, List.empty)
                                      .explicitGet())
     (r._1, r._2.map {
-      case TRUE  => true
-      case FALSE => false
-      case _     => ???
+      case CONST_BOOLEAN(b) => b
+      case _                => ???
     })
   }
 
@@ -762,8 +760,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     import PureContext.{toStringBoolean, toStringLong}
     def evalToString(f: FunctionHeader, arg: EXPR) = ev[EVALUATED](expr = FUNCTION_CALL(f, List(arg)))
 
-    evalToString(toStringBoolean, TRUE) shouldBe evaluated("true")
-    evalToString(toStringBoolean, FALSE) shouldBe evaluated("false")
+    evalToString(toStringBoolean, CONST_BOOLEAN(true)) shouldBe evaluated("true")
+    evalToString(toStringBoolean, CONST_BOOLEAN(false)) shouldBe evaluated("false")
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
       evalToString(toStringLong, CONST_LONG(n)) shouldBe evaluated(n.toString)
@@ -776,8 +774,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     import PureContext.{toBytesBoolean, toBytesLong, toBytesString}
     def evalToBytes(f: FunctionHeader, arg: EXPR) = ev[EVALUATED](expr = FUNCTION_CALL(f, List(arg)))
 
-    evalToBytes(toBytesBoolean, TRUE) shouldBe evaluated(ByteVector(1))
-    evalToBytes(toBytesBoolean, FALSE) shouldBe evaluated(ByteVector(0))
+    evalToBytes(toBytesBoolean, CONST_BOOLEAN(true)) shouldBe evaluated(ByteVector(1))
+    evalToBytes(toBytesBoolean, CONST_BOOLEAN(false)) shouldBe evaluated(ByteVector(0))
     Try(evalToBytes(toStringBoolean, REF("unit"))).isFailure shouldBe true
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>

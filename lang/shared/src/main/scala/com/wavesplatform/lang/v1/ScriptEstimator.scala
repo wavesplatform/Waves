@@ -9,8 +9,8 @@ object ScriptEstimator {
     type Result[T] = EitherT[Coeval, String, T]
 
     def aux(t: Result[EXPR], syms: Map[String, (EXPR, Boolean)]): Result[(Long, Map[String, (EXPR, Boolean)])] = t.flatMap {
-      case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | TRUE | FALSE => EitherT.pure((1, syms))
-      case t: GETTER                                                            => aux(EitherT.pure(t.expr), syms).map { case (comp, out) => (comp + 2, out) }
+      case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | _: CONST_BOOLEAN => EitherT.pure((1, syms))
+      case t: GETTER                                                                => aux(EitherT.pure(t.expr), syms).map { case (comp, out) => (comp + 2, out) }
 
       case BLOCK(let, body) =>
         aux(EitherT.pure(body), syms + ((let.name, (let.value, false))))
@@ -49,6 +49,6 @@ object ScriptEstimator {
         } yield (callCost() + argsComp, argsSyms)
     }
 
-    aux(EitherT.pure(t), declaredVals.map(_ -> ((TRUE, true))).toMap).value().map(_._1)
+    aux(EitherT.pure(t), declaredVals.map(_ -> ((CONST_BOOLEAN(true), true))).toMap).value().map(_._1)
   }
 }

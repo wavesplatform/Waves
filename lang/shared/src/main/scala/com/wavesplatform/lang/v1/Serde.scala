@@ -48,8 +48,8 @@ object Serde {
               body = body
             )
         case E_REF    => Coeval.now(REF(bb.getString))
-        case E_TRUE   => Coeval.now(TRUE)
-        case E_FALSE  => Coeval.now(FALSE)
+        case E_TRUE   => Coeval.now(CONST_BOOLEAN(true))
+        case E_FALSE  => Coeval.now(CONST_BOOLEAN(false))
         case E_GETTER => aux().map(GETTER(_, field = bb.getString))
         case E_FUNCALL =>
           Coeval
@@ -72,9 +72,9 @@ object Serde {
 
   implicit class ByteBufferOps(val self: ByteBuffer) extends AnyVal {
     def getBytes: Array[Byte] = {
-      val len   = self.getInt
-      if(self.limit() < len || len < 0) {
-         throw new Exception(s"Invalid array size ($len)")
+      val len = self.getInt
+      if (self.limit() < len || len < 0) {
+        throw new Exception(s"Invalid array size ($len)")
       }
       val bytes = new Array[Byte](len)
       self.get(bytes)
@@ -153,8 +153,8 @@ object Serde {
             out.write(E_REF)
             out.writeString(key)
           }
-        case TRUE  => Coeval.now(out.write(E_TRUE))
-        case FALSE => Coeval.now(out.write(E_FALSE))
+        case CONST_BOOLEAN(true)  => Coeval.now(out.write(E_TRUE))
+        case CONST_BOOLEAN(false) => Coeval.now(out.write(E_FALSE))
         case GETTER(obj, field) =>
           aux(Coeval.now[Unit](out.write(E_GETTER)), obj).map { _ =>
             out.writeString(field)

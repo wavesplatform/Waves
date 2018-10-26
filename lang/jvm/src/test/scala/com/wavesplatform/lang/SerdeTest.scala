@@ -20,18 +20,18 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     "CONST_BYTEVECTOR" in roundTripTest(CONST_BYTEVECTOR(ByteVector[Byte](1)))
     "CONST_STRING" in roundTripTest(CONST_STRING("foo"))
 
-    "IF" in roundTripTest(IF(TRUE, CONST_LONG(0), CONST_LONG(1)))
+    "IF" in roundTripTest(IF(CONST_BOOLEAN(true), CONST_LONG(0), CONST_LONG(1)))
 
     "BLOCK" in roundTripTest(
       BLOCK(
-        let = LET("foo", TRUE),
-        body = FALSE
+        let = LET("foo", CONST_BOOLEAN(true)),
+        body = CONST_BOOLEAN(false)
       )
     )
 
     "REF" in roundTripTest(REF("foo"))
-    "TRUE" in roundTripTest(TRUE)
-    "FALSE" in roundTripTest(FALSE)
+    "TRUE" in roundTripTest(CONST_BOOLEAN(true))
+    "FALSE" in roundTripTest(CONST_BOOLEAN(false))
 
     "GETTER" in roundTripTest(GETTER(REF("foo"), "bar"))
 
@@ -39,14 +39,14 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
       "native" in roundTripTest(
         FUNCTION_CALL(
           function = FunctionHeader.Native(1),
-          args = List(TRUE)
+          args = List(CONST_BOOLEAN(true))
         )
       )
 
       "user" in roundTripTest(
         FUNCTION_CALL(
           function = FunctionHeader.User("foo"),
-          args = List(TRUE)
+          args = List(CONST_BOOLEAN(true))
         )
       )
 

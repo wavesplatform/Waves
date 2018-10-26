@@ -39,8 +39,8 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[EVALUATED] =
     evalExpr(cond) flatMap {
-      case TRUE  => evalExpr(ifTrue)
-      case FALSE => evalExpr(ifFalse)
+      case CONST_BOOLEAN(true) => evalExpr(ifTrue)
+      case CONST_BOOLEAN(false) => evalExpr(ifFalse)
     }
 
   private def evalGetter(expr: EXPR, field: String): EvalM[EVALUATED] =

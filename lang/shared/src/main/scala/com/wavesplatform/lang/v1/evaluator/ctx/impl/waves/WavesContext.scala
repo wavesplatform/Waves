@@ -41,8 +41,7 @@ object WavesContext {
                 case b: ByteVector => CONST_BYTEVECTOR(b)
                 case b: Long       => CONST_LONG(b)
                 case b: String     => CONST_STRING(b)
-                case true          => TRUE
-                case false         => FALSE
+                case b: Boolean    => CONST_BOOLEAN(b)
               }
           }
         case _ => ???
