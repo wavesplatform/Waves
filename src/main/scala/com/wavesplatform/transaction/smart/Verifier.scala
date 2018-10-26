@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.smart
 
 import cats.implicits._
 import com.wavesplatform.crypto
+import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
@@ -36,10 +37,10 @@ object Verifier extends Instrumented with ScorexLogging {
           case (stx: SignedTransaction, None) =>
             stats.signatureVerification
               .measureForType(stx.builder.typeId)(stx.signaturesValid())
-          case (_: SignedTransaction, Some(_)) =>
-            Left(GenericError("Can't process transaction with signature from scripted account"))
           case (et: ExchangeTransaction, scriptOpt) =>
             verifyExchange(et, blockchain, scriptOpt, currentBlockHeight)
+          case (_: SignedTransaction, Some(_)) =>
+            Left(GenericError("Can't process transaction with signature from scripted account"))
           case (_, Some(script)) =>
             stats.accountScriptExecution
               .measureForType(pt.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, pt, false))
@@ -81,11 +82,10 @@ object Verifier extends Instrumented with ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] =
     Try {
-      ScriptRunner[Boolean](height, Coproduct[TxOrd](order), blockchain, script) match {
-        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx, false))
-        case (ctx, Right(false)) =>
-          Left(TransactionNotAllowedByScript(ctx, script.text, false))
-        case (_, Right(true)) => Right(order)
+      MatcherScriptRunner[Boolean](script, order) match {
+        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx, isTokenScript = false))
+        case (ctx, Right(false))    => Left(TransactionNotAllowedByScript(ctx, script.text, isTokenScript = false))
+        case (_, Right(true))       => Right(order)
       }
     }.getOrElse(Left(ScriptExecutionError(
       """
@@ -105,24 +105,38 @@ object Verifier extends Instrumented with ScorexLogging {
     val sellOrder = et.sellOrder
     val buyOrder  = et.buyOrder
 
-    lazy val matcherTxVerification =
+    def matcherTxVerification =
       matcherScriptOpt
         .map { script =>
-          stats.accountScriptExecution
-            .measureForType(typeId)(verifyTx(blockchain, script, height, et, false))
+          if (et.version != 1) {
+            stats.accountScriptExecution
+              .measureForType(typeId)(verifyTx(blockchain, script, height, et, false))
+          } else {
+            Left(GenericError("Can't process transaction with signature from scripted account"))
+          }
         }
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et)))
 
-    lazy val sellerOrderVerification =
+    def sellerOrderVerification =
       blockchain
         .accountScript(sellOrder.sender.toAddress)
-        .map(script => stats.orderValidation.measure(verifyOrder(blockchain, script, height, sellOrder)))
+        .map(script =>
+          if (sellOrder.version != 1) {
+            stats.orderValidation.measure(verifyOrder(blockchain, script, height, sellOrder))
+          } else {
+            Left(GenericError("Can't process order with signature from scripted account"))
+        })
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(sellOrder)))
 
-    lazy val buyerOrderVerification =
+    def buyerOrderVerification =
       blockchain
         .accountScript(buyOrder.sender.toAddress)
-        .map(script => stats.orderValidation.measure(verifyOrder(blockchain, script, height, buyOrder)))
+        .map(script =>
+          if (buyOrder.version != 1) {
+            stats.orderValidation.measure(verifyOrder(blockchain, script, height, buyOrder))
+          } else {
+            Left(GenericError("Can't process order with signature from scripted account"))
+        })
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(buyOrder)))
 
     for {

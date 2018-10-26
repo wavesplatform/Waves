@@ -174,8 +174,6 @@ trait Caches extends Blockchain {
       newTransactions += id -> ((tx, addresses.map(addressId)))
     }
 
-    //Graph.store(block, carryFee)
-
     doAppend(
       block,
       carryFee,
