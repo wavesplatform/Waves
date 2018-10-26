@@ -86,6 +86,18 @@ object AsyncMatcherHttpApi extends Assertions {
         .as[MatcherStatusResponse]
     }
 
+    def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String): Future[Boolean] = {
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/$orderId") transform {
+        case Failure(UnexpectedStatusCodeException(_, 404, responseBody)) =>
+          Try(parse(responseBody).as[MessageMatcherResponse]) match {
+            case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
+            case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+          }
+        case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
+        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
+      }
+    }
+
     def transactionsByOrder(orderId: String): Future[Seq[ExchangeTransaction]] =
       matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
 
@@ -100,6 +112,17 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}").as[OrderBookResponse]
+
+    def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Future[Boolean] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}") transform {
+        case Failure(UnexpectedStatusCodeException(_, 404, responseBody)) =>
+          Try(parse(responseBody).as[MessageMatcherResponse]) match {
+            case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
+            case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+          }
+        case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
+        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
+      }
 
     def deleteOrderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       retrying(_delete(s"${matcherNode.matcherApiEndpoint}/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build())

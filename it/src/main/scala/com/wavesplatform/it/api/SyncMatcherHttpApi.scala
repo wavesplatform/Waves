@@ -26,6 +26,9 @@ object SyncMatcherHttpApi {
     def orderBook(assetPair: AssetPair): OrderBookResponse =
       Await.result(async(m).orderBook(assetPair), RequestAwaitTime)
 
+    def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Boolean =
+      Await.result(async(m).orderBookExpectInvalidAssetId(assetPair, assetId), OrderRequestAwaitTime)
+
     def marketStatus(assetPair: AssetPair): MarketStatusResponse =
       Await.result(async(m).marketStatus(assetPair), RequestAwaitTime)
 
@@ -54,6 +57,9 @@ object SyncMatcherHttpApi {
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       Await.result(async(m).orderStatus(orderId, assetPair, waitForStatus), RequestAwaitTime)
+
+    def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String): Boolean =
+      Await.result(async(m).orderStatusExpectInvalidAssetId(orderId, assetPair, assetId), OrderRequestAwaitTime)
 
     def transactionsByOrder(orderId: String): Seq[ExchangeTransaction] =
       Await.result(async(m).transactionsByOrder(orderId), RequestAwaitTime)
@@ -95,6 +101,14 @@ object SyncMatcherHttpApi {
                                       waitTime: Duration = OrderRequestAwaitTime): Boolean =
       Await.result(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus), waitTime)
 
+    def expectRejectedOrderPlacement(node: Node,
+                                     pair: AssetPair,
+                                     orderType: OrderType,
+                                     amount: Long,
+                                     price: Long,
+                                     timeToLive: Duration = 30.days - 1.seconds): Boolean =
+      expectIncorrectOrderPlacement(prepareOrder(node, pair, orderType, amount, price, timeToLive), 400, "OrderRejected", OrderRequestAwaitTime)
+
     def expectCancelRejected(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
       Await.result(async(m).expectCancelRejected(sender, assetPair, orderId), waitTime)
 
@@ -109,6 +123,13 @@ object SyncMatcherHttpApi {
                             timestamp: Long = System.currentTimeMillis(),
                             waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).cancelOrdersForPair(sender, assetPair, timestamp), waitTime)
+
+    def cancelOrder(sender: Node,
+                    assetPair: AssetPair,
+                    orderId: Option[String],
+                    timestamp: Option[Long] = None,
+                    waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      cancelOrder(sender.privateKey, assetPair, orderId, timestamp, waitTime)
 
     def cancelAllOrders(sender: Node,
                         timestamp: Long = System.currentTimeMillis(),
