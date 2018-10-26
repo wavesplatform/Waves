@@ -17,7 +17,10 @@ object Terms {
   case class BLOCK(let: LET, body: EXPR)                        extends EXPR
   case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)        extends EXPR
   case class REF(key: String)                                   extends EXPR
-  case class CONST_BOOLEAN(b: Boolean)                          extends EXPR with EVALUATED
+
+  case class CONST_BOOLEAN(b: Boolean) extends EXPR with EVALUATED {
+    override def toString(): String = if (b) "TRUE" else "FALSE"
+  }
 
   case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR]) extends EXPR
 
