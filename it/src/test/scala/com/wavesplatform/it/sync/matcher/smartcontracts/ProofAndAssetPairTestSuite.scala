@@ -197,13 +197,13 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
         for (i <- Seq(sc1, sc3, sc4, sc5)) {
           log.debug(s"contract: $i")
           val aliceOrd1 = matcherNode
-            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id
           matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
 
           val aliceOrd2 = matcherNode
-            .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id
           matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
@@ -215,12 +215,12 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             .message
             .id
           val bobOrd2 = matcherNode
-            .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id
 
           matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Filled", 1.minute)
-          matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd1, "Filled", 1.minute)
+          matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Filled", 1.minute)
           matcherNode.waitOrderStatus(predefAssetPair, bobOrd1, "Filled", 1.minute)
           matcherNode.waitOrderStatus(aliceWavesPair, bobOrd2, "Filled", 1.minute)
 
@@ -302,12 +302,12 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           assertBadRequest(
             matcherNode
-              .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+              .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
           )
 
           assertBadRequest(
             matcherNode
-              .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+              .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
           )
         }
         setContract(None, aliceAcc)
@@ -338,7 +338,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             .id
 
           val bobOrd2 = matcherNode
-            .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+            .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
             .message
             .id
 
