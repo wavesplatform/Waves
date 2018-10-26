@@ -22,15 +22,16 @@ object DocExport {
       val wavesContext = WavesContext.build(
         version,
         new Environment {
-        override def height: Long                                                                                    = ???
-        override def networkByte: Byte                                                                               = 66
-        override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
-        override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-        override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
-        override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
-        override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-        override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-      })
+          override def height: Long                                                                                    = ???
+          override def networkByte: Byte                                                                               = 66
+          override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
+          override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+          override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
+          override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
+          override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+          override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+        }
+      )
 
       val cryptoContext = CryptoContext.build(Global)
 

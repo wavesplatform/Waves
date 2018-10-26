@@ -53,7 +53,7 @@ object PureContext {
 
   lazy val eq: BaseFunction =
     NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, "Equality", ("a", TYPEPARAM('T'), "value"), ("b", TYPEPARAM('T'), "value")) {
-      case a :: b :: Nil => Right(B.fromBoolean(a == b))
+      case a :: b :: Nil => Right(CONST_BOOLEAN(a == b))
       case _             => ???
     }
 
@@ -118,7 +118,7 @@ object PureContext {
     case CONST_BYTEVECTOR(_) :: CONST_STRING("ByteVector") :: Nil => Right(CONST_BOOLEAN(true))
     case CONST_STRING(_) :: CONST_STRING("String") :: Nil         => Right(CONST_BOOLEAN(true))
     case CONST_LONG(_) :: CONST_STRING("Int") :: Nil              => Right(CONST_BOOLEAN(true))
-    case (p: CaseObj) :: CONST_STRING(s) :: Nil                   => Right(B.fromBoolean(p.caseType.name == s))
+    case (p: CaseObj) :: CONST_STRING(s) :: Nil                   => Right(CONST_BOOLEAN(p.caseType.name == s))
     case _                                                        => Right(CONST_BOOLEAN(false))
   }
 
@@ -266,7 +266,7 @@ object PureContext {
   def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
       body: (Long, Long) => Boolean): BaseFunction =
     NativeFunction(opsToFunctions(op), complicity, func, r, docString, ("a", t, arg1Doc), ("b", t, arg2Doc)) {
-      case CONST_LONG(a) :: CONST_LONG(b) :: Nil => Right(B.fromBoolean(body(a, b)))
+      case CONST_LONG(a) :: CONST_LONG(b) :: Nil => Right(CONST_BOOLEAN(body(a, b)))
       case _                                     => ???
     }
 
