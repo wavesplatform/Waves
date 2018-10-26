@@ -23,14 +23,14 @@ object PureContext {
 
   lazy val mulLong: BaseFunction =
     createTryOp(MUL_OP, LONG, LONG, MUL_LONG, "Integer multiplication", "multiplyer", "multiplyer")((a, b) => Math.multiplyExact(a, b))
-  lazy val divLong: BaseFunction = createTryOp(DIV_OP, LONG, LONG, DIV_LONG, "Integer devision", "divisible", "divisor")((a, b) =>
-    Math.floorDiv(a, b))
+  lazy val divLong: BaseFunction =
+    createTryOp(DIV_OP, LONG, LONG, DIV_LONG, "Integer devision", "divisible", "divisor")((a, b) => Math.floorDiv(a, b))
   lazy val modLong: BaseFunction =
     createTryOp(MOD_OP, LONG, LONG, MOD_LONG, "Modulo", "divisible", "divisor")((a, b) => Math.floorMod(a, b))
   lazy val sumLong: BaseFunction =
     createTryOp(SUM_OP, LONG, LONG, SUM_LONG, "Integer sum", "term", "term")((a, b) => Math.addExact(a, b))
-  lazy val subLong: BaseFunction = createTryOp(SUB_OP, LONG, LONG, SUB_LONG, "Integer substitution", "term", "term")((a, b) =>
-    Math.subtractExact(a, b))
+  lazy val subLong: BaseFunction =
+    createTryOp(SUB_OP, LONG, LONG, SUB_LONG, "Integer substitution", "term", "term")((a, b) => Math.subtractExact(a, b))
   lazy val sumString: BaseFunction =
     createRawOp(SUM_OP, STRING, STRING, SUM_STRING, "Limited strings concatination", "prefix", "suffix", 10) {
       case (CONST_STRING(a), CONST_STRING(b)) =>
@@ -114,11 +114,10 @@ object PureContext {
                                                         "Internal function to check value type",
                                                         ("obj", TYPEPARAM('T'), "value"),
                                                         ("of", STRING, "type name")) {
-    case TRUE :: CONST_STRING("Boolean") :: Nil                   => Right(TRUE)
-    case FALSE :: CONST_STRING("Boolean") :: Nil                  => Right(TRUE)
-    case CONST_BYTEVECTOR(_) :: CONST_STRING("ByteVector") :: Nil => Right(TRUE)
-    case CONST_STRING(_) :: CONST_STRING("String") :: Nil         => Right(TRUE)
-    case CONST_LONG(_) :: CONST_STRING("Int") :: Nil              => Right(TRUE)
+    case CONST_BOOLEAN(_) :: CONST_STRING("Boolean") :: Nil       => Right(CONST_BOOLEAN(true))
+    case CONST_BYTEVECTOR(_) :: CONST_STRING("ByteVector") :: Nil => Right(CONST_BOOLEAN(true))
+    case CONST_STRING(_) :: CONST_STRING("String") :: Nil         => Right(CONST_BOOLEAN(true))
+    case CONST_LONG(_) :: CONST_STRING("Int") :: Nil              => Right(CONST_BOOLEAN(true))
     case (p: CaseObj) :: CONST_STRING(s) :: Nil                   => Right(B.fromBoolean(p.caseType.name == s))
     case _                                                        => Right(FALSE)
   }
@@ -130,9 +129,9 @@ object PureContext {
 
   lazy val toBytesBoolean: BaseFunction =
     NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("b", BOOLEAN, "value")) {
-      case FALSE :: Nil => Right(CONST_BYTEVECTOR(ByteVector(0)))
-      case TRUE :: Nil  => Right(CONST_BYTEVECTOR(ByteVector(1)))
-      case _            => ???
+      case CONST_BOOLEAN(true) :: Nil  => Right(CONST_BYTEVECTOR(ByteVector(1)))
+      case CONST_BOOLEAN(false) :: Nil => Right(CONST_BYTEVECTOR(ByteVector(0)))
+      case _                           => ???
     }
 
   lazy val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("n", LONG, "value")) {
@@ -153,9 +152,9 @@ object PureContext {
 
   lazy val toStringBoolean: BaseFunction =
     NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, "String representation", ("b", BOOLEAN, "value")) {
-      case TRUE :: Nil  => Right(CONST_STRING("true"))
-      case FALSE :: Nil => Right(CONST_STRING("false"))
-      case _            => ???
+      case CONST_BOOLEAN(true) :: Nil  => Right(CONST_STRING("true"))
+      case CONST_BOOLEAN(false) :: Nil => Right(CONST_STRING("false"))
+      case _                           => ???
     }
 
   lazy val toStringLong: BaseFunction = NativeFunction("toString", 1, LONG_TO_STRING, STRING, "String representation", ("n", LONG, "value")) {
@@ -214,13 +213,13 @@ object PureContext {
   lazy val takeString: BaseFunction =
     NativeFunction("take", 1, TAKE_STRING, STRING, "Take string prefix", ("xs", STRING, "sctring"), ("number", LONG, "prefix size in characters")) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => Right(CONST_STRING(xs.take(trimLongToInt(number))))
-      case xs                                                => notImplemented("take(xs: String, number: Long)", xs)
+      case xs                                            => notImplemented("take(xs: String, number: Long)", xs)
     }
 
   lazy val dropString: BaseFunction =
     NativeFunction("drop", 1, DROP_STRING, STRING, "Remmove sring prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => Right(CONST_STRING(xs.drop(trimLongToInt(number))))
-      case xs                                                => notImplemented("drop(xs: String, number: Long)", xs)
+      case xs                                            => notImplemented("drop(xs: String, number: Long)", xs)
     }
 
   lazy val takeRightString: BaseFunction =
@@ -331,8 +330,7 @@ object PureContext {
 
   lazy val unit: EVALUATED = CaseObj(CASETYPEREF("Unit", List.empty), Map.empty)
 
-  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
-    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))))
+  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))))
   private lazy val functions = Array(
     fraction,
     sizeBytes,
