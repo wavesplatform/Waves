@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.utils.compilerContext
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import fastparse.core.Parsed
 import org.scalacheck.{Arbitrary, Gen}
@@ -15,6 +15,7 @@ import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
@@ -218,7 +219,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   private def createScript(code: String) = {
     val Parsed.Success(expr, _) = Parser(code).get
-    ScriptV1(CompilerV1(dummyCompilerContext, expr).explicitGet()._1).explicitGet()
+    ScriptV1(CompilerV1(compilerContext(V1), expr).explicitGet()._1).explicitGet()
   }
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransactionV1)] =

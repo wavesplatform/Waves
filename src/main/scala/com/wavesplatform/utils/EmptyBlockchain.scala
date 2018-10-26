@@ -75,6 +75,10 @@ object EmptyBlockchain extends Blockchain {
 
   override def hasScript(address: Address): Boolean = false
 
+  override def assetScript(asset: AssetId): Option[Script] = None
+
+  override def hasAssetScript(asset: AssetId): Boolean = false
+
   override def accountData(acc: Address): AccountDataInfo = AccountDataInfo(Map.empty)
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
@@ -86,7 +90,7 @@ object EmptyBlockchain extends Blockchain {
   override def wavesDistribution(height: Int): Map[Address, Long] = Map.empty
 
   override def allActiveLeases: Set[LeaseTransaction] = Set.empty
-  
+
   override def assetDistributionAtHeight(assetId: AssetId, height: Int): Map[Address, Long] = Map.empty
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.

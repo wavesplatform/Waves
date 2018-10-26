@@ -2,12 +2,13 @@ package com.wavesplatform.matcher.model
 
 import com.google.common.base.Charsets
 import com.wavesplatform.WithDB
-import com.wavesplatform.account.{Address, PrivateKeyAccount}
-import com.wavesplatform.matcher.{MatcherKeys, MatcherTestData}
+import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.OrderHistorySpecification._
+import com.wavesplatform.matcher.{MatcherKeys, MatcherTestData}
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -50,6 +51,8 @@ class OrderHistorySpecification
 
   private def selectOrders(xs: Seq[Order.Id]): Seq[Order] = xs.map(id => db.get(MatcherKeys.order(id))).flatten
 
+  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]) = DBUtils.openVolume(db, senderPublicKey, assetId)
+
   property("New buy order added") {
     val ord = buy(pair, 10000, 0.0007)
 
@@ -63,9 +66,9 @@ class OrderHistorySpecification
     }
 
     withClue("reserved assets") {
-      oh.openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 0L
-      oh.openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 7L
-      oh.openVolume(ord.senderPublicKey, None) shouldBe ord.matcherFee
+      openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 7L
+      openVolume(ord.senderPublicKey, None) shouldBe ord.matcherFee
     }
 
     withClue("orders list") {
@@ -92,9 +95,9 @@ class OrderHistorySpecification
     }
 
     withClue("reserved assets") {
-      oh.openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 10000L
-      oh.openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 0L
-      oh.openVolume(ord.senderPublicKey, None) shouldBe ord.matcherFee
+      openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 10000L
+      openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(ord.senderPublicKey, None) shouldBe ord.matcherFee
     }
 
     withClue("orders list") {
@@ -122,8 +125,8 @@ class OrderHistorySpecification
     }
 
     withClue("reserved assets considering amount of received WAVES") {
-      oh.openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 2000L
-      oh.openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 8L
+      openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 2000L
+      openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 8L
     }
 
     activeOrderIds(ord.senderPublicKey) shouldBe Seq(ord.id())
@@ -136,8 +139,8 @@ class OrderHistorySpecification
 
     oh.process(OrderAdded(lo))
     oh.orderInfo(ord.id()).status shouldBe LimitOrder.Accepted
-    oh.openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 10000L + ord.matcherFee
-    oh.openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 0L
+    openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 10000L + ord.matcherFee
+    openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 0L
 
     activeOrderIds(ord.senderPublicKey) shouldBe Seq(ord.id())
   }
@@ -151,7 +154,7 @@ class OrderHistorySpecification
     val oi = oh.orderInfo(ord.id())
     oi.status shouldBe LimitOrder.Accepted
 
-    oh.openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 0L
+    openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 0L
   }
 
   property("Should not reserve fee, if buyer receives more WAVES than total fee in buy order") {
@@ -163,7 +166,7 @@ class OrderHistorySpecification
     val oi = oh.orderInfo(ord.id())
     oi.status shouldBe LimitOrder.Accepted
 
-    oh.openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 0L
+    openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 0L
   }
 
   property("Two sell orders added") {
@@ -180,8 +183,8 @@ class OrderHistorySpecification
     }
 
     withClue("correction was used to reserve assets") {
-      oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe ord1.amount + ord1.matcherFee + ord2.amount + ord2.matcherFee
-      oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe ord1.amount + ord1.matcherFee + ord2.amount + ord2.matcherFee
+      openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
     }
 
     withClue("orders list") {
@@ -212,13 +215,13 @@ class OrderHistorySpecification
     }
 
     withClue(s"has no reserved assets, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
-      oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
-      oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
     }
 
     withClue(s"has no reserved assets, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.idStr()}") {
-      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
-      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
     }
 
     withClue("orders list of counter owner") {
@@ -247,8 +250,8 @@ class OrderHistorySpecification
     oh.process(OrderAdded(counterLo))
     val counterOrderInfo1 = oh.orderInfo(counter.id())
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
-      oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe counterLo.getRawSpendAmount - counterOrderInfo1.totalSpend(counterLo) + counterOrderInfo1.remainingFee
-      oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe counterLo.getRawSpendAmount - counterOrderInfo1.totalSpend(counterLo) + counterOrderInfo1.remainingFee
+      openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(counter.senderPublicKey) shouldBe Seq(counter.id())
     }
 
@@ -285,13 +288,13 @@ class OrderHistorySpecification
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
       val remainingSpend = counter.amount - counterOrderInfo.totalSpend(LimitOrder(counter))
-      oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe remainingSpend + counterOrderInfo.remainingFee
-      oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe remainingSpend + counterOrderInfo.remainingFee
+      openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
     }
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.idStr()}") {
-      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
-      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
     }
 
     withClue("orders list of counter owner") {
@@ -345,10 +348,10 @@ class OrderHistorySpecification
     }
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.idStr()}") {
-      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe
+      openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe
         math.max(0L,
                  OrderInfo.safeSum(LimitOrder.getPartialFee(submitted.matcherFee, submitted.amount, submitted.amount - counter.amount), -20000000L))
-      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe (BigDecimal(0.00085) * 20000000L).toLong
+      openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe (BigDecimal(0.00085) * 20000000L).toLong
     }
 
     withClue("orders list of counter owner") {
@@ -409,19 +412,19 @@ class OrderHistorySpecification
     exec2.submittedRemainingFee shouldBe submitted2Info1.remainingFee
     oh.orderInfo(submitted2.id()).status shouldBe LimitOrder.PartiallyFilled(50000000)
 
-    oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
-    oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
+    openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+    openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
     activeOrderIds(counter.senderPublicKey) shouldBe empty
 
-    oh.openVolume(submitted1.senderPublicKey, pair.priceAsset) shouldBe 0L
-    oh.openVolume(submitted1.senderPublicKey, pair.amountAsset) shouldBe 0L
+    openVolume(submitted1.senderPublicKey, pair.priceAsset) shouldBe 0L
+    openVolume(submitted1.senderPublicKey, pair.amountAsset) shouldBe 0L
     activeOrderIds(submitted1.senderPublicKey) shouldBe empty
 
     withClue(s"account checks, ord3.senderPublicKey: ${submitted2.senderPublicKey}, ord3.order.id=${submitted2.idStr()}") {
       val lo             = LimitOrder(submitted2)
       val remainingSpend = lo.getSpendAmount - submitted2Info1.totalSpend(lo)
-      oh.openVolume(submitted2.senderPublicKey, pair.amountAsset) shouldBe remainingSpend + submitted2Info1.remainingFee
-      oh.openVolume(submitted2.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(submitted2.senderPublicKey, pair.amountAsset) shouldBe remainingSpend + submitted2Info1.remainingFee
+      openVolume(submitted2.senderPublicKey, pair.priceAsset) shouldBe 0L
       activeOrderIds(submitted2.senderPublicKey) shouldBe Seq(submitted2.id())
     }
   }
@@ -436,17 +439,17 @@ class OrderHistorySpecification
     oh.processAll(exec, OrderCanceled(exec.submittedRemaining, unmatchable = true))
 
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
-      oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 205L
-      oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
-      oh.openVolume(counter.senderPublicKey, None) shouldBe counter.matcherFee - LimitOrder.getPartialFee(counter.matcherFee,
-                                                                                                          counter.amount,
-                                                                                                          exec.executedAmount)
+      openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 205L
+      openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(counter.senderPublicKey, None) shouldBe counter.matcherFee - LimitOrder.getPartialFee(counter.matcherFee,
+                                                                                                       counter.amount,
+                                                                                                       exec.executedAmount)
     }
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
-      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
-      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
-      oh.openVolume(submitted.senderPublicKey, None) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, None) shouldBe 0L
     }
   }
 
@@ -460,9 +463,9 @@ class OrderHistorySpecification
     oh.process(exec)
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
-      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
-      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
-      oh.openVolume(submitted.senderPublicKey, None) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, None) shouldBe 0L
     }
   }
 
@@ -481,8 +484,8 @@ class OrderHistorySpecification
     )
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
-      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
-      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
     }
   }
 
@@ -501,9 +504,9 @@ class OrderHistorySpecification
     )
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
-      oh.openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
-      oh.openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
-      oh.openVolume(submitted.senderPublicKey, None) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, None) shouldBe 0L
     }
   }
 
@@ -574,8 +577,8 @@ class OrderHistorySpecification
     val expectedAmountReserved = counterOrderInfo.remainingFee + submittedOrderInfo.remaining + submittedOrderInfo.remainingFee
     expectedAmountReserved shouldBe 110157143L
 
-    oh.openVolume(pk, pair.amountAsset) shouldBe expectedAmountReserved
-    oh.openVolume(pk, pair.priceAsset) shouldBe 0L
+    openVolume(pk, pair.amountAsset) shouldBe expectedAmountReserved
+    openVolume(pk, pair.priceAsset) shouldBe 0L
 
     withClue("orders list") {
       activeOrderIds(pk) shouldBe Seq(submitted.id())
@@ -595,8 +598,8 @@ class OrderHistorySpecification
 
     oh.processAll(OrderAdded(LimitOrder(counter)), OrderCanceled(LimitOrder(submitted), unmatchable = true))
 
-    oh.openVolume(pk, pair.amountAsset) should be >= 0L
-    oh.openVolume(pk, pair.priceAsset) should be >= 0L
+    openVolume(pk, pair.amountAsset) should be >= 0L
+    openVolume(pk, pair.priceAsset) should be >= 0L
 
     withClue("orders list of submitted owner") {
       activeOrderIds(pk) shouldBe empty
@@ -614,8 +617,8 @@ class OrderHistorySpecification
 
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Cancelled(0)
 
-    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 0L
-    oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
+    openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 0L
+    openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
 
     withClue("orders list") {
       val addr = ord1.senderPublicKey.toAddress
@@ -636,8 +639,8 @@ class OrderHistorySpecification
 
     oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Cancelled(0)
 
-    oh.openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 0L
-    oh.openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
+    openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 0L
+    openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
     activeOrderIds(ord1.senderPublicKey) shouldBe empty
   }
 
@@ -653,8 +656,8 @@ class OrderHistorySpecification
     oh.orderInfo(counter.id()).status shouldBe LimitOrder.Cancelled(1000000000)
     oh.orderInfo(submitted.id()).status shouldBe LimitOrder.Filled(1000000000)
 
-    oh.openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
-    oh.openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+    openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
+    openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
 
     withClue("orders list of counter owner") {
       val addr = counter.senderPublicKey.toAddress
@@ -685,11 +688,11 @@ class OrderHistorySpecification
     val submittedInfo = oh.orderInfo(submitted.id())
     submittedInfo.status shouldBe LimitOrder.Filled(100000000)
 
-    oh.openVolume(pk, pair.amountAsset) shouldBe 0 // We receive 210000000 >> 300000 WAVES
+    openVolume(pk, pair.amountAsset) shouldBe 0 // We receive 210000000 >> 300000 WAVES
 
     val counterLo             = LimitOrder(counter)
     val expectedPriceReserved = counterLo.getSpendAmount - counterInfo.totalSpend(counterLo)
-    oh.openVolume(pk, pair.priceAsset) shouldBe expectedPriceReserved
+    openVolume(pk, pair.priceAsset) shouldBe expectedPriceReserved
 
     oh.deleteOrder(pk, counter.id()) shouldBe Left(LimitOrder.PartiallyFilled(100000000))
     oh.deleteOrder(pk, submitted.id()) shouldBe Right(())

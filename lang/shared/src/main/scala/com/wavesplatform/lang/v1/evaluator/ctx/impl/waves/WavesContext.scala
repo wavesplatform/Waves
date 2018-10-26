@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
 import cats.implicits._
+import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -19,7 +20,7 @@ object WavesContext {
   import Bindings._
   import Types._
 
-  def build(env: Environment, orderTypeVarsEnabled: Boolean = false): CTX = {
+  def build(version: ScriptVersion, env: Environment): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction =
@@ -292,26 +293,18 @@ object WavesContext {
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
     val buyOrdTypeCoeval: Coeval[Either[String, CaseObj]]  = Coeval(Right(ordType(OrdType.Buy)))
 
-    val defaultVars = Map(
+    val commonVars = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
       ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
     )
 
-    val orderTypeVars = Map(
-      ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
-      ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
+    val vars = Map(
+      1 -> Map(),
+      2 -> Map(
+        ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
+        ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
+      )
     )
-
-    implicit class BuilderOps[A](fa: A) {
-      def |>(cond: Boolean)(f: A => A): A = {
-        if (cond) f(fa)
-        else fa
-      }
-    }
-
-    val vars: Map[String, ((FINAL, String), LazyVal)] =
-      defaultVars
-        .|>(orderTypeVarsEnabled)(_ ++ orderTypeVars)
 
     val functions = Array(
       txByIdF,
@@ -335,6 +328,6 @@ object WavesContext {
       wavesBalanceF
     )
 
-    CTX(Types.wavesTypes, vars, functions)
+    CTX(Types.wavesTypes, commonVars ++ vars(version.value), functions)
   }
 }

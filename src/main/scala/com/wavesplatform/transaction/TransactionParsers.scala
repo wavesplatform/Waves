@@ -44,7 +44,8 @@ object TransactionParsers {
     ExchangeTransactionV2,
     LeaseTransactionV2,
     LeaseCancelTransactionV2,
-    SponsorFeeTransaction
+    SponsorFeeTransaction,
+    SetAssetScriptTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)

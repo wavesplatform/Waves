@@ -148,8 +148,6 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
     orderIds
   }
 
-  private def orderStatus(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, expectedStatus: String) = {
+  private def orderStatus(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, expectedStatus: String) =
     matcherNode.waitOrderStatus(assetPair, orderId, expectedStatus)
-    matcherNode.fullOrderHistory(sender).filter(_.id == orderId).seq.head.status shouldBe expectedStatus
-  }
 }

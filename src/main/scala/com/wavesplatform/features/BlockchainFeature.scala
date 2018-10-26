@@ -25,6 +25,7 @@ object BlockchainFeatures {
     FeeSponsorship,
     FairPoS,
     SmartAccountTrading,
+    SmartAssets,
   ).map(f => f.id -> f).toMap
 
   val implemented: Set[Short] = dict.keySet

@@ -21,15 +21,22 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   override def balance(address: Address, assetId: Option[AssetId]): Long =
     inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
 
-  override def assetDescription(id: ByteStr): Option[AssetDescription] =
+  override def assetScript(id: ByteStr): Option[Script] = maybeDiff.flatMap(_.assetScripts.get(id)).getOrElse(inner.assetScript(id))
+  override def hasAssetScript(id: ByteStr) = maybeDiff.flatMap(_.assetScripts.get(id)) match {
+    case Some(s) => s.nonEmpty
+    case None    => inner.hasAssetScript(id)
+  }
+
+  override def assetDescription(id: ByteStr): Option[AssetDescription] = {
+    val script: Option[Script] = assetScript(id)
     inner.assetDescription(id) match {
       case Some(ad) =>
         diff.issuedAssets
           .get(id)
           .map { newAssetInfo =>
-            val oldAssetInfo = AssetInfo(ad.reissuable, ad.totalVolume, ad.script)
+            val oldAssetInfo = AssetInfo(ad.reissuable, ad.totalVolume)
             val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
-            ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = combination.script)
+            ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = script)
           }
           .orElse(Some(ad))
           .map { ad =>
@@ -49,10 +56,11 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
           .get(id)
           .collectFirst {
             case (_, it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, it.script, sponsorship)
+              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship)
           }
-          .map(z => diff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = r.script)))
+          .map(z => diff.issuedAssets.get(id).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
     }
+  }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse

@@ -12,7 +12,7 @@ object MatcherScriptRunner {
 
   def apply[A](script: Script, order: Order): (Log, Either[String, A]) = script match {
     case Script.Expr(expr) =>
-      val ctx = MatcherContext.build(AddressScheme.current.chainId, Coeval.evalOnce(order))
+      val ctx = MatcherContext.build(script.version, AddressScheme.current.chainId, Coeval.evalOnce(order))
       EvaluatorV1.applywithLogging[A](ctx, expr)
     case _ => (List.empty, "Unsupported script version".asLeft[A])
   }
