@@ -1,6 +1,6 @@
 package com.wavesplatform.utils
 
-import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, TRUE}
+import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, CONST_BOOLEAN}
 import com.wavesplatform.lang.v1.compiler.Types.BOOLEAN
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, UserFunction}
 import org.scalatest.{FreeSpec, Matchers}
@@ -9,7 +9,7 @@ class UtilsSpecification extends FreeSpec with Matchers {
 
   "estimate()" - {
     "handles functions that depend on each other" in {
-      val callee = UserFunction("callee", BOOLEAN, "test users true")(TRUE)
+      val callee = UserFunction("callee", BOOLEAN, "test users true")(CONST_BOOLEAN(true))
       val caller = UserFunction("caller", BOOLEAN, "test call")(FUNCTION_CALL(callee.header, List.empty))
       val ctx = EvaluationContext(
         typeDefs = Map.empty,

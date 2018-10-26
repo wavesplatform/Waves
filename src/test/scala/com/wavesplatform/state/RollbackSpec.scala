@@ -6,7 +6,7 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.features._
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.ValidationError.AliasDoesNotExist
@@ -307,7 +307,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
       case (sender, initialBalance) =>
         withDomain(createSettings(SmartAccounts -> 0)) { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
-          val script = ScriptV1(TRUE).explicitGet()
+          val script = ScriptV1(CONST_BOOLEAN(true)).explicitGet()
 
           val genesisBlockId = d.lastBlockId
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty

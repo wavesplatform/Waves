@@ -24,7 +24,7 @@ class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks wit
       fee       <- smallFeeGen
       ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(TRUE).explicitGet())
+      setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(CONST_BOOLEAN(true)).explicitGet())
       transfer = TransferTransactionV2.selfSigned(version, None, master, recepient, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
     } yield (genesis, setScript, transfer)
 

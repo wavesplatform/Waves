@@ -92,7 +92,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
       .selfSigned(
         version = 1,
         sender = sender,
-        script = Some(ScriptV1(V1, Terms.TRUE, checkSize = false).explicitGet()),
+        script = Some(ScriptV1(V1, Terms.CONST_BOOLEAN(true), checkSize = false).explicitGet()),
         fee = 1000000,
         timestamp = System.currentTimeMillis() - 5.minutes.toMillis
       )

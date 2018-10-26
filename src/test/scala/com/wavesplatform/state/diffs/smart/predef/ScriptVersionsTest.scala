@@ -7,7 +7,7 @@ import com.wavesplatform.state.diffs._
 import com.wavesplatform.lang.{ScriptVersion, Testing}
 import com.wavesplatform.lang.ScriptVersion.Versions._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, CONST_BOOLEAN}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Blockchain
@@ -77,7 +77,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
         master <- accountGen
         ts     <- positiveLongGen
         genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-        script  = ScriptV1(V2, TRUE, checkSize = false).explicitGet()
+        script  = ScriptV1(V2, CONST_BOOLEAN(true), checkSize = false).explicitGet()
         tx      = SetScriptTransaction.selfSigned(1, master, Some(script), 100000, ts + 1).explicitGet()
       } yield (genesis, tx)
 

@@ -87,7 +87,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
     def baseGen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = accountGen.map { master =>
       val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       val setScriptTx = SetScriptTransaction
-        .selfSigned(1, master, Some(ScriptV1(Terms.TRUE).explicitGet()), 5000000, ts)
+        .selfSigned(1, master, Some(ScriptV1(Terms.CONST_BOOLEAN(true)).explicitGet()), 5000000, ts)
         .explicitGet()
 
       val block = TestBlock.create(ts, Seq(genesisTx, setScriptTx))

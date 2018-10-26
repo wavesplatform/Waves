@@ -28,7 +28,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
           args = List(byteVector, byteVector, byteVector)
         )
       }
-      .reduceLeft[EXPR](IF(_, _, FALSE))
+      .reduceLeft[EXPR](IF(_, _, CONST_BOOLEAN(false)))
 
     ScriptV1(expr) should produce("Script is too complex")
   }
@@ -59,7 +59,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
           args = List(byteVector, byteVector, byteVector)
         )
       }
-      .reduceLeft[EXPR](IF(_, _, FALSE))
+      .reduceLeft[EXPR](IF(_, _, CONST_BOOLEAN(false)))
 
     ScriptV1(expr) shouldBe 'right
   }

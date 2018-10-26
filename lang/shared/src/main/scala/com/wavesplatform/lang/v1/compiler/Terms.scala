@@ -19,11 +19,6 @@ object Terms {
   case class REF(key: String)                                   extends EXPR
   case class CONST_BOOLEAN(b: Boolean)                          extends EXPR with EVALUATED
 
-  case object TRUE  extends EXPR with EVALUATED
-  case object FALSE extends EXPR with EVALUATED
-  case object B {
-    def fromBoolean(b: Boolean) = if (b) TRUE else FALSE
-  }
   case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR]) extends EXPR
 
 }
