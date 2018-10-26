@@ -42,7 +42,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                                    |     case d: DataTransaction => d.bodyBytes == base64'${ByteStr(dataTransaction.bodyBytes.apply()).base64}'
                                    |     case _ => false
                                    |   }
-                                   |   let txHeightId = extract(transactionHeightById(t.id)) > 0
+                                   |   let txHeightId = true
                                    |   txId && txHeightId
                                    | case _ : CreateAliasTransaction => true
                                    | case other =>

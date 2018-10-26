@@ -64,6 +64,6 @@ class WavesEnvironment(nByte: Byte, tx: Coeval[Transaction], h: Coeval[Int], blo
       balance = blockchain.balance(address, maybeAssetId.map(ByteStr(_)))
     } yield balance).left.map(_.toString)
   }
-  override def transactionHeightById(id: Array[Byte]): Option[Int] =
-    blockchain.transactionHeight(ByteStr(id))
+//  override def transactionHeightById(id: Array[Byte]): Option[Int] =
+//    blockchain.transactionHeight(ByteStr(id))
 }
