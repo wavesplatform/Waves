@@ -1,15 +1,21 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.fromOption
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx.{ARR, CaseObj}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters
 import com.wavesplatform.lang.v1.traits.domain.Tx._
 import com.wavesplatform.lang.v1.traits.domain._
 import scodec.bits.ByteVector
 
 object Bindings {
+
+  import converters._
+
+  private def combine(m0: Map[String, EVALUATED], m1: Map[String, EVALUATED]*) = m1.toList.fold(m0)(_ ++ _)
+
   import Types._
 
-  private def headerPart(tx: Header): Map[String, Any] = Map(
+  private def headerPart(tx: Header): Map[String, EVALUATED] = Map(
     "id"        -> tx.id,
     "fee"       -> tx.fee,
     "timestamp" -> tx.timestamp,
@@ -17,15 +23,16 @@ object Bindings {
   )
 
   private def proofsPart(existingProofs: IndexedSeq[ByteVector]) =
-    "proofs" -> (existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)).toIndexedSeq
+    "proofs" -> ARR((existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)).map(CONST_BYTEVECTOR).toIndexedSeq)
 
-  private def provenTxPart(tx: Proven): Map[String, Any] =
-    Map(
-      "sender"          -> senderObject(tx.sender),
-      "senderPublicKey" -> tx.senderPk,
-      "bodyBytes"       -> tx.bodyBytes,
-      proofsPart(tx.proofs)
-    ) ++ headerPart(tx.h)
+  private def provenTxPart(tx: Proven): Map[String, EVALUATED] =
+    combine(Map(
+              "sender"          -> senderObject(tx.sender),
+              "senderPublicKey" -> tx.senderPk,
+              "bodyBytes"       -> tx.bodyBytes,
+              proofsPart(tx.proofs)
+            ),
+            headerPart(tx.h))
 
   private def mapRecipient(r: Recipient) =
     "recipient" -> (r match {
@@ -37,8 +44,8 @@ object Bindings {
     CaseObj(
       assetPairType.typeRef,
       Map(
-        "amountAsset" -> fromOption(ap.amountAsset),
-        "priceAsset"  -> fromOption(ap.priceAsset)
+        "amountAsset" -> fromOptionBV(ap.amountAsset),
+        "priceAsset"  -> ap.priceAsset
       )
     )
 
@@ -73,104 +80,124 @@ object Bindings {
   def transactionObject(tx: Tx): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
-        CaseObj(genesisTransactionType.typeRef, Map("amount" -> amount) ++ headerPart(h) + mapRecipient(recipient))
+        CaseObj(genesisTransactionType.typeRef, Map("amount" -> CONST_LONG(amount)) ++ headerPart(h) + mapRecipient(recipient))
       case Tx.Payment(p, amount, recipient) =>
-        CaseObj(paymentTransactionType.typeRef, Map("amount" -> amount) ++ provenTxPart(p) + mapRecipient(recipient))
+        CaseObj(paymentTransactionType.typeRef, Map("amount" -> CONST_LONG(amount)) ++ provenTxPart(p) + mapRecipient(recipient))
       case Tx.Transfer(p, feeAssetId, assetId, amount, recipient, attachment) =>
         CaseObj(
           transferTransactionType.typeRef,
-          Map(
-            "amount"     -> amount,
-            "feeAssetId" -> fromOption(feeAssetId),
-            "assetId"    -> fromOption(assetId),
-            "attachment" -> attachment
-          ) ++ provenTxPart(p) + mapRecipient(recipient)
+          combine(
+            Map(
+              "amount"     -> amount,
+              "feeAssetId" -> feeAssetId,
+              "assetId"    -> assetId,
+              "attachment" -> attachment
+            ),
+            provenTxPart(p) + mapRecipient(recipient)
+          )
         )
       case Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
           issueTransactionType.typeRef,
-          Map(
-            "quantity"    -> quantity,
-            "name"        -> name,
-            "description" -> description,
-            "reissuable"  -> reissuable,
-            "decimals"    -> decimals,
-            "script"      -> fromOption(scriptOpt)
-          ) ++ provenTxPart(p)
+          combine(
+            Map(
+              "quantity"    -> quantity,
+              "name"        -> name,
+              "description" -> description,
+              "reissuable"  -> reissuable,
+              "decimals"    -> decimals,
+              "script"      -> scriptOpt
+            ),
+            provenTxPart(p)
+          )
         )
       case ReIssue(p, quantity, assetId, reissuable) =>
-        CaseObj(
-          reissueTransactionType.typeRef,
-          Map(
-            "quantity"   -> quantity,
-            "assetId"    -> assetId,
-            "reissuable" -> reissuable,
-          ) ++ provenTxPart(p)
-        )
+        CaseObj(reissueTransactionType.typeRef,
+                combine(Map(
+                          "quantity"   -> quantity,
+                          "assetId"    -> assetId,
+                          "reissuable" -> reissuable,
+                        ),
+                        provenTxPart(p)))
       case Burn(p, quantity, assetId) =>
         CaseObj(burnTransactionType.typeRef,
-                Map(
-                  "quantity" -> quantity,
-                  "assetId"  -> assetId
-                ) ++ provenTxPart(p))
+                combine(Map(
+                          "quantity" -> quantity,
+                          "assetId"  -> assetId
+                        ),
+                        provenTxPart(p)))
       case Lease(p, amount, recipient) =>
-        CaseObj(
-          leaseTransactionType.typeRef,
-          Map(
-            "amount" -> amount,
-          ) ++ provenTxPart(p) + mapRecipient(recipient)
-        )
+        CaseObj(leaseTransactionType.typeRef,
+                combine(Map(
+                          "amount" -> amount,
+                        ),
+                        provenTxPart(p) + mapRecipient(recipient)))
       case LeaseCancel(p, leaseId) =>
         CaseObj(
           leaseCancelTransactionType.typeRef,
-          Map(
-            "leaseId" -> leaseId,
-          ) ++ provenTxPart(p)
+          combine(Map(
+                    "leaseId" -> leaseId,
+                  ),
+                  provenTxPart(p))
         )
       case CreateAlias(p, alias) =>
-        CaseObj(
-          createAliasTransactionType.typeRef,
-          Map(
-            "alias" -> alias,
-          ) ++ provenTxPart(p)
-        )
+        CaseObj(createAliasTransactionType.typeRef,
+                combine(Map(
+                          "alias" -> alias,
+                        ),
+                        provenTxPart(p)))
       case MassTransfer(p, assetId, transferCount, totalAmount, transfers, attachment) =>
         CaseObj(
           massTransferTransactionType.typeRef,
-          Map(
-            "transfers" -> transfers
-              .map(bv => CaseObj(transfer.typeRef, Map(mapRecipient(bv.recipient), "amount" -> bv.amount))),
-            "assetId"       -> fromOption(assetId),
-            "transferCount" -> transferCount,
-            "totalAmount"   -> totalAmount,
-            "attachment"    -> attachment
-          ) ++ provenTxPart(p)
+          combine(
+            Map(
+              "transfers" -> transfers
+                .map(bv => CaseObj(transfer.typeRef, Map(mapRecipient(bv.recipient), "amount" -> bv.amount))),
+              "assetId"       -> assetId,
+              "transferCount" -> transferCount,
+              "totalAmount"   -> totalAmount,
+              "attachment"    -> attachment
+            ),
+            provenTxPart(p)
+          )
         )
       case SetScript(p, scriptOpt) =>
-        CaseObj(setScriptTransactionType.typeRef, Map("script" -> fromOption(scriptOpt)) ++ provenTxPart(p))
+        CaseObj(setScriptTransactionType.typeRef, Map("script" -> fromOptionBV(scriptOpt)) ++ provenTxPart(p))
       case SetAssetScript(p, assetId, scriptOpt) =>
-        CaseObj(setScriptTransactionType.typeRef, Map("script" -> fromOption(scriptOpt), "assetId" -> assetId) ++ provenTxPart(p))
+        CaseObj(setScriptTransactionType.typeRef,combine( Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId) , provenTxPart(p)))
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
         CaseObj(
           sponsorFeeTransactionType.typeRef,
-          Map("assetId" -> assetId, "minSponsoredAssetFee" -> fromOption(minSponsoredAssetFee)) ++ provenTxPart(p)
+          combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p))
         )
       case Data(p, data) =>
+        def mapValue(e: Any): EVALUATED = e match {
+          case s: String     => c(s)
+          case s: Boolean    => c(s)
+          case s: Long       => c(s)
+          case s: ByteVector => c(s)
+          case _             => ???
+        }
+
         CaseObj(
           dataTransactionType.typeRef,
-          Map("data" -> data.map(e => CaseObj(dataEntryType.typeRef, Map("key" -> e.key, "value" -> e.value)))) ++ provenTxPart(p)
+          combine(Map("data" -> data.map(e => CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING(e.key), "value" -> mapValue(e.value))))),
+                  provenTxPart(p))
         )
       case Exchange(p, amount, price, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
         CaseObj(
           exchangeTransactionType.typeRef,
-          Map(
-            "buyOrder"       -> orderObject(buyOrder),
-            "sellOrder"      -> orderObject(sellOrder),
-            "amount"         -> amount,
-            "price"          -> price,
-            "buyMatcherFee"  -> buyMatcherFee,
-            "sellMatcherFee" -> sellMatcherFee,
-          ) ++ provenTxPart(p)
+          combine(
+            Map(
+              "buyOrder"       -> orderObject(buyOrder),
+              "sellOrder"      -> orderObject(sellOrder),
+              "amount"         -> amount,
+              "price"          -> price,
+              "buyMatcherFee"  -> buyMatcherFee,
+              "sellMatcherFee" -> sellMatcherFee,
+            ),
+            provenTxPart(p)
+          )
         )
     }
 

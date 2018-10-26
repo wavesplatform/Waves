@@ -132,8 +132,8 @@ object CommonValidation {
           case Some(2)        => activationBarrier(BlockchainFeatures.SmartAccountTrading, Some("Script version 2"))
           case Some(v)        => Left(GenericError(s"Bad script version $v"))
         }
-      case _: TransferTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case it: IssueTransactionV2      => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
+      case _: TransferTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
       case it: SetAssetScriptTransaction =>
         if (it.script.isEmpty) {
           Left(GenericError("Empty script is disabled."))

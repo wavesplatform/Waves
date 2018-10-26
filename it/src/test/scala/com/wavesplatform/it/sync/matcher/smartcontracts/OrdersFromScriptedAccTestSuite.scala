@@ -34,7 +34,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
     "trading is deprecated" in {
       assertBadRequestAndResponse(
-        matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes),
+        matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes),
         "Trading on scripted account isn't allowed yet."
       )
     }
@@ -43,7 +43,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       matcherNode.waitForHeight(ActivationHeight, 3.minutes)
       setContract(Some("true && (height > 0)"), bobAcc)
       assertBadRequestAndResponse(
-        matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes),
+        matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes),
         "height is inaccessible when running script on matcher"
       )
     }
@@ -51,7 +51,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     "scripted account can trade once SmartAccountTrading is activated" in {
       setContract(Some("true"), bobAcc)
       val bobOrder = matcherNode
-        .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+        .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
       bobOrder.status shouldBe "OrderAccepted"
     }
 

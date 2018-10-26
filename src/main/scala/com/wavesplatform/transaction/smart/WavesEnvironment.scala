@@ -12,7 +12,7 @@ import scodec.bits.ByteVector
 import shapeless._
 
 class WavesEnvironment(nByte: Byte, in: Coeval[Transaction :+: Order :+: CNil], h: Coeval[Int], blockchain: Blockchain) extends Environment {
-  override def height: Int = h()
+  override def height: Long = h()
 
   override def inputEntity: Tx :+: Ord :+: CNil = {
     in.apply()
@@ -70,6 +70,6 @@ class WavesEnvironment(nByte: Byte, in: Coeval[Transaction :+: Order :+: CNil], 
       balance = blockchain.balance(address, maybeAssetId.map(ByteStr(_)))
     } yield balance).left.map(_.toString)
   }
-  override def transactionHeightById(id: Array[Byte]): Option[Int] =
-    blockchain.transactionHeight(ByteStr(id))
+  override def transactionHeightById(id: Array[Byte]): Option[Long] =
+    blockchain.transactionHeight(ByteStr(id)).map(_.toLong)
 }

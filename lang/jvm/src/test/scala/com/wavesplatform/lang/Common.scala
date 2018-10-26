@@ -2,7 +2,7 @@ package com.wavesplatform.lang
 
 import cats.data.EitherT
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -17,8 +17,9 @@ import shapeless.{:+:, CNil}
 import scala.util.{Left, Right, Try}
 
 object Common {
+  import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  def ev[T](context: EvaluationContext = PureContext.build(V1).evaluationContext, expr: EXPR): Either[ExecutionError, T] =
+  def ev[T <: EVALUATED](context: EvaluationContext = PureContext.build(V1).evaluationContext, expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)
 
   trait NoShrink {
@@ -42,8 +43,8 @@ object Common {
 
   val multiplierFunction: NativeFunction =
     NativeFunction("MULTIPLY", 1, 10005, LONG, "test ultiplication", ("x1", LONG, "x1"), ("x2", LONG, "x2")) {
-      case (x1: Long) :: (x2: Long) :: Nil => Try(x1 * x2).toEither.left.map(_.toString)
-      case _                               => ??? // suppress pattern match warning
+      case CONST_LONG(x1: Long) :: CONST_LONG(x2: Long) :: Nil => Try(x1 * x2).map(CONST_LONG).toEither.left.map(_.toString)
+      case _                                                   => ??? // suppress pattern match warning
     }
 
   val pointTypeA = CaseType("PointA", List("X"  -> LONG, "YA" -> LONG))
@@ -56,12 +57,12 @@ object Common {
   val BorC    = UNION(pointTypeB.typeRef, pointTypeC.typeRef)
   val CorD    = UNION(pointTypeC.typeRef, pointTypeD.typeRef)
 
-  val pointAInstance     = CaseObj(pointTypeA.typeRef, Map("X" -> 3L, "YA" -> 40L))
-  val pointBInstance     = CaseObj(pointTypeB.typeRef, Map("X" -> 3L, "YB" -> 41L))
-  val pointCInstance     = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
-  val pointDInstance1    = CaseObj(pointTypeD.typeRef, Map("YB" -> 43L))
-  private val unit: Unit = ()
-  val pointDInstance2    = CaseObj(pointTypeD.typeRef, Map("YB" -> unit))
+  val pointAInstance  = CaseObj(pointTypeA.typeRef, Map("X"  -> 3L, "YA" -> 40L))
+  val pointBInstance  = CaseObj(pointTypeB.typeRef, Map("X"  -> 3L, "YB" -> 41L))
+  val pointCInstance  = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
+  val pointDInstance1 = CaseObj(pointTypeD.typeRef, Map("YB" -> 43L))
+
+  val pointDInstance2 = CaseObj(pointTypeD.typeRef, Map("YB" -> PureContext.unit))
 
   val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC, pointTypeD) ++ Seq(UnionType("PointAB", AorB.l),
                                                                                UnionType("PointBC", BorC.l),
@@ -71,12 +72,12 @@ object Common {
     EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
 
   def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Tx :+: Ord :+: CNil] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
-    override def height: Int       = h
+    override def height: Long      = h
     override def networkByte: Byte = nByte
     override def inputEntity       = in()
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+    override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???

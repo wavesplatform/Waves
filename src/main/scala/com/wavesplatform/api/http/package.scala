@@ -1,6 +1,5 @@
 package com.wavesplatform.api
 
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import com.wavesplatform.http.ApiMarshallers
 import com.wavesplatform.api.http.DataRequest._
@@ -21,9 +20,6 @@ import play.api.libs.json._
 import scala.util.{Success, Try}
 
 package object http extends ApiMarshallers {
-
-  val invalidLimit = StatusCodes.BadRequest -> Json.obj("message" -> "invalid.limit")
-
   val versionReads: Reads[Byte] = {
     val defaultByteReads = implicitly[Reads[Byte]]
     val intToByteReads   = implicitly[Reads[Int]].map(_.toByte)
