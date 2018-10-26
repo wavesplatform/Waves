@@ -33,11 +33,13 @@ object MiningConstraints {
           MultiDimensionalMiningConstraint(NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber), total))
         else total,
       keyBlock =
-        if (isMassTransferEnabled) OneDimensionalMiningConstraint(0, TxEstimators.one)
-        else if (isNgEnabled)
-          minerSettings
-            .map(ms => OneDimensionalMiningConstraint(ms.maxTransactionsInKeyBlock, TxEstimators.one))
-            .getOrElse(MiningConstraint.Unlimited)
+        if (isNgEnabled)
+          if (isMassTransferEnabled)
+            OneDimensionalMiningConstraint(0, TxEstimators.one)
+          else
+            minerSettings
+              .map(ms => OneDimensionalMiningConstraint(ms.maxTransactionsInKeyBlock, TxEstimators.one))
+              .getOrElse(MiningConstraint.Unlimited)
         else OneDimensionalMiningConstraint(ClassicAmountOfTxsInBlock, TxEstimators.one),
       micro =
         if (isNgEnabled && minerSettings.isDefined)
