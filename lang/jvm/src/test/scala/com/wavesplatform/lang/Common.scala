@@ -72,12 +72,12 @@ object Common {
     EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
 
   def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Tx :+: Ord :+: CNil] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
-    override def height: Int       = h
+    override def height: Long      = h
     override def networkByte: Byte = nByte
     override def inputEntity       = in()
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+    override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
