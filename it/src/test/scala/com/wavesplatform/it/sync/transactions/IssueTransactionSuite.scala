@@ -12,7 +12,6 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   val supportedVersions: List[Byte] = List(1, 2)
 
   test("asset issue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
-    nodes.head.activationStatus
     for (v <- supportedVersions) {
       val assetName        = "myasset"
       val assetDescription = "my asset description"
