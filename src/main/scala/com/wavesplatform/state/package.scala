@@ -2,6 +2,7 @@ package com.wavesplatform
 
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
+import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
@@ -11,6 +12,46 @@ import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
+
+  // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
+  def addressTransactionsFromDiff(
+      b: Blockchain,
+      d: Option[Diff])(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] = {
+
+    def transactionsFromDiff(d: Diff): Iterable[(Int, Transaction, Set[Address])] = d.transactions.values.view
+
+    def withPagination(s: Iterable[(Int, Transaction, Set[Address])]): Iterable[(Int, Transaction, Set[Address])] =
+      fromId match {
+        case None     => s
+        case Some(id) => s.dropWhile(_._2.id() == id).drop(1)
+      }
+
+    def withFilterAndLimit(txs: Iterable[(Int, Transaction, Set[Address])]): Seq[(Int, Transaction)] =
+      txs
+        .collect {
+          case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
+        }
+        .take(count)
+        .toSeq
+
+    def withRestFromBlockchain(s: Seq[(Int, Transaction)]): Seq[(Int, Transaction)] =
+      s.length match {
+        case `count`        => s
+        case l if l < count => s ++ b.addressTransactions(address, types, count - l, None).getOrElse(Seq.empty)
+        case _              => s.take(count)
+      }
+
+    def transactions: Diff => Seq[(Int, Transaction)] =
+      withRestFromBlockchain _ compose withFilterAndLimit compose withPagination compose transactionsFromDiff
+
+    d.fold(b.addressTransactions(address, types, count, fromId)) { diff =>
+      fromId match {
+        case Some(id) if !diff.transactions.contains(id) =>
+          b.addressTransactions(address, types, count, fromId)
+        case _ => Right(transactions(diff))
+      }
+    }
+  }
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
     def liftValidationError[T <: Transaction](t: T): Either[ValidationError, R] = {
@@ -77,12 +118,14 @@ package object state {
 
     def aliasesOfAddress(address: Address): Seq[Alias] =
       blockchain
-        .addressTransactions(address, Set(CreateAliasTransactionV1.typeId), Int.MaxValue, 0)
+        .addressTransactions(address, Set(CreateAliasTransactionV1.typeId), Int.MaxValue, None)
+        .getOrElse(Seq.empty)
         .collect { case (_, a: CreateAliasTransaction) => a.alias }
 
     def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
       blockchain
-        .addressTransactions(address, Set(LeaseTransactionV1.typeId), Int.MaxValue, 0)
+        .addressTransactions(address, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
+        .getOrElse(Seq.empty)
         .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
 
     def unsafeHeightOf(id: ByteStr): Int =

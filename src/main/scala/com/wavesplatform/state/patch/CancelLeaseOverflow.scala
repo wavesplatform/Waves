@@ -14,9 +14,10 @@ object CancelLeaseOverflow extends ScorexLogging {
     addressesWithLeaseOverflow.keys.foreach(addr => log.info(s"Resetting lease overflow for $addr"))
 
     val leasesToCancel = addressesWithLeaseOverflow.keys.flatMap { a =>
-      blockchain.addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, 0).collect {
-        case (_, lt: LeaseTransaction) if lt.sender.toAddress == a => lt.id()
-      }
+      blockchain
+        .addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
+        .getOrElse(Seq.empty)
+        .collect { case (_, lt: LeaseTransaction) if lt.sender.toAddress == a => lt.id() }
     }
     leasesToCancel.foreach(id => log.info(s"Cancelling lease $id"))
 

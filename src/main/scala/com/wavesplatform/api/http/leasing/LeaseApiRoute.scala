@@ -73,7 +73,8 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
         case Left(e) => ApiError.fromValidationError(e)
         case Right(a) =>
           blockchain
-            .addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, 0)
+            .addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
+            .getOrElse(Seq.empty)
             .collect {
               case (h, lt: LeaseTransaction) if blockchain.leaseDetails(lt.id()).exists(_.isActive) =>
                 lt.json() + ("height" -> JsNumber(h))

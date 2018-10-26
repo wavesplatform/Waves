@@ -121,29 +121,30 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
   }
 
   "addressTransactions" - {
-    "return txs in correct ordering" in {
-      val preconditions = (ts: Long) => {
-        for {
-          master    <- accountGen
-          recipient <- accountGen
-          genesisBlock = TestBlock
-            .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
-          block1 = TestBlock
-            .create(
-              ts + 3,
-              genesisBlock.uniqueId,
-              Seq(
-                createTransfer(master, recipient.toAddress, ts + 1),
-                createTransfer(master, recipient.toAddress, ts + 2)
-              )
+    def preconditions(ts: Long): Gen[(PrivateKeyAccount, List[Block])] = {
+      for {
+        master    <- accountGen
+        recipient <- accountGen
+        genesisBlock = TestBlock
+          .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+        block1 = TestBlock
+          .create(
+            ts + 3,
+            genesisBlock.uniqueId,
+            Seq(
+              createTransfer(master, recipient.toAddress, ts + 1),
+              createTransfer(master, recipient.toAddress, ts + 2)
             )
-          emptyBlock = TestBlock.create(ts + 5, block1.uniqueId, Seq())
-        } yield (master, List(genesisBlock, block1, emptyBlock))
-      }
+          )
+        emptyBlock = TestBlock.create(ts + 5, block1.uniqueId, Seq())
+      } yield (master, List(genesisBlock, block1, emptyBlock))
+    }
 
+    "return txs in correct ordering without fromId" in {
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, 0)
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, None)
+          .getOrElse(Seq.empty)
 
         val ordering = Ordering
           .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
@@ -151,6 +152,54 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
         txs.length shouldBe 2
 
         txs.sorted(ordering) shouldBe txs
+      }
+    }
+
+    "return Left if fromId argument is a non-existent transaction" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
+
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, Some(nonExistentTxId))
+
+        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
+      }
+    }
+
+    "return txs in correct ordering starting from a given id" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        // using pagination
+        val firstTx = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, None)
+          .getOrElse(Seq.empty)
+          .head
+
+        val secondTx = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, Some(firstTx._2.id()))
+          .getOrElse(Seq.empty)
+          .head
+
+        // without pagination
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
+          .getOrElse(Seq.empty)
+
+        txs shouldBe Seq(firstTx, secondTx)
+      }
+    }
+
+    "return an empty Seq when paginating from the last transaction" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
+          .getOrElse(Seq.empty)
+
+        val txsFromLast = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, Some(txs.last._2.id()))
+          .explicitGet()
+
+        txs.length shouldBe 2
+        txsFromLast shouldBe Seq.empty
       }
     }
 

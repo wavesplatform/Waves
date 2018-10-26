@@ -513,17 +513,43 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   override def transactionHeight(id: ByteStr): Option[Int] = readOnly(db => db.get(Keys.transactionHeight(id)))
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = readOnly { db =>
-    db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
-      val txs = for {
-        seqNr          <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).view
-        (txType, txId) <- db.get(Keys.addressTransactionIds(addressId, seqNr))
-        if types.isEmpty || types.contains(txType.toByte)
-        (h, tx) <- db.get(Keys.transactionInfo(txId))
-      } yield (h, tx)
+  override def addressTransactions(address: Address,
+                                   types: Set[Type],
+                                   count: Int,
+                                   fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] = {
 
-      txs.slice(from, count).force
+    def takeAfterTx(s: Seq[(Int, ByteStr)], fromId: Option[ByteStr]): Seq[(Int, AssetId)] =
+      fromId match {
+        case None => s
+        case Some(id) =>
+          s.dropWhile { case (_, txId) => txId != id }
+            .drop(1)
+      }
+
+    readOnly { db =>
+      def transactions: Seq[(Int, Transaction)] = {
+        db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
+          val txs = for {
+            seqNr          <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).view
+            (txType, txId) <- takeAfterTx(db.get(Keys.addressTransactionIds(addressId, seqNr)), fromId)
+            if types.isEmpty || types.contains(txType.toByte)
+            (h, tx) <- db.get(Keys.transactionInfo(txId))
+          } yield (h, tx)
+
+          txs.take(count).force
+        }
+      }
+
+      fromId match {
+        case None => Right(transactions)
+        case Some(fId) =>
+          db.get(Keys.transactionInfo(fId)) match {
+            case None    => Left(s"Transaction $fId does not exist")
+            case Some(_) => Right(transactions)
+          }
+      }
     }
+
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
