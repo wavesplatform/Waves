@@ -1,6 +1,6 @@
 package com.wavesplatform.state.patch
 
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio, EitherExt2}
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 
@@ -16,7 +16,7 @@ object CancelLeaseOverflow extends ScorexLogging {
     val leasesToCancel = addressesWithLeaseOverflow.keys.flatMap { a =>
       blockchain
         .addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
-        .getOrElse(Seq.empty)
+        .explicitGet()
         .collect { case (_, lt: LeaseTransaction) if lt.sender.toAddress == a => lt.id() }
     }
     leasesToCancel.foreach(id => log.info(s"Cancelling lease $id"))

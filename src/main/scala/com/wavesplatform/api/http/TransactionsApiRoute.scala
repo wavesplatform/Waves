@@ -44,7 +44,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
 
   override lazy val route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ broadcast ~ complete(StatusCodes.NotFound)
+      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ broadcast
     }
 
   @Path("/address/{address}/limit/{limit}?after={after}")

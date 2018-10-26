@@ -119,13 +119,13 @@ package object state {
     def aliasesOfAddress(address: Address): Seq[Alias] =
       blockchain
         .addressTransactions(address, Set(CreateAliasTransactionV1.typeId), Int.MaxValue, None)
-        .getOrElse(Seq.empty)
+        .explicitGet()
         .collect { case (_, a: CreateAliasTransaction) => a.alias }
 
     def activeLeases(address: Address): Seq[(Int, LeaseTransaction)] =
       blockchain
         .addressTransactions(address, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
-        .getOrElse(Seq.empty)
+        .explicitGet()
         .collect { case (h, l: LeaseTransaction) if blockchain.leaseDetails(l.id()).exists(_.isActive) => h -> l }
 
     def unsafeHeightOf(id: ByteStr): Int =

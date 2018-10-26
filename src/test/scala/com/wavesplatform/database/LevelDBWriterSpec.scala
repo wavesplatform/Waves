@@ -144,7 +144,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
         val txs = writer
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, None)
-          .getOrElse(Seq.empty)
+          .explicitGet()
 
         val ordering = Ordering
           .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
@@ -171,18 +171,18 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
         // using pagination
         val firstTx = writer
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, None)
-          .getOrElse(Seq.empty)
+          .explicitGet()
           .head
 
         val secondTx = writer
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, Some(firstTx._2.id()))
-          .getOrElse(Seq.empty)
+          .explicitGet()
           .head
 
         // without pagination
         val txs = writer
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
-          .getOrElse(Seq.empty)
+          .explicitGet()
 
         txs shouldBe Seq(firstTx, secondTx)
       }
@@ -192,7 +192,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
         val txs = writer
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
-          .getOrElse(Seq.empty)
+          .explicitGet()
 
         val txsFromLast = writer
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, Some(txs.last._2.id()))

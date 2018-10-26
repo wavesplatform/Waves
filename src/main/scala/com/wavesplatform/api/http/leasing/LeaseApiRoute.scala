@@ -17,6 +17,7 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.state.EitherExt2
 
 @Path("/leasing")
 @Api(value = "/leasing")
@@ -74,7 +75,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
         case Right(a) =>
           blockchain
             .addressTransactions(a, Set(LeaseTransactionV1.typeId), Int.MaxValue, None)
-            .getOrElse(Seq.empty)
+            .explicitGet()
             .collect {
               case (h, lt: LeaseTransaction) if blockchain.leaseDetails(lt.id()).exists(_.isActive) =>
                 lt.json() + ("height" -> JsNumber(h))
