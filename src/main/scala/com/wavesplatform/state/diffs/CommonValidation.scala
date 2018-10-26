@@ -209,16 +209,8 @@ object CommonValidation {
 
     def isSmartToken(input: FeeInfo): Boolean = input._1.map(_._1).flatMap(blockchain.assetDescription).exists(_.script.isDefined)
 
-//    def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = Right {
-//      if (isSmartToken(inputFee)) {
-//        val (feeAssetInfo, feeAmount) = inputFee
-//        (feeAssetInfo, feeAmount + ScriptExtraFee)
-//      } else inputFee
-//    }
-
     def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = {
       val (feeAssetInfo, feeAmount) = inputFee
-//      val assetsCount               = 0
       val assetsCount = tx match {
         case tx: ExchangeTransaction => tx.checkedAssets().count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
         case tx                      => tx.checkedAssets().count(blockchain.hasAssetScript)
