@@ -129,8 +129,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       val mf        = 700000L
       val matcher   = acc2
       val sellPrice = (0.50 * Order.PriceConstant).toLong
-      val buy       = orders(2)._1
-      val sell      = orders(1)._2
+      val buy       = orders(1)._1
+      val sell      = orders(2)._2
 
       val amount = math.min(buy.amount, sell.amount)
       val tx = ExchangeTransactionV2
@@ -163,6 +163,34 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     val sig       = (Json.parse(tx.toString()) \ "proofs").as[Seq[JsString]].head
     val changedTx = tx + ("version" -> JsNumber(1)) + ("signature" -> sig)
     assertBadRequest(sender.signedBroadcast(changedTx).id, 500) //TODO: change to correct error message
+  }
+
+  test("negative: exchange tx v2 and order v1 from scripted acc") {
+    setContract(sc1, acc0)
+
+    val mf        = 700000L
+    val matcher   = acc2
+    val sellPrice = (0.50 * Order.PriceConstant).toLong
+    val buy       = orders(2)._1
+    val sell      = orders(1)._2
+
+    val amount = math.min(buy.amount, sell.amount)
+    val tx = ExchangeTransactionV2
+      .create(
+        matcher = matcher,
+        buyOrder = buy,
+        sellOrder = sell,
+        amount = amount,
+        price = sellPrice,
+        buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
+        sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
+        fee = mf,
+        timestamp = NTP.correctedTime()
+      )
+      .explicitGet()
+      .json()
+
+    assertBadRequestAndMessage(sender.signedBroadcast(tx).id, "Reason: Can't process order with signature from scripted account")
   }
 
   def exchangeTx() = {
