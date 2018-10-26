@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.data.EitherT
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -18,7 +19,8 @@ import scala.util.{Left, Right, Try}
 object Common {
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  def ev[T <: EVALUATED](context: EvaluationContext = PureContext.evalContext, expr: EXPR): Either[ExecutionError, T] = EvaluatorV1[T](context, expr)
+  def ev[T <: EVALUATED](context: EvaluationContext = PureContext.build(V1).evaluationContext, expr: EXPR): Either[ExecutionError, T] =
+    EvaluatorV1[T](context, expr)
 
   trait NoShrink {
     implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)

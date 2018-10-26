@@ -6,6 +6,7 @@ import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, EitherExt
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FreeSpec, Matchers}
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
 
@@ -55,7 +56,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
   }
 
   private val assetId = ByteStr("coin_id".getBytes())
-  private val script  = ScriptV1(Terms.TRUE, checkSize = false).explicitGet()
+  private val script  = ScriptV1(V1, Terms.TRUE, checkSize = false).explicitGet()
 
   private val transferWavesTx = TransferTransactionV1
     .selfSigned(

@@ -1,17 +1,15 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.transaction.transfer._
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future.traverse
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import play.api.libs.json.JsNumber
 
 trait IntegrationSuiteWithThreeAddresses
     extends BeforeAndAfterAll
@@ -28,66 +26,78 @@ trait IntegrationSuiteWithThreeAddresses
 
   protected def sender: Node = notMiner
 
-  protected lazy val firstAddress: String  = Await.result(sender.createAddress, 2.minutes)
-  protected lazy val secondAddress: String = Await.result(sender.createAddress, 2.minutes)
-  protected lazy val thirdAddress: String  = Await.result(sender.createAddress, 2.minutes)
+  protected lazy val firstAddress: String  = sender.createAddress()
+  protected lazy val secondAddress: String = sender.createAddress()
+  protected lazy val thirdAddress: String  = sender.createAddress()
 
-  def pkByAddress(address: String) = PrivateKeyAccount.fromSeed(Await.result(sender.seed(address), 10.seconds)).right.get
+  def pkByAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).right.get
 
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
 
     val defaultBalance: Long = 100.waves
 
-    def dumpBalances(node: Node, accounts: Seq[String], label: String): Future[Unit] = {
-      Future
-        .traverse(accounts) { acc =>
-          notMiner.accountBalance(acc).zip(notMiner.accountEffectiveBalance(acc)).map(acc -> _)
-        }
-        .map { info =>
-          val formatted = info
-            .map {
-              case (account, (balance, effectiveBalance)) =>
-                f"$account: balance = $balance, effective = $effectiveBalance"
-            }
-            .mkString("\n")
-          log.debug(s"$label:\n$formatted")
-        }
+    def dumpBalances(node: Node, accounts: Seq[String], label: String): Unit = {
+      accounts.foreach(acc => {
+        val (balance, eff) = notMiner.accountBalances(acc)
+
+        val formatted = s"$acc: balance = $balance, effective = $eff"
+        log.debug(s"$label account balance:\n$formatted")
+      })
     }
 
-    def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {
+    def waitForTxsToReachAllNodes(txIds: Seq[String]) = {
       val txNodePairs = for {
         txId <- txIds
         node <- nodes
       } yield (node, txId)
-      traverse(txNodePairs) { case (node, tx) => node.waitForTransaction(tx) }
+
+      txNodePairs.foreach({ case (node, tx) => node.waitForTransaction(tx) })
     }
 
-    def makeTransfers(accounts: Seq[String]): Future[Seq[String]] = traverse(accounts) { acc =>
-      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransferTransactionV1.typeId)).map(_.id)
+    def makeTransfers(accounts: Seq[String]): Seq[String] = accounts.map { acc =>
+      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransferTransactionV1.typeId)).id
     }
 
-    val correctStartBalancesFuture = for {
-      _ <- traverse(nodes)(_.waitForHeight(2))
-      accounts = Seq(firstAddress, secondAddress, thirdAddress)
+    def correctStartBalancesFuture(): Unit = {
+      nodes.waitForHeight(2)
+      val accounts = Seq(firstAddress, secondAddress, thirdAddress)
 
-      _   <- dumpBalances(sender, accounts, "initial")
-      txs <- makeTransfers(accounts)
+      dumpBalances(sender, accounts, "initial")
+      val txs = makeTransfers(accounts)
 
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- withClue(s"waitForHeight(${height + 2})") {
-        Await.ready(traverse(nodes)(_.waitForHeight(height + 2)), 3.minutes)
+      val height = nodes.map(_.height).max
+
+      withClue(s"waitForHeight(${height + 2})") {
+        nodes.waitForHeight(height + 2)
       }
 
-      _ <- withClue("waitForTxsToReachAllNodes") {
-        Await.ready(waitForTxsToReachAllNodes(txs), 2.minute)
+      withClue("waitForTxsToReachAllNodes") {
+        waitForTxsToReachAllNodes(txs)
       }
-      _ <- dumpBalances(sender, accounts, "after transfer")
-      _ <- traverse(accounts)(notMiner.assertBalances(_, defaultBalance, defaultBalance))
-    } yield succeed
+
+      dumpBalances(sender, accounts, "after transfer")
+      accounts.foreach(notMiner.assertBalances(_, defaultBalance, defaultBalance))
+    }
 
     withClue("beforeAll") {
-      Await.result(correctStartBalancesFuture, 5.minutes)
+      correctStartBalancesFuture()
     }
   }
+
+  def setContract(contractText: Option[String], acc: PrivateKeyAccount) = {
+    val script = contractText.map { x =>
+      val scriptText = x.stripMargin
+      ScriptCompiler(scriptText).explicitGet()._1
+    }
+    val setScriptTransaction = SetScriptTransaction
+      .selfSigned(SetScriptTransaction.supportedVersions.head, acc, script, 0.014.waves, System.currentTimeMillis())
+      .right
+      .get
+    val setScriptId = sender
+      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .id
+    nodes.waitForHeightAriseAndTxPresent(setScriptId)
+  }
+
 }

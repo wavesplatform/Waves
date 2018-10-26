@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.lang.{Testing, Global}
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -21,7 +22,7 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
-class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
     (Seq[GenesisTransaction], IssueTransactionV2, DataTransaction, TransferTransactionV1, DataTransaction, DataTransaction, TransferTransactionV1)] =
     for {
@@ -60,7 +61,7 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
 
       untypedScript = Parser(assetScript).get.value
 
-      typedScript = ScriptV1(CompilerV1(dummyCompilerContext, untypedScript).explicitGet()._1).explicitGet()
+      typedScript = ScriptV1(CompilerV1(compilerContext(V1), untypedScript).explicitGet()._1).explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -110,8 +111,8 @@ class NotaryControlledTransferScenartioTest extends PropSpec with PropertyChecks
 
   private def eval(code: String) = {
     val untyped = Parser(code).get.value
-    val typed   = CompilerV1(dummyCompilerContext, untyped).map(_._1)
-    typed.flatMap(EvaluatorV1[EVALUATED](dummyEvaluationContext, _))
+    val typed   = CompilerV1(compilerContext(V1), untyped).map(_._1)
+    typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(V1), _))
   }
 
   property("Script toBase58String") {

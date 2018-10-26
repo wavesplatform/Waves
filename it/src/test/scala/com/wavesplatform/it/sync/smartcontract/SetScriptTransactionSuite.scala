@@ -55,7 +55,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           }
           case _ => false
         }
-
       """.stripMargin
 
     val script = ScriptCompiler(scriptText).explicitGet()._1

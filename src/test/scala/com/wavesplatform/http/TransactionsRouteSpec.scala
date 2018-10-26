@@ -5,6 +5,7 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
@@ -202,7 +203,7 @@ class TransactionsRouteSpec
             decimals = 8,
             reissuable = false,
             totalVolume = Long.MaxValue,
-            script = Some(ScriptV1(TRUE, checkSize = false).explicitGet()),
+            script = Some(ScriptV1(V1, TRUE, checkSize = false).explicitGet()),
             sponsorship = 5
           )))
           .anyNumberOfTimes()

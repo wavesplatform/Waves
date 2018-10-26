@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -17,6 +18,11 @@ import scodec.bits.ByteVector
 import scorex.crypto.signatures.Curve25519
 
 import scala.util.Random
+import ScriptEvaluatorBenchmark.pureEvalContext
+
+object ScriptEvaluatorBenchmark {
+  val pureEvalContext = PureContext.build(V1).evaluationContext
+}
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -26,7 +32,7 @@ import scala.util.Random
 @Measurement(iterations = 10)
 class ScriptEvaluatorBenchmark {
   @Benchmark
-  def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(EvaluatorV1[EVALUATED](PureContext.evalContext, st.expr))
+  def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(EvaluatorV1[EVALUATED](pureEvalContext, st.expr))
 
   @Benchmark
   def nestedBlocks(st: NestedBlocks, bh: Blackhole): Unit = bh.consume(EvaluatorV1[EVALUATED](st.context, st.expr))
@@ -49,7 +55,7 @@ class ScriptEvaluatorBenchmark {
 
 @State(Scope.Benchmark)
 class NestedBlocks {
-  val context: EvaluationContext = PureContext.evalContext
+  val context: EvaluationContext = pureEvalContext
 
   val expr: EXPR = {
     val blockCount = 300
@@ -63,7 +69,7 @@ class NestedBlocks {
 
 @State(Scope.Benchmark)
 class Base58Perf {
-  val context: EvaluationContext = Monoid.combine(PureContext.evalContext, CryptoContext.build(Global).evaluationContext)
+  val context: EvaluationContext = Monoid.combine(pureEvalContext, CryptoContext.build(Global).evaluationContext)
 
   val encode: EXPR = {
     val base58Count = 120
@@ -96,7 +102,7 @@ class Base58Perf {
 
 @State(Scope.Benchmark)
 class Signatures {
-  val context: EvaluationContext = Monoid.combine(PureContext.evalContext, CryptoContext.build(Global).evaluationContext)
+  val context: EvaluationContext = Monoid.combine(pureEvalContext, CryptoContext.build(Global).evaluationContext)
 
   val expr: EXPR = {
     val sigCount = 20
@@ -130,7 +136,7 @@ class Signatures {
 
 @State(Scope.Benchmark)
 class Concat {
-  val context: EvaluationContext = PureContext.evalContext
+  val context: EvaluationContext = pureEvalContext
 
   private val Steps = 180
 

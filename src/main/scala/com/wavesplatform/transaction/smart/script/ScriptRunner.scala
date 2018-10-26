@@ -21,6 +21,7 @@ object ScriptRunner {
     script match {
       case Script.Expr(expr) =>
         val ctx = BlockchainContext.build(
+          script.version,
           AddressScheme.current.chainId,
           Coeval.evalOnce(in),
           Coeval.evalOnce(height),

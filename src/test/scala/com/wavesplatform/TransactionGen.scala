@@ -18,8 +18,10 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
+import MassTransferTransaction.MaxTransferCount
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
@@ -106,9 +108,33 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
   val scriptGen = BOOLgen(100).map {
     case (expr, _) =>
       val typed =
-        CompilerV1(PureContext.compilerContext |+| CryptoContext.compilerContext(Global), expr).explicitGet()
+        CompilerV1(PureContext.build(V1).compilerContext |+| CryptoContext.compilerContext(Global), expr).explicitGet()
       ScriptV1(typed._1).explicitGet()
   }
+
+  val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = for {
+    version                                                                  <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
+    (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
+    fee                                                                      <- smallFeeGen
+    timestamp                                                                <- timestampGen
+    proofs                                                                   <- proofsGen
+    script                                                                   <- Gen.option(scriptGen)
+    issue = IssueTransactionV2
+      .selfSigned(2: Byte,
+                  AddressScheme.current.chainId,
+                  sender,
+                  assetName,
+                  description,
+                  quantity,
+                  decimals,
+                  reissuable = true,
+                  script,
+                  iFee,
+                  timestamp)
+      .explicitGet()
+  } yield
+    (Seq(issue),
+     SetAssetScriptTransaction.create(version, AddressScheme.current.chainId, sender, issue.id(), script, fee, timestamp, proofs).explicitGet())
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
     version                   <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)

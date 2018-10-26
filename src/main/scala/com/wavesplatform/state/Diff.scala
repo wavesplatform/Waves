@@ -35,12 +35,12 @@ object VolumeAndFee {
   }
 }
 
-case class AssetInfo(isReissuable: Boolean, volume: BigInt, script: Option[Script])
+case class AssetInfo(isReissuable: Boolean, volume: BigInt)
 object AssetInfo {
   implicit val assetInfoMonoid: Monoid[AssetInfo] = new Monoid[AssetInfo] {
-    override def empty: AssetInfo = AssetInfo(isReissuable = true, 0, None)
+    override def empty: AssetInfo = AssetInfo(isReissuable = true, 0)
     override def combine(x: AssetInfo, y: AssetInfo): AssetInfo =
-      AssetInfo(x.isReissuable && y.isReissuable, x.volume + y.volume, y.script.orElse(x.script))
+      AssetInfo(x.isReissuable && y.isReissuable, x.volume + y.volume)
   }
 }
 
@@ -122,6 +122,7 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 orderFills: Map[ByteStr, VolumeAndFee],
                 leaseState: Map[ByteStr, Boolean],
                 scripts: Map[Address, Option[Script]],
+                assetScripts: Map[AssetId, Option[Script]],
                 accountData: Map[Address, AccountDataInfo],
                 sponsorship: Map[AssetId, Sponsorship]) {
 
@@ -148,6 +149,7 @@ object Diff {
             orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
             leaseState: Map[ByteStr, Boolean] = Map.empty,
             scripts: Map[Address, Option[Script]] = Map.empty,
+            assetScripts: Map[AssetId, Option[Script]] = Map.empty,
             accountData: Map[Address, AccountDataInfo] = Map.empty,
             sponsorship: Map[AssetId, Sponsorship] = Map.empty): Diff =
     Diff(
@@ -158,11 +160,12 @@ object Diff {
       orderFills = orderFills,
       leaseState = leaseState,
       scripts = scripts,
+      assetScripts = assetScripts,
       accountData = accountData,
       sponsorship = sponsorship
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
@@ -176,6 +179,7 @@ object Diff {
         orderFills = older.orderFills.combine(newer.orderFills),
         leaseState = older.leaseState ++ newer.leaseState,
         scripts = older.scripts ++ newer.scripts,
+        assetScripts = older.assetScripts ++ newer.assetScripts,
         accountData = older.accountData.combine(newer.accountData),
         sponsorship = older.sponsorship.combine(newer.sponsorship)
       )

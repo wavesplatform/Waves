@@ -92,10 +92,11 @@ object RealTransactionWrapper {
           transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
           attachment = ByteVector(ms.attachment)
         )
-      case ss: SetScriptTransaction => Tx.SetScript(proven(ss), ss.script.map(_.bytes()).map(toByteVector))
-      case p: PaymentTransaction    => Tx.Payment(proven(p), p.amount, p.recipient)
-      case e: ExchangeTransaction   => Tx.Exchange(proven(e), e.amount, e.price, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder)
-      case s: SponsorFeeTransaction => Tx.Sponsorship(proven(s), s.assetId, s.minSponsoredAssetFee)
+      case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes()).map(toByteVector))
+      case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.assetId, ss.script.map(_.bytes()).map(toByteVector))
+      case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, p.recipient)
+      case e: ExchangeTransaction        => Tx.Exchange(proven(e), e.amount, e.price, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder)
+      case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.assetId, s.minSponsoredAssetFee)
       case d: DataTransaction =>
         Tx.Data(
           proven(d),

@@ -15,8 +15,8 @@ import scala.collection.mutable.ListBuffer
 
 object EvaluatorV1 extends ExprEvaluator {
 
-  override type V = V1.type
-  override val version: V = V1
+  override type Ver = V1.type
+  override val version: Ver = V1
 
   private def evalLetBlock(let: LET, inner: EXPR): EvalM[EVALUATED] =
     for {

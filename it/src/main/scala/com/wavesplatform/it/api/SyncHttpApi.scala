@@ -1,5 +1,8 @@
 package com.wavesplatform.it.api
 
+import java.net.InetSocketAddress
+import java.util.concurrent.TimeoutException
+
 import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
@@ -64,6 +67,7 @@ object SyncHttpApi extends Assertions {
     try Await.result(awaitable, atMost)
     catch {
       case usce: UnexpectedStatusCodeException => throw usce
+      case te: TimeoutException                => throw te
       case NonFatal(cause) =>
         throw new Exception(cause)
     }
@@ -124,8 +128,9 @@ object SyncHttpApi extends Assertions {
               decimals: Byte,
               reissuable: Boolean,
               fee: Long,
-              version: Byte = 2): Transaction =
-      sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version))
+              version: Byte = 1,
+              script: Option[String] = None): Transaction =
+      sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script))
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
@@ -253,6 +258,21 @@ object SyncHttpApi extends Assertions {
 
     def calculateFee(tx: JsObject): FeeInfo =
       sync(async(n).calculateFee(tx))
+
+    def blacklistedPeers: Seq[BlacklistedPeer] =
+      sync(async(n).blacklistedPeers)
+
+    def waitForBlackList(blackList: Int): Seq[BlacklistedPeer] =
+      sync(async(n).waitForBlackList(blackList))
+
+    def status(): Status =
+      sync(async(n).status)
+
+    def waitForPeers(targetPeersCount: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Seq[Peer] =
+      sync(async(n).waitForPeers(targetPeersCount), requestAwaitTime)
+
+    def connect(address: InetSocketAddress): Unit =
+      sync(async(n).connect(address))
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {

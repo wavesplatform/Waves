@@ -101,7 +101,6 @@ class OrderValidator(db: DB,
           _ <- validateBalance(order)
           _ <- validatePair(order.assetPair)
           _ <- verifyScript(order.sender, order)
-          _ <- verifyScript(order.matcherPublicKey, order)
         } yield order
       }
 }
