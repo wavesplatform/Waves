@@ -3,9 +3,10 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{Testing, Global}
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
@@ -108,25 +109,25 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
        accountBDataTransaction,
        transferFromAToB)
 
-  private def eval[T](code: String) = {
+  private def eval(code: String) = {
     val untyped = Parser(code).get.value
     val typed   = CompilerV1(compilerContext(V1), untyped).map(_._1)
-    typed.flatMap(EvaluatorV1[T](dummyEvalContext(V1), _))
+    typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(V1), _))
   }
 
   property("Script toBase58String") {
     val s = "AXiXp5CmwVaq4Tp6h6"
-    eval[Boolean](s"""toBase58String(base58'$s') == \"$s\"""").explicitGet() shouldBe true
+    eval(s"""toBase58String(base58'$s') == \"$s\"""") shouldBe Testing.evaluated(true)
   }
 
   property("Script toBase64String") {
     val s = "Kl0pIkOM3tRikA=="
-    eval[Boolean](s"""toBase64String(base64'$s') == \"$s\"""").explicitGet() shouldBe true
+    eval(s"""toBase64String(base64'$s') == \"$s\"""") shouldBe Testing.evaluated(true)
   }
 
   property("addressFromString() returns None when address is too long") {
     val longAddress = "A" * (Global.MaxBase58String + 1)
-    eval[Any](s"""addressFromString("$longAddress")""") shouldBe Left("base58Decode input exceeds 100")
+    eval(s"""addressFromString("$longAddress")""") shouldBe Left("base58Decode input exceeds 100")
   }
 
   property("Scenario") {

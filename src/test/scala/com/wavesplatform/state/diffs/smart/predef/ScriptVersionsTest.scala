@@ -4,10 +4,10 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.lang.ScriptVersion
+import com.wavesplatform.lang.{ScriptVersion, Testing}
 import com.wavesplatform.lang.ScriptVersion.Versions._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
-import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Blockchain
@@ -22,7 +22,10 @@ import org.scalatest.prop.PropertyChecks
 import shapeless.Coproduct
 
 class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with TransactionGen {
-  def eval[T](script: String, version: ScriptVersion, tx: Transaction = null, blockchain: Blockchain = EmptyBlockchain): Either[String, T] = {
+  def eval[T <: EVALUATED](script: String,
+                           version: ScriptVersion,
+                           tx: Transaction = null,
+                           blockchain: Blockchain = EmptyBlockchain): Either[String, T] = {
     val Success(expr, _) = Parser(script)
     for {
       compileResult <- CompilerV1(compilerContext(version), expr)
@@ -46,24 +49,24 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
   "ScriptV1" - {
     "forbids duplicate names" in {
       forAll(transferV1Gen) { tx =>
-        eval[Boolean](duplicateNames, V1, tx) should produce("duplicate variable names")
+        eval[EVALUATED](duplicateNames, V1, tx) should produce("duplicate variable names")
       }
     }
 
     "does not have bindings defined in V2" in {
-      eval[Boolean](orderTypeBindings, V1) should produce("definition of 'Buy' is not found")
+      eval[EVALUATED](orderTypeBindings, V1) should produce("definition of 'Buy' is not found")
     }
   }
 
   "ScriptV2" - {
     "allows duplicate names" in {
       forAll(transferV2Gen) { tx =>
-        eval[Boolean](duplicateNames, V2, tx) shouldBe Right(true)
+        eval[EVALUATED](duplicateNames, V2, tx) shouldBe Testing.evaluated(true)
       }
     }
 
     "has bindings defined in V2" in {
-      eval[Boolean](orderTypeBindings, V2) shouldBe Right(true)
+      eval[EVALUATED](orderTypeBindings, V2) shouldBe Testing.evaluated(true)
     }
 
     "only works after SmartAccountTrading feature activation" in {

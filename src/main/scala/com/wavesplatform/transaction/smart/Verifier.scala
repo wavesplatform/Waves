@@ -1,7 +1,9 @@
 package com.wavesplatform.transaction.smart
 
 import cats.implicits._
+import com.google.common.base.Throwables
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
@@ -13,7 +15,7 @@ import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon
 import shapeless.{:+:, CNil, Coproduct}
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 object Verifier extends Instrumented with ScorexLogging {
 
@@ -64,38 +66,50 @@ object Verifier extends Instrumented with ScorexLogging {
                transaction: Transaction,
                isTokenScript: Boolean): Either[ValidationError, Transaction] =
     Try {
-      ScriptRunner[Boolean](height, Coproduct[TxOrd](transaction), blockchain, script) match {
+      ScriptRunner[EVALUATED](height, Coproduct[TxOrd](transaction), blockchain, script) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript))
-        case (log, Right(false)) =>
+        case (log, Right(FALSE)) =>
           Left(TransactionNotAllowedByScript(log, script.text, isTokenScript))
-        case (_, Right(true)) => Right(transaction)
+        case (_, Right(TRUE)) => Right(transaction)
+        case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
-    }.getOrElse(Left(ScriptExecutionError(
-      """
+    } match {
+      case Failure(e) =>
+        Left(
+          ScriptExecutionError(
+            s"""
       |Uncaught execution error.
-      |Probably script does not return boolean, and can't validate any transaction or order.
+      |Probably script does not return boolean, and can't validate any transaction or order: ${Throwables.getStackTraceAsString(e)}
     """.stripMargin,
-      script.text,
-      List.empty,
-      isTokenScript
-    )))
+            script.text,
+            List.empty,
+            isTokenScript
+          ))
+      case Success(s) => s
+    }
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] =
     Try {
-      MatcherScriptRunner[Boolean](script, order) match {
+      MatcherScriptRunner[EVALUATED](script, order) match {
         case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx, isTokenScript = false))
-        case (ctx, Right(false))    => Left(TransactionNotAllowedByScript(ctx, script.text, isTokenScript = false))
-        case (_, Right(true))       => Right(order)
+        case (ctx, Right(FALSE))    => Left(TransactionNotAllowedByScript(ctx, script.text, isTokenScript = false))
+        case (_, Right(TRUE))       => Right(order)
+        case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
-    }.getOrElse(Left(ScriptExecutionError(
-      """
+    } match {
+      case Failure(e) =>
+        Left(
+          ScriptExecutionError(
+            s"""
       |Uncaught execution error.
-      |Probably script does not return boolean, and can't validate any transaction or order.
+      |Probably script does not return Boolean, and can't validate any transaction or order: $e
     """.stripMargin,
-      script.text,
-      List.empty,
-      false
-    )))
+            script.text,
+            List.empty,
+            false
+          ))
+      case Success(s) => s
+    }
 
   def verifyExchange(et: ExchangeTransaction,
                      blockchain: Blockchain,

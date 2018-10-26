@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTEVECTOR
 import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.predef._
@@ -12,7 +13,6 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
 
 class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -41,11 +41,12 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
       case (gen, aliasTx, transferViaAddress, transferViaAlias) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(aliasTx))) {
           case (_, state) =>
-            val addressBytes = runScript[CaseObj](script, transferViaAddress, state).explicitGet().fields("bytes").asInstanceOf[ByteVector]
-            addressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
-            val resolvedAddressBytes = runScript[CaseObj](script, transferViaAlias, state).explicitGet().fields("bytes").asInstanceOf[ByteVector]
+            val addressBytes = runScript[CaseObj](script, transferViaAddress, state).explicitGet().fields("bytes").asInstanceOf[CONST_BYTEVECTOR]
+            addressBytes.bs.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
+            val resolvedAddressBytes =
+              runScript[CaseObj](script, transferViaAlias, state).explicitGet().fields("bytes").asInstanceOf[CONST_BYTEVECTOR]
 
-            resolvedAddressBytes.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
+            resolvedAddressBytes.bs.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
         }
     }
   }
