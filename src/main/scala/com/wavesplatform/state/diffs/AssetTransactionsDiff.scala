@@ -44,10 +44,16 @@ object AssetTransactionsDiff {
       tx: ReissueTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, blockchain, tx.assetId, issuerOnly = true).flatMap { _ =>
       val oldInfo = blockchain.assetDescription(tx.assetId).get
-      def wasBurnt = blockchain.addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, 0).exists {
-        case (_, t: BurnTransaction) if t.assetId == tx.assetId => true
-        case _                                                  => false
-      }
+
+      def wasBurnt =
+        blockchain
+          .addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, None)
+          .getOrElse(Seq.empty)
+          .exists {
+            case (_, t: BurnTransaction) if t.assetId == tx.assetId => true
+            case _                                                  => false
+          }
+
       val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height)
       if (oldInfo.reissuable || (blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isDataTxActivated && wasBurnt)) {
         if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && isDataTxActivated) {
