@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.smart
 import cats.implicits._
 import com.google.common.base.Throwables
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
@@ -68,10 +68,10 @@ object Verifier extends Instrumented with ScorexLogging {
     Try {
       ScriptRunner[EVALUATED](height, Coproduct[TxOrd](transaction), blockchain, script) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript))
-        case (log, Right(FALSE)) =>
+        case (log, Right(CONST_BOOLEAN(false))) =>
           Left(TransactionNotAllowedByScript(log, script.text, isTokenScript))
-        case (_, Right(TRUE)) => Right(transaction)
-        case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
+        case (_, Right(CONST_BOOLEAN(true))) => Right(transaction)
+        case (_, Right(x))                   => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
     } match {
       case Failure(e) =>
@@ -91,10 +91,10 @@ object Verifier extends Instrumented with ScorexLogging {
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] =
     Try {
       MatcherScriptRunner[EVALUATED](script, order) match {
-        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx, isTokenScript = false))
-        case (ctx, Right(FALSE))    => Left(TransactionNotAllowedByScript(ctx, script.text, isTokenScript = false))
-        case (_, Right(TRUE))       => Right(order)
-        case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
+        case (ctx, Left(execError))             => Left(ScriptExecutionError(execError, script.text, ctx, isTokenScript = false))
+        case (ctx, Right(CONST_BOOLEAN(false))) => Left(TransactionNotAllowedByScript(ctx, script.text, isTokenScript = false))
+        case (_, Right(CONST_BOOLEAN(true)))    => Right(order)
+        case (_, Right(x))                      => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
     } match {
       case Failure(e) =>

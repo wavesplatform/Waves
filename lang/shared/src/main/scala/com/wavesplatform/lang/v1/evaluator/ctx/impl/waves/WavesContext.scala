@@ -66,8 +66,7 @@ object WavesContext {
         case ARR(data: IndexedSeq[CaseObj] @unchecked) :: CONST_STRING(key: String) :: Nil =>
           data.find(_.fields("key") == CONST_STRING(key)).map(_.fields("value")) match {
             case Some(n: CONST_LONG) if dataType == DataType.Long            => Right(n)
-            case Some(TRUE) if dataType == DataType.Boolean                  => Right(TRUE)
-            case Some(FALSE) if dataType == DataType.Boolean                 => Right(FALSE)
+            case Some(b: CONST_BOOLEAN) if dataType == DataType.Boolean      => Right(b)
             case Some(b: CONST_BYTEVECTOR) if dataType == DataType.ByteArray => Right(b)
             case Some(s: CONST_STRING) if dataType == DataType.String        => Right(s)
             case _                                                           => Right(PureContext.unit)

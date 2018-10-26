@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, CONST_BOOLEAN}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.api.DBUtils.indexes.active.MaxElements
@@ -46,10 +46,10 @@ class OrderValidator(db: DB,
         Left("Trading on scripted account isn't allowed yet")
       else
         try MatcherScriptRunner[EVALUATED](script, order) match {
-          case (_, Left(execError)) => Left(s"Error executing script for $address: $execError")
-          case (_, Right(FALSE))    => Left(s"Order rejected by script for $address")
-          case (_, Right(TRUE))     => Right(order)
-          case (_, Right(x))        => Left(s"Script returned not a boolean result, but $x")
+          case (_, Left(execError))             => Left(s"Error executing script for $address: $execError")
+          case (_, Right(CONST_BOOLEAN(false))) => Left(s"Order rejected by script for $address")
+          case (_, Right(CONST_BOOLEAN(true)))  => Right(order)
+          case (_, Right(x))                    => Left(s"Script returned not a boolean result, but $x")
         } catch {
           case NonFatal(e) => Left(s"Caught ${e.getClass.getCanonicalName} while executing script for $address: ${e.getMessage}")
         }
