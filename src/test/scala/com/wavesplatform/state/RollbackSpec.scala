@@ -92,8 +92,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
               ))
           }
 
-          val stransactions1 = d.addressTransactions(sender).getOrElse(Seq.empty).sortBy(_._2.timestamp)
-          val rtransactions1 = d.addressTransactions(recipient).getOrElse(Seq.empty).sortBy(_._2.timestamp)
+          val stransactions1 = d.addressTransactions(sender).explicitGet().sortBy(_._2.timestamp)
+          val rtransactions1 = d.addressTransactions(recipient).explicitGet().sortBy(_._2.timestamp)
 
           d.removeAfter(genesisSignature)
 
@@ -106,8 +106,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
               ))
           }
 
-          val stransactions2 = d.addressTransactions(sender).getOrElse(Seq.empty).sortBy(_._2.timestamp)
-          val rtransactions2 = d.addressTransactions(recipient).getOrElse(Seq.empty).sortBy(_._2.timestamp)
+          val stransactions2 = d.addressTransactions(sender).explicitGet().sortBy(_._2.timestamp)
+          val rtransactions2 = d.addressTransactions(recipient).explicitGet().sortBy(_._2.timestamp)
 
           stransactions1 shouldBe stransactions2
           rtransactions1 shouldBe rtransactions2

@@ -196,7 +196,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
 
         val txsFromLast = writer
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, Some(txs.last._2.id()))
-          .getOrElse(txs) // should never return this value
+          .explicitGet()
 
         txs.length shouldBe 2
         txsFromLast shouldBe Seq.empty
