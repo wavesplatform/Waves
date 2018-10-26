@@ -9,7 +9,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
   val script                        = ScriptCompiler(s"""true""".stripMargin).explicitGet()._1.bytes.value.base64
-  val supportedVersions: List[Byte] = List(1) // add "2" after IssueTransactionV2 activation
+  val supportedVersions: List[Byte] = List(1, 2)
 
   test("asset issue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     for (v <- supportedVersions) {
@@ -59,6 +59,24 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
     assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, bigAssetFee),
                                "negative waves balance")
+  }
+
+  test("Try to put incorrect script") {
+    val assetName        = "myasset"
+    val assetDescription = "my asset description"
+
+    assertBadRequestAndMessage(
+      sender.issue(firstAddress,
+                   assetName,
+                   assetDescription,
+                   someAssetAmount,
+                   2,
+                   reissuable = false,
+                   issueFee,
+                   version = 2,
+                   script = Some("base64:AQa3b8tZ")),
+      "ScriptParseError(Invalid checksum)"
+    )
   }
 
   val invalidAssetValue =
