@@ -153,8 +153,7 @@ object Serde {
             out.write(E_REF)
             out.writeString(key)
           }
-        case TRUE  => Coeval.now(out.write(E_TRUE))
-        case FALSE => Coeval.now(out.write(E_FALSE))
+        case CONST_BOOLEAN(b)  => Coeval.now(out.write(if (b) E_TRUE else E_FALSE))
         case GETTER(obj, field) =>
           aux(Coeval.now[Unit](out.write(E_GETTER)), obj).map { _ =>
             out.writeString(field)
