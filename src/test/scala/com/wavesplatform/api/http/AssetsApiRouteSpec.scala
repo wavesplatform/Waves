@@ -2,6 +2,8 @@ package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
 
+import com.wavesplatform.api.http.assets.AssetsApiRoute
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
@@ -10,8 +12,6 @@ import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import com.wavesplatform.api.http.assets.AssetsApiRoute
-import com.wavesplatform.database.LevelDBWriter
 
 class AssetsApiRouteSpec
     extends RouteSpec("/assets")
@@ -91,9 +91,9 @@ class AssetsApiRouteSpec
     }
   }
 
-  val currentHeight = 5000
-  val tooDeepHeight = currentHeight - LevelDBWriter.MAX_DEPTH
-  val okHeight      = tooDeepHeight + 1
+  val currentHeight: Int = 5000
+  val tooDeepHeight: Int = currentHeight - LevelDBWriter.MAX_DEPTH
+  val okHeight: Int      = tooDeepHeight + 1
 
   blockchain.height _ when () returns currentHeight
   blockchain.assetDistribution _ when * returns Map.empty
@@ -102,16 +102,15 @@ class AssetsApiRouteSpec
   routePath(s"/${sillyAssetTx.assetId()}/distribution/$okHeight") in {
     Get(routePath(s"/${sillyAssetTx.assetId()}/distribution/$okHeight")) ~> route ~> check {
       val response = responseAs[JsObject]
-      response.keys shouldBe Set.empty
+      response shouldBe JsObject.empty
     }
   }
 
   routePath(s"/${sillyAssetTx.assetId()}/distribution/$tooDeepHeight") in {
     Get(routePath(s"/${sillyAssetTx.assetId()}/distribution/$tooDeepHeight")) ~> route ~> check {
       val response = responseAs[JsObject]
-      (response \ "error").as[Int] shouldBe 10
-      (response \ "message").as[String] shouldBe "Too big sequences requested"
+      (response \ "error").as[Int] shouldBe TooBigArrayAllocation.id
+      (response \ "message").as[String] shouldBe TooBigArrayAllocation.message
     }
   }
-
 }

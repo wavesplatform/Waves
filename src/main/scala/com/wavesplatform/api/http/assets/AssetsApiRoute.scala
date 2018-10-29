@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http.assets
 
-import java.util.concurrent.{Executors, RejectedExecutionException}
+import java.util.concurrent._
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
@@ -35,7 +35,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     extends ApiRoute
     with BroadcastRoute {
 
-  import AssetsApiRoute._
+  private val distributionTaskScheduler = {
+    val executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS))
+    Scheduler(executor)
+  }
 
   override lazy val route =
     pathPrefix("assets") {
@@ -375,8 +378,5 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 }
 
 object AssetsApiRoute {
-  val distributionTaskScheduler = {
-    val executor = Executors.newSingleThreadExecutor()
-    Scheduler(executor)
-  }
+  val MAX_DISTRIBUTION_TASKS = 5
 }
