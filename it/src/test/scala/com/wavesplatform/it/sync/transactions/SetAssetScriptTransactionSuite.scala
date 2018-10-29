@@ -24,7 +24,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
              reissuable = false,
              issueFee,
              2,
-             script = Some(script))
+             script = None //Some(script)
+      )
       .id
     nodes.waitForHeightArise()
   }

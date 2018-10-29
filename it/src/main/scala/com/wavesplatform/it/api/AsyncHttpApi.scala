@@ -270,6 +270,7 @@ object AsyncHttpApi extends Assertions {
       signAndBroadcast(
         Json.obj(
           "type"    -> 15,
+          "version" -> 1,
           "assetId" -> assetId,
           "sender"  -> sender,
           "fee"     -> fee,
