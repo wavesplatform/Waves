@@ -17,7 +17,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   private val acc1 = pkByAddress(secondAddress)
   private val acc2 = pkByAddress(thirdAddress)
 
-  var exchAsset: String    = null
+  var exchAsset: String    = ""
   var dtx: DataTransaction = null
 
   val sc1 = Some(s"""true""")

@@ -273,6 +273,9 @@ object SyncHttpApi extends Assertions {
 
     def connect(address: InetSocketAddress): Unit =
       sync(async(n).connect(address))
+
+    def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None): Transaction =
+      sync(async(n).setAssetScript(assetId, sender, fee, script))
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
