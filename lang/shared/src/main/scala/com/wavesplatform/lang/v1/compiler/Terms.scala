@@ -21,6 +21,8 @@ object Terms {
   case class CONST_BOOLEAN(b: Boolean) extends EXPR with EVALUATED {
     override def toString(): String = if (b) "TRUE" else "FALSE"
   }
+  val TRUE  = CONST_BOOLEAN(true)
+  val FALSE = CONST_BOOLEAN(false)
 
   case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR]) extends EXPR
 

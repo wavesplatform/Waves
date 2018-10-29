@@ -140,7 +140,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       )
     ),
     expectedResult = Right(
-      (BLOCK(LET("a", IF(CONST_BOOLEAN(true), CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))),
+      (BLOCK(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))),
        BOOLEAN))
   )
 
@@ -183,14 +183,14 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
                PureContext._isInstanceOf.header,
                List(REF("$match0"), CONST_STRING("PointB"))
              ),
-             CONST_BOOLEAN(true),
+             TRUE,
              FUNCTION_CALL(
                PureContext._isInstanceOf.header,
                List(REF("$match0"), CONST_STRING("PointA"))
              )
            ),
-           BLOCK(LET("p", REF("$match0")), CONST_BOOLEAN(true)),
-           CONST_BOOLEAN(false)
+           BLOCK(LET("p", REF("$match0")), TRUE),
+           FALSE
          )
        ),
        BOOLEAN))

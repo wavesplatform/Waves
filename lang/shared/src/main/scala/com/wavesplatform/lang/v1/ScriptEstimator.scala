@@ -49,6 +49,6 @@ object ScriptEstimator {
         } yield (callCost() + argsComp, argsSyms)
     }
 
-    aux(EitherT.pure(t), declaredVals.map(_ -> ((CONST_BOOLEAN(true), true))).toMap).value().map(_._1)
+    aux(EitherT.pure(t), declaredVals.map(_ -> ((TRUE, true))).toMap).value().map(_._1)
   }
 }

@@ -114,12 +114,12 @@ object PureContext {
                                                         "Internal function to check value type",
                                                         ("obj", TYPEPARAM('T'), "value"),
                                                         ("of", STRING, "type name")) {
-    case CONST_BOOLEAN(_) :: CONST_STRING("Boolean") :: Nil       => Right(CONST_BOOLEAN(true))
-    case CONST_BYTEVECTOR(_) :: CONST_STRING("ByteVector") :: Nil => Right(CONST_BOOLEAN(true))
-    case CONST_STRING(_) :: CONST_STRING("String") :: Nil         => Right(CONST_BOOLEAN(true))
-    case CONST_LONG(_) :: CONST_STRING("Int") :: Nil              => Right(CONST_BOOLEAN(true))
+    case CONST_BOOLEAN(_) :: CONST_STRING("Boolean") :: Nil       => Right(TRUE)
+    case CONST_BYTEVECTOR(_) :: CONST_STRING("ByteVector") :: Nil => Right(TRUE)
+    case CONST_STRING(_) :: CONST_STRING("String") :: Nil         => Right(TRUE)
+    case CONST_LONG(_) :: CONST_STRING("Int") :: Nil              => Right(TRUE)
     case (p: CaseObj) :: CONST_STRING(s) :: Nil                   => Right(CONST_BOOLEAN(p.caseType.name == s))
-    case _                                                        => Right(CONST_BOOLEAN(false))
+    case _                                                        => Right(FALSE)
   }
 
   lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes vector", ("byteVector", BYTEVECTOR, "vector")) {
@@ -129,8 +129,8 @@ object PureContext {
 
   lazy val toBytesBoolean: BaseFunction =
     NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("b", BOOLEAN, "value")) {
-      case CONST_BOOLEAN(true) :: Nil  => Right(CONST_BYTEVECTOR(ByteVector(1)))
-      case CONST_BOOLEAN(false) :: Nil => Right(CONST_BYTEVECTOR(ByteVector(0)))
+      case TRUE :: Nil  => Right(CONST_BYTEVECTOR(ByteVector(1)))
+      case FALSE :: Nil => Right(CONST_BYTEVECTOR(ByteVector(0)))
       case _                           => ???
     }
 
@@ -152,8 +152,8 @@ object PureContext {
 
   lazy val toStringBoolean: BaseFunction =
     NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, "String representation", ("b", BOOLEAN, "value")) {
-      case CONST_BOOLEAN(true) :: Nil  => Right(CONST_STRING("true"))
-      case CONST_BOOLEAN(false) :: Nil => Right(CONST_STRING("false"))
+      case TRUE :: Nil  => Right(CONST_STRING("true"))
+      case FALSE :: Nil => Right(CONST_STRING("false"))
       case _                           => ???
     }
 
@@ -307,7 +307,7 @@ object PureContext {
   }
 
   lazy val uNot: BaseFunction = UserFunction("!", BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
-    IF(FUNCTION_CALL(eq, List(REF("@p"), CONST_BOOLEAN(false))), CONST_BOOLEAN(true), CONST_BOOLEAN(false))
+    IF(FUNCTION_CALL(eq, List(REF("@p"), FALSE)), TRUE, FALSE)
   }
 
   private lazy val operators: Array[BaseFunction] = Array(

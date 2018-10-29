@@ -48,8 +48,8 @@ object Serde {
               body = body
             )
         case E_REF    => Coeval.now(REF(bb.getString))
-        case E_TRUE   => Coeval.now(CONST_BOOLEAN(true))
-        case E_FALSE  => Coeval.now(CONST_BOOLEAN(false))
+        case E_TRUE   => Coeval.now(TRUE)
+        case E_FALSE  => Coeval.now(FALSE)
         case E_GETTER => aux().map(GETTER(_, field = bb.getString))
         case E_FUNCALL =>
           Coeval
@@ -153,8 +153,8 @@ object Serde {
             out.write(E_REF)
             out.writeString(key)
           }
-        case CONST_BOOLEAN(true)  => Coeval.now(out.write(E_TRUE))
-        case CONST_BOOLEAN(false) => Coeval.now(out.write(E_FALSE))
+        case TRUE  => Coeval.now(out.write(E_TRUE))
+        case FALSE => Coeval.now(out.write(E_FALSE))
         case GETTER(obj, field) =>
           aux(Coeval.now[Unit](out.write(E_GETTER)), obj).map { _ =>
             out.writeString(field)

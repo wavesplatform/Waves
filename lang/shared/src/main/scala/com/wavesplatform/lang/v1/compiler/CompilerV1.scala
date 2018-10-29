@@ -41,8 +41,8 @@ object CompilerV1 {
       case x: Expressions.CONST_LONG                => (CONST_LONG(x.value): EXPR, LONG: FINAL).pure[CompileM]
       case x: Expressions.CONST_BYTEVECTOR          => handlePart(x.value).map(v => (CONST_BYTEVECTOR(v), BYTEVECTOR: FINAL))
       case x: Expressions.CONST_STRING              => handlePart(x.value).map(v => (CONST_STRING(v), STRING: FINAL))
-      case _: Expressions.TRUE                      => (CONST_BOOLEAN(true): EXPR, BOOLEAN: FINAL).pure[CompileM]
-      case _: Expressions.FALSE                     => (CONST_BOOLEAN(false): EXPR, BOOLEAN: FINAL).pure[CompileM]
+      case _: Expressions.TRUE                      => (TRUE: EXPR, BOOLEAN: FINAL).pure[CompileM]
+      case _: Expressions.FALSE                     => (FALSE: EXPR, BOOLEAN: FINAL).pure[CompileM]
       case Expressions.GETTER(p, ref, field)        => compileGetter(p, field, ref)
       case Expressions.BLOCK(p, let, body)          => compileBlock(p, let, body)
       case Expressions.IF(p, cond, ifTrue, ifFalse) => compileIf(p, cond, ifTrue, ifFalse)

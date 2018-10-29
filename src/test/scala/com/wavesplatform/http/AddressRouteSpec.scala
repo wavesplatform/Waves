@@ -148,7 +148,7 @@ class AddressRouteSpec
   }
 
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
-    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: Address) => Some(ScriptV1(CONST_BOOLEAN(true)).explicitGet()))
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).onCall((_: Address) => Some(ScriptV1(TRUE).explicitGet()))
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)

@@ -56,7 +56,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
   }
 
   private val assetId = ByteStr("coin_id".getBytes())
-  private val script  = ScriptV1(V1, Terms.CONST_BOOLEAN(true), checkSize = false).explicitGet()
+  private val script  = ScriptV1(V1, Terms.TRUE, checkSize = false).explicitGet()
 
   private val transferWavesTx = TransferTransactionV1
     .selfSigned(
