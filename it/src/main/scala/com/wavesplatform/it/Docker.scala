@@ -61,7 +61,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
   dumpContainers(client.listContainers())
   sys.addShutdownHook {
     log.debug("Shutdown hook")
-    close()
+//    close()
   }
 
   private[it] val configTemplate = parseResources("template.conf")

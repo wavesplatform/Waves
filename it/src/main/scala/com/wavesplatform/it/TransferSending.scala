@@ -114,7 +114,7 @@ trait TransferSending extends ScorexLogging {
               .selfSigned(
                 assetId = None,
                 sender = PrivateKeyAccount.fromSeed(x.senderSeed).explicitGet(),
-                recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
+                recipient = PrivateKeyAccount.fromSeed(x.senderSeed).explicitGet(), //AddressOrAlias.fromString(x.targetAddress).explicitGet(),
                 amount = x.amount,
                 timestamp = start + i,
                 feeAssetId = None,
