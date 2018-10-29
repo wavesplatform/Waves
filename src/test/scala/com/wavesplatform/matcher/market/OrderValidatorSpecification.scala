@@ -158,7 +158,7 @@ class OrderValidatorSpecification
 
   private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = portfolioTest(defaultPortfolio) { (ov, bc) =>
     val pk            = PrivateKeyAccount(randomBytes())
-    val accountScript = ScriptV1(ScriptVersion.Versions.V2, TRUE, checkSize = false).explicitGet()
+    val accountScript = ScriptV1(ScriptVersion.Versions.V2, Terms.TRUE, checkSize = false).explicitGet()
 
     (bc.accountScript _).when(pk.toAddress).returns(Some(accountScript)).anyNumberOfTimes()
     (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()

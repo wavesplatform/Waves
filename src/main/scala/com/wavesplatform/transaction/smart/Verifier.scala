@@ -71,7 +71,7 @@ object Verifier extends Instrumented with ScorexLogging {
         case (log, Right(FALSE)) =>
           Left(TransactionNotAllowedByScript(log, script.text, isTokenScript))
         case (_, Right(TRUE)) => Right(transaction)
-        case (_, Right(x))                   => Left(GenericError(s"Script returned not a boolean result, but $x"))
+        case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
     } match {
       case Failure(e) =>
@@ -91,10 +91,10 @@ object Verifier extends Instrumented with ScorexLogging {
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] =
     Try {
       MatcherScriptRunner[EVALUATED](script, order) match {
-        case (ctx, Left(execError))             => Left(ScriptExecutionError(execError, script.text, ctx, isTokenScript = false))
-        case (ctx, Right(FALSE)) => Left(TransactionNotAllowedByScript(ctx, script.text, isTokenScript = false))
-        case (_, Right(TRUE))    => Right(order)
-        case (_, Right(x))                      => Left(GenericError(s"Script returned not a boolean result, but $x"))
+        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx, isTokenScript = false))
+        case (ctx, Right(FALSE))    => Left(TransactionNotAllowedByScript(ctx, script.text, isTokenScript = false))
+        case (_, Right(TRUE))       => Right(order)
+        case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
     } match {
       case Failure(e) =>
