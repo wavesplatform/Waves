@@ -67,7 +67,8 @@ class Matcher(actorSystem: ActorSystem,
       p => Option(marketStatuses.get(p)),
       orderBooksSnapshotCache,
       settings,
-      db
+      db,
+      NTP
     )
   )
 

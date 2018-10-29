@@ -7,7 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.transaction.assets.exchange.{OrderType}
+import com.wavesplatform.transaction.assets.exchange.OrderType
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -45,7 +45,7 @@ class RoundingIssuesTestSuite
     matcherNode.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(filledAmount), 1.minute)
     matcherNode.waitOrderStatusAndAmount(wavesUsdPair, counterId, "PartiallyFilled", Some(filledAmount), 1.minute)
 
-    matcherNode.cancelOrder(aliceNode, wavesUsdPair, Some(counterId))
+    matcherNode.cancelOrder(aliceNode, wavesUsdPair, counterId)
     val tx = matcherNode.transactionsByOrder(counterId).head
 
     matcherNode.waitForTransaction(tx.id)
@@ -76,7 +76,7 @@ class RoundingIssuesTestSuite
 
     withClue("Alice's reserved balance before cancel")(matcherNode.reservedBalance(aliceNode) shouldBe empty)
 
-    matcherNode.cancelOrder(bobNode, ethBtcPair, Some(counterId))
+    matcherNode.cancelOrder(bobNode, ethBtcPair, counterId)
     val tx = matcherNode.transactionsByOrder(counterId).head
 
     matcherNode.waitForTransaction(tx.id)

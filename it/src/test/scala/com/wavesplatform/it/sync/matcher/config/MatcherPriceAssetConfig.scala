@@ -124,12 +124,10 @@ object MatcherPriceAssetConfig {
 
   val orderLimit = 10
 
-  private val updatedMatcherConfig = parseString(s"""
-                                                    |waves.matcher {
+  private val updatedMatcherConfig = parseString(s"""waves.matcher {
                                                     |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-                                                    |  rest-order-limit=$orderLimit
-                                                    |}
-     """.stripMargin)
+                                                    |  rest-order-limit = $orderLimit
+                                                    |}""".stripMargin)
 
   val Configs: Seq[Config] = _Configs.map(updatedMatcherConfig.withFallback(_))
 
