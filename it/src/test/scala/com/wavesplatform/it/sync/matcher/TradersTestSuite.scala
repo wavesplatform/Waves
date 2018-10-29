@@ -87,7 +87,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          matcherNode.cancelOrder(bobNode, twoAssetsPair, Some(newestOrderId)).status should be("OrderCanceled")
+          matcherNode.cancelOrder(bobNode, twoAssetsPair, newestOrderId).status should be("OrderCanceled")
 
           val transferBackId = aliceNode.transfer(aliceNode.address, bobNode.address, 3050, TransactionFee, Some(bobNewAsset), None).id
           nodes.waitForHeightAriseAndTxPresent(transferBackId)
@@ -112,7 +112,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          matcherNode.cancelOrder(bobNode, twoAssetsPair, Some(newestOrderId)).status should be("OrderCanceled")
+          matcherNode.cancelOrder(bobNode, twoAssetsPair, newestOrderId).status should be("OrderCanceled")
           val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, TransactionFee).id
           nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
         }
@@ -136,7 +136,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          matcherNode.cancelOrder(bobNode, twoAssetsPair, Some(newestOrderId)).status should be("OrderCanceled")
+          matcherNode.cancelOrder(bobNode, twoAssetsPair, newestOrderId).status should be("OrderCanceled")
           val transferBackId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
           nodes.waitForHeightAriseAndTxPresent(transferBackId)
         }
@@ -164,7 +164,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          matcherNode.cancelOrder(bobNode, bobWavesPair, Some(newestOrderId)).status should be("OrderCanceled")
+          matcherNode.cancelOrder(bobNode, bobWavesPair, newestOrderId).status should be("OrderCanceled")
           val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, TransactionFee).id
           nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
         }
