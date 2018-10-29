@@ -1,9 +1,10 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{someAssetAmount}
+import com.wavesplatform.it.sync.someAssetAmount
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.sync._
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   var testAssetWOScript = ""
@@ -30,15 +31,23 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
   test("cannot set script on asset w/o initial script") {
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-    assertBadRequestAndMessage(sender.setAssetScript(testAssetWOScript, firstAddress, issueFee, Some(script)).id, "")
+    assertBadRequestAndMessage(sender.setAssetScript(testAssetWOScript, firstAddress, issueFee, Some(script)), "")
     notMiner.assertBalances(firstAddress, balance1, eff1)
   }
-//  test("sender's waves balance is decreased by fee.") {
-//    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-//    val txId             = sender.setAssetScript(testAsset, firstAddress, data, transferFee).id
-//    nodes.waitForHeightAriseAndTxPresent(txId)
-//    notMiner.assertBalances(firstAddress, balance1 - transferFee, eff1 - transferFee)
-//  }
+
+  test("sender's waves balance is decreased by fee.") {
+    val script = ScriptCompiler(s"""
+           |match tx {
+           |  case s : SetScriptTransaction => true
+           |  case _ => false
+           |}
+         """.stripMargin).explicitGet()._1.bytes.value.base64
+
+    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
+    val txId             = sender.setAssetScript(testAsset, firstAddress, issueFee, Some(script)).id
+    nodes.waitForHeightAriseAndTxPresent(txId)
+    notMiner.assertBalances(firstAddress, balance1 - issueFee, eff1 - issueFee)
+  }
 
 //  test("cannot transact without having enough waves") {
 //    val (balance1, eff1) = notMiner.accountBalances(firstAddress)

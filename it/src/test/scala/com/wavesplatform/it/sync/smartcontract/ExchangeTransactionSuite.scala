@@ -91,7 +91,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       setContract(mcontr, acc2)
 
       val tx = exchangeTx()
-      assertBadRequestAndMessage(sender.signedBroadcast(tx), "Transaction not allowed by account-script")
+      assertBadRequestAndMessage(sender.signedBroadcast(tx), "Transaction is not allowed by account-script")
       //TODO : add assert balances
     }
     setContract(None, acc0)
