@@ -3,13 +3,10 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
-import akka.http.scaladsl.model.StatusCodes
-import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
-import akka.util.Timeout
 import com.google.common.base.Charsets
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{MatcherResponse, OrderRejected}
+import com.wavesplatform.matcher.api.DuringShutdown
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.OrderExecuted
 import com.wavesplatform.matcher.model.OrderBook
@@ -22,12 +19,10 @@ import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.utils._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-
 class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
                    orderBooks: AtomicReference[Map[AssetPair, ActorRef]],
                    updateSnapshot: AssetPair => OrderBook => Unit,
+                   updateMarketStatus: AssetPair => MarketStatus => Unit,
                    utx: UtxPool,
                    allChannels: ChannelGroup,
                    settings: MatcherSettings,
@@ -37,8 +32,6 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
     with ScorexLogging {
 
   import MatcherActor._
-
-  private implicit val timeout: Timeout = 5.seconds
 
   private var tradedPairs            = Map.empty[AssetPair, MarketData]
   private var lastSnapshotSequenceNr = 0L
@@ -51,7 +44,8 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
     onComplete = () => ()
   )
 
-  private def orderBook(pair: AssetPair) = Option(orderBooks.get()).flatMap(_.get(pair))
+  private def orderBook(pair: AssetPair)           = Option(orderBooks.get()).flatMap(_.get(pair))
+  private def removeOrderBook(ref: ActorRef): Unit = orderBooks.getAndUpdate(_.filterNot(_._2 == ref))
 
   def getAssetName(asset: Option[AssetId], desc: Option[AssetDescription]): String =
     asset.fold(AssetPair.WavesName) { _ =>
@@ -76,7 +70,7 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
   }
 
   private def createOrderBookActor(pair: AssetPair): ActorRef = context.actorOf(
-    OrderBookActor.props(pair, updateSnapshot(pair), utx, allChannels, settings, createTransaction),
+    OrderBookActor.props(pair, updateSnapshot(pair), updateMarketStatus(pair), utx, allChannels, settings, createTransaction),
     OrderBookActor.name(pair)
   )
 
@@ -85,21 +79,18 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
     val orderBook = createOrderBookActor(pair)
     orderBooks.updateAndGet(_ + (pair -> orderBook))
     tradedPairs += pair -> createMarketData(pair)
+    context.watch(orderBook)
     orderBook
   }
 
-  def createAndForward(order: Order): Unit = {
-    val pair      = order.assetPair
-    val orderBook = createOrderBook(pair)
-    val md        = tradedPairs(pair)
-    if (order.price % md.zeros == 0) {
-      persistAsync(OrderBookCreated(pair)) { _ =>
+  def createAndForward(order: Order): Unit =
+    if (shutdownStatus.initiated) sender() ! DuringShutdown
+    else {
+      val orderBook = createOrderBook(order.assetPair)
+      persistAsync(OrderBookCreated(order.assetPair)) { _ =>
         forwardReq(order)(orderBook)
       }
-    } else {
-      sender() ! OrderRejected(s"Invalid price. Last ${md.decs} digits should be zero")
     }
-  }
 
   def returnEmptyOrderBook(pair: AssetPair): Unit = {
     sender() ! GetOrderBookResponse.empty(pair)
@@ -110,25 +101,17 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
   def forwardToOrderBook: Receive = {
     case GetMarkets => sender() ! tradedPairs.values.toSeq
 
-    case req @ GetMarketStatusRequest(pair) =>
-      val snd = sender()
-      context
-        .child(OrderBookActor.name(pair))
-        .fold {
-          snd ! MatcherResponse(StatusCodes.NotFound, "Market not found")
-        } { orderbook =>
-          (orderbook ? req)
-            .mapTo[GetMarketStatusResponse]
-            .foreach(snd ! _)
-        }
-
     case order: Order =>
       orderBook(order.assetPair).fold(createAndForward(order))(forwardReq(order))
 
     case ob: DeleteOrderBookRequest =>
-      orderBook(ob.assetPair)
-        .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
-      removeOrderBook(ob.assetPair)
+      orderBook(ob.assetPair).fold(returnEmptyOrderBook(ob.assetPair)) { ref =>
+        forwardReq(ob)(ref)
+        removeOrderBook(ref)
+        tradedPairs -= ob.assetPair
+        deleteMessages(lastSequenceNr)
+        saveSnapshot(Snapshot(tradedPairs.keySet))
+      }
 
     case Shutdown =>
       shutdownStatus = shutdownStatus.copy(
@@ -138,6 +121,7 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
         }
       )
 
+      context.children.foreach(context.unwatch)
       context.become(snapshotsCommands orElse shutdownFallback)
 
       if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(tradedPairs.keySet))
@@ -155,14 +139,8 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
       } else {
         context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, self))
       }
-  }
 
-  private def removeOrderBook(pair: AssetPair): Unit = {
-    if (tradedPairs.contains(pair)) {
-      tradedPairs -= pair
-      deleteMessages(lastSequenceNr)
-      saveSnapshot(Snapshot(tradedPairs.keySet))
-    }
+    case Terminated(ref) => removeOrderBook(ref)
   }
 
   override def receiveRecover: Receive = {
@@ -232,7 +210,7 @@ class MatcherActor(validateAssetPair: AssetPair => Either[String, AssetPair],
       shutdownStatus = shutdownStatus.copy(orderBooksStopped = true)
       shutdownStatus.tryComplete()
 
-    case _ if shutdownStatus.initiated => sender() ! MatcherResponse(StatusCodes.ServiceUnavailable, "System is going shutdown")
+    case _ if shutdownStatus.initiated => sender() ! DuringShutdown
   }
 
   override def receiveCommand: Receive = forwardToOrderBook orElse snapshotsCommands
@@ -246,12 +224,24 @@ object MatcherActor {
   def props(validateAssetPair: AssetPair => Either[String, AssetPair],
             orderBooks: AtomicReference[Map[AssetPair, ActorRef]],
             updateSnapshot: AssetPair => OrderBook => Unit,
+            updateMarketStatus: AssetPair => MarketStatus => Unit,
             utx: UtxPool,
             allChannels: ChannelGroup,
             settings: MatcherSettings,
             assetDescription: ByteStr => Option[AssetDescription],
             createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction]): Props =
-    Props(new MatcherActor(validateAssetPair, orderBooks, updateSnapshot, utx, allChannels, settings, assetDescription, createTransaction))
+    Props(
+      new MatcherActor(
+        validateAssetPair,
+        orderBooks,
+        updateSnapshot,
+        updateMarketStatus,
+        utx,
+        allChannels,
+        settings,
+        assetDescription,
+        createTransaction
+      ))
 
   private case class ShutdownStatus(initiated: Boolean,
                                     oldMessagesDeleted: Boolean,
@@ -288,16 +278,7 @@ object MatcherActor {
                         priceAssetName: String,
                         created: Long,
                         amountAssetInfo: Option[AssetInfo],
-                        priceAssetinfo: Option[AssetInfo]) {
-    val (decs, zeros) = {
-      val decs = priceAssetinfo.map(_.decimals).getOrElse(0) - amountAssetInfo.map(_.decimals).getOrElse(0)
-      if (decs > 0) {
-        (decs, BigInt(10).pow(decs).toLong)
-      } else {
-        (0, 1L)
-      }
-    }
-  }
+                        priceAssetinfo: Option[AssetInfo])
 
   def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
     if (buffer1.isEmpty && buffer2.isEmpty) 0
