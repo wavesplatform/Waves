@@ -1,18 +1,18 @@
 package com.wavesplatform.it.sync.matcher
 
-import com.typesafe.config.ConfigFactory.parseString
 import com.typesafe.config.Config
-import com.wavesplatform.it.{Node, ReportingTestName}
+import com.typesafe.config.ConfigFactory.parseString
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.sync.someAssetAmount
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.util._
+import com.wavesplatform.it.{Node, ReportingTestName}
 import com.wavesplatform.state.ByteStr.decodeBase58
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import com.wavesplatform.it.util._
 
 import scala.concurrent.duration._
 
@@ -82,8 +82,8 @@ class RestOrderLimitTestSuite
     matcher.placeOrder(bob, bobPair, SELL, 1, 4.waves).message.id  // fill filled2
     matcher.placeOrder(bob, bobPair, SELL, 1, 3.waves).message.id  // part fill partial2
 
-    matcher.cancelOrder(alice, alicePair, Some(cancelled1))
-    matcher.cancelOrder(alice, alicePair, Some(cancelled2))
+    matcher.cancelOrder(alice, alicePair, cancelled1)
+    matcher.cancelOrder(alice, alicePair, cancelled2)
     matcher.waitOrderStatus(bobPair, cancelled2, "Cancelled", 1.minutes)
 
     val activeOrdersAllFive       = Seq(partial2, active2, partial1, active1, active0)

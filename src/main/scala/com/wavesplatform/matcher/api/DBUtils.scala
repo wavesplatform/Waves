@@ -121,5 +121,5 @@ object DBUtils {
     key.parse(db.get(key.keyBytes)).getOrElse(0)
   }
 
-  def lastOrderTimestamp(db: DB, address: Address): Option[Long] = db.get(MatcherKeys.lastOrderTimestamp(address))
+  def lastOrderTimestamp(db: DB, address: Address): Option[Long] = db.get(MatcherKeys.lastCommandTimestamp(address))
 }

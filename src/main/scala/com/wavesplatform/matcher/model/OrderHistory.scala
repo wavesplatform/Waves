@@ -25,13 +25,32 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
   private val saveOpenVolumeTimer = timer.refine("action" -> "save-open-volume")
   private val saveOrderInfoTimer  = timer.refine("action" -> "save-order-info")
 
+  private def updateTimestamp(rw: RW, address: Address, newTimestamp: Long): Either[String, Long] = {
+    val k = lastCommandTimestamp(address)
+    rw.get(k) match {
+      case None =>
+        rw.put(k, Some(newTimestamp))
+        Right(newTimestamp)
+      case Some(prevTimestamp) =>
+        val earliestTimestamp = prevTimestamp - settings.orderTimestampDrift
+        if (newTimestamp < earliestTimestamp) {
+          Left(s"Timestamp must be >= $earliestTimestamp")
+        } else if (newTimestamp <= prevTimestamp) {
+          Right(prevTimestamp)
+        } else {
+          rw.put(k, Some(newTimestamp))
+          Right(newTimestamp)
+        }
+    }
+  }
+
+  def updateTimestamp(address: Address, newTimestamp: Long): Either[String, Long] = db.readWrite(rw => updateTimestamp(rw, address, newTimestamp))
+
   def process(event: OrderAdded): Unit = saveOrderInfoTimer.measure {
     db.readWrite { rw =>
-      val order           = event.order.order
-      val k               = lastOrderTimestamp(order.sender)
-      val newestTimestamp = rw.get(k).fold(order.timestamp)(_.max(order.timestamp))
+      val order = event.order.order
 
-      rw.put(k, Some(newestTimestamp))
+      updateTimestamp(rw, order.sender, order.timestamp)
 
       val origInfo = rw.get(orderInfoOpt(order.id()))
       if (!origInfo.exists(_.status.isFinal)) {
