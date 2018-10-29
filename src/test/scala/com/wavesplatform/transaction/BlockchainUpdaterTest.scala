@@ -213,7 +213,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
         super.checkExit(status)
         if (status == 38)
           signal.release()
-        throw new SecurityException("System exit not allowed")
+        throw new SecurityException("System exit is not allowed")
       }
     })
 
