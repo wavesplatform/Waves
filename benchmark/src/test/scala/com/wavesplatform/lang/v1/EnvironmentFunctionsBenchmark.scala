@@ -77,13 +77,13 @@ object EnvironmentFunctionsBenchmark {
   val SeedBytesLength   = 128
 
   private val defaultEnvironment: Environment = new Environment {
-    override def height: Int                                                                                     = 1
+    override def height: Long                                                                                    = 1
     override def networkByte: Byte                                                                               = NetworkByte
     override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(alias: String): Either[String, Recipient.Address]                                  = ???
-    override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+    override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
   }
 

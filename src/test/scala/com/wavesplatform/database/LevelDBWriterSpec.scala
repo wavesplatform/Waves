@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.utils.{Time, TimeImpl}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.{RequestGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
@@ -101,13 +101,12 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
   }
 
   def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = {
-    val time          = new TimeImpl
     val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, time)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
     try {
-      val (account, blocks) = gen(time).sample.get
+      val (account, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
         bcu.processBlock(block).explicitGet()
@@ -116,36 +115,36 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       bcu.shutdown()
       f(defaultWriter, account)
     } finally {
-      time.close()
       bcu.shutdown()
       db.close()
     }
   }
 
   "addressTransactions" - {
-    "return txs in correct ordering" in {
-      val preconditions = (ts: Long) => {
-        for {
-          master    <- accountGen
-          recipient <- accountGen
-          genesisBlock = TestBlock
-            .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
-          block1 = TestBlock
-            .create(
-              ts + 3,
-              genesisBlock.uniqueId,
-              Seq(
-                createTransfer(master, recipient.toAddress, ts + 1),
-                createTransfer(master, recipient.toAddress, ts + 2)
-              )
+    def preconditions(ts: Long): Gen[(PrivateKeyAccount, List[Block])] = {
+      for {
+        master    <- accountGen
+        recipient <- accountGen
+        genesisBlock = TestBlock
+          .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+        block1 = TestBlock
+          .create(
+            ts + 3,
+            genesisBlock.uniqueId,
+            Seq(
+              createTransfer(master, recipient.toAddress, ts + 1),
+              createTransfer(master, recipient.toAddress, ts + 2)
             )
-          emptyBlock = TestBlock.create(ts + 5, block1.uniqueId, Seq())
-        } yield (master, List(genesisBlock, block1, emptyBlock))
-      }
+          )
+        emptyBlock = TestBlock.create(ts + 5, block1.uniqueId, Seq())
+      } yield (master, List(genesisBlock, block1, emptyBlock))
+    }
 
+    "return txs in correct ordering without fromId" in {
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
         val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, 0)
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, None)
+          .explicitGet()
 
         val ordering = Ordering
           .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
@@ -153,6 +152,54 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
         txs.length shouldBe 2
 
         txs.sorted(ordering) shouldBe txs
+      }
+    }
+
+    "return Left if fromId argument is a non-existent transaction" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
+
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, Some(nonExistentTxId))
+
+        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
+      }
+    }
+
+    "return txs in correct ordering starting from a given id" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        // using pagination
+        val firstTx = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, None)
+          .explicitGet()
+          .head
+
+        val secondTx = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 1, Some(firstTx._2.id()))
+          .explicitGet()
+          .head
+
+        // without pagination
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
+          .explicitGet()
+
+        txs shouldBe Seq(firstTx, secondTx)
+      }
+    }
+
+    "return an empty Seq when paginating from the last transaction" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, None)
+          .explicitGet()
+
+        val txsFromLast = writer
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 2, Some(txs.last._2.id()))
+          .explicitGet()
+
+        txs.length shouldBe 2
+        txsFromLast shouldBe Seq.empty
       }
     }
 

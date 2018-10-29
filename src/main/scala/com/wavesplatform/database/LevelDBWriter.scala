@@ -118,6 +118,14 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
   }
 
+  override protected def loadAssetScript(asset: AssetId): Option[Script] = readOnly { db =>
+    db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
+  }
+
+  override protected def hasAssetScriptBytes(asset: AssetId): Boolean = readOnly { db =>
+    db.hasInHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset))
+  }
+
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
   override def accountData(address: Address): AccountDataInfo = readOnly { db =>
@@ -164,9 +172,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   override protected def loadAssetDescription(assetId: ByteStr): Option[AssetDescription] = readOnly { db =>
     db.get(Keys.transactionInfo(assetId)) match {
       case Some((_, i: IssueTransaction)) =>
-        val ai          = db.fromHistory(Keys.assetInfoHistory(assetId), Keys.assetInfo(assetId)).getOrElse(AssetInfo(i.reissuable, i.quantity, i.script))
+        val ai          = db.fromHistory(Keys.assetInfoHistory(assetId), Keys.assetInfo(assetId)).getOrElse(AssetInfo(i.reissuable, i.quantity))
         val sponsorship = db.fromHistory(Keys.sponsorshipHistory(assetId), Keys.sponsorship(assetId)).fold(0L)(_.minFee)
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, ai.script, sponsorship))
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, i.script, sponsorship))
       case _ => None
     }
   }
@@ -200,6 +208,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
                                   reissuedAssets: Map[ByteStr, AssetInfo],
                                   filledQuantity: Map[ByteStr, VolumeAndFee],
                                   scripts: Map[BigInt, Option[Script]],
+                                  assetScripts: Map[AssetId, Option[Script]],
                                   data: Map[BigInt, AccountDataInfo],
                                   aliases: Map[Alias, BigInt],
                                   sponsorship: Map[AssetId, Sponsorship]): Unit = readWrite { rw =>
@@ -291,6 +300,11 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       script.foreach(s => rw.put(Keys.addressScript(addressId)(height), Some(s)))
     }
 
+    for ((asset, script) <- assetScripts) {
+      expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
+      script.foreach(s => rw.put(Keys.assetScript(asset)(height), Some(s)))
+    }
+
     for ((addressId, addressData) <- data) {
       val newKeys = (
         for {
@@ -353,7 +367,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     rw.put(Keys.transactionIdsAtHeight(height), transactions.keys.toSeq)
 
-    expiredKeys.foreach(rw.delete)
+    expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
       DisableHijackedAliases(rw)
@@ -369,6 +383,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         val assetInfoToInvalidate  = Seq.newBuilder[ByteStr]
         val ordersToInvalidate     = Seq.newBuilder[ByteStr]
         val scriptsToDiscard       = Seq.newBuilder[Address]
+        val assetScriptsToDiscard  = Seq.newBuilder[ByteStr]
 
         val discardedBlock = readWrite { rw =>
           log.trace(s"Rolling back to ${currentHeight - 1}")
@@ -435,6 +450,12 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
                     rw.filterHistory(Keys.addressScriptHistory(addressId), currentHeight)
                   }
 
+                case tx: SetAssetScriptTransaction =>
+                  val asset = tx.assetId
+                  assetScriptsToDiscard += asset
+                  rw.delete(Keys.assetScript(asset)(currentHeight))
+                  rw.filterHistory(Keys.assetScriptHistory(asset), currentHeight)
+
                 case tx: DataTransaction =>
                   val address = tx.sender.toAddress
                   for (addressId <- addressId(address)) {
@@ -477,6 +498,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         assetInfoToInvalidate.result().foreach(discardAssetDescription)
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
+        assetScriptsToDiscard.result().foreach(discardAssetScript)
         discardedBlock
       }
 
@@ -513,17 +535,43 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   override def transactionHeight(id: ByteStr): Option[Int] = readOnly(db => db.get(Keys.transactionHeight(id)))
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] = readOnly { db =>
-    db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
-      val txs = for {
-        seqNr          <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).view
-        (txType, txId) <- db.get(Keys.addressTransactionIds(addressId, seqNr))
-        if types.isEmpty || types.contains(txType.toByte)
-        (h, tx) <- db.get(Keys.transactionInfo(txId))
-      } yield (h, tx)
+  override def addressTransactions(address: Address,
+                                   types: Set[Type],
+                                   count: Int,
+                                   fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] = {
 
-      txs.slice(from, count).force
+    def takeAfterTx(s: Seq[(Int, ByteStr)], fromId: Option[ByteStr]): Seq[(Int, AssetId)] =
+      fromId match {
+        case None => s
+        case Some(id) =>
+          s.dropWhile { case (_, txId) => txId != id }
+            .drop(1)
+      }
+
+    readOnly { db =>
+      def transactions: Seq[(Int, Transaction)] = {
+        db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
+          val txs = for {
+            seqNr          <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).view
+            (txType, txId) <- takeAfterTx(db.get(Keys.addressTransactionIds(addressId, seqNr)), fromId)
+            if types.isEmpty || types.contains(txType.toByte)
+            (h, tx) <- db.get(Keys.transactionInfo(txId))
+          } yield (h, tx)
+
+          txs.take(count).force
+        }
+      }
+
+      fromId match {
+        case None => Right(transactions)
+        case Some(fId) =>
+          db.get(Keys.transactionInfo(fId)) match {
+            case None    => Left(s"Transaction $fId does not exist")
+            case Some(_) => Right(transactions)
+          }
+      }
     }
+
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>

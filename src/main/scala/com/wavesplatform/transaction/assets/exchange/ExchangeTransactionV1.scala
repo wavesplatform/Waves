@@ -4,19 +4,19 @@ import cats.data.State
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
-import com.wavesplatform.crypto._
 
 import scala.util.{Failure, Success, Try}
 
 case class ExchangeTransactionV1(buyOrder: OrderV1,
                                  sellOrder: OrderV1,
-                                 price: Long,
                                  amount: Long,
+                                 price: Long,
                                  buyMatcherFee: Long,
                                  sellMatcherFee: Long,
                                  fee: Long,
@@ -51,21 +51,21 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
   def create(matcher: PrivateKeyAccount,
              buyOrder: OrderV1,
              sellOrder: OrderV1,
-             price: Long,
              amount: Long,
+             price: Long,
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
+    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))
     }
   }
 
   def create(buyOrder: OrderV1,
              sellOrder: OrderV1,
-             price: Long,
              amount: Long,
+             price: Long,
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
@@ -74,24 +74,14 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
     validateExchangeParams(
       buyOrder,
       sellOrder,
-      price,
       amount,
+      price,
       buyMatcherFee,
       sellMatcherFee,
       fee,
       timestamp
     ).map { _ =>
-      ExchangeTransactionV1(
-        buyOrder,
-        sellOrder,
-        price,
-        amount,
-        buyMatcherFee,
-        sellMatcherFee,
-        fee,
-        timestamp,
-        signature
-      )
+      ExchangeTransactionV1(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
     }
   }
 
@@ -115,7 +105,7 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
         timestamp      <- read(Longs.fromByteArray _, 8)
         signature      <- read(ByteStr.apply, SignatureLength)
       } yield {
-        create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
+        create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
           .fold(left => Failure(new Exception(left.toString)), right => Success(right))
       }
       makeTransaction.run(0).value._2

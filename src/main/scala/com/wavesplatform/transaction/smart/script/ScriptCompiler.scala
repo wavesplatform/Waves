@@ -7,15 +7,12 @@ import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectivePars
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.utils
-import com.wavesplatform.utils.{ScorexLogging, functionCosts}
+import com.wavesplatform.utils._
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 
 import scala.util.{Failure, Success, Try}
 
 object ScriptCompiler extends ScorexLogging {
-
-  private val v1Compiler = new CompilerV1(utils.dummyCompilerContext)
 
   def apply(scriptText: String): Either[String, (Script, Long)] = {
     val directives = DirectiveParser(scriptText)
@@ -26,18 +23,17 @@ object ScriptCompiler extends ScorexLogging {
         .mkString("\n")
 
     for {
-      v <- extractVersion(directives)
-      expr <- v match {
-        case V1 => tryCompile(scriptWithoutDirectives, directives)
-      }
-      script     <- ScriptV1(expr)
-      complexity <- ScriptEstimator(utils.dummyVarNames, functionCosts, expr)
+      ver        <- extractVersion(directives)
+      expr       <- tryCompile(scriptWithoutDirectives, ver, directives)
+      script     <- ScriptV1(ver, expr)
+      complexity <- ScriptEstimator(varNames(ver), functionCosts(ver), expr)
     } yield (script, complexity)
   }
 
-  def tryCompile(src: String, directives: List[Directive]): Either[String, EXPR] = {
+  def tryCompile(src: String, version: ScriptVersion, directives: List[Directive]): Either[String, EXPR] = {
+    val compiler = new CompilerV1(compilerContext(version))
     try {
-      v1Compiler.compile(src, directives)
+      compiler.compile(src, directives)
     } catch {
       case ex: Throwable =>
         log.error("Error compiling script", ex)
@@ -47,8 +43,8 @@ object ScriptCompiler extends ScorexLogging {
     }
   }
 
-  def estimate(script: Script): Either[String, Long] = script match {
-    case Script.Expr(expr) => ScriptEstimator(utils.dummyVarNames, functionCosts, expr)
+  def estimate(script: Script, version: ScriptVersion): Either[String, Long] = script match {
+    case Script.Expr(expr) => ScriptEstimator(varNames(version), functionCosts(version), expr)
   }
 
   private def extractVersion(directives: List[Directive]): Either[String, ScriptVersion] = {

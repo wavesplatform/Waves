@@ -118,6 +118,9 @@ object AsyncHttpApi extends Assertions {
     def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] =
       waitFor[Seq[Peer]](s"connectedPeers.size >= $targetPeersCount")(_.connectedPeers, _.lengthCompare(targetPeersCount) >= 0, 1.second)
 
+    def waitForBlackList(blackListSize: Int): Future[Seq[BlacklistedPeer]] =
+      waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers > ${blackListSize}")(_.blacklistedPeers, _.lengthCompare(blackListSize) > 0, 500.millis)
+
     def height: Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
 
     def blockAt(height: Int) = get(s"/blocks/at/$height").as[Block]
@@ -240,21 +243,24 @@ object AsyncHttpApi extends Assertions {
               decimals: Byte,
               reissuable: Boolean,
               fee: Long,
-              version: Byte = 2): Future[Transaction] = {
+              version: Byte = 2,
+              script: Option[String] = None): Future[Transaction] = {
       version match {
         case 2 => { //TODO: @monroid refactor after https://wavesplatform.atlassian.net/browse/NODE-1222 fix
-          signAndBroadcast(
-            Json.obj(
-              "type"        -> 3,
-              "name"        -> name,
-              "quantity"    -> quantity,
-              "description" -> description,
-              "sender"      -> sourceAddress,
-              "decimals"    -> decimals,
-              "reissuable"  -> reissuable,
-              "fee"         -> fee,
-              "version"     -> version
-            ))
+          val js = Json.obj(
+            "type"        -> 3,
+            "name"        -> name,
+            "quantity"    -> quantity,
+            "description" -> description,
+            "sender"      -> sourceAddress,
+            "decimals"    -> decimals,
+            "reissuable"  -> reissuable,
+            "fee"         -> fee,
+            "version"     -> version
+          )
+
+          val jsUpdated = if (script.isDefined) js ++ Json.obj("script" -> JsString(script.get)) else js
+          signAndBroadcast(jsUpdated)
         }
         case _ => postJson("/assets/issue", IssueV1Request(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
       }

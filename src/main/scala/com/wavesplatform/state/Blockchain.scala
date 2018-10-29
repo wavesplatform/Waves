@@ -40,7 +40,10 @@ trait Blockchain {
   def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
   def transactionHeight(id: ByteStr): Option[Int]
 
-  def addressTransactions(address: Address, types: Set[Transaction.Type], count: Int, from: Int): Seq[(Int, Transaction)]
+  def addressTransactions(address: Address,
+                          types: Set[Transaction.Type],
+                          count: Int,
+                          fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]]
 
   def containsTransaction(id: ByteStr): Boolean
   def forgetTransactions(pred: (ByteStr, Long) => Boolean): Map[ByteStr, Long]
@@ -59,6 +62,9 @@ trait Blockchain {
 
   def accountScript(address: Address): Option[Script]
   def hasScript(address: Address): Boolean
+
+  def assetScript(id: ByteStr): Option[Script]
+  def hasAssetScript(id: ByteStr): Boolean
 
   def accountData(acc: Address): AccountDataInfo
   def accountData(acc: Address, key: String): Option[DataEntry[_]]

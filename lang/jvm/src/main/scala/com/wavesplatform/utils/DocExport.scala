@@ -1,6 +1,6 @@
 import cats.kernel.Monoid
 import shapeless.{:+:, CNil}
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{Global, ScriptVersion}
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -15,15 +15,18 @@ import com.github.mustachejava._
 
 object DocExport {
   def main(args: Array[String]) {
-    if (args.size != 3 || args(0) != "--gen-doc") {
-      System.err.println("Expected args: --gen-doc <template> <output>")
+    if (args.size != 4 || args(0) != "--gen-doc") {
+      System.err.println("Expected args: --gen-doc <version> <template> <output>")
     } else {
-      val wavesContext = WavesContext.build(new Environment {
-        override def height: Int                                                                                     = ???
+      val version = ScriptVersion.fromInt(args(1).toByte).get
+      val wavesContext = WavesContext.build(
+        version,
+        new Environment {
+        override def height: Long                                                                                    = ???
         override def networkByte: Byte                                                                               = 66
         override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
         override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-        override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
+        override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
         override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
         override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
         override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
@@ -62,7 +65,7 @@ object DocExport {
         case t       => nativeTypeDoc(t.toString)
       }
 
-      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext))
+      val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(version), cryptoContext, wavesContext))
 
       def getTypes() = fullContext.types.map(v => typeRepr(v.typeRef)(v.name))
 
@@ -162,7 +165,7 @@ object DocExport {
       val commons = transactionDocs(transactionsType, commonFields)
       val transactionClasses = Seq(
         "Transfers"      -> Set("TransferTransaction", "MassTransferTransaction", "PaymentTransaction"),
-        "Issuing assets" -> Set("IssueTransaction", "ReissueTransaction", "BurnTransaction", "SponsorFeeTransaction"),
+        "Issuing assets" -> Set("IssueTransaction", "ReissueTransaction", "BurnTransaction", "SponsorFeeTransaction", "SetAssetScriptTransaction"),
         "Leasing"        -> Set("LeaseTransaction", "LeaseCancelTransaction")
       )
       def otherTransactions(name: String) = transactionsTypesNames(name) && !transactionClasses.map(_._2).exists(_(name))
