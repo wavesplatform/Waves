@@ -47,7 +47,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ broadcast
     }
 
-  @Path("/address/{address}/limit/{limit}?after={after}")
+  @Path("/address/{address}/limit/{limit}")
   @ApiOperation(value = "List of transactions by address",
                 notes = "Get list of transactions where specified address has been involved",
                 httpMethod = "GET")
