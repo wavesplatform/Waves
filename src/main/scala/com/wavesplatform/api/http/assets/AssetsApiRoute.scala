@@ -7,6 +7,7 @@ import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, ByteStr}
@@ -54,17 +55,23 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     }
 
   def assetDistributionTask(assetId: AssetId, maybeHeight: Option[Int]): Task[ToResponseMarshallable] = {
-    lazy val currHeightDistributionTask: Task[Map[Address, Long]] = Task.eval(blockchain.assetDistribution(assetId))
+    val currHeightDistributionTask: Task[Map[Address, Long]] = Task.eval(blockchain.assetDistribution(assetId))
 
-    maybeHeight
+    val distributionTask: Task[ToResponseMarshallable] = maybeHeight
       .fold(currHeightDistributionTask) { height =>
         Task.eval(
           blockchain
-            .assetDistributionAtHeight(assetId, height))
+            .assetDistributionAtHeight(assetId, height)
+        )
       }
       .map { dst =>
         Json.toJson(dst.map { case (a, b) => a.stringRepr -> b }): ToResponseMarshallable
       }
+
+    val heightValid = maybeHeight.fold(true)(_ > blockchain.height - LevelDBWriter.MAX_DEPTH)
+
+    if (heightValid) distributionTask
+    else Task.pure(TooBigArrayAllocation.json: ToResponseMarshallable)
   }
 
   @Path("/{assetId}/distribution")

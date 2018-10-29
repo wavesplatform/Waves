@@ -11,6 +11,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import com.wavesplatform.api.http.assets.AssetsApiRoute
+import com.wavesplatform.database.LevelDBWriter
 
 class AssetsApiRouteSpec
     extends RouteSpec("/assets")
@@ -87,6 +88,29 @@ class AssetsApiRouteSpec
       (response \ "reissuable").as[Boolean] shouldBe sillyAssetTx.reissuable
       (response \ "quantity").as[BigDecimal] shouldBe sillyAssetDesc.totalVolume
       (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
+    }
+  }
+
+  val currentHeight = 5000
+  val tooDeepHeight = currentHeight - LevelDBWriter.MAX_DEPTH
+  val okHeight      = tooDeepHeight + 1
+
+  blockchain.height _ when () returns currentHeight
+  blockchain.assetDistribution _ when * returns Map.empty
+  blockchain.assetDistributionAtHeight _ when (*, *) returns Map.empty
+
+  routePath(s"/${sillyAssetTx.assetId()}/distribution/$okHeight") in {
+    Get(routePath(s"/${sillyAssetTx.assetId()}/distribution/$okHeight")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      response.keys shouldBe Set.empty
+    }
+  }
+
+  routePath(s"/${sillyAssetTx.assetId()}/distribution/$tooDeepHeight") in {
+    Get(routePath(s"/${sillyAssetTx.assetId()}/distribution/$tooDeepHeight")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      (response \ "error").as[Int] shouldBe 10
+      (response \ "message").as[String] shouldBe "Too big sequences requested"
     }
   }
 
