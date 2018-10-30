@@ -28,8 +28,12 @@ class RoundingIssuesTestSuite
 
   private def bobNode = nodes(2)
 
-  Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
-  nodes.waitForHeightArise()
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).map(matcherNode.signedIssue).foreach { x =>
+      matcherNode.waitForTransaction(x.id)
+    }
+  }
 
   "should correctly fill an order with small amount" in {
     val aliceBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1

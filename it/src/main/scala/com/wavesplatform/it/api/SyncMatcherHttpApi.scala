@@ -20,7 +20,7 @@ object SyncMatcherHttpApi {
 
     import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
 
-    private val RequestAwaitTime      = 15.seconds
+    private val RequestAwaitTime      = 30.seconds
     private val OrderRequestAwaitTime = 1.minutes
 
     def orderBook(assetPair: AssetPair): OrderBookResponse =
@@ -70,6 +70,9 @@ object SyncMatcherHttpApi {
                                  expectedFilledAmount: Option[Long],
                                  waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
+
+    def waitOrderInBlockchain(orderId: String, retryInterval: FiniteDuration = 1.second): Unit =
+      Await.result(async(m).waitOrderInBlockchain(orderId, retryInterval), RequestAwaitTime)
 
     def reservedBalance(sender: Node, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       reservedBalance(sender.privateKey, waitTime)

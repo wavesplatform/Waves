@@ -34,11 +34,11 @@ class TradeBalanceAndRoundingTestSuite
 
   private def bobNode = nodes(2)
 
-  Seq(IssueUsdTx, IssueEthTx, IssueWctTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
-  nodes.waitForHeightArise()
+  Seq(IssueUsdTx, IssueEthTx, IssueWctTx).map(createSignedIssueRequest).map(matcherNode.signedIssue).foreach { x =>
+    matcherNode.waitForTransaction(x.id)
+  }
 
   "Alice and Bob trade WAVES-USD" - {
-    nodes.waitForHeightArise()
     val aliceWavesBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
     val bobWavesBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
 
@@ -139,7 +139,6 @@ class TradeBalanceAndRoundingTestSuite
     val correctedSellAmount2 = correctAmount(sellOrderAmount2, price2)
 
     "place usd-waves order" in {
-      nodes.waitForHeightArise()
       // Alice wants to sell USD for Waves
       val bobWavesBalanceBefore = matcherNode.accountBalances(bobNode.address)._1
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES")

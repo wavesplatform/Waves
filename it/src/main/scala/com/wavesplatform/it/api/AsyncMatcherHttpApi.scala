@@ -89,6 +89,15 @@ object AsyncMatcherHttpApi extends Assertions {
     def transactionsByOrder(orderId: String): Future[Seq[ExchangeTransaction]] =
       matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
 
+    def waitOrderInBlockchain(orderId: String, retryInterval: FiniteDuration = 1.second): Future[Unit] =
+      transactionsByOrder(orderId).flatMap { txs =>
+        Future
+          .sequence {
+            txs.map(tx => waitForTransaction(tx.id, retryInterval))
+          }
+          .map(_ => ())
+      }
+
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}").as[OrderBookResponse]
 

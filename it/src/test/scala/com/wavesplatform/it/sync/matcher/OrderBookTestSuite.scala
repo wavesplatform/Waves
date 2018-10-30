@@ -1,13 +1,13 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.{Node, ReportingTestName}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.transaction.assets.exchange.OrderType._
+import com.wavesplatform.it.{Node, ReportingTestName}
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
+import com.wavesplatform.transaction.assets.exchange.OrderType._
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
 class OrderBookTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with NodesFromDocker with ReportingTestName {
@@ -18,9 +18,9 @@ class OrderBookTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
   private def aliceNode   = nodes(1)
   private def bobNode     = nodes(2)
 
-  matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
-  matcherNode.signedIssue(createSignedIssueRequest(IssueWctTx))
-  nodes.waitForHeightArise()
+  Seq(IssueUsdTx, IssueWctTx).map(createSignedIssueRequest).map(matcherNode.signedIssue).foreach { x =>
+    matcherNode.waitForTransaction(x.id)
+  }
 
   case class ReservedBalances(wct: Long, usd: Long, waves: Long)
   def reservedBalancesOf(node: Node): ReservedBalances = {
