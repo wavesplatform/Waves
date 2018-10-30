@@ -59,7 +59,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
                         tx.timestamp,
                         tx.proofs.base58().toList)
 
-    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(DataTransaction.typeId)))
+    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(DataTransaction.typeId.toInt)))
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTxs = Seq(

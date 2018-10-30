@@ -111,7 +111,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   }
 
   def scriptText(version: Int) = version match {
-    case 2 => Some(script)
+    case 2 => Some(scriptBase64)
     case _ => None
   }
 
