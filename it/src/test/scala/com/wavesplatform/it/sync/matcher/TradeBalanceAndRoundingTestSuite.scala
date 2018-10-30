@@ -32,7 +32,6 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
   }
 
   "Alice and Bob trade WAVES-USD" - {
-    nodes.waitForHeightArise()
     val aliceWavesBalanceBefore = matcherNode.accountBalances(aliceAcc.address)._1
     val bobWavesBalanceBefore   = matcherNode.accountBalances(bobAcc.address)._1
 
@@ -133,7 +132,6 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val correctedSellAmount2 = correctAmount(sellOrderAmount2, price2)
 
     "place usd-waves order" in {
-      nodes.waitForHeightArise()
       // Alice wants to sell USD for Waves
       val bobWavesBalanceBefore = matcherNode.accountBalances(bobAcc.address)._1
       matcherNode.tradableBalance(bobAcc, wavesUsdPair)("WAVES")

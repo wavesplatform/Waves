@@ -68,8 +68,7 @@ object SyncHttpApi extends Assertions {
     catch {
       case usce: UnexpectedStatusCodeException => throw usce
       case te: TimeoutException                => throw te
-      case NonFatal(cause) =>
-        throw new Exception(cause)
+      case NonFatal(cause)                     => throw new Exception(cause)
     }
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {

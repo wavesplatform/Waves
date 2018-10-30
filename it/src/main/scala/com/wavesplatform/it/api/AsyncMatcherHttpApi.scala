@@ -90,6 +90,12 @@ object AsyncMatcherHttpApi extends Assertions {
     def transactionsByOrder(orderId: String): Future[Seq[ExchangeTransaction]] =
       matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
 
+    def waitOrderInBlockchain(orderId: String, retryInterval: FiniteDuration = 1.second): Future[Seq[TransactionInfo]] =
+      transactionsByOrder(orderId).flatMap { txs =>
+        assert(txs.nonEmpty, s"There is no exchange transaction for $orderId")
+        Future.sequence { txs.map(tx => waitForTransaction(tx.id, retryInterval)) }
+      }
+
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}").as[OrderBookResponse]
 

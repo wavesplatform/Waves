@@ -93,9 +93,9 @@ class MatcherTestSuite extends MatcherSuiteBase {
       }
 
       "and should match with buy order" in {
-        val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
+        val bobBalance     = matcherNode.accountBalances(bobAcc.address)._1
         val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
-        val aliceBalance   = aliceNode.accountBalances(aliceAcc.address)._1
+        val aliceBalance   = matcherNode.accountBalances(aliceAcc.address)._1
 
         // Bob places a buy order
         val order2 = matcherNode.placeOrder(bobAcc, aliceWavesPair, BUY, 200, 2.waves * Order.PriceConstant, orderVersion)
@@ -107,10 +107,10 @@ class MatcherTestSuite extends MatcherSuiteBase {
         matcherNode.orderHistoryByPair(bobAcc, aliceWavesPair).map(_.id) should contain(order2.message.id)
         matcherNode.fullOrderHistory(bobAcc).map(_.id) should contain(order2.message.id)
 
-        nodes.waitForHeightArise()
+        matcherNode.waitOrderInBlockchain(order2.message.id)
 
         // Bob checks that asset on his balance
-        bobNode.assertAssetBalance(bobAcc.address, aliceAsset, 200)
+        matcherNode.assertAssetBalance(bobAcc.address, aliceAsset, 200)
 
         // Alice checks that part of her order still in the order book
         val orders = matcherNode.orderBook(aliceWavesPair)
@@ -118,14 +118,14 @@ class MatcherTestSuite extends MatcherSuiteBase {
         orders.asks.head.price shouldBe 2000.waves
 
         // Alice checks that she sold some assets
-        aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, 800)
+        matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, 800)
 
         // Bob checks that he spent some Waves
-        val updatedBobBalance = bobNode.accountBalances(bobAcc.address)._1
+        val updatedBobBalance = matcherNode.accountBalances(bobAcc.address)._1
         updatedBobBalance shouldBe (bobBalance - 2000 * 200 - matcherFee)
 
         // Alice checks that she received some Waves
-        val updatedAliceBalance = aliceNode.accountBalances(aliceAcc.address)._1
+        val updatedAliceBalance = matcherNode.accountBalances(aliceAcc.address)._1
         updatedAliceBalance shouldBe (aliceBalance + 2000 * 200 - (matcherFee * 200.0 / 500.0).toLong)
 
         // Matcher checks that it earn fees
@@ -156,8 +156,8 @@ class MatcherTestSuite extends MatcherSuiteBase {
 
       "buy order should match on few price levels" in {
         val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
-        val aliceBalance   = aliceNode.accountBalances(aliceAcc.address)._1
-        val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
+        val aliceBalance   = matcherNode.accountBalances(aliceAcc.address)._1
+        val bobBalance     = matcherNode.accountBalances(bobAcc.address)._1
 
         // Alice places a buy order
         val order4 = matcherNode.placeOrder(aliceAcc, aliceWavesPair, BUY, 350, (21.waves / 10.0 * Order.PriceConstant).toLong, orderVersion)
@@ -167,18 +167,18 @@ class MatcherTestSuite extends MatcherSuiteBase {
         matcherNode.waitOrderStatus(aliceWavesPair, order4.message.id, "Filled")
 
         // Check balances
-        nodes.waitForHeightArise()
-        aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, 950)
-        bobNode.assertAssetBalance(bobAcc.address, aliceAsset, 50)
+        matcherNode.waitOrderInBlockchain(order4.message.id)
+        matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, 950)
+        matcherNode.assertAssetBalance(bobAcc.address, aliceAsset, 50)
 
         val updatedMatcherBalance = matcherNode.accountBalances(matcherNode.address)._1
         updatedMatcherBalance should be(
           matcherBalance - 2 * exTxFee + matcherFee + (matcherFee * 150.0 / 350.0).toLong + (matcherFee * 200.0 / 350.0).toLong + (matcherFee * 200.0 / 500.0).toLong)
 
-        val updatedBobBalance = bobNode.accountBalances(bobAcc.address)._1
+        val updatedBobBalance = matcherNode.accountBalances(bobAcc.address)._1
         updatedBobBalance should be(bobBalance - matcherFee + 150 * 1900)
 
-        val updatedAliceBalance = aliceNode.accountBalances(aliceAcc.address)._1
+        val updatedAliceBalance = matcherNode.accountBalances(aliceAcc.address)._1
         updatedAliceBalance should be(
           aliceBalance - (matcherFee * 200.0 / 350.0).toLong - (matcherFee * 150.0 / 350.0).toLong - (matcherFee * 200.0 / 500.0).toLong - 1900 * 150)
       }
@@ -204,12 +204,11 @@ class MatcherTestSuite extends MatcherSuiteBase {
 
       "buy order should execute all open orders and put remaining in order book" in {
         val matcherBalance = matcherNode.accountBalances(matcherNode.address)._1
-        val aliceBalance   = aliceNode.accountBalances(aliceAcc.address)._1
-        val bobBalance     = bobNode.accountBalances(bobAcc.address)._1
+        val aliceBalance   = matcherNode.accountBalances(aliceAcc.address)._1
+        val bobBalance     = matcherNode.accountBalances(bobAcc.address)._1
 
         // Bob places buy order on amount bigger then left in sell orders
         val order5 = matcherNode.placeOrder(bobAcc, aliceWavesPair, BUY, 130, 2000.waves, orderVersion)
-        order5.status should be("OrderAccepted")
 
         // Check that the order is partially filled
         matcherNode.waitOrderStatus(aliceWavesPair, order5.message.id, "PartiallyFilled")
@@ -219,17 +218,17 @@ class MatcherTestSuite extends MatcherSuiteBase {
         orders.bids should contain(LevelResponse(30, 2000.waves))
 
         // Check balances
-        nodes.waitForHeightArise()
-        aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, 850)
-        bobNode.assertAssetBalance(bobAcc.address, aliceAsset, 150)
+        matcherNode.waitOrderInBlockchain(order5.message.id)
+        matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, 850)
+        matcherNode.assertAssetBalance(bobAcc.address, aliceAsset, 150)
 
         val updatedMatcherBalance = matcherNode.accountBalances(matcherNode.address)._1
         updatedMatcherBalance should be(matcherBalance - exTxFee + matcherFee + (matcherFee * 100.0 / 130.0).toLong)
 
-        val updatedBobBalance = bobNode.accountBalances(bobAcc.address)._1
+        val updatedBobBalance = matcherNode.accountBalances(bobAcc.address)._1
         updatedBobBalance should be(bobBalance - (matcherFee * 100.0 / 130.0).toLong - 100 * 2000)
 
-        val updatedAliceBalance = aliceNode.accountBalances(aliceAcc.address)._1
+        val updatedAliceBalance = matcherNode.accountBalances(aliceAcc.address)._1
         updatedAliceBalance should be(aliceBalance - matcherFee + 2000 * 100)
       }
 
@@ -286,9 +285,9 @@ class MatcherTestSuite extends MatcherSuiteBase {
           priceAsset = None
         )
 
-        aliceNode.assertAssetBalance(aliceAcc.address, bobAsset, 0)
+        matcherNode.assertAssetBalance(aliceAcc.address, bobAsset, 0)
         matcherNode.assertAssetBalance(matcherAcc.address, bobAsset, 0)
-        bobNode.assertAssetBalance(bobAcc.address, bobAsset, bobAssetQuantity)
+        matcherNode.assertAssetBalance(bobAcc.address, bobAsset, bobAssetQuantity)
 
         // Bob wants to sell all own assets for 1 Wave
         def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, SELL, bobAssetQuantity, 1.waves * Order.PriceConstant, orderVersion)
@@ -310,9 +309,7 @@ class MatcherTestSuite extends MatcherSuiteBase {
         matcherNode.waitOrderStatus(bobWavesPair, order8.message.id, "Accepted")
 
         // Cleanup
-        nodes.waitForHeightArise()
         matcherNode.cancelOrder(bobAcc, bobWavesPair, order8.message.id).status should be("OrderCanceled")
-
         val transferBobId = aliceNode.transfer(aliceAcc.address, bobAcc.address, transferAmount, minFee, None, None, 2).id
         nodes.waitForHeightAriseAndTxPresent(transferBobId)
       }

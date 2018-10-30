@@ -15,22 +15,21 @@ class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
-  nodes.waitForHeightArise()
-
-  aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2)
-  nodes.waitForHeightArise()
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    matcherNode.waitForTransaction(matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx)).id)
+    matcherNode.waitForTransaction(
+      aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2).id)
+  }
 
   "Alice and Bob trade WAVES-USD" - {
-    nodes.waitForHeightArise()
-    val bobWavesBalanceBefore = matcherNode.accountBalances(bobAcc.address)._1
-
     val price           = 238
     val buyOrderAmount  = 425532L
     val sellOrderAmount = 840340L
 
     "place usd-waves order" in {
       // Alice wants to sell USD for Waves
+      val bobWavesBalanceBefore = matcherNode.accountBalances(bobAcc.address)._1
 
       val bobOrder   = matcherNode.prepareOrder(bobAcc, wavesUsdPair, OrderType.SELL, sellOrderAmount, price)
       val bobOrderId = matcherNode.placeOrder(bobOrder).message.id

@@ -99,6 +99,9 @@ object SyncMatcherHttpApi extends Assertions {
                                  waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       sync(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
 
+    def waitOrderInBlockchain(orderId: String, retryInterval: FiniteDuration = 1.second): Seq[TransactionInfo] =
+      sync(async(m).waitOrderInBlockchain(orderId, retryInterval))
+
     def reservedBalance(sender: PrivateKeyAccount, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       sync(async(m).reservedBalance(sender), waitTime)
 

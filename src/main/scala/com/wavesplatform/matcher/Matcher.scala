@@ -44,7 +44,7 @@ class Matcher(actorSystem: ActorSystem,
     new OrderValidator(db, blockchain, utx.portfolio, pairBuilder.validateAssetPair, settings.matcherSettings, matcherPrivateKey, NTP)
   private val createTransaction = new ExchangeTransactionCreator(matcherPrivateKey, matcherSettings, NTP).createTransaction _
 
-  private val orderBooks = new AtomicReference(Map.empty[AssetPair, ActorRef])
+  private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
     matcherSettings.orderBookSnapshotHttpCache,
     p => Option(orderBookCache.get(p))

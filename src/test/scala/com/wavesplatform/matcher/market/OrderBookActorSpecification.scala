@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{ActorRef, Props}
-import akka.testkit.ImplicitSender
+import akka.testkit.{ImplicitSender, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.OrderOps._
 import com.wavesplatform.matcher.MatcherTestData
@@ -48,7 +48,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
     (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty)))
     val allChannels = stub[ChannelGroup]
     val actor = system.actorOf(
-      Props(new OrderBookActor(pair, update(pair), p => Option(md.get(p)), utx, allChannels, matcherSettings, txFactory) with RestartableActor))
+      Props(
+        new OrderBookActor(TestProbe().ref, pair, update(pair), p => Option(md.get(p)), utx, allChannels, matcherSettings, txFactory, ntpTime)
+        with RestartableActor))
 
     f(pair, actor)
   }
@@ -265,7 +267,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       }
       val allChannels = stub[ChannelGroup]
       val actor = system.actorOf(
-        Props(new OrderBookActor(pair, update(pair), m => md.put(pair, m), pool, allChannels, matcherSettings, txFactory) with RestartableActor))
+        Props(new OrderBookActor(TestProbe().ref, pair, update(pair), m => md.put(pair, m), pool, allChannels, matcherSettings, txFactory, ntpTime)
+        with RestartableActor))
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))
