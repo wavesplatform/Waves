@@ -33,7 +33,8 @@ object AssetTransactionsDiff {
           Diff(
             height = height,
             tx = tx,
-            assetScripts = Map(tx.assetId -> tx.script)
+            portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+            assetScripts = Map(tx.assetId        -> tx.script)
           ))
       } else {
         Left(GenericError("Asset is not scripted."))

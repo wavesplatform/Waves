@@ -176,6 +176,47 @@ object TransactionFactory {
       )
     } yield tx
 
+  def setAssetScript(request: SetAssetScriptRequest,
+                     wallet: Wallet,
+                     signerAddress: String,
+                     time: Time): Either[ValidationError, SetAssetScriptTransaction] =
+    for {
+      sender <- wallet.findPrivateKey(request.sender)
+      signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+      script <- request.script match {
+        case None    => Right(None)
+        case Some(s) => Script.fromBase64String(s).map(Some(_))
+      }
+      tx <- SetAssetScriptTransaction.signed(
+        request.version,
+        AddressScheme.current.chainId,
+        sender,
+        ByteStr.decodeBase58(request.assetId).get,
+        script,
+        request.fee,
+        request.timestamp.getOrElse(time.getTimestamp()),
+        signer
+      )
+    } yield tx
+
+  def setAssetScript(request: SetAssetScriptRequest, sender: PublicKeyAccount): Either[ValidationError, SetAssetScriptTransaction] =
+    for {
+      script <- request.script match {
+        case None    => Right(None)
+        case Some(s) => Script.fromBase64String(s).map(Some(_))
+      }
+      tx <- SetAssetScriptTransaction.create(
+        request.version,
+        AddressScheme.current.chainId,
+        sender,
+        ByteStr.decodeBase58(request.assetId).get,
+        script,
+        request.fee,
+        request.timestamp.getOrElse(0),
+        Proofs.empty
+      )
+    } yield tx
+
   def issueAssetV2(request: IssueV2Request, wallet: Wallet, time: Time): Either[ValidationError, IssueTransactionV2] =
     issueAssetV2(request, wallet, request.sender, time)
 

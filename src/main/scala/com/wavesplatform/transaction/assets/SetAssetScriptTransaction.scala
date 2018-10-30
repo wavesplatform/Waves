@@ -5,12 +5,13 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
+import com.wavesplatform.account._
 //import com.wavesplatform.transaction.validation._
-import com.wavesplatform.transaction.{AssetId, FastHashId, ValidationError, _}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.crypto._
+import com.wavesplatform.state._
 import scala.util.{Failure, Success, Try}
 
 case class SetAssetScriptTransaction private (version: Byte,
@@ -72,6 +73,17 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
 
   }
 
+  def signed(version: Byte,
+             chainId: Byte,
+             sender: PublicKeyAccount,
+             assetId: ByteStr,
+             script: Option[Script],
+             fee: Long,
+             timestamp: Long,
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+    create(version, chainId, sender, assetId, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(sign(signer, unsigned.bodyBytes())))).explicitGet())
+    }
   override def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = {
     val readByte: State[Int, Byte] = State { from =>
       (from + 1, bytes(from))

@@ -21,7 +21,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable, Future}
 import scala.util.control.NonFatal
-import scala.util.{Failure, Try}
+import scala.util._
 
 object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
@@ -47,11 +47,11 @@ object SyncHttpApi extends Assertions {
     case _          => Assertions.fail("Expecting bad request")
   }
 
-  def assertBadRequestAndMessage[R](f: => R, errorMessage: String, statusCode: Int = BadRequest.intValue): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == statusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
+  def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion = Try(f) match {
+    case Failure(e @ UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Assertions.assert(statusCode == expectedStatusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
-    case _          => Assertions.fail(s"Expecting bad request")
+    case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
   }
 
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
@@ -273,6 +273,9 @@ object SyncHttpApi extends Assertions {
 
     def connect(address: InetSocketAddress): Unit =
       sync(async(n).connect(address))
+
+    def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None): Transaction =
+      sync(async(n).setAssetScript(assetId, sender, fee, script))
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {

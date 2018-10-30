@@ -266,6 +266,18 @@ object AsyncHttpApi extends Assertions {
       }
     }
 
+    def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None): Future[Transaction] = {
+      signAndBroadcast(
+        Json.obj(
+          "type"    -> 15,
+          "version" -> 1,
+          "assetId" -> assetId,
+          "sender"  -> sender,
+          "fee"     -> fee,
+          "script"  -> script
+        ))
+    }
+
     def scriptCompile(code: String) = post("/utils/script/compile", code).as[CompiledScript]
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =

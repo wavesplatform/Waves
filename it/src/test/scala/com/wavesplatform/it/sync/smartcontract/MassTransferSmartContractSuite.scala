@@ -105,8 +105,10 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     val accountSigToGovFail = ByteStr(crypto.sign(sender.privateKey, unsignedToGov.bodyBytes()))
     val signedToGovFail     = unsignedToGov.copy(proofs = Proofs(Seq(accountSigToGovFail)))
 
-    assertBadRequestAndResponse(sender.signedBroadcast(signedToGovFail.json() + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt))),
-                                "Transaction is not allowed by account-script")
+    assertBadRequestAndResponse(
+      sender.signedBroadcast(signedToGovFail.json() + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt))),
+      "Transaction is not allowed by account-script"
+    )
 
     //make correct transfer to government after some time
     sender.waitForHeight(heightBefore + 10, 2.minutes)
