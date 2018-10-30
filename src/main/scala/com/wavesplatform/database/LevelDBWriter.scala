@@ -696,7 +696,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     Either
       .cond(
-        currentHeight - height >= MAX_DEPTH,
+        currentHeight - height <= MAX_DEPTH,
         (for {
           seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
           addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
