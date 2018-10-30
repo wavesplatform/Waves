@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
-import com.wavesplatform.database.LevelDBWriter
+import cats.implicits._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, ByteStr}
@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{AssetId, AssetIdStringLength, TransactionFactory}
+import com.wavesplatform.transaction.{AssetId, AssetIdStringLength, TransactionFactory, ValidationError}
 import com.wavesplatform.utils.{Base58, Time, _}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -58,23 +58,23 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     }
 
   def assetDistributionTask(assetId: AssetId, maybeHeight: Option[Int]): Task[ToResponseMarshallable] = {
-    val currHeightDistributionTask: Task[Map[Address, Long]] = Task.eval(blockchain.assetDistribution(assetId))
+    val currHeightDistributionTask: Task[Either[ValidationError, Map[Address, Long]]] =
+      Task
+        .eval(blockchain.assetDistribution(assetId))
+        .map(_.asRight[ValidationError])
 
-    val distributionTask: Task[ToResponseMarshallable] = maybeHeight
+    val distributionTask = maybeHeight
       .fold(currHeightDistributionTask) { height =>
         Task.eval(
           blockchain
             .assetDistributionAtHeight(assetId, height)
         )
       }
-      .map { dst =>
-        Json.toJson(dst.map { case (a, b) => a.stringRepr -> b }): ToResponseMarshallable
-      }
 
-    val heightValid = maybeHeight.fold(true)(_ > blockchain.height - LevelDBWriter.MAX_DEPTH)
-
-    if (heightValid) distributionTask
-    else Task.pure(TooBigArrayAllocation.json: ToResponseMarshallable)
+    distributionTask.map {
+      case Right(dst) => Json.toJson(dst.map { case (a, b) => a.stringRepr -> b }): ToResponseMarshallable
+      case Left(err)  => ApiError.fromValidationError(err)
+    }
   }
 
   @Path("/{assetId}/distribution")
