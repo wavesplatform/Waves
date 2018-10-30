@@ -15,7 +15,7 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, NegativeAmount, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.utils.{NTP, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -31,7 +31,8 @@ class OrderBookActor(parent: ActorRef,
                      utx: UtxPool,
                      allChannels: ChannelGroup,
                      settings: MatcherSettings,
-                     createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction])
+                     createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction],
+                     time: Time)
     extends PersistentActor
     with ScorexLogging {
 
@@ -58,7 +59,7 @@ class OrderBookActor(parent: ActorRef,
   private def executeCommands: Receive = {
     case order: Order        => onAddOrder(order)
     case cancel: CancelOrder => onCancelOrder(cancel.orderId)
-    case OrderCleanup        => onOrderCleanup(orderBook, NTP.correctedTime())
+    case OrderCleanup        => onOrderCleanup(orderBook, time.correctedTime())
   }
 
   private def snapshotsCommands: Receive = {
@@ -300,8 +301,9 @@ object OrderBookActor {
             utx: UtxPool,
             allChannels: ChannelGroup,
             settings: MatcherSettings,
-            createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction]): Props =
-    Props(new OrderBookActor(parent, assetPair, updateSnapshot, updateMarketStatus, utx, allChannels, settings, createTransaction))
+            createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction],
+            time: Time = NTP): Props =
+    Props(new OrderBookActor(parent, assetPair, updateSnapshot, updateMarketStatus, utx, allChannels, settings, createTransaction, time))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
@@ -321,7 +323,7 @@ object OrderBookActor {
   }
 
   object GetOrderBookResponse {
-    def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(NTP.correctedTime(), pair, Seq(), Seq())
+    def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(System.currentTimeMillis(), pair, Seq(), Seq())
   }
 
   case class MarketStatus(pair: AssetPair, bid: Option[(Price, Level[LimitOrder])], ask: Option[(Price, Level[LimitOrder])], last: Option[Order])

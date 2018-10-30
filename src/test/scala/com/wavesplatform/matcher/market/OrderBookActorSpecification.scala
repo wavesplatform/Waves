@@ -48,7 +48,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
     val allChannels = stub[ChannelGroup]
     val actor = system.actorOf(
       Props(
-        new OrderBookActor(TestProbe().ref, pair, update(pair), p => Option(md.get(p)), utx, allChannels, matcherSettings, txFactory)
+        new OrderBookActor(TestProbe().ref, pair, update(pair), p => Option(md.get(p)), utx, allChannels, matcherSettings, txFactory, ntpTime)
         with RestartableActor))
 
     f(pair, actor)
@@ -266,7 +266,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       }
       val allChannels = stub[ChannelGroup]
       val actor = system.actorOf(
-        Props(new OrderBookActor(TestProbe().ref, pair, update(pair), m => md.put(pair, m), pool, allChannels, matcherSettings, txFactory)
+        Props(new OrderBookActor(TestProbe().ref, pair, update(pair), m => md.put(pair, m), pool, allChannels, matcherSettings, txFactory, ntpTime)
         with RestartableActor))
 
       actor ! ord1
