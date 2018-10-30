@@ -401,6 +401,10 @@ object Application extends ScorexLogging {
     SLF4JBridgeHandler.install()
 
     val config = readConfig(args.headOption)
+    // Initialize global var with actual address scheme
+    AddressScheme.current = new AddressScheme {
+      override val chainId: Byte = config.getString("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
+    }
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
@@ -436,11 +440,6 @@ object Application extends ScorexLogging {
               .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
           )
         }
-      }
-
-      // Initialize global var with actual address scheme
-      AddressScheme.current = new AddressScheme {
-        override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
       }
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
