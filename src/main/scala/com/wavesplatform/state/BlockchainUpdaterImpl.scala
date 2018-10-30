@@ -451,7 +451,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   }
 
   override def hasAssetScript(asset: AssetId): Boolean = ngState.fold(blockchain.hasAssetScript(asset)) { ng =>
-    ng.bestLiquidDiff.assetScripts.contains(asset) || blockchain.hasAssetScript(asset)
+    ng.bestLiquidDiff.assetScripts.get(asset) match {
+      case None    => blockchain.hasAssetScript(asset)
+      case Some(x) => x.nonEmpty
+    }
   }
 
   override def accountData(acc: Address): AccountDataInfo = ngState.fold(blockchain.accountData(acc)) { ng =>

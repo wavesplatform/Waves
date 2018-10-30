@@ -81,7 +81,10 @@ trait Caches extends Blockchain {
 
   override def assetScript(asset: AssetId): Option[Script] = assetScriptCache.get(asset)
   override def hasAssetScript(asset: AssetId): Boolean =
-    Option(assetScriptCache.getIfPresent(asset)).flatten.isDefined || hasAssetScriptBytes(asset)
+    assetScriptCache.getIfPresent(asset) match {
+      case null => hasAssetScriptBytes(asset)
+      case x    => x.nonEmpty
+    }
 
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): BigInt

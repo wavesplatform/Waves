@@ -557,7 +557,7 @@ object AsyncHttpApi extends Assertions {
         allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
         _            <- traverse(nodes)(_.waitForHeight(allHeights.max + 1))
         finalHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
-      } yield all(finalHeights).shouldBe(finalHeights.head)
+      } yield all(finalHeights) should be >= (finalHeights.head)
 
     def waitForHeightArise(): Future[Int] =
       for {
