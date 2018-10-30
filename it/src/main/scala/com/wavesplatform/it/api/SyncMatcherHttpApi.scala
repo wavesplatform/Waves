@@ -124,13 +124,6 @@ object SyncMatcherHttpApi {
                             waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).cancelOrdersForPair(sender, assetPair, timestamp), waitTime)
 
-    def cancelOrder(sender: Node,
-                    assetPair: AssetPair,
-                    orderId: Option[String],
-                    timestamp: Option[Long] = None,
-                    waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
-      cancelOrder(sender.privateKey, assetPair, orderId, timestamp, waitTime)
-
     def cancelAllOrders(sender: Node,
                         timestamp: Long = System.currentTimeMillis(),
                         waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
