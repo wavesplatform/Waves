@@ -33,6 +33,7 @@ object AssetTransactionsDiff {
           Diff(
             height = height,
             tx = tx,
+            portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty),
             assetScripts = Map(tx.assetId -> tx.script)
           ))
       } else {
