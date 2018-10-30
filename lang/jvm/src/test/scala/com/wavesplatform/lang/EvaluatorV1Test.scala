@@ -644,9 +644,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         )
       )
     ).map {
-      case TRUE  => true
-      case FALSE => false
-      case _     => ???
+      case CONST_BOOLEAN(b) => b
+      case _                => ???
     }
   }
 
@@ -703,9 +702,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
                                      .compile(script, List.empty)
                                      .explicitGet())
     (r._1, r._2.map {
-      case TRUE  => true
-      case FALSE => false
-      case _     => ???
+      case CONST_BOOLEAN(b) => b
+      case _                => ???
     })
   }
 

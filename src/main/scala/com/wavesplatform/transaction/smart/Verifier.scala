@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.smart
 import cats.implicits._
 import com.google.common.base.Throwables
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
+import com.wavesplatform.lang.v1.compiler.Terms.{TRUE, FALSE, EVALUATED}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._

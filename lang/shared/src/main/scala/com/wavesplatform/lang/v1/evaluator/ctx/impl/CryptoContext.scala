@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import com.wavesplatform.lang.v1.compiler.CompilerContext
-import com.wavesplatform.lang.v1.compiler.Terms.{B, CONST_BYTEVECTOR, CONST_STRING}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTEVECTOR, CONST_STRING}
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTEVECTOR, STRING}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
@@ -31,7 +31,7 @@ object CryptoContext {
                      ("sig", BYTEVECTOR, "signature"),
                      ("pub", BYTEVECTOR, "public key")) {
         case CONST_BYTEVECTOR(m: ByteVector) :: CONST_BYTEVECTOR(s: ByteVector) :: CONST_BYTEVECTOR(p: ByteVector) :: Nil =>
-          Right(B.fromBoolean(global.curve25519verify(m.toArray, s.toArray, p.toArray)))
+          Right(CONST_BOOLEAN(global.curve25519verify(m.toArray, s.toArray, p.toArray)))
         case _ => ???
       }
 

@@ -31,9 +31,8 @@ object JsAPI {
           jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
         case IF(cond, ifTrue, ifFalse) =>
           jObj.applyDynamic("apply")("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
-        case REF(key) => jObj.applyDynamic("apply")("type" -> "REF", "key"    -> key)
-        case TRUE     => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> true)
-        case FALSE    => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> false)
+        case REF(key)         => jObj.applyDynamic("apply")("type" -> "REF", "key"    -> key)
+        case CONST_BOOLEAN(b) => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> b)
         case FUNCTION_CALL(function, args) =>
           jObj.applyDynamic("apply")("type" -> "CALL", "name" -> (function match {
             case Native(name) => name.toString()
