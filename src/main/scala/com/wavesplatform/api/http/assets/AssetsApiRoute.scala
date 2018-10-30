@@ -119,7 +119,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "assetId", value = "ID of the asset", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "Boolean", paramType = "query")
+      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
     ))
   def details: Route =
     (get & path("details" / Segment)) { id =>
@@ -322,15 +322,16 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "decimals"       -> JsNumber(tx.decimals.toInt),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
+          "scripted"       -> JsBoolean(description.script.nonEmpty),
           "minSponsoredAssetFee" -> (description.sponsorship match {
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
           })
         ) ++ (script.toSeq.flatMap { script =>
           Seq(
-            "complexity" -> JsNumber(BigDecimal(complexity)),
-            "script"     -> JsString(script.bytes().base64),
-            "scriptText" -> JsString(script.text)
+            "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
+            "script"           -> JsString(script.bytes().base64),
+            "scriptText"       -> JsString(script.text)
           )
         })
       )
