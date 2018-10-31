@@ -6,7 +6,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.someAssetAmount
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.sync._
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.transaction.smart.script.{ScriptCompiler}
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
@@ -18,6 +18,7 @@ import scala.concurrent.duration._
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   var testAssetWOScript = ""
   var testAssetWScript  = ""
+  val setAssetScriptFee = 1.waves + 0.004.waves
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -41,7 +42,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
   test("cannot set script on asset w/o initial script") {
     val (balance, eff) = notMiner.accountBalances(firstAddress)
-    assertBadRequestAndMessage(sender.setAssetScript(testAssetWOScript, firstAddress, issueFee, Some(scriptBase64)), "")
+    assertBadRequestAndMessage(sender.setAssetScript(testAssetWOScript, firstAddress, setAssetScriptFee, Some(scriptBase64)), "")
     notMiner.assertBalances(firstAddress, balance, eff)
   }
 
@@ -54,9 +55,9 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
          """.stripMargin).explicitGet()._1.bytes.value.base64
 
     val (balance, eff) = notMiner.accountBalances(firstAddress)
-    val txId           = sender.setAssetScript(testAssetWScript, firstAddress, issueFee, Some(script)).id
+    val txId           = sender.setAssetScript(testAssetWScript, firstAddress, setAssetScriptFee, Some(script)).id
     nodes.waitForHeightAriseAndTxPresent(txId)
-    notMiner.assertBalances(firstAddress, balance - issueFee, eff - issueFee)
+    notMiner.assertBalances(firstAddress, balance - setAssetScriptFee, eff - setAssetScriptFee)
   }
 
   test("cannot transact without having enough waves") {
@@ -76,9 +77,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
-    //ByteStr.decodeBase58(testAssetWScript).get,
     def sastx(version: Byte = SetAssetScriptTransaction.supportedVersions.head,
-              fee: Long = 100000000L,
+              fee: Long = setAssetScriptFee,
               timestamp: Long = System.currentTimeMillis,
               assetId: ByteStr = ByteStr.decodeBase58(testAssetWScript).get,
     ): SetAssetScriptTransaction =
@@ -105,7 +105,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val invalidTxs = Seq(
       (sastx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
       (sastx(fee = 9999999), "Fee .* does not exceed minimal value"),
-      (sastx(assetId = ByteStr.decodeBase64(testAssetWScript).get), "invalid.assetId")
+      (sastx(assetId = ByteStr.decodeBase64(testAssetWScript).get), "invalid.assetId"),
+      (sastx(assetId = ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get), "Referenced assetId not found")
     )
 
     for ((tx, diag) <- invalidTxs) {
@@ -121,12 +122,14 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     def request: JsObject = {
       val rs = sender.postJsonWithApiKey(
         "/transactions/sign",
-        Json.obj("version" -> 1,
-                 "type"    -> SetAssetScriptTransaction.typeId,
-                 "sender"  -> firstAddress,
-                 "fee"     -> issueFee,
-                 "assetId" -> testAssetWScript,
-                 "script"  -> Some(scriptBase64))
+        Json.obj(
+          "version" -> 1,
+          "type"    -> SetAssetScriptTransaction.typeId,
+          "sender"  -> firstAddress,
+          "fee"     -> setAssetScriptFee,
+          "assetId" -> testAssetWScript,
+          "script"  -> Some(scriptBase64)
+        )
       )
       Json.parse(rs.getResponseBody).as[JsObject]
     }
@@ -144,6 +147,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
     sender.postJson("/transactions/broadcast", withProof)
     nodes.waitForHeightAriseAndTxPresent(id(withProof))
+  }
+
+  test("try to make setassetscript with script: null") {
+    assertBadRequestAndResponse(sender.setAssetScript(testAssetWScript, firstAddress, setAssetScriptFee), "Reason: Empty script is disabled.")
   }
 
 }
