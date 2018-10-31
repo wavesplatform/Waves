@@ -172,7 +172,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def doCancel(order: Order): Future[MatcherResponse] = orderBook(order.assetPair) match {
     case Some(Right(orderBookRef)) =>
       log.trace(s"Canceling ${order.id()} for ${order.sender.address}")
-      (orderBookRef ? CancelOrder(order.id())).mapTo[MatcherResponse]
+      (orderBookRef ? CancelOrder(order.id())).mapTo[MatcherResponse].map {
+        case _: OrderCancelRejected =>
+          orderHistory ! Events.OrderCanceled(LimitOrder(order), unmatchable = false)
+          OrderCanceled(order.id())
+        case x => x
+      }
     case Some(Left(_)) => Future.successful(OrderBookUnavailable)
     case None =>
       log.debug(s"Order book for ${order.assetPair} was not found, canceling ${order.id()} anyway")
@@ -186,13 +191,15 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def cancelOrder(orderId: ByteStr, senderPublicKey: Option[PublicKeyAccount]): ToResponseMarshallable = {
     val st = cancelTimer.start()
     DBUtils.orderInfo(db, orderId).status match {
-      case LimitOrder.NotFound      => StatusCodes.NotFound
+      case LimitOrder.NotFound      => StatusCodes.NotFound   -> LimitOrder.NotFound.json
       case status if status.isFinal => StatusCodes.BadRequest -> Json.obj("message" -> s"Order is already ${status.name}")
       case _ =>
         DBUtils.order(db, orderId) match {
           case None =>
-            log.warn(s"Order $orderId was not found in history")
-            StatusCodes.NotFound
+            StatusCodes.NotFound -> Json.obj(
+              "status"  -> "NotFound",
+              "message" -> "The order is not found"
+            )
           case Some(order) if senderPublicKey.exists(_ != order.senderPublicKey) =>
             OrderCancelRejected("Public key mismatch")
           case Some(order) =>
