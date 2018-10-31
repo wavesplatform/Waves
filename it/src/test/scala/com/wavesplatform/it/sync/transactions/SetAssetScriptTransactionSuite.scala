@@ -36,7 +36,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
              2,
              script = Some(scriptBase64))
       .id
-    nodes.waitForHeightArise()
+    nodes.waitForHeightAriseAndTxPresent(testAssetWScript)
   }
 
   test("cannot set script on asset w/o initial script") {
