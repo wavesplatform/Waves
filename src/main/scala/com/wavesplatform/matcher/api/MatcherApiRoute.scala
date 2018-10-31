@@ -159,7 +159,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def place: Route = path("orderbook") {
     (pathEndOrSingleSlash & post) {
       json[Order] { order =>
-        placeTimer.measure {
+        placeTimer.measureFuture {
           orderValidator.validateNewOrder(order) match {
             case Left(e)  => Future.successful[MatcherResponse](OrderRejected(e))
             case Right(_) => (matcher ? order).mapTo[MatcherResponse]
