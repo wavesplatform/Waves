@@ -10,11 +10,7 @@ import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.SignedIssueV1Request
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.transaction.assets.IssueTransactionV1
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.transaction.transfer.TransferTransactionV1
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -67,79 +63,6 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     notMiner.assertAssetBalance(senderAddress, issuedAssetId, defaultAssetQuantity - transferFee - 2)
     notMiner.assertAssetBalance(secondAddress, issuedAssetId, 2)
     notMiner.assertAssetBalance(minerAddress, issuedAssetId, transferFee)
-  }
-
-  test("Fee for null-scripted account") {
-    val smartAccount = PrivateKeyAccount("such smart".getBytes)
-
-    val initialTransfer =
-      TransferTransactionV1
-        .selfSigned(
-          None,
-          notMiner.privateKey,
-          smartAccount,
-          5.waves,
-          System.currentTimeMillis(),
-          None,
-          transferFee,
-          Array.emptyByteArray
-        )
-        .explicitGet()
-
-    notMiner.signedBroadcast(initialTransfer.json())
-
-    nodes.waitForHeightAriseAndTxPresent(initialTransfer.id().base58)
-
-    println("Transfer")
-
-    val setScriptTx =
-      SetScriptTransaction
-        .selfSigned(
-          1,
-          smartAccount,
-          Some(ScriptV1(CONST_BOOLEAN(true)).explicitGet()),
-          setScriptFee,
-          System.currentTimeMillis()
-        )
-        .explicitGet()
-
-    notMiner.signedBroadcast(setScriptTx.json())
-
-    nodes.waitForHeightAriseAndTxPresent(setScriptTx.id().base58)
-
-    println("SetScript")
-
-    val setNullScriptTx =
-      SetScriptTransaction
-        .selfSigned(
-          1,
-          smartAccount,
-          None,
-          setScriptFee,
-          System.currentTimeMillis()
-        )
-        .explicitGet()
-
-    notMiner.signedBroadcast(setNullScriptTx.json())
-
-    nodes.waitForHeightAriseAndTxPresent(setNullScriptTx.id().base58)
-
-    println("SetNullScript")
-
-    val wrongFeeTransfer = TransferTransactionV1
-      .selfSigned(
-        None,
-        smartAccount,
-        notMiner.privateKey,
-        1.waves,
-        System.currentTimeMillis(),
-        None,
-        transferFee,
-        Array.emptyByteArray
-      )
-      .explicitGet()
-
-    println(sender.postJson("/debug/validate", wrongFeeTransfer.json()))
   }
 
 }
