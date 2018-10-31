@@ -307,8 +307,8 @@ object WavesContext {
       "get height when transaction was stored to blockchain",
       ("id", BYTEVECTOR, "transaction Id")
     ) {
-      case (id: ByteVector) :: Nil => Right(fromOptionL(env.transactionHeightById(id.toArray).map(_.toLong)))
-      case _                       => ???
+      case CONST_BYTEVECTOR(id: ByteVector) :: Nil => Right(fromOptionL(env.transactionHeightById(id.toArray).map(_.toLong)))
+      case _                                       => ???
     }
 
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))

@@ -17,15 +17,6 @@ package object smartcontract {
        |}
      """.stripMargin)
 
-  def checkExtract(dtx: DataTransaction) =
-    Some(s"""
-       |match tx {
-       |  case ext : ExchangeTransaction =>
-       |     extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
-       |  case _ => false
-       |}
-     """.stripMargin)
-
   def pureContext(dtx: DataTransaction) =
     Some(s"""
        | match tx {
@@ -45,7 +36,7 @@ package object smartcontract {
        |       case ddtx : DataTransaction => ddtx.data[0] != DataEntry("ha", true)
        |       case _ => false
        |    }
-       |    let neOptionAndExtractHeight = dtx.id != base58'' # shouldbe extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
+       |    let neOptionAndExtractHeight = extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
        |
        |    let ne = nePrim && neDataEntryAndGetElement && neOptionAndExtractHeight
        |    let gteLong = 1000 > 999 && 1000 >= 999
