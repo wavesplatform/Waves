@@ -81,7 +81,7 @@ object LimitOrder {
   }
   case object NotFound extends OrderStatus {
     val name             = "NotFound"
-    def json: JsObject   = Json.obj("status" -> name)
+    def json: JsObject   = Json.obj("status" -> name, "message" -> "The limit order is not found")
     val isFinal: Boolean = true
     val ordering         = 5
   }

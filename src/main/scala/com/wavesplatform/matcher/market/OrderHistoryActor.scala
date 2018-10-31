@@ -8,10 +8,11 @@ import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderE
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon
 import org.iq80.leveldb.DB
 
-class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor {
+class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor with ScorexLogging {
 
   val orderHistory = new OrderHistory(db, settings)
 
@@ -46,6 +47,11 @@ class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor {
       orderHistory.process(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
     }
     sender ! maybeOrder
+  }
+
+  override def postStop(): Unit = {
+    log.info("Stopped OrderHistoryActor")
+    super.postStop()
   }
 }
 

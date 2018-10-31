@@ -17,7 +17,7 @@ import scala.util.Random
 object MatcherPriceAssetConfig {
 
   private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
+    .zip(Seq(matcherConfig.withFallback(minerDisabled), minerDisabled, minerDisabled, empty()))
     .map { case (n, o) => o.withFallback(n) }
 
   private val aliceSeed = _Configs(1).getString("account-seed")
