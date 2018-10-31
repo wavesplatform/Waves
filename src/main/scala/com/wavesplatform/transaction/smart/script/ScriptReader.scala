@@ -2,7 +2,6 @@ package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ScriptVersion
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
@@ -22,16 +21,13 @@ object ScriptReader {
       sv <- ScriptVersion
         .fromInt(version)
         .fold[Either[ScriptParseError, ScriptVersion]](Left(ScriptParseError(s"Invalid version: $version")))(v => Right(v))
-      script <- sv match {
-        case V1 =>
-          ScriptV1
-            .validateBytes(scriptBytes)
-            .flatMap { _ =>
-              Serde.deserialize(scriptBytes).flatMap(ScriptV1(_, checkSize = false))
-            }
-            .left
-            .map(ScriptParseError)
-      }
+      script <- ScriptV1
+        .validateBytes(scriptBytes)
+        .flatMap { _ =>
+          Serde.deserialize(scriptBytes).flatMap(ScriptV1(sv, _, checkSize = false))
+        }
+        .left
+        .map(ScriptParseError)
     } yield script
   }
 

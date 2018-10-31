@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -102,7 +103,7 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
   }
 
   private def roundTripTest(untypedExpr: Expressions.EXPR): Assertion = {
-    val typedExpr = CompilerV1(PureContext.compilerContext, untypedExpr).map(_._1).explicitGet()
+    val typedExpr = CompilerV1(PureContext.build(V1).compilerContext, untypedExpr).map(_._1).explicitGet()
     roundTripTest(typedExpr)
   }
 

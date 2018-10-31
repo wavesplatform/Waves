@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.parser.Parser
@@ -37,7 +38,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
          |
       """.stripMargin
     val untyped = Parser(script).get.value
-    CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
+    CompilerV1(compilerContext(V1), untyped).explicitGet()._1
   }
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, TransferTransactionV2, Seq[ByteStr])] = for {

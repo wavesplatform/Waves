@@ -4,8 +4,8 @@ import com.google.common.base.Charsets
 import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
@@ -14,6 +14,7 @@ import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.{TestTime, WithDB}
@@ -135,6 +136,15 @@ class OrderValidatorSpecification
     "validate order with any number of signatures from a scripted account" in forAll(Gen.choose(0, 5)) { proofsNumber =>
       validateOrderProofsTest((1 to proofsNumber).map(x => ByteStr(Array(x.toByte))))
     }
+
+    "meaningful error for undefined functions in matcher" in portfolioTest(defaultPortfolio) { (ov, bc) =>
+      (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
+
+      val o      = newBuyOrder
+      val script = ScriptCompiler("true && (height > 0)").explicitGet()._1
+      (bc.accountScript _).when(o.sender.toAddress).returns(Some(script))
+      ov.validateNewOrder(o) should produce("height is inaccessible when running script on matcher")
+    }
   }
 
   private def portfolioTest(p: Portfolio)(f: (OrderValidator, Blockchain) => Any): Unit = {
@@ -148,7 +158,7 @@ class OrderValidatorSpecification
 
   private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = portfolioTest(defaultPortfolio) { (ov, bc) =>
     val pk            = PrivateKeyAccount(randomBytes())
-    val accountScript = ScriptV1(TRUE, checkSize = false).explicitGet()
+    val accountScript = ScriptV1(ScriptVersion.Versions.V2, Terms.TRUE, checkSize = false).explicitGet()
 
     (bc.accountScript _).when(pk.toAddress).returns(Some(accountScript)).anyNumberOfTimes()
     (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()

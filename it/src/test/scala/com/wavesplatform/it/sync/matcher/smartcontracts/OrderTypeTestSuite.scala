@@ -124,7 +124,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setContract(None, aliceAcc)
       }
 
-      "place order and then set contract on BUY type" in {
+      "place order and then set contract on BUY type" ignore {
         val aliceOrd1 = matcherNode
           .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
           .message

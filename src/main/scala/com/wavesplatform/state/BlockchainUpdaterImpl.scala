@@ -388,22 +388,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       .map(t => (t._1, t._2))
       .orElse(blockchain.transactionInfo(id))
 
-  override def addressTransactions(address: Address, types: Set[Type], count: Int, from: Int): Seq[(Int, Transaction)] =
-    ngState.fold(blockchain.addressTransactions(address, types, count, from)) { ng =>
-      val transactionsFromDiff = ng.bestLiquidDiff.transactions.values.view
-        .collect {
-          case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
-        }
-        .slice(from, from + count)
-        .toSeq
-
-      val actualTxCount = transactionsFromDiff.length
-
-      if (actualTxCount == count) transactionsFromDiff
-      else {
-        transactionsFromDiff ++ blockchain.addressTransactions(address, types, count - actualTxCount, 0)
-      }
-    }
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
+    addressTransactionsFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, types, count, fromId)
 
   override def containsTransaction(id: AssetId): Boolean = ngState.fold(blockchain.containsTransaction(id)) { ng =>
     ng.bestLiquidDiff.transactions.contains(id) || blockchain.containsTransaction(id)
@@ -448,14 +434,27 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
   override def accountScript(address: Address): Option[Script] = ngState.fold(blockchain.accountScript(address)) { ng =>
     ng.bestLiquidDiff.scripts.get(address) match {
-      case None            => blockchain.accountScript(address)
-      case Some(None)      => None
-      case Some(Some(scr)) => Some(scr)
+      case None      => blockchain.accountScript(address)
+      case Some(scr) => scr
     }
   }
 
   override def hasScript(address: Address): Boolean = ngState.fold(blockchain.hasScript(address)) { ng =>
     ng.bestLiquidDiff.scripts.contains(address) || blockchain.hasScript(address)
+  }
+
+  override def assetScript(asset: AssetId): Option[Script] = ngState.fold(blockchain.assetScript(asset)) { ng =>
+    ng.bestLiquidDiff.assetScripts.get(asset) match {
+      case None      => blockchain.assetScript(asset)
+      case Some(scr) => scr
+    }
+  }
+
+  override def hasAssetScript(asset: AssetId): Boolean = ngState.fold(blockchain.hasAssetScript(asset)) { ng =>
+    ng.bestLiquidDiff.assetScripts.get(asset) match {
+      case None    => blockchain.hasAssetScript(asset)
+      case Some(x) => x.nonEmpty
+    }
   }
 
   override def accountData(acc: Address): AccountDataInfo = ngState.fold(blockchain.accountData(acc)) { ng =>
@@ -531,10 +530,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
   override def rollbackTo(targetBlockId: AssetId): Seq[Block] = blockchain.rollbackTo(targetBlockId)
 
-  override def transactionHeight(id: AssetId): Option[Int] = ngState match {
-    case Some(ng) => ng.bestLiquidDiff.transactions.get(id).map(_._1)
-    case None     => blockchain.transactionHeight(id)
-  }
+  override def transactionHeight(id: AssetId): Option[Int] =
+    ngState flatMap { ng =>
+      ng.bestLiquidDiff.transactions.get(id).map(_._1)
+    } orElse blockchain.transactionHeight(id)
 
   override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = ngState match {
     case Some(ng) =>

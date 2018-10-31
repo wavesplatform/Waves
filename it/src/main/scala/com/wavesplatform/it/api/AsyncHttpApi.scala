@@ -243,24 +243,39 @@ object AsyncHttpApi extends Assertions {
               decimals: Byte,
               reissuable: Boolean,
               fee: Long,
-              version: Byte = 2): Future[Transaction] = {
+              version: Byte = 2,
+              script: Option[String] = None): Future[Transaction] = {
       version match {
         case 2 => { //TODO: @monroid refactor after https://wavesplatform.atlassian.net/browse/NODE-1222 fix
-          signAndBroadcast(
-            Json.obj(
-              "type"        -> 3,
-              "name"        -> name,
-              "quantity"    -> quantity,
-              "description" -> description,
-              "sender"      -> sourceAddress,
-              "decimals"    -> decimals,
-              "reissuable"  -> reissuable,
-              "fee"         -> fee,
-              "version"     -> version
-            ))
+          val js = Json.obj(
+            "type"        -> 3,
+            "name"        -> name,
+            "quantity"    -> quantity,
+            "description" -> description,
+            "sender"      -> sourceAddress,
+            "decimals"    -> decimals,
+            "reissuable"  -> reissuable,
+            "fee"         -> fee,
+            "version"     -> version
+          )
+
+          val jsUpdated = if (script.isDefined) js ++ Json.obj("script" -> JsString(script.get)) else js
+          signAndBroadcast(jsUpdated)
         }
         case _ => postJson("/assets/issue", IssueV1Request(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
       }
+    }
+
+    def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None): Future[Transaction] = {
+      signAndBroadcast(
+        Json.obj(
+          "type"    -> 15,
+          "version" -> 1,
+          "assetId" -> assetId,
+          "sender"  -> sender,
+          "fee"     -> fee,
+          "script"  -> script
+        ))
     }
 
     def scriptCompile(code: String) = post("/utils/script/compile", code).as[CompiledScript]
@@ -554,7 +569,7 @@ object AsyncHttpApi extends Assertions {
         allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
         _            <- traverse(nodes)(_.waitForHeight(allHeights.max + 1))
         finalHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
-      } yield all(finalHeights).shouldBe(finalHeights.head)
+      } yield all(finalHeights) should be >= (finalHeights.head)
 
     def waitForHeightArise(): Future[Int] =
       for {
