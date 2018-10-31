@@ -157,7 +157,8 @@ object MatcherPriceAssetConfig {
       reissuable,
       fee,
       timestamp,
-      tx.proofs.base58().toList
+      tx.proofs.base58().toList,
+      None
     )
   }
 

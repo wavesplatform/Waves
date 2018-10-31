@@ -2,6 +2,8 @@ package com.wavesplatform.database
 import java.util
 
 trait Key[V] {
+  def name: String
+
   def keyBytes: Array[Byte]
 
   def parse(bytes: Array[Byte]): V
@@ -19,7 +21,9 @@ trait Key[V] {
 }
 
 object Key {
-  def apply[V](key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
+  def apply[V](keyName: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
+    override def name: String = keyName
+
     override def keyBytes: Array[Byte] = key
 
     override def parse(bytes: Array[Byte]) = parser(bytes)
@@ -27,6 +31,6 @@ object Key {
     override def encode(v: V) = encoder(v)
   }
 
-  def opt[V](key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
-    apply[Option[V]](key, Option(_).map(parser), _.fold[Array[Byte]](null)(encoder))
+  def opt[V](name: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
+    apply[Option[V]](name, key, Option(_).map(parser), _.fold[Array[Byte]](null)(encoder))
 }

@@ -51,8 +51,10 @@ object TransactionDiffer extends Instrumented with ScorexLogging {
           case atx: CreateAliasTransaction  => CreateAliasTransactionDiff(blockchain, currentBlockHeight)(atx)
           case dtx: DataTransaction         => DataTransactionDiff(blockchain, currentBlockHeight)(dtx)
           case sstx: SetScriptTransaction   => SetScriptTransactionDiff(currentBlockHeight)(sstx)
-          case stx: SponsorFeeTransaction   => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
-          case _                            => Left(UnsupportedTransactionType)
+          case sstx: SetAssetScriptTransaction =>
+            AssetTransactionsDiff.setAssetScript(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(sstx)
+          case stx: SponsorFeeTransaction => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
+          case _                          => Left(UnsupportedTransactionType)
         }
       }
       positiveDiff <- stats.balanceValidation

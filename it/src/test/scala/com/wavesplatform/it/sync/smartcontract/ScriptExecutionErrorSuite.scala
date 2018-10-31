@@ -5,18 +5,17 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.CreateAliasTransactionV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.utils.dummyCompilerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
 
 class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFailure {
-
   private val acc0 = pkByAddress(firstAddress)
   private val acc1 = pkByAddress(secondAddress)
   private val acc2 = pkByAddress(thirdAddress)
@@ -34,10 +33,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
         |}
       """.stripMargin
 
-    val compiled = ScriptV1(
-      new CompilerV1(dummyCompilerContext).compile(scriptSrc, Nil).explicitGet(),
-      checkSize = false
-    ).explicitGet()
+    val compiled = ScriptCompiler(scriptSrc).explicitGet()._1
 
     val tx = sender.signedBroadcast(
       SetScriptTransaction.selfSigned(1, acc2, Some(compiled), setScriptFee, ts).explicitGet().json() +
@@ -74,7 +70,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
           .selfSigned(2, None, acc0, acc1.toAddress, 1000, ts, None, minFee, Array())
           .explicitGet()
           .json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))),
-      "Probably script does not return boolean"
+      "not a boolean"
     )
   }
 }

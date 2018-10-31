@@ -28,7 +28,6 @@ import javax.ws.rs.Path
 import play.api.libs.json._
 
 import scala.util.Success
-import scala.util.control.Exception
 
 @Path("/transactions")
 @Api(value = "/transactions")
@@ -43,16 +42,11 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     with BroadcastRoute
     with CommonApiFunctions {
 
-  import TransactionsApiRoute.MaxTransactionsPerRequest
-
   override lazy val route =
     pathPrefix("transactions") {
       unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ broadcast
     }
 
-  private val invalidLimit = StatusCodes.BadRequest -> Json.obj("message" -> "invalid.limit")
-
-  //TODO implement general pagination
   @Path("/address/{address}/limit/{limit}")
   @ApiOperation(value = "List of transactions by address",
                 notes = "Get list of transactions where specified address has been involved",
@@ -60,31 +54,41 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "limit", value = "Number of transactions to be returned", required = true, dataType = "integer", paramType = "path")
+      new ApiImplicitParam(name = "limit",
+                           value = "Number of transactions to be returned",
+                           required = true,
+                           dataType = "integer",
+                           paramType = "path"),
+      new ApiImplicitParam(name = "after", value = "Id of transaction to paginate after", required = false, dataType = "string", paramType = "query")
     ))
-  def addressLimit: Route = (pathPrefix("address") & get) {
-    pathPrefix(Segment) { address =>
+  def addressLimit: Route = {
+    def getResponse(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] =
+      blockchain
+        .addressTransactions(address, Set.empty, limit, fromId)
+        .map(_.map { case (h, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(h)) })
+        .map(txs => Json.arr(JsArray(txs)))
+
+    (get & pathPrefix("address" / Segment)) { address =>
       Address.fromString(address) match {
         case Left(e) => complete(ApiError.fromValidationError(e))
         case Right(a) =>
-          pathPrefix("limit") {
-            pathEndOrSingleSlash {
-              complete(invalidLimit)
-            } ~
-              path(Segment) { limitStr =>
-                Exception.allCatch.opt(limitStr.toInt) match {
-                  case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
-                    complete(
-                      Json.arr(JsArray(blockchain
-                        .addressTransactions(a, Set.empty, limit, 0)
-                        .map({ case (h, tx) => txToCompactJson(a, tx) + ("height" -> JsNumber(h)) }))))
-                  case Some(limit) if limit > MaxTransactionsPerRequest =>
-                    complete(TooBigArrayAllocation)
-                  case _ =>
-                    complete(invalidLimit)
-                }
+          (path("limit" / IntNumber) & parameter('after.?)) { (limit, after) =>
+            if (limit > settings.transactionByAddressLimit) complete(TooBigArrayAllocation)
+            else
+              after match {
+                case Some(t) =>
+                  ByteStr.decodeBase58(t) match {
+                    case Success(id) =>
+                      getResponse(a, limit, Some(id)).fold(
+                        _ => complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain")),
+                        complete(_))
+                    case _ => complete(CustomValidationError(s"Unable to decode transaction id $t"))
+                  }
+                case None =>
+                  getResponse(a, limit, None)
+                    .fold(_ => complete(StatusCodes.NotFound), complete(_))
               }
-          } ~ complete(StatusCodes.NotFound)
+          } ~ complete(CustomValidationError("invalid.limit"))
       }
     }
   }
@@ -169,7 +173,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           )
           createTransaction(senderPk, enrichedJsv) { tx =>
             CommonValidation.getMinFee(blockchain, functionalitySettings, blockchain.height, tx).map {
-              case (assetId, assetAmount) =>
+              case (assetId, assetAmount, wavesAmount) =>
                 Json.obj(
                   "feeAssetId" -> assetId,
                   "feeAmount"  -> assetAmount
@@ -237,24 +241,25 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
           case Some(x) =>
             x match {
-              case IssueTransactionV1       => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], wallet, signerAddress, time)
-              case IssueTransactionV2       => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], wallet, signerAddress, time)
-              case TransferTransactionV1    => TransactionFactory.transferAssetV1(txJson.as[TransferV1Request], wallet, signerAddress, time)
-              case TransferTransactionV2    => TransactionFactory.transferAssetV2(txJson.as[TransferV2Request], wallet, signerAddress, time)
-              case ReissueTransactionV1     => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], wallet, signerAddress, time)
-              case ReissueTransactionV2     => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], wallet, signerAddress, time)
-              case BurnTransactionV1        => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], wallet, signerAddress, time)
-              case BurnTransactionV2        => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], wallet, signerAddress, time)
-              case MassTransferTransaction  => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
-              case LeaseTransactionV1       => TransactionFactory.leaseV1(txJson.as[LeaseV1Request], wallet, signerAddress, time)
-              case LeaseTransactionV2       => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], wallet, signerAddress, time)
-              case LeaseCancelTransactionV1 => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], wallet, signerAddress, time)
-              case LeaseCancelTransactionV2 => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], wallet, signerAddress, time)
-              case CreateAliasTransactionV1 => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], wallet, signerAddress, time)
-              case CreateAliasTransactionV2 => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], wallet, signerAddress, time)
-              case DataTransaction          => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
-              case SetScriptTransaction     => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
-              case SponsorFeeTransaction    => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
+              case IssueTransactionV1        => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], wallet, signerAddress, time)
+              case IssueTransactionV2        => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], wallet, signerAddress, time)
+              case TransferTransactionV1     => TransactionFactory.transferAssetV1(txJson.as[TransferV1Request], wallet, signerAddress, time)
+              case TransferTransactionV2     => TransactionFactory.transferAssetV2(txJson.as[TransferV2Request], wallet, signerAddress, time)
+              case ReissueTransactionV1      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], wallet, signerAddress, time)
+              case ReissueTransactionV2      => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], wallet, signerAddress, time)
+              case BurnTransactionV1         => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], wallet, signerAddress, time)
+              case BurnTransactionV2         => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], wallet, signerAddress, time)
+              case MassTransferTransaction   => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
+              case LeaseTransactionV1        => TransactionFactory.leaseV1(txJson.as[LeaseV1Request], wallet, signerAddress, time)
+              case LeaseTransactionV2        => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], wallet, signerAddress, time)
+              case LeaseCancelTransactionV1  => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], wallet, signerAddress, time)
+              case LeaseCancelTransactionV2  => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], wallet, signerAddress, time)
+              case CreateAliasTransactionV1  => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], wallet, signerAddress, time)
+              case CreateAliasTransactionV2  => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], wallet, signerAddress, time)
+              case DataTransaction           => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
+              case SetScriptTransaction      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
+              case SetAssetScriptTransaction => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
+              case SponsorFeeTransaction     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
             }
         }).fold(ApiError.fromValidationError, _.json())
     }
@@ -305,8 +310,4 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       case _ => txToExtendedJson(tx)
     }
   }
-}
-
-object TransactionsApiRoute {
-  val MaxTransactionsPerRequest = 10000
 }

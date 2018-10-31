@@ -1,135 +1,208 @@
 package com.wavesplatform.matcher.market
 
 import com.google.common.base.Charsets
-import com.wavesplatform.WithDB
+import com.wavesplatform.OrderOps._
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.ScriptVersion
+import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
-import com.wavesplatform.settings.{Constants, WalletSettings}
-import com.wavesplatform.state.{Blockchain, ByteStr, EitherExt2, LeaseBalance, Portfolio}
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.settings.Constants
+import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.utils.randomBytes
+import com.wavesplatform.{TestTime, WithDB}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.assets.IssueTransactionV1
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.wallet.Wallet
 
 class OrderValidatorSpecification
     extends WordSpec
     with WithDB
-    with PropertyChecks
     with Matchers
     with MatcherTestData
     with BeforeAndAfterAll
-    with BeforeAndAfterEach
-    with PathMockFactory {
+    with PathMockFactory
+    with PropertyChecks {
 
-  val utxPool: UtxPool = stub[UtxPool]
+  private val wbtc         = mkAssetId("WBTC")
+  private val pairWavesBtc = AssetPair(None, Some(wbtc))
+  private val defaultTs    = 1000
 
-  val bc: Blockchain = stub[Blockchain]
-  val i1: IssueTransactionV1 =
-    IssueTransactionV1
-      .selfSigned(PrivateKeyAccount(Array.empty), "WBTC".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
-      .right
-      .get
-  (bc.transactionInfo _).when(*).returns(Some((1, i1)))
-
-  val s: MatcherSettings             = matcherSettings.copy(account = MatcherAccount.address)
-  val w                              = Wallet(WalletSettings(None, Some("matcher"), Some(WalletSeed)))
-  val acc: Option[PrivateKeyAccount] = w.generateNewAccount()
-
-  val matcherPubKey: PublicKeyAccount = w.findPrivateKey(s.account).explicitGet()
-
-  private var ov = new OrderValidator {
-    override val orderHistory: OrderHistory = new OrderHistory(db, matcherSettings)
-    override val utxPool: UtxPool           = stub[UtxPool]
-    override val settings: MatcherSettings  = s
-    override val wallet: Wallet             = w
-  }
-
-  override def beforeEach(): Unit = {
-    super.beforeEach()
-    ov = new OrderValidator {
-      override val orderHistory: OrderHistory = new OrderHistory(db, matcherSettings)
-      override val utxPool: UtxPool           = stub[UtxPool]
-      override val settings: MatcherSettings  = s
-      override val wallet: Wallet             = w
-    }
-  }
-
-  val wbtc: ByteStr = mkAssetId("WBTC")
-  val pairWavesBtc  = AssetPair(None, Some(wbtc))
+  private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
 
   "OrderValidator" should {
-    "allows buy WAVES for BTC without balance for order fee" in {
-      validateNewOrderTest(
-        Portfolio(0,
-                  LeaseBalance.empty,
-                  Map(
-                    wbtc -> 10 * Constants.UnitsInWave
-                  ))) shouldBe an[Right[_, _]]
+    "allow buying WAVES for BTC without balance for order fee" in
+      portfolioTest(defaultPortfolio) { (ov, bc) =>
+        val o = newBuyOrder
+        (bc.accountScript _).when(o.sender.toAddress).returns(None)
+        ov.validateNewOrder(o) shouldBe 'right
+      }
+
+    "reject new order" when {
+      "asset balance is negative" in portfolioTest(Portfolio(0, LeaseBalance.empty, Map(wbtc -> -10 * Constants.UnitsInWave))) { (ov, _) =>
+        ov.validateNewOrder(newBuyOrder) should produce("Not enough tradable balance")
+      }
+
+      "this order had already been accepted" in portfolioTest(defaultPortfolio) { (ov, _) =>
+        val o       = newBuyOrder
+        val history = new OrderHistory(db, matcherSettings)
+        history.process(OrderAdded(LimitOrder(o)))
+        ov.validateNewOrder(o) shouldBe Left("Order has already been placed")
+      }
+
+      "this order had already been canceled" in portfolioTest(defaultPortfolio) { (ov, _) =>
+        val o       = newBuyOrder
+        val history = new OrderHistory(db, matcherSettings)
+        history.process(OrderAdded(LimitOrder(o)))
+        history.process(OrderCanceled(LimitOrder(o), unmatchable = false))
+
+        ov.validateNewOrder(o) shouldBe Left("Order has already been placed")
+      }
+
+      val blacklistedAccount = PrivateKeyAccount("3irbW78fffj5XDzAMjaEeo3kn8V".getBytes(Charsets.UTF_8))
+      "sender's address is blacklisted" in settingsTest(matcherSettings.copy(blacklistedAddresses = Set(blacklistedAccount.toAddress))) { ov =>
+        val o = newBuyOrder(blacklistedAccount)
+        ov.validateNewOrder(o) shouldBe Left("Invalid address")
+      }
+
+      "sender's address has a script, but trading from smart accounts hasn't been activated" in forAll(accountGen) { scripted =>
+        val bc = stub[Blockchain]
+        (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
+        (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 100))
+        (bc.height _).when().returns(50).once()
+
+        val ov = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
+        ov.validateNewOrder(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
+      }
+
+      "sender's address has a script returning FALSE" in forAll(accountGen) { scripted =>
+        val bc = stub[Blockchain]
+        (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.FALSE).explicitGet()))
+        (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 100))
+        (bc.height _).when().returns(150).once()
+
+        val ov = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
+        ov.validateNewOrder(newBuyOrder(scripted)) should produce("Order rejected by script")
+      }
+
+      "order expires too soon" in forAll(Gen.choose[Long](1, OrderValidator.MinExpiration), accountGen) { (offset, pk) =>
+        val bc       = stub[Blockchain]
+        val tt       = new TestTime
+        val ov       = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, tt)
+        val unsigned = newBuyOrder
+        val signed   = Order.sign(unsigned.updateExpiration(tt.getTimestamp() + offset).updateSender(pk), pk)
+        ov.validateNewOrder(signed) shouldBe Left("Order expiration should be > 1 min")
+      }
+
+      "order signature is invalid" in {
+        val bc = stub[Blockchain]
+        val o  = newBuyOrder.updateProofs(Proofs(List(ByteStr(new Array[Byte](32)))))
+        (bc.accountScript _).when(o.senderPublicKey.toAddress).returns(None)
+        val ov = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
+        ov.validateNewOrder(o) should produce("Script doesn't exist and proof doesn't validate as signature")
+      }
+
+      "default ts - drift > its for new users" in portfolioTest(defaultPortfolio) { (ov, _) =>
+        ov.validateNewOrder(newBuyOrder(defaultTs - matcherSettings.orderTimestampDrift - 1)) should produce("Order should have a timestamp")
+      }
+
+      "default ts - drift = its ts for new users" in portfolioTest(defaultPortfolio) { (ov, _) =>
+        ov.validateNewOrder(newBuyOrder(defaultTs - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
+      }
+
+      "ts1 - drift > ts2" in portfolioTest(defaultPortfolio) { (ov, _) =>
+        val pk      = PrivateKeyAccount(randomBytes())
+        val history = new OrderHistory(db, matcherSettings)
+        history.process(OrderAdded(LimitOrder(newBuyOrder(pk, defaultTs + 1000))))
+        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 999 - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
+      }
+
+      "ts1 - drift = ts2" in portfolioTest(defaultPortfolio) { (ov, _) =>
+        val pk      = PrivateKeyAccount(randomBytes())
+        val history = new OrderHistory(db, matcherSettings)
+        history.process(OrderAdded(LimitOrder(newBuyOrder(pk, defaultTs + 1000))))
+        ov.validateNewOrder(newBuyOrder(pk, defaultTs + 1000 - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
+      }
     }
 
-    "does not allow to add the order" when {
-      "the assets number is negative" in {
-        validateNewOrderTest(
-          Portfolio(0,
-                    LeaseBalance.empty,
-                    Map(
-                      wbtc -> -10 * Constants.UnitsInWave
-                    ))) shouldBe a[Left[_, _]]
-      }
+    "validate order with any number of signatures from a scripted account" in forAll(Gen.choose(0, 5)) { proofsNumber =>
+      validateOrderProofsTest((1 to proofsNumber).map(x => ByteStr(Array(x.toByte))))
+    }
 
-      "it was added before" when {
-        "it accepted" in {
-          val o = newBuyOrder
-          setupEnoughPortfolio()
+    "meaningful error for undefined functions in matcher" in portfolioTest(defaultPortfolio) { (ov, bc) =>
+      (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
 
-          ov.orderHistory.process(OrderAdded(LimitOrder(o)))
-
-          ov.validateNewOrder(o) shouldBe Left(GenericError("Order was placed before"))
-        }
-
-        "it canceled" in {
-          val o = newBuyOrder
-          setupEnoughPortfolio()
-
-          ov.orderHistory.process(OrderAdded(LimitOrder(o)))
-          ov.orderHistory.process(OrderCanceled(LimitOrder(o), unmatchable = false))
-
-          ov.validateNewOrder(o) shouldBe Left(GenericError("Order was placed before"))
-        }
-      }
+      val o      = newBuyOrder
+      val script = ScriptCompiler("true && (height > 0)").explicitGet()._1
+      (bc.accountScript _).when(o.sender.toAddress).returns(Some(script))
+      ov.validateNewOrder(o) should produce("height is inaccessible when running script on matcher")
     }
   }
 
-  private def validateNewOrderTest(expectedPortfolio: Portfolio): Either[ValidationError.GenericError, Order] = {
-    (ov.utxPool.portfolio _).when(*).returns(expectedPortfolio)
-    val o = newBuyOrder
-    ov.validateNewOrder(o)
+  private def portfolioTest(p: Portfolio)(f: (OrderValidator, Blockchain) => Any): Unit = {
+    val bc = stub[Blockchain]
+    f(new OrderValidator(db, bc, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime), bc)
+  }
+
+  private def settingsTest(settings: MatcherSettings)(f: OrderValidator => Any): Unit = {
+    f(new OrderValidator(db, stub[Blockchain], _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
+  }
+
+  private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = portfolioTest(defaultPortfolio) { (ov, bc) =>
+    val pk            = PrivateKeyAccount(randomBytes())
+    val accountScript = ScriptV1(ScriptVersion.Versions.V2, Terms.TRUE, checkSize = false).explicitGet()
+
+    (bc.accountScript _).when(pk.toAddress).returns(Some(accountScript)).anyNumberOfTimes()
+    (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
+    (bc.height _).when().returns(1).anyNumberOfTimes()
+
+    val order = OrderV2(
+      senderPublicKey = pk,
+      matcherPublicKey = MatcherAccount,
+      assetPair = pairWavesBtc,
+      amount = 100 * Constants.UnitsInWave,
+      price = (0.0022 * Order.PriceConstant).toLong,
+      timestamp = System.currentTimeMillis(),
+      expiration = System.currentTimeMillis() + 60 * 60 * 1000L,
+      matcherFee = (0.003 * Constants.UnitsInWave).toLong,
+      orderType = OrderType.BUY,
+      proofs = Proofs.empty
+    )
+
+    ov.validateNewOrder(order) shouldBe 'right
   }
 
   private def newBuyOrder: Order = buy(
     pair = pairWavesBtc,
-    price = 0.0022,
     amount = 100 * Constants.UnitsInWave,
+    price = 0.0022,
     matcherFee = Some((0.003 * Constants.UnitsInWave).toLong)
   )
 
-  private def setupEnoughPortfolio(): Unit = {
-    (ov.utxPool.portfolio _)
-      .when(*)
-      .returns(
-        Portfolio(0,
-                  LeaseBalance.empty,
-                  Map(
-                    wbtc -> 10 * Constants.UnitsInWave
-                  )))
-  }
+  private def newBuyOrder(ts: Long): Order = buy(
+    pair = pairWavesBtc,
+    amount = 100 * Constants.UnitsInWave,
+    price = 0.0022,
+    matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+    ts = Some(ts)
+  )
+
+  private def newBuyOrder(pk: PrivateKeyAccount, ts: Long = System.currentTimeMillis()): Order = buy(
+    pair = pairWavesBtc,
+    amount = 100 * Constants.UnitsInWave,
+    price = 0.0022,
+    matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+    sender = Some(pk),
+    ts = Some(ts)
+  )
 
   private def mkAssetId(prefix: String): ByteStr = {
     val prefixBytes = prefix.getBytes(Charsets.UTF_8)

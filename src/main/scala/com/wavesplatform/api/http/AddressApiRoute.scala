@@ -367,8 +367,9 @@ case class AddressApiRoute(settings: RestAPISettings,
 
   private def addressScriptInfoJson(account: Address): Either[ValidationError, AddressScriptInfo] =
     for {
-      script     <- Right(blockchain.accountScript(account))
-      complexity <- script.fold[Either[ValidationError, Long]](Right(0))(x => ScriptCompiler.estimate(x).left.map(GenericError(_)))
+      script <- Right(blockchain.accountScript(account))
+      complexity <- script.fold[Either[ValidationError, Long]](Right(0))(script =>
+        ScriptCompiler.estimate(script, script.version).left.map(GenericError(_)))
     } yield
       AddressScriptInfo(
         address = account.address,

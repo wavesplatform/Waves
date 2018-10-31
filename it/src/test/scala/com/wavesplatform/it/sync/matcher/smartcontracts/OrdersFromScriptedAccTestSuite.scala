@@ -1,16 +1,13 @@
-package com.wavesplatform.it.sync.matcher
+package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.it.sync._
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import play.api.libs.json.JsNumber
 
 import scala.concurrent.duration._
 
@@ -32,40 +29,36 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
       matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
 
-      val scriptText = s"""true""".stripMargin
-
-      val script = ScriptCompiler(scriptText).explicitGet()._1
-      val setScriptTransaction = SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, bobAcc, Some(script), setScriptFee, System.currentTimeMillis())
-        .right
-        .get
-
-      val setScriptId = bobNode
-        .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
-        .id
-
-      nodes.waitForHeightAriseAndTxPresent(setScriptId)
+      setContract(Some("true"), bobAcc)
     }
 
     "trading is deprecated" in {
       assertBadRequestAndResponse(
-        matcherNode
-          .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes),
+        matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes),
         "Trading on scripted account isn't allowed yet."
       )
     }
 
-    "scripted account can trade once SmartAccountTrading is activated" in {
+    "invalid setScript at account" in {
       matcherNode.waitForHeight(ActivationHeight, 3.minutes)
+      setContract(Some("true && (height > 0)"), bobAcc)
+      assertBadRequestAndResponse(
+        matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes),
+        "height is inaccessible when running script on matcher"
+      )
+    }
+
+    "scripted account can trade once SmartAccountTrading is activated" in {
+      setContract(Some("true"), bobAcc)
       val bobOrder = matcherNode
-        .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
+        .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
       bobOrder.status shouldBe "OrderAccepted"
     }
 
     "can trade from non-scripted account" in {
       // Alice places sell order
       val aliceOrder = matcherNode
-        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 2.waves * Order.PriceConstant, 500, version = 1, 10.minutes)
+        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
 
       aliceOrder.status shouldBe "OrderAccepted"
 
@@ -74,7 +67,6 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       // Alice checks that the order in order book
       matcherNode.waitOrderStatus(aliceWavesPair, orderId, "Filled")
       matcherNode.fullOrderHistory(aliceAcc).head.status shouldBe "Filled"
-
     }
   }
 }

@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.Versioned
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.ByteStr
@@ -32,9 +31,9 @@ object Script {
     } yield script
 
   object Expr {
-    def unapply(arg: Script): Option[Terms.EXPR] = {
-      if (arg.version == V1) Some(arg.expr.asInstanceOf[Terms.EXPR])
-      else None
+    def unapply(arg: Script): Option[Terms.EXPR] = arg.version.value match {
+      case 1 | 2 => Some(arg.expr.asInstanceOf[Terms.EXPR])
+      case _     => None
     }
   }
 }
