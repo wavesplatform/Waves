@@ -47,14 +47,16 @@ object DBUtils {
     }
   }
 
-  def ordersByAddressAndPair(db: DB, address: Address, pair: AssetPair, maxOrders: Int): IndexedSeq[(Order, OrderInfo)] = db.readOnly { ro =>
-    mergeOrders(
-      ro,
-      maxOrders,
-      activeIndex = indexes.active.iterator(ro, address).collect { case (`pair`, id) => id },
-      finalizedIndex = indexes.finalized.pair.iterator(ro, address, pair)
-    )
-  }
+  def ordersByAddressAndPair(db: DB, address: Address, pair: AssetPair, activeOnly: Boolean, maxOrders: Int): IndexedSeq[(Order, OrderInfo)] =
+    db.readOnly { ro =>
+      mergeOrders(
+        ro,
+        maxOrders,
+        activeOnly,
+        activeIndex = indexes.active.iterator(ro, address).collect { case (`pair`, id) => id },
+        finalizedIndex = indexes.finalized.pair.iterator(ro, address, pair)
+      )
+    }
 
   /**
     * @param activeOnly If false - returns all active orders and the (maxOrders - allActiveOrders.size) recent of others
@@ -63,25 +65,30 @@ object DBUtils {
     mergeOrders(
       ro,
       maxOrders,
+      activeOnly,
       activeIndex = indexes.active.iterator(ro, address).map { case (_, id) => id },
-      finalizedIndex = if (activeOnly) Iterator.empty else indexes.finalized.common.iterator(ro, address)
+      finalizedIndex = indexes.finalized.common.iterator(ro, address)
     )
   }
 
   private def mergeOrders(ro: ReadOnlyDB,
                           maxOrders: Int,
+                          activeOnly: Boolean,
                           activeIndex: Iterator[Order.Id],
-                          finalizedIndex: Iterator[Order.Id]): IndexedSeq[(Order, OrderInfo)] = {
+                          finalizedIndex: => Iterator[Order.Id]): IndexedSeq[(Order, OrderInfo)] = {
     def get(id: Order.Id): (Option[Order], Option[OrderInfo]) = (ro.get(MatcherKeys.order(id)), ro.get(MatcherKeys.orderInfoOpt(id)))
 
     // We show all active orders even they count exceeds the pair limit
     val active = activeIndex.map(get).collect { case (Some(o), Some(oi)) => (o, oi) }.toIndexedSeq
 
-    val nonActive = finalizedIndex
-      .map(get)
-      .collect { case (Some(o), Some(oi)) => (o, oi) }
-      .take(maxOrders - active.size)
-      .toVector
+    val nonActive =
+      if (activeOnly) Iterator.empty
+      else
+        finalizedIndex
+          .map(get)
+          .collect { case (Some(o), Some(oi)) => (o, oi) }
+          .take(maxOrders - active.size)
+          .toVector
 
     (active ++ nonActive).sortBy { case (order, info) => (info.status, -order.timestamp) }
   }
@@ -114,5 +121,5 @@ object DBUtils {
     key.parse(db.get(key.keyBytes)).getOrElse(0)
   }
 
-  def lastOrderTimestamp(db: DB, address: Address): Option[Long] = db.get(MatcherKeys.lastOrderTimestamp(address))
+  def lastOrderTimestamp(db: DB, address: Address): Option[Long] = db.get(MatcherKeys.lastCommandTimestamp(address))
 }

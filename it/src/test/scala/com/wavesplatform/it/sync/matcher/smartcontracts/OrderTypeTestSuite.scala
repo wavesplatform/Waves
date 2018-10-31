@@ -9,7 +9,6 @@ import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-
 import scala.concurrent.duration._
 
 class OrderTypeTestSuite extends MatcherSuiteBase {
@@ -78,7 +77,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
             .message
             .id)
 
-        matcherNode.cancelOrder(aliceAcc, predefAssetPair, Some(aliceOrd1)).status should be("OrderCanceled")
+        matcherNode.cancelOrder(aliceAcc, predefAssetPair, aliceOrd1).status should be("OrderCanceled")
 
         setContract(None, aliceAcc)
       }
@@ -98,7 +97,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
           .id
         matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
 
-        matcherNode.cancelOrder(aliceAcc, aliceWavesPair, Some(aliceOrd2)).status should be("OrderCanceled")
+        matcherNode.cancelOrder(aliceAcc, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
 
         setContract(None, aliceAcc)
       }
@@ -118,8 +117,8 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
           .id
         matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
 
-        matcherNode.cancelOrder(aliceAcc, predefAssetPair, Some(aliceOrd1)).status should be("OrderCanceled")
-        matcherNode.cancelOrder(aliceAcc, aliceWavesPair, Some(aliceOrd2)).status should be("OrderCanceled")
+        matcherNode.cancelOrder(aliceAcc, predefAssetPair, aliceOrd1).status should be("OrderCanceled")
+        matcherNode.cancelOrder(aliceAcc, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
 
         setContract(None, aliceAcc)
       }

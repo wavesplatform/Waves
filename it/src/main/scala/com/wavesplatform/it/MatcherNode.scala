@@ -31,9 +31,8 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
 
   def initialBalances(): Unit = {
     for (i <- List(matcherNode, aliceNode, bobNode).indices) {
-
       val tx = nodes(i).transfer(nodes(i).address, addresses(i), 10000.waves, 0.001.waves).id
-      nodes.waitForHeightAriseAndTxPresent(tx)
+      matcherNode.waitForTransaction(tx)
     }
   }
 
@@ -50,7 +49,7 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
         .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
         .id
 
-      nodes.waitForHeightAriseAndTxPresent(setScriptId)
+      matcherNode.waitForTransaction(setScriptId)
     }
   }
 
@@ -68,6 +67,6 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
       .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
       .id
 
-    nodes.waitForHeightAriseAndTxPresent(setScriptId)
+    matcherNode.waitForTransaction(setScriptId)
   }
 }
