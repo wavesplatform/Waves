@@ -42,35 +42,6 @@ object LevelDBWriter {
     c1 :+ c2.headOption.getOrElse(1)
   }
 
-  /** {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5)]}}}
-    *
-    * @param wbh WAVES balance history
-    * @param lbh Lease balance history
-    */
-  private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
-    @tailrec
-    def recMerge(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
-      buf += wh -> lh
-      if (wt.isEmpty && lt.isEmpty) {
-        buf
-      } else if (wt.isEmpty) {
-        recMerge(wh, wt, lt.head, lt.tail, buf)
-      } else if (lt.isEmpty) {
-        recMerge(wt.head, wt.tail, lh, lt, buf)
-      } else {
-        if (wh == lh) {
-          recMerge(wt.head, wt.tail, lt.head, lt.tail, buf)
-        } else if (wh > lh) {
-          recMerge(wt.head, wt.tail, lh, lt, buf)
-        } else {
-          recMerge(wh, wt, lt.head, lt.tail, buf)
-        }
-      }
-    }
-
-    recMerge(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
-  }
-
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
       for {
@@ -617,6 +588,67 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
       } yield BalanceSnapshot(wh.max(lh), wb, lb.in, lb.out)
     }
+  }
+
+  /**
+    * @todo move this method to `object LevelDBWriter` once SmartAccountTrading is activated
+    */
+  private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
+
+    /**
+      * Compatibility implementation where
+      *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5)]}}}
+      *
+      * @todo remove this method once SmartAccountTrading is activated
+      */
+    @tailrec
+    def recMergeCompat(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
+      buf += wh -> lh
+      if (wt.isEmpty && lt.isEmpty) {
+        buf
+      } else if (wt.isEmpty) {
+        recMergeCompat(wh, wt, lt.head, lt.tail, buf)
+      } else if (lt.isEmpty) {
+        recMergeCompat(wt.head, wt.tail, lh, lt, buf)
+      } else {
+        if (wh >= lh) {
+          recMergeCompat(wt.head, wt.tail, lh, lt, buf)
+        } else {
+          recMergeCompat(wh, wt, lt.head, lt.tail, buf)
+        }
+      }
+    }
+
+    /**
+      * Fixed implementation where
+      *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 5)]}}}
+      */
+    @tailrec
+    def recMergeFixed(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
+      buf += wh -> lh
+      if (wt.isEmpty && lt.isEmpty) {
+        buf
+      } else if (wt.isEmpty) {
+        recMergeFixed(wh, wt, lt.head, lt.tail, buf)
+      } else if (lt.isEmpty) {
+        recMergeFixed(wt.head, wt.tail, lh, lt, buf)
+      } else {
+        if (wh == lh) {
+          recMergeFixed(wt.head, wt.tail, lt.head, lt.tail, buf)
+        } else if (wh > lh) {
+          recMergeFixed(wt.head, wt.tail, lh, lt, buf)
+        } else {
+          recMergeFixed(wh, wt, lt.head, lt.tail, buf)
+        }
+      }
+    }
+
+    val recMerge = activatedFeatures
+      .get(BlockchainFeatures.SmartAccountTrading.id)
+      .filter(_ <= height)
+      .fold(recMergeCompat _)(_ => recMergeFixed _)
+
+    recMerge(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
   override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>

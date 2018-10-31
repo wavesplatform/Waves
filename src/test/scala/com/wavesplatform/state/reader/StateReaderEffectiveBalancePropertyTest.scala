@@ -1,6 +1,7 @@
 package com.wavesplatform.state.reader
 
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.state.{EitherExt2, LeaseBalance}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -8,6 +9,7 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
+import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransactionV2
 
@@ -33,7 +35,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
   }
 
   property("Negative generating balance case") {
-    import com.wavesplatform.settings.TestFunctionalitySettings.{Enabled => fs}
+    val fs  = Enabled.copy(preActivatedFeatures = Map(SmartAccounts.id -> 0, SmartAccountTrading.id -> 0))
     val Fee = 100000
     val setup = for {
       master <- accountGen
