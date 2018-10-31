@@ -2,6 +2,7 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.immutable.TreeMap
 
@@ -12,7 +13,7 @@ case class OrderBook(bids: TreeMap[Price, Level[BuyLimitOrder]], asks: TreeMap[P
   lazy val allOrderIds = bids.values.flatMap(_.map(_.order.id())).toSet ++ asks.values.flatMap(_.map(_.order.id())).toSet
 }
 
-object OrderBook {
+object OrderBook extends ScorexLogging {
   val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
   val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
 
@@ -72,16 +73,27 @@ object OrderBook {
   private def updateExecutedBuy(ob: OrderBook, o: BuyLimitOrder, remainingAmount: Long, remainingFee: Long) = ob.bids.get(o.price) match {
     case Some(l) =>
       val (l1, l2) = l.span(_ != o)
-      val ll       = if (remainingAmount > 0) (l1 :+ o.copy(amount = remainingAmount, fee = remainingFee)) ++ l2.tail else l1 ++ l2.tail
-      ob.copy(bids = if (ll.isEmpty) ob.bids - o.price else ob.bids + (o.price -> ll))
+      if (l2.isEmpty) {
+        // Impossible situation if all works properly
+        log.warn(s"Can't find '${o.order.id()}' order in '${o.order.assetPair}': $o")
+        ob
+      } else {
+        val ll = if (remainingAmount > 0) (l1 :+ o.copy(amount = remainingAmount, fee = remainingFee)) ++ l2.tail else l1 ++ l2.tail
+        ob.copy(bids = if (ll.isEmpty) ob.bids - o.price else ob.bids + (o.price -> ll))
+      }
     case None => ob
   }
 
   private def updateExecutedSell(ob: OrderBook, o: SellLimitOrder, remainingAmount: Long, remainingFee: Long) = ob.asks.get(o.price) match {
     case Some(l) =>
       val (l1, l2) = l.span(_ != o)
-      val ll       = if (remainingAmount > 0) (l1 :+ o.copy(amount = remainingAmount, fee = remainingFee)) ++ l2.tail else l1 ++ l2.tail
-      ob.copy(asks = if (ll.isEmpty) ob.asks - o.price else ob.asks + (o.price -> ll))
+      if (l2.isEmpty) {
+        log.warn(s"Can't find '${o.order.id()}' order in '${o.order.assetPair}': $o")
+        ob
+      } else {
+        val ll = if (remainingAmount > 0) (l1 :+ o.copy(amount = remainingAmount, fee = remainingFee)) ++ l2.tail else l1 ++ l2.tail
+        ob.copy(asks = if (ll.isEmpty) ob.asks - o.price else ob.asks + (o.price -> ll))
+      }
     case None => ob
   }
 

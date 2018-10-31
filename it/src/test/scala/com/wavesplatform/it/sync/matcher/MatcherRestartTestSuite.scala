@@ -4,14 +4,13 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
+import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
-import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
-
 import scala.util.Random
 
 class MatcherRestartTestSuite extends MatcherSuiteBase {
@@ -68,7 +67,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
       orders2.asks.head.amount shouldBe 1000
       orders2.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
-      val cancel = matcherNode.cancelOrder(aliceAcc, aliceWavesPair, Some(firstOrder))
+      val cancel = matcherNode.cancelOrder(aliceAcc, aliceWavesPair, firstOrder)
       cancel.status should be("OrderCanceled")
 
       val orders3 = matcherNode.orderBook(aliceWavesPair)
