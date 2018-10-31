@@ -440,12 +440,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   }
 
   override def hasScript(address: Address): Boolean = {
-    log.debug(s"Trying to get script for address: $address")
     ngState.fold(blockchain.hasScript(address)) { ng =>
-      log.debug(s"Searching for script in Ng")
-      val result = ng.bestLiquidDiff.scripts.contains(address) || blockchain.hasScript(address)
-      log.debug(s"$address has script: $result")
-      result
+      ng.bestLiquidDiff.scripts.contains(address) || blockchain.hasScript(address)
     }
   }
 
