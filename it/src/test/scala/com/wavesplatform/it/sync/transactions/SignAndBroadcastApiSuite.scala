@@ -205,7 +205,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
         "type"    -> 13,
         "version" -> 1,
         "sender"  -> firstAddress,
-        "script"  -> None
+        "script"  -> ""
       ),
       usesProofs = true
     )

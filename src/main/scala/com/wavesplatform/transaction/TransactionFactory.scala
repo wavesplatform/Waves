@@ -147,8 +147,8 @@ object TransactionFactory {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       script <- request.script match {
-        case None    => Right(None)
-        case Some(s) => Script.fromBase64String(s).map(Some(_))
+        case None | Some("") => Right(None)
+        case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
       tx <- SetScriptTransaction.signed(
         request.version,
@@ -163,8 +163,8 @@ object TransactionFactory {
   def setScript(request: SetScriptRequest, sender: PublicKeyAccount): Either[ValidationError, SetScriptTransaction] =
     for {
       script <- request.script match {
-        case None    => Right(None)
-        case Some(s) => Script.fromBase64String(s).map(Some(_))
+        case None | Some("") => Right(None)
+        case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
       tx <- SetScriptTransaction.create(
         request.version,
