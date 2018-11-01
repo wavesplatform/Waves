@@ -149,7 +149,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(id(withProof))
   }
 
-  test("try to make setassetscript with script: null") {
+  test("try to update script to null") {
     assertBadRequestAndResponse(sender.setAssetScript(testAssetWScript, firstAddress, setAssetScriptFee), "Reason: Empty script is disabled.")
   }
 
