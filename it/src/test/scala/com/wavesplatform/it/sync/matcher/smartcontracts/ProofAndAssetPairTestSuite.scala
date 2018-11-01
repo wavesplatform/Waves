@@ -29,18 +29,9 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
   }
 
   private val predefAssetPair = wavesUsdPair
-  // private val unallowedAssetPair = wctWavesPair
-
-  private val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
+  private val aliceWavesPair  = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
   "Proofs and AssetPairs verification with SmartContracts" - {
-    val sc1 = s"""true"""
-    val sc2 =
-      s"""
-         |match tx {
-         | case s : SetScriptTransaction => true
-         | case _ => false
-         |}""".stripMargin
     val sc3 = s"""
                  |match tx {
                  | case t : Order =>
@@ -235,11 +226,16 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           matcherNode.waitForTransaction(exchangeTx2.id)
 
           matcherNode.reservedBalance(bobAcc) shouldBe empty
+
+          setContract(None, aliceAcc)
         }
       }
 
       "place order and then set contract with many proofs" in {
         setContract(Some("true"), aliceAcc)
+
+        val transferTx = aliceNode.transfer(aliceAcc.address, bobAcc.address, 1000, 0.005.waves, Some(aliceAsset), None, 2)
+        nodes.waitForHeightAriseAndTxPresent(transferTx.id)
 
         for ((i, step) <- Seq(sc5, sc6).zipWithIndex) {
           markup(s"step $step started")
@@ -295,6 +291,8 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           matcherNode.reservedBalance(bobAcc) shouldBe empty
         }
+
+        setContract(None, aliceAcc)
       }
     }
 
