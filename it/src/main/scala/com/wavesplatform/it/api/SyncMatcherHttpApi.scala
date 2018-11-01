@@ -6,19 +6,19 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
-import org.scalatest.{Assertions, Matchers}
-import play.api.libs.json.{Format, Json, Writes}
+import org.scalatest.Assertions
+import play.api.libs.json.Writes
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
 object SyncMatcherHttpApi extends Assertions {
 
-  implicit class MatcherNodeExtSync(m: Node) extends Matchers {
+  implicit class MatcherNodeExtSync(m: Node) {
 
     import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
 
-    private val RequestAwaitTime      = 15.seconds
+    private val RequestAwaitTime      = 30.seconds
     private val OrderRequestAwaitTime = 1.minutes
 
     def orderBook(assetPair: AssetPair): OrderBookResponse =
@@ -69,6 +69,9 @@ object SyncMatcherHttpApi extends Assertions {
                                  waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
 
+    def waitOrderInBlockchain(orderId: String, retryInterval: FiniteDuration = 1.second): Unit =
+      Await.result(async(m).waitOrderInBlockchain(orderId, retryInterval), RequestAwaitTime)
+
     def reservedBalance(sender: Node, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       reservedBalance(sender.privateKey, waitTime)
 
@@ -91,21 +94,24 @@ object SyncMatcherHttpApi extends Assertions {
                                       waitTime: Duration = OrderRequestAwaitTime): Boolean =
       Await.result(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus, expectedMessage), waitTime)
 
-    def cancelOrder(sender: Node,
-                    assetPair: AssetPair,
-                    orderId: Option[String],
-                    timestamp: Option[Long] = None,
-                    waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
-      cancelOrder(sender.privateKey, assetPair, orderId, timestamp, waitTime)
+    def expectCancelRejected(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
+      Await.result(async(m).expectCancelRejected(sender, assetPair, orderId), waitTime)
 
-    def cancelOrder(sender: PrivateKeyAccount,
-                    assetPair: AssetPair,
-                    orderId: Option[String],
-                    timestamp: Option[Long],
-                    waitTime: Duration): MatcherStatusResponse =
-      Await.result(async(m).cancelOrder(sender, assetPair, orderId, timestamp), waitTime)
+    def cancelOrder(sender: Node, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      cancelOrder(sender.privateKey, assetPair, orderId, waitTime)
 
-    def cancelAllOrders(sender: Node, timestamp: Option[Long] = None, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+    def cancelOrder(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, waitTime: Duration): MatcherStatusResponse =
+      Await.result(async(m).cancelOrder(sender, assetPair, orderId), waitTime)
+
+    def cancelOrdersForPair(sender: Node,
+                            assetPair: AssetPair,
+                            timestamp: Long = System.currentTimeMillis(),
+                            waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      Await.result(async(m).cancelOrdersForPair(sender, assetPair, timestamp), waitTime)
+
+    def cancelAllOrders(sender: Node,
+                        timestamp: Long = System.currentTimeMillis(),
+                        waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       Await.result(async(m).cancelAllOrders(sender, timestamp), waitTime)
 
     def cancelOrderWithApiKey(orderId: String, waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =

@@ -32,9 +32,9 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     // val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
     // Wait for balance on Alice's account
-    aliceNode.assertAssetBalance(aliceNode.address, aliceAsset, someAssetAmount)
+    matcherNode.assertAssetBalance(aliceNode.address, aliceAsset, someAssetAmount)
     matcherNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
-    bobNode.assertAssetBalance(bobNode.address, aliceAsset, 0)
+    matcherNode.assertAssetBalance(bobNode.address, aliceAsset, 0)
 
     // Bob issues a new asset
     val bobAssetQuantity = 10000
@@ -60,8 +60,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           priceAsset = Some(aliceAssetId)
         )
 
-    nodes.waitForHeightArise()
-    bobNode.assertAssetBalance(bobNode.address, bobNewAsset, bobAssetQuantity)
+    matcherNode.assertAssetBalance(bobNode.address, bobNewAsset, bobAssetQuantity)
 
     "matcher should respond with Public key" in {
       matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
@@ -87,7 +86,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           nodes.waitForHeightArise()
-          matcherNode.cancelOrder(bobNode, twoAssetsPair, Some(newestOrderId)).status should be("OrderCanceled")
+          matcherNode.cancelOrder(bobNode, twoAssetsPair, newestOrderId).status should be("OrderCanceled")
 
           val transferBackId = aliceNode.transfer(aliceNode.address, bobNode.address, 3050, TransactionFee, Some(bobNewAsset), None).id
           nodes.waitForHeightAriseAndTxPresent(transferBackId)
@@ -111,8 +110,8 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           }
 
           // Cleanup
-          nodes.waitForHeightArise()
-          matcherNode.cancelOrder(bobNode, twoAssetsPair, Some(newestOrderId)).status should be("OrderCanceled")
+          matcherNode.cancelOrder(bobNode, twoAssetsPair, newestOrderId)
+          matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
           val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, TransactionFee).id
           nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
         }
@@ -135,8 +134,9 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           }
 
           // Cleanup
-          nodes.waitForHeightArise()
-          matcherNode.cancelOrder(bobNode, twoAssetsPair, Some(newestOrderId)).status should be("OrderCanceled")
+          matcherNode.cancelOrder(bobNode, twoAssetsPair, newestOrderId)
+          matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
+
           val transferBackId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
           nodes.waitForHeightAriseAndTxPresent(transferBackId)
         }
@@ -163,8 +163,9 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           }
 
           // Cleanup
-          nodes.waitForHeightArise()
-          matcherNode.cancelOrder(bobNode, bobWavesPair, Some(newestOrderId)).status should be("OrderCanceled")
+          matcherNode.cancelOrder(bobNode, bobWavesPair, newestOrderId)
+          matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
+
           val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, TransactionFee).id
           nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
         }
@@ -183,7 +184,6 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           }
 
           // Cleanup
-          nodes.waitForHeightArise()
           val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, TransactionFee).id
           nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
         }
@@ -203,7 +203,6 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           }
 
           // Cleanup
-          nodes.waitForHeightArise()
           val transferBackId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
           nodes.waitForHeightAriseAndTxPresent(transferBackId)
         }

@@ -8,16 +8,28 @@ import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
+import com.wavesplatform.metrics.TimerExt
+import com.wavesplatform.transaction.assets.exchange.OrderJson._
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import kamon.Kamon
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import com.wavesplatform.transaction.assets.exchange.OrderJson._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.collection.immutable.TreeMap
 
 class EventSerializers extends SerializerWithStringManifest {
   import EventSerializers._
+
+  private val serializationTimer = Kamon.timer("matcher.serialization.encode")
+  private val bytesWritten       = Kamon.histogram("matcher.serialization.bytes-written")
+
+  private def encodeAndMeasure[A: Writes](manifest: String, v: A): Array[Byte] = {
+    val bytes = serializationTimer.refine("manifest" -> manifest).measure(Json.toJson(v).toString().getBytes)
+    bytesWritten.refine("manifest" -> manifest).record(bytes.length)
+    bytes
+  }
+
   override def identifier: Int = id
   override def manifest(o: AnyRef): String = o match {
     case _: OrderBookActor.Snapshot       => Manifest.Snapshot
@@ -28,17 +40,14 @@ class EventSerializers extends SerializerWithStringManifest {
     case _: MatcherActor.Snapshot         => Manifest.MatcherSnapshot
   }
 
-  override def toBinary(o: AnyRef): Array[Byte] =
-    Json
-      .stringify(o match {
-        case s: OrderBookActor.Snapshot         => snapshotFormat.writes(s)
-        case obc: MatcherActor.OrderBookCreated => orderBookCreatedFormat.writes(obc)
-        case x: MatcherActor.Snapshot           => matcherSnapshot.writes(x)
-        case oa: OrderAdded                     => orderAddedFormat.writes(oa)
-        case oe: OrderExecuted                  => orderExecutedFormat.writes(oe)
-        case oc: OrderCanceled                  => orderCancelledFormat.writes(oc)
-      })
-      .getBytes
+  override def toBinary(o: AnyRef): Array[Byte] = o match {
+    case s: OrderBookActor.Snapshot         => encodeAndMeasure("order-book-snapshot", s)
+    case obc: MatcherActor.OrderBookCreated => encodeAndMeasure("order-book-created", obc)
+    case x: MatcherActor.Snapshot           => encodeAndMeasure("matcher-actor-snapshot", x)
+    case oa: OrderAdded                     => encodeAndMeasure("order-added", oa)
+    case oe: OrderExecuted                  => encodeAndMeasure("order-executed", oe)
+    case oc: OrderCanceled                  => encodeAndMeasure("order-cancelled", oc)
+  }
 
   override def fromBinary(bytes: Array[Byte], manifest: String): AnyRef = manifest match {
     case Manifest.Snapshot         => snapshotFormat.reads(Json.parse(bytes)).get
@@ -103,15 +112,15 @@ object EventSerializers {
 
   implicit val orderBookFormat: Format[OrderBook] = Json.format
 
-  val orderAddedFormat = Format(
+  implicit val orderAddedFormat: Format[OrderAdded] = Format(
     (__ \ "o").read[LimitOrder].map(OrderAdded),
     Writes[OrderAdded](oa => Json.obj("o" -> oa.order))
   )
 
-  val orderExecutedFormat: Format[OrderExecuted] = ((__ \ "o1").format[LimitOrder] and
+  implicit val orderExecutedFormat: Format[OrderExecuted] = ((__ \ "o1").format[LimitOrder] and
     (__ \ "o2").format[LimitOrder])(OrderExecuted.apply, unlift(OrderExecuted.unapply))
 
-  val orderCancelledFormat = Format(
+  implicit val orderCancelledFormat: Format[OrderCanceled] = Format(
     Reads[OrderCanceled] {
       case js: JsObject =>
         val o = (js \ "o").as[LimitOrder]

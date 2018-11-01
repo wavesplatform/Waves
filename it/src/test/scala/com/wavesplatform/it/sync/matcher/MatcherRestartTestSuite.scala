@@ -1,8 +1,10 @@
 package com.wavesplatform.it.sync.matcher
 
-import com.typesafe.config.{Config}
+import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{TransferSending, _}
@@ -12,8 +14,6 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
-import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 
 class MatcherRestartTestSuite
     extends FreeSpec
@@ -84,7 +84,7 @@ class MatcherRestartTestSuite
         orders2.asks.head.price shouldBe 2.waves * Order.PriceConstant
       }
 
-      val cancel = matcherNode.cancelOrder(aliceNode, aliceWavesPair, Some(firstOrder))
+      val cancel = matcherNode.cancelOrder(aliceNode, aliceWavesPair, firstOrder)
       cancel.status should be("OrderCanceled")
 
       eventually {

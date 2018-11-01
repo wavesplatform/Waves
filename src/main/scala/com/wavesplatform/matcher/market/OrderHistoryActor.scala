@@ -2,15 +2,17 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.api.BatchCancel
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon
 import org.iq80.leveldb.DB
 
-class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor {
+class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor with ScorexLogging {
 
   val orderHistory = new OrderHistory(db, settings)
 
@@ -34,6 +36,8 @@ class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor {
       cancelledTimer.measure(orderHistory.process(ev))
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
+    case BatchCancel(address, _, ts) =>
+      sender() ! orderHistory.updateTimestamp(address, ts)
   }
 
   def forceCancelOrder(id: ByteStr): Unit = {
@@ -43,6 +47,11 @@ class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor {
       orderHistory.process(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
     }
     sender ! maybeOrder
+  }
+
+  override def postStop(): Unit = {
+    log.info("Stopped OrderHistoryActor")
+    super.postStop()
   }
 }
 

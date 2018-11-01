@@ -44,7 +44,7 @@ class Matcher(actorSystem: ActorSystem,
     new OrderValidator(db, blockchain, utx.portfolio, pairBuilder.validateAssetPair, settings.matcherSettings, matcherPrivateKey, NTP)
   private val createTransaction = new ExchangeTransactionCreator(matcherPrivateKey, matcherSettings, NTP).createTransaction _
 
-  private val orderBooks = new AtomicReference(Map.empty[AssetPair, ActorRef])
+  private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
     matcherSettings.orderBookSnapshotHttpCache,
     p => Option(orderBookCache.get(p))
@@ -67,7 +67,8 @@ class Matcher(actorSystem: ActorSystem,
       p => Option(marketStatuses.get(p)),
       orderBooksSnapshotCache,
       settings,
-      db
+      db,
+      NTP
     )
   )
 
@@ -102,6 +103,7 @@ class Matcher(actorSystem: ActorSystem,
     val stopMatcherTimeout = 5.minutes
     orderBooksSnapshotCache.close()
     Await.result(gracefulStop(matcher, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
+    Await.result(gracefulStop(orderHistory, stopMatcherTimeout), stopMatcherTimeout)
     log.debug("Matcher's actor system has been shut down")
     db.close()
     log.debug("Matcher's database closed")

@@ -34,11 +34,11 @@ class TradeBalanceAndRoundingTestSuite
 
   private def bobNode = nodes(2)
 
-  Seq(IssueUsdTx, IssueEthTx, IssueWctTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
-  nodes.waitForHeightArise()
+  Seq(IssueUsdTx, IssueEthTx, IssueWctTx).map(createSignedIssueRequest).map(matcherNode.signedIssue).foreach { x =>
+    matcherNode.waitForTransaction(x.id)
+  }
 
   "Alice and Bob trade WAVES-USD" - {
-    nodes.waitForHeightArise()
     val aliceWavesBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
     val bobWavesBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
 
@@ -125,7 +125,7 @@ class TradeBalanceAndRoundingTestSuite
 
       val orderId = matcherNode.fullOrderHistory(bobNode).head.id
       matcherNode.fullOrderHistory(bobNode).size should be(1)
-      matcherNode.cancelOrder(bobNode, wavesUsdPair, Some(orderId))
+      matcherNode.cancelOrder(bobNode, wavesUsdPair, orderId)
       matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES") shouldBe bobNode.accountBalances(bobNode.address)._1
     }
@@ -139,7 +139,6 @@ class TradeBalanceAndRoundingTestSuite
     val correctedSellAmount2 = correctAmount(sellOrderAmount2, price2)
 
     "place usd-waves order" in {
-      nodes.waitForHeightArise()
       // Alice wants to sell USD for Waves
       val bobWavesBalanceBefore = matcherNode.accountBalances(bobNode.address)._1
       matcherNode.tradableBalance(bobNode, wavesUsdPair)("WAVES")
@@ -160,7 +159,7 @@ class TradeBalanceAndRoundingTestSuite
       // Each side get fair amount of assets
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrder.id().base58).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
-      matcherNode.cancelOrder(bobNode, wavesUsdPair, Some(bobOrder1Id))
+      matcherNode.cancelOrder(bobNode, wavesUsdPair, bobOrder1Id)
     }
 
   }
@@ -179,7 +178,7 @@ class TradeBalanceAndRoundingTestSuite
 
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
-      matcherNode.cancelOrder(bobNode, wctUsdPair, Some(bobOrderId))
+      matcherNode.cancelOrder(bobNode, wctUsdPair, bobOrderId)
 
       matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Cancelled", 1.minute)
 
@@ -224,7 +223,7 @@ class TradeBalanceAndRoundingTestSuite
       val expectedReservedWaves = matcherFee - LimitOrder.getPartialFee(matcherFee, wctUsdSellAmount, executedAmount)
       matcherNode.reservedBalance(bobNode)("WAVES") shouldBe expectedReservedWaves
 
-      matcherNode.cancelOrder(bobNode, wctUsdPair, Some(matcherNode.fullOrderHistory(bobNode).head.id))
+      matcherNode.cancelOrder(bobNode, wctUsdPair, matcherNode.fullOrderHistory(bobNode).head.id)
     }
 
     "reserved balance is empty after the total execution" in {
@@ -267,7 +266,7 @@ class TradeBalanceAndRoundingTestSuite
       matcherNode.waitOrderStatus(wctWavesPair, bobOrderId, "Accepted", 1.minute)
 
       matcherNode.tradableBalance(bobNode, wctWavesPair)("WAVES") shouldBe matcherFee / 2 + receiveAmount(SELL, wctWavesSellAmount, wctWavesPrice) - matcherFee
-      matcherNode.cancelOrder(bobNode, wctWavesPair, Some(bobOrderId))
+      matcherNode.cancelOrder(bobNode, wctWavesPair, bobOrderId)
 
       assertBadRequestAndResponse(matcherNode.placeOrder(bobNode, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice),
                                   "Not enough tradable balance")
@@ -295,7 +294,7 @@ class TradeBalanceAndRoundingTestSuite
       nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
 
       matcherNode.reservedBalance(bobNode) shouldBe empty
-      matcherNode.cancelOrder(aliceNode, ethWavesPair, Some(counterId2))
+      matcherNode.cancelOrder(aliceNode, ethWavesPair, counterId2)
     }
   }
 
@@ -319,7 +318,7 @@ class TradeBalanceAndRoundingTestSuite
     val order = aliceOrders.find(_.id == aliceOrderId).getOrElse(throw new IllegalStateException(s"Alice should have the $aliceOrderId order"))
     order.status shouldBe "Filled"
 
-    matcherNode.cancelOrder(matcherNode, wavesUsdPair, Some(bobOrderId))
+    matcherNode.cancelOrder(matcherNode, wavesUsdPair, bobOrderId)
   }
 
   def correctAmount(a: Long, price: Long): Long = {
