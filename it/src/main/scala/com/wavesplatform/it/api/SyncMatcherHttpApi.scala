@@ -7,7 +7,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
-import org.scalatest.{Assertion, Assertions, Matchers}
+import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, Json, Writes}
 
