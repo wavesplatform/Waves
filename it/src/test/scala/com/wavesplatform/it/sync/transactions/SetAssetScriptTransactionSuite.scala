@@ -16,9 +16,14 @@ import scala.util.Random
 import scala.concurrent.duration._
 
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
-  var testAssetWOScript = ""
-  var testAssetWScript  = ""
-  val setAssetScriptFee = 1.waves + 0.004.waves
+  var testAssetWOScript     = ""
+  var testAssetWScript      = ""
+  var testAssetWDeprecation = ""
+  val setAssetScriptFee     = 1.waves + 0.004.waves
+  val scriptWithDeprecation = ScriptCompiler(s"""
+                                               |match tx {
+                                               |case s : SetAssetScriptTransaction => false
+                                               |case _ => true}""".stripMargin).explicitGet()._1
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -37,6 +42,21 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
              2,
              script = Some(scriptBase64))
       .id
+
+    testAssetWDeprecation = sender
+      .issue(
+        firstAddress,
+        "SetAssetWDep",
+        "Test coin for SetAssetScript tests",
+        someAssetAmount,
+        0,
+        reissuable = false,
+        issueFee,
+        2,
+        script = Some(scriptWithDeprecation.bytes.value.base64)
+      )
+      .id
+
     nodes.waitForHeightArise()
   }
 
@@ -151,6 +171,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
   test("try to update script to null") {
     assertBadRequestAndResponse(sender.setAssetScript(testAssetWScript, firstAddress, setAssetScriptFee), "Reason: Empty script is disabled.")
+  }
+
+  test("try to make setassetscript tx on script what deprecated setassetscript") {
+    assertBadRequestAndResponse(sender.setAssetScript(testAssetWDeprecation, firstAddress, setAssetScriptFee, Some(scriptBase64)),
+                                "Transaction is not allowed by token-script")
   }
 
 }
