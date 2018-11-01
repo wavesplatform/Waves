@@ -1,7 +1,5 @@
 package com.wavesplatform.matcher.api
 
-import cats.mtl.syntax.empty._
-import cats.syntax.functor._
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, RW, ReadOnlyDB}
 import com.wavesplatform.matcher._
@@ -18,10 +16,12 @@ object DBUtils {
     object active {
       val MaxElements = 200
 
-      def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit                   = c(address).add(rw, pair, id)
-      def delete(rw: RW, address: Address, id: Order.Id): Unit                                 = c(address).delete(rw, id)
-      def size(ro: ReadOnlyDB, address: Address): Int                                          = c(address).size(ro)
-      def iterator(ro: ReadOnlyDB, address: Address): ClosableIterable[ActiveOrdersIndex.Node] = c(address).iterator(ro)
+      def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit = c(address).add(rw, pair, id)
+      def delete(rw: RW, address: Address, id: Order.Id): Unit               = c(address).delete(rw, id)
+      def size(ro: ReadOnlyDB, address: Address): Int                        = c(address).size(ro)
+
+      // We show all active orders even they count exceeds the pair limit
+      def getAll(ro: ReadOnlyDB, address: Address): IndexedSeq[ActiveOrdersIndex.Node] = c(address).getAll(ro)
 
       private def c(address: Address) = new ActiveOrdersIndex(address, MaxElements)
     }
@@ -30,9 +30,9 @@ object DBUtils {
       object common {
         val MaxElements = 100
 
-        def add(rw: RW, address: Address, id: Order.Id): Unit                      = add(rw, address, List(id))
-        def add(rw: RW, address: Address, ids: Seq[Order.Id]): Unit                = c(address).add(rw, ids)
-        def iterator(ro: ReadOnlyDB, address: Address): ClosableIterable[Order.Id] = c(address).iterator(ro)
+        def add(rw: RW, address: Address, id: Order.Id): Unit                  = add(rw, address, List(id))
+        def add(rw: RW, address: Address, ids: Seq[Order.Id]): Unit            = c(address).add(rw, ids)
+        def get(ro: ReadOnlyDB, address: Address, nNewest: Int): Seq[Order.Id] = c(address).get(ro, nNewest)
 
         private def c(address: Address) = new FinalizedOrdersCommonIndex(address, MaxElements)
       }
@@ -40,9 +40,9 @@ object DBUtils {
       object pair {
         val MaxElements = 100
 
-        def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit                      = add(rw, address, pair, List(id))
-        def add(rw: RW, address: Address, pair: AssetPair, ids: Seq[Order.Id]): Unit                = c(address, pair).add(rw, ids)
-        def iterator(ro: ReadOnlyDB, address: Address, pair: AssetPair): ClosableIterable[Order.Id] = c(address, pair).iterator(ro)
+        def add(rw: RW, address: Address, pair: AssetPair, id: Order.Id): Unit                  = add(rw, address, pair, List(id))
+        def add(rw: RW, address: Address, pair: AssetPair, ids: Seq[Order.Id]): Unit            = c(address, pair).add(rw, ids)
+        def get(ro: ReadOnlyDB, address: Address, pair: AssetPair, nNewest: Int): Seq[Order.Id] = c(address, pair).get(ro, nNewest)
 
         private def c(address: Address, pair: AssetPair) = new FinalizedOrdersPairIndex(address, pair, MaxElements)
       }
@@ -55,8 +55,8 @@ object DBUtils {
         ro,
         maxOrders,
         activeOnly,
-        activeIndex = indexes.active.iterator(ro, address).collect { case x if x.pair == `pair` => x.id },
-        getFinalizedIndex = indexes.finalized.pair.iterator(ro, address, pair)
+        active = indexes.active.getAll(ro, address).collect { case x if x.pair == `pair` => x.id },
+        getFinalizedIndex = indexes.finalized.pair.get(ro, address, pair, _)
       )
     }
 
@@ -68,34 +68,23 @@ object DBUtils {
       ro,
       maxOrders,
       activeOnly,
-      activeIndex = indexes.active.iterator(ro, address).map(_.id),
-      getFinalizedIndex = indexes.finalized.common.iterator(ro, address)
+      active = indexes.active.getAll(ro, address).map(_.id),
+      getFinalizedIndex = indexes.finalized.common.get(ro, address, _)
     )
   }
 
   private def mergeOrders(ro: ReadOnlyDB,
                           maxOrders: Int,
                           activeOnly: Boolean,
-                          activeIndex: ClosableIterable[Order.Id],
-                          getFinalizedIndex: => ClosableIterable[Order.Id]): IndexedSeq[(Order, OrderInfo)] = {
+                          active: IndexedSeq[Order.Id],
+                          getFinalizedIndex: Int => Seq[Order.Id]): IndexedSeq[(Order, OrderInfo)] = {
     def get(id: Order.Id): (Option[Order], Option[OrderInfo]) = (ro.get(MatcherKeys.order(id)), ro.get(MatcherKeys.orderInfoOpt(id)))
 
-    val finalizedIndex = if (activeOnly) ClosableIterable.empty else getFinalizedIndex
-    try {
-      // We show all active orders even they count exceeds the pair limit
-      val active = activeIndex.iterator.map(get).collect { case (Some(o), Some(oi)) => (o, oi) }.toIndexedSeq
-
-      val finalized = finalizedIndex.iterator
-        .map(get)
-        .collect { case (Some(o), Some(oi)) => (o, oi) }
-        .take(maxOrders - active.size)
-        .toVector
-
-      (active ++ finalized).sortBy { case (order, info) => (info.status, -order.timestamp) }
-    } finally {
-      activeIndex.close()
-      finalizedIndex.close()
-    }
+    val finalized = if (activeOnly) Seq.empty else getFinalizedIndex(maxOrders - active.size)
+    (active ++ finalized)
+      .map(get)
+      .collect { case (Some(o), Some(oi)) => (o, oi) }
+      .sortBy { case (order, info) => (info.status, -order.timestamp) }
   }
 
   def reservedBalance(db: DB, address: Address): Map[Option[AssetId], Long] = db.readOnly { ro =>

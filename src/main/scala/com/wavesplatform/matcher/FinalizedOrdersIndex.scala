@@ -2,7 +2,6 @@ package com.wavesplatform.matcher
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{Key, RW, ReadOnlyDB}
-import com.wavesplatform.db.prefixIterator
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.Order.Id
@@ -26,33 +25,26 @@ abstract class FinalizedOrdersIndex(elementsLimit: Int, deleteOutdatedOrders: Bo
   def add(rw: RW, ids: Seq[Id]): Unit = if (ids.nonEmpty) {
     val origNewestIdxOpt = rw.get(newestKey)
 
-    // to 1 because seqs cannot contain more than Int.MaxValue elements
-    val newItems = ids.zip(origNewestIdxOpt.fold(Int.MaxValue)(_ - 1) to 1 by -1)
+    val newItems = ids.zip((origNewestIdxOpt.getOrElse(0) + 1) to Int.MaxValue)
     newItems.foreach { case (id, idx) => rw.put(itemKey(idx), Some(id)) }
 
     val updatedNewestIdx = newItems.last._2
-    (updatedNewestIdx to origNewestIdxOpt.getOrElse(Int.MaxValue)).drop(elementsLimit).foreach { idx =>
+    (origNewestIdxOpt.getOrElse(1) to updatedNewestIdx).dropRight(elementsLimit).foreach { idx =>
       val k = itemKey(idx)
-      rw.delete(k)
       if (deleteOutdatedOrders) rw.get(k).foreach { id =>
         rw.delete(MatcherKeys.order(id))
         rw.delete(MatcherKeys.orderInfo(id))
       }
+      rw.delete(k)
     }
-
     rw.put(newestKey, Some(updatedNewestIdx))
   }
 
-  def iterator(ro: ReadOnlyDB): ClosableIterable[Id] =
-    ro.get(newestKey).fold(ClosableIterable.empty: ClosableIterable[Id])(mkIterator(ro, _))
-
-  private def mkIterator(ro: ReadOnlyDB, latestIdx: Int): ClosableIterable[Id] = new ClosableIterable[Id] {
-    private val internal = ro.iterator
-    internal.seek(itemKey(latestIdx).keyBytes)
-
-    override val iterator: Iterator[Id] = prefixIterator(internal, prefix)(e => ByteStr(e.getValue))
-
-    override def close(): Unit = internal.close()
+  def get(ro: ReadOnlyDB, nNewest: Int): Seq[Id] = {
+    ro.get(newestKey).fold(Seq.empty[Id]) { newestIdx =>
+      val fromIdx = math.max(newestIdx - nNewest + 1, 1)
+      ro.read[Id](prefix, seek = itemKey(fromIdx).keyBytes, n = math.min(newestIdx, nNewest))(x => ByteStr(x.getValue))
+    }
   }
 
   protected def itemKey(idx: Index): Key[Option[Id]]
