@@ -155,6 +155,16 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       }
     }
 
+    "correctly applies transaction type filter" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(GenesisTransaction.typeId), 10, None)
+          .explicitGet()
+
+        txs.length shouldBe 1
+      }
+    }
+
     "return Left if fromId argument is a non-existent transaction" in {
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
         val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()

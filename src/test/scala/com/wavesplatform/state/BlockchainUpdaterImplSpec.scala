@@ -73,6 +73,27 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       } yield (master, List(genesisBlock, b1, b2))
     }
 
+    "correctly applies transaction type filter" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val txs = writer
+          .addressTransactions(account.toAddress, Set(GenesisTransaction.typeId), 10, None)
+          .explicitGet()
+
+        txs.length shouldBe 1
+      }
+    }
+
+    "return Left if fromId argument is a non-existent transaction" in {
+      baseTest(time => preconditions(time.correctedTime())) { (updater, account) =>
+        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
+
+        val txs = updater
+          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, Some(nonExistentTxId))
+
+        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
+      }
+    }
+
     "without pagination" in {
       baseTest(time => preconditions(time.correctedTime())) { (updater, account) =>
         val txs = updater
