@@ -298,20 +298,30 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
     "negative scenarios of order placement" - {
       "set contact and then place order" in {
-        for (i <- Seq(sc2, sc7, sc8, sc9)) {
+        for (i <- Seq(sc2, sc7, sc8)) {
           log.debug(s"contract: $i")
           setContract(Some(i), aliceAcc)
 
-          assertBadRequest(
+          assertBadRequestAndResponse(
             matcherNode
-              .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+              .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes),
+            "Order rejected by script for"
           )
 
-          assertBadRequest(
+          assertBadRequestAndResponse(
             matcherNode
-              .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+              .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes),
+            "Order rejected by script for"
           )
         }
+
+        setContract(Some(sc9), aliceAcc)
+        assertBadRequestAndResponse(
+          matcherNode
+            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes),
+          "Error executing script for"
+        )
+
         setContract(None, aliceAcc)
       }
 
