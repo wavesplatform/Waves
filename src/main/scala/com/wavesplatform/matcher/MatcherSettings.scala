@@ -24,6 +24,7 @@ case class MatcherSettings(enable: Boolean,
                            journalDataDir: String,
                            snapshotsDataDir: String,
                            snapshotsInterval: Int,
+                           makeSnapshotsAtStart: Boolean,
                            orderCleanupInterval: FiniteDuration,
                            priceAssets: Seq[String],
                            maxTimestampDiff: FiniteDuration,
@@ -53,6 +54,7 @@ object MatcherSettings {
     val journalDirectory      = config.as[String](s"$configPath.journal-directory")
     val snapshotsDirectory    = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval     = config.as[Int](s"$configPath.snapshots-interval")
+    val makeSnapshotsAtStart  = config.as[Boolean](s"$configPath.make-snapshots-at-start")
     val orderCleanupInterval  = config.as[FiniteDuration](s"$configPath.order-cleanup-interval")
     val maxOrdersPerRequest   = config.as[Int](s"$configPath.rest-order-limit")
     val defaultOrderTimestamp = config.as[Long](s"$configPath.default-order-timestamp")
@@ -80,6 +82,7 @@ object MatcherSettings {
       journalDirectory,
       snapshotsDirectory,
       snapshotsInterval,
+      makeSnapshotsAtStart,
       orderCleanupInterval,
       baseAssets,
       maxTimestampDiff,
