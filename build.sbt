@@ -208,7 +208,14 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
   p: ProjectReference
 }
 
-addCommandAlias("checkPR", """;set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings"); Global / checkPRRaw""")
+addCommandAlias(
+  "checkPR",
+  """;
+    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
+    |Global / checkPRRaw;
+    |set scalacOptions in ThisBuild -= "-Xfatal-warnings";
+  """.stripMargin
+)
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw in Global := {
   try {

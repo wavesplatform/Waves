@@ -17,6 +17,7 @@ case class Validation(status: Boolean, labels: Set[String] = Set.empty) {
 
   def |:(l: String): Validation = if (!this.status) copy(labels = labels.map(l + " " + _)) else this
 
+  def toEither: Either[String, Unit] = if (status) Right(()) else Left(messages())
 }
 
 class ExtendedBoolean(b: => Boolean) {
