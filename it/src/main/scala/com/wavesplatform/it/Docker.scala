@@ -352,6 +352,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
   }
 
   def restartNode(node: DockerNode, configUpdates: Config = empty): DockerNode = {
+    Await.result(node.waitForHeightArise, 3.minutes)
+
     if (configUpdates != empty) {
       val renderedConfig = renderProperties(asProperties(configUpdates))
 

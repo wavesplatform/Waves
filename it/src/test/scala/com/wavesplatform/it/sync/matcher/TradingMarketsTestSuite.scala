@@ -21,29 +21,24 @@ class TradingMarketsTestSuite
 
   private def matcher = dockerNodes().head
   private def alice   = dockerNodes()(1)
-  private def bob     = dockerNodes()(2)
+
+  val (dec2, dec8) = (1000L, 1000000000L)
 
   Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).map(matcher.signedIssue).foreach { tx =>
     matcher.waitForTransaction(tx.id)
   }
 
-  val (dec2, dec8) = (1000L, 1000000000L)
-
-  "When some orders was placed and matcher was restarted" - {
-    val usdOrder = matcher.placeOrder(alice, wavesUsdPair, BUY, dec8, dec2).message.id
-    val wctOrder = matcher.placeOrder(alice, wctWavesPair, BUY, dec2, dec8).message.id
-
-    matcher.waitOrderStatus(wctWavesPair, wctOrder, "Accepted")
-
-    docker.restartNode(matcher)
-
+  "When some orders were placed and matcher was restarted" - {
     "Trading markets have info about all asset pairs" in {
+      val wctOrder = matcher.placeOrder(alice, wctWavesPair, BUY, dec2, dec8).message.id
+      matcher.waitOrderStatus(wctWavesPair, wctOrder, "Accepted")
+
+      docker.restartNode(matcher)
 
       val markets = matcher.tradingMarkets().markets
-      markets.size shouldBe 2
+      markets.size shouldBe 1
       markets.foreach(_.amountAssetName shouldNot be("Unknown"))
       markets.foreach(_.priceAssetName shouldNot be("Unknown"))
     }
-
   }
 }
