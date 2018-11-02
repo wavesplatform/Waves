@@ -6,7 +6,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.someAssetAmount
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.sync._
-import com.wavesplatform.transaction.smart.script.{ScriptCompiler}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
@@ -16,12 +16,12 @@ import scala.util.Random
 import scala.concurrent.duration._
 
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
-  var assetWOScript           = ""
-  var assetWScript            = ""
-  var assetUnchangeableScript = ""
-  var assetWAnotherOwner      = ""
-  val setAssetScriptFee       = 1.waves + 0.004.waves
-  val unchangeableScript      = ScriptCompiler(s"""
+  var assetWOScript              = ""
+  var assetWScript               = ""
+  var assetUnchangeableScript    = ""
+  var assetWAnotherOwner         = ""
+  private val setAssetScriptFee  = 1.waves + 0.004.waves
+  private val unchangeableScript = ScriptCompiler(s"""
                                                |match tx {
                                                |case s : SetAssetScriptTransaction => false
                                                |case _ => true}""".stripMargin).explicitGet()._1
@@ -90,6 +90,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(unchangeableScript.bytes.value.base64)),
       "Reason: Asset is not scripted."
     )
+    assertBadRequestAndMessage(
+      sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
+      "Reason: Empty script is disabled."
+    )
     notMiner.assertBalances(firstAddress, balance, eff)
   }
 
@@ -97,6 +101,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     //enable then https://wavesplatform.atlassian.net/browse/NODE-1277 will be fixed
     assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset is not scripted.")
+    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")), "Reason: Asset is not scripted.")
   }
 
   test("non-issuer cannot change script on asset w/o script") {
@@ -105,6 +110,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee), "Empty script is disabled.")
+    assertBadRequestAndMessage(
+      sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
+      "Reason: Empty script is disabled."
+    )
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(unchangeableScript.bytes.value.base64)),
       "Reason: Asset was issued by other address"
@@ -218,6 +227,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
   test("try to update script to null") {
     assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee), "Reason: Empty script is disabled.")
+    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some("")), "Reason: Empty script is disabled.")
   }
 
   test("try to make SetAssetScript tx on script that deprecates SetAssetScript") {

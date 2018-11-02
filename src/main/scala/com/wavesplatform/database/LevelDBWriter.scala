@@ -10,7 +10,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -691,15 +691,22 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
   }
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Map[Address, Long] = readOnly { db =>
-    (for {
-      seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
-      addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
-      history = db.get(Keys.assetBalanceHistory(addressId, assetId))
-      actualHeight <- history.partition(_ > height)._2.headOption
-      balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
-      if balance > 0
-    } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
+    val currentHeight = db.get(Keys.height)
+
+    Either
+      .cond(
+        currentHeight - height <= MAX_DEPTH,
+        (for {
+          seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
+          addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
+          history = db.get(Keys.assetBalanceHistory(addressId, assetId))
+          actualHeight <- history.partition(_ > height)._2.headOption
+          balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
+          if balance > 0
+        } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq,
+        GenericError(s"Cannot get asset distribution at height less than ${currentHeight - MAX_DEPTH}")
+      )
   }
 
   override def wavesDistribution(height: Int): Map[Address, Long] = readOnly { db =>
