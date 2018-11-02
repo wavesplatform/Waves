@@ -26,8 +26,9 @@ class BlacklistedTradingTestSuite
   private def alice   = dockerNodes()(1)
   private def bob     = dockerNodes()(2)
 
-  Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).foreach(matcher.signedIssue)
-  nodes.waitForHeightArise()
+  Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).map(matcher.signedIssue).foreach { tx =>
+    matcher.waitForTransaction(tx.id)
+  }
 
   val (dec2, dec8) = (1000L, 1000000000L)
 
