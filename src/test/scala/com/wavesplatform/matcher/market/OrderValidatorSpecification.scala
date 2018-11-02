@@ -73,6 +73,16 @@ class OrderValidatorSpecification
         ov.validateNewOrder(o) shouldBe Left("Invalid address")
       }
 
+      "v1 order from a scripted account" in forAll(accountGen) { scripted =>
+        portfolioTest(defaultPortfolio) { (ov, bc) =>
+          (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
+          (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 100))
+          (bc.height _).when().returns(50).once()
+
+          ov.validateNewOrder(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
+        }
+      }
+
       "sender's address has a script, but trading from smart accounts hasn't been activated" in forAll(accountGen) { scripted =>
         portfolioTest(defaultPortfolio) { (ov, bc) =>
           (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
@@ -90,7 +100,7 @@ class OrderValidatorSpecification
           (bc.height _).when().returns(150).once()
 
           val ov = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
-          ov.validateNewOrder(newBuyOrder(scripted)) should produce("Order rejected by script")
+          ov.validateNewOrder(newBuyOrder(scripted, version = 2)) should produce("Order rejected by script")
         }
       }
 
@@ -168,9 +178,10 @@ class OrderValidatorSpecification
     "meaningful error for undefined functions in matcher" in portfolioTest(defaultPortfolio) { (ov, bc) =>
       (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
 
-      val o      = newBuyOrder
+      val pk     = PrivateKeyAccount(randomBytes())
+      val o      = newBuyOrder(pk, version = 2)
       val script = ScriptCompiler("true && (height > 0)").explicitGet()._1
-      (bc.accountScript _).when(o.sender.toAddress).returns(Some(script))
+      (bc.accountScript _).when(pk.toAddress).returns(Some(script))
       ov.validateNewOrder(o) should produce("height is inaccessible when running script on matcher")
     }
   }
@@ -214,29 +225,26 @@ class OrderValidatorSpecification
   private def mkAssetDescription(decimals: Int): Option[AssetDescription] =
     Some(AssetDescription(MatcherAccount, Array.emptyByteArray, Array.emptyByteArray, decimals, reissuable = false, BigInt(0), None, 0))
 
-  private def newBuyOrder: Order = buy(
-    pair = pairWavesBtc,
-    amount = 100 * Constants.UnitsInWave,
-    price = 0.0022,
-    matcherFee = Some((0.003 * Constants.UnitsInWave).toLong)
-  )
+  private def newBuyOrder: Order =
+    buy(pair = pairWavesBtc, amount = 100 * Constants.UnitsInWave, price = 0.0022, matcherFee = Some((0.003 * Constants.UnitsInWave).toLong))
 
-  private def newBuyOrder(ts: Long): Order = buy(
-    pair = pairWavesBtc,
-    amount = 100 * Constants.UnitsInWave,
-    price = 0.0022,
-    matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
-    ts = Some(ts)
-  )
+  private def newBuyOrder(ts: Long): Order =
+    buy(pair = pairWavesBtc,
+        amount = 100 * Constants.UnitsInWave,
+        price = 0.0022,
+        matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+        ts = Some(ts))
 
-  private def newBuyOrder(pk: PrivateKeyAccount, ts: Long = System.currentTimeMillis()): Order = buy(
-    pair = pairWavesBtc,
-    amount = 100 * Constants.UnitsInWave,
-    price = 0.0022,
-    matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
-    sender = Some(pk),
-    ts = Some(ts)
-  )
+  private def newBuyOrder(pk: PrivateKeyAccount, ts: Long = System.currentTimeMillis(), version: Byte = 1) =
+    buy(
+      pair = pairWavesBtc,
+      amount = 100 * Constants.UnitsInWave,
+      price = 0.0022,
+      sender = Some(pk),
+      matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+      ts = Some(ts),
+      version = version
+    )
 
   private def mkAssetId(prefix: String): ByteStr = {
     val prefixBytes = prefix.getBytes(Charsets.UTF_8)
