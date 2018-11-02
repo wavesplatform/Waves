@@ -257,6 +257,28 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
+  property("SetAssetScriptTransaction binding") {
+    forAll(setAssetScriptTransactionGen.sample.get._2) { t =>
+      val result = runScript(
+        s"""
+           |match tx {
+           | case t : SetAssetScriptTransaction =>
+           |   ${provenPart(t)}
+           |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
+             .map(_.bytes().base64)
+             .getOrElse("")}' else isDefined(t.script) == false
+           |    let assetId = t.assetId == base58'${t.assetId.base58}'
+           |   ${assertProvenPart("t")} && script && assetId
+           | case other => throw() 
+           | }
+           |""".stripMargin,
+        Coproduct(t),
+        T
+      )
+      result shouldBe evaluated(true)
+    }
+  }
+
   property("DataTransaction binding") {
     forAll(dataTransactionGen(10, useForScript = true)) { t =>
       def pg(i: Int) = {
