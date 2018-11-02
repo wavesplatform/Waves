@@ -76,8 +76,6 @@ class BlacklistedTradingTestSuite
 
       And("Trading markets have info about all asset pairs")
       matcher.tradingMarkets().markets.size shouldBe 4
-      matcher.tradingMarkets().markets.foreach(_.amountAssetName shouldNot be("Unknown"))
-      matcher.tradingMarkets().markets.foreach(_.priceAssetName shouldNot be("Unknown"))
 
       And("balances are still reserved")
       matcher.reservedBalance(alice).size shouldBe 3
