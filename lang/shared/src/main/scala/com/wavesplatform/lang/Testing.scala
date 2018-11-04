@@ -1,6 +1,5 @@
 package com.wavesplatform.lang
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.{ARR, CaseObj}
 import scodec.bits.ByteVector
 
 import scala.util.{Left, Right}
