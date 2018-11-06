@@ -83,10 +83,6 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     smartAccountCheckFeeTest(feeInAssets = false, feeAmount = 400000)(_ shouldBe 'right)
   }
 
-  property("checkFee for smart accounts fails if the fee is in tokens") {
-    smartAccountCheckFeeTest(feeInAssets = true, feeAmount = 1)(_ should produce("Transactions from scripted accounts require Waves as fee"))
-  }
-
   private def sponsorAndSetScriptGen(sponsorship: Boolean, smartToken: Boolean, smartAccount: Boolean, feeInAssets: Boolean, feeAmount: Long) =
     for {
       richAcc      <- accountGen

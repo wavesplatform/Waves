@@ -251,9 +251,7 @@ object CommonValidation {
       case _                               => false
     }
 
-    if (tx.assetFee._1.nonEmpty && !blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, height) && hasSmartAccountScript) {
-      Left(GenericError("Transactions from scripted accounts require Waves as fee"))
-    } else if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
       for {
         minAFee <- getMinFee(blockchain, fs, height, tx)
         minWaves   = minAFee._3
