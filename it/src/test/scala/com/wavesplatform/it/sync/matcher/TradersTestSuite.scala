@@ -26,7 +26,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   "Verifications of tricky ordering cases" - {
     // Alice issues new asset
     val aliceAsset =
-      aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
+      aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, issueFee).id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     // val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
@@ -38,7 +38,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     // Bob issues a new asset
     val bobAssetQuantity = 10000
-    val bobNewAsset      = bobNode.issue(bobNode.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, false, 100000000L).id
+    val bobNewAsset      = bobNode.issue(bobNode.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, false, issueFee).id
     nodes.waitForHeightAriseAndTxPresent(bobNewAsset)
     val bobAssetId   = ByteStr.decodeBase58(bobNewAsset).get
     val aliceAssetId = ByteStr.decodeBase58(aliceAsset).get
