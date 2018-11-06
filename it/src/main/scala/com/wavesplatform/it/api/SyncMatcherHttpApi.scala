@@ -16,9 +16,6 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
 object SyncMatcherHttpApi extends Assertions {
-  case class ErrorMessage(error: Int, message: String)
-
-  implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
   case class NotFoundErrorMessage(message: String)
 
@@ -125,7 +122,7 @@ object SyncMatcherHttpApi extends Assertions {
                                      amount: Long,
                                      price: Long,
                                      timeToLive: Duration = 30.days - 1.seconds): Boolean =
-      expectIncorrectOrderPlacement(prepareOrder(node, pair, orderType, amount, price, timeToLive), 400, "OrderRejected", OrderRequestAwaitTime)
+      expectIncorrectOrderPlacement(prepareOrder(node, pair, orderType, amount, price, timeToLive), 400, "OrderRejected")
 
     def expectCancelRejected(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
       Await.result(async(m).expectCancelRejected(sender, assetPair, orderId), waitTime)

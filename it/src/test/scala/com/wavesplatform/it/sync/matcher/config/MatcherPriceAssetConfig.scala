@@ -137,19 +137,5 @@ object MatcherPriceAssetConfig {
 
   val Configs: Seq[Config] = _Configs.map(updatedMatcherConfig.withFallback(_))
 
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
-    import tx._
-    SignedIssueV1Request(
-      Base58.encode(tx.sender.publicKey),
-      new String(name),
-      new String(description),
-      quantity,
-      decimals,
-      reissuable,
-      fee,
-      timestamp,
-      signature.base58
-    )
-  }
 
 }

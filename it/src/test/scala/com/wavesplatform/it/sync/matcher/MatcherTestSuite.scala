@@ -13,11 +13,19 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.Order._
 import com.wavesplatform.transaction.assets.exchange.OrderType._
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with NodesFromDocker with ReportingTestName {
+class MatcherTestSuite
+    extends FreeSpec
+    with Matchers
+    with BeforeAndAfterAll
+    with CancelAfterFailure
+    with NodesFromDocker
+    with ReportingTestName
+    with TableDrivenPropertyChecks {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -36,7 +44,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   "Check cross ordering between Alice and Bob " - {
     // Alice issues new asset
     val aliceAsset = aliceNode
-      .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, 100000000L)
+      .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, issueFee)
       .id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
@@ -280,7 +288,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         // Bob issues new asset
         val bobAssetQuantity = 10000
         val bobAssetName     = "BobCoin2"
-        val bobAsset         = bobNode.issue(bobNode.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, false, 100000000L).id
+        val bobAsset         = bobNode.issue(bobNode.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, false, issueFee).id
         nodes.waitForHeightAriseAndTxPresent(bobAsset)
 
         val bobWavesPair = AssetPair(
@@ -324,8 +332,9 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     val ap34 = issueAssetPair(aliceNode.privateKey, 3, 4)
     val ap08 = issueAssetPair(aliceNode.privateKey, 0, 8)
 
-    Seq(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2).foreach(matcherNode.signedIssue)
-    nodes.waitForHeightArise()
+    Seq(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2).map(matcherNode.signedIssue).foreach { x =>
+      matcherNode.waitForTransaction(x.id)
+    }
 
     val assets =
       Table(
@@ -345,13 +354,13 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         val o2         = matcherNode.prepareOrder(aliceNode, pair, SELL, amount, maxInvalid)
 
         matcherNode.expectIncorrectOrderPlacement(o1,
-          400,
-          "OrderRejected",
-          Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
+                                                  400,
+                                                  "OrderRejected",
+                                                  Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
         matcherNode.expectIncorrectOrderPlacement(o2,
-          400,
-          "OrderRejected",
-          Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
+                                                  400,
+                                                  "OrderRejected",
+                                                  Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
       }
     }
 
@@ -363,5 +372,5 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
         o1.status shouldBe "OrderAccepted"
       }
     }
-
+  }
 }
