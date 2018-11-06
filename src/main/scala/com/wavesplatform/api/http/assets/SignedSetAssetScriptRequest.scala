@@ -1,16 +1,26 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json.{Json, OFormat}
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
+import play.api.libs.functional.syntax._
+import play.api.libs.json.{JsPath, Reads}
 
 object SignedSetAssetScriptRequest {
-  implicit val jsonFormatSigneSetAssetScriptRequest: OFormat[SignedSetAssetScriptRequest] = Json.format
+  implicit val signedSetAssetScriptRequestReads: Reads[SignedSetAssetScriptRequest] = (
+    (JsPath \ "version").read[Byte] and
+      (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "assetId").read[String] and
+      (JsPath \ "script").readNullable[String] and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "proofs").read[List[ProofStr]]
+  )(SignedSetAssetScriptRequest.apply _)
+
 }
 
 @ApiModel(value = "Proven SetAssetScript transaction")

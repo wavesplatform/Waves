@@ -1,16 +1,24 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json.{Json, OFormat}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{Proofs, ValidationError}
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
+import play.api.libs.functional.syntax._
+import play.api.libs.json.{JsPath, Reads}
 
 object SignedSetScriptRequest {
-  implicit val jsonFormat: OFormat[SignedSetScriptRequest] = Json.format
+  implicit val signedSetScriptRequestReads: Reads[SignedSetScriptRequest] = (
+    (JsPath \ "version").read[Byte] and
+      (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "script").readNullable[String] and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "proofs").read[List[ProofStr]]
+  )(SignedSetScriptRequest.apply _)
 }
 
 @ApiModel(value = "Proven SetScript transaction")
