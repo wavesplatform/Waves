@@ -41,7 +41,7 @@ class BlacklistedTradingTestSuite
     matcher.waitOrderStatus(wctWavesPair, btcOrder, "Accepted")
 
     "If some assets and addresses are blacklisted" in {
-      docker.restartNodeWithNewConfig(
+      docker.restartNode(
         matcher,
         configWithBlacklisted(
           assets = Array(WctId.toString),
@@ -76,8 +76,6 @@ class BlacklistedTradingTestSuite
 
       And("Trading markets have info about all asset pairs")
       matcher.tradingMarkets().markets.size shouldBe 4
-      matcher.tradingMarkets().markets.foreach(_.amountAssetName shouldNot be("Unknown"))
-      matcher.tradingMarkets().markets.foreach(_.priceAssetName shouldNot be("Unknown"))
 
       And("balances are still reserved")
       matcher.reservedBalance(alice).size shouldBe 3
@@ -88,7 +86,7 @@ class BlacklistedTradingTestSuite
     }
 
     "And now if all blacklists are cleared" in {
-      docker.restartNodeWithNewConfig(matcher, configWithBlacklisted())
+      docker.restartNode(matcher)
 
       Then("OrderBook for blacklisted assets is available again")
       matcher.orderBook(wctWavesPair).bids.size shouldBe 1

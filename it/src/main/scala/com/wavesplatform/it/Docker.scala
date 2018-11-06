@@ -351,16 +351,20 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     node
   }
 
-  def restartNodeWithNewConfig(node: DockerNode, configUpdates: Config): DockerNode = {
-    val renderedConfig = renderProperties(asProperties(configUpdates))
+  def restartNode(node: DockerNode, configUpdates: Config = empty): DockerNode = {
+    Await.result(node.waitForHeightArise, 3.minutes)
 
-    log.debug("Set new config directly in the script for starting node")
-    val shPath = "/opt/waves/start-waves.sh"
-    val scriptCmd: Array[String] =
-      Array("sh", "-c", s"sed -i 's|$$WAVES_OPTS.*-jar|$$WAVES_OPTS $renderedConfig -jar|' $shPath && chmod +x $shPath")
+    if (configUpdates != empty) {
+      val renderedConfig = renderProperties(asProperties(configUpdates))
 
-    val execScriptCmd = client.execCreate(node.containerId, scriptCmd).id()
-    client.execStart(execScriptCmd)
+      log.debug("Set new config directly in the script for starting node")
+      val shPath = "/opt/waves/start-waves.sh"
+      val scriptCmd: Array[String] =
+        Array("sh", "-c", s"sed -i 's|$$WAVES_OPTS.*-jar|$$WAVES_OPTS $renderedConfig -jar|' $shPath && chmod +x $shPath")
+
+      val execScriptCmd = client.execCreate(node.containerId, scriptCmd).id()
+      client.execStart(execScriptCmd)
+    }
 
     restartContainer(node)
   }
