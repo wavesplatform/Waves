@@ -129,13 +129,13 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           setContract(Some(i), aliceAcc)
 
           val aliceOrd1 = matcherNode
-            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id
           matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
 
           val aliceOrd2 = matcherNode
-            .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id
           matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
@@ -206,7 +206,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           setContract(Some(i), aliceAcc)
 
           val bobOrd1 = matcherNode
-            .placeOrder(bobAcc, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(bobAcc, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id
           val bobOrd2 = matcherNode
@@ -272,11 +272,11 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           setContract(Some(i), aliceAcc)
 
           val bobOrd1 = matcherNode
-            .placeOrder(bobAcc, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(bobAcc, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id
           val bobOrd2 = matcherNode
-            .placeOrder(bobAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(bobAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id
 
@@ -350,7 +350,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             .id
 
           val bobOrd2 = matcherNode
-            .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id
 

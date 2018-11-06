@@ -66,14 +66,14 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setContract(Some(sco1), aliceAcc)
 
         val aliceOrd1 = matcherNode
-          .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+          .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
 
         assertBadRequest(
           matcherNode
-            .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id)
 
@@ -87,12 +87,12 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
         assertBadRequest(
           matcherNode
-            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
             .message
             .id)
 
         val aliceOrd2 = matcherNode
-          .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+          .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
@@ -106,13 +106,13 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setContract(Some(sco3), aliceAcc)
 
         val aliceOrd1 = matcherNode
-          .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+          .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
 
         val aliceOrd2 = matcherNode
-          .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+          .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
@@ -123,15 +123,15 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setContract(None, aliceAcc)
       }
 
-      "place order and then set contract on BUY type" ignore {
+      "place order and then set contract on BUY type" in {
         val aliceOrd1 = matcherNode
-          .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+          .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
 
         val aliceOrd2 = matcherNode
-          .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+          .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
@@ -150,7 +150,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Filled", 1.minute)
         matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Cancelled", 1.minute)
         matcherNode.waitOrderStatus(predefAssetPair, bobOrd1, "Filled", 1.minute)
-        matcherNode.waitOrderStatus(aliceWavesPair, bobOrd2, "Active", 1.minute)
+        matcherNode.waitOrderStatus(aliceWavesPair, bobOrd2, "Accepted", 1.minute)
 
         val exchangeTx1 = matcherNode.transactionsByOrder(bobOrd1).headOption.getOrElse(fail("Expected an exchange transaction"))
         nodes.waitForHeightAriseAndTxPresent(exchangeTx1.id)

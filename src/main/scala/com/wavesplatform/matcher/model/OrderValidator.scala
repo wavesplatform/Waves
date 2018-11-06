@@ -48,6 +48,7 @@ class OrderValidator(db: DB,
     blockchain.accountScript(address).fold(verifySignature(order)) { script =>
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
         Left("Trading on scripted account isn't allowed yet")
+      else if (order.version <= 1) Left("Can't process order with signature from scripted account")
       else
         try MatcherScriptRunner[EVALUATED](script, order) match {
           case (_, Left(execError)) => Left(s"Error executing script for $address: $execError")
