@@ -9,6 +9,8 @@ import com.wavesplatform.it.{Node, ReportingTestName}
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import com.wavesplatform.it.sync._
+
 
 class OrderBookTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with NodesFromDocker with ReportingTestName {
 
