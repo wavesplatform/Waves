@@ -221,9 +221,11 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           val exchangeTx1 = matcherNode.transactionsByOrder(bobOrd1).headOption.getOrElse(fail("Expected an exchange transaction"))
           matcherNode.waitForTransaction(exchangeTx1.id)
+          assert(exchangeTx1.fee == 700000)
 
           val exchangeTx2 = matcherNode.transactionsByOrder(bobOrd2).headOption.getOrElse(fail("Expected an exchange transaction"))
           matcherNode.waitForTransaction(exchangeTx2.id)
+          assert(exchangeTx2.fee == 700000)
 
           matcherNode.reservedBalance(bobAcc) shouldBe empty
 
@@ -285,9 +287,11 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           val exchangeTx1 = matcherNode.transactionsByOrder(bobOrd1).headOption.getOrElse(fail("Expected an exchange transaction"))
           matcherNode.waitForTransaction(exchangeTx1.id)
+          assert(exchangeTx1.fee == 700000)
 
           val exchangeTx2 = matcherNode.transactionsByOrder(bobOrd2).headOption.getOrElse(fail("Expected an exchange transaction"))
           matcherNode.waitForTransaction(exchangeTx2.id)
+          assert(exchangeTx2.fee == 700000)
 
           matcherNode.reservedBalance(bobAcc) shouldBe empty
         }
@@ -362,18 +366,22 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           matcherNode.waitOrderStatus(predefAssetPair, bobOrd1, "Accepted", 1.minute)
           matcherNode.waitOrderStatus(aliceWavesPair, bobOrd2, "Accepted", 1.minute)
 
-          // TODO:  check Bob's balance
           matcherNode.ordersByAddress(aliceAcc, activeOnly = true).length shouldBe 0
 
           // Alice checks that she received some Waves
           val updatedAliceBalance = aliceNode.accountBalances(aliceAcc.address)._1
           updatedAliceBalance shouldBe (aliceBalance - 0.014.waves)
 
+          assert(matcherNode.transactionsByOrder(bobOrd1).isEmpty)
+          assert(matcherNode.transactionsByOrder(bobOrd2).isEmpty)
+
           matcherNode.cancelOrder(bobAcc, predefAssetPair, bobOrd1)
           matcherNode.waitOrderStatus(predefAssetPair, bobOrd1, "Cancelled")
 
           matcherNode.cancelOrder(bobAcc, aliceWavesPair, bobOrd2)
           matcherNode.waitOrderStatus(aliceWavesPair, bobOrd2, "Cancelled")
+
+          matcherNode.reservedBalance(bobAcc) shouldBe empty
 
           setContract(None, aliceAcc)
         }
