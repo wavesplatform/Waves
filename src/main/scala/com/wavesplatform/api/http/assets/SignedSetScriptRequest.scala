@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
-import play.api.libs.json.{JsPath, Reads}
+import play.api.libs.json._
 
 object SignedSetScriptRequest {
   implicit val signedSetScriptRequestReads: Reads[SignedSetScriptRequest] = (
@@ -19,6 +19,8 @@ object SignedSetScriptRequest {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "proofs").read[List[ProofStr]]
   )(SignedSetScriptRequest.apply _)
+
+  implicit val signedSetScriptRequestWrites: OWrites[SignedSetScriptRequest] = Json.writes[SignedSetScriptRequest]
 }
 
 @ApiModel(value = "Proven SetScript transaction")
