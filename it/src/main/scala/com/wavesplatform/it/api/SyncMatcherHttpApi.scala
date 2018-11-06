@@ -2,17 +2,35 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.crypto
+import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
+import org.scalatest.{Assertion, Assertions}
+import play.api.libs.json.Json.parse
+import play.api.libs.json.{Format, Json, Writes}
 import org.scalatest.Assertions
 import play.api.libs.json.Writes
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.{Failure, Try}
 
 object SyncMatcherHttpApi extends Assertions {
+
+  case class NotFoundErrorMessage(message: String)
+
+  object NotFoundErrorMessage {
+    implicit val format: Format[NotFoundErrorMessage] = Json.format
+  }
+
+  def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].message.contains(errorMessage))
+    case Failure(e) => Assertions.fail(e)
+    case _          => Assertions.fail(s"Expecting not found error")
+  }
 
   implicit class MatcherNodeExtSync(m: Node) {
 
