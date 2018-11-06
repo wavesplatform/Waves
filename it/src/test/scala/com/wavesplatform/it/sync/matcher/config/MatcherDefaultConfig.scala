@@ -19,8 +19,12 @@ object MatcherDefaultConfig {
   val ForbiddenAssetId = "FdbnAsset"
   val orderLimit       = 20
 
+  val minerEnabled  = parseString(s"""
+       |waves.miner.enable = yes
+       |waves.miner.quorum = 0""".stripMargin)
   val minerDisabled = parseString("waves.miner.enable = no")
   val matcherConfig = parseString(s"""
+                                     |waves.miner.enable = no
                                      |waves.matcher {
                                      |  enable = yes
                                      |  account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
@@ -33,9 +37,8 @@ object MatcherDefaultConfig {
                                      |}""".stripMargin)
 
   val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig.withFallback(minerDisabled), minerDisabled, minerDisabled, empty()))
+    .zip(Seq(matcherConfig.withFallback(minerDisabled), minerDisabled, minerDisabled, minerEnabled))
     .map { case (n, o) => o.withFallback(n) }
-
 
   def issueAssetPair(issuer: PrivateKeyAccount,
                      amountAssetDecimals: Byte,
@@ -78,16 +81,16 @@ object MatcherDefaultConfig {
 
     if (MatcherActor.compare(Some(issuePriceAssetTx.id().arr), Some(issueAmountAssetTx.id().arr)) < 0) {
       (createSignedIssueRequest(issueAmountAssetTx),
-        createSignedIssueRequest(issuePriceAssetTx),
-        AssetPair(
-          amountAsset = Some(issueAmountAssetTx.id()),
-          priceAsset = Some(issuePriceAssetTx.id())
-        ))
+       createSignedIssueRequest(issuePriceAssetTx),
+       AssetPair(
+         amountAsset = Some(issueAmountAssetTx.id()),
+         priceAsset = Some(issuePriceAssetTx.id())
+       ))
     } else
       issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
   }
 
-  def assetPairIssuePriceAsset(issuer: PrivateKeyAccount, amountAssetId: AssetId, priceAssetDecimals: Byte): AssetPair = {
+  def assetPairIssuePriceAsset(issuer: PrivateKeyAccount, amountAssetId: AssetId, priceAssetDecimals: Byte): (SignedIssueV1Request, AssetPair) = {
 
     val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
@@ -104,14 +107,13 @@ object MatcherDefaultConfig {
       .get
 
     if (MatcherActor.compare(Some(issuePriceAssetTx.id().arr), Some(amountAssetId.arr)) < 0) {
-      val req = createSignedIssueRequest(issuePriceAssetTx)
-      AssetPair(
-        amountAsset = Some(amountAssetId),
-        priceAsset = Some(issuePriceAssetTx.id())
-      )
+      (createSignedIssueRequest(issuePriceAssetTx),
+       AssetPair(
+         amountAsset = Some(amountAssetId),
+         priceAsset = Some(issuePriceAssetTx.id())
+       ))
     } else
       assetPairIssuePriceAsset(issuer, amountAssetId, priceAssetDecimals)
-
   }
 
 }

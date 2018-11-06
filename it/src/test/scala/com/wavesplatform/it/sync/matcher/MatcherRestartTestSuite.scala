@@ -26,14 +26,14 @@ class MatcherRestartTestSuite
     with Eventually {
 
   override protected def nodeConfigs: Seq[Config] = Configs
-  private def matcherNode                         = nodes.head
-  private def aliceNode                           = nodes(1)
+  private val matcherNode                         = nodes.head
+  private val aliceNode                           = nodes(1)
 
   "check order execution" - {
     // Alice issues new asset
     val aliceAsset =
       aliceNode.issue(aliceNode.address, "DisconnectCoin", "Alice's coin for disconnect tests", someAssetAmount, 0, reissuable = false, 100000000L).id
-    nodes.waitForHeightAriseAndTxPresent(aliceAsset)
+    matcherNode.waitForTransaction(aliceAsset)
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
     // check assets's balances

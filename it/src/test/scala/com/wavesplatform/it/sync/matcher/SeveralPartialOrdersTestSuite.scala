@@ -63,7 +63,7 @@ class SeveralPartialOrdersTestSuite
 
       // Each side get fair amount of assets
       val exchangeTx = matcherNode.transactionsByOrder(bobOrder1Id).headOption.getOrElse(fail("Expected an exchange transaction"))
-      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+      matcherNode.waitForTransaction(exchangeTx.id)
       matcherNode.reservedBalance(bobNode) shouldBe empty
       matcherNode.reservedBalance(aliceNode) shouldBe empty
 
@@ -104,7 +104,9 @@ class SeveralPartialOrdersTestSuite
       // Each side get fair amount of assets
       val exchangeTxs = matcherNode.transactionsByOrder(bobOrder1Id)
       exchangeTxs should not be empty
-      exchangeTxs.map(_.id).foreach(nodes.waitForHeightAriseAndTxPresent)
+      exchangeTxs.map(_.id).foreach {
+        matcherNode.waitForTransaction(_)
+      }
 
       matcherNode.reservedBalance(bobNode) shouldBe empty
       matcherNode.reservedBalance(aliceNode) shouldBe empty

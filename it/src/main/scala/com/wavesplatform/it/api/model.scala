@@ -163,7 +163,6 @@ object MatcherErrorResponse {
   implicit val matcherErrorResponseFormat: Format[MatcherErrorResponse] = Json.format
 }
 
-
 case class MarketDataInfo(matcherPublicKey: String, markets: Seq[MarketData])
 object MarketDataInfo {
   implicit val marketDataInfoResponseFormat: Format[MarketDataInfo] = Json.format

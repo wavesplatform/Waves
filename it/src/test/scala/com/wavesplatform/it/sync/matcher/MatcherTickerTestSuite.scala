@@ -36,8 +36,8 @@ class MatcherTickerTestSuite
 
   private def bobNode = nodes(2)
 
-  matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
-  nodes.waitForHeightArise()
+  val issueTx = matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
+  matcherNode.waitForTransaction(issueTx.id)
 
   "matcher ticker validation" - {
     "get tickers for unavailable asset should produce error" in {
@@ -71,8 +71,8 @@ class MatcherTickerTestSuite
     }
 
     "issue tokens" in {
-      matcherNode.signedIssue(createSignedIssueRequest(IssueEightDigitAssetTx))
-      nodes.waitForHeightArise()
+      val tx = matcherNode.signedIssue(createSignedIssueRequest(IssueEightDigitAssetTx))
+      matcherNode.waitForTransaction(tx.id)
     }
 
     val bidPrice  = 200

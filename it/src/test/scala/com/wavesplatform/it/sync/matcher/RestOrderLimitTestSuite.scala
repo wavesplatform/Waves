@@ -53,12 +53,10 @@ class RestOrderLimitTestSuite
     val aliceAsset = alice
       .issue(alice.address, "AliceCoin", "Test", someAssetAmount, 0, reissuable = false, issueFee)
       .id
-    nodes.waitForHeightAriseAndTxPresent(aliceAsset)
-
     val bobAsset = bob
       .issue(bob.address, "BobCoin", "Test", someAssetAmount, 0, reissuable = false, issueFee)
       .id
-    nodes.waitForHeightAriseAndTxPresent(bobAsset)
+    Seq(aliceAsset, bobAsset).foreach(matcher.waitForTransaction(_))
 
     val alicePair = AssetPair(decodeBase58(aliceAsset).toOption, None)
     val bobPair   = AssetPair(decodeBase58(bobAsset).toOption, None)

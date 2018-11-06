@@ -16,8 +16,6 @@ import com.wavesplatform.transaction.assets.exchange.OrderType._
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
-import scala.concurrent.duration._
-
 class MatcherTestSuite
     extends FreeSpec
     with Matchers
@@ -29,11 +27,11 @@ class MatcherTestSuite
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private def matcherNode = nodes.head
+  private val matcherNode = nodes.head
 
-  private def aliceNode = nodes(1)
+  private val aliceNode = nodes(1)
 
-  private def bobNode = nodes(2)
+  private val bobNode = nodes(2)
 
   private val aliceSellAmount         = 500
   private val TransactionFee          = 300000
@@ -46,7 +44,14 @@ class MatcherTestSuite
     val aliceAsset = aliceNode
       .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, issueFee)
       .id
-    nodes.waitForHeightAriseAndTxPresent(aliceAsset)
+    val bobAsset = bobNode
+      .issue(bobNode.address, "BobCoin1", "Bob's asset", someAssetAmount, 5, false, issueFee)
+      .id
+    val bobAsset2 = bobNode
+      .issue(bobNode.address, "BobCoin2", "Bob's asset", someAssetAmount, 0, false, issueFee)
+      .id
+
+    Seq(aliceAsset, bobAsset, bobAsset2).foreach(matcherNode.waitForTransaction(_))
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
@@ -260,69 +265,62 @@ class MatcherTestSuite
       }
 
       "should consider UTX pool when checking the balance" in {
-        // Bob issues new asset
-        val bobAssetQuantity = 10000
-        val bobAssetName     = "BobCoin"
-        val bobAsset         = bobNode.issue(bobNode.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, false, 100000000L).id
-        nodes.waitForHeightAriseAndTxPresent(bobAsset)
 
         matcherNode.assertAssetBalance(aliceNode.address, bobAsset, 0)
         matcherNode.assertAssetBalance(matcherNode.address, bobAsset, 0)
-        matcherNode.assertAssetBalance(bobNode.address, bobAsset, bobAssetQuantity)
+        matcherNode.assertAssetBalance(bobNode.address, bobAsset, someAssetAmount)
         val bobWavesPair = AssetPair(ByteStr.decodeBase58(bobAsset).toOption, None)
 
-        def bobOrder = matcherNode.prepareOrder(bobNode, bobWavesPair, SELL, bobAssetQuantity, 1.waves)
+        def bobOrder = matcherNode.prepareOrder(bobNode, bobWavesPair, SELL, someAssetAmount, 0.5.waves)
 
         val order6 = matcherNode.placeOrder(bobOrder)
         matcherNode.waitOrderStatus(bobWavesPair, order6.message.id, "Accepted")
 
         // Alice wants to buy all Bob's assets for 1 Wave
-        val order7 = matcherNode.placeOrder(aliceNode, bobWavesPair, BUY, bobAssetQuantity, 1.waves)
+        val order7 = matcherNode.placeOrder(aliceNode, bobWavesPair, BUY, someAssetAmount, 0.5.waves)
         matcherNode.waitOrderStatus(bobWavesPair, order7.message.id, "Filled")
 
+        val tx = matcherNode.transactionsByOrder(order7.message.id).head
+        matcherNode.waitForTransaction(tx.id)
         // Bob tries to do the same operation, but at now he have no assets
         matcherNode.expectIncorrectOrderPlacement(bobOrder, 400, "OrderRejected")
       }
 
       "trader can buy waves for assets with order without having waves" in {
         // Bob issues new asset
-        val bobAssetQuantity = 10000
-        val bobAssetName     = "BobCoin2"
-        val bobAsset         = bobNode.issue(bobNode.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, false, issueFee).id
-        nodes.waitForHeightAriseAndTxPresent(bobAsset)
-
         val bobWavesPair = AssetPair(
-          amountAsset = ByteStr.decodeBase58(bobAsset).toOption,
+          amountAsset = ByteStr.decodeBase58(bobAsset2).toOption,
           priceAsset = None
         )
 
-        matcherNode.assertAssetBalance(aliceNode.address, bobAsset, 0)
-        matcherNode.assertAssetBalance(matcherNode.address, bobAsset, 0)
-        matcherNode.assertAssetBalance(bobNode.address, bobAsset, bobAssetQuantity)
+        val bobBalance = matcherNode.accountBalances(bobNode.address)._1
+        matcherNode.assertAssetBalance(aliceNode.address, bobAsset2, 0)
+        matcherNode.assertAssetBalance(matcherNode.address, bobAsset2, 0)
+        matcherNode.assertAssetBalance(bobNode.address, bobAsset2, someAssetAmount)
 
         // Bob wants to sell all own assets for 1 Wave
-        def bobOrder = matcherNode.prepareOrder(bobNode, bobWavesPair, SELL, bobAssetQuantity, 1.waves)
+        def bobOrder = matcherNode.prepareOrder(bobNode, bobWavesPair, SELL, someAssetAmount, 1.waves)
 
         val order8 = matcherNode.placeOrder(bobOrder)
         matcherNode.waitOrderStatus(bobWavesPair, order8.message.id, "Accepted")
-
+        matcherNode.reservedBalance(bobNode)
         // Bob moves all waves to Alice
-        val h1              = matcherNode.height
-        val bobBalance      = matcherNode.accountBalances(bobNode.address)._1
-        val transferAmount  = bobBalance - TransactionFee
-        val transferAliceId = bobNode.transfer(bobNode.address, aliceNode.address, transferAmount, TransactionFee, None, None).id
-        nodes.waitForHeightAriseAndTxPresent(transferAliceId)
+
+        val transferAmount    = bobBalance - minFee
+        val transferToAliceId = bobNode.transfer(bobNode.address, aliceNode.address, transferAmount, minFee, None, None).id
+        matcherNode.waitForTransaction(transferToAliceId)
+        matcherNode.reservedBalance(bobNode)
 
         matcherNode.accountBalances(bobNode.address)._1 shouldBe 0
 
         // Order should stay accepted
-        matcherNode.waitForHeight(h1 + 5, 2.minutes)
+        nodes.waitForHeightArise()
         matcherNode.waitOrderStatus(bobWavesPair, order8.message.id, "Accepted")
 
         // Cleanup
         matcherNode.cancelOrder(bobNode, bobWavesPair, order8.message.id).status should be("OrderCanceled")
         val transferBobId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
-        nodes.waitForHeightAriseAndTxPresent(transferBobId)
+        matcherNode.waitForTransaction(transferBobId)
       }
     }
   }
