@@ -86,7 +86,7 @@ class BlacklistedTradingTestSuite
     }
 
     "And now if all blacklists are cleared" in {
-      docker.restartNode(matcher)
+      docker.restartNode(matcher, configWithBlacklisted())
 
       Then("OrderBook for blacklisted assets is available again")
       matcher.orderBook(wctWavesPair).bids.size shouldBe 1
