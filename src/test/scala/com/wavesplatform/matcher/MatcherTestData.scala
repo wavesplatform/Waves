@@ -49,7 +49,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       |    max-open-orders: 1000
       |    price-assets: ["BASE1", "BASE2", "BASE"]
       |    blacklisted-assets: ["BLACKLST"]
-      |    blacklisted-names: ["[F,f]orbidden"]
+      |    blacklisted-names: ["[Ff]orbidden"]
       |  }
       |}""".stripMargin))
 

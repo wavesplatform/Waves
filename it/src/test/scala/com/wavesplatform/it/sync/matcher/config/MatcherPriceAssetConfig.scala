@@ -30,6 +30,7 @@ object MatcherPriceAssetConfig {
   val usdAssetName = "USD-X"
   val wctAssetName = "WCT-X"
   val ethAssetName = "ETH-X"
+  val btcAssetName = "BTC-X"
 
   val IssueUsdTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
@@ -76,7 +77,7 @@ object MatcherPriceAssetConfig {
   val IssueBtcTx: IssueTransactionV1 = IssueTransactionV1
     .selfSigned(
       sender = bobPk,
-      name = "BTC-X".getBytes(),
+      name = btcAssetName.getBytes(),
       description = "asset description".getBytes(),
       quantity = defaultAssetQuantity,
       decimals = 8,
@@ -120,6 +121,11 @@ object MatcherPriceAssetConfig {
   val ethUsdPair = AssetPair(
     amountAsset = Some(EthId),
     priceAsset = Some(UsdId)
+  )
+
+  val wavesBtcPair = AssetPair(
+    amountAsset = None,
+    priceAsset = Some(BtcId)
   )
 
   val orderLimit = 10
