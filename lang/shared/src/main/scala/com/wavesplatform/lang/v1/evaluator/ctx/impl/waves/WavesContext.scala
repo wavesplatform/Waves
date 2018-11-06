@@ -232,10 +232,10 @@ object WavesContext {
       FUNCTION_CALL(assetBalanceF.header, List(REF("@addressOrAlias"), REF("unit")))
     }
 
-    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
-      case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
-      case _                       => ???
-    }
+//    val txHeightByIdF: BaseFunction = NativeFunction("transactionHeightById", 100, TRANSACTIONHEIGHTBYID, optionLong, "id" -> BYTEVECTOR) {
+//      case (id: ByteVector) :: Nil => Right(fromOption(env.transactionHeightById(id.toArray)))
+//      case _                       => ???
+//    }
 
     val vars: Map[String, (FINAL, LazyVal)] = Map(
       ("height", (com.wavesplatform.lang.v1.compiler.Types.LONG, LazyVal(EitherT(heightCoeval)))),
@@ -244,7 +244,7 @@ object WavesContext {
 
     val functions = Seq(
       txByIdF,
-      txHeightByIdF,
+//      txHeightByIdF,
       getIntegerFromStateF,
       getBooleanFromStateF,
       getBinaryFromStateF,
