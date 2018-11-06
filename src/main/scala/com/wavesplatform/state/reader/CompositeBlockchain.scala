@@ -38,7 +38,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
             val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
             ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = script)
           }
-          .orElse(Some(ad))
+          .orElse(Some(ad.copy(script = script)))
           .map { ad =>
             diff.sponsorship.get(id).fold(ad) {
               case SponsorshipValue(sponsorship) =>

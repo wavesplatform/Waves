@@ -143,17 +143,17 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
          """.stripMargin).explicitGet()._1.bytes.value.base64
 
     val (balance, eff) = notMiner.accountBalances(firstAddress)
-    val details        = notMiner.assetsDetails(assetWScript, true)
-    assert(details.scriptComplexity.get == 1)
-    assert(details.scriptText.get == "TRUE")
-    assert(details.script.get == scriptBase64)
+    val details        = notMiner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
+    assert(details.scriptComplexity == 1)
+    assert(details.scriptText == "TRUE")
+    assert(details.script == scriptBase64)
 
     val txId = sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(script2)).id
     nodes.waitForHeightAriseAndTxPresent(txId)
     notMiner.assertBalances(firstAddress, balance - setAssetScriptFee, eff - setAssetScriptFee)
-    val details2 = notMiner.assetsDetails(assetWScript, true)
-    assert(details2.scriptComplexity.get == 1)
-    assert(details2.script.get == script2)
+    val details2 = notMiner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
+    assert(details2.scriptComplexity == 18)
+    assert(details2.script == script2)
   }
 
   test("cannot transact without having enough waves") {

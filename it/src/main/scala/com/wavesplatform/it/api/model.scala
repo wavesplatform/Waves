@@ -56,6 +56,11 @@ object FullAssetsInfo {
   implicit val fullAssetsInfoFormat: Format[FullAssetsInfo] = Json.format
 }
 
+case class ScriptAssetInfo(scriptComplexity: Long, script: String, scriptText: String)
+object ScriptAssetInfo {
+  implicit val scriptAssetInfoFormat: Format[ScriptAssetInfo] = Json.format
+}
+
 case class AssetInfo(assetId: String,
                      issueHeight: Int,
                      issueTimestamp: Long,
@@ -66,10 +71,7 @@ case class AssetInfo(assetId: String,
                      reissuable: Boolean,
                      quantity: Long,
                      minSponsoredAssetFee: Option[Long],
-                     scriptComplexity: Option[Long],
-                     script: Option[String],
-                     scriptText: Option[String])
-
+                     scriptDetails: Option[ScriptAssetInfo])
 object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
