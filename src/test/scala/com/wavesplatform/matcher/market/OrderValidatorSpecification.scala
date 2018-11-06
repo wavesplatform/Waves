@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.market
 import com.google.common.base.Charsets
 import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.utils.randomBytes
-import com.wavesplatform.{TestTime, WithDB}
+import com.wavesplatform.{NoShrink, TestTime, WithDB}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -30,7 +30,8 @@ class OrderValidatorSpecification
     with MatcherTestData
     with BeforeAndAfterAll
     with PathMockFactory
-    with PropertyChecks {
+    with PropertyChecks
+    with NoShrink {
 
   private val wbtc         = mkAssetId("WBTC")
   private val pairWavesBtc = AssetPair(None, Some(wbtc))
@@ -75,8 +76,8 @@ class OrderValidatorSpecification
 
       "v1 order from a scripted account" in forAll(accountGen) { scripted =>
         portfolioTest(defaultPortfolio) { (ov, bc) =>
+          activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
           (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
-          (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 100))
           (bc.height _).when().returns(50).once()
 
           ov.validateNewOrder(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
@@ -85,8 +86,8 @@ class OrderValidatorSpecification
 
       "sender's address has a script, but trading from smart accounts hasn't been activated" in forAll(accountGen) { scripted =>
         portfolioTest(defaultPortfolio) { (ov, bc) =>
+          activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
           (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
-          (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 100))
           (bc.height _).when().returns(50).once()
 
           ov.validateNewOrder(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
@@ -95,11 +96,12 @@ class OrderValidatorSpecification
 
       "sender's address has a script returning FALSE" in forAll(accountGen) { scripted =>
         portfolioTest(defaultPortfolio) { (_, bc) =>
+          activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
           (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.FALSE).explicitGet()))
-          (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 100))
           (bc.height _).when().returns(150).once()
 
-          val ov = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
+          val tc = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime)
+          val ov = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
           ov.validateNewOrder(newBuyOrder(scripted, version = 2)) should produce("Order rejected by script")
         }
       }
@@ -107,7 +109,8 @@ class OrderValidatorSpecification
       "order expires too soon" in forAll(Gen.choose[Long](1, OrderValidator.MinExpiration), accountGen) { (offset, pk) =>
         val bc       = stub[Blockchain]
         val tt       = new TestTime
-        val ov       = new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, tt)
+        val tc       = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime)
+        val ov       = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, tt)
         val unsigned = newBuyOrder
         val signed   = Order.sign(unsigned.updateExpiration(tt.getTimestamp() + offset).updateSender(pk), pk)
         ov.validateNewOrder(signed) shouldBe Left("Order expiration should be > 1 min")
@@ -176,7 +179,7 @@ class OrderValidatorSpecification
     }
 
     "meaningful error for undefined functions in matcher" in portfolioTest(defaultPortfolio) { (ov, bc) =>
-      (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
+      activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
 
       val pk     = PrivateKeyAccount(randomBytes())
       val o      = newBuyOrder(pk, version = 2)
@@ -184,26 +187,85 @@ class OrderValidatorSpecification
       (bc.accountScript _).when(pk.toAddress).returns(Some(script))
       ov.validateNewOrder(o) should produce("height is inaccessible when running script on matcher")
     }
+
+    "validate order with smart token" when {
+      val asset1 = mkAssetId("asset1")
+      val asset2 = mkAssetId("asset2")
+      val pair   = AssetPair(Some(asset1), Some(asset2))
+      val portfolio = Portfolio(10 * Constants.UnitsInWave,
+                                LeaseBalance.empty,
+                                Map(
+                                  asset1 -> 10 * Constants.UnitsInWave,
+                                  asset2 -> 10 * Constants.UnitsInWave
+                                ))
+
+      val permitScript = ScriptV1(Terms.TRUE).explicitGet()
+      val denyScript   = ScriptV1(Terms.FALSE).explicitGet()
+
+      "two assets are smart and they permit an order" in test { (ov, bc, o) =>
+        (bc.assetScript _).when(asset1).returns(Some(permitScript))
+        (bc.assetScript _).when(asset2).returns(Some(permitScript))
+
+        ov.validateNewOrder(o) shouldBe 'right
+      }
+
+      "first asset is smart and it deny an order" in test { (ov, bc, o) =>
+        (bc.assetScript _).when(asset1).returns(Some(denyScript))
+        (bc.assetScript _).when(asset2).returns(None)
+
+        ov.validateNewOrder(o) should produce("Order rejected by script of asset")
+      }
+
+      "second asset is smart and it deny an order" in test { (ov, bc, o) =>
+        (bc.assetScript _).when(asset1).returns(None)
+        (bc.assetScript _).when(asset2).returns(Some(denyScript))
+
+        ov.validateNewOrder(o) should produce("Order rejected by script of asset")
+      }
+
+      def test(f: (OrderValidator, Blockchain, Order) => Any): Unit = forAll(Gen.oneOf(1, 2)) { version =>
+        portfolioTest(portfolio) { (ov, bc) =>
+          activate(bc, BlockchainFeatures.SmartAssets -> 0)
+          (bc.assetDescription _).when(asset1).returns(mkAssetDescription(8))
+          (bc.assetDescription _).when(asset2).returns(mkAssetDescription(8))
+
+          val pk = PrivateKeyAccount(randomBytes())
+          val o = buy(
+            pair = pair,
+            amount = 100 * Constants.UnitsInWave,
+            price = 0.0022,
+            sender = Some(pk),
+            matcherFee = Some((0.003 * Constants.UnitsInWave).toLong),
+            ts = Some(System.currentTimeMillis()),
+            version = version.toByte
+          )
+          (bc.accountScript _).when(o.sender.toAddress).returns(None)
+          f(ov, bc, o)
+        }
+      }
+    }
   }
 
   private def portfolioTest(p: Portfolio)(f: (OrderValidator, Blockchain) => Any): Unit = {
     val bc = stub[Blockchain]
     (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8)).anyNumberOfTimes()
-    f(new OrderValidator(db, bc, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime), bc)
+    val transactionCreator = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime)
+    f(new OrderValidator(db, bc, transactionCreator, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime), bc)
   }
 
   private def settingsTest(settings: MatcherSettings)(f: OrderValidator => Any): Unit = {
     val bc = stub[Blockchain]
     (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8)).anyNumberOfTimes()
-    f(new OrderValidator(db, bc, _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
+    val transactionCreator = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime)
+    f(new OrderValidator(db, bc, transactionCreator, _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
   }
 
   private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = portfolioTest(defaultPortfolio) { (ov, bc) =>
     val pk            = PrivateKeyAccount(randomBytes())
     val accountScript = ScriptV1(ScriptVersion.Versions.V2, Terms.TRUE, checkSize = false).explicitGet()
 
+    activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
     (bc.accountScript _).when(pk.toAddress).returns(Some(accountScript)).anyNumberOfTimes()
-    (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
     (bc.height _).when().returns(1).anyNumberOfTimes()
 
     val order = OrderV2(
@@ -249,5 +311,9 @@ class OrderValidatorSpecification
   private def mkAssetId(prefix: String): ByteStr = {
     val prefixBytes = prefix.getBytes(Charsets.UTF_8)
     ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32))
+  }
+
+  private def activate(bc: Blockchain, features: (BlockchainFeature, Int)*): Unit = {
+    (bc.activatedFeatures _).when().returns(features.map(x => x._1.id -> x._2).toMap).anyNumberOfTimes()
   }
 }
