@@ -318,4 +318,50 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       }
     }
   }
+
+  "Max 8 price decimals allowed to be non zero" - {
+    val ap28 = issueAssetPair(aliceNode.privateKey, 2, 8)
+    val ap34 = issueAssetPair(aliceNode.privateKey, 3, 4)
+    val ap08 = issueAssetPair(aliceNode.privateKey, 0, 8)
+
+    Seq(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2).foreach(matcherNode.signedIssue)
+    nodes.waitForHeightArise()
+
+    val assets =
+      Table(
+        ("pair", "amountDecimals", "priceDecimals"),
+        (ap28._3, 2, 8),
+        (ap34._3, 3, 4),
+        (ap08._3, 0, 8),
+      )
+
+    forAll(assets) { (pair: AssetPair, amountDecimals: Int, priceDecimals: Int) =>
+      s"Not able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
+        val amount     = BigDecimal(10).pow(amountDecimals).toLong
+        val valid      = BigDecimal(10).pow(8 + priceDecimals - amountDecimals).longValue()
+        val minInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() + 1
+        val maxInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() - 1
+        val o1         = matcherNode.prepareOrder(aliceNode, pair, SELL, amount, minInvalid)
+        val o2         = matcherNode.prepareOrder(aliceNode, pair, SELL, amount, maxInvalid)
+
+        matcherNode.expectIncorrectOrderPlacement(o1,
+          400,
+          "OrderRejected",
+          Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
+        matcherNode.expectIncorrectOrderPlacement(o2,
+          400,
+          "OrderRejected",
+          Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
+      }
+    }
+
+    forAll(assets) { (pair: AssetPair, amountDecimals: Int, priceDecimals: Int) =>
+      s"Able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
+        val amount            = BigDecimal(10).pow(amountDecimals + 8).toLong //big amount, because low price
+        val minNonZeroInvalid = BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue()
+        val o1                = matcherNode.placeOrder(aliceNode, pair, BUY, amount, minNonZeroInvalid)
+        o1.status shouldBe "OrderAccepted"
+      }
+    }
+
 }

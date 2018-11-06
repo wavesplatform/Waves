@@ -154,8 +154,8 @@ object AsyncHttpApi extends Assertions {
       case Failure(ex)                                       => Failure(ex)
     }
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[TransactionInfo] =
-      waitFor[Option[TransactionInfo]](s"transaction $txId")(
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[TransactionInfo] = {
+      val condition = waitFor[Option[TransactionInfo]](s"transaction $txId")(
         _.transactionInfo(txId).transform {
           case Success(tx)                                       => Success(Some(tx))
           case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
@@ -164,6 +164,9 @@ object AsyncHttpApi extends Assertions {
         tOpt => tOpt.exists(_.id == txId),
         retryInterval
       ).map(_.get)
+      Thread.sleep(n.settings.minerSettings.microBlockInterval.toMillis)
+      condition
+    }
 
     def waitForUtxIncreased(fromSize: Int): Future[Int] = waitFor[Int](s"utxSize > $fromSize")(
       _.utxSize,

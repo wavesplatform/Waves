@@ -115,8 +115,9 @@ object SyncMatcherHttpApi extends Assertions {
     def expectIncorrectOrderPlacement(order: Order,
                                       expectedStatusCode: Int,
                                       expectedStatus: String,
+                                      expectedMessage: Option[String] = None,
                                       waitTime: Duration = OrderRequestAwaitTime): Boolean =
-      Await.result(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus), waitTime)
+      Await.result(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus, expectedMessage), waitTime)
 
     def expectRejectedOrderPlacement(node: Node,
                                      pair: AssetPair,
