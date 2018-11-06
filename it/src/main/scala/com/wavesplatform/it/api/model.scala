@@ -65,7 +65,11 @@ case class AssetInfo(assetId: String,
                      decimals: Int,
                      reissuable: Boolean,
                      quantity: Long,
-                     minSponsoredAssetFee: Option[Long])
+                     minSponsoredAssetFee: Option[Long],
+                     scriptComplexity: Option[Long],
+                     script: Option[String],
+                     scriptText: Option[String])
+
 object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }

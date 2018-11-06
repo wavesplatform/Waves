@@ -135,7 +135,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("sender's waves balance is decreased by fee") {
-    val script = ScriptCompiler(s"""
+    val script2 = ScriptCompiler(s"""
            |match tx {
            |  case s : SetAssetScriptTransaction => true
            |  case _ => false
@@ -143,9 +143,17 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
          """.stripMargin).explicitGet()._1.bytes.value.base64
 
     val (balance, eff) = notMiner.accountBalances(firstAddress)
-    val txId           = sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(script)).id
+    val details        = notMiner.assetsDetails(assetWScript, true)
+    assert(details.scriptComplexity.get == 1)
+    assert(details.scriptText.get == "TRUE")
+    assert(details.script.get == scriptBase64)
+
+    val txId = sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(script2)).id
     nodes.waitForHeightAriseAndTxPresent(txId)
     notMiner.assertBalances(firstAddress, balance - setAssetScriptFee, eff - setAssetScriptFee)
+    val details2 = notMiner.assetsDetails(assetWScript, true)
+    assert(details2.scriptComplexity.get == 1)
+    assert(details2.script.get == script2)
   }
 
   test("cannot transact without having enough waves") {

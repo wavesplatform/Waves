@@ -111,8 +111,8 @@ object SyncHttpApi extends Assertions {
     def assetBalance(address: String, asset: String): AssetBalance =
       sync(async(n).assetBalance(address, asset))
 
-    def assetsDetails(assetId: String): AssetInfo =
-      sync(async(n).assetsDetails(assetId))
+    def assetsDetails(assetId: String, fullInfo: Boolean = false): AssetInfo =
+      sync(async(n).assetsDetails(assetId, fullInfo))
 
     def addressScriptInfo(address: String): AddressApiRoute.AddressScriptInfo =
       sync(async(n).scriptInfo(address))
