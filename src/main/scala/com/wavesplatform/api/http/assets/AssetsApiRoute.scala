@@ -152,11 +152,14 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   @ApiOperation(value = "Information about an asset", notes = "Provides detailed information about given asset", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "assetId", value = "ID of the asset", required = true, dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "assetId", value = "ID of the asset", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
     ))
   def details: Route =
     (get & path("details" / Segment)) { id =>
-      complete(assetDetails(id))
+      parameters('full.as[Boolean].?) { full =>
+        complete(assetDetails(id, full.getOrElse(false)))
+      }
     }
 
   @Path("/transfer")
@@ -329,7 +332,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     }).left.map(ApiError.fromValidationError)
 
-  private def assetDetails(assetId: String): Either[ApiError, JsObject] =
+  private def assetDetails(assetId: String, full: Boolean): Either[ApiError, JsObject] =
     (for {
       id <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
       tt <- blockchain.transactionInfo(id).toRight("Failed to find issue transaction by ID")
@@ -339,7 +342,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         case _                   => None
       }).toRight("No issue transaction found with given asset ID")
       description <- blockchain.assetDescription(id).toRight("Failed to get description of the asset")
-      complexity  <- description.script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.version))
+      script = description.script.filter(_ => full)
+      complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.version))
     } yield {
       JsObject(
         Seq(
@@ -352,11 +356,18 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "decimals"       -> JsNumber(tx.decimals.toInt),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
+          "scripted"       -> JsBoolean(description.script.nonEmpty),
           "minSponsoredAssetFee" -> (description.sponsorship match {
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
           })
-        )
+        ) ++ (script.toSeq.flatMap { script =>
+          Seq(
+            "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
+            "script"           -> JsString(script.bytes().base64),
+            "scriptText"       -> JsString(script.text)
+          )
+        })
       )
     }).left.map(m => CustomValidationError(m))
 
