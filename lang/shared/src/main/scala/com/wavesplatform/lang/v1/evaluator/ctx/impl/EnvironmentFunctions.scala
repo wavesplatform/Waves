@@ -1,8 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTEVECTOR, CONST_STRING}
-import com.wavesplatform.lang.v1.evaluator.ctx.CaseObj
+import com.wavesplatform.lang.v1.compiler.Terms.{CaseObj, CONST_BYTEVECTOR, CONST_STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}

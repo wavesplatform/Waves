@@ -4,7 +4,7 @@ import cats.data.EitherT
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.lang.{Global, ScriptVersion}
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._

@@ -52,7 +52,7 @@ object Verifier extends Instrumented with ScorexLogging {
         }
     }).flatMap(
       tx =>
-        tx.checkedAssets
+        tx.checkedAssets()
           .flatMap(assetId => blockchain.assetDescription(assetId).flatMap(_.script))
           .foldRight(Either.right[ValidationError, Transaction](tx)) { (script, txr) =>
             txr.right.flatMap(tx =>

@@ -162,7 +162,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     val tx        = exchangeTx()
     val sig       = (Json.parse(tx.toString()) \ "proofs").as[Seq[JsString]].head
     val changedTx = tx + ("version" -> JsNumber(1)) + ("signature" -> sig)
-    assertBadRequest(sender.signedBroadcast(changedTx).id, 500) //TODO: change to correct error message
+    assertBadRequestAndMessage(sender.signedBroadcast(changedTx).id, "can only contain orders of version 1", 400)
   }
 
   test("negative: exchange tx v2 and order v1 from scripted acc") {

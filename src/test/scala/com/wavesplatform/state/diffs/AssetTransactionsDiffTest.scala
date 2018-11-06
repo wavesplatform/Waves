@@ -307,13 +307,11 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     }
   }
 
-  property("Can reissue when script evaluates to TRUE even if sender is not original issuer") {
+  property("Only issuer can reissue") {
     forAll(genesisIssueTransferReissue("true")) {
       case (gen, issue, _, reissue) =>
-        assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS) {
-          case (blockDiff, newState) =>
-            val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
-            totalPortfolioDiff.assets(issue.id()) shouldEqual (issue.quantity + reissue.quantity)
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS) { ei =>
+          ei should produce("Asset was issued by other address")
         }
     }
   }

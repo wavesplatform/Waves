@@ -38,7 +38,7 @@ object CommonValidation {
     DataTransaction.typeId           -> 1,
     SetScriptTransaction.typeId      -> 10,
     SponsorFeeTransaction.typeId     -> 1000,
-    SetAssetScriptTransaction.typeId -> 1000
+    SetAssetScriptTransaction.typeId -> (1000 - 4)
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
