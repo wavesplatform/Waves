@@ -39,7 +39,7 @@ case class SignedReissueV2Request(@ApiModelProperty(value = "Base58 encoded Issu
 
 object SignedReissueV2Request {
   implicit val assetReissueRequestReads: Reads[SignedReissueV2Request] = (
-    (JsPath \ "senderPubliKey").read[String] and
+    (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "version").read[Byte] and
       (JsPath \ "assetId").read[String] and
       (JsPath \ "quantity").read[Long] and
