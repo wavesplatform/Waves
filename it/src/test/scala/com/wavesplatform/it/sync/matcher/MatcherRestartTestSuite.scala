@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.api.AsyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
@@ -61,14 +60,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
       orders1.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
       val aliceSecondOrder =
-        matcherNode.placeOrder(aliceAcc,
-                               aliceWavesPair,
-                               OrderType.SELL,
-                               500,
-                               2.waves * Order.PriceConstant,
-                               AsyncMatcherHttpApi.DefaultMatcherFee,
-                               orderVersion,
-                               5.minutes)
+        matcherNode.placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee, orderVersion, 5.minutes)
       aliceSecondOrder.status shouldBe "OrderAccepted"
 
       val orders2 = matcherNode.orderBook(aliceWavesPair)

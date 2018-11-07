@@ -2,16 +2,15 @@ package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.Config
 import com.wavesplatform.crypto
-import com.wavesplatform.it.api.AsyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
-import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
 
 import scala.concurrent.duration._
 
@@ -135,7 +134,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.BUY,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -148,7 +147,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.SELL,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -212,7 +211,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.BUY,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -225,7 +224,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.SELL,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -240,7 +239,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.SELL,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -251,7 +250,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.BUY,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -320,7 +319,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.SELL,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -331,7 +330,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.SELL,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -366,7 +365,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                           OrderType.BUY,
                           500,
                           2.waves * Order.PriceConstant,
-                          AsyncMatcherHttpApi.DefaultMatcherFee,
+                          matcherFee,
                           version = 2,
                           10.minutes),
             "Order rejected by script for"
@@ -379,7 +378,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                           OrderType.SELL,
                           500,
                           2.waves * Order.PriceConstant,
-                          AsyncMatcherHttpApi.DefaultMatcherFee,
+                          matcherFee,
                           version = 2,
                           10.minutes),
             "Order rejected by script for"
@@ -394,7 +393,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.BUY,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes),
           "Error executing script for"
@@ -414,7 +413,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.BUY,
                         100,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -427,7 +426,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.SELL,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -442,7 +441,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.SELL,
                         100,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message
@@ -454,7 +453,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                         OrderType.BUY,
                         500,
                         2.waves * Order.PriceConstant,
-                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        matcherFee,
                         version = 2,
                         10.minutes)
             .message

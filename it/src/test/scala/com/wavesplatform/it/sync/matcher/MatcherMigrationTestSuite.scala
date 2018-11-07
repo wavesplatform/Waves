@@ -1,14 +1,13 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.api.AsyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
-import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 
 import scala.concurrent.duration._
 
@@ -32,7 +31,7 @@ class MatcherMigrationTestSuite extends MatcherSuiteBase {
     "place order and run migration tool" in {
       // Alice places sell order
       val aliceOrder = matcherNode
-        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 3000000, 3000000, AsyncMatcherHttpApi.DefaultMatcherFee)
+        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 3000000, 3000000, matcherFee)
       aliceOrder.status shouldBe "OrderAccepted"
       val firstOrder = aliceOrder.message.id
 

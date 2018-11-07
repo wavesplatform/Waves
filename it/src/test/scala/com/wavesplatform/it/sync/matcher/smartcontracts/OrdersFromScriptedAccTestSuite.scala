@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.AsyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
@@ -78,7 +77,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
                                               OrderType.SELL,
                                               500,
                                               2.waves * Order.PriceConstant,
-                                              AsyncMatcherHttpApi.DefaultMatcherFee,
+                                              matcherFee,
                                               version = 1,
                                               10.minutes)
 

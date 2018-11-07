@@ -2,10 +2,10 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.it.api.AsyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.Order.PriceConstant
 import com.wavesplatform.transaction.assets.exchange.OrderType._
@@ -38,21 +38,21 @@ class OrderBookTestSuite extends MatcherSuiteBase {
   val (amount, price) = (1000L, PriceConstant)
 
   "When delete order book" - {
-    val buyOrder        = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, 2 * amount, price, AsyncMatcherHttpApi.DefaultMatcherFee).message.id
-    val anotherBuyOrder = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, amount, price, AsyncMatcherHttpApi.DefaultMatcherFee).message.id
+    val buyOrder        = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, 2 * amount, price, matcherFee).message.id
+    val anotherBuyOrder = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, amount, price, matcherFee).message.id
 
-    val submitted = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, amount, price, AsyncMatcherHttpApi.DefaultMatcherFee).message.id
+    val submitted = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, amount, price, matcherFee).message.id
 
-    val sellOrder = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, amount, 2 * price, AsyncMatcherHttpApi.DefaultMatcherFee).message.id
+    val sellOrder = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, amount, 2 * price, matcherFee).message.id
 
     matcherNode.waitOrderStatus(wctUsdPair, buyOrder, "PartiallyFilled")
     matcherNode.waitOrderStatus(wctUsdPair, submitted, "Filled")
 
     val (aliceRBForOnePair, bobRBForOnePair) = (reservedBalancesOf(aliceAcc), reservedBalancesOf(bobAcc))
 
-    val buyOrderForAnotherPair = matcherNode.placeOrder(aliceAcc, wctWavesPair, BUY, amount, price, AsyncMatcherHttpApi.DefaultMatcherFee).message.id
+    val buyOrderForAnotherPair = matcherNode.placeOrder(aliceAcc, wctWavesPair, BUY, amount, price, matcherFee).message.id
     val sellOrderForAnotherPair =
-      matcherNode.placeOrder(bobAcc, wctWavesPair, SELL, amount, 2 * price, AsyncMatcherHttpApi.DefaultMatcherFee).message.id
+      matcherNode.placeOrder(bobAcc, wctWavesPair, SELL, amount, 2 * price, matcherFee).message.id
 
     matcherNode.waitOrderStatus(wctWavesPair, buyOrderForAnotherPair, "Accepted")
     matcherNode.waitOrderStatus(wctWavesPair, sellOrderForAnotherPair, "Accepted")
