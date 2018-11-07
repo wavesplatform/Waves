@@ -198,6 +198,7 @@ trait Caches extends Blockchain {
     for ((address, portfolio)    <- newPortfolios.result()) portfolioCache.put(address, portfolio)
     for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     scriptCache.putAll(diff.scripts.asJava)
+    assetScriptCache.putAll(diff.assetScripts.asJava)
   }
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]

@@ -267,8 +267,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
           })
-        ) ++ (script.toSeq.flatMap { script =>
-          Seq(
+        ) ++ (script.toSeq.map { script =>
+          "scriptDetails" -> Json.obj(
             "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
             "script"           -> JsString(script.bytes().base64),
             "scriptText"       -> JsString(script.text)
