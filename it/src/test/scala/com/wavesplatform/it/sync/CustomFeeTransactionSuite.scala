@@ -16,8 +16,6 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  override def notMiner = nodes.last
-
   private val transferFee = 100000
   private val assetFee    = 1.waves
   private val assetToken  = 100
@@ -68,13 +66,12 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 }
 
 object CustomFeeTransactionSuite {
-  val minerAddress  = Default(0).getString("address")
-  val senderAddress = Default(1).getString("address")
-
+  val minerAddress             = Default.head.getString("address")
+  val senderAddress            = Default.last.getString("address")
   val defaultAssetQuantity     = 999999999999l
   val featureCheckBlocksPeriod = 13
 
-  private val seed = Default(1).getString("account-seed")
+  private val seed = Default.last.getString("account-seed")
   private val pk   = PrivateKeyAccount.fromSeed(seed).explicitGet()
   val assetTx = IssueTransactionV1
     .selfSigned(
@@ -105,7 +102,7 @@ object CustomFeeTransactionSuite {
   val Configs: Seq[Config] = Seq(
     minerConfig.withFallback(Default.head),
     notMinerConfig.withFallback(Default(1)),
-    notMinerConfig.withFallback(Default(2)),
+    notMinerConfig.withFallback(Default(2))
   )
 
 }
