@@ -102,8 +102,7 @@ object CustomFeeTransactionSuite {
   val Configs: Seq[Config] = Seq(
     minerConfig.withFallback(Default.head),
     notMinerConfig.withFallback(Default(1)),
-    notMinerConfig.withFallback(Default(2)),
-    notMinerConfig.withFallback(Default(3))
+    notMinerConfig.withFallback(Default(2))
   )
 
 }
