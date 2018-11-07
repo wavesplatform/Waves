@@ -8,10 +8,25 @@ import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.functional.syntax._
+import play.api.libs.json.{JsPath, Reads}
 
 object SignedIssueV2Request {
-  implicit val signedExchangeRequestFormat: Format[SignedIssueV2Request] = Json.format
+  implicit val signedExchangeRequestReads: Reads[SignedIssueV2Request] = {
+    (
+      (JsPath \ "version").read[Byte] and
+        (JsPath \ "senderPublicKey").read[String] and
+        (JsPath \ "name").read[String] and
+        (JsPath \ "description").read[String] and
+        (JsPath \ "quantity").read[Long] and
+        (JsPath \ "decimals").read[Byte] and
+        (JsPath \ "reissuable").read[Boolean] and
+        (JsPath \ "fee").read[Long] and
+        (JsPath \ "timestamp").read[Long] and
+        (JsPath \ "proofs").read[List[ProofStr]] and
+        (JsPath \ "script").readNullable[String]
+    )(SignedIssueV2Request.apply _)
+  }
 }
 
 @ApiModel(value = "Signed Smart issue transaction")

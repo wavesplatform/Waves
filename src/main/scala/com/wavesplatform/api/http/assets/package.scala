@@ -2,6 +2,7 @@ package com.wavesplatform.api.http
 
 import play.api.libs.json._
 import shapeless.{:+:, CNil, Coproduct}
+import supertagged.TaggedType
 
 package object assets {
 
@@ -26,17 +27,30 @@ package object assets {
   implicit val autoSignedTransferRequestsReads: Reads[SignedTransferRequests] = Reads { json =>
     (json \ "version").asOpt[Int] match {
       case None | Some(1) => SignedTransferV1Request.reads.reads(json).map(Coproduct[SignedTransferRequests](_))
-      case _              => SignedTransferV2Request.format.reads(json).map(Coproduct[SignedTransferRequests](_))
+      case _              => SignedTransferV2Request.reads.reads(json).map(Coproduct[SignedTransferRequests](_))
     }
   }
   implicit val autoSignedTransferRequestsWrites: Writes[SignedTransferRequests] = Writes {
     _.eliminate(
       SignedTransferV1Request.writes.writes,
       _.eliminate(
-        SignedTransferV2Request.format.writes,
+        SignedTransferV2Request.writes.writes,
         _ => JsNull
       )
     )
+  }
+
+  object ProofStr extends TaggedType[String]
+  type ProofStr = ProofStr.Type
+
+  implicit object MaybeStringReads extends Reads[ProofStr] {
+    override def reads(json: JsValue): JsResult[ProofStr] = {
+      json match {
+        case JsNull      => JsSuccess(ProofStr(""))
+        case JsString(s) => JsSuccess(ProofStr(s))
+        case _           => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.jsstring"))))
+      }
+    }
   }
 
 }
