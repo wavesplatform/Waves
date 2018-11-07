@@ -1,19 +1,19 @@
 package com.wavesplatform.api.http.alias
 
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.account.Alias
+import com.wavesplatform.api.http._
+import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction._
+import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.{Format, Json}
-import com.wavesplatform.account.Alias
-import com.wavesplatform.api.http._
-import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.utils.Time
-import com.wavesplatform.transaction._
-import com.wavesplatform.wallet.Wallet
 
 @Path("/alias")
 @Api(value = "/alias")
@@ -25,20 +25,6 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
     alias ~ addressOfAlias ~ aliasOfAddress
   }
 
-  @Path("/create")
-  @ApiOperation(value = "Create an alias", httpMethod = "POST", produces = "application/json", consumes = "application/json")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataType = "com.wavesplatform.api.http.alias.CreateAliasV1Request",
-        defaultValue = "{\n\t\"alias\": \"aliasalias\",\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000\n}"
-      )
-    ))
-  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def alias: Route = processRequest("create", (t: CreateAliasV1Request) => doBroadcast(TransactionFactory.aliasV1(t, wallet, time)))
 
   @Path("/by-alias/{alias}")
