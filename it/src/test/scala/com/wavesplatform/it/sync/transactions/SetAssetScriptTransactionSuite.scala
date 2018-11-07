@@ -96,16 +96,19 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
   test("issuer cannot change script on asset w/o initial script") {
     val (balance, eff) = notMiner.accountBalances(firstAddress)
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(scriptBase64)),
-                               "Reason: Asset is not scripted.")
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee), "Reason: Empty script is disabled.")
+    assertBadRequestAndMessage(
+      sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(scriptBase64)),
+      "Reason: Cannot set script on an asset issued without a script"
+    )
+    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee),
+                               "Reason: Cannot remove script from an asset issued with a script")
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(unchangeableScript.bytes.value.base64)),
-      "Reason: Asset is not scripted."
+      "Reason: Cannot set script on an asset issued without a script"
     )
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
-      "Reason: Empty script is disabled."
+      "Reason: Cannot remove script from an asset issued with a script"
     )
     notMiner.assertBalances(firstAddress, balance, eff)
   }
@@ -113,7 +116,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   test("non-issuer cannot change script") {
     assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")), "Reason: Empty script is disabled")
+    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
+                               "Reason: Cannot remove script from an asset issued with a script")
   }
 
   test("non-issuer cannot change script on asset w/o script") {
@@ -121,10 +125,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee), "Empty script is disabled.")
+    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee),
+                               "Cannot remove script from an asset issued with a script")
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
-      "Reason: Empty script is disabled."
+      "Reason: Cannot remove script from an asset issued with a script"
     )
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(unchangeableScript.bytes.value.base64)),
@@ -238,8 +243,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("try to update script to null") {
-    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee), "Reason: Empty script is disabled.")
-    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some("")), "Reason: Empty script is disabled.")
+    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee),
+                                "Reason: Cannot remove script from an asset issued with a script")
+    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some("")),
+                                "Reason: Cannot remove script from an asset issued with a script")
   }
 
   test("try to make SetAssetScript tx on script that deprecates SetAssetScript") {
@@ -309,7 +316,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val (balance1, eff1) = notMiner.accountBalances(thirdAddress)
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     assertBadRequestAndMessage(sender.setAssetScript(assetV1, thirdAddress, setAssetScriptFee, Some(scriptBase64)).id,
-                               "Reason: Asset is not scripted.")
+                               "Reason: Cannot set script on an asset issued without a script")
     assertBadRequestAndMessage(sender.setAssetScript(assetV1, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
     notMiner.assertBalances(thirdAddress, balance1, eff1)

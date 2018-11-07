@@ -37,7 +37,7 @@ object AssetTransactionsDiff {
             assetScripts = Map(tx.assetId        -> tx.script)
           ))
       } else {
-        Left(GenericError("Asset is not scripted."))
+        Left(GenericError("Cannot set script on an asset issued without a script"))
       }
     }
 
