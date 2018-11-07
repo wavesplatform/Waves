@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE, FALSE}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.api.DBUtils.indexes.active.MaxElements
@@ -12,6 +12,7 @@ import com.wavesplatform.matcher.model.OrderHistory.OrderInfoChange
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.transaction.{AssetAcc, AssetId}
@@ -107,13 +108,20 @@ class OrderValidator(db: DB,
           .lastOrderTimestamp(db, order.senderPublicKey)
           .getOrElse(settings.defaultOrderTimestamp) - settings.orderTimestampDrift
 
+        lazy val minOrderFee: Long = {
+          val extraFee =
+            if (blockchain.hasScript(order.sender)) CommonValidation.ScriptExtraFee
+            else 0
+          settings.minOrderFee + extraFee
+        }
+
         for {
           _ <- (Right(order): Either[String, Order])
             .ensure("Incorrect matcher public key")(_.matcherPublicKey == matcherPublicKey)
             .ensure("Invalid address")(_ => !settings.blacklistedAddresses.contains(senderAddress))
             .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
             .ensure(s"Order should have a timestamp after $lowestOrderTs, but it is ${order.timestamp}")(_.timestamp > lowestOrderTs)
-            .ensure(s"Order matcherFee should be >= ${settings.minOrderFee}")(_.matcherFee >= settings.minOrderFee)
+            .ensure(s"Order matcherFee should be >= ${minOrderFee}")(_.matcherFee >= minOrderFee)
           _ <- order.isValid(time.correctedTime()).toEither
           _ <- (Right(order): Either[String, Order])
             .ensure("Order has already been placed")(o => DBUtils.orderInfo(db, o.id()).status == LimitOrder.NotFound)

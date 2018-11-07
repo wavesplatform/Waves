@@ -2,13 +2,14 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.it.api.AsyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -48,23 +49,51 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
 
     // Alice places sell orders
     val aliceOrderIdFill = matcherNode
-      .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant, orderVersion, 10.minutes)
+      .placeOrder(aliceAcc,
+                  aliceSecondWavesPair,
+                  OrderType.SELL,
+                  3,
+                  Order.PriceConstant,
+                  AsyncMatcherHttpApi.DefaultMatcherFee,
+                  orderVersion,
+                  10.minutes)
       .message
       .id
 
     val alicePartialOrderId = matcherNode
-      .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant, orderVersion, 10.minutes)
+      .placeOrder(aliceAcc,
+                  aliceSecondWavesPair,
+                  OrderType.SELL,
+                  3,
+                  Order.PriceConstant,
+                  AsyncMatcherHttpApi.DefaultMatcherFee,
+                  orderVersion,
+                  10.minutes)
       .message
       .id
 
     val aliceOrderToCancelId =
       matcherNode
-        .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant, orderVersion, 70.seconds)
+        .placeOrder(aliceAcc,
+                    aliceSecondWavesPair,
+                    OrderType.SELL,
+                    3,
+                    Order.PriceConstant,
+                    AsyncMatcherHttpApi.DefaultMatcherFee,
+                    orderVersion,
+                    70.seconds)
         .message
         .id
 
     val aliceActiveOrderId = matcherNode
-      .placeOrder(aliceAcc, aliceSecondWavesPair, OrderType.SELL, 3, Order.PriceConstant + 100000000, orderVersion, 10.minutes)
+      .placeOrder(aliceAcc,
+                  aliceSecondWavesPair,
+                  OrderType.SELL,
+                  3,
+                  Order.PriceConstant + 100000000,
+                  AsyncMatcherHttpApi.DefaultMatcherFee,
+                  orderVersion,
+                  10.minutes)
       .message
       .id
 
@@ -141,7 +170,14 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
   private def ordersRequestsGen(n: Int, sender: PrivateKeyAccount, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[String] = {
     val orderIds = 1 to n map (_ => {
       matcherNode
-        .placeOrder(sender, assetPair, orderType, amount, Order.PriceConstant, orderVersion, (120 + Random.nextInt(70)).seconds)
+        .placeOrder(sender,
+                    assetPair,
+                    orderType,
+                    amount,
+                    Order.PriceConstant,
+                    AsyncMatcherHttpApi.DefaultMatcherFee,
+                    orderVersion,
+                    (120 + Random.nextInt(70)).seconds)
         .message
         .id
     })

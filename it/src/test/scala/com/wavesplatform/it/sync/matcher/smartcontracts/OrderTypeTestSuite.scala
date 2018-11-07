@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.Config
+import com.wavesplatform.it.api.AsyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
@@ -9,6 +10,7 @@ import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+
 import scala.concurrent.duration._
 
 class OrderTypeTestSuite extends MatcherSuiteBase {
@@ -66,14 +68,28 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setContract(Some(sco1), aliceAcc)
 
         val aliceOrd1 = matcherNode
-          .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+          .placeOrder(aliceAcc,
+                      predefAssetPair,
+                      OrderType.BUY,
+                      500,
+                      2.waves * Order.PriceConstant,
+                      AsyncMatcherHttpApi.DefaultMatcherFee,
+                      version = 2,
+                      10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
 
         assertBadRequest(
           matcherNode
-            .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+            .placeOrder(aliceAcc,
+                        aliceWavesPair,
+                        OrderType.SELL,
+                        500,
+                        2.waves * Order.PriceConstant,
+                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        version = 2,
+                        10.minutes)
             .message
             .id)
 
@@ -87,12 +103,26 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
         assertBadRequest(
           matcherNode
-            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+            .placeOrder(aliceAcc,
+                        predefAssetPair,
+                        OrderType.BUY,
+                        500,
+                        2.waves * Order.PriceConstant,
+                        AsyncMatcherHttpApi.DefaultMatcherFee,
+                        version = 2,
+                        10.minutes)
             .message
             .id)
 
         val aliceOrd2 = matcherNode
-          .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+          .placeOrder(aliceAcc,
+                      aliceWavesPair,
+                      OrderType.SELL,
+                      500,
+                      2.waves * Order.PriceConstant,
+                      AsyncMatcherHttpApi.DefaultMatcherFee,
+                      version = 2,
+                      10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
@@ -106,13 +136,27 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setContract(Some(sco3), aliceAcc)
 
         val aliceOrd1 = matcherNode
-          .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+          .placeOrder(aliceAcc,
+                      predefAssetPair,
+                      OrderType.BUY,
+                      500,
+                      2.waves * Order.PriceConstant,
+                      AsyncMatcherHttpApi.DefaultMatcherFee,
+                      version = 2,
+                      10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
 
         val aliceOrd2 = matcherNode
-          .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+          .placeOrder(aliceAcc,
+                      aliceWavesPair,
+                      OrderType.SELL,
+                      500,
+                      2.waves * Order.PriceConstant,
+                      AsyncMatcherHttpApi.DefaultMatcherFee,
+                      version = 2,
+                      10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
@@ -125,13 +169,27 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
       "place order and then set contract on BUY type" in {
         val aliceOrd1 = matcherNode
-          .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+          .placeOrder(aliceAcc,
+                      predefAssetPair,
+                      OrderType.BUY,
+                      500,
+                      2.waves * Order.PriceConstant,
+                      AsyncMatcherHttpApi.DefaultMatcherFee,
+                      version = 2,
+                      10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Accepted", 1.minute)
 
         val aliceOrd2 = matcherNode
-          .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+          .placeOrder(aliceAcc,
+                      aliceWavesPair,
+                      OrderType.SELL,
+                      500,
+                      2.waves * Order.PriceConstant,
+                      AsyncMatcherHttpApi.DefaultMatcherFee,
+                      version = 2,
+                      10.minutes)
           .message
           .id
         matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
@@ -139,11 +197,25 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         setContract(Some(sco1), aliceAcc)
 
         val bobOrd1 = matcherNode
-          .placeOrder(bobAcc, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+          .placeOrder(bobAcc,
+                      predefAssetPair,
+                      OrderType.SELL,
+                      500,
+                      2.waves * Order.PriceConstant,
+                      AsyncMatcherHttpApi.DefaultMatcherFee,
+                      version = 1,
+                      10.minutes)
           .message
           .id
         val bobOrd2 = matcherNode
-          .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+          .placeOrder(bobAcc,
+                      aliceWavesPair,
+                      OrderType.BUY,
+                      500,
+                      2.waves * Order.PriceConstant,
+                      AsyncMatcherHttpApi.DefaultMatcherFee,
+                      version = 1,
+                      10.minutes)
           .message
           .id
 
