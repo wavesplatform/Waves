@@ -12,8 +12,9 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, NegativeAmount, OrderValidationError}
+import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, HasScriptType, NegativeAmount, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{NTP, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
@@ -198,6 +199,10 @@ class OrderBookActor(parent: ActorRef,
         }
       case _: NegativeAmount =>
         processEvent(Events.OrderCanceled(event.submitted, unmatchable = true))
+        None
+      case TransactionValidationError(_: HasScriptType, _) =>
+        processEvent(Events.OrderCanceled(event.counter, unmatchable = false))
+        processEvent(Events.OrderCanceled(event.submitted, unmatchable = false))
         None
       case _ =>
         cancelCounterOrder()

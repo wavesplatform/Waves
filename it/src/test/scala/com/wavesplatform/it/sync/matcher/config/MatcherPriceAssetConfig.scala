@@ -3,12 +3,12 @@ package com.wavesplatform.it.sync.matcher.config
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.{empty, parseString}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
-import com.wavesplatform.api.http.assets.SignedIssueV2Request
+import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.Base58
 
@@ -157,7 +157,22 @@ object MatcherPriceAssetConfig {
       fee,
       timestamp,
       tx.proofs.base58().toList,
-      tx.script.map(_.bytes().base58)
+      tx.script.map(_.bytes().base64)
+    )
+  }
+
+  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
+    import tx._
+    SignedIssueV1Request(
+      Base58.encode(tx.sender.publicKey),
+      new String(name),
+      new String(description),
+      quantity,
+      decimals,
+      reissuable,
+      fee,
+      timestamp,
+      signature.base58
     )
   }
 

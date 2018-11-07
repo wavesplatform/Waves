@@ -30,9 +30,4 @@ abstract class MatcherSuiteBase
       .withDefault(4)
       .buildNonConflicting()
 
-  override protected def nodes: Seq[Node] = dockerNodes()
-
-  protected override def beforeAll(): Unit = {
-    super.beforeAll()
-  }
 }
