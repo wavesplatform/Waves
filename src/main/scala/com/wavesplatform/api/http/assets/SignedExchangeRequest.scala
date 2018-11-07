@@ -6,7 +6,8 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransactionV1, Order, OrderV1}
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange._
 
 object SignedExchangeRequest {
   implicit val orderFormat: Format[Order]                                 = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
@@ -38,14 +39,13 @@ case class SignedExchangeRequest(@ApiModelProperty(value = "Base58 encoded sende
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      _t <- ExchangeTransactionV1.create(order1.asInstanceOf[OrderV1],
-                                         order2.asInstanceOf[OrderV1],
-                                         amount,
-                                         price,
-                                         buyMatcherFee,
-                                         sellMatcherFee,
-                                         fee,
-                                         timestamp,
-                                         _signature)
+      o1         <- castOrder(order1)
+      o2         <- castOrder(order2)
+      _t         <- ExchangeTransactionV1.create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, _signature)
     } yield _t
+
+  def castOrder(o: Order): Either[ValidationError, OrderV1] = o match {
+    case o1 @ OrderV1(_, _, _, _, _, _, _, _, _, _) => Right(o1)
+    case _                                          => Left(GenericError("ExchangeTransaction of version 1 can only contain orders of version 1"))
+  }
 }

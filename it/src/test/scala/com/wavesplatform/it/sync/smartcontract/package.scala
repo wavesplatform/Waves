@@ -3,7 +3,7 @@ import com.wavesplatform.transaction.DataTransaction
 
 package object smartcontract {
   def cryptoContext(dtx: DataTransaction) =
-    s"""
+    Some(s"""
        |match tx {
        |  case ext : ExchangeTransaction =>
        |    # Crypto context
@@ -15,19 +15,10 @@ package object smartcontract {
        |  case s : SetScriptTransaction => true
        |  case _ => false
        |}
-     """.stripMargin
-
-  def checkExtract(dtx: DataTransaction) =
-    s"""
-       |match tx {
-       |  case ext : ExchangeTransaction =>
-       |     extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
-       |  case _ => false
-       |}
-     """.stripMargin
+     """.stripMargin)
 
   def pureContext(dtx: DataTransaction) =
-    s"""
+    Some(s"""
        | match tx {
        |  case ext : ExchangeTransaction =>
        |    # Pure context
@@ -45,7 +36,7 @@ package object smartcontract {
        |       case ddtx : DataTransaction => ddtx.data[0] != DataEntry("ha", true)
        |       case _ => false
        |    }
-       |    let neOptionAndExtractHeight = dtx.id != base58'' # shouldbe extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
+       |    let neOptionAndExtractHeight = extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
        |
        |    let ne = nePrim && neDataEntryAndGetElement && neOptionAndExtractHeight
        |    let gteLong = 1000 > 999 && 1000 >= 999
@@ -69,10 +60,10 @@ package object smartcontract {
        |  case s : SetScriptTransaction => true
        |  case _ => false
        | }
-     """.stripMargin
+     """.stripMargin)
 
   def wavesContext(dtx: DataTransaction) =
-    s"""
+    Some(s"""
        | match tx {
        |  case ext : ExchangeTransaction =>
        |    # Waves context
@@ -114,5 +105,5 @@ package object smartcontract {
        |  case s : SetScriptTransaction => true
        |  case _ => false
        | }
-     """.stripMargin
+     """.stripMargin)
 }

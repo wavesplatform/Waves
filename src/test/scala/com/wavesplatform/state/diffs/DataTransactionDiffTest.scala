@@ -118,7 +118,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
     forAll(setup) {
       case (genesis, data) =>
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(data)), settings) { blockDiffEi =>
-          blockDiffEi should produce("DataTransaction transaction has not been activated")
+          blockDiffEi should produce("DataTransaction has not been activated")
         }
     }
   }

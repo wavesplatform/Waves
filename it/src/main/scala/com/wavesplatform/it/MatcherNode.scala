@@ -1,9 +1,8 @@
-package com.wavesplatform.it.transactions
+package com.wavesplatform.it
 
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.it.Nodes
-import com.wavesplatform.it.util._
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.ScorexLogging
@@ -32,21 +31,17 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
 
   def initialBalances(): Unit = {
     for (i <- List(matcherNode, aliceNode, bobNode).indices) {
-
       val tx = nodes(i).transfer(nodes(i).address, addresses(i), 10000.waves, 0.001.waves).id
-      nodes.waitForHeightAriseAndTxPresent(tx)
+      matcherNode.waitForTransaction(tx)
     }
   }
 
   def initialScripts(): Unit = {
     for (i <- List(matcherNode, aliceNode, bobNode).indices) {
-
-      val scriptText = s"""true""".stripMargin
-
-      val script = ScriptCompiler(scriptText).explicitGet()._1
+      val script = ScriptCompiler("true").explicitGet()._1
       val pk     = PrivateKeyAccount.fromSeed(nodes(i).seed(addresses(i))).right.get
       val setScriptTransaction = SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, pk, Some(script), 1.waves, System.currentTimeMillis())
+        .selfSigned(SetScriptTransaction.supportedVersions.head, pk, Some(script), 0.01.waves, System.currentTimeMillis())
         .right
         .get
 
@@ -54,7 +49,24 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
         .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
         .id
 
-      nodes.waitForHeightAriseAndTxPresent(setScriptId)
+      matcherNode.waitForTransaction(setScriptId)
     }
+  }
+
+  def setContract(contractText: Option[String], acc: PrivateKeyAccount) = {
+    val script = contractText.map { x =>
+      val scriptText = x.stripMargin
+      ScriptCompiler(scriptText).explicitGet()._1
+    }
+    val setScriptTransaction = SetScriptTransaction
+      .selfSigned(SetScriptTransaction.supportedVersions.head, acc, script, 0.014.waves, System.currentTimeMillis())
+      .right
+      .get
+
+    val setScriptId = matcherNode
+      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .id
+
+    matcherNode.waitForTransaction(setScriptId)
   }
 }

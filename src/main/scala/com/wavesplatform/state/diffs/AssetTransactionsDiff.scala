@@ -13,24 +13,48 @@ import scala.util.{Left, Right}
 
 object AssetTransactionsDiff {
   def issue(height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
-    val info = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity, script = tx.script)
+    val info = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
     Right(
       Diff(
         height = height,
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.id() -> tx.quantity))),
-        assetInfos = Map(tx.id()             -> info)
+        assetInfos = Map(tx.id()             -> info),
+        assetScripts = if (tx.script.isEmpty) { Map() } else { Map(tx.id() -> tx.script) }
       ))
   }
+
+  def setAssetScript(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
+      tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
+    validateAsset(tx, blockchain, tx.assetId, issuerOnly = true).flatMap { _ =>
+      //val isActivated = blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height)
+      if (blockchain.hasAssetScript(tx.assetId)) {
+        Right(
+          Diff(
+            height = height,
+            tx = tx,
+            portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+            assetScripts = Map(tx.assetId        -> tx.script)
+          ))
+      } else {
+        Left(GenericError("Asset is not scripted."))
+      }
+    }
 
   def reissue(blockchain: Blockchain, settings: FunctionalitySettings, blockTime: Long, height: Int)(
       tx: ReissueTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, blockchain, tx.assetId, issuerOnly = true).flatMap { _ =>
       val oldInfo = blockchain.assetDescription(tx.assetId).get
-      def wasBurnt = blockchain.addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, 0).exists {
-        case (_, t: BurnTransaction) if t.assetId == tx.assetId => true
-        case _                                                  => false
-      }
+
+      def wasBurnt =
+        blockchain
+          .addressTransactions(tx.sender, Set(BurnTransaction.typeId), Int.MaxValue, None)
+          .getOrElse(Seq.empty)
+          .exists {
+            case (_, t: BurnTransaction) if t.assetId == tx.assetId => true
+            case _                                                  => false
+          }
+
       val isDataTxActivated = blockchain.isFeatureActivated(BlockchainFeatures.DataTransaction, blockchain.height)
       if (oldInfo.reissuable || (blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) || (!isDataTxActivated && wasBurnt)) {
         if ((Long.MaxValue - tx.quantity) < oldInfo.totalVolume && isDataTxActivated) {
@@ -42,7 +66,7 @@ object AssetTransactionsDiff {
               tx = tx,
               portfolios =
                 Map(tx.sender.toAddress   -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.assetId -> tx.quantity))),
-              assetInfos = Map(tx.assetId -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable, script = None))
+              assetInfos = Map(tx.assetId -> AssetInfo(volume = tx.quantity, isReissuable = tx.reissuable))
             ))
         }
       } else {
@@ -58,7 +82,7 @@ object AssetTransactionsDiff {
         height = height,
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(tx.assetId -> -tx.quantity))),
-        assetInfos = Map(tx.assetId          -> AssetInfo(isReissuable = true, volume = -tx.quantity, None))
+        assetInfos = Map(tx.assetId          -> AssetInfo(isReissuable = true, volume = -tx.quantity))
       )
     }
   }
@@ -78,7 +102,7 @@ object AssetTransactionsDiff {
 
   private def validateAsset(tx: ProvenTransaction, blockchain: Blockchain, assetId: AssetId, issuerOnly: Boolean): Either[ValidationError, Unit] = {
     blockchain.transactionInfo(assetId) match {
-      case Some((_, sitx: IssueTransaction)) if sitx.script.isEmpty && !validIssuer(issuerOnly, tx.sender, sitx.sender) =>
+      case Some((_, sitx: IssueTransaction)) if !validIssuer(issuerOnly, tx.sender, sitx.sender) =>
         Left(GenericError("Asset was issued by other address"))
       case None =>
         Left(GenericError("Referenced assetId not found"))

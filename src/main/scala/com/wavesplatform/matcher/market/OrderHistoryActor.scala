@@ -2,6 +2,7 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.api.BatchCancel
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model._
@@ -34,6 +35,8 @@ class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor {
       cancelledTimer.measure(orderHistory.process(ev))
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
+    case BatchCancel(address, _, ts) =>
+      sender() ! orderHistory.updateTimestamp(address, ts)
   }
 
   def forceCancelOrder(id: ByteStr): Unit = {

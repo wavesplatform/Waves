@@ -1,12 +1,13 @@
 package com.wavesplatform.api.http.assets
 
-import java.util.concurrent.Executors
+import java.util.concurrent._
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
+import cats.implicits._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, ByteStr}
@@ -14,7 +15,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
+import com.wavesplatform.transaction.{AssetId, AssetIdStringLength, TransactionFactory, ValidationError}
 import com.wavesplatform.utils.{Base58, Time, _}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -34,7 +35,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     extends ApiRoute
     with BroadcastRoute {
 
-  import AssetsApiRoute._
+  private val distributionTaskScheduler = {
+    val executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS))
+    Scheduler(executor)
+  }
 
   override lazy val route =
     pathPrefix("assets") {
@@ -53,6 +57,26 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       complete(balanceJson(address, assetId))
     }
 
+  def assetDistributionTask(assetId: AssetId, maybeHeight: Option[Int]): Task[ToResponseMarshallable] = {
+    val currHeightDistributionTask: Task[Either[ValidationError, Map[Address, Long]]] =
+      Task
+        .eval(blockchain.assetDistribution(assetId))
+        .map(_.asRight[ValidationError])
+
+    val distributionTask = maybeHeight
+      .fold(currHeightDistributionTask) { height =>
+        Task.eval(
+          blockchain
+            .assetDistributionAtHeight(assetId, height)
+        )
+      }
+
+    distributionTask.map {
+      case Right(dst) => Json.toJson(dst.map { case (a, b) => a.stringRepr -> b }): ToResponseMarshallable
+      case Left(err)  => ApiError.fromValidationError(err)
+    }
+  }
+
   @Path("/{assetId}/distribution")
   @ApiOperation(value = "Asset balance distribution", notes = "Asset balance distribution by account", httpMethod = "GET")
   @ApiImplicitParams(
@@ -64,13 +88,20 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       val distributionTask: Task[ToResponseMarshallable] =
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) =>
-            Task
-              .eval(blockchain.assetDistribution(ByteStr(byteArray)).map { case (a, b) => a.stringRepr -> b })
-              .map(dst => Json.toJson(dst): ToResponseMarshallable)
+            assetDistributionTask(ByteStr(byteArray), None)
           case Failure(_) =>
             Task.pure(ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId")))
         }
-      complete(distributionTask.runAsyncLogErr(distributionTaskScheduler))
+
+      complete {
+        try {
+          distributionTask.runAsyncLogErr(distributionTaskScheduler)
+        } catch {
+          case _: RejectedExecutionException =>
+            val errMsg = CustomValidationError("Asset distribution currently unavailable, try again later")
+            Future.successful(errMsg.json: ToResponseMarshallable)
+        }
+      }
     }
 
   @Path("/{assetId}/distribution/{height}")
@@ -89,18 +120,21 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       val distributionTask: Task[ToResponseMarshallable] =
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) =>
-            Task
-              .eval(
-                blockchain
-                  .assetDistributionAtHeight(ByteStr(byteArray), height)
-                  .map { case (a, b) => a.stringRepr -> b })
-              .map(r => Json.toJson(r): ToResponseMarshallable)
+            assetDistributionTask(ByteStr(byteArray), Some(height))
 
           case Failure(_) =>
             Task.pure(ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId")))
         }
 
-      complete(distributionTask.runAsyncLogErr(distributionTaskScheduler))
+      complete {
+        try {
+          distributionTask.runAsyncLogErr(distributionTaskScheduler)
+        } catch {
+          case _: RejectedExecutionException =>
+            val errMsg = CustomValidationError("Asset distribution currently unavailable, try again later")
+            Future.successful(errMsg.json: ToResponseMarshallable)
+        }
+      }
     }
 
   @Path("/balance/{address}")
@@ -118,11 +152,14 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   @ApiOperation(value = "Information about an asset", notes = "Provides detailed information about given asset", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "assetId", value = "ID of the asset", required = true, dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "assetId", value = "ID of the asset", required = true, dataType = "string", paramType = "path"),
+      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
     ))
   def details: Route =
     (get & path("details" / Segment)) { id =>
-      complete(assetDetails(id))
+      parameters('full.as[Boolean].?) { full =>
+        complete(assetDetails(id, full.getOrElse(false)))
+      }
     }
 
   @Path("/transfer")
@@ -295,7 +332,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       )
     }).left.map(ApiError.fromValidationError)
 
-  private def assetDetails(assetId: String): Either[ApiError, JsObject] =
+  private def assetDetails(assetId: String, full: Boolean): Either[ApiError, JsObject] =
     (for {
       id <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
       tt <- blockchain.transactionInfo(id).toRight("Failed to find issue transaction by ID")
@@ -305,7 +342,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         case _                   => None
       }).toRight("No issue transaction found with given asset ID")
       description <- blockchain.assetDescription(id).toRight("Failed to get description of the asset")
-      complexity  <- description.script.fold[Either[String, Long]](Right(0))(ScriptCompiler.estimate)
+      script = description.script.filter(_ => full)
+      complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.version))
     } yield {
       JsObject(
         Seq(
@@ -318,11 +356,18 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "decimals"       -> JsNumber(tx.decimals.toInt),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
+          "scripted"       -> JsBoolean(description.script.nonEmpty),
           "minSponsoredAssetFee" -> (description.sponsorship match {
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
           })
-        )
+        ) ++ (script.toSeq.flatMap { script =>
+          Seq(
+            "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
+            "script"           -> JsString(script.bytes().base64),
+            "scriptText"       -> JsString(script.text)
+          )
+        })
       )
     }).left.map(m => CustomValidationError(m))
 
@@ -344,5 +389,5 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 }
 
 object AssetsApiRoute {
-  val distributionTaskScheduler = Scheduler(Executors.newSingleThreadExecutor())
+  val MAX_DISTRIBUTION_TASKS = 5
 }

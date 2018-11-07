@@ -2,6 +2,7 @@ package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
 
+import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
 import com.wavesplatform.utx.UtxPool
@@ -10,7 +11,6 @@ import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import com.wavesplatform.api.http.assets.AssetsApiRoute
 
 class AssetsApiRouteSpec
     extends RouteSpec("/assets")
@@ -89,5 +89,4 @@ class AssetsApiRouteSpec
       (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
     }
   }
-
 }

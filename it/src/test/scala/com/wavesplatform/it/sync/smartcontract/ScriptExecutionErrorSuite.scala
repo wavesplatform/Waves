@@ -5,7 +5,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.{Terms}
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.CreateAliasTransactionV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -70,7 +70,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
           .selfSigned(2, None, acc0, acc1.toAddress, 1000, ts, None, minFee, Array())
           .explicitGet()
           .json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))),
-      "Probably script does not return boolean"
+      "not a boolean"
     )
   }
 }

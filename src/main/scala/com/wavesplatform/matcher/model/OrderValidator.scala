@@ -4,6 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE, FALSE}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.api.DBUtils.indexes.active.MaxElements
@@ -20,6 +21,10 @@ import org.iq80.leveldb.DB
 
 import scala.util.control.NonFatal
 
+/**
+  * @param db matcher LevelDB instance
+  * @param portfolio "pessimistic" portfolio, which includes pending spendings from UTX pool!
+  */
 class OrderValidator(db: DB,
                      blockchain: Blockchain,
                      portfolio: Address => Portfolio,
@@ -43,11 +48,13 @@ class OrderValidator(db: DB,
     blockchain.accountScript(address).fold(verifySignature(order)) { script =>
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
         Left("Trading on scripted account isn't allowed yet")
+      else if (order.version <= 1) Left("Can't process order with signature from scripted account")
       else
-        try MatcherScriptRunner[Boolean](script, order) match {
+        try MatcherScriptRunner[EVALUATED](script, order) match {
           case (_, Left(execError)) => Left(s"Error executing script for $address: $execError")
-          case (_, Right(false))    => Left(s"Order rejected by script for $address")
-          case (_, Right(true))     => Right(order)
+          case (_, Right(FALSE))    => Left(s"Order rejected by script for $address")
+          case (_, Right(TRUE))     => Right(order)
+          case (_, Right(x))        => Left(s"Script returned not a boolean result, but $x")
         } catch {
           case NonFatal(e) => Left(s"Caught ${e.getClass.getCanonicalName} while executing script for $address: ${e.getMessage}")
         }
@@ -69,6 +76,20 @@ class OrderValidator(db: DB,
         s"available balance is ${formatPortfolio(actualBalance.combine(openVolume.mapValues(-_)))}"
     )
   }
+
+  @inline private def decimals(assetId: Option[AssetId]): Either[String, Int] = assetId.fold[Either[String, Int]](Right(8)) { aid =>
+    blockchain.assetDescription(aid).map(_.decimals).toRight(s"Invalid asset id $aid")
+  }
+
+  private def validateDecimals(o: Order): Either[String, Order] =
+    for {
+      pd <- decimals(o.assetPair.priceAsset)
+      ad <- decimals(o.assetPair.amountAsset)
+      insignificantDecimals = (pd - ad).max(0)
+      _ <- Either.cond(o.price % BigDecimal(10).pow(insignificantDecimals).toLongExact == 0,
+                       o,
+                       s"Invalid price, last $insignificantDecimals digits must be 0")
+    } yield o
 
   def tradableBalance(acc: AssetAcc): Long =
     timer
@@ -93,13 +114,14 @@ class OrderValidator(db: DB,
             .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
             .ensure(s"Order should have a timestamp after $lowestOrderTs, but it is ${order.timestamp}")(_.timestamp > lowestOrderTs)
             .ensure(s"Order matcherFee should be >= ${settings.minOrderFee}")(_.matcherFee >= settings.minOrderFee)
-            .ensure("Invalid order")(_.isValid(time.correctedTime()))
+          _ <- order.isValid(time.correctedTime()).toEither
+          _ <- (Right(order): Either[String, Order])
             .ensure("Order has already been placed")(o => DBUtils.orderInfo(db, o.id()).status == LimitOrder.NotFound)
             .ensure(s"Limit of $MaxElements active orders has been reached")(o => DBUtils.activeOrderCount(db, o.senderPublicKey) < MaxElements)
           _ <- validateBalance(order)
           _ <- validatePair(order.assetPair)
+          _ <- validateDecimals(order)
           _ <- verifyScript(order.sender, order)
-          _ <- verifyScript(order.matcherPublicKey, order)
         } yield order
       }
 }

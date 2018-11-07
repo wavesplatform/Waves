@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 package object sync {
   val smartFee                   = 0.004.waves
@@ -10,6 +11,7 @@ package object sync {
   val issueFee                   = 1.waves
   val burnFee                    = 1.waves
   val sponsorFee                 = 1.waves
+  val setAssetScriptFee          = 1.waves
   val setScriptFee               = 0.01.waves
   val transferAmount             = 10.waves
   val leasingAmount              = transferAmount
@@ -30,4 +32,7 @@ package object sync {
   }
 
   val supportedVersions = List(null, "2") //sign and broadcast use default for V1
+
+  val script       = ScriptCompiler(s"""true""".stripMargin).explicitGet()._1
+  val scriptBase64 = script.bytes.value.base64
 }
