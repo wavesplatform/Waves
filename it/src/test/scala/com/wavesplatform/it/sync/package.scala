@@ -18,6 +18,7 @@ package object sync {
   val massTransferFeePerTransfer = 0.0005.waves
   val someAssetAmount            = 9999999999999l
   val matcherFee                 = 0.003.waves
+  val smartMatcherFee            = 0.007.waves
 
   def calcDataFee(data: List[DataEntry[_]]): Long = {
     val dataSize = data.map(_.toBytes.length).sum + 128

@@ -31,7 +31,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
     "make order and after matcher's restart try to cancel it" in {
       // Alice places sell order
       val aliceOrder = matcherNode
-        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, orderVersion)
+        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee, orderVersion)
       aliceOrder.status shouldBe "OrderAccepted"
       val firstOrder = aliceOrder.message.id
 
