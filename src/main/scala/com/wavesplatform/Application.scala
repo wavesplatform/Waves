@@ -266,19 +266,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         classOf[TransactionsApiRoute],
         classOf[NxtConsensusApiRoute],
         classOf[WalletApiRoute],
-        classOf[PaymentApiRoute],
         classOf[UtilsApiRoute],
         classOf[PeersApiRoute],
         classOf[AddressApiRoute],
         classOf[DebugApiRoute],
-        classOf[WavesApiRoute],
         classOf[AssetsApiRoute],
         classOf[ActivationApiRoute],
-        classOf[AssetsBroadcastApiRoute],
         classOf[LeaseApiRoute],
-        classOf[LeaseBroadcastApiRoute],
-        classOf[AliasApiRoute],
-        classOf[AliasBroadcastApiRoute]
+        classOf[AliasApiRoute]
       )
       val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)

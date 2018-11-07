@@ -1,96 +1,44 @@
 package com.wavesplatform.matcher.market
 
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{ActorRef, Props}
-import akka.testkit.ImplicitSender
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import akka.actor.{Actor, ActorRef, Kill, Props, Terminated}
+import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.OrderAccepted
-import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData}
-import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook}
-import com.wavesplatform.matcher.{AssetPairBuilder, MatcherTestData}
-import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.matcher.market.MatcherActorSpecification.FailAtStartActor
+import com.wavesplatform.matcher.model.ExchangeTransactionCreator
+import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
+import org.scalatest.concurrent.Eventually
 
 class MatcherActorSpecification
     extends MatcherSpec("MatcherActor")
     with MatcherTestData
     with BeforeAndAfterEach
     with PathMockFactory
-    with ImplicitSender {
+    with ImplicitSender
+    with Eventually {
 
   private val blockchain: Blockchain = stub[Blockchain]
   (blockchain.assetDescription _)
-    .when(ByteStr.decodeBase58("BASE1").get)
-    .returns(Some(AssetDescription(PrivateKeyAccount(Array.empty), "Unknown".getBytes, Array.emptyByteArray, 8, false, 1, None, 0)))
-  (blockchain.assetDescription _)
-    .when(ByteStr.decodeBase58("BASE2").get)
-    .returns(Some(AssetDescription(PrivateKeyAccount(Array.empty), "Unknown".getBytes, Array.emptyByteArray, 8, false, 1, None, 0)))
-
-  private val pairBuilder = new AssetPairBuilder(matcherSettings, blockchain)
-  private val txFactory   = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime).createTransaction _
-  private val obc         = new ConcurrentHashMap[AssetPair, OrderBook]
-  private val ob          = new AtomicReference(Map.empty[AssetPair, ActorRef])
-
-  def update(ap: AssetPair)(snapshot: OrderBook): Unit = obc.put(ap, snapshot)
-
-  private var actor: ActorRef = system.actorOf(
-    Props(
-      new MatcherActor(pairBuilder.validateAssetPair,
-                       ob,
-                       update,
-                       mock[UtxPool],
-                       mock[ChannelGroup],
-                       matcherSettings,
-                       blockchain.assetDescription,
-                       txFactory) with RestartableActor))
-
-  val i1 = IssueTransactionV1
-    .selfSigned(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
-    .right
-    .get
-  val i2 = IssueTransactionV1
-    .selfSigned(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
-    .right
-    .get
-  (blockchain.assetDescription _)
-    .when(i2.id())
-    .returns(Some(AssetDescription(i2.sender, "ForbiddenName".getBytes, "".getBytes, 8, false, i2.quantity, None, 0)))
-  (blockchain.assetDescription _)
     .when(*)
-    .returns(Some(AssetDescription(PublicKeyAccount(Array(0: Byte)), "Unknown".getBytes, "".getBytes, 8, false, i1.quantity, None, 0)))
-  (blockchain.portfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseBalance.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
-
-  override protected def beforeEach(): Unit = {
-    obc.clear()
-    super.beforeEach()
-
-    actor = system.actorOf(
-      Props(
-        new MatcherActor(pairBuilder.validateAssetPair,
-                         ob,
-                         update,
-                         mock[UtxPool],
-                         mock[ChannelGroup],
-                         matcherSettings,
-                         blockchain.assetDescription,
-                         txFactory) with RestartableActor))
-  }
+    .returns(Some(AssetDescription(PrivateKeyAccount(Array.empty), "Unknown".getBytes, Array.emptyByteArray, 8, reissuable = false, 1, None, 0)))
+    .anyNumberOfTimes()
 
   "MatcherActor" should {
     "return all open markets" in {
-      val a1 = strToSomeAssetId("123")
-      val a2 = strToSomeAssetId("234")
+      val actor = defaultActor()
 
-      val pair  = AssetPair(a2, a1)
+      val pair  = AssetPair(randomAssetId, randomAssetId)
       val order = buy(pair, 2000, 1)
 
       (blockchain.accountScript _)
@@ -111,10 +59,82 @@ class MatcherActorSpecification
           s.size shouldBe 1
       }
     }
+
+    "mark an order book as failed" when {
+      "it crashes at start" in {
+        val pair = AssetPair(randomAssetId, randomAssetId)
+        val ob   = emptyOrderBookRefs
+        val actor = waitInitialization(
+          TestActorRef(
+            new MatcherActor(
+              ob,
+              (_, _) => Props(classOf[FailAtStartActor], pair),
+              blockchain.assetDescription
+            )
+          ))
+
+        actor ! buy(pair, 2000, 1)
+        eventually { ob.get()(pair) shouldBe 'left }
+      }
+
+      "it crashes during the work" in {
+        val ob    = emptyOrderBookRefs
+        val actor = defaultActor(ob)
+
+        val a1, a2, a3 = randomAssetId
+
+        val pair1  = AssetPair(a1, a2)
+        val order1 = buy(pair1, 2000, 1)
+
+        val pair2  = AssetPair(a2, a3)
+        val order2 = buy(pair2, 2000, 1)
+
+        actor ! order1
+        actor ! order2
+        receiveN(2)
+
+        ob.get()(pair1) shouldBe 'right
+        ob.get()(pair2) shouldBe 'right
+
+        val toKill = actor.getChild(List(OrderBookActor.name(pair1)).iterator)
+
+        val probe = TestProbe()
+        probe.watch(toKill)
+        toKill.tell(Kill, actor)
+        probe.expectMsgType[Terminated]
+
+        ob.get()(pair1) shouldBe 'left
+      }
+    }
+
     "delete order books" is pending
     "forward new orders to order books" is pending
   }
 
-  override protected def afterAll(): Unit          = shutdown()
-  def strToSomeAssetId(s: String): Option[AssetId] = Some(ByteStr(s.getBytes()))
+  private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs): TestActorRef[MatcherActor] = {
+    val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime).createTransaction _
+    waitInitialization(
+      TestActorRef(
+        new MatcherActor(
+          ob,
+          (assetPair, matcher) =>
+            OrderBookActor.props(matcher, assetPair, _ => {}, _ => {}, mock[UtxPool], mock[ChannelGroup], matcherSettings, txFactory),
+          blockchain.assetDescription
+        )
+      ))
+  }
+
+  private def waitInitialization(x: TestActorRef[MatcherActor]): TestActorRef[MatcherActor] = eventually {
+    x.underlyingActor.recoveryFinished shouldBe true
+    x
+  }
+  private def emptyOrderBookRefs             = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private def randomAssetId: Option[AssetId] = Some(ByteStr(randomBytes()))
+}
+
+object MatcherActorSpecification {
+  private class FailAtStartActor(pair: AssetPair) extends Actor {
+    throw new RuntimeException("I don't want to work today")
+    override def receive: Receive = Actor.emptyBehavior
+  }
 }

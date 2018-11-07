@@ -12,8 +12,8 @@ import org.scalatest.{Assertion, Assertions, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, Json, Writes}
 
-import scala.concurrent.{Await, Awaitable}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Awaitable}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Try}
 
@@ -47,20 +47,23 @@ object SyncMatcherHttpApi extends Assertions {
 
     import com.wavesplatform.it.api.AsyncMatcherHttpApi.{MatcherAsyncHttpApi => async}
 
-    private val RequestAwaitTime      = 15.seconds
+    private val RequestAwaitTime      = 30.seconds
     private val OrderRequestAwaitTime = 1.minutes
 
     def orderBook(assetPair: AssetPair): OrderBookResponse =
       sync(async(m).orderBook(assetPair))
 
     def marketStatus(assetPair: AssetPair): MarketStatusResponse =
-      sync(async(m).marketStatus(assetPair))
+      sync(async(m).marketStatus(assetPair), RequestAwaitTime)
+
+    def deleteOrderBook(assetPair: AssetPair): OrderBookResponse =
+      sync(async(m).deleteOrderBook(assetPair), RequestAwaitTime)
 
     def fullOrderHistory(sender: PrivateKeyAccount): Seq[OrderbookHistory] =
-      sync(async(m).fullOrdersHistory(sender))
+      sync(async(m).fullOrdersHistory(sender), RequestAwaitTime)
 
-    def orderHistoryByPair(sender: PrivateKeyAccount, assetPair: AssetPair): Seq[OrderbookHistory] =
-      sync(async(m).orderHistoryByPair(sender, assetPair))
+    def orderHistoryByPair(sender: PrivateKeyAccount, assetPair: AssetPair, activeOnly: Boolean = false): Seq[OrderbookHistory] =
+      sync(async(m).orderHistoryByPair(sender, assetPair, activeOnly), RequestAwaitTime)
 
     def activeOrderHistory(sender: PrivateKeyAccount): Seq[OrderbookHistory] =
       sync(async(m).activeOrderHistory(sender))
@@ -96,6 +99,9 @@ object SyncMatcherHttpApi extends Assertions {
                                  waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       sync(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
 
+    def waitOrderInBlockchain(orderId: String, retryInterval: FiniteDuration = 1.second): Seq[TransactionInfo] =
+      sync(async(m).waitOrderInBlockchain(orderId, retryInterval))
+
     def reservedBalance(sender: PrivateKeyAccount, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       sync(async(m).reservedBalance(sender), waitTime)
 
@@ -111,15 +117,23 @@ object SyncMatcherHttpApi extends Assertions {
                                       waitTime: Duration = OrderRequestAwaitTime): Boolean =
       sync(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus), waitTime)
 
+    def expectCancelRejected(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
+      sync(async(m).expectCancelRejected(sender, assetPair, orderId), waitTime)
+
     def cancelOrder(sender: PrivateKeyAccount,
                     assetPair: AssetPair,
-                    orderId: Option[String],
-                    timestamp: Option[Long] = None,
+                    orderId: String,
                     waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
-      sync(async(m).cancelOrder(sender, assetPair, orderId, timestamp), waitTime)
+      sync(async(m).cancelOrder(sender, assetPair, orderId), waitTime)
+
+    def cancelOrdersForPair(sender: PrivateKeyAccount,
+                            assetPair: AssetPair,
+                            timestamp: Long = System.currentTimeMillis(),
+                            waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
+      sync(async(m).cancelOrdersForPair(sender, assetPair, timestamp), waitTime)
 
     def cancelAllOrders(sender: PrivateKeyAccount,
-                        timestamp: Option[Long] = None,
+                        timestamp: Long = System.currentTimeMillis(),
                         waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       sync(async(m).cancelAllOrders(sender, timestamp), waitTime)
 

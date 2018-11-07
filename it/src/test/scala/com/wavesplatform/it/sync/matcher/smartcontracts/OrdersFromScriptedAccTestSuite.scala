@@ -21,12 +21,12 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     // Alice issues new asset
     val aliceAsset =
       aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, issueFee, 2).id
-    nodes.waitForHeightAriseAndTxPresent(aliceAsset)
+    matcherNode.waitForTransaction(aliceAsset)
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
     "setScript at account" in {
       // check assets's balances
-      aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
+      matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
       matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
 
       setContract(Some("true"), bobAcc)
@@ -50,15 +50,13 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
     "scripted account can trade once SmartAccountTrading is activated" in {
       setContract(Some("true"), bobAcc)
-      val bobOrder = matcherNode
-        .placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
+      val bobOrder = matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, version = 2, 10.minutes)
       bobOrder.status shouldBe "OrderAccepted"
     }
 
     "can trade from non-scripted account" in {
       // Alice places sell order
-      val aliceOrder = matcherNode
-        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
+      val aliceOrder = matcherNode.placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, version = 1, 10.minutes)
 
       aliceOrder.status shouldBe "OrderAccepted"
 

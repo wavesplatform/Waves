@@ -38,7 +38,7 @@ object CommonValidation {
     DataTransaction.typeId           -> 1,
     SetScriptTransaction.typeId      -> 10,
     SponsorFeeTransaction.typeId     -> 1000,
-    SetAssetScriptTransaction.typeId -> 1000
+    SetAssetScriptTransaction.typeId -> (1000 - 4)
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
@@ -136,7 +136,7 @@ object CommonValidation {
       case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
       case it: SetAssetScriptTransaction =>
         if (it.script.isEmpty) {
-          Left(GenericError("Empty script is disabled."))
+          Left(GenericError("Cannot remove script from an asset issued with a script"))
         } else {
           activationBarrier(BlockchainFeatures.SmartAssets)
         }
@@ -246,14 +246,7 @@ object CommonValidation {
   }
 
   def checkFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, Unit] = {
-    def hasSmartAccountScript: Boolean = tx match {
-      case tx: Transaction with Authorized => blockchain.hasScript(tx.sender)
-      case _                               => false
-    }
-
-    if (tx.assetFee._1.nonEmpty && !blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, height) && hasSmartAccountScript) {
-      Left(GenericError("Transactions from scripted accounts require Waves as fee"))
-    } else if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
+    if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
       for {
         minAFee <- getMinFee(blockchain, fs, height, tx)
         minWaves   = minAFee._3

@@ -34,7 +34,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   private lazy val maxBlockReadinessAge = settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
   private var ngState: Option[NgState]              = Option.empty
-  private var restTotalConstraint: MiningConstraint = MiningConstraints(settings.minerSettings, blockchain, blockchain.height).total
+  private var restTotalConstraint: MiningConstraint = MiningConstraints(blockchain, blockchain.height).total
 
   private val service               = monix.execution.Scheduler.singleThread("last-block-info-publisher")
   private val internalLastBlockInfo = ConcurrentSubject.publish[LastBlockInfo](service)
@@ -118,7 +118,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
               case lastBlockId =>
                 val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
-                val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
+                val miningConstraints = MiningConstraints(blockchain, height)
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
                   .map(r => Some((r, Seq.empty[Transaction])))
@@ -127,7 +127,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
             if (ng.base.reference == block.reference) {
               if (block.blockScore() > ng.base.blockScore()) {
                 val height            = blockchain.unsafeHeightOf(ng.base.reference)
-                val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
+                val miningConstraints = MiningConstraints(blockchain, height)
 
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
@@ -143,7 +143,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 } else {
                   log.trace(s"New liquid block is better version of existing, swapping")
                   val height            = blockchain.unsafeHeightOf(ng.base.reference)
-                  val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
+                  val miningConstraints = MiningConstraints(blockchain, height)
 
                   BlockDiffer
                     .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
@@ -165,7 +165,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
                     val constraint: MiningConstraint = {
                       val height            = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(0)
-                      val miningConstraints = MiningConstraints(settings.minerSettings, blockchain, height)
+                      val miningConstraints = MiningConstraints(blockchain, height)
                       miningConstraints.total
                     }
 
@@ -242,7 +242,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
             for {
               _ <- microBlock.signaturesValid()
               r <- {
-                val constraints  = MiningConstraints(settings.minerSettings, blockchain, blockchain.height)
+                val constraints  = MiningConstraints(blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
                 BlockDiffer.fromMicroBlock(functionalitySettings, this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, mdConstraint)
               }
@@ -439,8 +439,12 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     }
   }
 
-  override def hasScript(address: Address): Boolean = ngState.fold(blockchain.hasScript(address)) { ng =>
-    ng.bestLiquidDiff.scripts.contains(address) || blockchain.hasScript(address)
+  override def hasScript(address: Address): Boolean = {
+    ngState.fold(blockchain.hasScript(address)) { ng =>
+      ng.bestLiquidDiff.scripts.exists {
+        case (addr, maybeScript) => addr == address && maybeScript.nonEmpty
+      } || blockchain.hasScript(address)
+    }
   }
 
   override def assetScript(asset: AssetId): Option[Script] = ngState.fold(blockchain.assetScript(asset)) { ng =>
@@ -480,7 +484,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   override def assetDistribution(assetId: AssetId): Map[Address, Long] =
     blockchain.assetDistribution(assetId) ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Map[Address, Long] = {
+  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = {
     val innerDistribution = blockchain.assetDistributionAtHeight(assetId, height)
     ngState.fold(innerDistribution) { ng =>
       if (height < this.height) {
@@ -488,7 +492,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       } else {
         val distributionFromNG =
           changedBalances(_.assets.getOrElse(assetId, 0) != 0, portfolio(_).assets.getOrElse(assetId, 0))
-        innerDistribution ++ distributionFromNG
+        innerDistribution |+| distributionFromNG.asRight
       }
     }
   }

@@ -61,15 +61,14 @@ object SyncHttpApi extends Assertions {
     case _          => Assertions.fail(s"Expecting not found error")
   }
 
-  val RequestAwaitTime = 15.seconds
+  val RequestAwaitTime = 30.seconds
 
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime) =
     try Await.result(awaitable, atMost)
     catch {
       case usce: UnexpectedStatusCodeException => throw usce
       case te: TimeoutException                => throw te
-      case NonFatal(cause) =>
-        throw new Exception(cause)
+      case NonFatal(cause)                     => throw new Exception(cause)
     }
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
@@ -112,8 +111,8 @@ object SyncHttpApi extends Assertions {
     def assetBalance(address: String, asset: String): AssetBalance =
       sync(async(n).assetBalance(address, asset))
 
-    def assetsDetails(assetId: String): AssetInfo =
-      sync(async(n).assetsDetails(assetId))
+    def assetsDetails(assetId: String, fullInfo: Boolean = false): AssetInfo =
+      sync(async(n).assetsDetails(assetId, fullInfo))
 
     def addressScriptInfo(address: String): AddressApiRoute.AddressScriptInfo =
       sync(async(n).scriptInfo(address))

@@ -1,13 +1,13 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import io.swagger.annotations.ApiModelProperty
-import play.api.libs.functional.syntax._
-import play.api.libs.json.{JsPath, Json, Reads, Writes}
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.assets.BurnTransactionV2
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import io.swagger.annotations.ApiModelProperty
+import play.api.libs.functional.syntax._
+import play.api.libs.json.{JsPath, Json, Reads, Writes}
 
 case class SignedBurnV2Request(@ApiModelProperty(value = "BurnTransaction format version", required = true)
                                version: Byte,
@@ -44,7 +44,7 @@ object SignedBurnV2Request {
       (JsPath \ "quantity").read[Long].orElse((JsPath \ "amount").read[Long]) and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "proofs").read[List[String]]
+      (JsPath \ "proofs").read[List[ProofStr]]
   )(SignedBurnV2Request.apply _)
 
   implicit val writes: Writes[SignedBurnV2Request] = Json.writes[SignedBurnV2Request]

@@ -26,7 +26,7 @@ object MatcherDefaultConfig {
                                      |}""".stripMargin)
 
   val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
+    .zip(Seq(matcherConfig.withFallback(minerDisabled), minerDisabled, minerDisabled, empty()))
     .map { case (n, o) => o.withFallback(n) }
 
 }

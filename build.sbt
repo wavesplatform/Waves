@@ -45,7 +45,7 @@ logBuffered := false
 
 inThisBuild(
   Seq(
-    scalaVersion := "2.12.6",
+    scalaVersion := "2.12.7",
     organization := "com.wavesplatform",
     crossPaths := false,
     scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
@@ -208,7 +208,14 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
   p: ProjectReference
 }
 
-addCommandAlias("checkPR", """;set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings"); Global / checkPRRaw""")
+addCommandAlias(
+  "checkPR",
+  """;
+    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
+    |Global / checkPRRaw;
+    |set scalacOptions in ThisBuild -= "-Xfatal-warnings";
+  """.stripMargin
+)
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw in Global := {
   try {
@@ -261,7 +268,7 @@ lazy val lang =
       scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
       developers := List(Developer("petermz", "Peter Zhelezniakov", "peterz@rambler.ru", url("https://wavesplatform.com"))),
       libraryDependencies ++= Seq(
-        "org.scala-js"                      %% "scalajs-stubs" % "0.6.22" % "provided",
+        "org.scala-js"                      %% "scalajs-stubs" % "1.0.0-RC1" % "provided",
         "com.github.spullara.mustache.java" % "compiler" % "0.9.5"
       ) ++ Dependencies.logging.map(_       % "test") // scrypto logs an error if a signature verification was failed
     )

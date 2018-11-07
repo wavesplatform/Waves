@@ -37,7 +37,7 @@ object AssetTransactionsDiff {
             assetScripts = Map(tx.assetId        -> tx.script)
           ))
       } else {
-        Left(GenericError("Asset is not scripted."))
+        Left(GenericError("Cannot set script on an asset issued without a script"))
       }
     }
 
@@ -105,7 +105,7 @@ object AssetTransactionsDiff {
 
   private def validateAsset(tx: ProvenTransaction, blockchain: Blockchain, assetId: AssetId, issuerOnly: Boolean): Either[ValidationError, Unit] = {
     blockchain.transactionInfo(assetId) match {
-      case Some((_, sitx: IssueTransaction)) if sitx.script.isEmpty && !validIssuer(issuerOnly, tx.sender, sitx.sender) =>
+      case Some((_, sitx: IssueTransaction)) if !validIssuer(issuerOnly, tx.sender, sitx.sender) =>
         Left(GenericError("Asset was issued by other address"))
       case None =>
         Left(GenericError("Referenced assetId not found"))

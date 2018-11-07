@@ -10,7 +10,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
+import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -40,33 +40,6 @@ object LevelDBWriter {
   private[database] def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
     val (c1, c2) = v.dropWhile(_ > to).partition(_ > from)
     c1 :+ c2.headOption.getOrElse(1)
-  }
-
-  /** {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5)]}}}
-    *
-    * @param wbh WAVES balance history
-    * @param lbh Lease balance history
-    */
-  private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
-    @tailrec
-    def recMerge(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
-      buf += wh -> lh
-      if (wt.isEmpty && lt.isEmpty) {
-        buf
-      } else if (wt.isEmpty) {
-        recMerge(wh, wt, lt.head, lt.tail, buf)
-      } else if (lt.isEmpty) {
-        recMerge(wt.head, wt.tail, lh, lt, buf)
-      } else {
-        if (wh >= lh) {
-          recMerge(wt.head, wt.tail, lh, lt, buf)
-        } else {
-          recMerge(wh, wt, lt.head, lt.tail, buf)
-        }
-      }
-    }
-
-    recMerge(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
@@ -174,7 +147,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       case Some((_, i: IssueTransaction)) =>
         val ai          = db.fromHistory(Keys.assetInfoHistory(assetId), Keys.assetInfo(assetId)).getOrElse(AssetInfo(i.reissuable, i.quantity))
         val sponsorship = db.fromHistory(Keys.sponsorshipHistory(assetId), Keys.sponsorship(assetId)).fold(0L)(_.minFee)
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, i.script, sponsorship))
+        val script      = db.fromHistory(Keys.assetScriptHistory(assetId), Keys.assetScript(assetId)).flatten
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship))
       case _ => None
     }
   }
@@ -617,6 +591,67 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
   }
 
+  /**
+    * @todo move this method to `object LevelDBWriter` once SmartAccountTrading is activated
+    */
+  private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
+
+    /**
+      * Compatibility implementation where
+      *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5)]}}}
+      *
+      * @todo remove this method once SmartAccountTrading is activated
+      */
+    @tailrec
+    def recMergeCompat(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
+      buf += wh -> lh
+      if (wt.isEmpty && lt.isEmpty) {
+        buf
+      } else if (wt.isEmpty) {
+        recMergeCompat(wh, wt, lt.head, lt.tail, buf)
+      } else if (lt.isEmpty) {
+        recMergeCompat(wt.head, wt.tail, lh, lt, buf)
+      } else {
+        if (wh >= lh) {
+          recMergeCompat(wt.head, wt.tail, lh, lt, buf)
+        } else {
+          recMergeCompat(wh, wt, lt.head, lt.tail, buf)
+        }
+      }
+    }
+
+    /**
+      * Fixed implementation where
+      *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 5)]}}}
+      */
+    @tailrec
+    def recMergeFixed(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
+      buf += wh -> lh
+      if (wt.isEmpty && lt.isEmpty) {
+        buf
+      } else if (wt.isEmpty) {
+        recMergeFixed(wh, wt, lt.head, lt.tail, buf)
+      } else if (lt.isEmpty) {
+        recMergeFixed(wt.head, wt.tail, lh, lt, buf)
+      } else {
+        if (wh == lh) {
+          recMergeFixed(wt.head, wt.tail, lt.head, lt.tail, buf)
+        } else if (wh > lh) {
+          recMergeFixed(wt.head, wt.tail, lh, lt, buf)
+        } else {
+          recMergeFixed(wh, wt, lt.head, lt.tail, buf)
+        }
+      }
+    }
+
+    val recMerge = activatedFeatures
+      .get(BlockchainFeatures.SmartAccountTrading.id)
+      .filter(_ <= height)
+      .fold(recMergeCompat _)(_ => recMergeFixed _)
+
+    recMerge(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
+  }
+
   override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>
     val txs = for {
       h  <- 1 to db.get(Keys.height)
@@ -691,15 +726,22 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
   }
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Map[Address, Long] = readOnly { db =>
-    (for {
-      seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
-      addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
-      history = db.get(Keys.assetBalanceHistory(addressId, assetId))
-      actualHeight <- history.partition(_ > height)._2.headOption
-      balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
-      if balance > 0
-    } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
+    val currentHeight = db.get(Keys.height)
+
+    Either
+      .cond(
+        currentHeight - height <= MAX_DEPTH,
+        (for {
+          seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
+          addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
+          history = db.get(Keys.assetBalanceHistory(addressId, assetId))
+          actualHeight <- history.partition(_ > height)._2.headOption
+          balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
+          if balance > 0
+        } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq,
+        GenericError(s"Cannot get asset distribution at height less than ${currentHeight - MAX_DEPTH}")
+      )
   }
 
   override def wavesDistribution(height: Int): Map[Address, Long] = readOnly { db =>
