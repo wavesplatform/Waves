@@ -106,29 +106,21 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
         version = v
       )
 
-      println(s"Issue: $issueId")
-
-      val reissueId = signBroadcastAndCalcFee(
+      signBroadcastAndCalcFee(
         Json.obj("type" -> 5, "quantity" -> 200.waves, "assetId" -> issueId, "sender" -> firstAddress, "reissuable" -> false),
         usesProofs = isProof,
         version = v
       )
 
-      println(s"Reissue: $reissueId")
-
-      val burnId = signBroadcastAndCalcFee(Json.obj("type" -> 6, "quantity" -> 0, "assetId" -> issueId, "sender" -> firstAddress),
+      signBroadcastAndCalcFee(Json.obj("type" -> 6, "quantity" -> 0, "assetId" -> issueId, "sender" -> firstAddress),
                                            usesProofs = isProof,
                                            version = v)
 
-      println(s"Burn 2: $burnId")
-
-      val burnId2 = signBroadcastAndCalcFee(Json.obj("type" -> 6, "quantity" -> 100.waves, "assetId" -> issueId, "sender" -> firstAddress),
+      signBroadcastAndCalcFee(Json.obj("type" -> 6, "quantity" -> 100.waves, "assetId" -> issueId, "sender" -> firstAddress),
                                             usesProofs = isProof,
                                             version = v)
 
-      println(s"Burn 2: $burnId2")
-
-      val transferId = signBroadcastAndCalcFee(
+      signBroadcastAndCalcFee(
         Json.obj(
           "type"       -> 4,
           "sender"     -> firstAddress,
@@ -140,8 +132,6 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
         usesProofs = isProof,
         version = v
       )
-
-      println(s"Transfer: $transferId")
     }
   }
 
