@@ -31,6 +31,11 @@ object Balance {
   implicit val balanceFormat: Format[Balance] = Json.format
 }
 
+case class BalanceDetails(address: String, regular: Long, generating: Long, available: Long, effective: Long)
+object BalanceDetails {
+  implicit val balanceDetailsFormat: Format[BalanceDetails] = Json.format
+}
+
 case class AssetBalance(address: String, assetId: String, balance: Long)
 object AssetBalance {
   implicit val assetBalanceFormat: Format[AssetBalance] = Json.format

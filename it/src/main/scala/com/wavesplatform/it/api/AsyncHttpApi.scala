@@ -25,7 +25,6 @@ import org.scalactic.source.Position
 import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
-
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -144,6 +143,8 @@ object AsyncHttpApi extends Assertions {
     def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
 
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
+
+    def balanceDetails(address: String): Future[BalanceDetails] = get(s"/addresses/balance/details/$address").as[BalanceDetails]
 
     def getAddresses: Future[Seq[String]] = get(s"/addresses").as[Seq[String]]
 
