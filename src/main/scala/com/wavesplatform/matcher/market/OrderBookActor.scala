@@ -265,6 +265,7 @@ class OrderBookActor(parent: ActorRef,
     case RecoveryCompleted =>
       updateSnapshot(orderBook)
       log.debug(s"Recovery completed: $orderBook")
+      if (settings.makeSnapshotsAtStart) self ! SaveSnapshot
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook

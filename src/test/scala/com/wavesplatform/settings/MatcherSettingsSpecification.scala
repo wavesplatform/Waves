@@ -20,6 +20,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    min-order-fee = 100000
         |    order-match-tx-fee = 100000
         |    snapshots-interval = 999
+        |    make-snapshots-at-start = yes
         |    order-cleanup-interval = 5m
         |    rest-order-limit = 100
         |    default-order-timestamp = 9999
@@ -52,6 +53,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.journalDataDir should be("/waves/matcher/journal")
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(999)
+    settings.makeSnapshotsAtStart should be(true)
     settings.orderCleanupInterval should be(5.minute)
     settings.maxOrdersPerRequest should be(100)
     settings.defaultOrderTimestamp should be(9999)

@@ -188,11 +188,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         }
   }
 
-  private def cancelOrder(orderId: ByteStr, senderPublicKey: Option[PublicKeyAccount]): ToResponseMarshallable = {
+  private def cancelOrder(orderId: ByteStr, senderPublicKey: Option[PublicKeyAccount], force: Boolean = false): ToResponseMarshallable = {
     val st = cancelTimer.start()
     DBUtils.orderInfo(db, orderId).status match {
-      case LimitOrder.NotFound      => StatusCodes.NotFound   -> LimitOrder.NotFound.json
-      case status if status.isFinal => StatusCodes.BadRequest -> Json.obj("message" -> s"Order is already ${status.name}")
+      case LimitOrder.NotFound                => StatusCodes.NotFound   -> LimitOrder.NotFound.json
+      case status if status.isFinal && !force => StatusCodes.BadRequest -> Json.obj("message" -> s"Order is already ${status.name}")
       case _ =>
         DBUtils.order(db, orderId) match {
           case None =>
@@ -419,7 +419,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
     ))
   def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth) { orderId =>
-    complete(cancelOrder(orderId, None))
+    complete(cancelOrder(orderId, None, force = true))
   }
 
   @Path("/orders/{address}")
