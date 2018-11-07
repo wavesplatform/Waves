@@ -193,14 +193,18 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     assertBadRequestAndMessage(sender.signedBroadcast(tx).id, "Reason: Can't process order with signature from scripted account")
   }
 
-  def exchangeTx() = {
-    val mf        = 700000L
+  def exchangeTx(isSmart: Boolean = true) = {
     val matcher   = acc2
     val sellPrice = (0.50 * Order.PriceConstant).toLong
-    val buy       = orders()._1
-    val sell      = orders()._2
+    val buy       = orders(2, isSmart)._1
+    val sell      = orders(2, isSmart)._2
 
     val amount = math.min(buy.amount, sell.amount)
+
+    val matcherFee     = if (isSmart) 1500000 else 700000L
+    val sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong
+    val buyMatcherFee  = matcherFee - sellMatcherFee
+
     val tx = ExchangeTransactionV2
       .create(
         matcher = matcher,
@@ -208,9 +212,9 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         sellOrder = sell,
         amount = amount,
         price = sellPrice,
-        buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
-        sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
-        fee = mf,
+        buyMatcherFee = buyMatcherFee,
+        sellMatcherFee = sellMatcherFee,
+        fee = matcherFee,
         timestamp = NTP.correctedTime()
       )
       .explicitGet()
@@ -219,7 +223,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     tx
   }
 
-  def orders(version: Byte = 2) = {
+  def orders(version: Byte = 2, isSmart: Boolean = true) = {
     val buyer               = acc1
     val seller              = acc0
     val matcher             = acc2
@@ -227,7 +231,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     val expirationTimestamp = time + Order.MaxLiveTime
     val buyPrice            = 1 * Order.PriceConstant
     val sellPrice           = (0.50 * Order.PriceConstant).toLong
-    val mf                  = 700000L
+    val mf                  = if (isSmart) 1500000L else 700000L
     val buyAmount           = 2
     val sellAmount          = 3
     val assetPair           = AssetPair.createAssetPair(exchAsset, "WAVES").get
