@@ -65,51 +65,38 @@ object Verifier extends Instrumented with ScorexLogging {
                height: Int,
                transaction: Transaction,
                isTokenScript: Boolean): Either[ValidationError, Transaction] =
-    Try {
-      ScriptRunner[EVALUATED](height, Coproduct[TxOrd](transaction), blockchain, script) match {
-        case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript))
-        case (log, Right(FALSE)) =>
-          Left(TransactionNotAllowedByScript(log, script.text, isTokenScript))
-        case (_, Right(TRUE)) => Right(transaction)
-        case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
+    logged(
+      s"transaction ${transaction.id()}",
+      Try {
+        ScriptRunner[EVALUATED](height, Coproduct[TxOrd](transaction), blockchain, script) match {
+          case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript))
+          case (log, Right(FALSE)) =>
+            Left(TransactionNotAllowedByScript(log, script.text, isTokenScript))
+          case (_, Right(TRUE)) => Right(transaction)
+          case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
+        }
+      } match {
+        case Failure(e) =>
+          Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", script.text, List.empty, isTokenScript))
+        case Success(s) => s
       }
-    } match {
-      case Failure(e) =>
-        Left(
-          ScriptExecutionError(
-            s"""
-      |Uncaught execution error.
-      |Probably script does not return boolean, and can't validate any transaction or order: ${Throwables.getStackTraceAsString(e)}
-    """.stripMargin,
-            script.text,
-            List.empty,
-            isTokenScript
-          ))
-      case Success(s) => s
-    }
+    )
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] =
-    Try {
-      MatcherScriptRunner[EVALUATED](script, order) match {
-        case (ctx, Left(execError)) => Left(ScriptExecutionError(execError, script.text, ctx, isTokenScript = false))
-        case (ctx, Right(FALSE))    => Left(TransactionNotAllowedByScript(ctx, script.text, isTokenScript = false))
-        case (_, Right(TRUE))       => Right(order)
-        case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
+    logged(
+      s"order ${order.idStr()}",
+      Try {
+        MatcherScriptRunner[EVALUATED](script, order) match {
+          case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript = false))
+          case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, script.text, isTokenScript = false))
+          case (_, Right(TRUE))       => Right(order)
+          case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
+        }
+      } match {
+        case Failure(e) => Left(ScriptExecutionError(s"Uncaught execution error: $e", script.text, List.empty, isTokenScript = false))
+        case Success(s) => s
       }
-    } match {
-      case Failure(e) =>
-        Left(
-          ScriptExecutionError(
-            s"""
-      |Uncaught execution error.
-      |Probably script does not return Boolean, and can't validate any transaction or order: $e
-    """.stripMargin,
-            script.text,
-            List.empty,
-            false
-          ))
-      case Success(s) => s
-    }
+    )
 
   def verifyExchange(et: ExchangeTransaction,
                      blockchain: Blockchain,
@@ -168,4 +155,9 @@ object Verifier extends Instrumented with ScorexLogging {
                     GenericError(s"Script doesn't exist and proof doesn't validate as signature for $pt"))
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     }
+
+  private def logged[T](id: => String, result: Either[ValidationError, T]): Either[ValidationError, T] = {
+    log.debug(s"Script verification for $id ${result.fold(err => s"failed: $err", _ => "ok")}")
+    result
+  }
 }
