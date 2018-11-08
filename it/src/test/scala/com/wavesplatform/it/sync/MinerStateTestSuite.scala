@@ -43,7 +43,6 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
 
     last.waitForHeight(heightAfterTransfer + 51, 6.minutes) // if you know how to reduce waiting time, please ping @monroid
 
-    assert(miner.balanceDetails(miner.address).generating == balance1 - transferAmount - minFee)
     assert(last.balanceDetails(newAddress).generating == balance2 + transferAmount)
 
     val minerInfoAfter = last.debugMinerInfo()
