@@ -21,25 +21,14 @@ import scala.concurrent.duration._
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   var assetWOScript              = ""
   var assetWScript               = ""
-  var assetUnchangeableScript    = ""
-  var assetWAnotherOwner         = ""
-  var assetV1                    = ""
   private val accountB           = pkByAddress(secondAddress)
   private val unchangeableScript = ScriptCompiler(s"""
                                                |match tx {
                                                |case s : SetAssetScriptTransaction => false
                                                |case _ => true}""".stripMargin).explicitGet()._1
-  private val accountScript      = ScriptCompiler(s"""
-                                               |let pkB = base58'${ByteStr(accountB.publicKey)}'
-                                               |match tx {
-                                               |case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
-                                               |case _ => true}""".stripMargin).explicitGet()._1
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    assetV1 = sender
-      .issue(thirdAddress, "AssetV1", "Test coin for V1", someAssetAmount, 0, reissuable = false, issueFee)
-      .id
     assetWOScript = sender
       .issue(firstAddress, "AssetWOScript", "Test coin for SetAssetScript tests w/o script", someAssetAmount, 0, reissuable = false, issueFee, 2)
       .id
@@ -58,40 +47,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       )
       .id
 
-    assetWAnotherOwner = sender
-      .issue(
-        firstAddress,
-        "NonOwnCoin",
-        "Test coin for SetAssetScript tests",
-        someAssetAmount,
-        0,
-        reissuable = false,
-        issueFee,
-        2,
-        script = Some(ScriptCompiler(s"""
-                                 |match tx {
-                                 |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(
-                                          pkByAddress(secondAddress).publicKey).base58}')
-                                 |case _ => false}""".stripMargin).explicitGet()._1.bytes.value.base64)
-      )
-      .id
-
-    assetUnchangeableScript = sender
-      .issue(
-        firstAddress,
-        "SetAssetWDep",
-        "Test coin for SetAssetScript tests",
-        someAssetAmount,
-        0,
-        reissuable = false,
-        issueFee,
-        2,
-        script = Some(unchangeableScript.bytes.value.base64)
-      )
-      .id
-
+    nodes.waitForHeightAriseAndTxPresent(assetWOScript)
     nodes.waitForHeightAriseAndTxPresent(assetWScript)
-    nodes.waitForHeightAriseAndTxPresent(assetUnchangeableScript)
   }
 
   test("issuer cannot change script on asset w/o initial script") {
@@ -102,10 +59,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     )
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee),
                                "Reason: Cannot remove script from an asset issued with a script")
-    assertBadRequestAndMessage(
-      sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(unchangeableScript.bytes.value.base64)),
-      "Reason: Cannot set script on an asset issued without a script"
-    )
+
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
       "Reason: Cannot remove script from an asset issued with a script"
@@ -114,6 +68,28 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("non-issuer cannot change script") {
+    /*
+    issuer is first address, but script allows make SetAssetScript only second address
+     */
+    val assetWAnotherOwner = sender
+      .issue(
+        firstAddress,
+        "NonOwnCoin",
+        "Test coin for SetAssetScript tests",
+        someAssetAmount,
+        0,
+        reissuable = false,
+        issueFee,
+        2,
+        script = Some(ScriptCompiler(s"""
+                                        |match tx {
+                                        |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(
+                                          pkByAddress(secondAddress).publicKey).base58}')
+                                        |case _ => false}""".stripMargin).explicitGet()._1.bytes.value.base64)
+      )
+      .id
+    nodes.waitForHeightAriseAndTxPresent(assetWAnotherOwner)
+
     assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
@@ -131,10 +107,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
       "Reason: Cannot remove script from an asset issued with a script"
     )
-    assertBadRequestAndMessage(
-      sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(unchangeableScript.bytes.value.base64)),
-      "Reason: Asset was issued by other address"
-    )
+
     notMiner.assertBalances(firstAddress, balance1, eff1)
     notMiner.assertBalances(secondAddress, balance2, eff2)
   }
@@ -258,15 +231,43 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("try to make SetAssetScript tx on script that deprecates SetAssetScript") {
+    /*
+    script doesn't allow do SetAssetScript
+     */
+    val assetUnchangeableScript = sender
+      .issue(
+        firstAddress,
+        "SetAssetWDep",
+        "Test coin for SetAssetScript tests",
+        someAssetAmount,
+        0,
+        reissuable = false,
+        issueFee,
+        2,
+        script = Some(unchangeableScript.bytes.value.base64)
+      )
+      .id
+
+    nodes.waitForHeightAriseAndTxPresent(assetUnchangeableScript)
+
     assertBadRequestAndResponse(sender.setAssetScript(assetUnchangeableScript, firstAddress, setAssetScriptFee, Some(scriptBase64)),
                                 "Transaction is not allowed by token-script")
   }
 
-  test("non-issuer can change script if issuer's script allows") {
-    val accountA  = pkByAddress(firstAddress)
-    val accScript = accountScript
+  test("non-issuer can change script if issuer's account script allows (proof correct)") {
+    val accountA = pkByAddress(firstAddress)
+
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, accountA, Some(accScript), setScriptFee, System.currentTimeMillis())
+      .selfSigned(
+        SetScriptTransaction.supportedVersions.head,
+        accountA,
+        Some(ScriptCompiler(s"""|let pkB = base58'${ByteStr(accountB.publicKey)}'
+                                |match tx {
+                                |case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
+                                |case _ => true}""".stripMargin).explicitGet()._1),
+        setScriptFee,
+        System.currentTimeMillis()
+      )
       .right
       .get
 
@@ -321,6 +322,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("try to make SetAssetScript for asset v1") {
+    val assetV1 = sender
+      .issue(thirdAddress, "AssetV1", "Test coin for V1", someAssetAmount, 0, reissuable = false, issueFee)
+      .id
+    nodes.waitForHeightAriseAndTxPresent(assetV1)
+
     val (balance1, eff1) = notMiner.accountBalances(thirdAddress)
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     assertBadRequestAndMessage(sender.setAssetScript(assetV1, thirdAddress, setAssetScriptFee, Some(scriptBase64)).id,
