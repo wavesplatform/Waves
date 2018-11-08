@@ -184,26 +184,6 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         featureCheckBlocksPeriod = 1
       )
 
-  property("checkFee sponsored + smart tokens + smart accounts sunny") {
-    val settings = createSettings(
-      BlockchainFeatures.FeeSponsorship -> 0,
-      BlockchainFeatures.SmartAccounts  -> 0,
-      BlockchainFeatures.SmartAssets    -> 0,
-    )
-    val gen =
-      sponsorAndSetScriptGen(sponsorship = true, smartToken = true, smartAccount = true, feeInAssets = true, 900 /* Need to bu more accurate */ )
-    forAll(gen) {
-      case (genesisBlock, transferTx) =>
-        withStateAndHistory(settings) { blockchain =>
-          val (preconditionDiff, preconditionFees, _) =
-            BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, genesisBlock)
-
-          CommonValidation.checkFee(blockchain, settings, 1, transferTx) shouldBe 'right
-        }
-    }
-  }
-
   private def smartTokensCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Assertion): Unit = {
     val settings = createSettings(BlockchainFeatures.SmartAccounts -> 0, BlockchainFeatures.SmartAssets -> 0)
     val gen      = sponsorAndSetScriptGen(sponsorship = false, smartToken = true, smartAccount = false, feeInAssets, feeAmount)

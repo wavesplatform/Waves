@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
@@ -33,7 +34,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
   "Order can be canceled" - {
     "by sender" in {
-      val orderId = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves, 800).message.id
+      val orderId = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
 
       matcherNode.cancelOrder(bobAcc, wavesUsdPair, orderId)
@@ -44,7 +45,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       }
     }
     "with API key" in {
-      val orderId = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves, 800).message.id
+      val orderId = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
 
       matcherNode.cancelOrderWithApiKey(orderId)
@@ -61,7 +62,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
   "Cancel is rejected" - {
     "when request sender is not the sender of and order" in {
-      val orderId = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves, 800).message.id
+      val orderId = matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
       matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
 
       matcherNode.expectCancelRejected(matcherNode.privateKey, wavesUsdPair, orderId)
@@ -78,13 +79,13 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
         matcherNode.fullOrderHistory(bobAcc)
 
         val usdOrderIds = 1 to 5 map { i =>
-          matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves + i, 400).message.id
+          matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves + i, 400, matcherFee).message.id
         }
 
         matcherNode.assetBalance(bobAcc.toAddress.stringRepr, BtcId.base58)
 
         val btcOrderIds = 1 to 5 map { i =>
-          matcherNode.placeOrder(bobAcc, wavesBtcPair, OrderType.BUY, 100.waves + i, 400).message.id
+          matcherNode.placeOrder(bobAcc, wavesBtcPair, OrderType.BUY, 100.waves + i, 400, matcherFee).message.id
         }
 
         (usdOrderIds ++ btcOrderIds).foreach(id => matcherNode.waitOrderStatus(wavesUsdPair, id, "Accepted"))
@@ -96,11 +97,11 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
       "a pair" in {
         val usdOrderIds = 1 to 5 map { i =>
-          matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves + i, 400).message.id
+          matcherNode.placeOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100.waves + i, 400, matcherFee).message.id
         }
 
         val btcOrderIds = 1 to 5 map { i =>
-          matcherNode.placeOrder(bobAcc, wavesBtcPair, OrderType.BUY, 100.waves + i, 400).message.id
+          matcherNode.placeOrder(bobAcc, wavesBtcPair, OrderType.BUY, 100.waves + i, 400, matcherFee).message.id
         }
 
         (usdOrderIds ++ btcOrderIds).foreach(id => matcherNode.waitOrderStatus(wavesUsdPair, id, "Accepted"))
