@@ -6,7 +6,6 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
-
 import scala.concurrent.duration._
 
 class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {
@@ -42,13 +41,23 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
 
     last.assertBalances(newAddress, balance2 + transferAmount, eff2 + transferAmount)
 
-    last.waitForHeight(heightAfterTransfer + 51, 6.minutes) // if you know how to reduce test time, please ping @monroid
+    last.waitForHeight(heightAfterTransfer + 51, 6.minutes) // if you know how to reduce waiting time, please ping @monroid
 
     assert(miner.balanceDetails(miner.address).generating == balance1 - transferAmount - minFee)
     assert(last.balanceDetails(newAddress).generating == balance2 + transferAmount)
 
     val minerInfoAfter = last.debugMinerInfo()
     atMost(1, minerInfoAfter) should matchPattern { case State(`newAddress`, _, ts) if ts > 0 => }
+
+    val leaseBack = last.lease(newAddress, miner.address, (transferAmount - minFee), minFee).id
+    nodes.waitForHeightAriseAndTxPresent(leaseBack)
+
+    assert(last.balanceDetails(newAddress).generating == balance2)
+
+    all(miner.debugMinerInfo()) shouldNot matchPattern { case State(`newAddress`, _, ts) if ts > 0 => }
+    // uncomment after https://wavesplatform.atlassian.net/browse/NODE-1287 fix
+    //all(last.debugMinerInfo()) shouldNot matchPattern { case State(`newAddress`, _, ts) if ts > 0  => }
+
   }
 }
 
