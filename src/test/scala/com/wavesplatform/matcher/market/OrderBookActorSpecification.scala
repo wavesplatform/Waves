@@ -16,6 +16,7 @@ import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.{ByteStr, Diff}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
@@ -25,7 +26,7 @@ import scala.util.Random
 
 class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTPTime with ImplicitSender with MatcherTestData with PathMockFactory {
 
-  private val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime).createTransaction _
+  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings, ntpTime).createTransaction _
   private val obc       = new ConcurrentHashMap[AssetPair, OrderBook]
   private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
 

@@ -42,7 +42,7 @@ class Matcher(actorSystem: ActorSystem,
   private val orderBookCache = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
   private val orderValidator =
     new OrderValidator(db, blockchain, utx.portfolio, pairBuilder.validateAssetPair, settings.matcherSettings, matcherPrivateKey, NTP)
-  private val createTransaction = new ExchangeTransactionCreator(matcherPrivateKey, matcherSettings, NTP).createTransaction _
+  private val createTransaction = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings, NTP).createTransaction _
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(

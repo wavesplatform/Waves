@@ -164,9 +164,9 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val buyAmount  = 46978
       val sellAmount = 56978
 
-      val bobOrderId = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, sellAmount, sellPrice).message.id
+      val bobOrderId = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, sellAmount, sellPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Accepted", 1.minute)
-      val aliceOrderId = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, buyAmount, buyPrice).message.id
+      val aliceOrderId = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, buyAmount, buyPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
 
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
@@ -192,10 +192,12 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val bobUsdBalance     = matcherNode.assetBalance(bobAcc.address, UsdId.base58).balance
       val bobWctInitBalance = matcherNode.assetBalance(bobAcc.address, WctId.base58).balance
 
-      val bobOrderId = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, wctUsdSellAmount, wctUsdPrice).message.id
+      val bobOrderId =
+        matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, wctUsdSellAmount, wctUsdPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Accepted", 1.minute)
 
-      val aliceOrderId = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, wctUsdBuyAmount, wctUsdPrice).message.id
+      val aliceOrderId =
+        matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, wctUsdBuyAmount, wctUsdPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
 
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
@@ -220,10 +222,10 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     }
 
     "reserved balance is empty after the total execution" in {
-      val aliceOrderId = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, 5000000, 100000).message.id
+      val aliceOrderId = matcherNode.placeOrder(aliceAcc, wctUsdPair, BUY, 5000000, 100000, matcherFee).message.id
       matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Accepted", 1.minute)
 
-      val bobOrderId = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, 5000000, 99908).message.id
+      val bobOrderId = matcherNode.placeOrder(bobAcc, wctUsdPair, SELL, 5000000, 99908, matcherFee).message.id
       matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Filled", 1.minute)
       matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
 
@@ -255,14 +257,17 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       val leasingAmount = bobNode.accountBalances(bobAcc.address)._1 - leasingFee - matcherFee / 2
       val leaseTxId     = bobNode.lease(bobAcc.address, matcherAcc.address, leasingAmount, leasingFee, 2).id
       nodes.waitForHeightAriseAndTxPresent(leaseTxId)
-      val bobOrderId = matcherNode.placeOrder(bobAcc, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice).message.id
+      val bobOrderId =
+        matcherNode.placeOrder(bobAcc, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(wctWavesPair, bobOrderId, "Accepted", 1.minute)
 
       matcherNode.tradableBalance(bobAcc, wctWavesPair)("WAVES") shouldBe matcherFee / 2 + receiveAmount(SELL, wctWavesSellAmount, wctWavesPrice) - matcherFee
       matcherNode.cancelOrder(bobAcc, wctWavesPair, bobOrderId)
 
-      assertBadRequestAndResponse(matcherNode.placeOrder(bobAcc, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice),
-                                  "Not enough tradable balance")
+      assertBadRequestAndResponse(
+        matcherNode.placeOrder(bobAcc, wctWavesPair, SELL, wctWavesSellAmount / 2, wctWavesPrice, matcherFee),
+        "Not enough tradable balance"
+      )
 
       val cancelLeaseTxId = bobNode.cancelLease(bobAcc.address, leaseTxId, leasingFee, 2).id
       nodes.waitForHeightAriseAndTxPresent(cancelLeaseTxId)
@@ -271,13 +276,13 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
   "Alice and Bob trade ETH-WAVES" - {
     "reserved balance is empty after the total execution" in {
-      val counterId1 = matcherNode.placeOrder(aliceAcc, ethWavesPair, SELL, 2864310, 300000).message.id
+      val counterId1 = matcherNode.placeOrder(aliceAcc, ethWavesPair, SELL, 2864310, 300000, matcherFee).message.id
       matcherNode.waitOrderStatus(ethWavesPair, counterId1, "Accepted", 1.minute)
 
-      val counterId2 = matcherNode.placeOrder(aliceAcc, ethWavesPair, SELL, 7237977, 300000).message.id
+      val counterId2 = matcherNode.placeOrder(aliceAcc, ethWavesPair, SELL, 7237977, 300000, matcherFee).message.id
       matcherNode.waitOrderStatus(ethWavesPair, counterId2, "Accepted", 1.minute)
 
-      val submittedId = matcherNode.placeOrder(bobAcc, ethWavesPair, BUY, 4373667, 300000).message.id
+      val submittedId = matcherNode.placeOrder(bobAcc, ethWavesPair, BUY, 4373667, 300000, matcherFee).message.id
 
       matcherNode.waitOrderStatus(ethWavesPair, counterId1, "Filled", 1.minute)
       matcherNode.waitOrderStatus(ethWavesPair, counterId2, "PartiallyFilled", 1.minute)
