@@ -191,13 +191,16 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     rw.put(Keys.height, height)
     rw.put(Keys.blockAt(height), Some(block))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
-    rw.put(Keys.lastAddressId, Some(loadMaxAddressId() + newAddresses.size))
+    val lastAddressId = loadMaxAddressId() + newAddresses.size
+    rw.put(Keys.lastAddressId, Some(lastAddressId))
     rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
 
     for ((address, id) <- newAddresses) {
       rw.put(Keys.addressId(address), Some(id))
+      log.trace(s"WRITE ${address.address} -> $id")
       rw.put(Keys.idToAddress(id), address)
     }
+    log.trace(s"WRITE lastAddressId = $lastAddressId")
 
     val threshold = height - MAX_DEPTH
 
