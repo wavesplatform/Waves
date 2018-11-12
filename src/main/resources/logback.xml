@@ -35,15 +35,16 @@
     </appender>
 
     <logger name="io.netty" level="INFO"/>
-    <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>
-    <logger name="com.wavesplatform.state.StateWriterImpl" level="DEBUG"/>
     <logger name="io.swagger" level="INFO"/>
+
+    <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>
+    <logger name="com.wavesplatform.transaction.smart" level="INFO"/>
+
+    <logger name="org.aspectj" level="INFO"/>
     <logger name="org.asynchttpclient" level="INFO"/>
 
     <logger name="sun.rmi" level="INFO"/>
     <logger name="javax.management" level="INFO"/>
-
-    <logger name="org.aspectj" level="INFO"/>
 
     <root level="TRACE">
         <appender-ref ref="STDOUT"/>
