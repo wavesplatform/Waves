@@ -8,8 +8,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 
-//import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import com.github.mustachejava._
 

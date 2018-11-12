@@ -4,10 +4,10 @@ import java.nio.ByteBuffer
 
 import cats.data.EitherT
 import cats.kernel.Monoid
-import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.ExprEvaluator.Log
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
+import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -15,8 +15,9 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
@@ -29,7 +30,6 @@ import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 import scala.util.Try
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -537,7 +537,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
       val actual = ev[EVALUATED](ctx.evaluationContext, expr)
-      actual shouldBe evaluated(PureContext.unit)
+      actual shouldBe evaluated(unit)
     }
   }
 
@@ -557,7 +557,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
       val actual = ev[EVALUATED](ctx.evaluationContext, expr)
-      actual shouldBe evaluated(PureContext.unit)
+      actual shouldBe evaluated(unit)
     }
   }
 
@@ -577,7 +577,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
       val actual = ev[EVALUATED](ctx.evaluationContext, expr)
-      actual shouldBe evaluated(PureContext.unit)
+      actual shouldBe evaluated(unit)
     }
   }
 
@@ -599,7 +599,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
       val actual = ev[EVALUATED](ctx.evaluationContext, expr)
-      actual shouldBe evaluated(PureContext.unit)
+      actual shouldBe evaluated(unit)
     }
   }
 
