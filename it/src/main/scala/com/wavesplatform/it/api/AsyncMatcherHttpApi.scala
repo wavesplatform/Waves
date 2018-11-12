@@ -240,13 +240,13 @@ object AsyncMatcherHttpApi extends Assertions {
         case Failure(UnexpectedStatusCodeException(_, `expectedStatusCode`, responseBody)) =>
           expectedMessage match {
             case None =>
-              Try(parse(responseBody).as[MatcherStatusResponse]) match {
-                case Success(mr) if mr.status == expectedStatus => Success(true)
-                case Failure(f)                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+              Try(parse(responseBody).as[MatcherErrorResponse]) match {
+                case Success(mr) if mr.status.get == expectedStatus => Success(true)
+                case Failure(f)                                     => Failure(new RuntimeException(s"Failed to parse response: $f"))
               }
             case _ =>
               Try(parse(responseBody).as[MatcherErrorResponse]) match {
-                case Success(mr) if mr.status.get == expectedStatus && mr.message == expectedMessage =>
+                case Success(mr) if mr.status.get == expectedStatus && mr.message.get.contains(expectedMessage.get) =>
                   Success(true)
                 case Failure(f) =>
                   Failure(new RuntimeException(s"Failed to parse response: $f"))

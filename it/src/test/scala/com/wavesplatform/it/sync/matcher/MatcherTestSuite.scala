@@ -13,8 +13,12 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.Order._
 import com.wavesplatform.transaction.assets.exchange.OrderType._
+import com.wavesplatform.utils.NTP
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+
+import scala.concurrent.duration._
+import scala.util.Random
 
 class MatcherTestSuite
     extends FreeSpec
@@ -36,7 +40,7 @@ class MatcherTestSuite
   private val aliceSellAmount         = 500
   private val TransactionFee          = 300000
   private val amountAssetName         = "AliceCoin"
-  private val AssetQuantity           = 1000
+  private val AssetQuantity: Long     = 1000
   private val aliceCoinDecimals: Byte = 0
 
   "Check cross ordering between Alice and Bob " - {
@@ -45,10 +49,10 @@ class MatcherTestSuite
       .issue(aliceNode.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, issueFee)
       .id
     val bobAsset = bobNode
-      .issue(bobNode.address, "BobCoin1", "Bob's asset", someAssetAmount, 5, false, issueFee)
+      .issue(bobNode.address, "BobCoin1", "Bob's asset", someAssetAmount, 5, reissuable = false, issueFee)
       .id
     val bobAsset2 = bobNode
-      .issue(bobNode.address, "BobCoin2", "Bob's asset", someAssetAmount, 0, false, issueFee)
+      .issue(bobNode.address, "BobCoin2", "Bob's asset", someAssetAmount, 0, reissuable = false, issueFee)
       .id
 
     Seq(aliceAsset, bobAsset, bobAsset2).foreach(matcherNode.waitForTransaction(_))
@@ -321,6 +325,28 @@ class MatcherTestSuite
         matcherNode.cancelOrder(bobNode, bobWavesPair, order8.message.id).status should be("OrderCanceled")
         val transferBobId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
         matcherNode.waitForTransaction(transferBobId)
+      }
+    }
+    val invalidOrders =
+      Table(
+        ("amount", "price", "fee", "creation", "expDate", "errMessage"),
+        (100l, 1.waves, 0L, NTP.correctedTime(), 20.days, "Order matcherFee should be >= 300000"),
+        (100l, 1.waves, -1L, NTP.correctedTime(), 20.days, "Order matcherFee should be >= 300000"),
+        (100l, 1.waves, 299999L, NTP.correctedTime(), 20.days, "Order matcherFee should be >= 300000"),
+        (100l, 1.waves, 300000l, NTP.correctedTime(), 60.seconds, "Order expiration should be > 1 min"),
+        (100l, 1.waves, 300000l, NTP.correctedTime() - 1.days.toMillis, 20.days, "Order should have a timestamp after"),
+        (100l, 1.waves, 300000l, NTP.correctedTime(), 30.days + 1.days, "expiration should be earlier than 30 days"),
+        (0l, 1.waves, 300000l, NTP.correctedTime(), 20.days, "amount should be > 0"),
+        (100l, 0.waves, 300000l, NTP.correctedTime(), 20.days, "price should be > 0"),
+        (AssetQuantity + 1, 1.waves, 300000l, NTP.correctedTime(), 20.days, "Not enough tradable balance")
+      )
+
+    forAll(invalidOrders) { (amount: Long, price: Long, fee: Long, creation: Long, expDate: Duration, errMessage: String) =>
+      s"Matcher error message should be detailed:  $errMessage ${Random.nextString(1)}" in {
+
+        val o1 = matcherNode.prepareOrder(aliceNode, aliceWavesPair, SELL, amount, price, creation, expDate, fee)
+        matcherNode.expectIncorrectOrderPlacement(o1, 400, "OrderRejected", Some(errMessage))
+
       }
     }
   }

@@ -5,6 +5,7 @@ import com.wavesplatform.crypto
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.utils.NTP
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.{Assertion, Assertions}
@@ -165,21 +166,29 @@ object SyncMatcherHttpApi extends Assertions {
                      orderType: OrderType,
                      amount: Long,
                      price: Long,
-                     timeToLive: Duration = 30.days - 1.seconds): Order = {
+                     timeToLive: Duration = 30.days - 1.seconds,
+                     matcherFee: Long = AsyncMatcherHttpApi.DefaultMatcherFee): Order = {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = m.publicKey
-      val unsigned = Order(node.publicKey,
-                           matcherPublicKey,
-                           pair,
-                           orderType,
-                           amount,
-                           price,
-                           creationTime,
-                           timeToLiveTimestamp,
-                           AsyncMatcherHttpApi.DefaultMatcherFee,
-                           Array())
-      val signature = crypto.sign(node.privateKey, unsigned.toSign)
+      val unsigned            = Order(node.publicKey, matcherPublicKey, pair, orderType, amount, price, creationTime, timeToLiveTimestamp, matcherFee, Array())
+      val signature           = crypto.sign(node.privateKey, unsigned.toSign)
+      unsigned.copy(signature = signature)
+    }
+
+    def prepareOrder(node: Node,
+                     pair: AssetPair,
+                     orderType: OrderType,
+                     amount: Long,
+                     price: Long,
+                     creationTime: Long,
+                     timeToLive: Duration,
+                     matcherFee: Long): Order = {
+
+      val timeToLiveTimestamp = NTP.correctedTime() + timeToLive.toMillis
+      val matcherPublicKey    = m.publicKey
+      val unsigned            = Order(node.publicKey, matcherPublicKey, pair, orderType, amount, price, creationTime, timeToLiveTimestamp, matcherFee, Array())
+      val signature           = crypto.sign(node.privateKey, unsigned.toSign)
       unsigned.copy(signature = signature)
     }
 
