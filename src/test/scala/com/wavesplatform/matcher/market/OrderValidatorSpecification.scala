@@ -100,7 +100,7 @@ class OrderValidatorSpecification
           (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.FALSE).explicitGet()))
           (bc.height _).when().returns(150).once()
 
-          val tc = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime)
+          val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
           val ov = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
           ov.validateNewOrder(newBuyOrder(scripted, version = 2)) should produce("Order rejected by script")
         }
@@ -109,7 +109,7 @@ class OrderValidatorSpecification
       "order expires too soon" in forAll(Gen.choose[Long](1, OrderValidator.MinExpiration), accountGen) { (offset, pk) =>
         val bc       = stub[Blockchain]
         val tt       = new TestTime
-        val tc       = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime)
+        val tc       = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
         val ov       = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, tt)
         val unsigned = newBuyOrder
         val signed   = Order.sign(unsigned.updateExpiration(tt.getTimestamp() + offset).updateSender(pk), pk)
@@ -248,15 +248,16 @@ class OrderValidatorSpecification
 
   private def portfolioTest(p: Portfolio)(f: (OrderValidator, Blockchain) => Any): Unit = {
     val bc = stub[Blockchain]
+    (bc.assetScript _).when(wbtc).returns(None)
     (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8)).anyNumberOfTimes()
-    val transactionCreator = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime)
+    val transactionCreator = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
     f(new OrderValidator(db, bc, transactionCreator, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime), bc)
   }
 
   private def settingsTest(settings: MatcherSettings)(f: OrderValidator => Any): Unit = {
     val bc = stub[Blockchain]
     (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8)).anyNumberOfTimes()
-    val transactionCreator = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime)
+    val transactionCreator = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
     f(new OrderValidator(db, bc, transactionCreator, _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
   }
 

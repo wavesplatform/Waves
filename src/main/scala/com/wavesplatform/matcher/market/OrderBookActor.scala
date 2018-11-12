@@ -200,7 +200,7 @@ class OrderBookActor(parent: ActorRef,
       case _: NegativeAmount =>
         processEvent(Events.OrderCanceled(event.submitted, unmatchable = true))
         None
-      case TransactionValidationError(_: HasScriptType, _) =>
+      case TransactionValidationError(x: HasScriptType, _) if x.isTokenScript =>
         processEvent(Events.OrderCanceled(event.counter, unmatchable = false))
         processEvent(Events.OrderCanceled(event.submitted, unmatchable = false))
         None
