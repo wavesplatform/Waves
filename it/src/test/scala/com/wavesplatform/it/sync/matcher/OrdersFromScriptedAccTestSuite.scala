@@ -36,7 +36,7 @@ class OrdersFromScriptedAccTestSuite
     // Alice issues new asset
     val aliceAsset =
       aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
-    nodes.waitForHeightAriseAndTxPresent(aliceAsset)
+    matcherNode.waitForTransaction(aliceAsset)
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
     // check assets's balances
@@ -55,8 +55,7 @@ class OrdersFromScriptedAccTestSuite
       val setScriptId = bobNode
         .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
         .id
-
-      nodes.waitForHeightAriseAndTxPresent(setScriptId)
+      matcherNode.waitForTransaction(setScriptId)
 
     }
 

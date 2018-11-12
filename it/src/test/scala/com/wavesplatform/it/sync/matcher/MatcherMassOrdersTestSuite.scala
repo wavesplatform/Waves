@@ -24,21 +24,20 @@ class MatcherMassOrdersTestSuite
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private def matcherNode = nodes.head
-  private def aliceNode   = nodes(1)
-  private def bobNode     = nodes(2)
+  private val matcherNode = nodes.head
+  private val aliceNode   = nodes(1)
+  private val bobNode     = nodes(2)
 
   "Create orders with statuses FILL, PARTIAL, CANCELLED, ACTIVE" - {
 
     // Alice issues new assets
     val aliceAsset =
       aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
-    nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
     val aliceSecondAsset = aliceNode
       .issue(aliceNode.address, "AliceSecondCoin", "AliceSecondCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L)
       .id
-    nodes.waitForHeightAriseAndTxPresent(aliceSecondAsset)
+    Seq(aliceAsset, aliceSecondAsset).foreach(matcherNode.waitForTransaction(_))
 
     val aliceWavesPair       = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
     val aliceSecondWavesPair = AssetPair(ByteStr.decodeBase58(aliceSecondAsset).toOption, None)
@@ -49,13 +48,13 @@ class MatcherMassOrdersTestSuite
     matcherNode.assertAssetBalance(matcherNode.address, aliceAsset, 0)
 
     val transfer1ToBobId = aliceNode.transfer(aliceNode.address, bobNode.address, someAssetAmount / 2, 100000, Some(aliceAsset), None).id
-    nodes.waitForHeightAriseAndTxPresent(transfer1ToBobId)
+    matcherNode.waitForTransaction(transfer1ToBobId)
 
     val transfer2ToBobId = aliceNode.transfer(aliceNode.address, bobNode.address, someAssetAmount / 2, 100000, Some(aliceSecondAsset), None).id
-    nodes.waitForHeightAriseAndTxPresent(transfer2ToBobId)
+    matcherNode.waitForTransaction(transfer2ToBobId)
 
-    bobNode.assertAssetBalance(bobNode.address, aliceAsset, someAssetAmount / 2)
-    bobNode.assertAssetBalance(bobNode.address, aliceSecondAsset, someAssetAmount / 2)
+    matcherNode.assertAssetBalance(bobNode.address, aliceAsset, someAssetAmount / 2)
+    matcherNode.assertAssetBalance(bobNode.address, aliceSecondAsset, someAssetAmount / 2)
 
     // Alice places sell orders
     val aliceOrderIdFill = matcherNode

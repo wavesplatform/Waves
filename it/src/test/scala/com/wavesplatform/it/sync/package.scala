@@ -1,7 +1,10 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.utils.Base58
 
 package object sync {
   val minFee                     = 0.001.waves
@@ -29,4 +32,20 @@ package object sync {
   }
 
   val supportedVersions = List(null, "2") //sign and broadcast use default for V1
+
+  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
+    import tx._
+    SignedIssueV1Request(
+      Base58.encode(tx.sender.publicKey),
+      new String(name),
+      new String(description),
+      quantity,
+      decimals,
+      reissuable,
+      fee,
+      timestamp,
+      signature.base58
+    )
+  }
+
 }

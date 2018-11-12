@@ -19,8 +19,8 @@ import scala.util.Random
 class SignAndBroadcastApiSuite extends BaseTransactionSuite {
   test("height should always be reported for transactions") {
     val txId = sender.transfer(firstAddress, secondAddress, 1.waves, fee = 1.waves).id
-    nodes.waitForHeightAriseAndTxPresent(txId)
 
+    sender.waitForTransaction(txId)
     val jsv1               = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody)
     val hasPositiveHeight1 = (jsv1 \ "height").asOpt[Int].map(_ > 0)
     assert(hasPositiveHeight1.getOrElse(false))
@@ -321,8 +321,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
       .json()
 
     val txId = sender.signedBroadcast(tx).id
-    nodes.waitForHeightAriseAndTxPresent(txId)
-
+    sender.waitForTransaction(txId)
   }
 
   private def signBroadcastAndCalcFee(json: JsObject, usesProofs: Boolean, version: String = null): String = {
@@ -341,7 +340,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
     assert(rb.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val id = (Json.parse(rb.getResponseBody) \ "id").as[String]
     assert(id.nonEmpty)
-    nodes.waitForHeightAriseAndTxPresent(id)
+    sender.waitForTransaction(id)
     id
   }
 }

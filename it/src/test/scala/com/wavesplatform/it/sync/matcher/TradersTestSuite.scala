@@ -23,11 +23,11 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   private def bobNode        = nodes(2)
   private val TransactionFee = 300000
 
-  "Verifications of tricky ordering cases" - {
+  "Verifications of tricky ordering cases" ignore {
     // Alice issues new asset
     val aliceAsset =
-      aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, 100000000L).id
-    nodes.waitForHeightAriseAndTxPresent(aliceAsset)
+      aliceNode.issue(aliceNode.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, issueFee).id
+    matcherNode.waitForTransaction(aliceAsset)
 
     // val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
@@ -38,8 +38,8 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     // Bob issues a new asset
     val bobAssetQuantity = 10000
-    val bobNewAsset      = bobNode.issue(bobNode.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, false, 100000000L).id
-    nodes.waitForHeightAriseAndTxPresent(bobNewAsset)
+    val bobNewAsset      = bobNode.issue(bobNode.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, false, issueFee).id
+    matcherNode.waitForTransaction(bobNewAsset)
     val bobAssetId   = ByteStr.decodeBase58(bobNewAsset).get
     val aliceAssetId = ByteStr.decodeBase58(aliceAsset).get
 
@@ -62,10 +62,6 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     matcherNode.assertAssetBalance(bobNode.address, bobNewAsset, bobAssetQuantity)
 
-    "matcher should respond with Public key" in {
-      matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
-    }
-
     "owner moves assets/waves to another account and order become an invalid" ignore {
       // todo: reactivate after balance watcher is reimplemented
       // Could not work sometimes because of NODE-546
@@ -75,7 +71,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           val newestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset)
 
           val transferId = bobNode.transfer(bobNode.address, aliceNode.address, 3050, TransactionFee, Some(bobNewAsset), None).id
-          nodes.waitForHeightAriseAndTxPresent(transferId)
+          matcherNode.waitForTransaction(transferId)
 
           withClue(s"The oldest order '$oldestOrderId' was cancelled") {
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
@@ -89,7 +85,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           matcherNode.cancelOrder(bobNode, twoAssetsPair, newestOrderId).status should be("OrderCanceled")
 
           val transferBackId = aliceNode.transfer(aliceNode.address, bobNode.address, 3050, TransactionFee, Some(bobNewAsset), None).id
-          nodes.waitForHeightAriseAndTxPresent(transferBackId)
+          matcherNode.waitForTransaction(transferBackId)
         }
 
         "leased waves, insufficient fee" in {
@@ -100,7 +96,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           // TransactionFee for leasing, matcherFee for one order
           val leaseAmount = bobBalance - TransactionFee - matcherFee
           val leaseId     = bobNode.lease(bobNode.address, aliceNode.address, leaseAmount, TransactionFee).id
-          nodes.waitForHeightAriseAndTxPresent(leaseId)
+          matcherNode.waitForTransaction(leaseId)
 
           withClue(s"The oldest order '$oldestOrderId' was cancelled") {
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
@@ -113,7 +109,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           matcherNode.cancelOrder(bobNode, twoAssetsPair, newestOrderId)
           matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
           val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, TransactionFee).id
-          nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
+          matcherNode.waitForTransaction(cancelLeaseId)
         }
 
         "moved waves, insufficient fee" in {
@@ -124,7 +120,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           // TransactionFee for leasing, matcherFee for one order
           val transferAmount = bobBalance - TransactionFee - matcherFee
           val transferId     = bobNode.transfer(bobNode.address, aliceNode.address, transferAmount, TransactionFee, None, None).id
-          nodes.waitForHeightAriseAndTxPresent(transferId)
+          matcherNode.waitForTransaction(transferId)
 
           withClue(s"The oldest order '$oldestOrderId' was cancelled") {
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
@@ -138,7 +134,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
 
           val transferBackId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
-          nodes.waitForHeightAriseAndTxPresent(transferBackId)
+          matcherNode.waitForTransaction(transferBackId)
         }
       }
 
@@ -153,7 +149,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           //      waitForOrderStatus(matcherNode, bobAssetIdRaw, id, "Accepted")
           val leaseAmount = bobBalance - TransactionFee - 10.waves - matcherFee
           val leaseId     = bobNode.lease(bobNode.address, aliceNode.address, leaseAmount, TransactionFee).id
-          nodes.waitForHeightAriseAndTxPresent(leaseId)
+          matcherNode.waitForTransaction(leaseId)
 
           withClue(s"The newest order '$oldestOrderId' is Cancelled") {
             matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
@@ -167,7 +163,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
           matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
 
           val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, TransactionFee).id
-          nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
+          matcherNode.waitForTransaction(cancelLeaseId)
         }
 
         "leased waves, insufficient waves" in {
@@ -177,7 +173,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           val leaseAmount = bobBalance - TransactionFee - price / 2
           val leaseId     = bobNode.lease(bobNode.address, aliceNode.address, leaseAmount, TransactionFee).id
-          nodes.waitForHeightAriseAndTxPresent(leaseId)
+          matcherNode.waitForTransaction(leaseId)
 
           withClue(s"The order '$order2' was cancelled") {
             matcherNode.waitOrderStatus(bobWavesPair, order2, "Cancelled")
@@ -185,7 +181,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, TransactionFee).id
-          nodes.waitForHeightAriseAndTxPresent(cancelLeaseId)
+          matcherNode.waitForTransaction(cancelLeaseId)
         }
 
         "moved waves, insufficient fee" in {
@@ -196,7 +192,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           val transferAmount = bobBalance - TransactionFee - price
           val txId           = bobNode.transfer(bobNode.address, aliceNode.address, transferAmount, TransactionFee, None, None).id
-          nodes.waitForHeightAriseAndTxPresent(txId)
+          matcherNode.waitForTransaction(txId)
 
           withClue(s"The order '$order3' was cancelled") {
             matcherNode.waitOrderStatus(bobWavesPair, order3, "Cancelled")
@@ -204,7 +200,7 @@ class TradersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
           // Cleanup
           val transferBackId = aliceNode.transfer(aliceNode.address, bobNode.address, transferAmount, TransactionFee, None, None).id
-          nodes.waitForHeightAriseAndTxPresent(transferBackId)
+          matcherNode.waitForTransaction(transferBackId)
         }
 
       }
