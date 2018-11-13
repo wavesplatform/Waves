@@ -61,7 +61,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
         (b, d, c, txs)
     }
 
-  def bestLiquidDiff: Diff =  micros.headOption.fold(baseBlockDiff)(m => diffFor(m.totalResBlockSig))
+  def bestLiquidDiff: Diff =  micros.headOption.fold(baseBlockDiff)(m => diffFor(m.totalResBlockSig)._1)
 
   def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
 
