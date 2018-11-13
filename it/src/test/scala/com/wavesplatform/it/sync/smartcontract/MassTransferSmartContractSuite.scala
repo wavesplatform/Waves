@@ -109,7 +109,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
                                 "Transaction not allowed by account-script")
 
     //make correct transfer to government after some time
-    sender.waitForHeight(heightBefore + 10, 2.minutes)
+    sender.waitForHeight(heightBefore + 10, 5.minutes)
 
     val unsignedToGovSecond =
       MassTransferTransaction
