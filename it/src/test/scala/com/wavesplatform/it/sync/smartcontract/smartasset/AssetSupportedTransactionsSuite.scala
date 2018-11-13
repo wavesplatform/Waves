@@ -405,7 +405,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
   test("sponsorship of smart asset") {
     assertBadRequestAndMessage(sender.sponsorAsset(firstAddress, asset, baseFee = 2, fee = sponsorFee + smartFee).id,
-                               "Reason: Sponsorship smart assets is disabled.")
+                               "Transaction is not allowed by token-script")
 
     val scr = ScriptCompiler(s"""
                                         |match tx {
