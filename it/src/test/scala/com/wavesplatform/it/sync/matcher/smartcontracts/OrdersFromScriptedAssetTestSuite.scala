@@ -54,13 +54,13 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   }
 
   "can execute against unscripted, if the script returns TRUE" in {
-    markup("place counter")
+    info("place counter")
     val pair = AssetPair.createAssetPair(UnscriptedAssetId, AllowAssetId).get
     val counterId =
       matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
     matcherNode.waitOrderStatus(pair, counterId, "Accepted")
 
-    markup("place a submitted order")
+    info("place a submitted order")
     val submittedId =
       matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
     matcherNode.waitOrderStatus(pair, submittedId, "Filled")
@@ -69,24 +69,24 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   "can't execute against unscripted, if the script returns FALSE" in {
     val allowAsset2Id = issueAsset()
 
-    markup("place a counter order")
+    info("place a counter order")
     val pair = AssetPair.createAssetPair(allowAsset2Id, UnscriptedAssetId).get
     val counterId =
       matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
     matcherNode.waitOrderStatus(pair, counterId, "Accepted")
 
-    markup("update a script")
+    info("update a script")
     val setAssetScriptId = matcherNode.setAssetScript(allowAsset2Id, matcherPk.address, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
     matcherNode.waitForTransaction(setAssetScriptId)
 
-    markup("a counter order wasn't rejected")
+    info("a counter order wasn't rejected")
     matcherNode.orderStatus(counterId, pair).status shouldBe "Accepted"
 
-    markup("place a submitted order")
+    info("place a submitted order")
     val submittedId =
       matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
 
-    markup("both orders are cancelled")
+    info("both orders are cancelled")
     matcherNode.waitOrderStatus(pair, submittedId, "Cancelled")
     matcherNode.waitOrderStatus(pair, counterId, "Cancelled")
   }
@@ -94,17 +94,17 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   "can execute against scripted, if both scripts returns TRUE" in {
     val allowAsset2Id = issueAsset()
 
-    markup("place a counter order")
+    info("place a counter order")
     val pair = AssetPair.createAssetPair(allowAsset2Id, AllowAssetId).get
     val counterId =
       matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
     matcherNode.waitOrderStatus(pair, counterId, "Accepted")
 
-    markup("place a submitted order")
+    info("place a submitted order")
     val submittedId =
       matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
 
-    markup("both orders are cancelled")
+    info("both orders are cancelled")
     matcherNode.waitOrderStatus(pair, submittedId, "Filled")
     matcherNode.waitOrderStatus(pair, counterId, "Filled")
   }
@@ -112,30 +112,30 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   "can't execute against scripted, if one script returns FALSE" in {
     val allowAsset2Id = issueAsset()
 
-    markup("place a counter order")
+    info("place a counter order")
     val pair = AssetPair.createAssetPair(allowAsset2Id, AllowAssetId).get
     val counterId =
       matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
     matcherNode.waitOrderStatus(pair, counterId, "Accepted")
 
-    markup("update a script")
+    info("update a script")
     val setAssetScriptId = matcherNode.setAssetScript(allowAsset2Id, matcherPk.address, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
     matcherNode.waitForTransaction(setAssetScriptId)
 
-    markup("a counter order wasn't rejected")
+    info("a counter order wasn't rejected")
     matcherNode.orderStatus(counterId, pair).status shouldBe "Accepted"
 
-    markup("place a submitted order")
+    info("place a submitted order")
     val submittedId =
       matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
 
-    markup("both orders are cancelled")
+    info("both orders are cancelled")
     matcherNode.waitOrderStatus(pair, submittedId, "Cancelled")
     matcherNode.waitOrderStatus(pair, counterId, "Cancelled")
   }
 
   private def issueAsset(): String = {
-    markup("issue an asset")
+    info("issue an asset")
     val allowAsset2   = mkAllowAsset()
     val allowAsset2Id = allowAsset2.id().base58
     matcherNode.signedIssue(createSignedIssueRequest(allowAsset2))
