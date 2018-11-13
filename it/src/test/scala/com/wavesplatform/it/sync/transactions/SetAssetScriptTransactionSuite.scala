@@ -161,21 +161,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         .right
         .get
 
-    def request(tx: SetAssetScriptTransaction): SignedSetAssetScriptRequest =
-      SignedSetAssetScriptRequest(
-        SetAssetScriptTransaction.supportedVersions.head,
-        Base58.encode(tx.sender.publicKey),
-        tx.assetId.base58,
-        Some(tx.script.get.bytes.value.base64),
-        tx.fee,
-        tx.timestamp,
-        tx.proofs.base58().toList
-      )
-
-    implicit val w =
-      Json.writes[SignedSetAssetScriptRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt)))
-
     val (balance, eff) = notMiner.accountBalances(firstAddress)
+
     val invalidTxs = Seq(
       (sastx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
       (sastx(fee = 9999999), "Fee .* does not exceed minimal value"),
@@ -184,7 +171,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     )
 
     for ((tx, diag) <- invalidTxs) {
-      assertBadRequestAndResponse(sender.broadcastRequest(request(tx)), diag)
+      assertBadRequestAndResponse(sender.broadcastRequest(tx.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))), diag)
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 
