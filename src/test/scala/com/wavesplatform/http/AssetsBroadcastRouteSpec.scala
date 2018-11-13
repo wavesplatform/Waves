@@ -33,7 +33,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
 
-    val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
+    val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
       ("issue", issueGen.retryUntil(_.version == 1), identity),
       ("reissue", reissueGen.retryUntil(_.version == 1), identity),
@@ -52,7 +52,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
-        forAll(gen) { (t: Transaction) =>
+        forAll(gen) { t: Transaction =>
           posting(url, transform(t.json())) should produce(StateCheckFailed(t, "foo"))
         }
       }
@@ -60,86 +60,96 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+    "issue transaction" in {
+      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      forAll(broadcastIssueReq) { ir =>
+        def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
 
-    "issue transaction" in forAll(broadcastIssueReq) { ir =>
-      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
-
-      forAll(nonPositiveLong) { q =>
-        posting(ir.copy(fee = q)) should produce(InsufficientFee())
-      }
-      forAll(nonPositiveLong) { q =>
-        posting(ir.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
-      }
-      forAll(invalidDecimals) { d =>
-        posting(ir.copy(decimals = d)) should produce(TooBigArrayAllocation)
-      }
-      forAll(longDescription) { d =>
-        posting(ir.copy(description = d)) should produce(TooBigArrayAllocation)
-      }
-      forAll(invalidName) { name =>
-        posting(ir.copy(name = name)) should produce(InvalidName)
-      }
-      forAll(invalidBase58) { name =>
-        posting(ir.copy(name = name)) should produce(InvalidName)
-      }
-      forAll(nonPositiveLong) { fee =>
-        posting(ir.copy(fee = fee)) should produce(InsufficientFee())
+        forAll(nonPositiveLong) { q =>
+          posting(ir.copy(fee = q)) should produce(InsufficientFee())
+        }
+        forAll(nonPositiveLong) { q =>
+          posting(ir.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
+        }
+        forAll(invalidDecimals) { d =>
+          posting(ir.copy(decimals = d)) should produce(TooBigArrayAllocation)
+        }
+        forAll(longDescription) { d =>
+          posting(ir.copy(description = d)) should produce(TooBigArrayAllocation)
+        }
+        forAll(invalidName) { name =>
+          posting(ir.copy(name = name)) should produce(InvalidName)
+        }
+        forAll(invalidBase58) { name =>
+          posting(ir.copy(name = name)) should produce(InvalidName)
+        }
+        forAll(nonPositiveLong) { fee =>
+          posting(ir.copy(fee = fee)) should produce(InsufficientFee())
+        }
       }
     }
 
-    "reissue transaction" in forAll(broadcastReissueReq) { rr =>
-      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("reissue"), v) ~> route
+    "reissue transaction" in {
+      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      forAll(broadcastReissueReq) { rr =>
+        def posting[A: Writes](v: A): RouteTestResult = Post(routePath("reissue"), v) ~> route
 
-      // todo: invalid sender
-      forAll(nonPositiveLong) { q =>
-        posting(rr.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
-      }
-      forAll(nonPositiveLong) { fee =>
-        posting(rr.copy(fee = fee)) should produce(InsufficientFee())
+        // todo: invalid sender
+        forAll(nonPositiveLong) { q =>
+          posting(rr.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
+        }
+        forAll(nonPositiveLong) { fee =>
+          posting(rr.copy(fee = fee)) should produce(InsufficientFee())
+        }
       }
     }
 
-    "burn transaction" in forAll(broadcastBurnReq) { br =>
-      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("burn"), v) ~> route
+    "burn transaction" in {
+      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      forAll(broadcastBurnReq) { br =>
+        def posting[A: Writes](v: A): RouteTestResult = Post(routePath("burn"), v) ~> route
 
-      forAll(invalidBase58) { pk =>
-        posting(br.copy(senderPublicKey = pk)) should produce(InvalidAddress)
-      }
-      forAll(nonPositiveLong) { q =>
-        posting(br.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
-      }
-      forAll(nonPositiveLong) { fee =>
-        posting(br.copy(fee = fee)) should produce(InsufficientFee())
+        forAll(invalidBase58) { pk =>
+          posting(br.copy(senderPublicKey = pk)) should produce(InvalidAddress)
+        }
+        forAll(nonPositiveLong) { q =>
+          posting(br.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
+        }
+        forAll(nonPositiveLong) { fee =>
+          posting(br.copy(fee = fee)) should produce(InsufficientFee())
+        }
       }
     }
 
-    "transfer transaction" in forAll(broadcastTransferReq) { tr =>
-      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
+    "transfer transaction" in {
+      val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
+      forAll(broadcastTransferReq) { tr =>
+        def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
-      forAll(nonPositiveLong) { q =>
-        posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of waves"))
-      }
-      forAll(invalidBase58) { pk =>
-        posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress)
-      }
-      forAll(invalidBase58) { a =>
-        posting(tr.copy(recipient = a)) should produce(InvalidAddress)
-      }
-      forAll(invalidBase58) { a =>
-        posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("invalid.assetId"))
-      }
-      forAll(invalidBase58) { a =>
-        posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("invalid.feeAssetId"))
-      }
-      forAll(longAttachment) { a =>
-        posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment"))
-      }
-      forAll(posNum[Long]) { quantity =>
-        posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError)
-      }
-      forAll(nonPositiveLong) { fee =>
-        posting(tr.copy(fee = fee)) should produce(InsufficientFee())
+        forAll(nonPositiveLong) { q =>
+          posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of waves"))
+        }
+        forAll(invalidBase58) { pk =>
+          posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress)
+        }
+        forAll(invalidBase58) { a =>
+          posting(tr.copy(recipient = a)) should produce(InvalidAddress)
+        }
+        forAll(invalidBase58) { a =>
+          posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("invalid.assetId"))
+        }
+        forAll(invalidBase58) { a =>
+          posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("invalid.feeAssetId"))
+        }
+        forAll(longAttachment) { a =>
+          posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment"))
+        }
+        forAll(posNum[Long]) { quantity =>
+          posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError)
+        }
+        forAll(nonPositiveLong) { fee =>
+          posting(tr.copy(fee = fee)) should produce(InsufficientFee())
+        }
       }
     }
   }
@@ -278,7 +288,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       timestamp,
       version,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      proofs.proofs.map(_.base58).toList
+      proofs.proofs.map(_.base58)
     )
   }
 

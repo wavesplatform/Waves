@@ -19,7 +19,6 @@ import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
 
 object JsAPI {
-
   private def toJs(ast: EXPR): js.Object = {
     def r(expr: EXPR): js.Object = {
       expr match {
