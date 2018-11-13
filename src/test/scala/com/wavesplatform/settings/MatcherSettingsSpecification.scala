@@ -1,7 +1,6 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import org.scalatest.{FlatSpec, Matchers}
@@ -61,7 +60,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
     settings.blacklistedAssets shouldBe Set("a")
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
-    settings.blacklistedAddresses shouldBe Set(Address.fromString("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD").right.get)
+    settings.blacklistedAddresses shouldBe Set("3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD")
     settings.orderBookSnapshotHttpCache shouldBe OrderBookSnapshotHttpCache.Settings(
       cacheTimeout = 11.minutes,
       depthRanges = List(1, 5, 333)

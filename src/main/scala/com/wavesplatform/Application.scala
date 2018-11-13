@@ -401,10 +401,6 @@ object Application extends ScorexLogging {
     SLF4JBridgeHandler.install()
 
     val config = readConfig(args.headOption)
-    // Initialize global var with actual address scheme
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = config.getString("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
-    }
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
@@ -414,6 +410,12 @@ object Application extends ScorexLogging {
     }
 
     val settings = WavesSettings.fromConfig(config)
+
+    // Initialize global var with actual address scheme
+    AddressScheme.current = new AddressScheme {
+      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
+    }
+
     if (config.getBoolean("kamon.enable")) {
       log.info("Aggregated metrics are enabled")
       Kamon.reconfigure(config)
