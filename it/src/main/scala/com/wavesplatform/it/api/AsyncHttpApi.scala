@@ -15,7 +15,7 @@ import com.wavesplatform.http.{DebugMessage, RollbackParams, api_key}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.{DataEntry, Portfolio}
+import com.wavesplatform.state.{DataEntry, EitherExt2, Portfolio}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
@@ -104,7 +104,7 @@ object AsyncHttpApi extends Assertions {
           .toScala
           .map(Option(_))
           .recoverWith {
-            case (_: IOException | _: TimeoutException) => Future(None)
+            case _: IOException | _: TimeoutException => Future(None)
           }
 
       def cond(ropt: Option[Response]) = ropt.exists { r =>
@@ -349,7 +349,7 @@ object AsyncHttpApi extends Assertions {
       postJson("/assets/broadcast/issue", issue).as[Transaction]
 
     def signedIssue(issue: SignedIssueV2Request): Future[Transaction] =
-      signedBroadcast(issue.toTx.right.get.json())
+      signedBroadcast(issue.toTx.explicitGet().json())
 
     def batchSignedTransfer(transfers: Seq[SignedTransferV2Request], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")

@@ -5,7 +5,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.OrderExecuted
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.{AssetId, ValidationError}
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.Time
 
@@ -20,8 +20,10 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
   }
 
   def calcExtraTxFee(o: Order): Long = {
-    if (blockchain.hasScript(o.sender)) CommonValidation.ScriptExtraFee
-    else 0
+    def assetFee(assetId: AssetId) = if (blockchain.hasAssetScript(assetId)) CommonValidation.ScriptExtraFee else 0L
+    val accFee                     = if (blockchain.hasScript(o.sender)) CommonValidation.ScriptExtraFee else 0
+
+    accFee + o.assetPair.amountAsset.fold(0L)(assetFee) + o.assetPair.priceAsset.fold(0L)(assetFee)
   }
 
   def createTransaction(event: OrderExecuted): Either[ValidationError, ExchangeTransaction] = {

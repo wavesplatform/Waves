@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
@@ -62,7 +62,7 @@ object Common {
   val pointCInstance  = CaseObj(pointTypeC.typeRef, Map("YB" -> 42L))
   val pointDInstance1 = CaseObj(pointTypeD.typeRef, Map("YB" -> 43L))
 
-  val pointDInstance2 = CaseObj(pointTypeD.typeRef, Map("YB" -> PureContext.unit))
+  val pointDInstance2 = CaseObj(pointTypeD.typeRef, Map("YB" -> unit))
 
   val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC, pointTypeD) ++ Seq(UnionType("PointAB", AorB.l),
                                                                                UnionType("PointBC", BorC.l),

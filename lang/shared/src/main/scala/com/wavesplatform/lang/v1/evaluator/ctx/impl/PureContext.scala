@@ -328,8 +328,6 @@ object PureContext {
     uNot
   )
 
-  lazy val unit: EVALUATED = CaseObj(CASETYPEREF("Unit", List.empty), Map.empty)
-
   private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))))
   private lazy val functions = Array(
     fraction,

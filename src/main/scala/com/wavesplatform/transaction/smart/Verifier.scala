@@ -3,35 +3,29 @@ package com.wavesplatform.transaction.smart
 import cats.implicits._
 import com.google.common.base.Throwables
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.v1.compiler.Terms.{TRUE, FALSE, EVALUATED}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.ValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.ValidationError.{GenericError, HasScriptType, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
 import com.wavesplatform.utils.ScorexLogging
-import kamon.Kamon
 import shapeless.{:+:, CNil, Coproduct}
 
 import scala.util.{Failure, Success, Try}
 
 object Verifier extends Instrumented with ScorexLogging {
 
-  val stats = TxProcessingStats
+  private val stats = TxProcessingStats
 
   import stats.TxTimerExt
 
-  val orderScriptExecutionTime = Kamon.histogram("order-script-execution-time")
-  val orderscriptsExecuted     = Kamon.counter("order-scripts-executed")
+  private type TxOrd       = Transaction :+: Order :+: CNil
+  type ValidationResult[T] = Either[ValidationError, T]
 
-  val orderSignatureVerificationTime = Kamon.histogram("order-signature-verification-time")
-  val orderSignaturesVerified        = Kamon.counter("order-signatures-verified")
-
-  private type TxOrd = Transaction :+: Order :+: CNil
-
-  def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): Either[ValidationError, Transaction] =
+  def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): ValidationResult[Transaction] =
     (tx match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
@@ -45,7 +39,7 @@ object Verifier extends Instrumented with ScorexLogging {
             Left(GenericError("Can't process transaction with signature from scripted account"))
           case (_, Some(script)) =>
             stats.accountScriptExecution
-              .measureForType(pt.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, pt, false))
+              .measureForType(pt.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, pt, isTokenScript = false))
           case _ =>
             stats.signatureVerification
               .measureForType(tx.builder.typeId)(verifyAsEllipticCurveSignature(pt))
@@ -57,14 +51,10 @@ object Verifier extends Instrumented with ScorexLogging {
           .foldRight(Either.right[ValidationError, Transaction](tx)) { (script, txr) =>
             txr.right.flatMap(tx =>
               stats.assetScriptExecution
-                .measureForType(tx.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, tx, true)))
+                .measureForType(tx.builder.typeId)(verifyTx(blockchain, script, currentBlockHeight, tx, isTokenScript = true)))
         })
 
-  def verifyTx(blockchain: Blockchain,
-               script: Script,
-               height: Int,
-               transaction: Transaction,
-               isTokenScript: Boolean): Either[ValidationError, Transaction] =
+  def verifyTx(blockchain: Blockchain, script: Script, height: Int, transaction: Transaction, isTokenScript: Boolean): ValidationResult[Transaction] =
     logged(
       s"transaction ${transaction.id()}",
       Try {
@@ -82,7 +72,7 @@ object Verifier extends Instrumented with ScorexLogging {
       }
     )
 
-  def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): Either[ValidationError, Order] =
+  def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
     logged(
       s"order ${order.idStr()}",
       Try {
@@ -101,7 +91,7 @@ object Verifier extends Instrumented with ScorexLogging {
   def verifyExchange(et: ExchangeTransaction,
                      blockchain: Blockchain,
                      matcherScriptOpt: Option[Script],
-                     height: Int): Either[ValidationError, Transaction] = {
+                     height: Int): ValidationResult[Transaction] = {
     val typeId    = et.builder.typeId
     val sellOrder = et.sellOrder
     val buyOrder  = et.buyOrder
@@ -111,7 +101,7 @@ object Verifier extends Instrumented with ScorexLogging {
         .map { script =>
           if (et.version != 1) {
             stats.accountScriptExecution
-              .measureForType(typeId)(verifyTx(blockchain, script, height, et, false))
+              .measureForType(typeId)(verifyTx(blockchain, script, height, et, isTokenScript = false))
           } else {
             Left(GenericError("Can't process transaction with signature from scripted account"))
           }
@@ -140,14 +130,27 @@ object Verifier extends Instrumented with ScorexLogging {
         })
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(buyOrder)))
 
+    def assetVerification(assetId: Option[AssetId], tx: ExchangeTransaction) =
+      assetId.fold[ValidationResult[Transaction]](Right(tx)) { assetId =>
+        blockchain.assetScript(assetId).fold[ValidationResult[Transaction]](Right(tx)) { script =>
+          verifyTx(blockchain, script, height, tx, isTokenScript = true).left.map {
+            case x: HasScriptType => x
+            case GenericError(x)  => ScriptExecutionError(x, script.text, List.empty, isTokenScript = true)
+            case x                => ScriptExecutionError(x.toString, script.text, List.empty, isTokenScript = true)
+          }
+        }
+      }
+
     for {
       _ <- matcherTxVerification
       _ <- sellerOrderVerification
       _ <- buyerOrderVerification
+      _ <- assetVerification(et.buyOrder.assetPair.amountAsset, et)
+      _ <- assetVerification(et.buyOrder.assetPair.priceAsset, et)
     } yield et
   }
 
-  def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): Either[ValidationError, T] =
+  def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): ValidationResult[T] =
     pt.proofs.proofs match {
       case p :: Nil =>
         Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender.publicKey),

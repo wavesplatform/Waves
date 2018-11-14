@@ -1,24 +1,16 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.api.http.assets.{SignedExchangeRequest, SignedExchangeRequestV2}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.assets.exchange.OrderJson._
-import com.wavesplatform.utils.{Base58, NTP}
+import com.wavesplatform.utils.NTP
 import play.api.libs.json._
 
 class ExchangeTransactionSuite extends BaseTransactionSuite {
-
-  implicit val w1 = Json.writes[SignedExchangeRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt)))
-  implicit val w2 =
-    Json.writes[SignedExchangeRequestV2].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt)))
-
   test("cannot exchange non-issued assets") {
-
     for ((o1ver, o2ver, tver) <- Seq(
            (1: Byte, 1: Byte, 1: Byte),
            (1: Byte, 1: Byte, 2: Byte),
@@ -46,7 +38,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
       val assetId = IssueTx.id().base58
 
       val buyer               = pkByAddress(firstAddress)
-      val seller              = pkByAddress(firstAddress)
+      val seller              = pkByAddress(secondAddress)
       val matcher             = pkByAddress(thirdAddress)
       val time                = NTP.correctedTime()
       val expirationTimestamp = time + Order.MaxLiveTime
@@ -75,22 +67,10 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
           .right
           .get
 
-        def request(tx: ExchangeTransaction): SignedExchangeRequestV2 =
-          SignedExchangeRequestV2(
-            Base58.encode(tx.sender.publicKey),
-            tx.buyOrder,
-            tx.sellOrder,
-            tx.price,
-            tx.amount,
-            matcherFee,
-            tx.buyMatcherFee,
-            tx.sellMatcherFee,
-            tx.timestamp,
-            2: Byte,
-            tx.proofs.proofs.map(_.base58).toList //signature.base58
-          )
-
-        assertBadRequestAndMessage(sender.postJson("/transactions/broadcast", request(tx)), "Assets should be issued before they can be traded")
+        assertBadRequestAndMessage(
+          sender.postJson("/transactions/broadcast", tx.json() + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt))),
+          "Assets should be issued before they can be traded"
+        )
       } else {
         val tx = ExchangeTransactionV1
           .create(
@@ -107,21 +87,10 @@ class ExchangeTransactionSuite extends BaseTransactionSuite {
           .right
           .get
 
-        def request(tx: ExchangeTransaction): SignedExchangeRequest =
-          SignedExchangeRequest(
-            Base58.encode(tx.sender.publicKey),
-            tx.buyOrder,
-            tx.sellOrder,
-            tx.amount,
-            tx.price,
-            matcherFee,
-            tx.buyMatcherFee,
-            tx.sellMatcherFee,
-            tx.timestamp,
-            tx.proofs.proofs(0).base58
-          )
-
-        assertBadRequestAndMessage(sender.postJson("/transactions/broadcast", request(tx)), "Assets should be issued before they can be traded")
+        assertBadRequestAndMessage(
+          sender.postJson("/transactions/broadcast", tx.json() + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt))),
+          "Assets should be issued before they can be traded"
+        )
       }
     }
 
