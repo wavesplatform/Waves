@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, LazyVal, NativeFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 
 package object compiler {
 
@@ -21,7 +22,7 @@ package object compiler {
   val returnsListLong =
     NativeFunction("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE, "test undefinedOptionLong")(_ => ???)
   val idOptionLong =
-    NativeFunction("idOptionLong", 1, 1003: Short, UNIT, "test Some", ("opt", UNION(LONG, UNIT), "opt"))(_ => Right(PureContext.unit))
+    NativeFunction("idOptionLong", 1, 1003: Short, UNIT, "test Some", ("opt", UNION(LONG, UNIT), "opt"))(_ => Right(unit))
   val functionWithTwoPrarmsOfTheSameType =
     NativeFunction("functionWithTwoPrarmsOfTheSameType",
                    1,
