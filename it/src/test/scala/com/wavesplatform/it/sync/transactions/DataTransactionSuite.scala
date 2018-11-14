@@ -51,16 +51,6 @@ class DataTransactionSuite extends BaseTransactionSuite {
              version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
       DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).explicitGet()
 
-    def request(tx: DataTransaction): SignedDataRequest =
-      SignedDataRequest(DataTransaction.supportedVersions.head,
-                        Base58.encode(tx.sender.publicKey),
-                        tx.data,
-                        tx.fee,
-                        tx.timestamp,
-                        tx.proofs.base58().toList)
-
-    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(DataTransaction.typeId.toInt)))
-
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTxs = Seq(
       (data(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
@@ -68,7 +58,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     )
 
     for ((tx, diag) <- invalidTxs) {
-      assertBadRequestAndResponse(sender.broadcastRequest(request(tx)), diag)
+      assertBadRequestAndResponse(sender.broadcastRequest(tx.json() + ("type" -> JsNumber(DataTransaction.typeId.toInt))), diag)
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 
