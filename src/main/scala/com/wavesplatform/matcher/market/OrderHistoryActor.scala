@@ -44,7 +44,7 @@ class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor with Sc
     val maybeOrder = orderHistory.order(id)
     for (o <- maybeOrder) {
       val oi = orderHistory.orderInfo(id)
-      orderHistory.process(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, oi.remainingFee, o), unmatchable = false))
+      orderHistory.process(OrderCanceled(LimitOrder.limitOrder(oi.remaining, oi.remainingFee, o), unmatchable = false))
     }
     sender ! maybeOrder
   }
