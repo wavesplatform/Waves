@@ -63,7 +63,11 @@ object Explorer extends ScorexLogging {
     "addresses-for-asset",
     "address-transaction-ids-seq-nr",
     "address-transaction-ids",
-    "alias-is-disabled"
+    "alias-is-disabled",
+    "carry-fee-history",
+    "carry-fee",
+    "asset-script-history",
+    "asset-script"
   )
 
   def main(args: Array[String]): Unit = {
