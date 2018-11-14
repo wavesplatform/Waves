@@ -137,7 +137,7 @@ object CommonValidation {
       case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
       case it: SetAssetScriptTransaction =>
         if (it.script.isEmpty) {
-          Left(GenericError("Cannot remove script from an asset issued with a script"))
+          Left(GenericError("The script being set should not be empty"))
         } else {
           activationBarrier(BlockchainFeatures.SmartAssets)
         }
