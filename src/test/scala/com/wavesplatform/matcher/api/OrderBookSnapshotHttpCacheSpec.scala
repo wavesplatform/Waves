@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.api
 import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
+import com.wavesplatform.OrderOps._
 import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model._
@@ -13,7 +14,6 @@ import org.scalatest.{FreeSpec, Matchers}
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration._
-import com.wavesplatform.OrderOps._
 
 class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase {
 
@@ -56,7 +56,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         .containerOfN[Vector, Order](2, orderGen)
         .map { xs =>
           val r = xs.head +: xs.tail.map(_.updatePrice(price = xs.head.price - 1))
-          r.map(x => SellLimitOrder(x.amount, x.price, x.matcherFee, x)).groupBy(_.price)
+          r.map(x => SellLimitOrder(x.amount, x.matcherFee, x)).groupBy(_.price)
         }
         .sample
         .get
@@ -65,7 +65,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
         .containerOfN[Vector, Order](2, orderGen)
         .map { xs =>
           val r = xs.head +: xs.tail.map(_.updatePrice(xs.head.price + 1))
-          r.map(x => BuyLimitOrder(x.amount, x.price, x.matcherFee, x)).groupBy(_.price)
+          r.map(x => BuyLimitOrder(x.amount, x.matcherFee, x)).groupBy(_.price)
         }
         .sample
         .get
@@ -210,7 +210,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     Gen
       .containerOfN[Vector, Order](10, orderGen)
       .map { xs =>
-        xs.map(x => BuyLimitOrder(x.amount, x.price, x.matcherFee, x)).groupBy(_.price)
+        xs.map(x => BuyLimitOrder(x.amount, x.matcherFee, x)).groupBy(_.price)
       }
       .sample
       .get

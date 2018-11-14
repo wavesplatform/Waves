@@ -18,11 +18,9 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Try}
 
 object SyncMatcherHttpApi extends Assertions {
-  case class ErrorMessage(error: Int, message: String)
-
-  implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
   case class NotFoundErrorMessage(message: String)
+  case class ErrorMessage(error: Int, message: String)
 
   object NotFoundErrorMessage {
     implicit val format: Format[NotFoundErrorMessage] = Json.format
@@ -52,6 +50,9 @@ object SyncMatcherHttpApi extends Assertions {
 
     def orderBook(assetPair: AssetPair): OrderBookResponse =
       sync(async(m).orderBook(assetPair))
+
+    def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Boolean =
+      Await.result(async(m).orderBookExpectInvalidAssetId(assetPair, assetId), OrderRequestAwaitTime)
 
     def marketStatus(assetPair: AssetPair): MarketStatusResponse =
       sync(async(m).marketStatus(assetPair), RequestAwaitTime)
@@ -84,6 +85,9 @@ object SyncMatcherHttpApi extends Assertions {
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       sync(async(m).orderStatus(orderId, assetPair, waitForStatus))
 
+    def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String): Boolean =
+      Await.result(async(m).orderStatusExpectInvalidAssetId(orderId, assetPair, assetId), OrderRequestAwaitTime)
+
     def transactionsByOrder(orderId: String): Seq[ExchangeTransaction] =
       sync(async(m).transactionsByOrder(orderId))
 
@@ -115,8 +119,17 @@ object SyncMatcherHttpApi extends Assertions {
     def expectIncorrectOrderPlacement(order: Order,
                                       expectedStatusCode: Int,
                                       expectedStatus: String,
+                                      expectedMessage: Option[String] = None,
                                       waitTime: Duration = OrderRequestAwaitTime): Boolean =
-      sync(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus), waitTime)
+      sync(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus, expectedMessage), waitTime)
+
+    def expectRejectedOrderPlacement(node: Node,
+                                     pair: AssetPair,
+                                     orderType: OrderType,
+                                     amount: Long,
+                                     price: Long,
+                                     timeToLive: Duration = 30.days - 1.seconds): Boolean =
+      expectIncorrectOrderPlacement(prepareOrder(node.privateKey, pair, orderType, amount, price, timeToLive = timeToLive), 400, "OrderRejected")
 
     def expectCancelRejected(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
       sync(async(m).expectCancelRejected(sender, assetPair, orderId), waitTime)

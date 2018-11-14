@@ -68,9 +68,10 @@ class OrderValidatorSpecification
       }
 
       val blacklistedAccount = PrivateKeyAccount("3irbW78fffj5XDzAMjaEeo3kn8V".getBytes(Charsets.UTF_8))
-      "sender's address is blacklisted" in settingsTest(matcherSettings.copy(blacklistedAddresses = Set(blacklistedAccount.toAddress))) { ov =>
-        val o = newBuyOrder(blacklistedAccount)
-        ov.validateNewOrder(o) shouldBe Left("Invalid address")
+      "sender's address is blacklisted" in settingsTest(matcherSettings.copy(blacklistedAddresses = Set(blacklistedAccount.toAddress.toString))) {
+        ov =>
+          val o = newBuyOrder(blacklistedAccount)
+          ov.validateNewOrder(o) shouldBe Left("Invalid address")
       }
 
       "v1 order from a scripted account" in forAll(accountGen) { scripted =>
