@@ -92,7 +92,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
+    assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some("")),
                                "Reason: Cannot remove script from an asset issued with a script")
   }
 
