@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.NTP
 import org.scalatest.CancelAfterFailure
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.{DataTransaction}
+import com.wavesplatform.transaction.DataTransaction
 import play.api.libs.json._
 import scorex.crypto.encode.Base64
 
@@ -65,8 +65,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       setContract(contr1, acc0)
       setContract(contr2, acc1)
       setContract(mcontr, acc2)
-
-      nodes.waitForHeightArise()
 
       val tx = exchangeTx()
 
