@@ -17,7 +17,7 @@ object MatcherModel {
 
 case class LevelAgg(amount: Long, price: Long)
 
-sealed trait LimitOrder {
+sealed trait LimitOrder extends Product with Serializable {
   def amount: Long // could be remaining or executed, see OrderExecuted
   def price: Price
   def fee: Long // same
@@ -52,19 +52,19 @@ sealed trait LimitOrder {
 }
 
 case class BuyLimitOrder(amount: Long, fee: Long, order: Order) extends LimitOrder {
-  def price                                        = order.price
-  def partial(amount: Long, fee: Long): LimitOrder = copy(amount = amount, fee = fee)
-  def getReceiveAmount: Long                       = amountOfAmountAsset
-  def getSpendAmount: Long                         = amountOfPriceAsset
-  def getRawSpendAmount: Long                      = amountOfPriceAsset
+  def price                                           = order.price
+  def partial(amount: Long, fee: Long): BuyLimitOrder = copy(amount = amount, fee = fee)
+  def getReceiveAmount: Long                          = amountOfAmountAsset
+  def getSpendAmount: Long                            = amountOfPriceAsset
+  def getRawSpendAmount: Long                         = amountOfPriceAsset
 }
 
 case class SellLimitOrder(amount: Long, fee: Long, order: Order) extends LimitOrder {
-  def price                                        = order.price
-  def partial(amount: Long, fee: Long): LimitOrder = copy(amount = amount, fee = fee)
-  def getReceiveAmount: Long                       = amountOfPriceAsset
-  def getSpendAmount: Long                         = amountOfAmountAsset
-  def getRawSpendAmount: Long                      = amount
+  def price                                            = order.price
+  def partial(amount: Long, fee: Long): SellLimitOrder = copy(amount = amount, fee = fee)
+  def getReceiveAmount: Long                           = amountOfPriceAsset
+  def getSpendAmount: Long                             = amountOfAmountAsset
+  def getRawSpendAmount: Long                          = amount
 }
 
 object LimitOrder {

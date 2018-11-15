@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.api.http.TransactionNotAllowedByScript
 import com.wavesplatform.it.api.SyncHttpApi.NodeExtSync
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
@@ -14,6 +15,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -125,9 +127,13 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val submittedId =
       matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
 
-    info("both orders are cancelled")
-    matcherNode.waitOrderStatus(pair, submittedId, "Cancelled")
-    matcherNode.waitOrderStatus(pair, counterId, "Cancelled")
+    info("two orders form an invalid transaction")
+    matcherNode.waitOrderStatus(pair, submittedId, "Filled")
+    matcherNode.waitOrderStatus(pair, counterId, "PartiallyFilled")
+
+    val txs = matcherNode.transactionsByOrder(submittedId)
+    txs.size shouldBe 1
+    matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByScript.ErrorCode
   }
 
   "can't execute against scripted, if one script returns FALSE" in {
@@ -148,9 +154,13 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     val submittedId =
       matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
 
-    info("both orders are cancelled")
-    matcherNode.waitOrderStatus(pair, submittedId, "Cancelled")
-    matcherNode.waitOrderStatus(pair, counterId, "Cancelled")
+    info("two orders form an invalid transaction")
+    matcherNode.waitOrderStatus(pair, submittedId, "Filled")
+    matcherNode.waitOrderStatus(pair, counterId, "PartiallyFilled")
+
+    val txs = matcherNode.transactionsByOrder(submittedId)
+    txs.size shouldBe 1
+    matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByScript.ErrorCode
   }
 
   private def issueAsset(): String = {

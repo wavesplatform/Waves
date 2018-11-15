@@ -4,6 +4,8 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
+import com.wavesplatform.it.matcher.MatcherState
+import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
@@ -27,7 +29,7 @@ object SyncMatcherHttpApi extends Assertions {
   }
 
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
       Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting not found error")
@@ -203,6 +205,22 @@ object SyncMatcherHttpApi extends Assertions {
 
     def ordersByAddress(sender: PrivateKeyAccount, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderbookHistory] =
       sync(async(m).ordersByAddress(sender, activeOnly), waitTime)
+
+    def getCurrentOffset: QueueEventWithMeta.Offset                   = sync(async(m).getCurrentOffset)
+    def getOldestSnapshotOffset: QueueEventWithMeta.Offset            = sync(async(m).getOldestSnapshotOffset)
+    def getAllSnapshotOffsets: Map[String, QueueEventWithMeta.Offset] = sync(async(m).getAllSnapshotOffsets)
+
+    def waitForStableOffset(confirmations: Int,
+                            maxTries: Int,
+                            interval: FiniteDuration,
+                            waitTime: Duration = RequestAwaitTime): Either[Unit, QueueEventWithMeta.Offset] =
+      sync(async(m).waitForStableOffset(confirmations, maxTries, interval), (maxTries + 1) * interval)
+
+    def matcherState(assetPairs: Seq[AssetPair],
+                     orders: IndexedSeq[Order],
+                     accounts: Seq[PrivateKeyAccount],
+                     waitTime: Duration = RequestAwaitTime * 5): MatcherState =
+      sync(async(m).matcherState(assetPairs, orders, accounts), waitTime)
   }
 
 }

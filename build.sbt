@@ -58,18 +58,19 @@ resolvers ++= Seq(
   Resolver.sbtPluginRepo("releases")
 )
 
-fork in run := true
-javaOptions in run ++= Seq(
-  "-XX:+IgnoreUnrecognizedVMOptions",
-  "--add-modules=java.xml.bind"
-)
-
-Test / fork := true
-Test / javaOptions ++= Seq(
+val java9Options = Seq(
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
   "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
 )
+
+fork in run := true
+javaOptions in run ++= java9Options
+
+Test / fork := true
+Test / javaOptions ++= java9Options
+
+Jmh / javaOptions ++= java9Options
 
 val aopMerge: MergeStrategy = new MergeStrategy {
   val name = "aopMerge"

@@ -10,9 +10,8 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.{AssetId, ValidationError}
-import com.wavesplatform.utils.Time
 
-class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: PrivateKeyAccount, settings: MatcherSettings, time: Time) {
+class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: PrivateKeyAccount, settings: MatcherSettings) {
   private def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
     def calcFee(o: Order, amount: Long): Long = {
       val p = BigInt(amount) * o.matcherFee / o.amount
@@ -22,7 +21,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
     (calcFee(buy, amount), calcFee(sell, amount))
   }
 
-  def createTransaction(event: OrderExecuted): Either[ValidationError, ExchangeTransaction] = {
+  def createTransaction(event: OrderExecuted, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
     import event.{counter, submitted}
     val price             = counter.price
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
@@ -30,12 +29,12 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
 
     val txFee = getMinFee(blockchain, settings.orderMatchTxFee, matcherPrivateKey, Some(buy.sender), Some(sell.sender), counter.order.assetPair)
     if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
-      ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, event.executedAmount, price, buyFee, sellFee, txFee, time.getTimestamp())
+      ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, event.executedAmount, price, buyFee, sellFee, txFee, timestamp)
     else
       for {
         buyV1  <- toV1(buy)
         sellV1 <- toV1(sell)
-        tx     <- ExchangeTransactionV1.create(matcherPrivateKey, buyV1, sellV1, event.executedAmount, price, buyFee, sellFee, txFee, time.getTimestamp())
+        tx     <- ExchangeTransactionV1.create(matcherPrivateKey, buyV1, sellV1, event.executedAmount, price, buyFee, sellFee, txFee, timestamp)
       } yield tx
   }
 
@@ -46,6 +45,8 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
 }
 
 object ExchangeTransactionCreator {
+
+  type CreateTransaction = (OrderExecuted, Long) => Either[ValidationError, ExchangeTransaction]
 
   /**
     * @note see Verifier.verifyExchange

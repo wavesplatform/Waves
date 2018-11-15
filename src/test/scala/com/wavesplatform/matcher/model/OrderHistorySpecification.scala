@@ -1010,6 +1010,100 @@ class OrderHistorySpecification
       activeOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe empty
     }
   }
+
+  property("Idempotence - OrderAdded") {
+    val ord = buy(pair, 10000, 0.0007)
+
+    val lo  = LimitOrder(ord)
+    val add = OrderAdded(lo)
+    oh.processAll(add, add)
+
+    val info = oh.orderInfo(ord.id())
+    withClue("info") {
+      info.status shouldBe LimitOrder.Accepted
+      info shouldBe OrderInfo(ord.amount, 0, None, Some(lo.minAmountOfAmountAsset), ord.matcherFee, Some(0L))
+    }
+
+    withClue("reserved assets") {
+      openVolume(ord.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(ord.senderPublicKey, pair.priceAsset) shouldBe 7L
+      openVolume(ord.senderPublicKey, None) shouldBe ord.matcherFee
+    }
+
+    withClue("orders list") {
+      val expected = Seq(ord.id())
+
+      activeOrderIds(ord.senderPublicKey) shouldBe expected
+      allOrderIds(ord.senderPublicKey) shouldBe expected
+
+      activeOrderIdsByPair(ord.senderPublicKey, pair) shouldBe expected
+      allOrderIdsByPair(ord.senderPublicKey, pair) shouldBe expected
+    }
+  }
+
+  property("Idempotence - OrderExecuted") {
+    val pair      = AssetPair(None, mkAssetId("BTC"))
+    val counter   = buy(pair, 100000, 0.0008, matcherFee = Some(2000L))
+    val submitted = sell(pair, 100000, 0.0007, matcherFee = Some(1000L))
+
+    oh.process(OrderAdded(LimitOrder(counter)))
+
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    oh.processAll(exec, exec)
+
+    withClue("executed exactly") {
+      exec.executedAmount shouldBe counter.amount
+      oh.orderInfo(counter.id()).status shouldBe LimitOrder.Filled(exec.executedAmount)
+      oh.orderInfo(submitted.id()).status shouldBe LimitOrder.Filled(exec.executedAmount)
+    }
+
+    withClue(s"has no reserved assets, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.idStr()}") {
+      openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
+    }
+
+    withClue(s"has no reserved assets, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.idStr()}") {
+      openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
+      openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
+    }
+
+    withClue("orders list of counter owner") {
+      activeOrderIds(counter.senderPublicKey) shouldBe empty
+      allOrderIds(counter.senderPublicKey) shouldBe Seq(counter.id())
+
+      activeOrderIdsByPair(counter.senderPublicKey, pair) shouldBe empty
+      allOrderIdsByPair(counter.senderPublicKey, pair) shouldBe Seq(counter.id())
+    }
+
+    withClue("orders list of submitted owner") {
+      activeOrderIds(submitted.senderPublicKey) shouldBe empty
+      allOrderIds(submitted.senderPublicKey) shouldBe Seq(submitted.id())
+
+      activeOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe empty
+      allOrderIdsByPair(submitted.senderPublicKey, pair) shouldBe Seq(submitted.id())
+    }
+  }
+
+  property("Idempotence - OrderCancelled") {
+    val ord1   = buy(pair, 100000000, 0.0008, matcherFee = Some(300000L))
+    val cancel = OrderCanceled(LimitOrder(ord1), unmatchable = false)
+    oh.processAll(OrderAdded(LimitOrder(ord1)), cancel, cancel)
+
+    oh.orderInfo(ord1.id()).status shouldBe LimitOrder.Cancelled(0)
+
+    openVolume(ord1.senderPublicKey, pair.amountAsset) shouldBe 0L
+    openVolume(ord1.senderPublicKey, pair.priceAsset) shouldBe 0L
+
+    withClue("orders list") {
+      val addr = ord1.senderPublicKey.toAddress
+
+      activeOrderIds(addr) shouldBe empty
+      allOrderIds(addr) shouldBe Seq(ord1.id())
+
+      activeOrderIdsByPair(addr, pair) shouldBe empty
+      allOrderIdsByPair(addr, pair) shouldBe Seq(ord1.id())
+    }
+  }
 }
 
 private object OrderHistorySpecification {
