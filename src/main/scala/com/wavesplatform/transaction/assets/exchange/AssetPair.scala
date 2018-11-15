@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Order.assetIdBytes
@@ -55,4 +56,10 @@ object AssetPair {
       a1 <- extractAssetId(amountAsset)
       a2 <- extractAssetId(priceAsset)
     } yield AssetPair(a1, a2)
+
+  def fromBytes(xs: Array[Byte]): AssetPair = {
+    val (amount, offset) = Deser.parseByteArrayOption(xs, 0, AssetIdLength)
+    val (price, _)       = Deser.parseByteArrayOption(xs, offset, AssetIdLength)
+    AssetPair(amount.map(ByteStr(_)), price.map(ByteStr(_)))
+  }
 }

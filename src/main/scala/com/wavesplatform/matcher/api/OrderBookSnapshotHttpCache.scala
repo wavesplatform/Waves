@@ -2,11 +2,10 @@ package com.wavesplatform.matcher.api
 
 import java.util.concurrent.ScheduledFuture
 
-import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache.Settings
-import com.wavesplatform.matcher.market.OrderBookActor.GetOrderBookResponse
-import com.wavesplatform.matcher.model.OrderBook
+import com.wavesplatform.matcher.model.{OrderBook, OrderBookResult}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.Time
 import kamon.Kamon
@@ -25,12 +24,18 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
     .build[Key, HttpResponse](new CacheLoader[Key, HttpResponse] {
       override def load(key: Key): HttpResponse = {
         val orderBook = orderBookSnapshot(key.pair).getOrElse(OrderBook.empty)
-        GetOrderBookResponse(
+        val entity = OrderBookResult(
           time.correctedTime(),
           key.pair,
           orderBook.bids.view.take(key.depth).map(aggregateLevel).toSeq,
           orderBook.asks.view.take(key.depth).map(aggregateLevel).toSeq
-        ).toHttpResponse
+        )
+        HttpResponse(
+          entity = HttpEntity(
+            ContentTypes.`application/json`,
+            OrderBookResult.toJson(entity)
+          )
+        )
       }
     })
 

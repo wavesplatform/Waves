@@ -2,7 +2,7 @@ package com.wavesplatform.database
 
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.state.ByteStr
 
 object KeyHelpers {
@@ -25,6 +25,9 @@ object KeyHelpers {
 
   def intKey(name: String, prefix: Short, default: Int = 0): Key[Int] =
     Key(name, Shorts.toByteArray(prefix), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
+
+  def longKey(name: String, prefix: Short, default: Long = 0): Key[Long] =
+    Key(name, Longs.toByteArray(prefix), Option(_).fold(default)(Longs.fromByteArray), Longs.toByteArray)
 
   def bytesSeqNr(name: String, prefix: Short, b: Array[Byte], default: Int = 0): Key[Int] =
     Key(name, bytes(prefix, b), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)

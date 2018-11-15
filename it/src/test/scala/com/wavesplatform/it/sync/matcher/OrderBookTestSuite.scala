@@ -15,14 +15,14 @@ class OrderBookTestSuite extends MatcherSuiteBase {
   override protected def nodeConfigs: Seq[Config] = Configs
 
   Seq(IssueUsdTx, IssueWctTx).map(createSignedIssueRequest).map(matcherNode.signedIssue).foreach { tx =>
-    matcherNode.waitForTransaction(tx.id)
+    nodes.waitForTransaction(tx.id)
   }
 
   Seq(
     aliceNode.transfer(IssueUsdTx.sender.toAddress.stringRepr, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2),
     bobNode.transfer(IssueWctTx.sender.toAddress.stringRepr, bobAcc.address, defaultAssetQuantity, 100000, Some(WctId.toString), None, 2)
   ).foreach { tx =>
-    matcherNode.waitForTransaction(tx.id)
+    nodes.waitForTransaction(tx.id)
   }
 
   case class ReservedBalances(wct: Long, usd: Long, waves: Long)

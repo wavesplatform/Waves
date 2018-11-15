@@ -261,11 +261,14 @@ case class ScriptExecutionError(tx: Transaction, error: String, scriptSrc: Strin
 }
 
 case class TransactionNotAllowedByScript(tx: Transaction, log: Log, scriptSrc: String, isTokenScript: Boolean) extends ApiError {
-
-  override val id: Int             = 307
+  override val id: Int             = TransactionNotAllowedByScript.ErrorCode
   override val code: StatusCode    = StatusCodes.BadRequest
   override val message: String     = s"Transaction is not allowed by ${if (isTokenScript) "token" else "account"}-script"
   override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
+}
+
+object TransactionNotAllowedByScript {
+  val ErrorCode = 307
 }
 
 object ScriptErrorJson {

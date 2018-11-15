@@ -60,13 +60,20 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
           updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(minAmount = Some(event.order.minAmountOfAmountAsset))
         )
 
-        log.trace(s"${order.id()}: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
-        saveOpenVolume(rw, diff(List(change)))
+        if (change.hasChanges) {
+          log.trace(s"${order.id()}: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
+          val d = diff(List(change))
+          saveOpenVolume(rw, d)
 
-        if (change.origInfo.isEmpty) rw.put(MatcherKeys.order(order.id()), Some(order))
-        rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
+          if (change.origInfo.isEmpty) rw.put(MatcherKeys.order(order.id()), Some(order))
+          rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
+        }
 
-        indexes.active.add(rw, order.senderPublicKey.toAddress, order.assetPair, order.id())
+        // Hack until DEX-160 is done
+        // We need to not add the same orders to index during recovery
+        // Recovery happens from a snapshot + commands
+        val senderAddress = order.senderPublicKey.toAddress
+        if (!indexes.active.has(rw, senderAddress, order.id())) indexes.active.add(rw, senderAddress, order.assetPair, order.id())
       }
     }
   }
@@ -83,28 +90,29 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
         val counterChanges   = collectChanges(event, event.counterExecuted, counterOrigInfo)
         val submittedChanges = collectChanges(event, event.submittedExecuted, submittedOrigInfo)
         val allChanges       = List(counterChanges, submittedChanges)
+        if (allChanges.forall(_.hasChanges)) {
+          val mergedDiff = diff(List(counterChanges, submittedChanges))
+          saveOpenVolume(rw, mergedDiff)
 
-        val mergedDiff = diff(List(counterChanges, submittedChanges))
-        saveOpenVolume(rw, mergedDiff)
-
-        if (submittedChanges.origInfo.isEmpty) rw.put(MatcherKeys.order(submittedChanges.order.id()), Some(submittedChanges.order))
-        allChanges.foreach { change =>
-          log.trace(s"${change.order.id()}: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
-          rw.put(MatcherKeys.orderInfo(change.order.id()), change.updatedInfo)
-        }
-
-        import event.counter.{order => counterOrder}
-        if (counterChanges.updatedInfo.status.isFinal) indexes.active.delete(rw, counterOrder.senderPublicKey.toAddress, counterOrder.id())
-
-        allChanges
-          .filter(_.updatedInfo.status.isFinal)
-          .groupBy(_.order.senderPublicKey.toAddress)
-          .foreach {
-            case (address, changes) =>
-              val ids = changes.map(_.order.id())
-              indexes.finalized.common.add(rw, address, ids)
-              indexes.finalized.pair.add(rw, address, counterOrder.assetPair, ids)
+          if (submittedChanges.origInfo.isEmpty) rw.put(MatcherKeys.order(submittedChanges.order.id()), Some(submittedChanges.order))
+          allChanges.foreach { change =>
+            log.trace(s"${change.order.id()}: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
+            rw.put(MatcherKeys.orderInfo(change.order.id()), change.updatedInfo)
           }
+
+          import event.counter.{order => counterOrder}
+          if (counterChanges.updatedInfo.status.isFinal) indexes.active.delete(rw, counterOrder.senderPublicKey.toAddress, counterOrder.id())
+
+          allChanges
+            .filter(_.updatedInfo.status.isFinal)
+            .groupBy(_.order.senderPublicKey.toAddress)
+            .foreach {
+              case (address, changes) =>
+                val ids = changes.map(_.order.id())
+                indexes.finalized.common.add(rw, address, ids)
+                indexes.finalized.pair.add(rw, address, counterOrder.assetPair, ids)
+            }
+        }
       }
     }
   }
@@ -120,16 +128,18 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
           updatedInfo = origInfo.getOrElse(OrderInfo.emptyFor(order)).copy(canceledByUser = Some(!event.unmatchable))
         )
 
-        log.trace(s"${order.id()}: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
-        saveOpenVolume(rw, diff(List(change)))
+        if (change.hasChanges) {
+          log.trace(s"${order.id()}: ${change.origInfo.fold("[]")(_.status.toString)} -> ${change.updatedInfo.status}")
+          saveOpenVolume(rw, diff(List(change)))
 
-        rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
-        if (change.origInfo.isEmpty) rw.put(MatcherKeys.order(order.id()), Some(order))
+          rw.put(MatcherKeys.orderInfo(order.id()), change.updatedInfo)
+          if (change.origInfo.isEmpty) rw.put(MatcherKeys.order(order.id()), Some(order))
 
-        val address = order.senderPublicKey.toAddress
-        indexes.active.delete(rw, address, order.id())
-        indexes.finalized.common.add(rw, address, order.id())
-        indexes.finalized.pair.add(rw, address, order.assetPair, order.id())
+          val address = order.senderPublicKey.toAddress
+          indexes.active.delete(rw, address, order.id())
+          indexes.finalized.common.add(rw, address, order.id())
+          indexes.finalized.pair.add(rw, address, order.assetPair, order.id())
+        }
       }
     }
   }
@@ -192,7 +202,9 @@ class OrderHistory(db: DB, settings: MatcherSettings) extends ScorexLogging {
 object OrderHistory extends ScorexLogging {
   import OrderInfo.orderStatusOrdering
 
-  case class OrderInfoChange(order: Order, origInfo: Option[OrderInfo], updatedInfo: OrderInfo)
+  case class OrderInfoChange(order: Order, origInfo: Option[OrderInfo], updatedInfo: OrderInfo) {
+    def hasChanges: Boolean = !origInfo.contains(updatedInfo)
+  }
 
   object OrderHistoryOrdering extends Ordering[(ByteStr, OrderInfo, Option[Order])] {
     def orderBy(oh: (ByteStr, OrderInfo, Option[Order])): (OrderStatus, Long) = (oh._2.status, -oh._3.map(_.timestamp).getOrElse(0L))
