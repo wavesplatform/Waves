@@ -6,6 +6,7 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
+import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange._
@@ -17,18 +18,7 @@ object MatcherKeys {
 
   val version: Key[Int] = intKey("matcher-version", 0, default = 1)
 
-  def order(orderId: ByteStr): Key[Option[Order]] =
-    Key.opt(
-      "matcher-order",
-      bytes(1, orderId.arr),
-      xs =>
-        xs.head match {
-          case 1     => OrderV1.parseBytes(xs.tail).get
-          case 2     => OrderV2.parseBytes(xs.tail).get
-          case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
-      },
-      o => o.version +: o.bytes()
-    )
+  def order(orderId: ByteStr): Key[Option[Order]] = Key.opt("matcher-order", bytes(1, orderId.arr), Order.fromBytes, o => o.version +: o.bytes())
 
   val OrderInfoPrefix: Short = 2
 
@@ -80,11 +70,11 @@ object MatcherKeys {
   val ActiveOrdersPrefix: Short            = 5
   val ActiveOrdersPrefixBytes: Array[Byte] = Shorts.toByteArray(ActiveOrdersPrefix)
   val ActiveOrdersKeyName: String          = "matcher-active-orders"
-  def activeOrders(address: Address, seqNr: Int): Key[ActiveOrdersIndex.Node] =
-    Key(ActiveOrdersKeyName,
-        bytes(ActiveOrdersPrefix, address.bytes.arr ++ Ints.toByteArray(seqNr)),
-        ActiveOrdersIndex.Node.read,
-        ActiveOrdersIndex.Node.write)
+  def activeOrders(address: Address, seqNr: Int): Key[Option[ActiveOrdersIndex.Node]] =
+    Key.opt(ActiveOrdersKeyName,
+            bytes(ActiveOrdersPrefix, address.bytes.arr ++ Ints.toByteArray(seqNr)),
+            ActiveOrdersIndex.Node.read,
+            ActiveOrdersIndex.Node.write)
 
   def openVolume(address: Address, assetId: Option[AssetId]): Key[Option[Long]] =
     Key.opt("matcher-open-volume", bytes(6, address.bytes.arr ++ assetIdToBytes(assetId)), Longs.fromByteArray, Longs.toByteArray)
@@ -123,4 +113,17 @@ object MatcherKeys {
 
   def lastCommandTimestamp(address: Address): Key[Option[Long]] =
     Key.opt("matcher-last-command-timestamp", bytes(18, address.bytes.arr), Longs.fromByteArray, Longs.toByteArray)
+
+  val lpqNewestIdx: Key[Long] = longKey("lpq-newest-idx", 19: Short, default = -1)
+
+  val LpqElementPrefix: Short            = 20
+  val LpqElementPrefixBytes: Array[Byte] = Shorts.toByteArray(LpqElementPrefix)
+  val LpqElementKeyName: String          = "lpq-element"
+  def lpqElement(idx: Long): Key[Option[QueueEventWithMeta]] =
+    Key.opt(
+      LpqElementKeyName,
+      bytes(LpqElementPrefix, Longs.toByteArray(idx)),
+      xs => QueueEventWithMeta(idx, Longs.fromByteArray(xs.take(8)), QueueEvent.fromBytes(xs.drop(8))),
+      QueueEventWithMeta.toBytes(_).drop(8)
+    )
 }

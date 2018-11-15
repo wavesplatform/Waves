@@ -103,7 +103,7 @@ class OrderValidatorSpecification
           (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.FALSE).explicitGet()))
           (bc.height _).when().returns(150).anyNumberOfTimes()
 
-          val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+          val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
           val ov = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
           ov.validateNewOrder(newBuyOrder(scripted, version = 2)) should produce("Order rejected by script")
         }
@@ -112,7 +112,7 @@ class OrderValidatorSpecification
       "order expires too soon" in forAll(Gen.choose[Long](1, OrderValidator.MinExpiration), accountGen) { (offset, pk) =>
         val bc       = stub[Blockchain]
         val tt       = new TestTime
-        val tc       = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+        val tc       = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
         val ov       = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, tt)
         val unsigned = newBuyOrder
         val signed   = Order.sign(unsigned.updateExpiration(tt.getTimestamp() + offset).updateSender(pk), pk)
@@ -257,7 +257,7 @@ class OrderValidatorSpecification
         activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
         (bc.height _).when().returns(0).anyNumberOfTimes()
 
-        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
         val ov = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
         ov.validateNewOrder(newBuyOrder(account, version = 2)) should produce("Orders of version 1 are only accepted")
       }
@@ -276,7 +276,7 @@ class OrderValidatorSpecification
         val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
         (bc.accountScript _).when(account.toAddress).returns(Some(script)).anyNumberOfTimes()
 
-        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
         val ov = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
         ov.validateNewOrder(newBuyOrder(account, version = 2)) should produce("height is inaccessible when running script on matcher")
       }
@@ -287,14 +287,14 @@ class OrderValidatorSpecification
     val bc = stub[Blockchain]
     (bc.assetScript _).when(wbtc).returns(None)
     (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8)).anyNumberOfTimes()
-    val transactionCreator = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+    val transactionCreator = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
     f(new OrderValidator(db, bc, transactionCreator, _ => p, Right(_), matcherSettings, MatcherAccount, ntpTime), bc)
   }
 
   private def settingsTest(settings: MatcherSettings)(f: OrderValidator => Any): Unit = {
     val bc = stub[Blockchain]
     (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8)).anyNumberOfTimes()
-    val transactionCreator = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+    val transactionCreator = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
     f(new OrderValidator(db, bc, transactionCreator, _ => defaultPortfolio, Right(_), settings, MatcherAccount, ntpTime))
   }
 

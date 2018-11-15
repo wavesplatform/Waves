@@ -34,13 +34,13 @@ object SyncHttpApi extends Assertions {
   }
 
   def assertBadRequest[R](f: => R, expectedStatusCode: Int = 400): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == expectedStatusCode)
-    case Failure(e)                                               => Assertions.fail(e)
-    case _                                                        => Assertions.fail("Expecting bad request")
+    case Failure(UnexpectedStatusCodeException(_, _, statusCode, _)) => Assertions.assert(statusCode == expectedStatusCode)
+    case Failure(e)                                                  => Assertions.fail(e)
+    case _                                                           => Assertions.fail("Expecting bad request")
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
       Assertions.assert(statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
                         s"\nexpected '$errorRegex'\nactual '$responseBody'")
     case Failure(e) => Assertions.fail(e)
@@ -48,14 +48,14 @@ object SyncHttpApi extends Assertions {
   }
 
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion = Try(f) match {
-    case Failure(e @ UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+    case Failure(e @ UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
       Assertions.assert(statusCode == expectedStatusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
   }
 
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
       Assertions.assert(statusCode == NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].details.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting not found error")
@@ -176,8 +176,8 @@ object SyncHttpApi extends Assertions {
     def cancelSponsorship(sourceAddress: String, assetId: String, fee: Long): Transaction =
       sync(async(n).cancelSponsorship(sourceAddress, assetId, fee))
 
-    def sign(jsObject: JsObject): JsObject =
-      sync(async(n).sign(jsObject))
+    def sign(json: JsValue): JsObject =
+      sync(async(n).sign(json))
 
     def createAlias(targetAddress: String, alias: String, fee: Long): Transaction =
       sync(async(n).createAlias(targetAddress, alias, fee))
@@ -225,7 +225,9 @@ object SyncHttpApi extends Assertions {
     def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: Byte = 1): Transaction =
       sync(async(n).cancelLease(sourceAddress, leaseId, fee))
 
-    def signedBroadcast(tx: JsObject, waitForTx: Boolean = false): Transaction = {
+    def expectSignedBroadcastRejected(json: JsValue): Int = sync(async(n).expectSignedBroadcastRejected(json))
+
+    def signedBroadcast(tx: JsValue, waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).signedBroadcast(tx)), waitForTx)
     }
 
@@ -247,7 +249,7 @@ object SyncHttpApi extends Assertions {
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
       sync(async(n).waitForTransaction(txId))
 
-    def signAndBroadcast(tx: JsObject, waitForTx: Boolean = false): Transaction = {
+    def signAndBroadcast(tx: JsValue, waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).signAndBroadcast(tx)), waitForTx)
     }
 
@@ -311,7 +313,7 @@ object SyncHttpApi extends Assertions {
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
       sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
 
-    def waitForTransaction(transactionId: String)(implicit pos: Position): Unit =
+    def waitForTransaction(transactionId: String)(implicit pos: Position): TransactionInfo =
       sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime)
 
     def waitForHeightArise(): Int =

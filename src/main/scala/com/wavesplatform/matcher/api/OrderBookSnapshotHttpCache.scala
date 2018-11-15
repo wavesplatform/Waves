@@ -2,12 +2,11 @@ package com.wavesplatform.matcher.api
 
 import java.util.concurrent.ScheduledFuture
 
-import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache.Settings
-import com.wavesplatform.matcher.market.OrderBookActor.GetOrderBookResponse
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
-import com.wavesplatform.matcher.model.{LevelAgg, LimitOrder, OrderBook}
+import com.wavesplatform.matcher.model.{LevelAgg, LimitOrder, OrderBook, OrderBookResult}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.Time
 import kamon.Kamon
@@ -28,12 +27,18 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
         def aggregateLevel(l: (Price, Level[LimitOrder])) = LevelAgg(l._2.foldLeft(0L)((b, o) => b + o.amount), l._1)
 
         val orderBook = orderBookSnapshot(key.pair).getOrElse(OrderBook.empty)
-        GetOrderBookResponse(
+        val entity = OrderBookResult(
           time.correctedTime(),
           key.pair,
           orderBook.bids.view.take(key.depth).map(aggregateLevel).toSeq,
           orderBook.asks.view.take(key.depth).map(aggregateLevel).toSeq
-        ).toHttpResponse
+        )
+        HttpResponse(
+          entity = HttpEntity(
+            ContentTypes.`application/json`,
+            OrderBookResult.toJson(entity)
+          )
+        )
       }
     })
 
