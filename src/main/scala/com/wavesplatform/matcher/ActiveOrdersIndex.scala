@@ -17,7 +17,7 @@ class ActiveOrdersIndex(address: Address, maxElements: Int) {
     val newestIdx        = rw.get(newestIdxKey)
     val updatedNewestIdx = newestIdx.getOrElse(0) + 1
 
-    rw.put(nodeKey(updatedNewestIdx), Node(pair, id))
+    rw.put(nodeKey(updatedNewestIdx), Some(Node(pair, id)))
     rw.put(orderIdxKey(id), Some(updatedNewestIdx))
 
     rw.update(sizeKey)(_.orElse(Some(0)).map(_ + 1))
@@ -51,6 +51,8 @@ class ActiveOrdersIndex(address: Address, maxElements: Int) {
     ro.read(MatcherKeys.ActiveOrdersKeyName, prefix, seek = nodeKey(oldestIdx).keyBytes, n = Int.MaxValue)(readNode)
   }
 
+  def has(ro: ReadOnlyDB, id: Id): Boolean = ro.get(orderIdxKey(id)).nonEmpty
+
   private def findNewerIdx(ro: ReadOnlyDB, thanIdx: Int): Option[Index] = {
     ro.read(MatcherKeys.ActiveOrdersKeyName, prefix, seek = nodeKey(thanIdx + 1).keyBytes, n = 1)(readIdx).headOption
   }
@@ -64,7 +66,7 @@ class ActiveOrdersIndex(address: Address, maxElements: Int) {
   private def readNode(x: ReadOnlyDB.Entry): Node = Node.read(x.getValue)
 
   private val sizeKey: Key[Option[Index]]             = MatcherKeys.activeOrdersSize(address)
-  private def nodeKey(idx: Index): Key[Node]          = MatcherKeys.activeOrders(address, idx)
+  private def nodeKey(idx: Index): Key[Option[Node]]  = MatcherKeys.activeOrders(address, idx)
   private val oldestIdxKey: Key[Option[Index]]        = MatcherKeys.activeOrdersOldestSeqNr(address)
   private val newestIdxKey: Key[Option[Index]]        = MatcherKeys.activeOrdersSeqNr(address)
   private def orderIdxKey(id: Id): Key[Option[Index]] = MatcherKeys.activeOrderSeqNr(address, id)
