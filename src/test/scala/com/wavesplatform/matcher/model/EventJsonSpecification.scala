@@ -52,7 +52,7 @@ class EventJsonSpecification extends PropSpec with PropertyChecks with Matchers 
       val res = j.validate[OrderBook]
       res.get should ===(ob)
 
-      val s = Snapshot(ob)
+      val s = Snapshot(2, ob)
 
       val js       = Json.toJson(s)
       val restored = js.validate[Snapshot]

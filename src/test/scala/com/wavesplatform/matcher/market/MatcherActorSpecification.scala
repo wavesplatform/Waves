@@ -8,15 +8,15 @@ import com.wavesplatform.NTPTime
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.OrderAccepted
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData}
+import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData, SaveSnapshot}
 import com.wavesplatform.matcher.market.MatcherActorSpecification.FailAtStartActor
+import com.wavesplatform.matcher.market.OrderBookActor.OrderBookSnapshotUpdated
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator
+import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.{EmptyBlockchain, randomBytes}
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
@@ -53,7 +53,7 @@ class MatcherActorSpecification
         .when(order.matcherPublicKey.toAddress)
         .returns(None)
 
-      actor ! order
+      actor ! wrap(order)
       expectMsg(OrderAccepted(order))
 
       actor ! GetMarkets
@@ -71,13 +71,15 @@ class MatcherActorSpecification
         val actor = waitInitialization(
           TestActorRef(
             new MatcherActor(
+              matcherSettings,
+              (_, _) => (),
               ob,
-              (_, _) => Props(classOf[FailAtStartActor], pair),
+              (_, _) => Props(new FailAtStartActor(pair)),
               blockchain.assetDescription
             )
           ))
 
-        actor ! buy(pair, 2000, 1)
+        actor ! wrap(buy(pair, 2000, 1))
         eventually { ob.get()(pair) shouldBe 'left }
       }
 
@@ -93,8 +95,8 @@ class MatcherActorSpecification
         val pair2  = AssetPair(a2, a3)
         val order2 = buy(pair2, 2000, 1)
 
-        actor ! order1
-        actor ! order2
+        actor ! wrap(order1)
+        actor ! wrap(order2)
         receiveN(2)
 
         ob.get()(pair1) shouldBe 'right
@@ -113,16 +115,119 @@ class MatcherActorSpecification
 
     "delete order books" is pending
     "forward new orders to order books" is pending
+
+    val pair12 = AssetPair(Some(ByteStr(Array(1))), Some(ByteStr(Array(2)))) // snapshots every 13 messages
+    val pair78 = AssetPair(Some(ByteStr(Array(6))), Some(ByteStr(Array(7)))) // snapshots every 8 messages
+
+    // snapshots for pair12 should be created every 13 messages
+    "forces an order book to create a snapshot" when {
+      "it didn't do snapshots for a long time" when {
+        "first time" in snapshotTest(pair12) { (matcherActor, probes) =>
+          sendBuyOrders(matcherActor, pair12, 0 to 14)
+          probes.head.expectMsg(OrderBookSnapshotUpdated(pair12, 14))
+        }
+
+        "later" in snapshotTest(pair12) { (matcherActor, probes) =>
+          val probe = probes.head
+          sendBuyOrders(matcherActor, pair12, 0 to 14)
+          probe.expectMsg(OrderBookSnapshotUpdated(pair12, 14))
+
+          sendBuyOrders(matcherActor, pair12, 15 to 28)
+          probe.expectMsg(OrderBookSnapshotUpdated(pair12, 28))
+        }
+
+        "multiple order books" in snapshotTest(pair12, pair78) { (matcherActor, probes) =>
+          val List(probe12, probe78) = probes
+          sendBuyOrders(matcherActor, pair12, 0 to 8)
+          probe12.expectNoMessage(200.millis)
+          probe78.expectNoMessage(200.millis)
+
+          sendBuyOrders(matcherActor, pair78, 9 to 15)
+          probe12.expectNoMessage(200.millis)
+          probe78.expectMsg(OrderBookSnapshotUpdated(pair78, 10))
+
+          sendBuyOrders(matcherActor, pair12, 15 to 18)
+          probe12.expectMsg(OrderBookSnapshotUpdated(pair12, 15))
+          probe78.expectNoMessage(200.millis)
+        }
+      }
+
+      "received a lot of messages and tries to maintain a snapshot's offset" in snapshotTest(pair12) { (matcherActor, probes) =>
+        val probe = probes.head
+        sendBuyOrders(matcherActor, pair12, 0 to 30)
+        probe.expectMsg(OrderBookSnapshotUpdated(pair12, 14))
+        probe.expectNoMessage(200.millis)
+
+        sendBuyOrders(matcherActor, pair12, 31 to 40)
+        probe.expectMsg(OrderBookSnapshotUpdated(pair12, 31))
+      }
+    }
+  }
+
+  private def sendBuyOrders(actor: ActorRef, assetPair: AssetPair, indexes: Range): Unit = {
+    val ts = System.currentTimeMillis()
+    indexes.foreach { i =>
+      actor ! wrap(i, buy(assetPair, amount = 1000, price = 1, ts = Some(ts + i)))
+    }
+  }
+
+  /**
+    * @param f (MatcherActor, TestProbe) => Any
+    * @return
+    */
+  private def snapshotTest(assetPairs: AssetPair*)(f: (ActorRef, List[TestProbe]) => Any): Any = {
+    val r = assetPairs.map(fakeOrderBookActor).toList
+    val actor = waitInitialization(
+      TestActorRef(
+        new MatcherActor(
+          matcherSettings.copy(snapshotsInterval = 20),
+          (_, _) => (),
+          emptyOrderBookRefs,
+          (assetPair, _) => {
+            val idx = assetPairs.indexOf(assetPair)
+            if (idx < 0) throw new RuntimeException(s"Can't find $assetPair in $assetPairs")
+            r(idx)._1
+          },
+          blockchain.assetDescription
+        )
+      ))
+
+    f(actor, r.map(_._2))
+  }
+
+  private def fakeOrderBookActor(assetPair: AssetPair): (Props, TestProbe) = {
+    val probe = TestProbe()
+    val props = Props(new Actor {
+      import context.dispatcher
+      private var nr = -1L
+
+      override def receive: Receive = {
+        case x: QueueEventWithMeta if x.offset > nr => nr = x.offset
+        case SaveSnapshot =>
+          val event = OrderBookSnapshotUpdated(assetPair, nr)
+          context.system.scheduler.scheduleOnce(200.millis) {
+            context.parent ! event
+            probe.ref ! event
+          }
+      }
+      context.parent ! OrderBookSnapshotUpdated(assetPair, 0)
+    })
+
+    (props, probe)
   }
 
   private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs): TestActorRef[MatcherActor] = {
-    val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings, ntpTime).createTransaction _
+    val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
+
     waitInitialization(
       TestActorRef(
         new MatcherActor(
+          matcherSettings,
+          (_, _) => (),
           ob,
           (assetPair, matcher) =>
-            OrderBookActor.props(matcher, assetPair, _ => {}, _ => {}, mock[UtxPool], mock[ChannelGroup], matcherSettings, txFactory, ntpTime),
+            OrderBookActor
+              .props(matcher, assetPair, _ => {}, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
           blockchain.assetDescription
         )
       ))

@@ -5,7 +5,7 @@ import java.util.concurrent.Executors
 import akka.actor.ActorRef
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.{Directive1, Route}
+import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import com.google.common.primitives.Longs
@@ -13,12 +13,14 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http._
 import com.wavesplatform.crypto
 import com.wavesplatform.matcher.AssetPairBuilder
+import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.matcher.queue.QueueEvent
 import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetAcc
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
@@ -44,8 +46,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            orderHistory: ActorRef,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
+                           storeEvent: StoreEvent,
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            wavesSettings: WavesSettings,
+                           isDuringShutdown: () => Boolean,
                            db: DB,
                            time: Time)
     extends ApiRoute
@@ -55,7 +59,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   import PathMatchers._
   import wavesSettings._
 
-  override val settings = restAPISettings
+  override val settings: RestAPISettings = restAPISettings
 
   private val timer           = Kamon.timer("matcher.api-requests")
   private val placeTimer      = timer.refine("action" -> "place")
@@ -64,13 +68,21 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private val batchCancelExecutor = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor(new DefaultThreadFactory("batch-cancel", true)))
 
-  override lazy val route: Route =
+  override lazy val route: Route = shutdownBarrier {
     pathPrefix("matcher") {
       matcherPublicKey ~ getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ getTradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
         getSettings
     }
+  }
+
+  private def shutdownBarrier: Directive0 = if (isDuringShutdown()) complete(DuringShutdown) else pass
+
+  private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
+    case Some(Left(_)) => complete(OrderBookUnavailable)
+    case _             => pass
+  }
 
   private def withAssetPair(p: AssetPair, redirectToInverse: Boolean = false, suffix: String = ""): Directive1[AssetPair] =
     assetPairBuilder.validateAssetPair(p) match {
@@ -150,25 +162,32 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def place: Route = path("orderbook") {
     (pathEndOrSingleSlash & post) {
-      json[Order] { order =>
-        placeTimer.measureFuture {
-          orderValidator.validateNewOrder(order) match {
-            case Left(e)  => Future.successful[MatcherResponse](OrderRejected(e))
-            case Right(_) => (matcher ? order).mapTo[MatcherResponse]
+      _json[Order] { order =>
+        unavailableOrderBookBarrier(order.assetPair) {
+          complete {
+            placeTimer.measureFuture {
+              orderValidator.validateNewOrder(order) match {
+                case Left(e)  => Future.successful[MatcherResponse](OrderRejected(e))
+                case Right(_) => storeEvent(QueueEvent.Placed(order))
+              }
+            }
           }
         }
       }
     }
   }
 
-  private def doCancel(order: Order): Future[MatcherResponse] = orderBook(order.assetPair) match {
-    case Some(Right(orderBookRef)) =>
+  private def doCancel(order: Order): Future[WrappedMatcherResponse] = orderBook(order.assetPair) match {
+    case Some(Right(_)) =>
       log.trace(s"Canceling ${order.id()} for ${order.sender.address}")
-      (orderBookRef ? CancelOrder(order.id())).mapTo[MatcherResponse].map {
+      storeEvent(QueueEvent.Canceled(order.assetPair, order.id())).flatMap {
         case _: OrderCancelRejected =>
           orderHistory ! Events.OrderCanceled(LimitOrder(order), unmatchable = false)
-          OrderCanceled(order.id())
-        case x => x
+          Future.successful(OrderCanceled(order.id()))
+        case x: OrderCanceled => Future.successful(x)
+        case x =>
+          log.warn(s"Unexpected response for cancel: $x")
+          Future.failed(new RuntimeException("Unexpected response"))
       }
     case Some(Left(_)) => Future.successful(OrderBookUnavailable)
     case None =>
@@ -207,8 +226,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         case Left(e) => Future.successful[ToResponseMarshallable](OrderCancelRejected(e))
         case Right(_) =>
           val ordersToCancel = assetPair match {
-            case Some(p) => DBUtils.ordersByAddressAndPair(db, senderPublicKey, p, true, DBUtils.indexes.active.MaxElements)
-            case None    => DBUtils.ordersByAddress(db, senderPublicKey, true, DBUtils.indexes.active.MaxElements)
+            case Some(p) => DBUtils.ordersByAddressAndPair(db, senderPublicKey, p, activeOnly = true, DBUtils.indexes.active.MaxElements)
+            case None    => DBUtils.ordersByAddress(db, senderPublicKey, activeOnly = true, DBUtils.indexes.active.MaxElements)
           }
 
           ordersToCancel
@@ -525,9 +544,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
     withAssetPair(p) { pair =>
-      complete((matcher ? DeleteOrderBookRequest(pair)).map { _ =>
-        GetOrderBookResponse(time.correctedTime(), pair, Seq(), Seq()).toHttpResponse
-      })
+      complete(storeEvent(QueueEvent.OrderBookDeleted(pair)))
     }
   }
 

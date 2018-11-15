@@ -11,6 +11,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
+import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 
@@ -22,10 +23,10 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
   {
     val issueTx = matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
-    matcherNode.waitForTransaction(issueTx.id)
+    nodes.waitForTransaction(issueTx.id)
 
     val transferTx = aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2)
-    matcherNode.waitForTransaction(transferTx.id)
+    nodes.waitForTransaction(transferTx.id)
   }
 
   private val predefAssetPair = wavesUsdPair
@@ -38,7 +39,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
                  |   let id = t.id == base58''
                  |   let assetPair1Amount = isDefined(t.assetPair.amountAsset)
                  |   let assetPair1Price = if (isDefined(t.assetPair.priceAsset)) then extract(t.assetPair.priceAsset) == base58'${UsdId.toString}' else false
-                 |   let assetPair2Amount = if (isDefined(t.assetPair.amountAsset)) then extract(t.assetPair.amountAsset) == base58'${aliceAsset}' else false
+                 |   let assetPair2Amount = if (isDefined(t.assetPair.amountAsset)) then extract(t.assetPair.amountAsset) == base58'$aliceAsset' else false
                  |   let assetPair2Price = isDefined(t.assetPair.priceAsset)
                  |   (!assetPair1Amount && assetPair1Price) || (assetPair2Amount && !assetPair2Price)
                  | case s : SetScriptTransaction => true
@@ -334,8 +335,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           info(s"$i")
           log.debug(s"contract $contract")
 
-          val aliceBalance = matcherNode.accountBalances(aliceAcc.address)._1
-
           val aliceOrd1 = matcherNode
             .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 100, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
             .message
@@ -360,28 +359,20 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             .message
             .id
 
-          matcherNode.transactionsByOrder(aliceOrd1)
-          matcherNode.transactionsByOrder(aliceOrd2)
+          matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Filled", 1.minute)
+          matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Filled", 1.minute)
+          matcherNode.waitOrderStatus(predefAssetPair, bobOrd1, "Filled", 1.minute)
+          matcherNode.waitOrderStatus(aliceWavesPair, bobOrd2, "Filled", 1.minute)
 
-          matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Cancelled", 1.minute)
-          matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Cancelled", 1.minute)
-          matcherNode.waitOrderStatus(predefAssetPair, bobOrd1, "Accepted", 1.minute)
-          matcherNode.waitOrderStatus(aliceWavesPair, bobOrd2, "Accepted", 1.minute)
+          val aliceOrd1Txs = matcherNode.transactionsByOrder(aliceOrd1)
+          aliceOrd1Txs.size shouldBe 1
+          matcherNode.expectSignedBroadcastRejected(Json.toJson(aliceOrd1Txs.head))
+
+          val aliceOrd2Txs = matcherNode.transactionsByOrder(aliceOrd2)
+          aliceOrd2Txs.size shouldBe 1
+          matcherNode.expectSignedBroadcastRejected(Json.toJson(aliceOrd2Txs.head))
 
           matcherNode.ordersByAddress(aliceAcc, activeOnly = true).length shouldBe 0
-
-          // Alice checks that she received some Waves
-          val updatedAliceBalance = aliceNode.accountBalances(aliceAcc.address)._1
-          updatedAliceBalance shouldBe (aliceBalance - 0.014.waves)
-
-          assert(matcherNode.transactionsByOrder(bobOrd1).isEmpty)
-          assert(matcherNode.transactionsByOrder(bobOrd2).isEmpty)
-
-          matcherNode.cancelOrder(bobAcc, predefAssetPair, bobOrd1)
-          matcherNode.waitOrderStatus(predefAssetPair, bobOrd1, "Cancelled")
-
-          matcherNode.cancelOrder(bobAcc, aliceWavesPair, bobOrd2)
-          matcherNode.waitOrderStatus(aliceWavesPair, bobOrd2, "Cancelled")
 
           matcherNode.reservedBalance(bobAcc) shouldBe empty
 

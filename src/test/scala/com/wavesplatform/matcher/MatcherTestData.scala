@@ -1,10 +1,14 @@
 package com.wavesplatform.matcher
 
+import java.util.concurrent.atomic.AtomicLong
+
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, DeleteOrderBookRequest}
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
+import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -17,12 +21,23 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   val bytes32gen: Gen[Array[Byte]]       = Gen.listOfN(signatureSize, Arbitrary.arbitrary[Byte]).map(xs => xs.toArray)
   val WalletSeed                         = ByteStr("Matcher".getBytes())
-  val MatcherSeed                        = crypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
+  val MatcherSeed: Array[Byte]           = crypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
   val MatcherAccount                     = PrivateKeyAccount(MatcherSeed)
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long]         = Gen.choose(1, Long.MaxValue)
 
   val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
+
+  private val seqNr                                       = new AtomicLong(-1)
+  def wrap(x: Order): QueueEventWithMeta                  = wrap(seqNr.incrementAndGet(), x)
+  def wrap(x: CancelOrder): QueueEventWithMeta            = wrap(seqNr.incrementAndGet(), x)
+  def wrap(x: DeleteOrderBookRequest): QueueEventWithMeta = wrap(seqNr.incrementAndGet(), x)
+
+  def wrap(n: Long, x: Order): QueueEventWithMeta                  = wrap(n, QueueEvent.Placed(x))
+  def wrap(n: Long, x: CancelOrder): QueueEventWithMeta            = wrap(n, QueueEvent.Canceled(x.assetPair, x.orderId))
+  def wrap(n: Long, x: DeleteOrderBookRequest): QueueEventWithMeta = wrap(n, QueueEvent.OrderBookDeleted(x.assetPair))
+
+  private def wrap(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
 
   def assetIdGen(prefix: Byte) = Gen.listOfN(signatureSize - 1, Arbitrary.arbitrary[Byte]).map(xs => Some(ByteStr(Array(prefix, xs: _*))))
   val distinctPairGen: Gen[AssetPair] = for {

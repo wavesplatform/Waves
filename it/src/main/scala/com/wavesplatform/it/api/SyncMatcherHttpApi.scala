@@ -27,7 +27,7 @@ object SyncMatcherHttpApi extends Assertions {
   }
 
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
       Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting not found error")
