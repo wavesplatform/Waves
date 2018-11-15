@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
+
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.unit
 import scodec.bits.ByteVector
 
 package object converters {
@@ -12,9 +12,9 @@ package object converters {
   implicit def c(is: IndexedSeq[EVALUATED]): EVALUATED = ARR(is)
 
   implicit def fromOptionBV[T](v: Option[ByteVector]): EVALUATED = v.map(CONST_BYTEVECTOR).getOrElse(unit)
-  implicit def fromOptionL[T](v: Option[Long]): EVALUATED       = v.map(CONST_LONG).getOrElse(unit)
-  implicit def fromOptionS[T](v: Option[String]): EVALUATED     = v.map(CONST_STRING).getOrElse(unit)
-  implicit def fromOptionB[T](v: Option[Boolean]): EVALUATED    = v.map(CONST_BOOLEAN).getOrElse(unit)
+  implicit def fromOptionL[T](v: Option[Long]): EVALUATED        = v.map(CONST_LONG).getOrElse(unit)
+  implicit def fromOptionS[T](v: Option[String]): EVALUATED      = v.map(CONST_STRING).getOrElse(unit)
+  implicit def fromOptionB[T](v: Option[Boolean]): EVALUATED     = v.map(CONST_BOOLEAN).getOrElse(unit)
   implicit def fromOptionCO[T](v: Option[CaseObj]): EVALUATED    = v.getOrElse(unit)
 
 }

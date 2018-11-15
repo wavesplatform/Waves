@@ -214,7 +214,7 @@ object CommonValidation {
       val (feeAssetInfo, feeAmount) = inputFee
       val assetsCount = tx match {
         case tx: ExchangeTransaction => tx.checkedAssets().count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
-        case tx                      => tx.checkedAssets().count(blockchain.hasAssetScript)
+        case _                       => tx.checkedAssets().count(blockchain.hasAssetScript)
       }
       if (isSmartToken(inputFee)) {
         //Left(GenericError("Using smart asset for sponsorship is disabled."))
