@@ -108,7 +108,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         (),
         GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")
       )
-      .flatMap(_ =>
+      .flatMap[ValidationError, Option[DiscardedTransactions]](_ =>
         (ngState match {
           case None =>
             blockchain.lastBlockId match {

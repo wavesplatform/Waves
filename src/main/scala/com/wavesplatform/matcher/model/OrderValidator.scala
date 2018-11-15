@@ -136,7 +136,7 @@ class OrderValidator(db: DB,
             case x: OrderV1 => x.copy(orderType = x.orderType.opposite)
             case x: OrderV2 => x.copy(orderType = x.orderType.opposite)
           }
-          transactionCreator.createTransaction(OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order))).left.map(_.toString)
+          transactionCreator.createTransaction(OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order)), time.correctedTime()).left.map(_.toString)
         }
 
         def verifyAssetScript(assetId: Option[AssetId]) = assetId.fold[ValidationResult](Right(order)) { assetId =>

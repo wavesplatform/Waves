@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.assets.exchange.Order
 
 import scala.util.Either
 
-trait ValidationError
+trait ValidationError extends Product with Serializable
 
 object ValidationError {
   type Validation[T] = Either[ValidationError, T]
