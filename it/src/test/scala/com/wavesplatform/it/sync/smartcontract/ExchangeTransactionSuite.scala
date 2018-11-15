@@ -79,8 +79,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         (mcontr, acc2),
       )
 
-      nodes.waitForHeightArise()
-
       val tx = exchangeTx()
 
       val txId = sender.signedBroadcast(tx).id

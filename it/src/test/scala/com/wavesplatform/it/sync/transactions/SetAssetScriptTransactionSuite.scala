@@ -1,22 +1,21 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.api.http.assets.SignedSetAssetScriptRequest
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{script, someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import scorex.crypto.encode.Base58
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json._
+import scorex.crypto.encode.Base58
 
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   var assetWOScript              = ""
@@ -92,7 +91,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
+    assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some("")),
                                "Reason: Cannot remove script from an asset issued with a script")
   }
 
@@ -161,21 +160,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         .right
         .get
 
-    def request(tx: SetAssetScriptTransaction): SignedSetAssetScriptRequest =
-      SignedSetAssetScriptRequest(
-        SetAssetScriptTransaction.supportedVersions.head,
-        Base58.encode(tx.sender.publicKey),
-        tx.assetId.base58,
-        Some(tx.script.get.bytes.value.base64),
-        tx.fee,
-        tx.timestamp,
-        tx.proofs.base58().toList
-      )
-
-    implicit val w =
-      Json.writes[SignedSetAssetScriptRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt)))
-
     val (balance, eff) = notMiner.accountBalances(firstAddress)
+
     val invalidTxs = Seq(
       (sastx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
       (sastx(fee = 9999999), "Fee .* does not exceed minimal value"),
@@ -184,7 +170,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     )
 
     for ((tx, diag) <- invalidTxs) {
-      assertBadRequestAndResponse(sender.broadcastRequest(request(tx)), diag)
+      assertBadRequestAndResponse(sender.broadcastRequest(tx.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))), diag)
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 
@@ -313,11 +299,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))
 
     val signedTxByB2 =
-      nonIssuerUnsignedTx.copy(proofs = Proofs(Seq(sigTxB2)))
+      nonIssuerUnsignedTx2.copy(proofs = Proofs(Seq(sigTxB2)))
 
     assertBadRequestAndMessage(
       sender.signedBroadcast(signedTxByB2.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))).id,
-      "Transaction is not allowed by account-script"
+      "Transaction is not allowed by token-script"
     )
   }
 
