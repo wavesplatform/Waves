@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.smartcontract.smartasset
 
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.smartcontract.{cryptoContext, pureContext, wavesContext}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.model.LimitOrder
@@ -35,7 +36,10 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     nodes.waitForHeightAriseAndTxPresent(dtxId)
   }
 
-  test("require using a certain matcher") {
+  test("require using a certain matcher with smart accounts") {
+    /*
+    combination of smart accounts and smart assets
+     */
     val script = Some(ScriptCompiler(s"""
                                        |match tx {
                                        |case s : SetAssetScriptTransaction => true
@@ -57,9 +61,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       setContract(contr2, acc1)
       setContract(mcontr, acc2)
 
-      val tx = exchangeTx(smartPair)
-
-      val txId = sender.signedBroadcast(tx).id
+      val txId = sender.signedBroadcast(exchangeTx(smartPair)).id
       nodes.waitForHeightAriseAndTxPresent(txId)
     }
 
@@ -72,15 +74,11 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     val scriptUpdateTx = sender.setAssetScript(smartAsset, firstAddress, setAssetScriptFee, scriptUpdated).id
     nodes.waitForHeightAriseAndTxPresent(scriptUpdateTx)
 
-    assertBadRequestAndMessage(sender.signedBroadcast(exchangeTx(smartPair)).id, "Transaction is not allowed by token-script")
-
-    setContract(None, acc0)
-    setContract(None, acc1)
-    setContract(None, acc2)
+    assertBadRequestAndMessage(sender.signedBroadcast(exchangeTx(smartPair)).id, errNotAllowedByToken)
 
   }
 
-  test("use smart assets for AssetPair") {
+  test("AssetPair from smart assets") {
     val assetA = sender
       .issue(firstAddress, "assetA", "TestCoin", someAssetAmount, 0, reissuable = false, issueFee, 2, Some(scriptBase64))
       .id
@@ -118,22 +116,55 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     val txId = sender.signedBroadcast(exchangeTx(smartAssetPair)).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
-    val incorrectSmartAssetPair = AssetPair(
-      amountAsset = Some(ByteStr.decodeBase58(assetA).get),
-      priceAsset = None
-    )
+    withClue("check fee for smart accounts and smart AssetPair - extx.fee == 0.023.waves") {
+      setContract(sc1, acc0)
+      setContract(sc1, acc1)
+      setContract(sc1, acc2)
 
-    assertBadRequestAndMessage(sender.signedBroadcast(exchangeTx(incorrectSmartAssetPair)).id, errNotAllowedByToken)
+      assertBadRequestAndMessage(
+        sender.signedBroadcast(exchangeTx(smartAssetPair)).id,
+        "com.wavesplatform.transaction.assets.exchange.ExchangeTransactionV2 does not exceed minimal value of 2300000"
+      )
+
+      val txId = sender.signedBroadcast(exchangeTx(smartAssetPair, someSmart = false)).id
+      nodes.waitForHeightAriseAndTxPresent(txId)
+    }
+
+    withClue("try to use incorrect assetPair") {
+      val incorrectSmartAssetPair = AssetPair(
+        amountAsset = Some(ByteStr.decodeBase58(assetA).get),
+        priceAsset = None
+      )
+      assertBadRequestAndMessage(sender.signedBroadcast(exchangeTx(incorrectSmartAssetPair)).id, errNotAllowedByToken)
+    }
   }
 
-  def exchangeTx(pair: AssetPair, isSmart: Boolean = true): JsObject = {
+  test("use all functions from RIDE for asset script") {
+    val script1 = Some(ScriptCompiler(cryptoContext(dtx).get).explicitGet()._1.bytes.value.base64)
+    val script2 = Some(ScriptCompiler(pureContext(dtx).get).explicitGet()._1.bytes.value.base64)
+    val script3 = Some(ScriptCompiler(wavesContext(dtx).get).explicitGet()._1.bytes.value.base64)
+
+    for (script <- List(script1, script2, script3)) {
+      val asset = sender
+        .issue(firstAddress, "assetA", "TestCoin", someAssetAmount, 0, reissuable = false, issueFee, 2, script)
+        .id
+      nodes.waitForHeightAriseAndTxPresent(asset)
+
+      val smartPair = AssetPair(ByteStr.decodeBase58(asset).toOption, None)
+
+      val txId = sender.signedBroadcast(exchangeTx(smartPair)).id
+      nodes.waitForHeightAriseAndTxPresent(txId)
+    }
+  }
+
+  def exchangeTx(pair: AssetPair, someSmart: Boolean = true): JsObject = {
     val matcher     = acc2
     val sellPrice   = (0.50 * Order.PriceConstant).toLong
-    val (buy, sell) = orders(pair, 2, isSmart)
+    val (buy, sell) = orders(pair, 2, someSmart)
 
     val amount = math.min(buy.amount, sell.amount)
 
-    val matcherFee     = if (isSmart) 1900000L else 1500000L
+    val matcherFee     = if (someSmart) 1900000L else 2300000L
     val sellMatcherFee = LimitOrder.getPartialFee(sell.matcherFee, sell.amount, amount)
     val buyMatcherFee  = LimitOrder.getPartialFee(buy.matcherFee, buy.amount, amount)
 

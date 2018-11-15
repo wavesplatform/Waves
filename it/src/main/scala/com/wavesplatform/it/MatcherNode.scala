@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -53,7 +54,7 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
     }
   }
 
-  def setContract(contractText: Option[String], acc: PrivateKeyAccount) = {
+  def setContract(contractText: Option[String], acc: PrivateKeyAccount): TransactionInfo = {
     val script = contractText.map { x =>
       val scriptText = x.stripMargin
       ScriptCompiler(scriptText).explicitGet()._1
