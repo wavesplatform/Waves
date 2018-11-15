@@ -160,10 +160,7 @@ object AsyncHttpApi extends Assertions {
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[TransactionInfo] = {
       val condition = waitFor[Option[TransactionInfo]](s"transaction $txId")(
         _.transactionInfo(txId).transform {
-          case Success(tx) => {
-            Thread.sleep(n.settings.minerSettings.microBlockInterval.toMillis)
-            Success(Some(tx))
-          }
+          case Success(tx)                                       => Success(Some(tx))
           case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
           case Failure(ex)                                       => Failure(ex)
         },

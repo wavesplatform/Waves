@@ -32,10 +32,10 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       .issue(aliceAcc.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, issueFee, 2)
       .id
     val bobAsset = bobNode
-      .issue(bobNode.address, "BobCoin1", "Bob's asset", someAssetAmount, 5, false, issueFee)
+      .issue(bobAcc.address, "BobCoin1", "Bob's asset", someAssetAmount, 5, false, issueFee)
       .id
     val bobAsset2 = bobNode
-      .issue(bobNode.address, "BobCoin2", "Bob's asset", someAssetAmount, 0, false, issueFee)
+      .issue(bobAcc.address, "BobCoin2", "Bob's asset", someAssetAmount, 0, false, issueFee)
       .id
 
     Seq(aliceAsset, bobAsset, bobAsset2).foreach(matcherNode.waitForTransaction(_))
@@ -264,13 +264,13 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         matcherNode.assertAssetBalance(bobAcc.address, bobAsset, someAssetAmount)
         val bobWavesPair = AssetPair(ByteStr.decodeBase58(bobAsset).toOption, None)
 
-        def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, SELL, someAssetAmount, 0.5.waves, matcherFee, orderVersion)
+        def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, SELL, someAssetAmount, 0.005.waves, matcherFee, orderVersion)
 
         val order6 = matcherNode.placeOrder(bobOrder)
         matcherNode.waitOrderStatus(bobWavesPair, order6.message.id, "Accepted")
 
         // Alice wants to buy all Bob's assets for 1 Wave
-        val order7 = matcherNode.placeOrder(aliceAcc, bobWavesPair, BUY, someAssetAmount, 0.5.waves, matcherFee, orderVersion)
+        val order7 = matcherNode.placeOrder(aliceAcc, bobWavesPair, BUY, someAssetAmount, 0.005.waves, matcherFee, orderVersion)
         matcherNode.waitOrderStatus(bobWavesPair, order7.message.id, "Filled")
 
         val tx = matcherNode.transactionsByOrder(order7.message.id).head
@@ -286,13 +286,14 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
           priceAsset = None
         )
 
-        val bobBalance = matcherNode.accountBalances(bobNode.address)._1
+        val bobBalance = matcherNode.accountBalances(bobAcc.address)._1
         matcherNode.assertAssetBalance(aliceAcc.address, bobAsset2, 0)
         matcherNode.assertAssetBalance(matcherAcc.address, bobAsset2, 0)
         matcherNode.assertAssetBalance(bobAcc.address, bobAsset2, someAssetAmount)
 
         // Bob wants to sell all own assets for 1 Wave
-        def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, SELL, someAssetAmount, 1.waves * Order.PriceConstant, matcherFee, orderVersion)
+        def bobOrder =
+          matcherNode.prepareOrder(bobAcc, bobWavesPair, SELL, someAssetAmount, 1.waves, matcherFee, orderVersion)
 
         val order8 = matcherNode.placeOrder(bobOrder)
         matcherNode.waitOrderStatus(bobWavesPair, order8.message.id, "Accepted")
@@ -300,7 +301,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         // Bob moves all waves to Alice
 
         val transferAmount    = bobBalance - minFee
-        val transferToAliceId = bobNode.transfer(bobNode.address, aliceNode.address, transferAmount, minFee, None, None).id
+        val transferToAliceId = bobNode.transfer(bobAcc.address, aliceAcc.address, transferAmount, minFee, None, None).id
         matcherNode.waitForTransaction(transferToAliceId)
         matcherNode.reservedBalance(bobAcc)
 
@@ -319,9 +320,9 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   }
 
   "Max 8 price decimals allowed to be non zero" - {
-    val ap28 = issueAssetPair(aliceNode.privateKey, 2, 8)
-    val ap34 = issueAssetPair(aliceNode.privateKey, 3, 4)
-    val ap08 = issueAssetPair(aliceNode.privateKey, 0, 8)
+    val ap28 = issueAssetPair(aliceAcc, 2, 8)
+    val ap34 = issueAssetPair(aliceAcc, 3, 4)
+    val ap08 = issueAssetPair(aliceAcc, 0, 8)
 
     Seq(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2).map(matcherNode.signedIssue).foreach { x =>
       matcherNode.waitForTransaction(x.id)
