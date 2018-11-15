@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi
@@ -14,7 +13,6 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
-import com.wavesplatform.utils.Base58
 import org.scalatest._
 
 import scala.util.Random
@@ -242,19 +240,4 @@ object MatcherTickerTestSuite {
      """.stripMargin)
 
   private val Configs = _Configs.map(updatedMatcherConfig.withFallback(_))
-
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
-    import tx._
-    SignedIssueV1Request(
-      Base58.encode(tx.sender.publicKey),
-      new String(name),
-      new String(description),
-      quantity,
-      decimals,
-      reissuable,
-      fee,
-      timestamp,
-      signature.base58
-    )
-  }
 }

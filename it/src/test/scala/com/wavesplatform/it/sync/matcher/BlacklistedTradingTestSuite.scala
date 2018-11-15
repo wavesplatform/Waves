@@ -2,23 +2,15 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
+import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import org.scalatest._
 
-class BlacklistedTradingTestSuite
-    extends FreeSpec
-    with Matchers
-    with BeforeAndAfterAll
-    with CancelAfterFailure
-    with NodesFromDocker
-    with ReportingTestName
-    with GivenWhenThen {
+class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
 
   import BlacklistedTradingTestSuite._
   override protected def nodeConfigs: Seq[Config] = Configs.map(configWithBlacklisted().withFallback(_))
@@ -26,6 +18,8 @@ class BlacklistedTradingTestSuite
   private def matcher = dockerNodes().head
   private def alice   = dockerNodes()(1)
   private def bob     = dockerNodes()(2)
+
+  println(IssueUsdTx)
 
   Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).map(matcher.signedIssue).foreach { tx =>
     matcher.waitForTransaction(tx.id)
