@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, UnionType}
 
 object Types {
@@ -78,8 +79,8 @@ object Types {
   val setAssetScriptTransactionType = CaseType(
     "SetAssetScriptTransaction",
     List(
-      "script" -> optionByteVector,
-      "assetId"  -> BYTEVECTOR
+      "script"  -> optionByteVector,
+      "assetId" -> BYTEVECTOR
     ) ++ header ++ proven
   )
 

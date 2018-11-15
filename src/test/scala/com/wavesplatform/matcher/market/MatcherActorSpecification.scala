@@ -13,7 +13,7 @@ import com.wavesplatform.matcher.model.ExchangeTransactionCreator
 import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.randomBytes
+import com.wavesplatform.utils.{EmptyBlockchain, randomBytes}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
@@ -112,7 +112,7 @@ class MatcherActorSpecification
   }
 
   private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs): TestActorRef[MatcherActor] = {
-    val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime).createTransaction _
+    val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings, ntpTime).createTransaction _
     waitInitialization(
       TestActorRef(
         new MatcherActor(

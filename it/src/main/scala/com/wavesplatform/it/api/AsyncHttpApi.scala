@@ -15,7 +15,7 @@ import com.wavesplatform.http.{DebugMessage, RollbackParams, api_key}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.{DataEntry, Portfolio}
+import com.wavesplatform.state.{DataEntry, EitherExt2, Portfolio}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
@@ -25,7 +25,6 @@ import org.scalactic.source.Position
 import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
-
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -105,7 +104,7 @@ object AsyncHttpApi extends Assertions {
           .toScala
           .map(Option(_))
           .recoverWith {
-            case (_: IOException | _: TimeoutException) => Future(None)
+            case _: IOException | _: TimeoutException => Future(None)
           }
 
       def cond(ropt: Option[Response]) = ropt.exists { r =>
@@ -144,6 +143,8 @@ object AsyncHttpApi extends Assertions {
     def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
 
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
+
+    def balanceDetails(address: String): Future[BalanceDetails] = get(s"/addresses/balance/details/$address").as[BalanceDetails]
 
     def getAddresses: Future[Seq[String]] = get(s"/addresses").as[Seq[String]]
 
@@ -292,8 +293,8 @@ object AsyncHttpApi extends Assertions {
     def assetsBalance(address: String): Future[FullAssetsInfo] =
       get(s"/assets/balance/$address").as[FullAssetsInfo]
 
-    def assetsDetails(assetId: String): Future[AssetInfo] =
-      get(s"/assets/details/$assetId").as[AssetInfo]
+    def assetsDetails(assetId: String, fullInfo: Boolean = false): Future[AssetInfo] =
+      get(s"/assets/details/$assetId?full=$fullInfo").as[AssetInfo]
 
     def sponsorAsset(sourceAddress: String, assetId: String, minSponsoredAssetFee: Long, fee: Long): Future[Transaction] =
       postJson("/assets/sponsor", SponsorFeeRequest(1, sourceAddress, assetId, Some(minSponsoredAssetFee), fee)).as[Transaction]
@@ -342,7 +343,7 @@ object AsyncHttpApi extends Assertions {
       postJson("/assets/broadcast/issue", issue).as[Transaction]
 
     def signedIssue(issue: SignedIssueV2Request): Future[Transaction] =
-      signedBroadcast(issue.toTx.right.get.json())
+      signedBroadcast(issue.toTx.explicitGet().json())
 
     def batchSignedTransfer(transfers: Seq[SignedTransferV2Request], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")

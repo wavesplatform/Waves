@@ -7,7 +7,8 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
-import com.wavesplatform.state.{ByteStr, Sponsorship}
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import com.wavesplatform.utils.Base58
 import org.scalatest.{Assertion, CancelAfterFailure, FreeSpec, Matchers}
@@ -85,32 +86,20 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     "sender cannot make transfer" - {
       "invalid tx timestamp" in {
 
-        def invalidTx(timestamp: Long) =
+        def invalidTx(timestamp: Long): SponsorFeeTransaction.TransactionT =
           SponsorFeeTransaction
             .selfSigned(1, sponsor.privateKey, ByteStr.decodeBase58(sponsorAssetId).get, Some(SmallFee), minFee, timestamp + 1.day.toMillis)
             .right
             .get
 
-        def request(tx: SponsorFeeTransaction): SignedSponsorFeeRequest =
-          SignedSponsorFeeRequest(
-            tx.version,
-            Base58.encode(tx.sender.publicKey),
-            tx.assetId.base58,
-            tx.minSponsoredAssetFee,
-            tx.fee,
-            tx.timestamp,
-            tx.proofs.base58().toList
-          )
-        implicit val w =
-          Json.writes[SignedSponsorFeeRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(SponsorFeeTransaction.typeId.toInt)))
-
         val iTx = invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis)
-        assertBadRequestAndResponse(sponsor.broadcastRequest(request(iTx)), "Transaction .* is from far future")
+        assertBadRequestAndResponse(sponsor.broadcastRequest(iTx.json() + ("type" -> JsNumber(SponsorFeeTransaction.typeId.toInt))),
+                                    "Transaction .* is from far future")
       }
     }
 
-    val minerWavesBalanceAfterFirstXferTest   = minerWavesBalance + 2.waves + minFee + Sponsorship.FeeUnit * SmallFee / minSponsorFee
-    val sponsorWavesBalanceAfterFirstXferTest = sponsorWavesBalance - 2.waves - minFee - Sponsorship.FeeUnit * SmallFee / minSponsorFee
+    val minerWavesBalanceAfterFirstXferTest   = minerWavesBalance + 2.waves + minFee + CommonValidation.FeeUnit * SmallFee / minSponsorFee
+    val sponsorWavesBalanceAfterFirstXferTest = sponsorWavesBalance - 2.waves - minFee - CommonValidation.FeeUnit * SmallFee / minSponsorFee
 
     "fee should be written off in issued asset" - {
 
@@ -173,10 +162,10 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       miner.assertAssetBalance(bob.address, sponsorAssetId, 10 * Token)
       miner.assertBalances(
         sponsor.address,
-        sponsorWavesBalanceAfterFirstXferTest - Sponsorship.FeeUnit * LargeFee / Token - leasingFee,
-        sponsorWavesBalanceAfterFirstXferTest - Sponsorship.FeeUnit * LargeFee / Token - leasingFee - leasingAmount
+        sponsorWavesBalanceAfterFirstXferTest - CommonValidation.FeeUnit * LargeFee / Token - leasingFee,
+        sponsorWavesBalanceAfterFirstXferTest - CommonValidation.FeeUnit * LargeFee / Token - leasingFee - leasingAmount
       )
-      miner.assertBalances(miner.address, minerWavesBalanceAfterFirstXferTest + Sponsorship.FeeUnit * LargeFee / Token + leasingFee)
+      miner.assertBalances(miner.address, minerWavesBalanceAfterFirstXferTest + CommonValidation.FeeUnit * LargeFee / Token + leasingFee)
     }
 
     "cancel sponsorship" - {
@@ -207,10 +196,10 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       "check sponsor and miner balances after cancel" in {
         miner.assertBalances(
           sponsor.address,
-          sponsorWavesBalanceAfterFirstXferTest - Sponsorship.FeeUnit * LargeFee / Token - leasingFee - issueFee,
-          sponsorWavesBalanceAfterFirstXferTest - Sponsorship.FeeUnit * LargeFee / Token - leasingFee - leasingAmount - issueFee
+          sponsorWavesBalanceAfterFirstXferTest - CommonValidation.FeeUnit * LargeFee / Token - leasingFee - issueFee,
+          sponsorWavesBalanceAfterFirstXferTest - CommonValidation.FeeUnit * LargeFee / Token - leasingFee - leasingAmount - issueFee
         )
-        miner.assertBalances(miner.address, minerWavesBalanceAfterFirstXferTest + Sponsorship.FeeUnit * LargeFee / Token + leasingFee + issueFee)
+        miner.assertBalances(miner.address, minerWavesBalanceAfterFirstXferTest + CommonValidation.FeeUnit * LargeFee / Token + leasingFee + issueFee)
       }
 
       "cancel sponsopship again" in {
@@ -245,7 +234,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
         nodes.waitForHeightAriseAndTxPresent(transferTxCustomFeeAlice)
         nodes.waitForHeightArise()
 
-        val wavesFee = Sponsorship.FeeUnit * TinyFee / TinyFee
+        val wavesFee = CommonValidation.FeeUnit * TinyFee / TinyFee
         sponsor.assertBalances(sponsor.address, sponsoredBalance._1 - wavesFee, sponsoredBalance._2 - wavesFee)
         sponsor.assertAssetBalance(sponsor.address, sponsorAssetId, sponsorAssetBalance + TinyFee)
         alice.assertAssetBalance(alice.address, sponsorAssetId, aliceAssetBalance - TinyFee)
@@ -286,7 +275,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
 
         val transferTxCustomFeeAlice = alice.transfer(alice.address, bob.address, 1.waves, LargeFee, None, Some(sponsorAssetId)).id
         nodes.waitForHeightAriseAndTxPresent(transferTxCustomFeeAlice)
-        val wavesFee = Sponsorship.FeeUnit * LargeFee / LargeFee
+        val wavesFee = CommonValidation.FeeUnit * LargeFee / LargeFee
         nodes.waitForHeightArise()
 
         sponsor.assertBalances(sponsor.address, sponsoredBalance._1 - wavesFee, sponsoredBalance._2 - wavesFee)
@@ -331,7 +320,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       nodes.waitForHeightAriseAndTxPresent(aliceTransferWaves)
       nodes.waitForHeightArise()
 
-      val totalWavesFee = Sponsorship.FeeUnit * SmallFee / Token + issueFee + sponsorFee + burnFee + minFee + issueFee
+      val totalWavesFee = CommonValidation.FeeUnit * SmallFee / Token + issueFee + sponsorFee + burnFee + minFee + issueFee
       miner.assertBalances(miner.address, minerBalance._1 + totalWavesFee)
       sponsor.assertBalances(sponsor.address, sponsorBalance._1 - totalWavesFee, sponsorBalance._2 - totalWavesFee)
       sponsor.assertAssetBalance(sponsor.address, sponsorAssetId2, SmallFee + sponsorAssetTotal)

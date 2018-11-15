@@ -21,25 +21,14 @@ import scala.concurrent.duration._
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   var assetWOScript              = ""
   var assetWScript               = ""
-  var assetUnchangeableScript    = ""
-  var assetWAnotherOwner         = ""
-  var assetV1                    = ""
   private val accountB           = pkByAddress(secondAddress)
   private val unchangeableScript = ScriptCompiler(s"""
                                                |match tx {
                                                |case s : SetAssetScriptTransaction => false
                                                |case _ => true}""".stripMargin).explicitGet()._1
-  private val accountScript      = ScriptCompiler(s"""
-                                               |let pkB = base58'${ByteStr(accountB.publicKey)}'
-                                               |match tx {
-                                               |case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
-                                               |case _ => true}""".stripMargin).explicitGet()._1
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    assetV1 = sender
-      .issue(thirdAddress, "AssetV1", "Test coin for V1", someAssetAmount, 0, reissuable = false, issueFee)
-      .id
     assetWOScript = sender
       .issue(firstAddress, "AssetWOScript", "Test coin for SetAssetScript tests w/o script", someAssetAmount, 0, reissuable = false, issueFee, 2)
       .id
@@ -58,7 +47,31 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       )
       .id
 
-    assetWAnotherOwner = sender
+    nodes.waitForHeightAriseAndTxPresent(assetWOScript)
+    nodes.waitForHeightAriseAndTxPresent(assetWScript)
+  }
+
+  test("issuer cannot change script on asset w/o initial script") {
+    val (balance, eff) = notMiner.accountBalances(firstAddress)
+    assertBadRequestAndMessage(
+      sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(scriptBase64)),
+      "Reason: Cannot set script on an asset issued without a script"
+    )
+    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee),
+                               "Reason: Cannot remove script from an asset issued with a script")
+
+    assertBadRequestAndMessage(
+      sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
+      "Reason: Cannot remove script from an asset issued with a script"
+    )
+    notMiner.assertBalances(firstAddress, balance, eff)
+  }
+
+  test("non-issuer cannot change script") {
+    /*
+    issuer is first address, but script allows make SetAssetScript only second address
+     */
+    val assetWAnotherOwner = sender
       .issue(
         firstAddress,
         "NonOwnCoin",
@@ -69,51 +82,18 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         issueFee,
         2,
         script = Some(ScriptCompiler(s"""
-                                 |match tx {
-                                 |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(
+                                        |match tx {
+                                        |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(
                                           pkByAddress(secondAddress).publicKey).base58}')
-                                 |case _ => false}""".stripMargin).explicitGet()._1.bytes.value.base64)
+                                        |case _ => false}""".stripMargin).explicitGet()._1.bytes.value.base64)
       )
       .id
+    nodes.waitForHeightAriseAndTxPresent(assetWAnotherOwner)
 
-    assetUnchangeableScript = sender
-      .issue(
-        firstAddress,
-        "SetAssetWDep",
-        "Test coin for SetAssetScript tests",
-        someAssetAmount,
-        0,
-        reissuable = false,
-        issueFee,
-        2,
-        script = Some(unchangeableScript.bytes.value.base64)
-      )
-      .id
-
-    nodes.waitForHeightAriseAndTxPresent(assetWScript)
-    nodes.waitForHeightAriseAndTxPresent(assetUnchangeableScript)
-  }
-
-  test("issuer cannot change script on asset w/o initial script") {
-    val (balance, eff) = notMiner.accountBalances(firstAddress)
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(scriptBase64)),
-                               "Reason: Asset is not scripted.")
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee), "Reason: Empty script is disabled.")
-    assertBadRequestAndMessage(
-      sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(unchangeableScript.bytes.value.base64)),
-      "Reason: Asset is not scripted."
-    )
-    assertBadRequestAndMessage(
-      sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
-      "Reason: Empty script is disabled."
-    )
-    notMiner.assertBalances(firstAddress, balance, eff)
-  }
-
-  test("non-issuer cannot change script") {
     assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")), "Reason: Empty script is disabled")
+    assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some("")),
+                               "Reason: Cannot remove script from an asset issued with a script")
   }
 
   test("non-issuer cannot change script on asset w/o script") {
@@ -121,21 +101,19 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee), "Empty script is disabled.")
+    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee),
+                               "Cannot remove script from an asset issued with a script")
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
-      "Reason: Empty script is disabled."
+      "Reason: Cannot remove script from an asset issued with a script"
     )
-    assertBadRequestAndMessage(
-      sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(unchangeableScript.bytes.value.base64)),
-      "Reason: Asset was issued by other address"
-    )
+
     notMiner.assertBalances(firstAddress, balance1, eff1)
     notMiner.assertBalances(secondAddress, balance2, eff2)
   }
 
   test("sender's waves balance is decreased by fee") {
-    val script = ScriptCompiler(s"""
+    val script2 = ScriptCompiler(s"""
            |match tx {
            |  case s : SetAssetScriptTransaction => true
            |  case _ => false
@@ -143,9 +121,17 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
          """.stripMargin).explicitGet()._1.bytes.value.base64
 
     val (balance, eff) = notMiner.accountBalances(firstAddress)
-    val txId           = sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(script)).id
+    val details        = notMiner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
+    assert(details.scriptComplexity == 1)
+    assert(details.scriptText == "TRUE")
+    assert(details.script == scriptBase64)
+
+    val txId = sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(script2)).id
     nodes.waitForHeightAriseAndTxPresent(txId)
     notMiner.assertBalances(firstAddress, balance - setAssetScriptFee, eff - setAssetScriptFee)
+    val details2 = notMiner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
+    assert(details2.scriptComplexity == 18)
+    assert(details2.script == script2)
   }
 
   test("cannot transact without having enough waves") {
@@ -175,21 +161,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         .right
         .get
 
-    def request(tx: SetAssetScriptTransaction): SignedSetAssetScriptRequest =
-      SignedSetAssetScriptRequest(
-        SetAssetScriptTransaction.supportedVersions.head,
-        Base58.encode(tx.sender.publicKey),
-        tx.assetId.base58,
-        Some(tx.script.get.bytes.value.base64),
-        tx.fee,
-        tx.timestamp,
-        tx.proofs.base58().toList
-      )
-
-    implicit val w =
-      Json.writes[SignedSetAssetScriptRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt)))
-
     val (balance, eff) = notMiner.accountBalances(firstAddress)
+
     val invalidTxs = Seq(
       (sastx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
       (sastx(fee = 9999999), "Fee .* does not exceed minimal value"),
@@ -198,7 +171,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     )
 
     for ((tx, diag) <- invalidTxs) {
-      assertBadRequestAndResponse(sender.broadcastRequest(request(tx)), diag)
+      assertBadRequestAndResponse(sender.broadcastRequest(tx.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))), diag)
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 
@@ -238,20 +211,50 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("try to update script to null") {
-    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee), "Reason: Empty script is disabled.")
-    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some("")), "Reason: Empty script is disabled.")
+    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee),
+                                "Reason: Cannot remove script from an asset issued with a script")
+    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some("")),
+                                "Reason: Cannot remove script from an asset issued with a script")
   }
 
   test("try to make SetAssetScript tx on script that deprecates SetAssetScript") {
+    /*
+    script doesn't allow do SetAssetScript
+     */
+    val assetUnchangeableScript = sender
+      .issue(
+        firstAddress,
+        "SetAssetWDep",
+        "Test coin for SetAssetScript tests",
+        someAssetAmount,
+        0,
+        reissuable = false,
+        issueFee,
+        2,
+        script = Some(unchangeableScript.bytes.value.base64)
+      )
+      .id
+
+    nodes.waitForHeightAriseAndTxPresent(assetUnchangeableScript)
+
     assertBadRequestAndResponse(sender.setAssetScript(assetUnchangeableScript, firstAddress, setAssetScriptFee, Some(scriptBase64)),
                                 "Transaction is not allowed by token-script")
   }
 
-  test("non-issuer can change script if issuer's script allows") {
-    val accountA  = pkByAddress(firstAddress)
-    val accScript = accountScript
+  test("non-issuer can change script if issuer's account script allows (proof correct)") {
+    val accountA = pkByAddress(firstAddress)
+
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, accountA, Some(accScript), setScriptFee, System.currentTimeMillis())
+      .selfSigned(
+        SetScriptTransaction.supportedVersions.head,
+        accountA,
+        Some(ScriptCompiler(s"""|let pkB = base58'${ByteStr(accountB.publicKey)}'
+                                |match tx {
+                                |case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
+                                |case _ => true}""".stripMargin).explicitGet()._1),
+        setScriptFee,
+        System.currentTimeMillis()
+      )
       .right
       .get
 
@@ -306,10 +309,15 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("try to make SetAssetScript for asset v1") {
+    val assetV1 = sender
+      .issue(thirdAddress, "AssetV1", "Test coin for V1", someAssetAmount, 0, reissuable = false, issueFee)
+      .id
+    nodes.waitForHeightAriseAndTxPresent(assetV1)
+
     val (balance1, eff1) = notMiner.accountBalances(thirdAddress)
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     assertBadRequestAndMessage(sender.setAssetScript(assetV1, thirdAddress, setAssetScriptFee, Some(scriptBase64)).id,
-                               "Reason: Asset is not scripted.")
+                               "Reason: Cannot set script on an asset issued without a script")
     assertBadRequestAndMessage(sender.setAssetScript(assetV1, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
     notMiner.assertBalances(thirdAddress, balance1, eff1)

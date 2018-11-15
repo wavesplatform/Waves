@@ -76,8 +76,8 @@ object Keys {
   def addressScript(addressId: BigInt)(height: Int): Key[Option[Script]] =
     Key.opt("address-script", hAddr(28, height, addressId), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
 
-  def approvedFeatures: Key[Map[Short, Int]]  = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
-  def activatedFeatures: Key[Map[Short, Int]] = Key("activated-features", Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
+  val approvedFeatures: Key[Map[Short, Int]]  = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
+  val activatedFeatures: Key[Map[Short, Int]] = Key("activated-features", Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
 
   def dataKeyChunkCount(addressId: BigInt): Key[Int] =
     Key("data-key-chunk-count", addr(31, addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
@@ -107,7 +107,7 @@ object Keys {
   def aliasIsDisabled(alias: Alias): Key[Boolean] =
     Key("alias-is-disabled", bytes(AliasIsDisabledPrefix, alias.bytes.arr), Option(_).exists(_(0) == 1), if (_) Array[Byte](1) else Array[Byte](0))
 
-  def carryFeeHistory: Key[Seq[Int]]   = historyKey("carry-fee-history", 44, Array())
+  val carryFeeHistory: Key[Seq[Int]]   = historyKey("carry-fee-history", 44, Array())
   def carryFee(height: Int): Key[Long] = Key("carry-fee", h(45, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetScriptHistory(assetId: ByteStr): Key[Seq[Int]] = historyKey("asset-script-history", 46, assetId.arr)

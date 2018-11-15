@@ -99,6 +99,8 @@ object SyncHttpApi extends Assertions {
     def accountBalances(acc: String): (Long, Long) =
       sync(async(n).accountBalances(acc))
 
+    def balanceDetails(acc: String): BalanceDetails = sync(async(n).balanceDetails(acc))
+
     def assertBalances(acc: String, balance: Long)(implicit pos: Position): Unit =
       sync(async(n).assertBalances(acc, balance, effectiveBalance = balance))
 
@@ -111,8 +113,8 @@ object SyncHttpApi extends Assertions {
     def assetBalance(address: String, asset: String): AssetBalance =
       sync(async(n).assetBalance(address, asset))
 
-    def assetsDetails(assetId: String): AssetInfo =
-      sync(async(n).assetsDetails(assetId))
+    def assetsDetails(assetId: String, fullInfo: Boolean = false): AssetInfo =
+      sync(async(n).assetsDetails(assetId, fullInfo))
 
     def addressScriptInfo(address: String): AddressApiRoute.AddressScriptInfo =
       sync(async(n).scriptInfo(address))

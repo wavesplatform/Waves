@@ -2,20 +2,21 @@ package com.wavesplatform.transaction.assets.exchange
 
 sealed trait OrderType {
   def bytes: Array[Byte]
+  def opposite: OrderType
 }
 
 object OrderType {
 
   case object BUY extends OrderType {
-    def bytes: Array[Byte] = Array(0.toByte)
-
-    override def toString: String = "buy"
+    def bytes: Array[Byte]           = Array(0.toByte)
+    override def opposite: OrderType = SELL
+    override def toString: String    = "buy"
   }
 
   case object SELL extends OrderType {
-    def bytes: Array[Byte] = Array(1.toByte)
-
-    override def toString: String = "sell"
+    def bytes: Array[Byte]           = Array(1.toByte)
+    override def opposite: OrderType = BUY
+    override def toString: String    = "sell"
   }
 
   def apply(value: Int): OrderType = value match {

@@ -4,20 +4,24 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE, FALSE}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.api.DBUtils.indexes.active.MaxElements
+import com.wavesplatform.matcher.model.Events.OrderExecuted
 import com.wavesplatform.matcher.model.OrderHistory.OrderInfoChange
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier
+import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.{AssetAcc, AssetId}
 import com.wavesplatform.utils.Time
 import kamon.Kamon
 import org.iq80.leveldb.DB
+import shapeless.Coproduct
 
 import scala.util.control.NonFatal
 
@@ -27,6 +31,7 @@ import scala.util.control.NonFatal
   */
 class OrderValidator(db: DB,
                      blockchain: Blockchain,
+                     transactionCreator: ExchangeTransactionCreator,
                      portfolio: Address => Portfolio,
                      validatePair: AssetPair => Either[String, AssetPair],
                      settings: MatcherSettings,
@@ -60,7 +65,33 @@ class OrderValidator(db: DB,
         }
     }
 
-  private def validateBalance(o: Order): Either[String, Order] = {
+  private def verifySmartToken(assetId: AssetId, order: Order): ValidationResult =
+    blockchain.assetScript(assetId).fold[ValidationResult](Right(order)) { script =>
+      if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
+        Left("Trading of scripted asset isn't allowed yet")
+      else {
+        val fakeOrder: Order = order match {
+          case x: OrderV1 => x.copy(orderType = x.orderType.opposite)
+          case x: OrderV2 => x.copy(orderType = x.orderType.opposite)
+        }
+        transactionCreator
+          .createTransaction(OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order)))
+          .flatMap { tx =>
+            try ScriptRunner[EVALUATED](blockchain.height, Coproduct(tx), blockchain, script) match {
+              case (_, Left(execError)) => Left(s"Error executing script of asset $assetId: $execError")
+              case (_, Right(FALSE))    => Left(s"Order rejected by script of asset $assetId")
+              case (_, Right(TRUE))     => Right(order)
+              case (_, Right(x))        => Left(s"Script returned not a boolean result, but $x")
+            } catch {
+              case NonFatal(e) => Left(s"Caught ${e.getClass.getCanonicalName} while executing script of asset $assetId: ${e.getMessage}")
+            }
+          }
+          .left
+          .map(_.toString)
+      }
+    }
+
+  private def validateBalance(o: Order): ValidationResult = {
     val senderAddress = o.sender.toAddress
     val lo            = LimitOrder(o)
     val actualBalance = Set(lo.feeAsset, lo.spentAsset).map(assetId => assetId -> spendableBalance(AssetAcc(senderAddress, assetId))).toMap
@@ -81,7 +112,7 @@ class OrderValidator(db: DB,
     blockchain.assetDescription(aid).map(_.decimals).toRight(s"Invalid asset id $aid")
   }
 
-  private def validateDecimals(o: Order): Either[String, Order] =
+  private def validateDecimals(o: Order): ValidationResult =
     for {
       pd <- decimals(o.assetPair.priceAsset)
       ad <- decimals(o.assetPair.amountAsset)
@@ -98,7 +129,7 @@ class OrderValidator(db: DB,
         math.max(0l, spendableBalance(acc) - DBUtils.openVolume(db, acc.account, acc.assetId))
       }
 
-  def validateNewOrder(order: Order): Either[String, Order] =
+  def validateNewOrder(order: Order): ValidationResult =
     timer
       .refine("action" -> "place", "pair" -> order.assetPair.toString)
       .measure {
@@ -107,26 +138,38 @@ class OrderValidator(db: DB,
           .lastOrderTimestamp(db, order.senderPublicKey)
           .getOrElse(settings.defaultOrderTimestamp) - settings.orderTimestampDrift
 
+        lazy val minOrderFee: Long = {
+          val extraFee =
+            if (blockchain.hasScript(order.sender)) CommonValidation.ScriptExtraFee
+            else 0
+          settings.minOrderFee + extraFee
+        }
+
         for {
-          _ <- (Right(order): Either[String, Order])
+          _ <- (Right(order): ValidationResult)
             .ensure("Incorrect matcher public key")(_.matcherPublicKey == matcherPublicKey)
             .ensure("Invalid address")(_ => !settings.blacklistedAddresses.contains(senderAddress))
             .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
             .ensure(s"Order should have a timestamp after $lowestOrderTs, but it is ${order.timestamp}")(_.timestamp > lowestOrderTs)
-            .ensure(s"Order matcherFee should be >= ${settings.minOrderFee}")(_.matcherFee >= settings.minOrderFee)
+            .ensure(s"Order matcherFee should be >= ${minOrderFee}")(_.matcherFee >= minOrderFee)
           _ <- order.isValid(time.correctedTime()).toEither
-          _ <- (Right(order): Either[String, Order])
+          _ <- (Right(order): ValidationResult)
             .ensure("Order has already been placed")(o => DBUtils.orderInfo(db, o.id()).status == LimitOrder.NotFound)
             .ensure(s"Limit of $MaxElements active orders has been reached")(o => DBUtils.activeOrderCount(db, o.senderPublicKey) < MaxElements)
           _ <- validateBalance(order)
           _ <- validatePair(order.assetPair)
           _ <- validateDecimals(order)
           _ <- verifyScript(order.sender, order)
+          _ <- order.assetPair.amountAsset.fold[ValidationResult](Right(order))(verifySmartToken(_, order))
+          _ <- order.assetPair.priceAsset.fold[ValidationResult](Right(order))(verifySmartToken(_, order))
         } yield order
       }
 }
 
 object OrderValidator {
+
+  type ValidationResult = Either[String, Order]
+
   val MinExpiration: Long = 60 * 1000L
 
   private def formatPortfolio(m: Map[Option[AssetId], Long]): String =
@@ -134,7 +177,7 @@ object OrderValidator {
       case (assetId, v) => s"${AssetPair.assetIdStr(assetId)} -> $v"
     } mkString ("[", ", ", "]")
 
-  private def verifySignature(order: Order): Either[String, Order] =
+  private def verifySignature(order: Order): ValidationResult =
     Verifier
       .verifyAsEllipticCurveSignature(order)
       .leftMap(_.toString)

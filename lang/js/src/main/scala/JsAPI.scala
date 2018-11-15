@@ -44,16 +44,21 @@ object JsAPI {
     r(ast)
   }
 
-  val wavesContext = WavesContext.build(new Environment {
-    override def height: Int                                                                                     = 0
-    override def networkByte: Byte                                                                               = 1: Byte
-    override def inputEntity: Tx :+: Ord :+: CNil                                                                = null
-    override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
-    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
-    override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-    override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-  })
+  val version = com.wavesplatform.lang.ScriptVersion.Versions.V1
+
+  val wavesContext = WavesContext.build(
+    version,
+    new Environment {
+      override def height: Long                                                                                    = 0
+      override def networkByte: Byte                                                                               = 1: Byte
+      override def inputEntity: Tx :+: Ord :+: CNil                                                                = null
+      override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+      override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
+      override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
+      override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+      override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+    }
+  )
 
   val cryptoContext = CryptoContext.build(Global)
 
@@ -66,7 +71,7 @@ object JsAPI {
   }
 
   @JSExportTopLevel("fullContext")
-  val fullContext: CTX = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext))
+  val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(version), cryptoContext, wavesContext))
 
   @JSExportTopLevel("getTypes")
   def getTypes() = fullContext.types.map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v.typeRef))).toJSArray
@@ -84,7 +89,7 @@ object JsAPI {
             "doc"        -> f.docString,
             "resultType" -> typeRepr(f.signature.result),
             "args" -> ((f.argsDoc zip f.signature.args) map { arg =>
-              js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._2), "doc" -> arg._1._2)
+              js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._1._2)
             }).toJSArray
         ))
       .toJSArray

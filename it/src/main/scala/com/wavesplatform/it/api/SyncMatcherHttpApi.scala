@@ -76,9 +76,10 @@ object SyncMatcherHttpApi extends Assertions {
                    orderType: OrderType,
                    amount: Long,
                    price: Long,
+                   fee: Long,
                    version: Byte = 1: Byte,
                    timeToLive: Duration = 30.days - 1.seconds): MatcherResponse =
-      sync(async(m).placeOrder(sender, pair, orderType, amount, price, version, timeToLive))
+      sync(async(m).placeOrder(sender, pair, orderType, amount, price, fee, version, timeToLive))
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): MatcherStatusResponse =
       sync(async(m).orderStatus(orderId, assetPair, waitForStatus))
@@ -158,6 +159,7 @@ object SyncMatcherHttpApi extends Assertions {
                      orderType: OrderType,
                      amount: Long,
                      price: Long,
+                     fee: Long = 300000L,
                      version: Byte = 1: Byte,
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val creationTime        = System.currentTimeMillis()
@@ -172,7 +174,7 @@ object SyncMatcherHttpApi extends Assertions {
               price,
               creationTime,
               timeToLiveTimestamp,
-              300000,
+              fee,
               Proofs.empty,
               version)
       Order.sign(unsigned, sender)
