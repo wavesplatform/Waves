@@ -49,22 +49,22 @@ object OrderBook extends ScorexLogging {
 
   private def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): OrderBook = {
     (limitOrder match {
-      case oo @ BuyLimitOrder(_, p, _, _) =>
-        ob.bids.get(p).map { lvl =>
+      case oo @ BuyLimitOrder(_, _, order) =>
+        ob.bids.get(order.price).map { lvl =>
           val updatedQ = lvl.filter(_ != oo)
           ob.copy(bids = if (updatedQ.nonEmpty) {
-            ob.bids + (p -> updatedQ)
+            ob.bids + (order.price -> updatedQ)
           } else {
-            ob.bids - p
+            ob.bids - order.price
           })
         }
-      case oo @ SellLimitOrder(_, p, _, _) =>
-        ob.asks.get(p).map { lvl =>
+      case oo @ SellLimitOrder(_, _, order) =>
+        ob.asks.get(order.price).map { lvl =>
           val updatedQ = lvl.filter(_ != oo)
           ob.copy(asks = if (updatedQ.nonEmpty) {
-            ob.asks + (p -> updatedQ)
+            ob.asks + (order.price -> updatedQ)
           } else {
-            ob.asks - p
+            ob.asks - order.price
           })
         }
     }).getOrElse(ob)

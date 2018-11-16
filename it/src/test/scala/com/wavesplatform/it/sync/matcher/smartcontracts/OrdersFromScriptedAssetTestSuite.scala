@@ -2,18 +2,17 @@ package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.it.api.SyncHttpApi.NodeExtSync
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
+import com.wavesplatform.it.sync.createSignedIssueRequest
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig
-import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig.createSignedIssueRequest
-import com.wavesplatform.it.sync.matcherFee
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.EitherExt2
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.it.api.SyncHttpApi.NodeExtSync
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 
 import scala.util.Random

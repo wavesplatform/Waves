@@ -140,13 +140,13 @@ object MatcherSnapshotStore extends ScorexLogging {
   private def writeSnapshotMetadata(sm: SM) =
     ByteBuffer.allocate(16).putLong(sm.seqNr).putLong(sm.ts).array()
 
-  private def kSMHistory(persistenceId: String) =
+  def kSMHistory(persistenceId: String): Key[Seq[Int]] =
     Key[Seq[Int]]("matcher-sm-history", Bytes.concat(Array(1: Byte), persistenceId.getBytes(UTF_8)), readIntSeq, writeIntSeq)
-  private def kSM(persistenceId: String, seqNr: Int) =
+  def kSM(persistenceId: String, seqNr: Int): Key[SM] =
     Key[SM]("matcher-sm",
             Bytes.concat(Array(2: Byte), persistenceId.getBytes(UTF_8), Ints.toByteArray(seqNr)),
             readSnapshotMetadata,
             writeSnapshotMetadata)
-  def kSnapshot(persistenceId: String, seqNr: Int) =
+  def kSnapshot(persistenceId: String, seqNr: Int): Key[Array[Byte]] =
     Key[Array[Byte]]("matcher-snapshot", Bytes.concat(Array(3: Byte), persistenceId.getBytes(UTF_8), Ints.toByteArray(seqNr)), identity, identity)
 }

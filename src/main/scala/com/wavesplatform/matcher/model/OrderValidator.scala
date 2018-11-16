@@ -39,7 +39,8 @@ class OrderValidator(db: DB,
                      time: Time) {
   import OrderValidator._
 
-  private val timer = Kamon.timer("matcher.validation")
+  private val timer                = Kamon.timer("matcher.validation")
+  private val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
 
   private def spendableBalance(a: AssetAcc): Long = {
     val p = portfolio(a.account)
@@ -148,7 +149,7 @@ class OrderValidator(db: DB,
         for {
           _ <- (Right(order): ValidationResult)
             .ensure("Incorrect matcher public key")(_.matcherPublicKey == matcherPublicKey)
-            .ensure("Invalid address")(_ => !settings.blacklistedAddresses.contains(senderAddress))
+            .ensure("Invalid address")(_ => !blacklistedAddresses.contains(senderAddress))
             .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
             .ensure(s"Order should have a timestamp after $lowestOrderTs, but it is ${order.timestamp}")(_.timestamp > lowestOrderTs)
             .ensure(s"Order matcherFee should be >= ${minOrderFee}")(_.matcherFee >= minOrderFee)

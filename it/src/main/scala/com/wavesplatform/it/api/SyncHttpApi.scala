@@ -20,8 +20,8 @@ import play.api.libs.json._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable, Future}
-import scala.util.control.NonFatal
 import scala.util._
+import scala.util.control.NonFatal
 
 object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
@@ -61,7 +61,7 @@ object SyncHttpApi extends Assertions {
     case _          => Assertions.fail(s"Expecting not found error")
   }
 
-  val RequestAwaitTime = 30.seconds
+  val RequestAwaitTime = 50.seconds
 
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime) =
     try Await.result(awaitable, atMost)

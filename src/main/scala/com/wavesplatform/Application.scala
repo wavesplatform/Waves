@@ -403,6 +403,12 @@ object Application extends ScorexLogging {
     }
 
     val settings = WavesSettings.fromConfig(config)
+
+    // Initialize global var with actual address scheme
+    AddressScheme.current = new AddressScheme {
+      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
+    }
+
     if (config.getBoolean("kamon.enable")) {
       log.info("Aggregated metrics are enabled")
       Kamon.reconfigure(config)
@@ -429,11 +435,6 @@ object Application extends ScorexLogging {
               .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
           )
         }
-      }
-
-      // Initialize global var with actual address scheme
-      AddressScheme.current = new AddressScheme {
-        override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
       }
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")

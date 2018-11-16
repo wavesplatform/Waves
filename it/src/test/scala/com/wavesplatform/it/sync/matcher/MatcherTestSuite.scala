@@ -11,11 +11,12 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, _}
+import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.duration._
 import scala.util.Random
 
-class MatcherTestSuite extends MatcherSuiteBase {
+class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   private val aliceSellAmount                     = 500
   private val exTxFee                             = 300000
   private val amountAssetName                     = "AliceCoin"
@@ -30,7 +31,14 @@ class MatcherTestSuite extends MatcherSuiteBase {
     val aliceAsset = aliceNode
       .issue(aliceAcc.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, issueFee, 2)
       .id
-    nodes.waitForHeightAriseAndTxPresent(aliceAsset)
+    val bobAsset = bobNode
+      .issue(bobAcc.address, "BobCoin1", "Bob's asset", someAssetAmount, 5, false, issueFee)
+      .id
+    val bobAsset2 = bobNode
+      .issue(bobAcc.address, "BobCoin2", "Bob's asset", someAssetAmount, 0, false, issueFee)
+      .id
+
+    Seq(aliceAsset, bobAsset, bobAsset2).foreach(matcherNode.waitForTransaction(_))
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
@@ -250,69 +258,110 @@ class MatcherTestSuite extends MatcherSuiteBase {
       }
 
       "should consider UTX pool when checking the balance" in {
-        // Bob issues new asset
-        val bobAssetQuantity = 10000
-        val bobAssetName     = "BobCoin"
-        val bobAsset         = bobNode.issue(bobAcc.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, reissuable = false, issueFee, 2).id
-        matcherNode.waitForTransaction(bobAsset)
 
         matcherNode.assertAssetBalance(aliceAcc.address, bobAsset, 0)
         matcherNode.assertAssetBalance(matcherAcc.address, bobAsset, 0)
-        matcherNode.assertAssetBalance(bobAcc.address, bobAsset, bobAssetQuantity)
+        matcherNode.assertAssetBalance(bobAcc.address, bobAsset, someAssetAmount)
         val bobWavesPair = AssetPair(ByteStr.decodeBase58(bobAsset).toOption, None)
 
-        def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, SELL, bobAssetQuantity, 1.waves, matcherFee, orderVersion)
+        def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, SELL, someAssetAmount, 0.005.waves, matcherFee, orderVersion)
 
         val order6 = matcherNode.placeOrder(bobOrder)
         matcherNode.waitOrderStatus(bobWavesPair, order6.message.id, "Accepted")
 
         // Alice wants to buy all Bob's assets for 1 Wave
-        val order7 = matcherNode.placeOrder(aliceAcc, bobWavesPair, BUY, bobAssetQuantity, 1.waves, matcherFee, orderVersion)
+        val order7 = matcherNode.placeOrder(aliceAcc, bobWavesPair, BUY, someAssetAmount, 0.005.waves, matcherFee, orderVersion)
         matcherNode.waitOrderStatus(bobWavesPair, order7.message.id, "Filled")
 
+        val tx = matcherNode.transactionsByOrder(order7.message.id).head
+        matcherNode.waitForTransaction(tx.id)
         // Bob tries to do the same operation, but at now he have no assets
         matcherNode.expectIncorrectOrderPlacement(bobOrder, 400, "OrderRejected")
       }
 
       "trader can buy waves for assets with order without having waves" in {
         // Bob issues new asset
-        val bobAssetQuantity = 10000
-        val bobAssetName     = "BobCoin2"
-        val bobAsset         = bobNode.issue(bobAcc.address, bobAssetName, "Bob's asset", bobAssetQuantity, 0, reissuable = false, issueFee, 2).id
-        nodes.waitForHeightAriseAndTxPresent(bobAsset)
-
         val bobWavesPair = AssetPair(
-          amountAsset = ByteStr.decodeBase58(bobAsset).toOption,
+          amountAsset = ByteStr.decodeBase58(bobAsset2).toOption,
           priceAsset = None
         )
 
-        matcherNode.assertAssetBalance(aliceAcc.address, bobAsset, 0)
-        matcherNode.assertAssetBalance(matcherAcc.address, bobAsset, 0)
-        matcherNode.assertAssetBalance(bobAcc.address, bobAsset, bobAssetQuantity)
+        val bobBalance = matcherNode.accountBalances(bobAcc.address)._1
+        matcherNode.assertAssetBalance(aliceAcc.address, bobAsset2, 0)
+        matcherNode.assertAssetBalance(matcherAcc.address, bobAsset2, 0)
+        matcherNode.assertAssetBalance(bobAcc.address, bobAsset2, someAssetAmount)
 
         // Bob wants to sell all own assets for 1 Wave
-        def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, SELL, bobAssetQuantity, 1.waves * Order.PriceConstant, matcherFee, orderVersion)
+        def bobOrder =
+          matcherNode.prepareOrder(bobAcc, bobWavesPair, SELL, someAssetAmount, 1.waves, matcherFee, orderVersion)
 
         val order8 = matcherNode.placeOrder(bobOrder)
         matcherNode.waitOrderStatus(bobWavesPair, order8.message.id, "Accepted")
-
+        matcherNode.reservedBalance(bobAcc)
         // Bob moves all waves to Alice
-        val h1              = matcherNode.height
-        val bobBalance      = matcherNode.accountBalances(bobAcc.address)._1
-        val transferAmount  = bobBalance - minFee
-        val transferAliceId = bobNode.transfer(bobAcc.address, aliceAcc.address, transferAmount, minFee, None, None, 2).id
-        nodes.waitForHeightAriseAndTxPresent(transferAliceId)
+
+        val transferAmount    = bobBalance - minFee
+        val transferToAliceId = bobNode.transfer(bobAcc.address, aliceAcc.address, transferAmount, minFee, None, None).id
+        matcherNode.waitForTransaction(transferToAliceId)
+        matcherNode.reservedBalance(bobAcc)
 
         matcherNode.accountBalances(bobAcc.address)._1 shouldBe 0
 
         // Order should stay accepted
-        matcherNode.waitForHeight(h1 + 5, 2.minutes)
+        nodes.waitForHeightArise()
         matcherNode.waitOrderStatus(bobWavesPair, order8.message.id, "Accepted")
 
         // Cleanup
         matcherNode.cancelOrder(bobAcc, bobWavesPair, order8.message.id).status should be("OrderCanceled")
         val transferBobId = aliceNode.transfer(aliceAcc.address, bobAcc.address, transferAmount, minFee, None, None, 2).id
-        nodes.waitForHeightAriseAndTxPresent(transferBobId)
+        matcherNode.waitForTransaction(transferBobId)
+      }
+    }
+  }
+
+  "Max 8 price decimals allowed to be non zero" - {
+    val ap28 = issueAssetPair(aliceAcc, 2, 8)
+    val ap34 = issueAssetPair(aliceAcc, 3, 4)
+    val ap08 = issueAssetPair(aliceAcc, 0, 8)
+
+    Seq(ap28._1, ap28._2, ap34._1, ap34._2, ap08._1, ap08._2).map(matcherNode.signedIssue).foreach { x =>
+      matcherNode.waitForTransaction(x.id)
+    }
+
+    val assets =
+      Table(
+        ("pair", "amountDecimals", "priceDecimals"),
+        (ap28._3, 2, 8),
+        (ap34._3, 3, 4),
+        (ap08._3, 0, 8),
+      )
+
+    forAll(assets) { (pair: AssetPair, amountDecimals: Int, priceDecimals: Int) =>
+      s"Not able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
+        val amount     = BigDecimal(10).pow(amountDecimals).toLong
+        val valid      = BigDecimal(10).pow(8 + priceDecimals - amountDecimals).longValue()
+        val minInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() + 1
+        val maxInvalid = valid + BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue() - 1
+        val o1         = matcherNode.prepareOrder(aliceAcc, pair, SELL, amount, minInvalid)
+        val o2         = matcherNode.prepareOrder(aliceAcc, pair, SELL, amount, maxInvalid)
+
+        matcherNode.expectIncorrectOrderPlacement(o1,
+                                                  400,
+                                                  "OrderRejected",
+                                                  Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
+        matcherNode.expectIncorrectOrderPlacement(o2,
+                                                  400,
+                                                  "OrderRejected",
+                                                  Some(s"Invalid price, last ${priceDecimals - amountDecimals} digits must be 0"))
+      }
+    }
+
+    forAll(assets) { (pair: AssetPair, amountDecimals: Int, priceDecimals: Int) =>
+      s"Able to place order, amount decimals =  $amountDecimals, price decimals =  $priceDecimals " in {
+        val amount            = BigDecimal(10).pow(amountDecimals + 8).toLong //big amount, because low price
+        val minNonZeroInvalid = BigDecimal(10).pow(priceDecimals - amountDecimals + 1).longValue()
+        val o1                = matcherNode.placeOrder(aliceAcc, pair, BUY, amount, minNonZeroInvalid, matcherFee)
+        o1.status shouldBe "OrderAccepted"
       }
     }
   }

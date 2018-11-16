@@ -49,7 +49,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       |    max-open-orders: 1000
       |    price-assets: ["BASE1", "BASE2", "BASE"]
       |    blacklisted-assets: ["BLACKLST"]
-      |    blacklisted-names: ["[F,f]orbidden"]
+      |    blacklisted-names: ["[Ff]orbidden"]
       |  }
       |}""".stripMargin))
 
@@ -150,8 +150,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     expiration: Long          <- maxTimeGen
     matcherFee: Long          <- maxWavesAmountGen
     orderVersion: Byte        <- Gen.oneOf(1: Byte, 2: Byte)
-  } yield
-    BuyLimitOrder(amount, price, matcherFee, Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
+  } yield BuyLimitOrder(amount, matcherFee, Order.buy(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
 
   val sellLimitOrderGenerator: Gen[SellLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -162,10 +161,6 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     expiration: Long          <- maxTimeGen
     matcherFee: Long          <- maxWavesAmountGen
     orderVersion: Byte        <- Gen.oneOf(1: Byte, 2: Byte)
-  } yield
-    SellLimitOrder(amount,
-                   price,
-                   matcherFee,
-                   Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
+  } yield SellLimitOrder(amount, matcherFee, Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
 
 }
