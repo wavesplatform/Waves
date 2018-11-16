@@ -105,7 +105,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
                                "Reason: Cannot set empty script")
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
-      "Reason: The script being set should not be empty"
+      "Reason: Cannot set empty script"
     )
 
     notMiner.assertBalances(firstAddress, balance1, eff1)
