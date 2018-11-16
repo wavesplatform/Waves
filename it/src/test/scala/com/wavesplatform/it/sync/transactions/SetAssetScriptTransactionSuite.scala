@@ -56,8 +56,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(scriptBase64)),
       "Reason: Cannot set script on an asset issued without a script"
     )
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee),
-                               "Reason: Cannot set empty script")
+    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee), "Reason: Cannot set empty script")
 
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
@@ -100,8 +99,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
-    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee),
-                               "Reason: Cannot set empty script")
+    assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee), "Reason: Cannot set empty script")
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
       "Reason: Cannot set empty script"
@@ -210,10 +208,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("try to update script to null") {
-    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee),
-                                "Reason: Cannot set empty script")
-    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some("")),
-                                "Reason: Cannot set empty script")
+    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee), "Reason: Cannot set empty script")
+    assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some("")), "Reason: Cannot set empty script")
   }
 
   test("try to make SetAssetScript tx on script that deprecates SetAssetScript") {
