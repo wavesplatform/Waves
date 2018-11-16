@@ -24,6 +24,7 @@ case class MatcherSettings(enable: Boolean,
                            journalDataDir: String,
                            snapshotsDataDir: String,
                            snapshotsInterval: Int,
+                           makeSnapshotsAtStart: Boolean,
                            orderCleanupInterval: FiniteDuration,
                            priceAssets: Seq[String],
                            maxTimestampDiff: FiniteDuration,
@@ -32,7 +33,8 @@ case class MatcherSettings(enable: Boolean,
                            maxOrdersPerRequest: Int,
                            defaultOrderTimestamp: Long,
                            orderTimestampDrift: Long,
-                           blacklistedAddresses: Set[Address],
+                           // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
+                           blacklistedAddresses: Set[String],
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings)
 
 object MatcherSettings {
@@ -53,6 +55,7 @@ object MatcherSettings {
     val journalDirectory      = config.as[String](s"$configPath.journal-directory")
     val snapshotsDirectory    = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval     = config.as[Int](s"$configPath.snapshots-interval")
+    val makeSnapshotsAtStart  = config.as[Boolean](s"$configPath.make-snapshots-at-start")
     val orderCleanupInterval  = config.as[FiniteDuration](s"$configPath.order-cleanup-interval")
     val maxOrdersPerRequest   = config.as[Int](s"$configPath.rest-order-limit")
     val defaultOrderTimestamp = config.as[Long](s"$configPath.default-order-timestamp")
@@ -63,7 +66,7 @@ object MatcherSettings {
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
     val blacklistedNames  = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
 
-    val blacklistedAddresses       = config.as[Set[Address]](s"$configPath.blacklisted-addresses")
+    val blacklistedAddresses       = config.as[Set[String]](s"$configPath.blacklisted-addresses")
     val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings](s"$configPath.order-book-snapshot-http-cache")
 
     val recoverOrderHistory = !new File(dataDirectory).exists()
@@ -80,6 +83,7 @@ object MatcherSettings {
       journalDirectory,
       snapshotsDirectory,
       snapshotsInterval,
+      makeSnapshotsAtStart,
       orderCleanupInterval,
       baseAssets,
       maxTimestampDiff,

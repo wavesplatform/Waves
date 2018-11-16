@@ -19,7 +19,7 @@ class TradersTestSuite extends MatcherSuiteBase {
   private def orderVersion                        = (Random.nextInt(2) + 1).toByte
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  "Verifications of tricky ordering cases" - {
+  "Verifications of tricky ordering cases" ignore {
     // Alice issues new asset
     val aliceAsset =
       aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, issueFee, 2).id
@@ -58,10 +58,6 @@ class TradersTestSuite extends MatcherSuiteBase {
         )
 
     matcherNode.assertAssetBalance(bobAcc.address, bobNewAsset, bobAssetQuantity)
-
-    "matcher should respond with Public key" in {
-      matcherNode.matcherGet("/matcher").getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
-    }
 
     "owner moves assets/waves to another account and order become an invalid" ignore {
       // todo: reactivate after balance watcher is reimplemented
@@ -194,7 +190,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
           val transferAmount = bobBalance - exTxFee - price
           val txId           = bobNode.transfer(bobAcc.address, aliceAcc.address, transferAmount, exTxFee, None, None, 2).id
-          nodes.waitForHeightAriseAndTxPresent(txId)
+          matcherNode.waitForTransaction(txId)
 
           withClue(s"The order '$order3' was cancelled") {
             matcherNode.waitOrderStatus(bobWavesPair, order3, "Cancelled")

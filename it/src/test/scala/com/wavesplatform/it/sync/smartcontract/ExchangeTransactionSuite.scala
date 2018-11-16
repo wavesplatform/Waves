@@ -1,14 +1,15 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.it.util._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.NTP
 import org.scalatest.CancelAfterFailure
-import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.{DataTransaction}
 import play.api.libs.json._
 import scorex.crypto.encode.Base64
 
@@ -49,6 +50,15 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     nodes.waitForHeightAriseAndTxPresent(dtxId)
   }
 
+  private def setContracts(contracts: (Option[String], PrivateKeyAccount)*): Unit = {
+    contracts
+      .map {
+        case (src, acc) => setContract(src, acc)
+      }
+      .foreach(id => sender.waitForTransaction(id))
+    nodes.waitForHeightArise()
+  }
+
   test("set contracts and put exchange transaction in blockchain") {
     val sc4 = cryptoContext(dtx)
     val sc5 = pureContext(dtx)
@@ -60,13 +70,14 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
            (None, None, sc1),
            (None, None, sc4),
            (None, None, sc5),
-           (None, None, sc6)
+           (None, None, sc6),
          )) {
-      setContract(contr1, acc0)
-      setContract(contr2, acc1)
-      setContract(mcontr, acc2)
 
-      nodes.waitForHeightArise()
+      setContracts(
+        (contr1, acc0),
+        (contr2, acc1),
+        (mcontr, acc2),
+      )
 
       val tx = exchangeTx()
 
@@ -74,9 +85,12 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       nodes.waitForHeightAriseAndTxPresent(txId)
       //TODO : add assert balances
     }
-    setContract(None, acc0)
-    setContract(None, acc1)
-    setContract(None, acc2)
+
+    setContracts(
+      (None, acc0),
+      (None, acc1),
+      (None, acc2),
+    )
   }
 
   test("negative: set simple contracts and put exchange transaction in blockchain") {
@@ -86,34 +100,42 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
            (None, None, sc2),
            (None, sc2, None)
          )) {
-      setContract(contr1, acc0)
-      setContract(contr2, acc1)
-      setContract(mcontr, acc2)
+      setContracts(
+        (contr1, acc0),
+        (contr2, acc1),
+        (mcontr, acc2),
+      )
 
       val tx = exchangeTx()
       assertBadRequestAndMessage(sender.signedBroadcast(tx), "Transaction is not allowed by account-script")
       //TODO : add assert balances
     }
-    setContract(None, acc0)
-    setContract(None, acc1)
-    setContract(None, acc2)
+    setContracts(
+      (None, acc0),
+      (None, acc1),
+      (None, acc2),
+    )
   }
 
   test("negative: check custom exception") {
     for ((contr1, contr2, mcontr) <- Seq(
            (sc1, sc1, sc3)
          )) {
-      setContract(contr1, acc0)
-      setContract(contr2, acc1)
-      setContract(mcontr, acc2)
+      setContracts(
+        (contr1, acc0),
+        (contr2, acc1),
+        (mcontr, acc2),
+      )
 
       val tx = exchangeTx()
       assertBadRequestAndMessage(sender.signedBroadcast(tx), "Error while executing account-script: Some generic error")
       //TODO : add assert balances
     }
-    setContract(None, acc0)
-    setContract(None, acc1)
-    setContract(None, acc2)
+    setContracts(
+      (None, acc0),
+      (None, acc1),
+      (None, acc2),
+    )
   }
 
   test("positive: versioning verification") {
@@ -122,9 +144,11 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
            (sc1, None, None),
            (None, None, sc1)
          )) {
-      setContract(contr1, acc0)
-      setContract(contr2, acc1)
-      setContract(mcontr, acc2)
+      setContracts(
+        (contr1, acc0),
+        (contr2, acc1),
+        (mcontr, acc2),
+      )
 
       val mf        = 700000L
       val matcher   = acc2
@@ -153,9 +177,11 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
 
       //TODO : add assert balances
     }
-    setContract(None, acc0)
-    setContract(None, acc1)
-    setContract(None, acc2)
+    setContracts(
+      (None, acc0),
+      (None, acc1),
+      (None, acc2),
+    )
   }
 
   test("negative: check orders v2 with exchange tx v1") {
@@ -166,7 +192,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("negative: exchange tx v2 and order v1 from scripted acc") {
-    setContract(sc1, acc0)
+    setContracts((sc1, acc0))
 
     val mf        = 700000L
     val matcher   = acc2
@@ -193,7 +219,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     assertBadRequestAndMessage(sender.signedBroadcast(tx).id, "Reason: Can't process order with signature from scripted account")
   }
 
-  def exchangeTx(isSmart: Boolean = true) = {
+  private def exchangeTx(isSmart: Boolean = true) = {
     val matcher   = acc2
     val sellPrice = (0.50 * Order.PriceConstant).toLong
     val buy       = orders(2, isSmart)._1
@@ -223,7 +249,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     tx
   }
 
-  def orders(version: Byte = 2, isSmart: Boolean = true) = {
+  private def orders(version: Byte, isSmart: Boolean = true) = {
     val buyer               = acc1
     val seller              = acc0
     val matcher             = acc2

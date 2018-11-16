@@ -1,22 +1,21 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.api.http.assets.SignedSetAssetScriptRequest
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{script, someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import scorex.crypto.encode.Base58
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json._
+import scorex.crypto.encode.Base58
 
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   var assetWOScript              = ""
@@ -58,11 +57,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       "Reason: Cannot set script on an asset issued without a script"
     )
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee),
-                               "Reason: Cannot remove script from an asset issued with a script")
+                               "Reason: Cannot set empty script")
 
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
-      "Reason: Cannot remove script from an asset issued with a script"
+      "Reason: Cannot set empty script"
     )
     notMiner.assertBalances(firstAddress, balance, eff)
   }
@@ -93,7 +92,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
     assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some("")),
-                               "Reason: Cannot remove script from an asset issued with a script")
+                               "Reason: Cannot set empty script")
   }
 
   test("non-issuer cannot change script on asset w/o script") {
@@ -102,10 +101,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee),
-                               "Cannot remove script from an asset issued with a script")
+                               "Reason: Cannot set empty script")
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
-      "Reason: Cannot remove script from an asset issued with a script"
+      "Reason: Cannot set empty script"
     )
 
     notMiner.assertBalances(firstAddress, balance1, eff1)
@@ -212,9 +211,9 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
   test("try to update script to null") {
     assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee),
-                                "Reason: Cannot remove script from an asset issued with a script")
+                                "Reason: Cannot set empty script")
     assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some("")),
-                                "Reason: Cannot remove script from an asset issued with a script")
+                                "Reason: Cannot set empty script")
   }
 
   test("try to make SetAssetScript tx on script that deprecates SetAssetScript") {
@@ -300,11 +299,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))
 
     val signedTxByB2 =
-      nonIssuerUnsignedTx.copy(proofs = Proofs(Seq(sigTxB2)))
+      nonIssuerUnsignedTx2.copy(proofs = Proofs(Seq(sigTxB2)))
 
     assertBadRequestAndMessage(
       sender.signedBroadcast(signedTxByB2.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))).id,
-      "Transaction is not allowed by account-script"
+      "Transaction is not allowed by token-script"
     )
   }
 
