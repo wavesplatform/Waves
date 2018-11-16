@@ -75,7 +75,10 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     nodes.waitForHeightAriseAndTxPresent(scriptUpdateTx)
 
     assertBadRequestAndMessage(sender.signedBroadcast(exchangeTx(smartPair)).id, errNotAllowedByToken)
-
+    
+    setContract(None, acc0)
+    setContract(None, acc1)
+    setContract(None, acc2)
   }
 
   test("AssetPair from smart assets") {
