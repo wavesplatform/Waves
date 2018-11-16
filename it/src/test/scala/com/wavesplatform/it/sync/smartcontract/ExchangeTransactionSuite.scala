@@ -50,7 +50,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("set contracts and put exchange transaction in blockchain") {
-    val sc4 = cryptoContext(dtx)
+    val sc4 = cryptoContextScript
     val sc5 = pureContext(dtx)
     val sc6 = wavesContext(dtx)
 
