@@ -58,11 +58,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       "Reason: Cannot set script on an asset issued without a script"
     )
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee),
-                               "Reason: The script being set should not be empty")
+                               "Reason: Cannot set empty script")
 
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
-      "Reason: The script being set should not be empty"
+      "Reason: Cannot set empty script"
     )
     notMiner.assertBalances(firstAddress, balance, eff)
   }
@@ -212,9 +212,9 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
   test("try to update script to null") {
     assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee),
-                                "Reason: The script being set should not be empty")
+                                "Reason: Cannot set empty script")
     assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some("")),
-                                "Reason: The script being set should not be empty")
+                                "Reason: Cannot set empty script")
   }
 
   test("try to make SetAssetScript tx on script that deprecates SetAssetScript") {
