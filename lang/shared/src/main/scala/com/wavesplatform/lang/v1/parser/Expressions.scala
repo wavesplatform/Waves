@@ -46,9 +46,15 @@ object Expressions {
     def name: PART[String]
     def allowShadowing: Boolean
   }
+
   case class LET(position: Pos, name: PART[String], value: EXPR, types: Seq[PART[String]], allowShadowing: Boolean = false) extends Declaration
   case class FUNC(position: Pos, name: PART[String], args: Seq[(PART[String], Seq[PART[String]])], expr: EXPR) extends Declaration {
     val allowShadowing = false
+  }
+
+  case class ANNOTATION(position: Pos, name: PART[String], args: Seq[PART[String]]) extends Positioned
+  case class ANNOTATEDFUNC(position: Pos, anns: Seq[ANNOTATION], f: FUNC) extends Positioned {
+    def name = f.name
   }
   sealed trait EXPR                                                             extends Positioned
   case class CONST_LONG(position: Pos, value: Long)                             extends EXPR
@@ -66,6 +72,9 @@ object Expressions {
   case class MATCH(position: Pos, expr: EXPR, cases: Seq[MATCH_CASE]) extends EXPR
 
   case class INVALID(position: Pos, message: String) extends EXPR
+
+  case class CONTRACT(position: Pos, decs: List[Declaration], fs: List[ANNOTATEDFUNC])
+
   implicit class PartOps[T](val self: PART[T]) extends AnyVal {
     def toEither: Either[String, T] = self match {
       case Expressions.PART.VALID(_, x)         => Right(x)

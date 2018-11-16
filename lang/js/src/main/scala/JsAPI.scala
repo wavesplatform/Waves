@@ -2,7 +2,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.{Serde, CTX}
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -107,10 +107,10 @@ object JsAPI {
       Right(s ++ hash(s).take(4))
     }
 
-    (Parser(input) match {
+    (Parser.parseScript(input) match {
       case Success(value, _)    => Right[String, Expressions.EXPR](value)
       case Failure(_, _, extra) => Left[String, Expressions.EXPR](extra.traced.trace)
-    }).flatMap(CompilerV1(compilerContext, _))
+    }).flatMap(ExpressionCompilerV1(compilerContext, _))
       .flatMap(ast => serialize(ast._1).map(x => (x, ast)))
       .fold(
         err => {

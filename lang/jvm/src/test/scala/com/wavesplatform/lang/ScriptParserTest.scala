@@ -14,9 +14,9 @@ import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.crypto.encode.{Base58 => ScorexBase58}
 
-class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
+class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
-  private def parse(x: String): EXPR = Parser(x) match {
+  private def parse(x: String): EXPR = Parser.parseScript(x) match {
     case Success(r, _)            => r
     case e: Failure[Char, String] => catchParseError(x, e)
   }
@@ -1279,6 +1279,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     }
     val script = s"$manyLets\n$lastStmt"
 
-    Parser(script) shouldBe an[Success[_, _, _]]
+    Parser.parseScript(script) shouldBe an[Success[_, _, _]]
   }
 }

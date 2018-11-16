@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.lang.Global.MaxBase58Bytes
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
@@ -55,8 +55,8 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                                    |   long && bool && bin && str
                                    |}""".stripMargin
       setScript <- {
-        val untypedAllFieldsRequiredScript = Parser(allFieldsRequiredScript).get.value
-        val typedAllFieldsRequiredScript   = CompilerV1(compilerContext(V1), untypedAllFieldsRequiredScript).explicitGet()._1
+        val untypedAllFieldsRequiredScript = Parser.parseScript(allFieldsRequiredScript).get.value
+        val typedAllFieldsRequiredScript   = ExpressionCompilerV1(compilerContext(V1), untypedAllFieldsRequiredScript).explicitGet()._1
         selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
       }
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)

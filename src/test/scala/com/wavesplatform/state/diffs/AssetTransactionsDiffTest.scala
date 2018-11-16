@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
@@ -218,8 +218,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   private def createScript(code: String) = {
-    val Parsed.Success(expr, _) = Parser(code).get
-    ScriptV1(CompilerV1(compilerContext(V1), expr).explicitGet()._1).explicitGet()
+    val Parsed.Success(expr, _) = Parser.parseScript(code).get
+    ScriptV1(ExpressionCompilerV1(compilerContext(V1), expr).explicitGet()._1).explicitGet()
   }
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransactionV1)] =

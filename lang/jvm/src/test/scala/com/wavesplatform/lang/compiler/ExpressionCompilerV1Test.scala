@@ -4,7 +4,7 @@ import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
@@ -17,18 +17,18 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 
-class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions._
-    val Right(v) = CompilerV1(compilerContext, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1))))
+    val Right(v) = ExpressionCompilerV1(compilerContext, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1))))
     v._2 shouldBe LONG
   }
 
   property("should infer inner types") {
     import com.wavesplatform.lang.v1.parser.Expressions._
     val Right(v) =
-      CompilerV1(
+      ExpressionCompilerV1(
         compilerContext,
         FUNCTION_CALL(AnyPos,
                       PART.VALID(AnyPos, "getElement"),
@@ -43,7 +43,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
     }
 
     val expectedResult = Right(LONG)
-    CompilerV1(compilerContext, expr).map(_._2) match {
+    ExpressionCompilerV1(compilerContext, expr).map(_._2) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
@@ -211,7 +211,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
           | }
           | a + b
       """.stripMargin
-      Parser.apply(script).get.value
+      Parser.parseScript(script).get.value
     },
     expectedResult = {
       Right(
@@ -407,7 +407,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
 
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)], ctx: CompilerContext): Unit =
     property(propertyName) {
-      compiler.CompilerV1(ctx, expr) shouldBe expectedResult
+      compiler.ExpressionCompilerV1(ctx, expr) shouldBe expectedResult
     }
 
 }

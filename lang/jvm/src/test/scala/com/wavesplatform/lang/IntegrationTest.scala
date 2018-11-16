@@ -8,7 +8,7 @@ import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LONG}
-import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompilerV1, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
@@ -120,12 +120,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   private def eval[T <: EVALUATED](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
-    val untyped                                                = Parser(code).get.value
+    val untyped                                                = Parser.parseScript(code).get.value
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
       Monoid.combine(PureContext.build(V1), CTX(sampleTypes, stringToTuple, Array.empty))
-    val typed = CompilerV1(ctx.compilerContext, untyped)
+    val typed = ExpressionCompilerV1(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
 
@@ -185,7 +185,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   def compile(script: String): Either[String, Terms.EXPR] = {
-    val compiler = new CompilerV1(CTX.empty.compilerContext)
+    val compiler = new ExpressionCompilerV1(CTX.empty.compilerContext)
     compiler.compile(script, List.empty)
   }
 

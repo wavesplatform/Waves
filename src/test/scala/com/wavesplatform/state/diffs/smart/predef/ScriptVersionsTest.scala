@@ -6,7 +6,7 @@ import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.lang.{ScriptVersion, Testing}
 import com.wavesplatform.lang.ScriptVersion.Versions._
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -26,9 +26,9 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
                            version: ScriptVersion,
                            tx: Transaction = null,
                            blockchain: Blockchain = EmptyBlockchain): Either[String, T] = {
-    val Success(expr, _) = Parser(script)
+    val Success(expr, _) = Parser.parseScript(script)
     for {
-      compileResult <- CompilerV1(compilerContext(version), expr)
+      compileResult <- ExpressionCompilerV1(compilerContext(version), expr)
       (typedExpr, _) = compileResult
       s <- ScriptV1(version, typedExpr, checkSize = false)
       r <- ScriptRunner[T](blockchain.height, Coproduct(tx), blockchain, s)._2
@@ -50,8 +50,8 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
     "forbids duplicate names" in {
       import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 
-      val Success(expr, _)      = Parser(duplicateNames)
-      val Right((typedExpr, _)) = CompilerV1(compilerContext(V1), expr)
+      val Success(expr, _)      = Parser.parseScript(duplicateNames)
+      val Right((typedExpr, _)) = ExpressionCompilerV1(compilerContext(V1), expr)
       val settings = TestFunctionalitySettings.Enabled.copy(
         preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.SmartAccountTrading.id -> 3))
       val setup = for {

@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.StateSyntheticBenchmark._
@@ -74,8 +74,8 @@ object StateSyntheticBenchmark {
       super.init()
 
       val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
-      val untypedScript = Parser(textScript).get.value
-      val typedScript   = CompilerV1(compilerContext(V1), untypedScript).explicitGet()._1
+      val untypedScript = Parser.parseScript(textScript).get.value
+      val typedScript   = ExpressionCompilerV1(compilerContext(V1), untypedScript).explicitGet()._1
 
       val setScriptBlock = nextBlock(
         Seq(

@@ -18,14 +18,14 @@ import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 
-class CompilerV1(ctx: CompilerContext) extends ExprCompiler {
+class ExpressionCompilerV1(ctx: CompilerContext) extends ExprCompiler {
   override type Ver = V1.type
   override val version: Ver = V1
 
   override def compile(input: String, directives: List[Directive]): Either[String, version.ExprT] = {
-    Parser(input) match {
+    Parser.parseScript(input) match {
       case fastparse.core.Parsed.Success(xs, _) =>
-        CompilerV1(ctx, xs) match {
+        ExpressionCompilerV1(ctx, xs) match {
           case Left(err)              => Left(err.toString)
           case Right((expr, BOOLEAN)) => Right(expr)
           case Right((_, _))          => Left("Script should return boolean")
@@ -35,7 +35,7 @@ class CompilerV1(ctx: CompilerContext) extends ExprCompiler {
   }
 }
 
-object CompilerV1 {
+object ExpressionCompilerV1 {
 
   def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
     expr match {

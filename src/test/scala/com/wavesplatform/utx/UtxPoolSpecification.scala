@@ -8,7 +8,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompilerV1}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
@@ -212,7 +212,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         |let y = 2
         |true""".stripMargin
 
-    val compiler = new CompilerV1(CompilerContext.empty)
+    val compiler = new ExpressionCompilerV1(CompilerContext.empty)
     compiler.compile(code, List.empty).explicitGet()
   }
 

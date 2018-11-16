@@ -165,15 +165,23 @@ object Parser {
   abstract class Accessor
   case class Getter(name: PART[String]) extends Accessor
   case class ListIndex(index: EXPR)     extends Accessor
-  val typesP: P[Seq[PART[String]]]     = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
+  val typesP: P[Seq[PART[String]]] = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
   val funcP: P[FUNC] = {
     val funcname    = anyVarName
     val argWithType = anyVarName ~ ":" ~ typesP
-    val args        = "(" ~ argWithType.rep(sep = "," ) ~ ")"
+    val args        = "(" ~ argWithType.rep(sep = ",") ~ ")"
     val funcHeader  = "func" ~ funcname ~ args ~ "=" ~ "{" ~ baseExpr ~ "}"
     funcHeader.map {
       case (name, args, expr) => FUNC(AnyPos, name, args, expr)
     }
+  }
+
+  val annotationP: P[ANNOTATION] = ("@" ~ anyVarName ~ "(" ~ anyVarName.rep ~ ")").map {
+    case (name: PART[String], args: Seq[PART[String]]) => ANNOTATION(AnyPos, name, args)
+  }
+
+  val annotatedFunc: P[ANNOTATEDFUNC] = (annotationP.rep ~ funcP).map {
+    case (as, f) => ANNOTATEDFUNC(AnyPos, as, f)
   }
 
   val matchCaseP: P[MATCH_CASE] = {
@@ -321,5 +329,12 @@ object Parser {
       } | acc
   }
 
-  def apply(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
+  def parseScript(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
+
+  def parseContract(str: String): core.Parsed[CONTRACT, Char, String] =
+    P(Start ~ (annotatedFunc.rep) ~ End)
+      .map {
+        case fs => CONTRACT(AnyPos, List.empty, fs.toList)
+      }
+      .parse(str)
 }

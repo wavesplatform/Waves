@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
@@ -26,8 +26,8 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
          |     false
          | }
       """.stripMargin
-    val untyped         = Parser(scriptText).get.value
-    val transferAllowed = CompilerV1(compilerContext(V1), untyped).explicitGet()._1
+    val untyped         = Parser.parseScript(scriptText).get.value
+    val transferAllowed = ExpressionCompilerV1(compilerContext(V1), untyped).explicitGet()._1
 
     forAll(preconditionsTransferAndLease(transferAllowed)) {
       case (genesis, script, lease, transfer) =>

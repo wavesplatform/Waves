@@ -8,7 +8,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.ExprEvaluator.Log
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -698,7 +698,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val r = EvaluatorV1
       .applywithLogging[EVALUATED](context.evaluationContext,
-                                   new CompilerV1(context.compilerContext)
+                                   new ExpressionCompilerV1(context.compilerContext)
                                      .compile(script, List.empty)
                                      .explicitGet())
     (r._1, r._2.map {
