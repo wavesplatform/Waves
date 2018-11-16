@@ -93,7 +93,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
     assertBadRequestAndMessage(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some("")),
-                               "Reason: The script being set should not be empty")
+                               "Reason: Cannot set empty script")
   }
 
   test("non-issuer cannot change script on asset w/o script") {
@@ -102,7 +102,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee),
-                               "The script being set should not be empty")
+                               "Reason: Cannot set empty script")
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some("")),
       "Reason: The script being set should not be empty"
