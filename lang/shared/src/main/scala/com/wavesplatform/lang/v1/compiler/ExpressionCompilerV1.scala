@@ -153,7 +153,7 @@ object ExpressionCompilerV1 {
     } yield (BLOCKV2(LET(letName, compiledLet._1), compiledBody._1), compiledBody._2)
   }
 
-  private def compileFuncBlock(p: Pos, func: Expressions.FUNC, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
+  def compileFunc(p: Pos, func: Expressions.FUNC): CompileM[(FUNC, FINAL, List[(String,FINAL)])] = {
     for {
       funcName <- validateShadowing(p, func)
       _ <- func.args.toList
@@ -180,10 +180,17 @@ object ExpressionCompilerV1 {
         modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ newArgs))
           .flatMap(_ => compileExpr(func.expr))
       }
-      func    = FUNC(funcName, argTypes.map(_._1), compiledFuncBody._1)
-      typeSig = FunctionTypeSignature(compiledFuncBody._2, argTypes, FunctionHeader.User(funcName))
+      func = FUNC(funcName, argTypes.map(_._1), compiledFuncBody._1)
+    } yield (func,compiledFuncBody._2,argTypes)
+  }
+
+  private def compileFuncBlock(p: Pos, func: Expressions.FUNC, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
+    for {
+      f <- compileFunc(p, func)
+      (func, compiledFuncBodyType, argTypes) = f
+      typeSig = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(func.name))
       compiledBody <- local {
-        modify[CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> List(typeSig))))
+        modify[CompilerContext, CompilationError](functions.modify(_)(_ + (func.name -> List(typeSig))))
           .flatMap(_ => compileExpr(body))
       }
     } yield (BLOCKV2(func, compiledBody._1), compiledBody._2)
@@ -317,7 +324,7 @@ object ExpressionCompilerV1 {
       })
   }
 
-  private def handlePart[T](part: PART[T]): CompileM[T] = part match {
+  def handlePart[T](part: PART[T]): CompileM[T] = part match {
     case PART.VALID(_, x)         => x.pure[CompileM]
     case PART.INVALID(p, message) => raiseError(Generic(p.start, p.end, message))
   }

@@ -1,6 +1,8 @@
 package com.wavesplatform.lang.contract
 import com.wavesplatform.lang.contract.Contract.{ContractFunction, VerifierFunction}
-import com.wavesplatform.lang.v1.evaluator.ctx.UserFunction
+import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
+import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
 import com.wavesplatform.lang.v1.parser.Expressions.Declaration
 
 /*
@@ -12,7 +14,6 @@ import com.wavesplatform.lang.v1.parser.Expressions.Declaration
   - ContractFunctions can't invoke each other
  */
 
-
 case class Contract(
     dec: List[Declaration],
     cfs: List[ContractFunction],
@@ -21,21 +22,35 @@ case class Contract(
 
 object Contract {
 
-  sealed trait Annotation
+  sealed trait Annotation {
+    def dic: Map[String, FINAL]
+  }
   object Annotation {
-    def parse(name: String, args: List[String]): Either[String, Annotation] = {
+    def parse(name: String, args: List[String]): Either[CompilationError, Annotation] = {
       (name, args) match {
         case ("Callable", s :: Nil)           => Right(CallableAnnotation(s))
         case ("Verifier", s :: Nil)           => Right(VerifierAnnotation(s))
         case ("Payable", amt :: token :: Nil) => Right(PayableAnnotation(amt, token))
-        case _                                => Left("Annotation not recognized")
+        case _                                => Left(Generic(0, 0, "Annotation not recognized"))
+      }
+    }
+
+    def validateAnnotationSet(l: List[Annotation]): Either[CompilationError, Unit] = {
+      l match {
+        case (v: VerifierAnnotation) :: Nil                           => Right(())
+        case (c: CallableAnnotation) :: Nil                           => Right(())
+        case (c: CallableAnnotation) :: (p: PayableAnnotation) :: Nil => Right(())
+        case _                                                        => Left(Generic(0, 0, "Unsupported annotation set"))
       }
     }
   }
-  case class CallableAnnotation(pubKeyArgName: String)                      extends Annotation
-  case class PayableAnnotation(amountArgName: String, tokenArgName: String) extends Annotation
-  case class VerifierAnnotation(txArgName: String)                          extends Annotation
+  case class CallableAnnotation(pubKeyArgName: String) extends Annotation { lazy val dic = Map(pubKeyArgName -> BYTEVECTOR) }
+  case class PayableAnnotation(amountArgName: String, tokenArgName: String) extends Annotation {
+    lazy val dic = Map(amountArgName -> LONG, tokenArgName -> BYTEVECTOR)
+  }
+  case class VerifierAnnotation(txArgName: String) extends Annotation { lazy val dic = Map(txArgName -> ???) }
 
-  case class ContractFunction(c: CallableAnnotation, p: Option[PayableAnnotation], u: UserFunction)
-  case class VerifierFunction(v: VerifierAnnotation, u: UserFunction)
+  sealed trait AnnotatedFunction
+  case class ContractFunction(c: CallableAnnotation, p: Option[PayableAnnotation], u: Terms.FUNC) extends AnnotatedFunction
+  case class VerifierFunction(v: VerifierAnnotation, u: Terms.FUNC)                               extends AnnotatedFunction
 }
