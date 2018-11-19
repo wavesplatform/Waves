@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.transaction.DataTransaction
 
 package object smartcontract {
-  def cryptoContext(dtx: DataTransaction) =
+  def cryptoContextScript =
     Some(s"""
        |match tx {
        |  case ext : ExchangeTransaction =>
