@@ -8,7 +8,7 @@ import scodec.bits.ByteVector
 object Terms {
   sealed abstract class EXPR
   sealed abstract class DECLARATION
-  sealed trait EVALUATED
+  sealed trait EVALUATED extends EXPR
 
   case class LET(name: String, value: EXPR)                     extends DECLARATION
   case class FUNC(name: String, args: List[String], body: EXPR) extends DECLARATION

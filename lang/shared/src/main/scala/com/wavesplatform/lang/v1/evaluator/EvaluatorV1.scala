@@ -107,7 +107,7 @@ object EvaluatorV1 extends ExprEvaluator {
         .getOrElse(raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"function '$header' not found"))
     } yield result
 
-  private def evalExpr(t: EXPR): EvalM[EVALUATED] = t match {
+  def evalExpr(t: EXPR): EvalM[EVALUATED] = t match {
     case BLOCKV1(let, inner) => evalLetBlock(let, inner)
     case BLOCKV2(dec, inner) =>
       dec match {
