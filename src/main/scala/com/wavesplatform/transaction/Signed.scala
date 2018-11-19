@@ -23,8 +23,11 @@ trait Signed extends Authorized {
 object Signed {
 
   type E[A] = Either[InvalidSignature, A]
-  private implicit val scheduler: SchedulerService =
-    Scheduler.computation(name = "sig-validator", parallelism = 4)
+  private implicit val scheduler: SchedulerService = {
+    val cores       = Runtime.getRuntime.availableProcessors()
+    val parallelism = (cores / 2).max(1).min(4)
+    Scheduler.computation(name = "sig-validator", parallelism = parallelism)
+  }
 
   private def validateTask[S <: Signed](s: S): Task[E[S]] =
     Task {
