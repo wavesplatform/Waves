@@ -5,11 +5,11 @@ import java.nio.ByteBuffer
 
 import cats.implicits._
 import com.wavesplatform.lang.contract.Contract._
+import com.wavesplatform.lang.utils.Serialize._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC, LET}
-import com.wavesplatform.utils.Serialize._
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 object ContractSerDe {
 
@@ -42,8 +42,6 @@ object ContractSerDe {
 
   def deserialize(arr: Array[Byte]): Either[String, Contract] = {
     val bb = ByteBuffer.wrap(arr)
-
-    type G[A] = Either[String, A]
 
     for {
       _    <- tryEi(bb.getInt())
@@ -210,10 +208,9 @@ object ContractSerDe {
   // HELPERS
   //
 
-  private[lang] def deserializeList[A](bb: ByteBuffer, df: ByteBuffer => Either[String, A]): Either[String, List[A]] = {
+  private[lang] def deserializeList[A](bb: ByteBuffer, df: ByteBuffer => Either[String, A]): Either[String, List[A]] =
     (1 to bb.getInt).toList
-      .traverse[({ type L[A] = Either[String, A] })#L, A](_ => df(bb))
-  }
+      .traverse[({ type L[B] = Either[String, B] })#L, A](_ => df(bb))
 
   private[lang] def deserializeOption[A](bb: ByteBuffer, df: ByteBuffer => Either[String, A]): Either[String, Option[A]] = {
     tryEi(bb.getInt > 0)

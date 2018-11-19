@@ -1,4 +1,4 @@
-package com.wavesplatform.utils
+package com.wavesplatform.lang.utils
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer

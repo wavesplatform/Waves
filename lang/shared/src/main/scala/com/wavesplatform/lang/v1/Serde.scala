@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 
 import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.utils.Serialize._
+import com.wavesplatform.lang.utils.Serialize._
 import monix.eval.Coeval
 
 import scala.util.Try
