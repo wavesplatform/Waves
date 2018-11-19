@@ -10,10 +10,11 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 
-trait Caches extends Blockchain {
+trait Caches extends Blockchain with ScorexLogging {
   import Caches._
 
   protected def maxCacheSize: Int
@@ -125,6 +126,9 @@ trait Caches extends Blockchain {
     def addressId(address: Address): BigInt = (newAddressIds.get(address) orElse addressIdCache.get(address)).get
 
     lastAddressId += newAddressIds.size
+
+    log.trace(s"CACHE newAddressIds = $newAddressIds")
+    log.trace(s"CACHE lastAddressId = $lastAddressId")
 
     val wavesBalances = Map.newBuilder[BigInt, Long]
     val assetBalances = Map.newBuilder[BigInt, Map[ByteStr, Long]]
