@@ -29,10 +29,17 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
       )
     )
 
-    "BLOCKV2" in roundTripTest(
+    "BLOCKV2 with LET" in roundTripTest(
       BLOCKV2(
         dec = LET("foo", TRUE),
         body = FALSE
+      )
+    )
+
+    "BLOCKV2 with FUNC" in roundTripTest(
+      BLOCKV2(
+        FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true)),
+        CONST_BOOLEAN(false)
       )
     )
 

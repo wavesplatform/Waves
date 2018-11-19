@@ -1,9 +1,11 @@
 package com.wavesplatform.lang.contract
+import java.nio.ByteBuffer
+
 import com.wavesplatform.lang.contract.Contract.{ContractFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
+import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
-import com.wavesplatform.lang.v1.parser.Expressions.Declaration
 
 /*
  Contact is a list of annotated definitions
@@ -15,7 +17,7 @@ import com.wavesplatform.lang.v1.parser.Expressions.Declaration
  */
 
 case class Contract(
-    dec: List[Declaration],
+    dec: List[DECLARATION],
     cfs: List[ContractFunction],
     vf: Option[VerifierFunction]
 )

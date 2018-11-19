@@ -235,6 +235,7 @@ lazy val lang =
       scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true))),
       test in assembly := {},
       addCompilerPlugin(Dependencies.kindProjector),
+      addCompilerPlugin(Dependencies.betterFor),
       libraryDependencies ++=
         Dependencies.cats ++
           Dependencies.fp ++
