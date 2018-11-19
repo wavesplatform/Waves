@@ -105,10 +105,10 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
 
-  private def generateOneBlockTask(account: PrivateKeyAccount, balance: Long)(
+  private def generateOneBlockTask(account: PrivateKeyAccount)(
       delay: FiniteDuration): Task[Either[String, (MiningConstraints, Block, MiningConstraint)]] = {
     Task {
-      forgeBlock(account, balance)
+      forgeBlock(account)
     }.delayExecution(delay)
   }
 
@@ -132,7 +132,7 @@ class MinerImpl(allChannels: ChannelGroup,
       .leftMap(_.toString)
   }
 
-  private def forgeBlock(account: PrivateKeyAccount, balance: Long): Either[String, (MiningConstraints, Block, MiningConstraint)] = {
+  private def forgeBlock(account: PrivateKeyAccount): Either[String, (MiningConstraints, Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
     val height              = blockchainUpdater.height
     val version             = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
@@ -143,6 +143,8 @@ class MinerImpl(allChannels: ChannelGroup,
     val refBlockID          = referencedBlockInfo.blockId
     lazy val currentTime    = timeService.correctedTime()
     lazy val blockDelay     = currentTime - lastBlock.timestamp
+    lazy val balance        = GeneratingBalanceProvider.balance(blockchainUpdater, blockchainSettings.functionalitySettings, height, account.toAddress)
+
     measureSuccessful(
       blockBuildTimeStats,
       for {
@@ -269,10 +271,7 @@ class MinerImpl(allChannels: ChannelGroup,
       }
   }
 
-  private def nextBlockGenerationTime(fs: FunctionalitySettings,
-                                      height: Int,
-                                      block: Block,
-                                      account: PublicKeyAccount): Either[String, (Long, Long)] = {
+  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKeyAccount): Either[String, Long] = {
     val balance = GeneratingBalanceProvider.balance(blockchainUpdater, fs, height, account.toAddress)
 
     if (GeneratingBalanceProvider.isMiningAllowed(blockchainUpdater, height, balance)) {
@@ -283,7 +282,7 @@ class MinerImpl(allChannels: ChannelGroup,
           .leftMap(_.toString)
         result <- Either.cond(
           0 < expectedTS && expectedTS < Long.MaxValue,
-          (balance, expectedTS),
+          expectedTS,
           s"Invalid next block generation time: $expectedTS"
         )
       } yield result
@@ -295,18 +294,17 @@ class MinerImpl(allChannels: ChannelGroup,
       val height    = blockchainUpdater.height
       val lastBlock = blockchainUpdater.lastBlock.get
       for {
-        _            <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
-        _            <- checkScript(account)
-        balanceAndTs <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
-        (balance, ts)    = balanceAndTs
+        _  <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
+        _  <- checkScript(account)
+        ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
         calculatedOffset = ts - timeService.correctedTime()
         offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
-      } yield (offset, balance)
+      } yield offset
     } match {
-      case Right((offset, balance)) =>
+      case Right(offset) =>
         log.debug(s"Next attempt for acc=$account in $offset")
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
-        generateOneBlockTask(account, balance)(offset).flatMap {
+        generateOneBlockTask(account)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
             BlockAppender(checkpoint, blockchainUpdater, timeService, utx, pos, settings, appenderScheduler)(block)
               .asyncBoundary(minerScheduler)
