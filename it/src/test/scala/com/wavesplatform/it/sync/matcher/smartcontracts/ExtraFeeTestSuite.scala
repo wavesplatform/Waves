@@ -48,11 +48,11 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
     val bobInitBalance     = matcherNode.accountBalances(bobAcc.address)._1
     val matcherInitBalance = matcherNode.accountBalances(matcherNode.address)._1
 
-    val aliceFee   = tradeFee + 3 * smartFee // smart account + 2 x "smart asset"
+    val aliceFee   = tradeFee + 2 * smartFee // 2 x "smart asset"
     val bobFee     = tradeFee + 2 * smartFee // 2 x "smart asset"
     val matcherFee = aliceFee
 
-    "smart acc and asset should reserve extra fee" in {
+    "smart asset should reserve extra fee" in {
       // place counter order by smart acc
       val counter = matcherNode.placeOrder(aliceAcc, pair, SELL, amount, price, aliceFee, 2).message.id
       matcherNode.waitOrderStatus(pair, counter, "Accepted")

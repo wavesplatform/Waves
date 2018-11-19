@@ -21,7 +21,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
 
   private var dtx: DataTransaction = _
 
-  private val sc1 = Some(s"""true""")
+  private val sc1 = Some("true")
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()

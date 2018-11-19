@@ -47,8 +47,6 @@ object ExchangeTransactionCreator {
 
     orderMatchTxFee +
       accountFee(matcherAddress) +
-      order1Sender.fold(0L)(accountFee) +
-      order2Sender.fold(0L)(accountFee) +
       assetPair.amountAsset.fold(0L)(assetFee) +
       assetPair.priceAsset.fold(0L)(assetFee)
   }
