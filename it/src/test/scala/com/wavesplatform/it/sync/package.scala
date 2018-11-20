@@ -3,6 +3,7 @@ package com.wavesplatform.it
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.state._
 
 package object sync {
   val smartFee                   = 0.004.waves
