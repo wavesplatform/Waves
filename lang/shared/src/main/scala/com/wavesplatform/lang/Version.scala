@@ -8,5 +8,7 @@ object Version extends TaggedType[Int] {
   val V1: Version = 1 @@ Version
   val V2: Version = 2 @@ Version
 
-  val SupportedVersions: Set[Version] = Set(V1, V2)
+  val V3: Version = 3 @@ Version
+
+  val SupportedVersions: Set[Version] = Set(V1, V2, V3)
 }
