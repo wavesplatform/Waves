@@ -16,59 +16,92 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  val trueScript = Some(ScriptCompiler("true").explicitGet()._1.bytes().base64)
-  val amount     = 10L
+  val trueScript = Some(ScriptCompiler("true").explicitGet()._1.bytes().base64) //TODO добавить типовые проверки в скрипт
+  val amount     = 1L
   val price      = 100000000L
 
-  "Execute orders with one smart account and two smart assets" - {
-    // set smart account
-    setContract(Some("true"), aliceAcc)
+  // set smart account
+  setContract(Some("true"), aliceAcc)
 
-    // issue two smart assets
-    val asset1 = aliceNode
-      .issue(aliceAcc.address, "SmartAsset1", "Test", defaultAssetQuantity, 0, reissuable = false, issueFee, 2, trueScript)
-      .id
-    val asset2 = bobNode
-      .issue(bobAcc.address, "SmartAsset2", "Test", defaultAssetQuantity, 0, reissuable = false, issueFee, 2, trueScript)
-      .id
-    val pair = //TODO не помогает от "should be reverse"
-      if (MatcherActor.compare(Some(asset2.getBytes), Some(asset1.getBytes)) < 0)
-        AssetPair(decodeBase58(asset1).toOption, decodeBase58(asset2).toOption)
-      else
-        AssetPair(decodeBase58(asset2).toOption, decodeBase58(asset1).toOption)
-    Seq(asset1, asset2).foreach(matcherNode.waitForTransaction(_))
+  // issue one simple and two smart assets
+  val asset0: String = aliceNode
+    .issue(aliceAcc.address, "Asset0", "Test", defaultAssetQuantity, 0, reissuable = false, issueFee, 2)
+    .id
+  val asset1: String = aliceNode
+    .issue(aliceAcc.address, "SmartAsset1", "Test", defaultAssetQuantity, 0, reissuable = false, issueFee, 2, trueScript)
+    .id
+  val asset2: String = bobNode
+    .issue(bobAcc.address, "SmartAsset2", "Test", defaultAssetQuantity, 0, reissuable = false, issueFee, 2, trueScript)
+    .id
+  Seq(asset1, asset2).foreach(matcherNode.waitForTransaction(_))
 
-    val aliceToBobTransferId =
-      aliceNode.transfer(aliceAcc.address, bobAcc.address, defaultAssetQuantity / 2, 0.009.waves, Some(asset1), None, 2).id
-    val bobToAliceTransferId =
-      bobNode.transfer(bobAcc.address, aliceAcc.address, defaultAssetQuantity / 2, 0.005.waves, Some(asset2), None, 2).id
-    Seq(aliceToBobTransferId, bobToAliceTransferId).foreach(matcherNode.waitForTransaction(_))
+  Seq(
+    aliceNode.transfer(aliceAcc.address, bobAcc.address, defaultAssetQuantity / 2, 0.005.waves, Some(asset0), None, 2).id,
+    aliceNode.transfer(aliceAcc.address, bobAcc.address, defaultAssetQuantity / 2, 0.009.waves, Some(asset1), None, 2).id,
+    bobNode.transfer(bobAcc.address, aliceAcc.address, defaultAssetQuantity / 2, 0.005.waves, Some(asset2), None, 2).id
+  ).foreach(matcherNode.waitForTransaction(_))
 
-    val aliceInitBalance   = matcherNode.accountBalances(aliceAcc.address)._1
-    val bobInitBalance     = matcherNode.accountBalances(bobAcc.address)._1
-    val matcherInitBalance = matcherNode.accountBalances(matcherNode.address)._1
+  "When matcher executes orders" - {
+    "with one Smart Account and one Smart Asset" - {
+      "then fee should be 0.003 + 0.004 (for Smart Asset only, not Smart Account)" in {
+        val oneSmartPair =
+          if (MatcherActor.compare(Some(asset0.getBytes), Some(asset1.getBytes)) < 0)
+            AssetPair(decodeBase58(asset1).toOption, decodeBase58(asset0).toOption)
+          else
+            AssetPair(decodeBase58(asset0).toOption, decodeBase58(asset1).toOption)
 
-    val aliceFee   = tradeFee + 2 * smartFee // 2 x "smart asset"
-    val bobFee     = tradeFee + 2 * smartFee // 2 x "smart asset"
-    val matcherFee = aliceFee
+        val aliceInitBalance   = matcherNode.accountBalances(aliceAcc.address)._1
+        val bobInitBalance     = matcherNode.accountBalances(bobAcc.address)._1
+        val matcherInitBalance = matcherNode.accountBalances(matcherNode.address)._1
 
-    "smart asset should reserve extra fee" in {
-      // place counter order by smart acc
-      val counter = matcherNode.placeOrder(aliceAcc, pair, SELL, amount, price, aliceFee, 2).message.id
-      matcherNode.waitOrderStatus(pair, counter, "Accepted")
-      // assert reserved balance
-      matcherNode.reservedBalance(aliceAcc)("WAVES") shouldBe aliceFee
+        val expectedFee = tradeFee + smartFee // 1 x "smart asset"
+
+        val counter = matcherNode.placeOrder(aliceAcc, oneSmartPair, SELL, amount, price, expectedFee, 2).message.id
+        matcherNode.waitOrderStatus(oneSmartPair, counter, "Accepted")
+
+        info("expected fee should be reserved")
+        matcherNode.reservedBalance(aliceAcc)("WAVES") shouldBe expectedFee
+
+        val submitted = matcherNode.placeOrder(bobAcc, oneSmartPair, BUY, amount, price, expectedFee, 2).message.id
+        matcherNode.waitOrderInBlockchain(submitted)
+
+        matcherNode.accountBalances(aliceAcc.address)._1 shouldBe aliceInitBalance - expectedFee
+        matcherNode.accountBalances(bobAcc.address)._1 shouldBe bobInitBalance - expectedFee
+        matcherNode.accountBalances(matcherNode.address)._1 shouldBe matcherInitBalance + expectedFee
+      }
     }
 
-    "assert fee" in {
-      // place submitted order
-      val submitted = matcherNode.placeOrder(bobAcc, pair, BUY, amount, price, bobFee, 2).message.id
-      matcherNode.waitOrderStatus(pair, submitted, "Filled")
-      matcherNode.waitOrderInBlockchain(submitted)
-      // assert fee for alice, bob and matcher
-      matcherNode.accountBalances(aliceAcc.address)._1 shouldBe aliceInitBalance - aliceFee
-      matcherNode.accountBalances(bobAcc.address)._1 shouldBe bobInitBalance - bobFee
-      matcherNode.accountBalances(matcherNode.address)._1 shouldBe matcherInitBalance + (aliceFee + bobFee - matcherFee)
+    "with one Smart Account, two Smart Assets and scripted Matcher" - {
+      "then fee should be 0.003 + (0.004 * 2) + 0.004 (for Smart Assets and Matcher Script)" - {
+        "and total fee should be divided proportionally with partial filling" in {
+          setContract(Some("true"), matcherNode.privateKey)
+
+          val bothSmartPair =
+            if (MatcherActor.compare(Some(asset2.getBytes), Some(asset1.getBytes)) < 0)
+              AssetPair(decodeBase58(asset1).toOption, decodeBase58(asset2).toOption)
+            else
+              AssetPair(decodeBase58(asset2).toOption, decodeBase58(asset1).toOption)
+
+          val aliceInitBalance   = matcherNode.accountBalances(aliceAcc.address)._1
+          val bobInitBalance     = matcherNode.accountBalances(bobAcc.address)._1
+          val matcherInitBalance = matcherNode.accountBalances(matcherNode.address)._1
+
+          val expectedFee = tradeFee + 2 * smartFee + smartFee // 2 x "smart asset" and 1 x "matcher script"
+
+          val counter = matcherNode.placeOrder(aliceAcc, bothSmartPair, SELL, amount, price, expectedFee, 2).message.id
+          matcherNode.waitOrderStatus(bothSmartPair, counter, "Accepted")
+
+          info("expected fee should be reserved")
+          matcherNode.reservedBalance(aliceAcc)("WAVES") shouldBe expectedFee
+
+          val submitted = matcherNode.placeOrder(bobAcc, bothSmartPair, BUY, amount, price, expectedFee, 2).message.id
+          matcherNode.waitOrderInBlockchain(submitted)
+
+          matcherNode.accountBalances(aliceAcc.address)._1 shouldBe aliceInitBalance - expectedFee
+          matcherNode.accountBalances(bobAcc.address)._1 shouldBe bobInitBalance - expectedFee
+          matcherNode.accountBalances(matcherNode.address)._1 shouldBe matcherInitBalance + expectedFee
+        }
+      }
     }
   }
 
