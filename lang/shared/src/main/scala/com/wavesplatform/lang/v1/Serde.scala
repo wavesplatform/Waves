@@ -2,11 +2,11 @@ package com.wavesplatform.lang.v1
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
 
+import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.utils.Serialize._
 import monix.eval.Coeval
-import scodec.bits.ByteVector
 
 import scala.util.Try
 
@@ -24,6 +24,11 @@ object Serde {
 
   val FH_NATIVE: Byte = 0
   val FH_USER: Byte   = 1
+
+  val E_BLOCK_V2 = 10
+
+  val DEC_LET  = 0
+  val DEC_FUNC = 1
 
   def deserialize(bytes: Array[Byte]): Either[String, EXPR] = {
     import cats.instances.list._
@@ -47,6 +52,12 @@ object Serde {
               let = LET(name, letValue),
               body = body
             )
+        case E_BLOCK_V2 =>
+          for {
+            decType <- Coeval.now(bb.get())
+            dec     <- deserializeDeclaration(bb, aux(), decType)
+            body    <- aux()
+          } yield BLOCKV2(dec, body)
         case E_REF    => Coeval.now(REF(bb.getString))
         case E_TRUE   => Coeval.now(TRUE)
         case E_FALSE  => Coeval.now(FALSE)
@@ -70,54 +81,36 @@ object Serde {
       }
   }
 
-  implicit class ByteBufferOps(val self: ByteBuffer) extends AnyVal {
-    def getBytes: Array[Byte] = {
-      val len = self.getInt
-      if (self.limit() < len || len < 0) {
-        throw new Exception(s"Invalid array size ($len)")
-      }
-      val bytes = new Array[Byte](len)
-      self.get(bytes)
-      bytes
-    }
-
-    def getByteVector: ByteVector = ByteVector(getBytes)
-
-    def getString: String = new String(getBytes, StandardCharsets.UTF_8)
-
-    def getFunctionHeader: FunctionHeader = self.get() match {
-      case FH_NATIVE => FunctionHeader.Native(self.getShort)
-      case FH_USER   => FunctionHeader.User(getString)
-      case x         => throw new RuntimeException(s"Unknown function header type: $x")
+  private def serializeDeclaration(bb: ByteArrayOutputStream, dec: DECLARATION, aux: EXPR => Coeval[Unit]): Coeval[Unit] = {
+    dec match {
+      case LET(name, value) =>
+        Coeval.now {
+          bb.write(DEC_LET)
+          bb.writeString(name)
+        } *> aux(value)
+      case FUNC(name, args, body) =>
+        Coeval.now {
+          bb.write(DEC_FUNC)
+          bb.writeString(name)
+          bb.writeInt(args.size)
+          args.foreach(bb.writeString)
+        } *> aux(body)
     }
   }
 
-  implicit class ByteArrayOutputStreamOps(val self: ByteArrayOutputStream) extends AnyVal {
-    def writeShort(value: Short): ByteArrayOutputStream = writeNumber(value, 2)
-    def writeInt(value: Int): ByteArrayOutputStream     = writeNumber(value, 4)
-    def writeLong(value: Long): ByteArrayOutputStream   = writeNumber(value, 8)
-
-    def writeNumber(n: Long, byteCount: Int): ByteArrayOutputStream = {
-      (byteCount - 1 to 0 by -1).foreach { i =>
-        self.write((n >> (8 * i) & 0xffL).toInt)
-      }
-      self
-    }
-
-    def writeString(x: String): ByteArrayOutputStream = {
-      val bytes = x.getBytes(StandardCharsets.UTF_8)
-      self.writeInt(bytes.length)
-      self.write(bytes)
-      self
-    }
-
-    def writeFunctionHeader(h: FunctionHeader): ByteArrayOutputStream = h match {
-      case FunctionHeader.Native(id) =>
-        self.write(FH_NATIVE)
-        self.writeShort(id)
-      case FunctionHeader.User(name) =>
-        self.write(FH_USER)
-        self.writeString(name)
+  private def deserializeDeclaration(bb: ByteBuffer, aux: => Coeval[EXPR], decType: Byte): Coeval[DECLARATION] = {
+    decType match {
+      case DEC_LET =>
+        for {
+          name <- Coeval.now(bb.getString)
+          body <- aux
+        } yield LET(name, body)
+      case DEC_FUNC =>
+        for {
+          name <- Coeval.now(bb.getString)
+          args <- Coeval.now(for (_ <- 1 to bb.getInt) yield bb.getString)
+          body <- aux
+        } yield FUNC(name, args.toList, body)
     }
   }
 
@@ -148,12 +141,17 @@ object Serde {
             out.writeString(name)
           }
           List(value, body).foldLeft(n)(aux)
+        case BLOCKV2(dec, body) =>
+          val n = Coeval.now[Unit] {
+            out.write(E_BLOCK_V2)
+          }
+          aux(serializeDeclaration(out, dec, aux(n, _)), body)
         case REF(key) =>
           Coeval.now {
             out.write(E_REF)
             out.writeString(key)
           }
-        case CONST_BOOLEAN(b)  => Coeval.now(out.write(if (b) E_TRUE else E_FALSE))
+        case CONST_BOOLEAN(b) => Coeval.now(out.write(if (b) E_TRUE else E_FALSE))
         case GETTER(obj, field) =>
           aux(Coeval.now[Unit](out.write(E_GETTER)), obj).map { _ =>
             out.writeString(field)
@@ -165,6 +163,7 @@ object Serde {
             out.writeInt(args.size)
           }
           args.foldLeft(n)(aux)
+
       }
     }
 
