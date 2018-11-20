@@ -2,8 +2,6 @@ package com.wavesplatform.lang.v1.compiler
 
 import cats.Show
 import cats.implicits._
-import com.wavesplatform.lang.ExprCompiler
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.Directive
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
@@ -18,11 +16,9 @@ import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 
-class ExpressionCompilerV1(ctx: CompilerContext) extends ExprCompiler {
-  override type Ver = V1.type
-  override val version: Ver = V1
+class ExpressionCompilerV1(ctx: CompilerContext) {
 
-  override def compile(input: String, directives: List[Directive]): Either[String, version.ExprT] = {
+  def compile(input: String, directives: List[Directive]): Either[String, EXPR] = {
     Parser.parseScript(input) match {
       case fastparse.core.Parsed.Success(xs, _) =>
         ExpressionCompilerV1(ctx, xs) match {
@@ -153,7 +149,7 @@ object ExpressionCompilerV1 {
     } yield (BLOCKV2(LET(letName, compiledLet._1), compiledBody._1), compiledBody._2)
   }
 
-  def compileFunc(p: Pos, func: Expressions.FUNC): CompileM[(FUNC, FINAL, List[(String,FINAL)])] = {
+  def compileFunc(p: Pos, func: Expressions.FUNC): CompileM[(FUNC, FINAL, List[(String, FINAL)])] = {
     for {
       funcName <- validateShadowing(p, func)
       _ <- func.args.toList
@@ -181,14 +177,14 @@ object ExpressionCompilerV1 {
           .flatMap(_ => compileExpr(func.expr))
       }
       func = FUNC(funcName, argTypes.map(_._1), compiledFuncBody._1)
-    } yield (func,compiledFuncBody._2,argTypes)
+    } yield (func, compiledFuncBody._2, argTypes)
   }
 
   private def compileFuncBlock(p: Pos, func: Expressions.FUNC, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
     for {
       f <- compileFunc(p, func)
       (func, compiledFuncBodyType, argTypes) = f
-      typeSig = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(func.name))
+      typeSig                                = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(func.name))
       compiledBody <- local {
         modify[CompilerContext, CompilationError](functions.modify(_)(_ + (func.name -> List(typeSig))))
           .flatMap(_ => compileExpr(body))

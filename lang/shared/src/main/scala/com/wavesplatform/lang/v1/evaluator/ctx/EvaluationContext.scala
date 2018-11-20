@@ -1,18 +1,18 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats._
-import com.wavesplatform.lang.ExprEvaluator.LetLogCallback
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.evaluator.LetLogCallback
 import shapeless.{Lens, lens}
 
 case class EvaluationContext(typeDefs: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Map[FunctionHeader, BaseFunction])
 
 case class LoggedEvaluationContext(l: LetLogCallback, ec: EvaluationContext)
 
-object LoggedEvaluationContext{
+object LoggedEvaluationContext {
   object Lenses {
     val types: Lens[LoggedEvaluationContext, Map[String, DefinedType]]          = lens[LoggedEvaluationContext] >> 'ec >> 'typeDefs
-    val lets: Lens[LoggedEvaluationContext, Map[String, LazyVal]]               = lens[LoggedEvaluationContext] >> 'ec >>'letDefs
+    val lets: Lens[LoggedEvaluationContext, Map[String, LazyVal]]               = lens[LoggedEvaluationContext] >> 'ec >> 'letDefs
     val funcs: Lens[LoggedEvaluationContext, Map[FunctionHeader, BaseFunction]] = lens[LoggedEvaluationContext] >> 'ec >> 'functions
   }
 }

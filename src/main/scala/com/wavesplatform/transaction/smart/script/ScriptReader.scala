@@ -1,7 +1,8 @@
 package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.ScriptVersion
+import com.wavesplatform.lang.Version
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
@@ -18,9 +19,13 @@ object ScriptReader {
 
     for {
       _ <- Either.cond(checkSum.sameElements(computedCheckSum), (), ScriptParseError("Invalid checksum"))
-      sv <- ScriptVersion
-        .fromInt(version)
-        .fold[Either[ScriptParseError, ScriptVersion]](Left(ScriptParseError(s"Invalid version: $version")))(v => Right(v))
+      ver = Version(version.toInt)
+      sv <- Either
+        .cond(
+          SupportedVersions(ver),
+          ver,
+          ScriptParseError(s"Invalid version: $version")
+        )
       script <- ScriptV1
         .validateBytes(scriptBytes)
         .flatMap { _ =>

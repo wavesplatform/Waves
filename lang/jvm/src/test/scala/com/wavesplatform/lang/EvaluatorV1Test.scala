@@ -5,14 +5,13 @@ import java.nio.ByteBuffer
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.ExprEvaluator.Log
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, Log}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._

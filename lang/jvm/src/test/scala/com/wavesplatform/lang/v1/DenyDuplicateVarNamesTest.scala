@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
+import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks

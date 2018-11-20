@@ -2,9 +2,8 @@ package com.wavesplatform.matcher.smart
 
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.lang.ExprEvaluator.Log
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, Log}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.script.Script
 import monix.eval.Coeval

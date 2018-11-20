@@ -1,13 +1,12 @@
 package com.wavesplatform.lang.v1
 
 import cats.data.EitherT
-import com.wavesplatform.lang.ScriptVersion
-import com.wavesplatform.lang.ScriptVersion.Versions._
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
 
 object DenyDuplicateVarNames {
-  def apply(version: ScriptVersion, initial: Set[String], t: EXPR): Either[String, Unit] = {
+  def apply(version: Version, initial: Set[String], t: EXPR): Either[String, Unit] = {
     type DenyDuplicates[T] = EitherT[Coeval, String, T]
 
     def isVarValid(declared: Set[String], name: String): Either[String, Set[String]] = name(0) match {
@@ -34,6 +33,12 @@ object DenyDuplicateVarNames {
           args.foldLeft(EitherT.pure[Coeval, String](declared)) {
             case (declEi, arg) => declEi.flatMap(aux(EitherT.pure[Coeval, String](arg), _))
           }
+        case BLOCKV2(LET(name, expr), body) =>
+          EitherT
+            .fromEither[Coeval](isVarValid(declared, name))
+            .flatMap(aux(EitherT.pure(expr), _))
+            .flatMap(aux(EitherT.pure(body), _))
+        case _ => EitherT.pure(declared)
       }
     }
 

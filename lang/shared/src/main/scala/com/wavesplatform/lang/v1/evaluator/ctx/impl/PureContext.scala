@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import java.nio.charset.StandardCharsets
 
 import cats.data.EitherT
-import com.wavesplatform.lang.ScriptVersion
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -131,7 +131,7 @@ object PureContext {
     NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("b", BOOLEAN, "value")) {
       case TRUE :: Nil  => Right(CONST_BYTEVECTOR(ByteVector(1)))
       case FALSE :: Nil => Right(CONST_BYTEVECTOR(ByteVector(0)))
-      case _                           => ???
+      case _            => ???
     }
 
   lazy val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("n", LONG, "value")) {
@@ -154,7 +154,7 @@ object PureContext {
     NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, "String representation", ("b", BOOLEAN, "value")) {
       case TRUE :: Nil  => Right(CONST_STRING("true"))
       case FALSE :: Nil => Right(CONST_STRING("false"))
-      case _                           => ???
+      case _            => ???
     }
 
   lazy val toStringLong: BaseFunction = NativeFunction("toString", 1, LONG_TO_STRING, STRING, "String representation", ("n", LONG, "value")) {
@@ -365,6 +365,6 @@ object PureContext {
     functions
   )
 
-  def build(version: ScriptVersion): CTX = ctx
+  def build(version: Version): CTX = ctx
 
 }

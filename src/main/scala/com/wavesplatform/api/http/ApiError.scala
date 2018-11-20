@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
-import com.wavesplatform.lang.ExprEvaluator.Log
+import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.transaction.{Transaction, ValidationError}
 
 case class ApiErrorResponse(error: Int, message: String)

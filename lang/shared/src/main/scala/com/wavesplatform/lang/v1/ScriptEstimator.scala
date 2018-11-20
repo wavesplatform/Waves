@@ -50,6 +50,8 @@ object ScriptEstimator {
           }
           (argsComp, argsSyms) = args
         } yield (callCost() + argsComp, argsSyms)
+
+      case _ => ??? //TODO: FIx exhaustivness
     }
 
     aux(EitherT.pure(t), declaredVals.map(_ -> ((TRUE, true))).toMap).value().map(_._1)

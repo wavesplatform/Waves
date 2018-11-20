@@ -5,10 +5,10 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.lang.v1.DenyDuplicateVarNames
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.utils.varNames
 
 import scala.util.Right
@@ -22,7 +22,7 @@ object SetScriptTransactionDiff {
           Right(())
         } else {
           val version = script.version
-          DenyDuplicateVarNames(version, varNames(version), script.expr).left.map(GenericError.apply)
+          DenyDuplicateVarNames(version, varNames(version), script.expr.asInstanceOf[EXPR]).left.map(GenericError.apply)
         }
       }
     } yield {

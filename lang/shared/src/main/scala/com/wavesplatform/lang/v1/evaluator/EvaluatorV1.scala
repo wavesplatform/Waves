@@ -2,28 +2,23 @@ package com.wavesplatform.lang.v1.evaluator
 
 import cats.Monad
 import cats.implicits._
-import com.wavesplatform.lang.ExprEvaluator.{LetExecResult, LetLogCallback, Log, LogItem}
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.task.imports._
-import com.wavesplatform.lang.{ExecutionError, ExprEvaluator, TrampolinedExecResult}
+import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
 
 import scala.collection.mutable.ListBuffer
 
-object EvaluatorV1 extends ExprEvaluator {
-
-  override type Ver = V1.type
-  override val version: Ver = V1
+object EvaluatorV1 {
 
   private def evalLetBlock(let: LET, inner: EXPR): EvalM[EVALUATED] =
     for {
       ctx <- get[LoggedEvaluationContext, ExecutionError]
       blockEvaluation = evalExpr(let.value)
       lazyBlock       = LazyVal(blockEvaluation.ter(ctx), ctx.l(let.name))
-      savedVars = ctx.ec.letDefs
+      savedVars       = ctx.ec.letDefs
       result <- id {
         modify[LoggedEvaluationContext, ExecutionError](lets.modify(_)(_.updated(let.name, lazyBlock)))
           .flatMap(_ => evalExpr(inner))
@@ -55,9 +50,9 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[EVALUATED] =
     evalExpr(cond) flatMap {
-      case TRUE => evalExpr(ifTrue)
+      case TRUE  => evalExpr(ifTrue)
       case FALSE => evalExpr(ifFalse)
-      case _ => ???
+      case _     => ???
     }
 
   private def evalGetter(expr: EXPR, field: String): EvalM[EVALUATED] =
@@ -111,8 +106,8 @@ object EvaluatorV1 extends ExprEvaluator {
     case BLOCKV1(let, inner) => evalLetBlock(let, inner)
     case BLOCKV2(dec, inner) =>
       dec match {
-        case l: LET => evalLetBlock(l, inner)
-        case f:FUNC      => evalFuncBlock(f, inner)
+        case l: LET  => evalLetBlock(l, inner)
+        case f: FUNC => evalFuncBlock(f, inner)
       }
     case REF(str)                    => evalRef(str)
     case c: EVALUATED                => implicitly[Monad[EvalM]].pure(c)

@@ -1,16 +1,15 @@
 package com.wavesplatform.state.diffs.smart
 
-import com.wavesplatform.lang.ScriptVersion
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.{Blockchain, ByteStr}
-import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.utils.{EmptyBlockchain, compilerContext}
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
@@ -19,7 +18,7 @@ import shapeless.Coproduct
 package object predef {
   val networkByte: Byte = 'u'
 
-  def runScript[T <: EVALUATED](script: String, version: ScriptVersion, t: In, blockchain: Blockchain, networkByte: Byte): Either[String, T] = {
+  def runScript[T <: EVALUATED](script: String, version: Version, t: In, blockchain: Blockchain, networkByte: Byte): Either[String, T] = {
     val Success(expr, _) = Parser.parseScript(script)
     for {
       compileResult <- ExpressionCompilerV1(compilerContext(version), expr)

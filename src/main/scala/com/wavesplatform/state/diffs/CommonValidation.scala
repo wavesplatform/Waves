@@ -4,6 +4,7 @@ import cats._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError._
@@ -128,10 +129,10 @@ object CommonValidation {
       case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
       case sst: SetScriptTransaction =>
-        sst.script.map(_.version.value) match {
-          case Some(1) | None => activationBarrier(BlockchainFeatures.SmartAccounts)
-          case Some(2)        => activationBarrier(BlockchainFeatures.SmartAccountTrading, Some("Script version 2"))
-          case Some(v)        => Left(GenericError(s"Bad script version $v"))
+        sst.script.map(_.version) match {
+          case Some(V1) | None => activationBarrier(BlockchainFeatures.SmartAccounts)
+          case Some(V2)        => activationBarrier(BlockchainFeatures.SmartAccountTrading, Some("Script version 2"))
+          case Some(v)         => Left(GenericError(s"Bad script version $v"))
         }
       case _: TransferTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)

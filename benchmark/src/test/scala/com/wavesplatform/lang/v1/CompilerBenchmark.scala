@@ -6,6 +6,7 @@ import com.wavesplatform.lang.v1.CompilerBenchmark.St
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.state._
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))

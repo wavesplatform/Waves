@@ -1,24 +1,23 @@
 import cats.kernel.Monoid
-import shapeless.{:+:, CNil}
-import com.wavesplatform.lang.{Global, ScriptVersion}
+import com.github.mustachejava._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext, _}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl._
+import com.wavesplatform.lang.{Global, Version}
+import shapeless.{:+:, CNil}
 
 import scala.collection.JavaConverters._
-import com.github.mustachejava._
 
 object DocExport {
   def main(args: Array[String]) {
     if (args.size != 4 || args(0) != "--gen-doc") {
       System.err.println("Expected args: --gen-doc <version> <template> <output>")
     } else {
-      val version = ScriptVersion.fromInt(args(1).toByte).get
+      val version = Version(args(1).toInt)
       val wavesContext = WavesContext.build(
         version,
         new Environment {

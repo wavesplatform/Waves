@@ -20,7 +20,7 @@ object ContractCompiler {
     }
     for {
       annotations <- annotationsM
-      predefs     = annotations.flatMap(_.dic.toList).toMap
+//      predefs     = annotations.flatMap(_.dic.toList).toMap TODO: unused
       compiledBody <- local {
         compiler.ExpressionCompilerV1.compileFunc(AnyPos, af.f)
       }
