@@ -98,4 +98,13 @@ trait IntegrationSuiteWithThreeAddresses
       .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
       .id
   }
+
+  def setContracts(contracts: (Option[String], PrivateKeyAccount)*): Unit = {
+    contracts
+      .map {
+        case (src, acc) => setContract(src, acc)
+      }
+      .foreach(id => sender.waitForTransaction(id))
+    nodes.waitForHeightArise()
+  }
 }
