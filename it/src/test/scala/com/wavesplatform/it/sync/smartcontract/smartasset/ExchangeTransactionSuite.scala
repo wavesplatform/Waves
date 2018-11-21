@@ -21,7 +21,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
 
   private var dtx: DataTransaction = _
 
-  private val sc1 = Some(s"""true""")
+  private val sc1 = Some("true")
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -52,9 +52,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
            (sc1, sc1, sc1),
            (None, sc1, None)
          )) {
-      setContract(contr1, acc0)
-      setContract(contr2, acc1)
-      setContract(mcontr, acc2)
+
+      setContracts((contr1, acc0), (contr2, acc1), (mcontr, acc2))
 
       val tx = exchangeTx(smartPair)
 
@@ -72,10 +71,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
 
     assertBadRequestAndMessage(sender.signedBroadcast(exchangeTx(smartPair)).id, errNotAllowedByToken)
 
-    setContract(None, acc0)
-    setContract(None, acc1)
-    setContract(None, acc2)
-
+    setContracts((None, acc0), (None, acc1), (None, acc2))
   }
 
   test("use smart assets for AssetPair") {

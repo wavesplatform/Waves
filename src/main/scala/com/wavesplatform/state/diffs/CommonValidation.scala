@@ -225,10 +225,6 @@ object CommonValidation {
     }
 
     def smartAccountScriptsCount: Int = tx match {
-      case etx: ExchangeTransaction =>
-        cond(blockchain.hasScript(etx.sender))(1, 0) +
-          cond(blockchain.hasScript(etx.sellOrder.sender))(1, 0) +
-          cond(blockchain.hasScript(etx.buyOrder.sender))(1, 0)
       case tx: Transaction with Authorized => cond(blockchain.hasScript(tx.sender))(1, 0)
       case _                               => 0
     }
