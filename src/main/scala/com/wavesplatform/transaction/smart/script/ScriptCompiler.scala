@@ -8,8 +8,9 @@ import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectivePars
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1.ScriptV1Impl
 import com.wavesplatform.utils._
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.{ScriptV1, ScriptV2}
 
 import scala.util.{Failure, Success, Try}
 
@@ -26,7 +27,7 @@ object ScriptCompiler extends ScorexLogging {
     for {
       ver        <- extractVersion(directives)
       expr       <- tryCompile(scriptWithoutDirectives, ver, directives)
-      script     <- ScriptV1(ver, expr)
+      script     <- ScriptV1.apply(ver, expr)
       complexity <- ScriptEstimator(varNames(ver), functionCosts(ver), expr)
     } yield (script, complexity)
   }
@@ -45,7 +46,9 @@ object ScriptCompiler extends ScorexLogging {
   }
 
   def estimate(script: Script, version: Version): Either[String, Long] = script match {
-    case Script.Expr(expr) => ScriptEstimator(varNames(version), functionCosts(version), expr)
+    case s: ScriptV1Impl => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
+    case s: ScriptV2     => Right(1)
+    case _               => ???
   }
 
   private def extractVersion(directives: List[Directive]): Either[String, Version] = {

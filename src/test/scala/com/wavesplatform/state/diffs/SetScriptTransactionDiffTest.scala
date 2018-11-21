@@ -20,7 +20,8 @@ import com.wavesplatform.transaction.smart.script.v1.ScriptV2
 
 class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
-  private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
+  private val fs = TestFunctionalitySettings.Enabled.copy(
+    preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0))
 
   val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
     version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)

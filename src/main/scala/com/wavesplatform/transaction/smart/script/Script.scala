@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import com.wavesplatform.utils.Base64
@@ -34,10 +33,4 @@ object Script {
       script <- ScriptReader.fromBytes(bytes)
     } yield script
 
-  object Expr {
-    def unapply(arg: Script): Option[Terms.EXPR] = arg.version match {
-      case V1 | V2 => Some(arg.expr.asInstanceOf[Terms.EXPR])
-      case _       => None
-    }
-  }
 }

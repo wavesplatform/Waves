@@ -3,13 +3,12 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.Version
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.lang.v1.DenyDuplicateVarNames
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.utils.varNames
 
 import scala.util.Right

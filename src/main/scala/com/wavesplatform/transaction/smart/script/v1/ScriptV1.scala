@@ -26,11 +26,11 @@ object ScriptV1 {
     for {
       scriptComplexity <- ScriptEstimator(varNames(version), functionCosts(version), x)
       _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
-      s = new ScriptV1(version, x)
+      s = new ScriptV1Impl(version, x)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s
 
-  private class ScriptV1(override val version: Version, override val expr: EXPR) extends Script {
+  case class ScriptV1Impl(override val version: Version, override val expr: EXPR) extends Script {
     override type Expr = EXPR
     override val text: String = expr.toString
     override val bytes: Coeval[ByteStr] =

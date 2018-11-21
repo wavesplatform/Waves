@@ -10,6 +10,8 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.BlockchainContext
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1.ScriptV1Impl
+import com.wavesplatform.transaction.smart.script.v1.ScriptV2
 import monix.eval.Coeval
 import shapeless._
 
@@ -20,7 +22,7 @@ object ScriptRunner {
                             blockchain: Blockchain,
                             script: Script): (Log, Either[ExecutionError, A]) =
     script match {
-      case Script.Expr(expr) =>
+      case s: ScriptV1Impl =>
         val ctx = BlockchainContext.build(
           script.version,
           AddressScheme.current.chainId,
@@ -28,9 +30,9 @@ object ScriptRunner {
           Coeval.evalOnce(height),
           blockchain
         )
-        EvaluatorV1.applywithLogging[A](ctx, expr)
-
-      case _ => (List.empty, "Unsupported script version".asLeft[A])
+        EvaluatorV1.applywithLogging[A](ctx, s.expr)
+      case s: ScriptV2 => (List.empty, Left("Transactions from contracts not supported"))
+      case _           => (List.empty, "Unsupported script version".asLeft[A])
     }
 
 }
