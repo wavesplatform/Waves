@@ -123,13 +123,19 @@ object SyncMatcherHttpApi extends Assertions {
                                       waitTime: Duration = OrderRequestAwaitTime): Boolean =
       sync(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus, expectedMessage), waitTime)
 
-    def expectRejectedOrderPlacement(node: Node,
+    def expectRejectedOrderPlacement(sender: PrivateKeyAccount,
                                      pair: AssetPair,
                                      orderType: OrderType,
                                      amount: Long,
                                      price: Long,
-                                     timeToLive: Duration = 30.days - 1.seconds): Boolean =
-      expectIncorrectOrderPlacement(prepareOrder(node.privateKey, pair, orderType, amount, price, timeToLive = timeToLive), 400, "OrderRejected")
+                                     fee: Long = 300000L,
+                                     version: Byte = 1,
+                                     timeToLive: Duration = 30.days - 1.seconds,
+                                     expectedMessage: Option[String] = None): Boolean =
+      expectIncorrectOrderPlacement(prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive),
+                                    400,
+                                    "OrderRejected",
+                                    expectedMessage)
 
     def expectCancelRejected(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
       sync(async(m).expectCancelRejected(sender, assetPair, orderId), waitTime)

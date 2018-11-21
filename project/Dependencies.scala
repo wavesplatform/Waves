@@ -57,7 +57,7 @@ object Dependencies {
   lazy val http = Seq("core", "annotations", "models", "jaxrs2").map(swaggerModule) ++ Seq(
     "io.swagger"                   %% "swagger-scala-module" % "1.0.4",
     "com.github.swagger-akka-http" %% "swagger-akka-http"    % "1.0.0",
-    "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.6",
+    "com.fasterxml.jackson.core"   % "jackson-databind"      % "2.9.6",
     "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",
     akkaHttpModule("akka-http")
   )
@@ -101,7 +101,7 @@ object Dependencies {
   lazy val scalactic   = Seq("org.scalactic" %% "scalactic"  % "3.0.5")
   lazy val cats        = Seq("org.typelevel" %% "cats-core"  % "1.1.0")
   lazy val scalacheck = Seq(
-    "org.scalacheck"      %% "scalacheck"      % "1.13.5",
+    "org.scalacheck"      %% "scalacheck"      % "1.14.0",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
   lazy val kindProjector = "org.spire-math" %% "kind-projector" % "0.9.6"

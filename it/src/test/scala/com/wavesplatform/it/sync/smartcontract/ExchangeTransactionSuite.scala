@@ -50,17 +50,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     nodes.waitForHeightAriseAndTxPresent(dtxId)
   }
 
-  private def setContracts(contracts: (Option[String], PrivateKeyAccount)*): Unit = {
-    contracts
-      .map {
-        case (src, acc) => setContract(src, acc)
-      }
-      .foreach(id => sender.waitForTransaction(id))
-    nodes.waitForHeightArise()
-  }
-
   test("set contracts and put exchange transaction in blockchain") {
-    val sc4 = cryptoContext(dtx)
+    val sc4 = cryptoContextScript
     val sc5 = pureContext(dtx)
     val sc6 = wavesContext(dtx)
 
