@@ -33,21 +33,21 @@ package object state {
         }
         .take(count)
 
-    def withRestFromBlockchain(s: Seq[(Int, Transaction)]): Seq[(Int, Transaction)] =
+    def withRestFromBlockchain(s: Seq[(Int, Transaction)]): Either[String, Seq[(Int, Transaction)]] =
       s.length match {
-        case `count`        => s
-        case l if l < count => s ++ b.addressTransactions(address, types, count - l, None).getOrElse(Seq.empty)
-        case _              => s.take(count)
+        case `count`        => Right(s)
+        case l if l < count => b.addressTransactions(address, types, count - l, None).map(s ++ _)
+        case _              => Right(s.take(count))
       }
 
-    def transactions: Diff => Seq[(Int, Transaction)] =
+    def transactions: Diff => Either[String, Seq[(Int, Transaction)]] =
       withRestFromBlockchain _ compose withFilterAndLimit compose withPagination compose transactionsFromDiff
 
     d.fold(b.addressTransactions(address, types, count, fromId)) { diff =>
       fromId match {
         case Some(id) if !diff.transactions.contains(id) =>
           b.addressTransactions(address, types, count, fromId)
-        case _ => Right(transactions(diff))
+        case _ => transactions(diff)
       }
     }
   }

@@ -109,6 +109,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     }
 
     "with pagination" - {
+      val LIMIT = 8
       def paginationTest(firstPageLength: Int): Unit = {
         baseTest(time => preconditions(time.correctedTime())) { (updater, account) =>
           // using pagination
@@ -117,12 +118,12 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             .explicitGet()
 
           val rest = updater
-            .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 10, Some(firstPage.last._2.id()))
+            .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), LIMIT - firstPageLength, Some(firstPage.last._2.id()))
             .explicitGet()
 
           // without pagination
           val txs = updater
-            .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 10, None)
+            .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), LIMIT, None)
             .explicitGet()
 
           (firstPage ++ rest) shouldBe txs
