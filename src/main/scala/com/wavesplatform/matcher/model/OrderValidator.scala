@@ -56,7 +56,7 @@ class OrderValidator(db: DB,
         Left("Trading on scripted account isn't allowed yet")
       else if (order.version <= 1) Left("Can't process order with signature from scripted account")
       else
-        try MatcherScriptRunner[EVALUATED](script, order) match {
+        try MatcherScriptRunner[EVALUATED](script, order, isTokenScript = false) match {
           case (_, Left(execError)) => Left(s"Error executing script for $address: $execError")
           case (_, Right(FALSE))    => Left(s"Order rejected by script for $address")
           case (_, Right(TRUE))     => Right(order)
@@ -78,7 +78,7 @@ class OrderValidator(db: DB,
         transactionCreator
           .createTransaction(OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order)))
           .flatMap { tx =>
-            try ScriptRunner[EVALUATED](blockchain.height, Coproduct(tx), blockchain, script) match {
+            try ScriptRunner[EVALUATED](blockchain.height, Coproduct(tx), blockchain, script, proofsEnabled = false) match {
               case (_, Left(execError)) => Left(s"Error executing script of asset $assetId: $execError")
               case (_, Right(FALSE))    => Left(s"Order rejected by script of asset $assetId")
               case (_, Right(TRUE))     => Right(order)

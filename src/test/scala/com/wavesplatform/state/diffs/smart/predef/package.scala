@@ -24,7 +24,7 @@ package object predef {
     for {
       compileResult <- CompilerV1(compilerContext(version), expr)
       (typedExpr, _) = compileResult
-      evalContext    = BlockchainContext.build(version, networkByte, Coeval.evalOnce(t), Coeval.evalOnce(blockchain.height), blockchain)
+      evalContext    = BlockchainContext.build(version, networkByte, Coeval.evalOnce(t), Coeval.evalOnce(blockchain.height), blockchain, true)
       r <- EvaluatorV1[T](evalContext, typedExpr)
     } yield r
   }
