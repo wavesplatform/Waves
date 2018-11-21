@@ -8,8 +8,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 
-//import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import com.github.mustachejava._
 
@@ -160,8 +160,8 @@ object DocExport {
                      specials: java.util.List[Special])
 
       val mf      = new DefaultMustacheFactory()
-      val doc     = mf.compile(args(1))
-      val output  = new java.io.FileWriter(args(2)) //new java.io.StringWriter
+      val doc     = mf.compile(args(2))
+      val output  = new java.io.FileWriter(args(3)) //new java.io.StringWriter
       val (t, f)  = transactionDocs(transactionsType)
       val commons = transactionDocs(transactionsType, commonFields)
       val transactionClasses = Seq(

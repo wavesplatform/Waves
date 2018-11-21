@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.{ActorRef, Props}
-import akka.testkit.ImplicitSender
+import akka.testkit.{ImplicitSender, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.OrderOps._
 import com.wavesplatform.matcher.MatcherTestData
@@ -16,6 +16,7 @@ import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.{ByteStr, Diff}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
@@ -25,8 +26,9 @@ import scala.util.Random
 
 class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTPTime with ImplicitSender with MatcherTestData with PathMockFactory {
 
-  private val txFactory = new ExchangeTransactionCreator(MatcherAccount, matcherSettings, ntpTime).createTransaction _
+  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings, ntpTime).createTransaction _
   private val obc       = new ConcurrentHashMap[AssetPair, OrderBook]
+  private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
 
   private def update(ap: AssetPair)(snapshot: OrderBook): Unit = obc.put(ap, snapshot)
 
@@ -37,6 +39,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
 
   private def obcTest(f: (AssetPair, ActorRef) => Unit): Unit = {
     obc.clear()
+    md.clear()
     val b = ByteStr(new Array[Byte](32))
     Random.nextBytes(b.arr)
 
@@ -45,7 +48,10 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
     val utx = stub[UtxPool]
     (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty)))
     val allChannels = stub[ChannelGroup]
-    val actor       = system.actorOf(Props(new OrderBookActor(pair, update(pair), utx, allChannels, matcherSettings, txFactory) with RestartableActor))
+    val actor = system.actorOf(
+      Props(
+        new OrderBookActor(TestProbe().ref, pair, update(pair), p => Option(md.get(p)), utx, allChannels, matcherSettings, txFactory, ntpTime)
+        with RestartableActor))
 
     f(pair, actor)
   }
@@ -92,16 +98,14 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       actor ! ord2
       receiveN(2)
       actor ! GetOrdersRequest
-      expectMsg(
-        GetOrdersResponse(
-          Seq(BuyLimitOrder(ord2.amount, ord2.price, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.price, ord1.matcherFee, ord1))))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord2.amount, ord2.matcherFee, ord2), BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))))
 
       val ord3 = sell(pair, 10 * Order.PriceConstant, 100)
       actor ! ord3
       expectMsg(OrderAccepted(ord3))
 
       actor ! GetOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord1.amount, ord1.price, ord1.matcherFee, ord1))))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord1.amount, ord1.matcherFee, ord1))))
     }
 
     "place buy and sell order to the order book and preserve it after restart" in obcTest { (pair, actor) =>
@@ -135,7 +139,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           Seq(
             SellLimitOrder(
               ord2.amount - ord1.amount,
-              ord2.price,
               ord2.matcherFee - LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord1.amount),
               ord2
             ))))
@@ -160,7 +163,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           Seq(
             BuyLimitOrder(
               restAmount,
-              ord2.price,
               ord2.matcherFee - LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
               ord2
             ))))
@@ -193,7 +195,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           Seq(
             SellLimitOrder(
               restAmount,
-              ord2.price,
               ord2.matcherFee - LimitOrder.getPartialFee(ord2.matcherFee, ord2.amount, ord2.amount - restAmount),
               ord2
             ))))
@@ -222,7 +223,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           Seq(
             SellLimitOrder(
               restAmount,
-              ord3.price,
               ord3.matcherFee - LimitOrder.getPartialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
               ord3
             ))))
@@ -261,7 +261,9 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
         }
       }
       val allChannels = stub[ChannelGroup]
-      val actor       = system.actorOf(Props(new OrderBookActor(pair, update(pair), pool, allChannels, matcherSettings, txFactory) with RestartableActor))
+      val actor = system.actorOf(
+        Props(new OrderBookActor(TestProbe().ref, pair, update(pair), m => md.put(pair, m), pool, allChannels, matcherSettings, txFactory, ntpTime)
+        with RestartableActor))
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))
@@ -279,7 +281,6 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
           Seq(
             BuyLimitOrder(
               restAmount,
-              ord1.price,
               ord1.matcherFee - LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, restAmount),
               ord1
             ))))
@@ -300,7 +301,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord1.amount, ord1.price, ord1.matcherFee, ord1))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord1.amount, ord1.matcherFee, ord1))))
 
     }
 
@@ -321,7 +322,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       val restAmount = ord1.amount - corrected2
       // See OrderExecuted.submittedRemainingFee
       val restFee = ord1.matcherFee - LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, corrected2)
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(restAmount, ord1.price, restFee, ord1))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(restAmount, restFee, ord1))))
     }
 
     "partially execute order with price > 1 and zero fee remaining part " in obcTest { (_, actor) =>
@@ -338,7 +339,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       actor ! GetAskOrdersRequest
       val restAmount = ord1.amount - (ord3.amount - ord2.amount)
       val restFee    = ord1.matcherFee - LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(restAmount, ord1.price, restFee, ord1))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(restAmount, restFee, ord1))))
     }
 
     "buy small amount of pricey asset" in obcTest { (_, actor) =>
@@ -353,7 +354,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       val restSAmount = Order.correctAmount(700000L, 280)
       val restAmount  = 30000000000L - restSAmount
       val restFee     = s.matcherFee - LimitOrder.getPartialFee(s.matcherFee, s.amount, restSAmount)
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(restAmount, s.price, restFee, s))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(restAmount, restFee, s))))
 
       actor ! GetBidOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))
@@ -367,7 +368,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       val expiredOrder = buy(pair, amount, price).updateExpiration(ts)
       actor ! expiredOrder
       receiveN(1)
-      getOrders(actor) shouldEqual Seq(BuyLimitOrder(amount, price * Order.PriceConstant, expiredOrder.matcherFee, expiredOrder))
+      getOrders(actor) shouldEqual Seq(BuyLimitOrder(amount, expiredOrder.matcherFee, expiredOrder))
       actor ! OrderCleanup
       expectMsg(OrderCanceled(expiredOrder.id()))
       getOrders(actor).size should be(0)
@@ -378,7 +379,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       val price  = 34118
 
       val order          = buy(pair, amount, price)
-      val expectedOrders = Seq(BuyLimitOrder(amount, price * Order.PriceConstant, order.matcherFee, order))
+      val expectedOrders = Seq(BuyLimitOrder(amount, order.matcherFee, order))
 
       actor ! order
       receiveN(1)

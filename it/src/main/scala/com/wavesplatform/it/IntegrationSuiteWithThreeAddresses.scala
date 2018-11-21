@@ -85,7 +85,7 @@ trait IntegrationSuiteWithThreeAddresses
     }
   }
 
-  def setContract(contractText: Option[String], acc: PrivateKeyAccount) = {
+  def setContract(contractText: Option[String], acc: PrivateKeyAccount): String = {
     val script = contractText.map { x =>
       val scriptText = x.stripMargin
       ScriptCompiler(scriptText).explicitGet()._1
@@ -94,10 +94,17 @@ trait IntegrationSuiteWithThreeAddresses
       .selfSigned(SetScriptTransaction.supportedVersions.head, acc, script, 0.014.waves, System.currentTimeMillis())
       .right
       .get
-    val setScriptId = sender
+    sender
       .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
       .id
-    nodes.waitForHeightAriseAndTxPresent(setScriptId)
   }
 
+  def setContracts(contracts: (Option[String], PrivateKeyAccount)*): Unit = {
+    contracts
+      .map {
+        case (src, acc) => setContract(src, acc)
+      }
+      .foreach(id => sender.waitForTransaction(id))
+    nodes.waitForHeightArise()
+  }
 }

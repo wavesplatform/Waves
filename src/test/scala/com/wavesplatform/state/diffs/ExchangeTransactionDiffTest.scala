@@ -235,7 +235,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         featureCheckBlocksPeriod = 1
       )
 
-  property("Exchange transaction with scripted matcher needs extra fee") {
+  property(s"Exchange transaction with scripted matcher and orders needs extra fee ($ScriptExtraFee)") {
     val allValidP = smartTradePreconditions(
       scriptGen("Order", true),
       scriptGen("Order", true),
@@ -244,9 +244,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(allValidP) {
       case (genesis, transfers, issueAndScripts, etx) =>
-        val smallFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(ExchangeTransaction.typeId)
+        val enoughFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
+        val smallFee  = enoughFee - 1
         val exchangeWithSmallFee = ExchangeTransactionV2
           .create(MATCHER, etx.buyOrder, etx.sellOrder, 1000000, 1000000, 0, 0, smallFee, etx.timestamp)
+          .explicitGet()
+
+        val exchangeWithEnoughFee = ExchangeTransactionV2
+          .create(MATCHER, etx.buyOrder, etx.sellOrder, 1000000, 1000000, 0, 0, enoughFee, etx.timestamp)
           .explicitGet()
 
         val preconBlocks = Seq(
@@ -255,9 +260,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
           TestBlock.create(issueAndScripts)
         )
 
-        val blockWithEx = TestBlock.create(Seq(exchangeWithSmallFee))
+        val blockWithSmallFeeETx  = TestBlock.create(Seq(exchangeWithSmallFee))
+        val blockWithEnoughFeeETx = TestBlock.create(Seq(exchangeWithEnoughFee))
 
-        assertLeft(preconBlocks, blockWithEx, fsV2)("does not exceed minimal value of")
+        assertLeft(preconBlocks, blockWithSmallFeeETx, fsV2)("does not exceed minimal value of")
+        assertDiffEi(preconBlocks, blockWithEnoughFeeETx, fsV2)(_ shouldBe 'right)
     }
   }
 

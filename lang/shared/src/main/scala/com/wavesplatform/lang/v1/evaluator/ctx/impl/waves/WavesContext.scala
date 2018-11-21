@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.{OrdType, Recipient}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
@@ -16,8 +16,8 @@ import scodec.bits.ByteVector
 
 object WavesContext {
 
-  import Types._
   import Bindings._
+  import Types._
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
   def build(version: ScriptVersion, env: Environment): CTX = {
@@ -35,7 +35,7 @@ object WavesContext {
       ) {
         case (addressOrAlias: CaseObj) :: CONST_STRING(k) :: Nil =>
           environmentFunctions.getData(addressOrAlias, k, dataType).map {
-            case None => PureContext.unit
+            case None => unit
             case Some(a) =>
               a match {
                 case b: ByteVector => CONST_BYTEVECTOR(b)
@@ -68,7 +68,7 @@ object WavesContext {
             case Some(b: CONST_BOOLEAN) if dataType == DataType.Boolean      => Right(b)
             case Some(b: CONST_BYTEVECTOR) if dataType == DataType.ByteArray => Right(b)
             case Some(s: CONST_STRING) if dataType == DataType.String        => Right(s)
-            case _                                                           => Right(PureContext.unit)
+            case _                                                           => Right(unit)
           }
         case _ => ???
       }
@@ -261,7 +261,7 @@ object WavesContext {
     val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Right(CONST_LONG(env.height)))
 
     val txByIdF: BaseFunction = {
-      val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(com.wavesplatform.lang.v1.compiler.Types.UNIT +: anyTransactionType.l)
+      val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
       NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTEVECTOR, "transaction Id")) {
         case CONST_BYTEVECTOR(id: ByteVector) :: Nil =>
           val maybeDomainTx: Option[CaseObj] = env.transactionById(id.toArray).map(transactionObject)
@@ -286,7 +286,7 @@ object WavesContext {
         ("addressOrAlias", addressOrAliasType, "account"),
         ("assetId", UNION(UNIT, BYTEVECTOR), "assetId (WAVES if none)")
       ) {
-        case (c: CaseObj) :: u :: Nil if u == PureContext.unit => env.accountBalanceOf(caseObjToRecipient(c), None).map(CONST_LONG)
+        case (c: CaseObj) :: u :: Nil if u == unit => env.accountBalanceOf(caseObjToRecipient(c), None).map(CONST_LONG)
         case (c: CaseObj) :: CONST_BYTEVECTOR(assetId: ByteVector) :: Nil =>
           env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray)).map(CONST_LONG)
 
@@ -307,8 +307,8 @@ object WavesContext {
       "get height when transaction was stored to blockchain",
       ("id", BYTEVECTOR, "transaction Id")
     ) {
-      case (id: ByteVector) :: Nil => Right(fromOptionL(env.transactionHeightById(id.toArray).map(_.toLong)))
-      case _                       => ???
+      case CONST_BYTEVECTOR(id: ByteVector) :: Nil => Right(fromOptionL(env.transactionHeightById(id.toArray).map(_.toLong)))
+      case _                                       => ???
     }
 
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))

@@ -38,7 +38,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
             val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
             ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = script)
           }
-          .orElse(Some(ad))
+          .orElse(Some(ad.copy(script = script)))
           .map { ad =>
             diff.sponsorship.get(id).fold(ad) {
               case SponsorshipValue(sponsorship) =>
@@ -167,7 +167,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   override def assetDistribution(assetId: ByteStr): Map[Address, Long] =
     inner.assetDistribution(assetId) ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Map[Address, Long] = {
+  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = {
     val innerDistribution = inner.assetDistributionAtHeight(assetId, height)
 
     if (height < this.height) {
@@ -175,7 +175,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     } else {
       val distributionFromDiff =
         changedBalances(_.assets.getOrElse(assetId, 0) != 0, portfolio(_).assets.getOrElse(assetId, 0))
-      innerDistribution ++ distributionFromDiff
+      innerDistribution |+| distributionFromDiff.asRight
     }
   }
 

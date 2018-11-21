@@ -12,9 +12,9 @@
 
 
 # Functions
-|funcs|doc|params|type|
-|-------|---|---|---|
-{{#funcs}}| {{name}}|{{doc}}|<ul>{{#params}} <li>{{name}}{{#type}}{{#isComplex}} {{name}}{{/isComplex}}{{#isNative}} [{{name}}](#{{name}}){{/isNative}}{{#isObj}} [{{name}}](#{{name}}){{/isObj}}{{#isUnion}}{{#union}} [{{name}}](#{{name}}){{/union}}{{/isUnion}}{{#hasParam}} {{name}}[{{#param}}{{#needLink}} [{{name}}](#{{name}}){{/needLink}}{{#noLink}} {{name}}{{/noLink}}{{/param}}]{{/hasParam}}{{/type}} {{doc}}</li>{{/params}}</ul>|{{#type}}{{#isComplex}}  {{name}}{{/isComplex}}{{#isNative}} [{{name}}](#{{name}}){{/isNative}}{{#isObj}} [{{name}}](#{{name}}){{/isObj}}{{#isUnion}}{{#union}} [{{name}}](#{{name}}){{/union}}{{/isUnion}}{{#hasParam}} {{name}}[{{#param}}{{#needLink}} [{{name}}](#{{name}}){{/needLink}}{{#noLink}} {{name}}{{/noLink}}{{/param}}] {{/hasParam}}{{/type}}
+|funcs|cost|doc|params|type|
+|-------|-|---|---|---|
+{{#funcs}}| {{name}}|{{cost}}|{{doc}}|<ul>{{#params}} <li>{{name}}{{#type}}{{#isComplex}} {{name}}{{/isComplex}}{{#isNative}} [{{name}}](#{{name}}){{/isNative}}{{#isObj}} [{{name}}](#{{name}}){{/isObj}}{{#isUnion}}{{#union}} [{{name}}](#{{name}}){{/union}}{{/isUnion}}{{#hasParam}} {{name}}[{{#param}}{{#needLink}} [{{name}}](#{{name}}){{/needLink}}{{#noLink}} {{name}}{{/noLink}}{{/param}}]{{/hasParam}}{{/type}} {{doc}}</li>{{/params}}</ul>|{{#type}}{{#isComplex}}  {{name}}{{/isComplex}}{{#isNative}} [{{name}}](#{{name}}){{/isNative}}{{#isObj}} [{{name}}](#{{name}}){{/isObj}}{{#isUnion}}{{#union}} [{{name}}](#{{name}}){{/union}}{{/isUnion}}{{#hasParam}} {{name}}[{{#param}}{{#needLink}} [{{name}}](#{{name}}){{/needLink}}{{#noLink}} {{name}}{{/noLink}}{{/param}}] {{/hasParam}}{{/type}}
 {{/funcs}}
 
 {{#commonFields}}

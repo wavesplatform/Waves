@@ -23,9 +23,13 @@ object EvaluatorV1 extends ExprEvaluator {
       ctx <- get[LoggedEvaluationContext, ExecutionError]
       blockEvaluation = evalExpr(let.value)
       lazyBlock       = LazyVal(blockEvaluation.ter(ctx), ctx.l(let.name))
+      savedVars = ctx.ec.letDefs
       result <- id {
         modify[LoggedEvaluationContext, ExecutionError](lets.modify(_)(_.updated(let.name, lazyBlock)))
           .flatMap(_ => evalExpr(inner))
+      }
+      _ <- id {
+        modify[LoggedEvaluationContext, ExecutionError](lets.set(_)(savedVars))
       }
     } yield result
 
@@ -41,6 +45,7 @@ object EvaluatorV1 extends ExprEvaluator {
     evalExpr(cond) flatMap {
       case TRUE => evalExpr(ifTrue)
       case FALSE => evalExpr(ifFalse)
+      case _ => ???
     }
 
   private def evalGetter(expr: EXPR, field: String): EvalM[EVALUATED] =

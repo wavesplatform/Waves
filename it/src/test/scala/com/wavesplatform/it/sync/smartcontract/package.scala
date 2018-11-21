@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.transaction.DataTransaction
 
 package object smartcontract {
-  def cryptoContext(dtx: DataTransaction) =
+  def cryptoContextScript =
     Some(s"""
        |match tx {
        |  case ext : ExchangeTransaction =>
@@ -13,15 +13,6 @@ package object smartcontract {
        |    let str64 = fromBase64String(toBase64String(tx.id)) == tx.id
        |    bks && sig && str58 && str64
        |  case s : SetScriptTransaction => true
-       |  case _ => false
-       |}
-     """.stripMargin)
-
-  def checkExtract(dtx: DataTransaction) =
-    Some(s"""
-       |match tx {
-       |  case ext : ExchangeTransaction =>
-       |     extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
        |  case _ => false
        |}
      """.stripMargin)
@@ -45,7 +36,7 @@ package object smartcontract {
        |       case ddtx : DataTransaction => ddtx.data[0] != DataEntry("ha", true)
        |       case _ => false
        |    }
-       |    let neOptionAndExtractHeight = dtx.id != base58'' # shouldbe extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
+       |    let neOptionAndExtractHeight = extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
        |
        |    let ne = nePrim && neDataEntryAndGetElement && neOptionAndExtractHeight
        |    let gteLong = 1000 > 999 && 1000 >= 999

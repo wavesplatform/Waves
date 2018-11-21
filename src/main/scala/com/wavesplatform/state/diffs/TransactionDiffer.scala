@@ -50,7 +50,7 @@ object TransactionDiffer extends Instrumented with ScorexLogging {
           case etx: ExchangeTransaction     => ExchangeTransactionDiff(blockchain, currentBlockHeight)(etx)
           case atx: CreateAliasTransaction  => CreateAliasTransactionDiff(blockchain, currentBlockHeight)(atx)
           case dtx: DataTransaction         => DataTransactionDiff(blockchain, currentBlockHeight)(dtx)
-          case sstx: SetScriptTransaction   => SetScriptTransactionDiff(currentBlockHeight)(sstx)
+          case sstx: SetScriptTransaction   => SetScriptTransactionDiff(blockchain, currentBlockHeight)(sstx)
           case sstx: SetAssetScriptTransaction =>
             AssetTransactionsDiff.setAssetScript(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(sstx)
           case stx: SponsorFeeTransaction => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)

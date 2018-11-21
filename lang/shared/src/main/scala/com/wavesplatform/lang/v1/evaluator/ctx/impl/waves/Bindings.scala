@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.{ARR, CaseObj}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters
 import com.wavesplatform.lang.v1.traits.domain.Tx._
 import com.wavesplatform.lang.v1.traits.domain._
@@ -164,7 +163,7 @@ object Bindings {
       case SetScript(p, scriptOpt) =>
         CaseObj(setScriptTransactionType.typeRef, Map("script" -> fromOptionBV(scriptOpt)) ++ provenTxPart(p))
       case SetAssetScript(p, assetId, scriptOpt) =>
-        CaseObj(setScriptTransactionType.typeRef,combine( Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId) , provenTxPart(p)))
+        CaseObj(setAssetScriptTransactionType.typeRef, combine(Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId), provenTxPart(p)))
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
         CaseObj(
           sponsorFeeTransactionType.typeRef,

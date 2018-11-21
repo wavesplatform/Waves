@@ -20,8 +20,8 @@ import play.api.libs.json._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable, Future}
-import scala.util.control.NonFatal
 import scala.util._
+import scala.util.control.NonFatal
 
 object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
@@ -61,15 +61,14 @@ object SyncHttpApi extends Assertions {
     case _          => Assertions.fail(s"Expecting not found error")
   }
 
-  val RequestAwaitTime = 15.seconds
+  val RequestAwaitTime = 50.seconds
 
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime) =
     try Await.result(awaitable, atMost)
     catch {
       case usce: UnexpectedStatusCodeException => throw usce
       case te: TimeoutException                => throw te
-      case NonFatal(cause) =>
-        throw new Exception(cause)
+      case NonFatal(cause)                     => throw new Exception(cause)
     }
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
@@ -100,6 +99,8 @@ object SyncHttpApi extends Assertions {
     def accountBalances(acc: String): (Long, Long) =
       sync(async(n).accountBalances(acc))
 
+    def balanceDetails(acc: String): BalanceDetails = sync(async(n).balanceDetails(acc))
+
     def assertBalances(acc: String, balance: Long)(implicit pos: Position): Unit =
       sync(async(n).assertBalances(acc, balance, effectiveBalance = balance))
 
@@ -112,8 +113,8 @@ object SyncHttpApi extends Assertions {
     def assetBalance(address: String, asset: String): AssetBalance =
       sync(async(n).assetBalance(address, asset))
 
-    def assetsDetails(assetId: String): AssetInfo =
-      sync(async(n).assetsDetails(assetId))
+    def assetsDetails(assetId: String, fullInfo: Boolean = false): AssetInfo =
+      sync(async(n).assetsDetails(assetId, fullInfo))
 
     def addressScriptInfo(address: String): AddressApiRoute.AddressScriptInfo =
       sync(async(n).scriptInfo(address))
@@ -129,8 +130,12 @@ object SyncHttpApi extends Assertions {
               reissuable: Boolean,
               fee: Long,
               version: Byte = 1,
-              script: Option[String] = None): Transaction =
-      sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script))
+              script: Option[String] = None,
+              waitForTx: Boolean = false): Transaction = {
+      val res = sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script))
+      if (waitForTx) waitForTransaction(res.id)
+      res
+    }
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
@@ -181,8 +186,12 @@ object SyncHttpApi extends Assertions {
                  fee: Long,
                  assetId: Option[String] = None,
                  feeAssetId: Option[String] = None,
-                 version: Byte = 1): Transaction =
-      sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version))
+                 version: Byte = 1,
+                 waitForTx: Boolean = false): Transaction = {
+      val res = sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version))
+      if (waitForTx) waitForTransaction(res.id)
+      res
+    }
 
     def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Transaction =
       sync(async(n).massTransfer(sourceAddress, transfers, fee, assetId))
@@ -274,8 +283,11 @@ object SyncHttpApi extends Assertions {
     def connect(address: InetSocketAddress): Unit =
       sync(async(n).connect(address))
 
-    def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None): Transaction =
-      sync(async(n).setAssetScript(assetId, sender, fee, script))
+    def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None, waitForTx: Boolean = false): Transaction = {
+      val res = sync(async(n).setAssetScript(assetId, sender, fee, script))
+      if (waitForTx) waitForTransaction(res.id)
+      res
+    }
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
@@ -290,6 +302,9 @@ object SyncHttpApi extends Assertions {
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
       sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
+
+    def waitForTransaction(transactionId: String)(implicit pos: Position): Unit =
+      sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime)
 
     def waitForHeightArise(): Int =
       sync(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)

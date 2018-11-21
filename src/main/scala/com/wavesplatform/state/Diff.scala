@@ -2,10 +2,11 @@ package com.wavesplatform.state
 
 import cats.implicits._
 import cats.kernel.Monoid
+import com.wavesplatform.account.{Address, Alias, PublicKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.account.{Address, Alias, PublicKeyAccount}
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{AssetId, Transaction}
 
@@ -81,8 +82,6 @@ case class SponsorshipValue(minFee: Long) extends Sponsorship
 case object SponsorshipNoInfo             extends Sponsorship
 
 object Sponsorship {
-  val FeeUnit = 100000
-
   implicit val sponsorshipMonoid: Monoid[Sponsorship] = new Monoid[Sponsorship] {
     override def empty: Sponsorship = SponsorshipNoInfo
 
@@ -99,7 +98,7 @@ object Sponsorship {
       .getOrElse(Int.MaxValue)
 
   def toWaves(assetFee: Long, sponsorship: Long): Long = {
-    val waves = (BigDecimal(assetFee) * BigDecimal(Sponsorship.FeeUnit)) / BigDecimal(sponsorship)
+    val waves = (BigDecimal(assetFee) * BigDecimal(CommonValidation.FeeUnit)) / BigDecimal(sponsorship)
     if (waves > Long.MaxValue) {
       throw new java.lang.ArithmeticException("Overflow")
     }
@@ -107,7 +106,7 @@ object Sponsorship {
   }
 
   def fromWaves(wavesFee: Long, sponsorship: Long): Long = {
-    val assetFee = (BigDecimal(wavesFee) / BigDecimal(Sponsorship.FeeUnit)) * BigDecimal(sponsorship)
+    val assetFee = (BigDecimal(wavesFee) / BigDecimal(CommonValidation.FeeUnit)) * BigDecimal(sponsorship)
     if (assetFee > Long.MaxValue) {
       throw new java.lang.ArithmeticException("Overflow")
     }
