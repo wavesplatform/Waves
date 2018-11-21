@@ -48,9 +48,9 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
       Then("orders for blacklisted assets are not available and new orders can't be placed")
       matcher.orderStatusExpectInvalidAssetId(wctOrder, wctWavesPair, WctId.toString)
       matcher.orderStatusExpectInvalidAssetId(ethOrder, ethWavesPair, EthId.toString)
-      matcher.expectRejectedOrderPlacement(alice, wctWavesPair, BUY, dec2, dec8)
-      matcher.expectRejectedOrderPlacement(alice, ethWavesPair, SELL, dec8, dec8)
-      matcher.expectRejectedOrderPlacement(bob, wavesBtcPair, SELL, dec8, dec8)
+      matcher.expectRejectedOrderPlacement(alice.privateKey, wctWavesPair, BUY, dec2, dec8)
+      matcher.expectRejectedOrderPlacement(alice.privateKey, ethWavesPair, SELL, dec8, dec8)
+      matcher.expectRejectedOrderPlacement(bob.privateKey, wavesBtcPair, SELL, dec8, dec8)
 
       And("orders of blacklisted address are still available")
       matcher.orderStatus(btcOrder, wavesBtcPair).status shouldBe "Accepted"
