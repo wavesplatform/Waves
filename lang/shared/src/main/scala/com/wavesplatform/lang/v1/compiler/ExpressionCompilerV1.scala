@@ -133,7 +133,7 @@ object ExpressionCompilerV1 {
         .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = true))(n => !ctx.functionDefs.contains(n))
     } yield letName
 
-  private def compileLetBlock(p: Pos, let: Expressions.LET, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
+  def compileLet(p: Pos, let: Expressions.LET): CompileM[(String, FINAL, EXPR)] =
     for {
       letName     <- validateShadowing(p, let)
       compiledLet <- compileExpr(let.value)
@@ -142,12 +142,7 @@ object ExpressionCompilerV1 {
         .traverse[CompileM, String](handlePart)
         .ensure(NonExistingType(p.start, p.end, letName, ctx.predefTypes.keys.toList))(_.forall(ctx.predefTypes.contains))
       typeUnion = handleTypeUnion(letTypes, compiledLet._2, ctx)
-      compiledBody <- local {
-        modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (typeUnion -> s"Defined at ${p.start}"))))
-          .flatMap(_ => compileExpr(body))
-      }
-    } yield (BLOCKV2(LET(letName, compiledLet._1), compiledBody._1), compiledBody._2)
-  }
+    } yield (letName, typeUnion, compiledLet._1)
 
   def compileFunc(p: Pos, func: Expressions.FUNC): CompileM[(FUNC, FINAL, List[(String, FINAL)])] = {
     for {
@@ -178,6 +173,17 @@ object ExpressionCompilerV1 {
       }
       func = FUNC(funcName, argTypes.map(_._1), compiledFuncBody._1)
     } yield (func, compiledFuncBody._2, argTypes)
+  }
+
+  private def compileLetBlock(p: Pos, let: Expressions.LET, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
+    for {
+      compiledLet <- compileLet(p, let)
+      (letName, letType, letExpr) = compiledLet
+      compiledBody <- local {
+        modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (letType -> s"Defined at ${p.start}"))))
+          .flatMap(_ => compileExpr(body))
+      }
+    } yield (BLOCKV2(LET(letName, letExpr), compiledBody._1), compiledBody._2)
   }
 
   private def compileFuncBlock(p: Pos, func: Expressions.FUNC, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {

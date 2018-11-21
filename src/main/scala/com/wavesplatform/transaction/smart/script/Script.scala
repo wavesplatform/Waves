@@ -8,9 +8,9 @@ import com.wavesplatform.lang.Version._
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
 
 trait Script {
-    type Expr
+  type Expr
 
-    val version: Version
+  val version: Version
 
   val expr: Expr
   val text: String

@@ -88,7 +88,7 @@ package object utils extends ScorexLogging {
   }
 
   private val lazyContexts: Map[Version, Coeval[CTX]] = Seq
-    .tabulate(2) { v =>
+    .tabulate(3) { v =>
       val version: Version = com.wavesplatform.lang.Version(v + 1)
       version -> Coeval.evalOnce(
         Monoid

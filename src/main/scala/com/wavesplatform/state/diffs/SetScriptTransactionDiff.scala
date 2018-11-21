@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.Version
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -22,7 +23,9 @@ object SetScriptTransactionDiff {
           Right(())
         } else {
           val version = script.version
-          DenyDuplicateVarNames(version, varNames(version), script.expr.asInstanceOf[EXPR]).left.map(GenericError.apply)
+          if (version == Version.V1 || version == Version.V2)
+            DenyDuplicateVarNames(version, varNames(version), script.expr.asInstanceOf[EXPR]).left.map(GenericError.apply)
+          else Right(())
         }
       }
     } yield {

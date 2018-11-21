@@ -5,7 +5,6 @@ import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.parser.Expressions.CONTRACT
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator, Serde}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.smart.script.Script
@@ -14,7 +13,7 @@ import com.wavesplatform.utils.{functionCosts, varNames}
 import monix.eval.Coeval
 
 object ScriptV1 {
-  val checksumLength = 4
+  val checksumLength         = 4
   private val maxComplexity  = 20 * functionCosts(V1)(FunctionHeader.Native(SIGVERIFY))()
   private val maxSizeInBytes = 8 * 1024
 
@@ -42,16 +41,12 @@ object ScriptV1 {
   }
 }
 
-
-object ScriptV2 {
-
-  private class ScriptV2(override val version: Version, override val expr: Contract) extends Script {
-    override type Expr = Contract
-    override val text: String = expr.toString
-    override val bytes: Coeval[ByteStr] =
-      Coeval.evalOnce {
-        val s = Array(version.toByte) ++ ContractSerDe.serialize(expr)
-        ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
-      }
-  }
+case class ScriptV2(override val version: Version, override val expr: Contract) extends Script {
+  override type Expr = Contract
+  override val text: String = expr.toString
+  override val bytes: Coeval[ByteStr] =
+    Coeval.evalOnce {
+      val s = Array(version.toByte) ++ ContractSerDe.serialize(expr)
+      ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
+    }
 }
