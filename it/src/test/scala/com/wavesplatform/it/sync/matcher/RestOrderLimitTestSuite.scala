@@ -2,11 +2,10 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.wavesplatform.it.sync._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
-import com.wavesplatform.it.sync.someAssetAmount
+import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{Node, ReportingTestName}
@@ -53,14 +52,12 @@ class RestOrderLimitTestSuite
 
   "Order History REST API methods should have limit for orders in response" in {
     val aliceAsset = alice
-      .issue(alice.address, "AliceCoin", "Test", someAssetAmount, 0, reissuable = false, 100000000L)
+      .issue(alice.address, "AliceCoin", "Test", someAssetAmount, 0, reissuable = false, issueFee)
       .id
-    matcher.waitForTransaction(aliceAsset)
-
     val bobAsset = bob
-      .issue(bob.address, "BobCoin", "Test", someAssetAmount, 0, reissuable = false, 100000000L)
+      .issue(bob.address, "BobCoin", "Test", someAssetAmount, 0, reissuable = false, issueFee)
       .id
-    matcher.waitForTransaction(bobAsset)
+    Seq(aliceAsset, bobAsset).foreach(matcher.waitForTransaction(_))
 
     val alicePair = AssetPair(decodeBase58(aliceAsset).toOption, None)
     val bobPair   = AssetPair(decodeBase58(bobAsset).toOption, None)

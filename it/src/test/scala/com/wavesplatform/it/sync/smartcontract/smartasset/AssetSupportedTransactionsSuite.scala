@@ -252,7 +252,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     assertBadRequestAndMessage(sender.burn(secondAddress, asset, 10, smartMinFee).id, errNotAllowedByToken)
   }
 
-  test("burn by some height") {
+  ignore("burn by some height") {
     val scr         = ScriptCompiler(s"""
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
