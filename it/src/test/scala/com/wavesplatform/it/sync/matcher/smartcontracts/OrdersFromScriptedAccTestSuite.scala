@@ -97,7 +97,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 }
 
 object OrdersFromScriptedAccTestSuite {
-  val ActivationHeight = 25
+  val ActivationHeight = 22
 
   import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 

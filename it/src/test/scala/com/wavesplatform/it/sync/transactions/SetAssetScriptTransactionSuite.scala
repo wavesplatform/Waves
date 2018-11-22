@@ -233,7 +233,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(assetUnchangeableScript)
 
     assertBadRequestAndResponse(sender.setAssetScript(assetUnchangeableScript, firstAddress, setAssetScriptFee, Some(scriptBase64)),
-                                "Transaction is not allowed by token-script")
+                                errNotAllowedByToken)
   }
 
   test("non-issuer can change script if issuer's account script allows (proof correct)") {
@@ -298,8 +298,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       nonIssuerUnsignedTx2.copy(proofs = Proofs(Seq(sigTxB2)))
 
     assertBadRequestAndMessage(
-      sender.signedBroadcast(signedTxByB2.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))).id,
-      "Transaction is not allowed by token-script"
+      sender.signedBroadcast(signedTxByB2.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))),
+      errNotAllowedByToken
     )
   }
 

@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.transaction.DataTransaction
 
 package object smartcontract {
-  def cryptoContextScript =
-    Some(s"""
+  def cryptoContextScript: String =
+    s"""
        |match tx {
        |  case ext : ExchangeTransaction =>
        |    # Crypto context
@@ -15,10 +15,10 @@ package object smartcontract {
        |  case s : SetScriptTransaction => true
        |  case _ => false
        |}
-     """.stripMargin)
+     """.stripMargin
 
-  def pureContext(dtx: DataTransaction) =
-    Some(s"""
+  def pureContextScript(dtx: DataTransaction): String =
+    s"""
        | match tx {
        |  case ext : ExchangeTransaction =>
        |    # Pure context
@@ -60,10 +60,10 @@ package object smartcontract {
        |  case s : SetScriptTransaction => true
        |  case _ => false
        | }
-     """.stripMargin)
+     """.stripMargin
 
-  def wavesContext(dtx: DataTransaction) =
-    Some(s"""
+  def wavesContextScript(dtx: DataTransaction): String =
+    s"""
        | match tx {
        |  case ext : ExchangeTransaction =>
        |    # Waves context
@@ -105,5 +105,5 @@ package object smartcontract {
        |  case s : SetScriptTransaction => true
        |  case _ => false
        | }
-     """.stripMargin)
+     """.stripMargin
 }

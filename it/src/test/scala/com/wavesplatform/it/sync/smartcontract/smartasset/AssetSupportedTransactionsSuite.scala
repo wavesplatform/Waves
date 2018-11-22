@@ -416,8 +416,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
   }
 
-  test("try to use not asset supported transaction") {
-
+  test("try to send transactions forbidden by the asset's script") {
     val assetWOSupport = sender
       .issue(
         firstAddress,
@@ -439,6 +438,10 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     assertBadRequestAndMessage(sender.reissue(firstAddress, assetWOSupport, someAssetAmount, true, issueFee + smartExtraFee).id,
                                "Asset is not reissuable")
 
-  }
+    val transfers = List(Transfer(firstAddress, 10))
+    assertBadRequestAndMessage(
+      sender.massTransfer(firstAddress, transfers, calcMassTransferFee(transfers.size) + smartExtraFee, Some(assetWOSupport)).id,
+      errNotAllowedByToken)
 
+  }
 }

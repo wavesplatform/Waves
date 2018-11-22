@@ -217,8 +217,11 @@ object SyncHttpApi extends Assertions {
     def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: Byte = 1): Transaction =
       sync(async(n).cancelLease(sourceAddress, leaseId, fee))
 
-    def signedBroadcast(tx: JsObject): Transaction =
-      sync(async(n).signedBroadcast(tx))
+    def signedBroadcast(tx: JsObject, waitForTx: Boolean = false): Transaction = {
+      val res = sync(async(n).signedBroadcast(tx))
+      if (waitForTx) waitForTransaction(res.id)
+      res
+    }
 
     def signedIssue(tx: SignedIssueV1Request): Transaction =
       sync(async(n).signedIssue(tx))
@@ -238,8 +241,11 @@ object SyncHttpApi extends Assertions {
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
       sync(async(n).waitForTransaction(txId))
 
-    def signAndBroadcast(tx: JsObject): Transaction =
-      sync(async(n).signAndBroadcast(tx))
+    def signAndBroadcast(tx: JsObject, waitForTx: Boolean = false): Transaction = {
+      val res = sync(async(n).signAndBroadcast(tx))
+      if (waitForTx) waitForTransaction(res.id)
+      res
+    }
 
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)

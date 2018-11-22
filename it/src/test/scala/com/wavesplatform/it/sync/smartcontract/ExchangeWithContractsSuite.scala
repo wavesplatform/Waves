@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -13,7 +12,7 @@ import org.scalatest.CancelAfterFailure
 import play.api.libs.json._
 import scorex.crypto.encode.Base64
 
-class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
+class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val acc0 = pkByAddress(firstAddress)
   private val acc1 = pkByAddress(secondAddress)
   private val acc2 = pkByAddress(thirdAddress)
@@ -51,9 +50,9 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("set contracts and put exchange transaction in blockchain") {
-    val sc4 = cryptoContextScript
-    val sc5 = pureContext(dtx)
-    val sc6 = wavesContext(dtx)
+    val sc4 = Some(cryptoContextScript)
+    val sc5 = Some(pureContextScript(dtx))
+    val sc6 = Some(wavesContextScript(dtx))
 
     for ((contr1, contr2, mcontr) <- Seq(
            (sc1, sc1, sc1),
