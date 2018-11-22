@@ -302,7 +302,11 @@ class MinerImpl(allChannels: ChannelGroup,
         ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
         calculatedOffset = ts - timeService.correctedTime()
         offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
-      } yield offset
+        quorumAvailable  = checkQuorumAvailable().isRight
+      } yield {
+        if (quorumAvailable) offset
+        else offset.max(5.seconds)
+      }
     } match {
       case Right(offset) =>
         log.debug(s"Next attempt for acc=$account in $offset")
@@ -321,11 +325,6 @@ class MinerImpl(allChannels: ChannelGroup,
                   if (ngEnabled && !totalConstraint.isEmpty) startMicroBlockMining(account, block, estimators, totalConstraint)
                 case Right(None) => log.warn("Newly created block has already been appended, should not happen")
               }
-
-          case Left(err) if err contains "Quorum not available" =>
-            log.debug(s"$err. Next attempt in 5 seconds")
-            generateBlockTask(account)
-              .delayExecution(5.seconds)
 
           case Left(err) =>
             log.debug(s"No block generated because $err, retrying")
