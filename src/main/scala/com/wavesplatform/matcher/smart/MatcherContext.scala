@@ -19,18 +19,19 @@ import monix.eval.Coeval
 
 object MatcherContext {
 
-  def build(version: ScriptVersion, nByte: Byte, in: Coeval[Order]): EvaluationContext = {
+  def build(version: ScriptVersion, nByte: Byte, in: Coeval[Order], proofsEnabled: Boolean): EvaluationContext = {
     val baseContext = Monoid.combine(PureContext.build(version), CryptoContext.build(Global)).evaluationContext
 
     val inputEntityCoeval: Coeval[Either[String, CaseObj]] =
-      Coeval.defer(in.map(o => Right(orderObject(RealTransactionWrapper.ord(o)))))
+      Coeval.defer(in.map(o => Right(orderObject(RealTransactionWrapper.ord(o), proofsEnabled))))
 
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
     val buyOrdTypeCoeval: Coeval[Either[String, CaseObj]]  = Coeval(Right(ordType(OrdType.Buy)))
 
     val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Left("height is inaccessible when running script on matcher"))
 
-    val matcherTypes = Seq(addressType, orderType, assetPairType)
+    val orderType: CaseType = buildOrderType(proofsEnabled)
+    val matcherTypes        = Seq(addressType, orderType, assetPairType)
 
     val matcherVars: Map[String, ((FINAL, String), LazyVal)] = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "undefined height placeholder"), LazyVal(EitherT(heightCoeval)))),
