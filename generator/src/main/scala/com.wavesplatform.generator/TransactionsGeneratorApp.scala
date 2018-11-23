@@ -131,6 +131,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         opt[Boolean]("complexity").abbr("ct").optional().text(" script complexity").action { (x, c) =>
           c.copy(swarm = c.swarm.copy(complexity = x))
         },
+        opt[Int]("exchange").abbr("et").optional().text("number of exchange transactions").action { (x, c) =>
+          c.copy(swarm = c.swarm.copy(exchange = x))
+        },
       )
   }
 

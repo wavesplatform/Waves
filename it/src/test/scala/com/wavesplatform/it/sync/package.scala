@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Base58
 
 package object sync {
-  val smartExtraFee              = 0.004.waves
+  val smartFee                   = 0.004.waves
   val minFee                     = 0.001.waves
   val leasingFee                 = 0.002.waves
   val issueFee                   = 1.waves
@@ -22,8 +22,9 @@ package object sync {
   val massTransferFeePerTransfer = 0.0005.waves
   val someAssetAmount            = 9999999999999l
   val matcherFee                 = 0.003.waves
+  val orderFee                   = matcherFee
   val smartMatcherFee            = 0.007.waves
-  val smartMinFee                = minFee + smartExtraFee
+  val smartMinFee                = minFee + smartFee
 
   def calcDataFee(data: List[DataEntry[_]]): Long = {
     val dataSize = data.map(_.toBytes.length).sum + 128
