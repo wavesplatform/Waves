@@ -74,6 +74,11 @@ object SyncHttpApi extends Assertions {
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
+    private def maybeWaitForTransaction(tx: Transaction, wait: Boolean = false): Transaction = {
+      if (wait) waitForTransaction(tx.id)
+      tx
+    }
+
     def get(path: String): Response =
       sync(async(n).get(path))
 
@@ -132,9 +137,7 @@ object SyncHttpApi extends Assertions {
               version: Byte = 1,
               script: Option[String] = None,
               waitForTx: Boolean = false): Transaction = {
-      val res = sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script))
-      if (waitForTx) waitForTransaction(res.id)
-      res
+      maybeWaitForTransaction(sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script)), waitForTx)
     }
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
@@ -152,8 +155,9 @@ object SyncHttpApi extends Assertions {
     def scriptCompile(code: String): CompiledScript =
       sync(async(n).scriptCompile(code))
 
-    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Transaction =
-      sync(async(n).burn(sourceAddress, assetId, quantity, fee))
+    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).burn(sourceAddress, assetId, quantity, fee)), waitForTx)
+    }
 
     def getAddresses: Seq[String] = sync(async(n).getAddresses)
 
@@ -165,8 +169,9 @@ object SyncHttpApi extends Assertions {
         Json.obj("type" -> 6, "quantity" -> quantity, "assetId" -> assetId, "sender" -> sourceAddress, "fee" -> fee, "version" -> version))
     }
 
-    def sponsorAsset(sourceAddress: String, assetId: String, baseFee: Long, fee: Long): Transaction =
-      sync(async(n).sponsorAsset(sourceAddress, assetId, baseFee, fee))
+    def sponsorAsset(sourceAddress: String, assetId: String, baseFee: Long, fee: Long, waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).sponsorAsset(sourceAddress, assetId, baseFee, fee)), waitForTx)
+    }
 
     def cancelSponsorship(sourceAddress: String, assetId: String, fee: Long): Transaction =
       sync(async(n).cancelSponsorship(sourceAddress, assetId, fee))
@@ -188,13 +193,16 @@ object SyncHttpApi extends Assertions {
                  feeAssetId: Option[String] = None,
                  version: Byte = 1,
                  waitForTx: Boolean = false): Transaction = {
-      val res = sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version))
-      if (waitForTx) waitForTransaction(res.id)
-      res
+      maybeWaitForTransaction(sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version)), waitForTx)
     }
 
-    def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Transaction =
-      sync(async(n).massTransfer(sourceAddress, transfers, fee, assetId))
+    def massTransfer(sourceAddress: String,
+                     transfers: List[Transfer],
+                     fee: Long,
+                     assetId: Option[String] = None,
+                     waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).massTransfer(sourceAddress, transfers, fee, assetId)), waitForTx)
+    }
 
     def lease(sourceAddress: String, recipient: String, leasingAmount: Long, leasingFee: Long, version: Byte = 1): Transaction =
       sync(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee))
@@ -218,9 +226,7 @@ object SyncHttpApi extends Assertions {
       sync(async(n).cancelLease(sourceAddress, leaseId, fee))
 
     def signedBroadcast(tx: JsObject, waitForTx: Boolean = false): Transaction = {
-      val res = sync(async(n).signedBroadcast(tx))
-      if (waitForTx) waitForTransaction(res.id)
-      res
+      maybeWaitForTransaction(sync(async(n).signedBroadcast(tx)), waitForTx)
     }
 
     def signedIssue(tx: SignedIssueV1Request): Transaction =
@@ -239,12 +245,10 @@ object SyncHttpApi extends Assertions {
       sync(async(n).rawTransactionInfo(txId))
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
-      sync(async(n).waitForTransaction(txId))
+      sync(async(n).waitForTransaction(txId, retryInterval))
 
     def signAndBroadcast(tx: JsObject, waitForTx: Boolean = false): Transaction = {
-      val res = sync(async(n).signAndBroadcast(tx))
-      if (waitForTx) waitForTransaction(res.id)
-      res
+      maybeWaitForTransaction(sync(async(n).signAndBroadcast(tx)), waitForTx)
     }
 
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
@@ -290,9 +294,7 @@ object SyncHttpApi extends Assertions {
       sync(async(n).connect(address))
 
     def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None, waitForTx: Boolean = false): Transaction = {
-      val res = sync(async(n).setAssetScript(assetId, sender, fee, script))
-      if (waitForTx) waitForTransaction(res.id)
-      res
+      maybeWaitForTransaction(sync(async(n).setAssetScript(assetId, sender, fee, script)), waitForTx)
     }
   }
 

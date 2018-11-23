@@ -8,6 +8,7 @@ import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, EitherExt2, IntegerDataEntry, StringDataEntry}
 import org.slf4j.LoggerFactory
 import com.wavesplatform.account.{Alias, PrivateKeyAccount}
+import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.utils.LoggerFacade
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -40,6 +41,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
   override def next(): Iterator[Transaction] = generate(settings.transactions).toIterator
 
   def generate(n: Int): Seq[Transaction] = {
+    Universe.AccountsWithBalances
     val issueTransactionSender = randomFrom(accounts).get
     val tradeAssetIssue = IssueTransactionV1
       .selfSigned(
