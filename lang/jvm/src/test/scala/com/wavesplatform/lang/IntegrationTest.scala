@@ -7,7 +7,7 @@ import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LONG}
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompilerV1, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -124,7 +124,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
-      Monoid.combine(PureContext.build(V1), CTX(sampleTypes, stringToTuple, Array.empty))
+      Monoid.combineAll(Seq(PureContext.build(V1), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
     val typed = ExpressionCompilerV1(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
@@ -346,6 +346,28 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       )
     )
     ev[CONST_LONG](context, expr) shouldBe evaluated(8)
+  }
+
+  property("list constructor primitive") {
+    val src =
+      """
+        |List(1,2)
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2))
+  }
+
+  property("list constructor for different data entries") {
+    val src =
+      """
+        |let x = DataEntry("foo",1)
+        |let y = DataEntry("bar","2")
+        |List(x,y)
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(
+      ARR(Vector(
+        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("foo"), "value" -> CONST_LONG(1))),
+        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("bar"), "value" -> CONST_STRING("2")))
+      )))
   }
 
 }
