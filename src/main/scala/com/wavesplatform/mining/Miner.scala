@@ -192,7 +192,7 @@ class MinerImpl(allChannels: ChannelGroup,
     val pc = allChannels.size()
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}), not forging microblock with ${account.address}, next attempt in 5 seconds")
-      Task.now(Delay(5.seconds))
+      Task.now(Delay(settings.minerSettings.noQuorumMiningDelay))
     } else if (utx.size == 0) {
       log.trace(s"Skipping microBlock because utx is empty")
       Task.now(Retry)
@@ -305,7 +305,7 @@ class MinerImpl(allChannels: ChannelGroup,
         quorumAvailable  = checkQuorumAvailable().isRight
       } yield {
         if (quorumAvailable) offset
-        else offset.max(5.seconds)
+        else offset.max(settings.minerSettings.noQuorumMiningDelay)
       }
     } match {
       case Right(offset) =>
