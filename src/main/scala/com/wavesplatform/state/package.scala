@@ -18,37 +18,36 @@ package object state {
       b: Blockchain,
       d: Option[Diff])(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] = {
 
-    def transactionsFromDiff(d: Diff): Iterable[(Int, Transaction, Set[Address])] = d.transactions.values.view
+    def transactionsFromDiff(d: Diff): Seq[(Int, Transaction, Set[Address])] = d.transactions.values.view.toSeq.reverse
 
-    def withPagination(s: Iterable[(Int, Transaction, Set[Address])]): Iterable[(Int, Transaction, Set[Address])] =
+    def withPagination(s: Seq[(Int, Transaction, Set[Address])]): Seq[(Int, Transaction, Set[Address])] =
       fromId match {
         case None     => s
-        case Some(id) => s.dropWhile(_._2.id() == id).drop(1)
+        case Some(id) => s.dropWhile(_._2.id() != id).drop(1)
       }
 
-    def withFilterAndLimit(txs: Iterable[(Int, Transaction, Set[Address])]): Seq[(Int, Transaction)] =
+    def withFilterAndLimit(txs: Seq[(Int, Transaction, Set[Address])]): Seq[(Int, Transaction)] =
       txs
         .collect {
           case (height, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder.typeId)) => (height, tx)
         }
         .take(count)
-        .toSeq
 
-    def withRestFromBlockchain(s: Seq[(Int, Transaction)]): Seq[(Int, Transaction)] =
+    def withRestFromBlockchain(s: Seq[(Int, Transaction)]): Either[String, Seq[(Int, Transaction)]] =
       s.length match {
-        case `count`        => s
-        case l if l < count => s ++ b.addressTransactions(address, types, count - l, None).getOrElse(Seq.empty)
-        case _              => s.take(count)
+        case `count`        => Right(s)
+        case l if l < count => b.addressTransactions(address, types, count - l, None).map(s ++ _)
+        case _              => Right(s.take(count))
       }
 
-    def transactions: Diff => Seq[(Int, Transaction)] =
+    def transactions: Diff => Either[String, Seq[(Int, Transaction)]] =
       withRestFromBlockchain _ compose withFilterAndLimit compose withPagination compose transactionsFromDiff
 
     d.fold(b.addressTransactions(address, types, count, fromId)) { diff =>
       fromId match {
         case Some(id) if !diff.transactions.contains(id) =>
           b.addressTransactions(address, types, count, fromId)
-        case _ => Right(transactions(diff))
+        case _ => transactions(diff)
       }
     }
   }

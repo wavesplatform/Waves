@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.smartcontract
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange._
@@ -18,9 +17,10 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
   private val acc2 = pkByAddress(thirdAddress)
 
   var exchAsset: String    = ""
-  var dtx: DataTransaction = null
+  var dtx: DataTransaction = _
+  var pair: AssetPair      = _
 
-  val sc1 = Some(s"""true""")
+  val sc1 = Some(s"true")
   val sc2 = Some(s"""
                |match tx {
                |  case s : SetScriptTransaction => true
@@ -34,19 +34,28 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
+
     exchAsset = sender
-      .issue(acc0.address, "ExchangeCoin", "ExchangeCoin for tests with exchange transaction", someAssetAmount, 0, reissuable = false, issueFee, 2)
+      .issue(acc0.address,
+             "ExchangeCoin",
+             "ExchangeCoin for tests with exchange transaction",
+             someAssetAmount,
+             0,
+             reissuable = false,
+             issueFee,
+             2,
+             waitForTx = true)
       .id
-    nodes.waitForHeightAriseAndTxPresent(exchAsset)
+
+    pair = AssetPair.createAssetPair(exchAsset, "WAVES").get
 
     val entry1 = IntegerDataEntry("int", 24)
-    val entry2 = BooleanDataEntry("bool", true)
+    val entry2 = BooleanDataEntry("bool", value = true)
     val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
     val entry4 = StringDataEntry("str", "test")
 
-    dtx = DataTransaction.selfSigned(1, acc0, List(entry1, entry2, entry3, entry4), 0.001.waves, NTP.correctedTime()).explicitGet()
-    val dtxId = sender.signedBroadcast(dtx.json()).id
-    nodes.waitForHeightAriseAndTxPresent(dtxId)
+    dtx = DataTransaction.selfSigned(1, acc0, List(entry1, entry2, entry3, entry4), minFee, NTP.correctedTime()).explicitGet()
+    sender.signedBroadcast(dtx.json(), waitForTx = true)
   }
 
   test("set contracts and put exchange transaction in blockchain") {
@@ -69,10 +78,8 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         (mcontr, acc2),
       )
 
-      val tx = exchangeTx()
+      sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, acc1, acc0, acc2)).id
 
-      val txId = sender.signedBroadcast(tx).id
-      nodes.waitForHeightAriseAndTxPresent(txId)
       //TODO : add assert balances
     }
 
@@ -96,8 +103,8 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         (mcontr, acc2),
       )
 
-      val tx = exchangeTx()
-      assertBadRequestAndMessage(sender.signedBroadcast(tx), "Transaction is not allowed by account-script")
+      assertBadRequestAndMessage(sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, acc1, acc0, acc2)),
+                                 "Transaction is not allowed by account-script")
       //TODO : add assert balances
     }
     setContracts(
@@ -117,7 +124,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         (mcontr, acc2),
       )
 
-      val tx = exchangeTx()
+      val tx = exchangeTx(pair, smartMatcherFee, orderFee, acc1, acc0, acc2)
       assertBadRequestAndMessage(sender.signedBroadcast(tx), "Error while executing account-script: Some generic error")
       //TODO : add assert balances
     }
@@ -140,11 +147,10 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         (mcontr, acc2),
       )
 
-      val mf        = 700000L
       val matcher   = acc2
       val sellPrice = (0.50 * Order.PriceConstant).toLong
-      val buy       = orders(1)._1
-      val sell      = orders(2)._2
+      val buy       = orders(pair, 1, orderFee, acc1, acc0, acc2)._1
+      val sell      = orders(pair, 2, orderFee, acc1, acc0, acc2)._2
 
       val amount = math.min(buy.amount, sell.amount)
       val tx = ExchangeTransactionV2
@@ -154,9 +160,9 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
           sellOrder = sell,
           amount = amount,
           price = sellPrice,
-          buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
-          sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
-          fee = mf,
+          buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,
+          sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong,
+          fee = smartMatcherFee,
           timestamp = NTP.correctedTime()
         )
         .explicitGet()
@@ -175,20 +181,19 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
   }
 
   test("negative: check orders v2 with exchange tx v1") {
-    val tx        = exchangeTx()
+    val tx        = exchangeTx(pair, smartMatcherFee, orderFee, acc1, acc0, acc2)
     val sig       = (Json.parse(tx.toString()) \ "proofs").as[Seq[JsString]].head
     val changedTx = tx + ("version" -> JsNumber(1)) + ("signature" -> sig)
-    assertBadRequestAndMessage(sender.signedBroadcast(changedTx).id, "can only contain orders of version 1", 400)
+    assertBadRequestAndMessage(sender.signedBroadcast(changedTx), "can only contain orders of version 1", 400)
   }
 
   test("negative: exchange tx v2 and order v1 from scripted acc") {
     setContracts((sc1, acc0))
 
-    val mf        = 700000L
     val matcher   = acc2
     val sellPrice = (0.50 * Order.PriceConstant).toLong
-    val buy       = orders(2)._1
-    val sell      = orders(1)._2
+    val buy       = orders(pair, 2, orderFee, acc1, acc0, acc2)._1
+    val sell      = orders(pair, 1, orderFee, acc1, acc0, acc2)._2
 
     val amount = math.min(buy.amount, sell.amount)
     val tx = ExchangeTransactionV2
@@ -198,63 +203,15 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         sellOrder = sell,
         amount = amount,
         price = sellPrice,
-        buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
-        sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
-        fee = mf,
+        buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,
+        sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong,
+        fee = smartMatcherFee,
         timestamp = NTP.correctedTime()
       )
       .explicitGet()
       .json()
 
-    assertBadRequestAndMessage(sender.signedBroadcast(tx).id, "Reason: Can't process order with signature from scripted account")
-  }
-
-  private def exchangeTx(isSmart: Boolean = true) = {
-    val matcher   = acc2
-    val sellPrice = (0.50 * Order.PriceConstant).toLong
-    val buy       = orders(2, isSmart)._1
-    val sell      = orders(2, isSmart)._2
-
-    val amount = math.min(buy.amount, sell.amount)
-
-    val matcherFee     = if (isSmart) 1500000 else 700000L
-    val sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong
-    val buyMatcherFee  = matcherFee - sellMatcherFee
-
-    val tx = ExchangeTransactionV2
-      .create(
-        matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
-        amount = amount,
-        price = sellPrice,
-        buyMatcherFee = buyMatcherFee,
-        sellMatcherFee = sellMatcherFee,
-        fee = matcherFee,
-        timestamp = NTP.correctedTime()
-      )
-      .explicitGet()
-      .json()
-
-    tx
-  }
-
-  private def orders(version: Byte, isSmart: Boolean = true) = {
-    val buyer               = acc1
-    val seller              = acc0
-    val matcher             = acc2
-    val time                = NTP.correctedTime()
-    val expirationTimestamp = time + Order.MaxLiveTime
-    val buyPrice            = 1 * Order.PriceConstant
-    val sellPrice           = (0.50 * Order.PriceConstant).toLong
-    val mf                  = if (isSmart) 1500000L else 700000L
-    val buyAmount           = 2
-    val sellAmount          = 3
-    val assetPair           = AssetPair.createAssetPair(exchAsset, "WAVES").get
-    val buy                 = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, time, expirationTimestamp, mf, version)
-    val sell                = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, time, expirationTimestamp, mf, version)
-
-    (buy, sell)
+    assertBadRequestAndMessage(sender.signedBroadcast(tx), "Reason: Can't process order with signature from scripted account")
   }
 
 }
