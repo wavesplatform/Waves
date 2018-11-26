@@ -94,7 +94,7 @@ package object utils extends ScorexLogging {
           .combineAll(Seq(
             PureContext.build(version),
             CryptoContext.build(Global),
-            WavesContext.build(version, new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain), true)
+            WavesContext.build(version, new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain), true, true)
           )))
     }
     .toMap

@@ -18,7 +18,8 @@ object ScriptRunner {
                             in: Transaction :+: Order :+: CNil,
                             blockchain: Blockchain,
                             script: Script,
-                            proofsEnabled: Boolean): (ExprEvaluator.Log, Either[ExecutionError, A]) = {
+                            proofsEnabled: Boolean,
+                            orderEnabled: Boolean): (ExprEvaluator.Log, Either[ExecutionError, A]) = {
     script match {
       case Script.Expr(expr) =>
         val ctx = BlockchainContext.build(
@@ -27,7 +28,8 @@ object ScriptRunner {
           Coeval.evalOnce(in),
           Coeval.evalOnce(height),
           blockchain,
-          proofsEnabled
+          proofsEnabled,
+          orderEnabled
         )
         EvaluatorV1.applywithLogging[A](ctx, expr)
 
