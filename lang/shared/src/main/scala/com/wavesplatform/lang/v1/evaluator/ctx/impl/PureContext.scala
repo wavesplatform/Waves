@@ -13,7 +13,6 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import scodec.bits.ByteVector
 
-import scala.collection.immutable
 import scala.util.Try
 
 object PureContext {

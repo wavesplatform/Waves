@@ -5,6 +5,7 @@ import com.wavesplatform.account.PublicKeyAccount._
 import com.wavesplatform.account._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -16,7 +17,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{ContractInvokationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
@@ -519,6 +520,25 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
   } yield {
     tx
   }
+
+  val argGen: Gen[EXPR] = Gen.const(CONST_LONG(11))
+
+  val funcCallGen = for {
+    functionName <- genBoundedString(1, 32).map(_.toString)
+    amt          <- Gen.choose(0, 10)
+    args         <- Gen.listOfN(amt, argGen)
+
+  } yield FUNCTION_CALL(FunctionHeader.User(functionName), args)
+
+  val contractInvokationGen = for {
+    sender          <- accountGen
+    contractAddress <- accountGen
+    version         <- Gen.oneOf(ContractInvokationTransaction.supportedVersions.toSeq)
+    fc              <- funcCallGen
+    chainId = AddressScheme.current.chainId
+    fee       <- smallFeeGen
+    timestamp <- timestampGen
+  } yield ContractInvokationTransaction.selfSigned(version, sender, contractAddress, fc, fee, timestamp).explicitGet()
 
   val priceGen: Gen[Long]            = Gen.choose(1, 3 * 100000L * 100000000L)
   val matcherAmountGen: Gen[Long]    = Gen.choose(1, 3 * 100000L * 100000000L)

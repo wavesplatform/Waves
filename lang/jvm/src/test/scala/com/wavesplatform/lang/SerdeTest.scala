@@ -95,7 +95,7 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
 
   "spec input" in {
     val byteArr   = Array[Byte](1, 113, -1, 63, 0, -1, 127, 0, -1, 39, -1, 87, -41, 50, -111, -38, 12, 1, 0, -19, 101, -128, -1, 54)
-    val (r, time) = measureTime(Serde.deserialize(byteArr))
+    val (r, time) = measureTime(Serde.deserialize(byteArr).map(_._1))
 
     r shouldBe an[Either[_, _]]
     time should be <= 1000L
@@ -103,7 +103,7 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
 
   "any input" in {
     forAll(Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)) { byteArr =>
-      val (r, time) = measureTime(Serde.deserialize(byteArr))
+      val (r, time) = measureTime(Serde.deserialize(byteArr).map(_._1))
 
       r shouldBe an[Either[_, _]]
       time should be <= 1000L
@@ -125,7 +125,7 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     val encoded = Serde.serialize(typedExpr)
     encoded.nonEmpty shouldBe true
 
-    val decoded = Serde.deserialize(encoded).explicitGet()
+    val decoded = Serde.deserialize(encoded).map(_._1).explicitGet()
     withClue(s"encoded bytes: [${encoded.mkString(", ")}]") {
       decoded shouldEqual typedExpr
     }

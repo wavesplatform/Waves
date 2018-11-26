@@ -30,7 +30,7 @@ object ScriptReader {
       s <- if (sv == V1 || sv == V2)
         for {
           _     <- ScriptV1.validateBytes(scriptBytes)
-          bytes <- Serde.deserialize(scriptBytes)
+          bytes <- Serde.deserialize(scriptBytes).map(_._1)
           s     <- ScriptV1(sv, bytes, checkSize = false)
         } yield s
       else

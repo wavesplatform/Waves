@@ -51,10 +51,6 @@ object ContractSerDe {
     } yield Contract(decs, cfs, vf)
   }
 
-  //
-  // ANNOTATIONS
-  //
-
   private[lang] def serializeAnnotation(out: ByteArrayOutputStream, a: Annotation): Unit = {
     a match {
       case c: CallableAnnotation =>
@@ -102,10 +98,6 @@ object ContractSerDe {
     out.writeString(v.txArgName)
   }
 
-  //
-  // DECLARATIONS
-  //
-
   private[lang] def serializeDeclaration(out: ByteArrayOutputStream, d: DECLARATION): Unit = {
     d match {
       case l: LET =>
@@ -137,8 +129,8 @@ object ContractSerDe {
   private[lang] def deserializeLET(bb: ByteBuffer): Either[String, LET] = {
     for {
       name <- tryEi(bb.getString)
-      body <- deserializeFromArray(bb, Serde.deserialize)
-    } yield LET(name, body)
+      body <- deserializeFromArray(bb, Serde.deserialize(_, all = true))
+    } yield LET(name, body._1)
   }
 
   private[lang] def serializeFUNC(out: ByteArrayOutputStream, f: FUNC): Unit = {
@@ -157,13 +149,9 @@ object ContractSerDe {
       argc <- tryEi(bb.getInt)
       args <- (1 to argc).toList
         .traverse[G, String](_ => tryEi(bb.getString))
-      expr <- deserializeFromArray(bb, Serde.deserialize)
-    } yield FUNC(name, args, expr)
+      expr <- deserializeFromArray(bb, Serde.deserialize(_, all = true))
+    } yield FUNC(name, args, expr._1)
   }
-
-  //
-  // CONTRACT FUNCTION
-  //
 
   private[lang] def serializeContractFunction(out: ByteArrayOutputStream, cf: ContractFunction): Unit = {
     serializeCallAnnotation(out, cf.c)
@@ -188,10 +176,6 @@ object ContractSerDe {
     } yield ContractFunction(ca, pa, cf)
   }
 
-  //
-  // VERIFIER FUNCTION
-  //
-
   def serializeVerifierFunction(out: ByteArrayOutputStream, vf: VerifierFunction): Unit = {
     serializeVerifiableAnnotation(out, vf.v)
     serializeFUNC(out, vf.u)
@@ -203,10 +187,6 @@ object ContractSerDe {
       f <- deserializeFUNC(bb)
     } yield VerifierFunction(a, f)
   }
-
-  //
-  // HELPERS
-  //
 
   private[lang] def deserializeList[A](bb: ByteBuffer, df: ByteBuffer => Either[String, A]): Either[String, List[A]] =
     (1 to bb.getInt).toList

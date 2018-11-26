@@ -30,7 +30,7 @@ object Serde {
   val DEC_LET  = 0
   val DEC_FUNC = 1
 
-  def deserialize(bytes: Array[Byte]): Either[String, EXPR] = {
+  def deserialize(bytes: Array[Byte], all: Boolean = true): Either[String, (EXPR, Int)] = {
     import cats.instances.list._
     import cats.syntax.apply._
     import cats.syntax.traverse._
@@ -73,12 +73,14 @@ object Serde {
       }
     }
 
-    Try(aux().value).toEither.left
+    val res = Try(aux().value).toEither.left
       .map(_.getMessage)
-      .flatMap { r =>
-        if (bb.hasRemaining) Left(s"${bb.remaining()} bytes left")
-        else Right(r)
-      }
+    (if (all)
+       res.flatMap { r =>
+         if (bb.hasRemaining) Left(s"${bb.remaining()} bytes left")
+         else Right(r)
+       } else res)
+      .map((_, bb.remaining()))
   }
 
   private def serializeDeclaration(bb: ByteArrayOutputStream, dec: DECLARATION, aux: EXPR => Coeval[Unit]): Coeval[Unit] = {
