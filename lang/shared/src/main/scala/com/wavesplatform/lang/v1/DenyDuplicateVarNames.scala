@@ -14,7 +14,7 @@ object DenyDuplicateVarNames {
       case '$' => Right(declared)
       case '@' => Left("VarNames: Can't declare var starting with @")
       case _ =>
-        Either.cond(!(declared contains name), declared + name, s"VarNames: duplicate variable names are temporarily denied: '$name'")
+        Either.cond(!(declared contains name), declared + name, throw new Exception(s"VarNames: duplicate variable names are temporarily denied: '$name'"))
     }
 
     def aux(t: DenyDuplicates[EXPR], declared: Set[String]): DenyDuplicates[Set[String]] = {
