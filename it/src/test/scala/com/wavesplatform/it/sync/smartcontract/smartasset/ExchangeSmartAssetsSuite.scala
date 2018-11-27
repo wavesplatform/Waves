@@ -108,9 +108,12 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
       setContracts((sc1, acc0), (sc1, acc1), (sc1, acc2))
 
       assertBadRequestAndMessage(
-        sender.signedBroadcast(exchangeTx(smartAssetPair, smartMatcherFee + 2 * smartFee, smartMatcherFee + 2 * smartFee, acc1, acc0, acc2)),
+        sender.signedBroadcast(exchangeTx(smartAssetPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, acc1, acc0, acc2)),
         "com.wavesplatform.transaction.assets.exchange.ExchangeTransactionV2 does not exceed minimal value of 1500000"
       )
+
+      sender.signedBroadcast(exchangeTx(smartAssetPair, smartMatcherFee + 2 * smartFee, smartMatcherFee + 2 * smartFee, acc1, acc0, acc2),
+                             waitForTx = true)
       setContracts((None, acc0), (None, acc1), (None, acc2))
     }
 

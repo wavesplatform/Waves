@@ -6,13 +6,13 @@ import cats.kernel.Monoid
 import com.google.common.base.Throwables
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.{Global, ScriptVersion}
-import com.wavesplatform.state._
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
+import com.wavesplatform.lang.{Global, ScriptVersion}
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
@@ -94,7 +94,7 @@ package object utils extends ScorexLogging {
           .combineAll(Seq(
             PureContext.build(version),
             CryptoContext.build(Global),
-            WavesContext.build(version, new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain))
+            WavesContext.build(version, new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain), true)
           )))
     }
     .toMap

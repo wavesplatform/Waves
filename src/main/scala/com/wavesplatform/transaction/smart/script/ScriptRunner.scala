@@ -17,7 +17,8 @@ object ScriptRunner {
   def apply[A <: EVALUATED](height: Int,
                             in: Transaction :+: Order :+: CNil,
                             blockchain: Blockchain,
-                            script: Script): (ExprEvaluator.Log, Either[ExecutionError, A]) =
+                            script: Script,
+                            proofsEnabled: Boolean): (ExprEvaluator.Log, Either[ExecutionError, A]) = {
     script match {
       case Script.Expr(expr) =>
         val ctx = BlockchainContext.build(
@@ -25,11 +26,12 @@ object ScriptRunner {
           AddressScheme.current.chainId,
           Coeval.evalOnce(in),
           Coeval.evalOnce(height),
-          blockchain
+          blockchain,
+          proofsEnabled
         )
         EvaluatorV1.applywithLogging[A](ctx, expr)
 
       case _ => (List.empty, "Unsupported script version".asLeft[A])
     }
-
+  }
 }

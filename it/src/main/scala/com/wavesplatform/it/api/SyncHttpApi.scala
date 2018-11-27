@@ -74,7 +74,7 @@ object SyncHttpApi extends Assertions {
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
-    private def maybeWaitForTransaction(tx: Transaction, wait: Boolean = false): Transaction = {
+    private def maybeWaitForTransaction(tx: Transaction, wait: Boolean): Transaction = {
       if (wait) waitForTransaction(tx.id)
       tx
     }
@@ -245,7 +245,7 @@ object SyncHttpApi extends Assertions {
       sync(async(n).rawTransactionInfo(txId))
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
-      sync(async(n).waitForTransaction(txId, retryInterval))
+      sync(async(n).waitForTransaction(txId))
 
     def signAndBroadcast(tx: JsObject, waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).signAndBroadcast(tx)), waitForTx)

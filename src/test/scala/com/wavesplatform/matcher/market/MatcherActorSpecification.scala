@@ -20,6 +20,8 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 
+import scala.concurrent.duration.DurationInt
+
 class MatcherActorSpecification
     extends MatcherSpec("MatcherActor")
     with MatcherTestData
@@ -124,7 +126,7 @@ class MatcherActorSpecification
       ))
   }
 
-  private def waitInitialization(x: TestActorRef[MatcherActor]): TestActorRef[MatcherActor] = eventually {
+  private def waitInitialization(x: TestActorRef[MatcherActor]): TestActorRef[MatcherActor] = eventually(timeout(1.second)) {
     x.underlyingActor.recoveryFinished shouldBe true
     x
   }

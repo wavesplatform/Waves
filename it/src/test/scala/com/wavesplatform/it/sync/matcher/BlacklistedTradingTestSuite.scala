@@ -19,8 +19,6 @@ class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
   private def alice   = dockerNodes()(1)
   private def bob     = dockerNodes()(2)
 
-  println(IssueUsdTx)
-
   Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).map(matcher.signedIssue).foreach { tx =>
     matcher.waitForTransaction(tx.id)
   }

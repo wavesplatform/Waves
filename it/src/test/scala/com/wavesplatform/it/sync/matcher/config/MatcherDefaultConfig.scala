@@ -36,8 +36,8 @@ object MatcherDefaultConfig {
                                      |  rest-order-limit=$orderLimit
                                      |}""".stripMargin)
 
-  val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, minerEnabled))
+  val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(2))
+    .zip(Seq(matcherConfig, minerDisabled, minerEnabled))
     .map { case (n, o) => o.withFallback(n) }
 
   def issueAssetPair(issuer: PrivateKeyAccount,
