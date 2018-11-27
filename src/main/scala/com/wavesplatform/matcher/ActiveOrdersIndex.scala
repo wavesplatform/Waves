@@ -48,11 +48,11 @@ class ActiveOrdersIndex(address: Address, maxElements: Int) {
   def size(ro: ReadOnlyDB): Int = ro.get(sizeKey).getOrElse(0)
 
   def getAll(ro: ReadOnlyDB): Vector[Node] = ro.get(oldestIdxKey).fold(Vector.empty[Node]) { oldestIdx =>
-    ro.read(prefix, seek = nodeKey(oldestIdx).keyBytes, n = Int.MaxValue)(readNode)
+    ro.read(MatcherKeys.ActiveOrdersKeyName, prefix, seek = nodeKey(oldestIdx).keyBytes, n = Int.MaxValue)(readNode)
   }
 
   private def findNewerIdx(ro: ReadOnlyDB, thanIdx: Int): Option[Index] = {
-    ro.read(prefix, seek = nodeKey(thanIdx + 1).keyBytes, n = 1)(readIdx).headOption
+    ro.read(MatcherKeys.ActiveOrdersKeyName, prefix, seek = nodeKey(thanIdx + 1).keyBytes, n = 1)(readIdx).headOption
   }
 
   private def prefix          = MatcherKeys.ActiveOrdersPrefixBytes ++ address.bytes.arr
