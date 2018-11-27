@@ -282,7 +282,7 @@ object Types {
       .create((activeTxTypes ++ obsoleteTxTypes).map(_.typeRef))
   }
 
-  def buildWavesTypes(orderEnabled: Boolean, proofsEnabled: Boolean): Seq[DefinedType] = {
+  def buildWavesTypes(proofsEnabled: Boolean): Seq[DefinedType] = {
     val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled)
     val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled)
 
@@ -290,18 +290,14 @@ object Types {
 
     val transactionTypes: List[CaseType] = obsoleteTxTypes ++ activeTxTypes
 
-    val wavesTypesWithoutOrder =
-      Seq(
-        addressType,
-        aliasType,
-        transfer,
-        assetPairType,
-        dataEntryType,
-        transactionsCommonType
-      ) ++ transactionTypes
-
-    if (orderEnabled)
-      wavesTypesWithoutOrder :+ buildOrderType(proofsEnabled)
-    else wavesTypesWithoutOrder
+    Seq(
+      addressType,
+      aliasType,
+      transfer,
+      assetPairType,
+      dataEntryType,
+      buildOrderType(proofsEnabled),
+      transactionsCommonType
+    ) ++ transactionTypes
   }
 }

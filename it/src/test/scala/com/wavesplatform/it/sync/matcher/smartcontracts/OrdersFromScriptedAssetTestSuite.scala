@@ -219,7 +219,7 @@ object OrdersFromScriptedAssetTestSuite {
                         | case other => true
                         |}
                         |""".stripMargin
-    ScriptCompiler(scriptText).explicitGet()._1
+    ScriptCompiler(scriptText, isAssetScript = true).explicitGet()._1
   }
 
   private val commonConfig = ConfigFactory.parseString(s"""

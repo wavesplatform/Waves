@@ -18,13 +18,16 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
-  var assetWOScript              = ""
-  var assetWScript               = ""
-  private val accountB           = pkByAddress(secondAddress)
-  private val unchangeableScript = ScriptCompiler(s"""
+  var assetWOScript    = ""
+  var assetWScript     = ""
+  private val accountB = pkByAddress(secondAddress)
+  private val unchangeableScript = ScriptCompiler(
+    s"""
                                                |match tx {
                                                |case s : SetAssetScriptTransaction => false
-                                               |case _ => true}""".stripMargin).explicitGet()._1
+                                               |case _ => true}""".stripMargin,
+    isAssetScript = true
+  ).explicitGet()._1
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -79,11 +82,15 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         reissuable = false,
         issueFee,
         2,
-        script = Some(ScriptCompiler(s"""
+        script = Some(
+          ScriptCompiler(
+            s"""
                                         |match tx {
                                         |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(
-                                          pkByAddress(secondAddress).publicKey).base58}')
-                                        |case _ => false}""".stripMargin).explicitGet()._1.bytes.value.base64)
+                 pkByAddress(secondAddress).publicKey).base58}')
+                                        |case _ => false}""".stripMargin,
+            isAssetScript = true
+          ).explicitGet()._1.bytes.value.base64)
       )
       .id
     nodes.waitForHeightAriseAndTxPresent(assetWAnotherOwner)
@@ -110,12 +117,15 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("sender's waves balance is decreased by fee") {
-    val script2 = ScriptCompiler(s"""
+    val script2 = ScriptCompiler(
+      s"""
            |match tx {
            |  case s : SetAssetScriptTransaction => true
            |  case _ => false
            |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
 
     val (balance, eff) = notMiner.accountBalances(firstAddress)
     val details        = notMiner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
@@ -243,10 +253,14 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       .selfSigned(
         SetScriptTransaction.supportedVersions.head,
         accountA,
-        Some(ScriptCompiler(s"""|let pkB = base58'${ByteStr(accountB.publicKey)}'
+        Some(
+          ScriptCompiler(
+            s"""|let pkB = base58'${ByteStr(accountB.publicKey)}'
                                 |match tx {
                                 |case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
-                                |case _ => true}""".stripMargin).explicitGet()._1),
+                                |case _ => true}""".stripMargin,
+            isAssetScript = true
+          ).explicitGet()._1),
         setScriptFee,
         System.currentTimeMillis()
       )

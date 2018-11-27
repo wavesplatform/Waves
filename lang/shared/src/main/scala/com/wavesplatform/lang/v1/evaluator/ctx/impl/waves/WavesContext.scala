@@ -355,7 +355,7 @@ object WavesContext {
       wavesBalanceF
     )
 
-    val types = buildWavesTypes(orderEnabled, proofsEnabled)
+    val types = buildWavesTypes(proofsEnabled)
 
     CTX(types, commonVars ++ vars(version.value), functions)
   }

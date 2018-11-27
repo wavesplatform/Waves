@@ -86,18 +86,34 @@ package object utils extends ScorexLogging {
     }
   }
 
-  private val lazyContexts: Map[ScriptVersion, Coeval[CTX]] = Seq
-    .tabulate(2) { v =>
-      val version = ScriptVersion.fromInt(v + 1).get
-      version -> Coeval.evalOnce(
-        Monoid
-          .combineAll(Seq(
-            PureContext.build(version),
-            CryptoContext.build(Global),
-            WavesContext.build(version, new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain), true, true)
-          )))
-    }
-    .toMap
+  private val lazyAssetContexts: Map[ScriptVersion, Coeval[CTX]] =
+    Seq
+      .tabulate(2) { v =>
+        val version = ScriptVersion.fromInt(v + 1).get
+        version -> Coeval.evalOnce(
+          Monoid
+            .combineAll(Seq(
+              PureContext.build(version),
+              CryptoContext.build(Global),
+              WavesContext
+                .build(version, new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain), false, false)
+            )))
+      }
+      .toMap
+
+  private val lazyContexts: Map[ScriptVersion, Coeval[CTX]] =
+    Seq
+      .tabulate(2) { v =>
+        val version = ScriptVersion.fromInt(v + 1).get
+        version -> Coeval.evalOnce(
+          Monoid
+            .combineAll(Seq(
+              PureContext.build(version),
+              CryptoContext.build(Global),
+              WavesContext.build(version, new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain), true, true)
+            )))
+      }
+      .toMap
 
   def dummyEvalContext(version: ScriptVersion): EvaluationContext = lazyContexts(version)().evaluationContext
 
@@ -124,9 +140,11 @@ package object utils extends ScorexLogging {
     costs.toMap
   }
 
-  def compilerContext(version: ScriptVersion): CompilerContext = lazyContexts(version)().compilerContext
+  def compilerContext(version: ScriptVersion, isAssetScript: Boolean): CompilerContext =
+    if (isAssetScript) lazyAssetContexts(version)().compilerContext
+    else lazyContexts(version)().compilerContext
 
-  def varNames(version: ScriptVersion): Set[String] = compilerContext(version).varDefs.keySet
+  def varNames(version: ScriptVersion): Set[String] = compilerContext(version, isAssetScript = false).varDefs.keySet
 
   @tailrec
   final def untilTimeout[T](timeout: FiniteDuration, delay: FiniteDuration = 100.milliseconds, onFailure: => Unit = {})(fn: => T): T = {

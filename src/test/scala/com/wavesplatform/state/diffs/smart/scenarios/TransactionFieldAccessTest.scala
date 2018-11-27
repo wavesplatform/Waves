@@ -22,7 +22,7 @@ class TransactionFieldAccessTest extends PropSpec with PropertyChecks with Match
   private def preconditionsTransferAndLease(
       code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV2)] = {
     val untyped = Parser(code).get.value
-    val typed   = CompilerV1(compilerContext(V1), untyped).explicitGet()._1
+    val typed   = CompilerV1(compilerContext(V1, isAssetScript = false), untyped).explicitGet()._1
     preconditionsTransferAndLease(typed)
   }
 

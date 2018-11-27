@@ -40,7 +40,7 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
 
   def initialScripts(): Unit = {
     for (i <- List(matcherNode, aliceNode, bobNode).indices) {
-      val script = ScriptCompiler("true").explicitGet()._1
+      val script = ScriptCompiler("true", isAssetScript = false).explicitGet()._1
       val pk     = PrivateKeyAccount.fromSeed(nodes(i).seed(addresses(i))).right.get
       val setScriptTransaction = SetScriptTransaction
         .selfSigned(SetScriptTransaction.supportedVersions.head, pk, Some(script), 0.01.waves, System.currentTimeMillis())
@@ -58,7 +58,7 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
   def setContract(contractText: Option[String], acc: PrivateKeyAccount): TransactionInfo = {
     val script = contractText.map { x =>
       val scriptText = x.stripMargin
-      ScriptCompiler(scriptText).explicitGet()._1
+      ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
     }
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(SetScriptTransaction.supportedVersions.head, acc, script, 0.014.waves, System.currentTimeMillis())

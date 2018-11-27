@@ -48,13 +48,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(tTxId1)
 
     //deprecate transfers with amount > 99
-    val scr         = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                                     |match tx {
                                     |  case s : SetAssetScriptTransaction => true
                                     |  case t:  TransferTransaction => t.amount <= 99
                                     |  case _ => false
                                     |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -70,14 +73,17 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   }
 
   test("transfer goes only to addresses from list (white or black)") {
-    val scr = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
                                         |  case t:  TransferTransaction => t.recipient == addressFromPublicKey(base58'${ByteStr(
-                                  pkByAddress(secondAddress).publicKey).base58}')
+           pkByAddress(secondAddress).publicKey).base58}')
                                         |  case _ => false
                                         |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -88,15 +94,18 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     assertBadRequestAndMessage(sender.transfer(firstAddress, firstAddress, 1, smartMinFee, Some(asset)), errNotAllowedByToken)
 
-    val scr1 = ScriptCompiler(s"""
+    val scr1 = ScriptCompiler(
+      s"""
                                 |match tx {
                                 |  case s : SetAssetScriptTransaction => true
                                 |  case t:  TransferTransaction => t.recipient != addressFromPublicKey(base58'${ByteStr(
-                                   pkByAddress(secondAddress).publicKey).base58}') && t.recipient != addressFromPublicKey(base58'${ByteStr(
-                                   pkByAddress(firstAddress).publicKey).base58}')
+           pkByAddress(secondAddress).publicKey).base58}') && t.recipient != addressFromPublicKey(base58'${ByteStr(
+           pkByAddress(firstAddress).publicKey).base58}')
                                 |  case _ => false
                                 |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId1 = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr1)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId1)
 
@@ -117,13 +126,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val sponsorId = sender.sponsorAsset(firstAddress, feeAsset, baseFee = 2, fee = sponsorFee + smartExtraFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorId)
 
-    val scr         = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                                 |match tx {
                                 |  case s : SetAssetScriptTransaction => true
                                 |  case t:  TransferTransaction => t.feeAssetId == base58'$feeAsset'
                                 |  case _ => false
                                 |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -156,14 +168,17 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val tTxId = sender.transfer(firstAddress, secondAddress, 100, smartMinFee, Some(blackAsset)).id
     nodes.waitForHeightAriseAndTxPresent(tTxId)
 
-    val scr         = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
                                         |  case t:  TransferTransaction => let issuer = extract(addressFromString("${firstAddress}"))
                                         |  isDefined(getInteger(issuer,toBase58String(t.id))) == true
                                         |  case _ => false
                                         |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(blackAsset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -217,13 +232,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val toThird = sender.transfer(firstAddress, thirdAddress, 100, smartMinFee, Some(asset)).id
     nodes.waitForHeightAriseAndTxPresent(toThird)
 
-    val scr         = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                                 |match tx {
                                 |  case s : SetAssetScriptTransaction => true
                                 |  case b:  BurnTransaction => b.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
                                 |  case _ => false
                                 |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -232,14 +250,17 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     assertBadRequestAndMessage(sender.burn(firstAddress, asset, 10, smartMinFee).id, errNotAllowedByToken)
 
-    val scr1 = ScriptCompiler(s"""
+    val scr1 = ScriptCompiler(
+      s"""
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
                                         |  case b:  BurnTransaction => b.sender != addressFromPublicKey(base58'${ByteStr(
-                                   pkByAddress(secondAddress).publicKey).base58}')
+           pkByAddress(secondAddress).publicKey).base58}')
                                         |  case _ => false
                                         |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId1 = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr1)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId1)
 
@@ -253,13 +274,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   }
 
   ignore("burn by some height") {
-    val scr         = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
                                         |  case b:  BurnTransaction => height % 2 == 0
                                         |  case _ => false
                                         |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -286,12 +310,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         reissuable = false,
         issueFee,
         2,
-        Some(ScriptCompiler(s"""
+        Some(
+          ScriptCompiler(
+            s"""
                                |match tx {
                                |  case b : BurnTransaction => false
                                |  case _ => true
                                |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64)
+         """.stripMargin,
+            isAssetScript = true
+          ).explicitGet()._1.bytes.value.base64)
       )
       .id
 
@@ -301,7 +329,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   }
 
   test("masstransfer - taxation") {
-    val scr         = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
                                         |  case m:  MassTransferTransaction => 
@@ -311,7 +340,9 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                         |  twoTransfers && issuerIsRecipient && taxesPaid
                                         |  case _ => false
                                         |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -325,14 +356,17 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   }
 
   test("masstransfer - transferCount <=2") {
-    val scr         = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
                                         |  case m:  MassTransferTransaction => 
                                         |  m.transferCount <= 2
                                         |  case _ => false
                                         |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -349,13 +383,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     assertBadRequestAndMessage(sender.reissue(secondAddress, asset, someAssetAmount, reissuable = true, fee = issueFee + smartExtraFee).id,
                                "Reason: Asset was issued by other address")
 
-    val scr         = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                              |match tx {
                              |  case s : SetAssetScriptTransaction => true
                              |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
                              |  case _ => false
                              |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -380,13 +417,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     nodes.waitForHeightAriseAndTxPresent(assetNonReissue)
 
-    val scr         = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                              |match tx {
                              |  case s : SetAssetScriptTransaction => true
                              |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
                              |  case _ => false
                              |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(assetNonReissue, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -400,14 +440,17 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   test("sponsorship of smart asset") {
     assertBadRequestAndMessage(sender.sponsorAsset(firstAddress, asset, baseFee = 2, fee = sponsorFee + smartExtraFee).id, errNotAllowedByToken)
 
-    val scr = ScriptCompiler(s"""
+    val scr = ScriptCompiler(
+      s"""
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
                                         |  case ss: SponsorFeeTransaction => ss.sender == addressFromPublicKey(base58'${ByteStr(
-                                  pkByAddress(firstAddress).publicKey).base58}')
+           pkByAddress(firstAddress).publicKey).base58}')
                                         |  case _ => false
                                         |}
-         """.stripMargin).explicitGet()._1.bytes.value.base64
+         """.stripMargin,
+      isAssetScript = true
+    ).explicitGet()._1.bytes.value.base64
     val setScriptId = sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartExtraFee, Some(scr)).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
@@ -427,7 +470,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         reissuable = false,
         issueFee,
         2,
-        script = Some(ScriptCompiler(s"""false""".stripMargin).explicitGet()._1.bytes.value.base64)
+        script = Some(ScriptCompiler(s"""false""".stripMargin, isAssetScript = true).explicitGet()._1.bytes.value.base64)
       )
       .id
     nodes.waitForHeightAriseAndTxPresent(assetWOSupport)

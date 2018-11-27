@@ -72,7 +72,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     }""".stripMargin
 
     val pkSwapBC1 = pkByAddress(swapBC1)
-    val script    = ScriptCompiler(scriptText).explicitGet()._1
+    val script    = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
     val sc1SetTx = SetScriptTransaction
       .selfSigned(version = SetScriptTransaction.supportedVersions.head,
                   sender = pkSwapBC1,
