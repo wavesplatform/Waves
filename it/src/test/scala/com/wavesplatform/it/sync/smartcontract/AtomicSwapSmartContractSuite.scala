@@ -101,10 +101,10 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           assetId = None,
           sender = pkByAddress(AliceBC1),
           recipient = AddressOrAlias.fromString(swapBC1).explicitGet(),
-          amount = transferAmount + setScriptFee + smartExtraFee,
+          amount = transferAmount + setScriptFee + smartFee,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = setScriptFee + smartExtraFee,
+          feeAmount = setScriptFee + smartFee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -126,7 +126,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = setScriptFee + smartExtraFee,
+          feeAmount = setScriptFee + smartFee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -151,7 +151,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = setScriptFee + smartExtraFee,
+          feeAmount = setScriptFee + smartFee,
           attachment = Array.emptyByteArray,
           proofs = Proofs.empty
         )
@@ -166,8 +166,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
 
     notMiner.assertBalances(swapBC1,
-                            swapBalance - transferAmount - (setScriptFee + smartExtraFee),
-                            swapEffBalance - transferAmount - (setScriptFee + smartExtraFee))
+                            swapBalance - transferAmount - (setScriptFee + smartFee),
+                            swapEffBalance - transferAmount - (setScriptFee + smartFee))
     notMiner.assertBalances(BobBC1, bobBalance + transferAmount, bobEffBalance + transferAmount)
     notMiner.assertBalances(AliceBC1, aliceBalance, aliceEffBalance)
 
@@ -187,7 +187,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         amount = transferAmount,
         timestamp = System.currentTimeMillis(),
         feeAssetId = None,
-        feeAmount = setScriptFee + smartExtraFee,
+        feeAmount = setScriptFee + smartFee,
         attachment = Array.emptyByteArray
       )
       .explicitGet()
@@ -197,8 +197,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeightAriseAndTxPresent(transferToAlice)
 
     notMiner.assertBalances(swapBC1,
-                            swapBalance - transferAmount - (setScriptFee + smartExtraFee),
-                            swapEffBalance - transferAmount - (setScriptFee + smartExtraFee))
+                            swapBalance - transferAmount - (setScriptFee + smartFee),
+                            swapEffBalance - transferAmount - (setScriptFee + smartFee))
     notMiner.assertBalances(BobBC1, bobBalance, bobEffBalance)
     notMiner.assertBalances(AliceBC1, aliceBalance + transferAmount, aliceEffBalance + transferAmount)
   }
