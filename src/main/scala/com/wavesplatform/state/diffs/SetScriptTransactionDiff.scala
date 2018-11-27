@@ -21,6 +21,7 @@ object SetScriptTransactionDiff {
         if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, height)) {
           Right(())
         } else {
+          println(s"SmartAccountTrading ${blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, height)} at $height")
           val version = script.version
           DenyDuplicateVarNames(version, varNames(version), script.expr).left.map(GenericError.apply)
         }
