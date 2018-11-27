@@ -6,7 +6,7 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -37,6 +37,10 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
       matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
 
+      withClue("mining was too fast, can't continue") {
+        matcherNode.height shouldBe <(ActivationHeight)
+      }
+
       withClue("duplicate names in contracts are denied") {
         val setScriptTransaction = SetScriptTransaction
           .selfSigned(SetScriptTransaction.supportedVersions.head,
@@ -44,8 +48,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
                       Some(ScriptCompiler(sDupNames).explicitGet()._1),
                       0.014.waves,
                       System.currentTimeMillis())
-          .right
-          .get
+          .explicitGet()
 
         assertBadRequestAndResponse(
           matcherNode
