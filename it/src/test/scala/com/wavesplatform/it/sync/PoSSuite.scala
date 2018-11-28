@@ -176,10 +176,6 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         _.raw(
           """
           |waves {
-          |  miner {
-          |      quorum = 1
-          |  }
-          |
           |  blockchain {
           |    custom {
           |      functionality {
@@ -199,7 +195,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         """.stripMargin
         ))
       .overrideBase(_.nonMiner)
-      .withDefault(2)
+      .withDefault(3)
       .withSpecial(_.raw("waves.miner.enable = yes"))
       .buildNonConflicting()
 
