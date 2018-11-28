@@ -59,7 +59,7 @@ object Verifier extends Instrumented with ScorexLogging {
     Try {
       logged(
         s"transaction ${transaction.id()}",
-        ScriptRunner[EVALUATED](height, Coproduct[TxOrd](transaction), blockchain, script, !isTokenScript)
+        ScriptRunner[EVALUATED](height, Coproduct[TxOrd](transaction), blockchain, script, !isTokenScript, !isTokenScript)
       ) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript))
         case (log, Right(FALSE)) =>

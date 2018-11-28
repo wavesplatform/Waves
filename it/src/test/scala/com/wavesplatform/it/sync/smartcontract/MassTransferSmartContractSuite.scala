@@ -58,7 +58,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
         """.stripMargin
 
     // set script
-    val script = ScriptCompiler(scriptText).explicitGet()._1
+    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(SetScriptTransaction.supportedVersions.head, sender.privateKey, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()

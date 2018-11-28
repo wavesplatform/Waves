@@ -61,7 +61,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
       untypedScript = Parser(assetScript).get.value
 
-      typedScript = ScriptV1(CompilerV1(compilerContext(V1), untypedScript).explicitGet()._1).explicitGet()
+      typedScript = ScriptV1(CompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -111,7 +111,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
   private def eval(code: String) = {
     val untyped = Parser(code).get.value
-    val typed   = CompilerV1(compilerContext(V1), untyped).map(_._1)
+    val typed   = CompilerV1(compilerContext(V1, isAssetScript = false), untyped).map(_._1)
     typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(V1), _))
   }
 

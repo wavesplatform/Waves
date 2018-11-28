@@ -5,7 +5,7 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.ScriptVersion.Versions.V2
 import com.wavesplatform.lang.Testing.evaluated
 import com.wavesplatform.lang.v1.compiler.CompilerV1
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -489,7 +489,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
-  property("Bindings without proofs") {
+  property("Bindings w/wo proofs/order") {
     val txTypeGen: Gen[String] = Gen.oneOf(
       List(
         "TransferTransaction",
@@ -504,8 +504,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       )
     )
 
-    forAll(txTypeGen, orderGen) { (txType, ord) =>
-      val src =
+    forAll(txTypeGen, orderGen) { (txType, in) =>
+      val src1 =
         s"""
           |let expectedProof = base58'satoshi'
           |match tx {
@@ -514,24 +514,46 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           |}
         """.stripMargin
 
-      val expectedError = s"Compilation failed: Undefined field `proofs` of variable of type `Union(List($txType))`"
+      val src2 =
+        s"""
+           |match tx {
+           |  case o: Order => 1
+           |  case t: $txType => 2
+           |  case _ => 3
+           |}
+         """.stripMargin
 
-      runWithoutProofs(src, Coproduct[In](ord)) should produce(expectedError)
-      runScript[EVALUATED](src, Coproduct[In](ord)) shouldBe Right(CONST_BOOLEAN(true))
+      val noProofsError = s"Compilation failed: Undefined field `proofs` of variable of type `Union(List($txType))`"
+
+      runCustom(
+        src1,
+        proofs = false,
+        order = true
+      ) should produce(noProofsError)
+
+      runCustom(
+        src2,
+        proofs = true,
+        order = false
+      ) shouldBe 'left
+
+      runScript[EVALUATED](src1, Coproduct[In](in)) shouldBe Right(CONST_BOOLEAN(true))
+      runScript[EVALUATED](src2, Coproduct[In](in)) shouldBe Right(CONST_LONG(1))
     }
   }
 
-  def runWithoutProofs(script: String, t: In, networkByte: Byte = networkByte): Either[String, EVALUATED] = {
+  def runCustom(script: String, proofs: Boolean, order: Boolean): Either[String, EVALUATED] = {
     import cats.syntax.monoid._
     import com.wavesplatform.lang.v1.CTX._
 
     val Success(expr, _) = Parser(script)
     val ctx =
-      PureContext.build(V2) |+|
+      PureContext
+        .build(V2) |+|
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, EmptyBlockchain), false)
+          .build(V2, new WavesEnvironment(networkByte, Coeval(null), null, EmptyBlockchain), proofsEnabled = proofs, orderEnabled = order)
 
     for {
       compileResult <- CompilerV1(ctx.compilerContext, expr)
@@ -550,7 +572,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, EmptyBlockchain), true)
+          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, EmptyBlockchain), true, true)
 
     for {
       compileResult <- CompilerV1(ctx.compilerContext, expr)

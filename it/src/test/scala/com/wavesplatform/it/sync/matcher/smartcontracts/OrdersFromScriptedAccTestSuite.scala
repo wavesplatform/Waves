@@ -43,11 +43,13 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
       withClue("duplicate names in contracts are denied") {
         val setScriptTransaction = SetScriptTransaction
-          .selfSigned(SetScriptTransaction.supportedVersions.head,
-                      bobAcc,
-                      Some(ScriptCompiler(sDupNames).explicitGet()._1),
-                      0.014.waves,
-                      System.currentTimeMillis())
+          .selfSigned(
+            SetScriptTransaction.supportedVersions.head,
+            bobAcc,
+            Some(ScriptCompiler(sDupNames, isAssetScript = false).explicitGet()._1),
+            0.014.waves,
+            System.currentTimeMillis()
+          )
           .explicitGet()
 
         assertBadRequestAndResponse(

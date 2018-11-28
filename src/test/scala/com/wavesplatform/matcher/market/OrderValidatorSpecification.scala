@@ -184,7 +184,7 @@ class OrderValidatorSpecification
 
       val pk     = PrivateKeyAccount(randomBytes())
       val o      = newBuyOrder(pk, version = 2)
-      val script = ScriptCompiler("true && (height > 0)").explicitGet()._1
+      val script = ScriptCompiler("true && (height > 0)", isAssetScript = false).explicitGet()._1
       (bc.accountScript _).when(pk.toAddress).returns(Some(script))
       ov.validateNewOrder(o) should produce("height is inaccessible when running script on matcher")
     }

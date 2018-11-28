@@ -13,7 +13,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  val trueScript = Some(ScriptCompiler("true").explicitGet()._1.bytes().base64) //TODO добавить типовые проверки в скрипт
+  val trueScript = Some(ScriptCompiler("true", isAssetScript = false).explicitGet()._1.bytes().base64) //TODO добавить типовые проверки в скрипт
   val amount     = 1L
   val price      = 100000000L
 

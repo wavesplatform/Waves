@@ -28,10 +28,10 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
                            blockchain: Blockchain = EmptyBlockchain): Either[String, T] = {
     val Success(expr, _) = Parser(script)
     for {
-      compileResult <- CompilerV1(compilerContext(version), expr)
+      compileResult <- CompilerV1(compilerContext(version, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
       s <- ScriptV1(version, typedExpr, checkSize = false)
-      r <- ScriptRunner[T](blockchain.height, Coproduct(tx), blockchain, s, true)._2
+      r <- ScriptRunner[T](blockchain.height, Coproduct(tx), blockchain, s, true, true)._2
     } yield r
 
   }
@@ -51,7 +51,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
       import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 
       val Success(expr, _)      = Parser(duplicateNames)
-      val Right((typedExpr, _)) = CompilerV1(compilerContext(V1), expr)
+      val Right((typedExpr, _)) = CompilerV1(compilerContext(V1, isAssetScript = false), expr)
       val settings = TestFunctionalitySettings.Enabled.copy(
         preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.SmartAccountTrading.id -> 3))
       val setup = for {
