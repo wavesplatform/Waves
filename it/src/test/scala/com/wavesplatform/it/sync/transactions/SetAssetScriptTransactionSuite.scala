@@ -259,7 +259,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
                                 |match tx {
                                 |case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
                                 |case _ => true}""".stripMargin,
-            isAssetScript = true
+            isAssetScript = false
           ).explicitGet()._1),
         setScriptFee,
         System.currentTimeMillis()
