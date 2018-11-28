@@ -2,7 +2,7 @@ package com.wavesplatform.matcher
 
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
@@ -30,7 +30,7 @@ object MatcherKeys {
       o => o.version +: o.bytes()
     )
 
-  val OrderInfoPrefix = 2.toShort
+  val OrderInfoPrefix: Short = 2
 
   def orderInfoOpt(orderId: ByteStr): Key[Option[OrderInfo]] = Key.opt(
     "matcher-order-info-opt",
@@ -72,39 +72,55 @@ object MatcherKeys {
     }
   }
 
+  def activeOrdersOldestSeqNr(address: Address): Key[Option[Int]] =
+    Key.opt("matcher-active-orders-oldest-seq-nr", bytes(3, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
   def activeOrdersSeqNr(address: Address): Key[Option[Int]] =
-    Key.opt("matcher-active-orders-seq-nr", bytes(3, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+    Key.opt("matcher-active-orders-seq-nr", bytes(4, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+
+  val ActiveOrdersPrefix: Short            = 5
+  val ActiveOrdersPrefixBytes: Array[Byte] = Shorts.toByteArray(ActiveOrdersPrefix)
+  val ActiveOrdersKeyName: String          = "matcher-active-orders"
   def activeOrders(address: Address, seqNr: Int): Key[ActiveOrdersIndex.Node] =
-    Key("matcher-active-orders", bytes(4, address.bytes.arr ++ Ints.toByteArray(seqNr)), ActiveOrdersIndex.Node.read, ActiveOrdersIndex.Node.write)
+    Key(ActiveOrdersKeyName,
+        bytes(ActiveOrdersPrefix, address.bytes.arr ++ Ints.toByteArray(seqNr)),
+        ActiveOrdersIndex.Node.read,
+        ActiveOrdersIndex.Node.write)
 
   def openVolume(address: Address, assetId: Option[AssetId]): Key[Option[Long]] =
-    Key.opt("matcher-open-volume", bytes(5, address.bytes.arr ++ assetIdToBytes(assetId)), Longs.fromByteArray, Longs.toByteArray)
-  def openVolumeSeqNr(address: Address): Key[Int] = bytesSeqNr("matcher-open-volume-seq-nr", 6, address.bytes.arr)
+    Key.opt("matcher-open-volume", bytes(6, address.bytes.arr ++ assetIdToBytes(assetId)), Longs.fromByteArray, Longs.toByteArray)
+  def openVolumeSeqNr(address: Address): Key[Int] = bytesSeqNr("matcher-open-volume-seq-nr", 7, address.bytes.arr)
   def openVolumeAsset(address: Address, seqNr: Int): Key[Option[AssetId]] =
-    Key("matcher-open-volume-asset", hBytes(7, seqNr, address.bytes.arr), Option(_).collect { case b if b.nonEmpty => ByteStr(b) }, assetIdToBytes)
+    Key("matcher-open-volume-asset", hBytes(8, seqNr, address.bytes.arr), Option(_).collect { case b if b.nonEmpty => ByteStr(b) }, assetIdToBytes)
 
-  def orderTxIdsSeqNr(orderId: ByteStr): Key[Int]           = bytesSeqNr("matcher-order-tx-ids-seq-nr", 8, orderId.arr)
-  def orderTxId(orderId: ByteStr, seqNr: Int): Key[ByteStr] = Key("matcher-order-tx-id", hBytes(9, seqNr, orderId.arr), ByteStr(_), _.arr)
+  def orderTxIdsSeqNr(orderId: ByteStr): Key[Int]           = bytesSeqNr("matcher-order-tx-ids-seq-nr", 9, orderId.arr)
+  def orderTxId(orderId: ByteStr, seqNr: Int): Key[ByteStr] = Key("matcher-order-tx-id", hBytes(10, seqNr, orderId.arr), ByteStr(_), _.arr)
 
   def exchangeTransaction(txId: ByteStr): Key[Option[ExchangeTransaction]] =
-    Key.opt("matcher-exchange-transaction", bytes(10, txId.arr), ExchangeTransaction.parse(_).get, _.bytes())
+    Key.opt("matcher-exchange-transaction", bytes(11, txId.arr), ExchangeTransaction.parse(_).get, _.bytes())
 
   def activeOrdersSize(address: Address): Key[Option[Int]] =
-    Key.opt("matcher-active-orders-size", bytes(11, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+    Key.opt("matcher-active-orders-size", bytes(12, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
   def activeOrderSeqNr(address: Address, orderId: Order.Id): Key[Option[Int]] =
-    Key.opt("matcher-active-order-seq-nr", bytes(12, address.bytes.arr ++ orderId.arr), Ints.fromByteArray, Ints.toByteArray)
+    Key.opt("matcher-active-order-seq-nr", bytes(13, address.bytes.arr ++ orderId.arr), Ints.fromByteArray, Ints.toByteArray)
 
   def finalizedCommonSeqNr(address: Address): Key[Option[Int]] =
-    Key.opt("matcher-finalized-common-seq-nr", bytes(13, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+    Key.opt("matcher-finalized-common-seq-nr", bytes(14, address.bytes.arr), Ints.fromByteArray, Ints.toByteArray)
+
+  val FinalizedCommonPrefix: Short            = 15
+  val FinalizedCommonPrefixBytes: Array[Byte] = Shorts.toByteArray(FinalizedCommonPrefix)
+  val FinalizedCommonKeyName: String          = "matcher-finalized-common"
   def finalizedCommon(address: Address, seqNr: Int): Key[Option[Order.Id]] =
-    Key.opt("matcher-finalized-common", bytes(14, address.bytes.arr ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
+    Key.opt(FinalizedCommonKeyName, bytes(FinalizedCommonPrefix, address.bytes.arr ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
 
   def finalizedPairSeqNr(address: Address, pair: AssetPair): Key[Option[Int]] =
-    Key.opt("matcher-finalized-pair-seq-nr", bytes(15, address.bytes.arr ++ pair.bytes), Ints.fromByteArray, Ints.toByteArray)
+    Key.opt("matcher-finalized-pair-seq-nr", bytes(16, address.bytes.arr ++ pair.bytes), Ints.fromByteArray, Ints.toByteArray)
 
+  val FinalizedPairPrefix: Short            = 17
+  val FinalizedPairPrefixBytes: Array[Byte] = Shorts.toByteArray(FinalizedPairPrefix)
+  val FinalizedPairKeyName: String          = "matcher-finalized-pair"
   def finalizedPair(address: Address, pair: AssetPair, seqNr: Int): Key[Option[Order.Id]] =
-    Key.opt("matcher-finalized-pair", bytes(16, address.bytes.arr ++ pair.bytes ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
+    Key.opt("matcher-finalized-pair", bytes(FinalizedPairPrefix, address.bytes.arr ++ pair.bytes ++ Ints.toByteArray(seqNr)), ByteStr(_), _.arr)
 
   def lastCommandTimestamp(address: Address): Key[Option[Long]] =
-    Key.opt("matcher-last-command-timestamp", bytes(17, address.bytes.arr), Longs.fromByteArray, Longs.toByteArray)
+    Key.opt("matcher-last-command-timestamp", bytes(18, address.bytes.arr), Longs.fromByteArray, Longs.toByteArray)
 }

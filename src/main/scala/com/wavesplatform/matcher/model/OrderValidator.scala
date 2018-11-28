@@ -13,11 +13,10 @@ import com.wavesplatform.matcher.model.OrderHistory.OrderInfoChange
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.transaction.smart.script.ScriptRunner
-import com.wavesplatform.transaction.{AssetAcc, AssetId}
 import com.wavesplatform.utils.Time
 import kamon.Kamon
 import org.iq80.leveldb.DB
@@ -39,7 +38,8 @@ class OrderValidator(db: DB,
                      time: Time) {
   import OrderValidator._
 
-  private val timer = Kamon.timer("matcher.validation")
+  private val timer                = Kamon.timer("matcher.validation")
+  private val blacklistedAddresses = settings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
 
   private def spendableBalance(a: AssetAcc): Long = {
     val p = portfolio(a.account)
@@ -49,13 +49,13 @@ class OrderValidator(db: DB,
     }
   }
 
-  private def verifyScript(address: Address, order: Order) =
+  private def verifyOrderByAccountScript(address: Address, order: Order) =
     blockchain.accountScript(address).fold(verifySignature(order)) { script =>
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
         Left("Trading on scripted account isn't allowed yet")
       else if (order.version <= 1) Left("Can't process order with signature from scripted account")
       else
-        try MatcherScriptRunner[EVALUATED](script, order) match {
+        try MatcherScriptRunner[EVALUATED](script, order, isTokenScript = false) match {
           case (_, Left(execError)) => Left(s"Error executing script for $address: $execError")
           case (_, Right(FALSE))    => Left(s"Order rejected by script for $address")
           case (_, Right(TRUE))     => Right(order)
@@ -65,30 +65,20 @@ class OrderValidator(db: DB,
         }
     }
 
-  private def verifySmartToken(assetId: AssetId, order: Order): ValidationResult =
-    blockchain.assetScript(assetId).fold[ValidationResult](Right(order)) { script =>
+  private def verifySmartToken(assetId: AssetId, tx: ExchangeTransaction) =
+    blockchain.assetScript(assetId).fold[Either[String, Unit]](Right(())) { script =>
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
         Left("Trading of scripted asset isn't allowed yet")
       else {
-        val fakeOrder: Order = order match {
-          case x: OrderV1 => x.copy(orderType = x.orderType.opposite)
-          case x: OrderV2 => x.copy(orderType = x.orderType.opposite)
+        try ScriptRunner[EVALUATED](blockchain.height, Coproduct(tx), blockchain, script, proofsEnabled = false) match {
+          case (_, Left(execError)) => Left(s"Error executing script of asset $assetId: $execError")
+          case (_, Right(FALSE))    => Left(s"Order rejected by script of asset $assetId")
+          case (_, Right(TRUE))     => Right(())
+          case (_, Right(x))        => Left(s"Script returned not a boolean result, but $x")
+        } catch {
+          case NonFatal(e) => Left(s"Caught ${e.getClass.getCanonicalName} while executing script of asset $assetId: ${e.getMessage}")
         }
-        transactionCreator
-          .createTransaction(OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order)))
-          .flatMap { tx =>
-            try ScriptRunner[EVALUATED](blockchain.height, Coproduct(tx), blockchain, script) match {
-              case (_, Left(execError)) => Left(s"Error executing script of asset $assetId: $execError")
-              case (_, Right(FALSE))    => Left(s"Order rejected by script of asset $assetId")
-              case (_, Right(TRUE))     => Right(order)
-              case (_, Right(x))        => Left(s"Script returned not a boolean result, but $x")
-            } catch {
-              case NonFatal(e) => Left(s"Caught ${e.getClass.getCanonicalName} while executing script of asset $assetId: ${e.getMessage}")
-            }
-          }
-          .left
-          .map(_.toString)
-      }
+      }.left.map(_.toString)
     }
 
   private def validateBalance(o: Order): ValidationResult = {
@@ -108,7 +98,7 @@ class OrderValidator(db: DB,
     )
   }
 
-  @inline private def decimals(assetId: Option[AssetId]): Either[String, Int] = assetId.fold[Either[String, Int]](Right(8)) { aid =>
+  @inline private def decimals(assetId: Option[AssetId]) = assetId.fold[Either[String, Int]](Right(8)) { aid =>
     blockchain.assetDescription(aid).map(_.decimals).toRight(s"Invalid asset id $aid")
   }
 
@@ -138,20 +128,28 @@ class OrderValidator(db: DB,
           .lastOrderTimestamp(db, order.senderPublicKey)
           .getOrElse(settings.defaultOrderTimestamp) - settings.orderTimestampDrift
 
-        lazy val minOrderFee: Long = {
-          val extraFee =
-            if (blockchain.hasScript(order.sender)) CommonValidation.ScriptExtraFee
-            else 0
-          settings.minOrderFee + extraFee
+        lazy val minOrderFee: Long =
+          ExchangeTransactionCreator.getMinFee(blockchain, settings.orderMatchTxFee, matcherPublicKey, Some(order.sender), None, order.assetPair)
+
+        lazy val exchangeTx = {
+          val fakeOrder: Order = order match {
+            case x: OrderV1 => x.copy(orderType = x.orderType.opposite)
+            case x: OrderV2 => x.copy(orderType = x.orderType.opposite)
+          }
+          transactionCreator.createTransaction(OrderExecuted(LimitOrder(fakeOrder), LimitOrder(order))).left.map(_.toString)
+        }
+
+        def verifyAssetScript(assetId: Option[AssetId]) = assetId.fold[ValidationResult](Right(order)) { assetId =>
+          exchangeTx.flatMap(verifySmartToken(assetId, _)).right.map(_ => order)
         }
 
         for {
           _ <- (Right(order): ValidationResult)
             .ensure("Incorrect matcher public key")(_.matcherPublicKey == matcherPublicKey)
-            .ensure("Invalid address")(_ => !settings.blacklistedAddresses.contains(senderAddress))
+            .ensure("Invalid address")(_ => !blacklistedAddresses.contains(senderAddress))
             .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
             .ensure(s"Order should have a timestamp after $lowestOrderTs, but it is ${order.timestamp}")(_.timestamp > lowestOrderTs)
-            .ensure(s"Order matcherFee should be >= ${minOrderFee}")(_.matcherFee >= minOrderFee)
+            .ensure(s"Order matcherFee should be >= $minOrderFee")(_.matcherFee >= minOrderFee)
           _ <- order.isValid(time.correctedTime()).toEither
           _ <- (Right(order): ValidationResult)
             .ensure("Order has already been placed")(o => DBUtils.orderInfo(db, o.id()).status == LimitOrder.NotFound)
@@ -159,9 +157,9 @@ class OrderValidator(db: DB,
           _ <- validateBalance(order)
           _ <- validatePair(order.assetPair)
           _ <- validateDecimals(order)
-          _ <- verifyScript(order.sender, order)
-          _ <- order.assetPair.amountAsset.fold[ValidationResult](Right(order))(verifySmartToken(_, order))
-          _ <- order.assetPair.priceAsset.fold[ValidationResult](Right(order))(verifySmartToken(_, order))
+          _ <- verifyOrderByAccountScript(order.sender, order)
+          _ <- verifyAssetScript(order.assetPair.amountAsset)
+          _ <- verifyAssetScript(order.assetPair.priceAsset)
         } yield order
       }
 }

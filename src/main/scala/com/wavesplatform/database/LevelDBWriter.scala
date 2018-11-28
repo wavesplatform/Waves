@@ -23,7 +23,7 @@ import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.{immutable, mutable}
+import scala.collection.{SeqView, immutable, mutable}
 
 object LevelDBWriter {
 
@@ -60,6 +60,7 @@ object LevelDBWriter {
         lastChange <- db.get(historyKey).headOption
       } yield db.get(valueKey(lastChange))
   }
+
 }
 
 class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int = 100000) extends Caches with ScorexLogging {
@@ -67,7 +68,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   import LevelDBWriter._
 
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
-  private def readWrite[A](f: RW => A): A        = writableDB.readWrite(f)
+
+  private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
   override protected def loadMaxAddressId(): BigInt = readOnly(db => db.get(Keys.lastAddressId).getOrElse(BigInt(0)))
 
@@ -191,13 +193,16 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     rw.put(Keys.height, height)
     rw.put(Keys.blockAt(height), Some(block))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
-    rw.put(Keys.lastAddressId, Some(loadMaxAddressId() + newAddresses.size))
+    val lastAddressId = loadMaxAddressId() + newAddresses.size
+    rw.put(Keys.lastAddressId, Some(lastAddressId))
     rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
 
     for ((address, id) <- newAddresses) {
       rw.put(Keys.addressId(address), Some(id))
+      log.trace(s"WRITE ${address.address} -> $id")
       rw.put(Keys.idToAddress(id), address)
     }
+    log.trace(s"WRITE lastAddressId = $lastAddressId")
 
     val threshold = height - MAX_DEPTH
 
@@ -514,25 +519,27 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
                                    count: Int,
                                    fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] = {
 
-    def takeAfterTx(s: Seq[(Int, ByteStr)], fromId: Option[ByteStr]): Seq[(Int, AssetId)] =
+    def takeAfterTx(s: SeqView[ByteStr, Seq[_]], fromId: Option[ByteStr]): SeqView[ByteStr, Seq[_]] =
       fromId match {
         case None => s
         case Some(id) =>
-          s.dropWhile { case (_, txId) => txId != id }
+          s.dropWhile(_ != id)
             .drop(1)
       }
 
     readOnly { db =>
       def transactions: Seq[(Int, Transaction)] = {
         db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
-          val txs = for {
+          val txIds = for {
             seqNr          <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).view
-            (txType, txId) <- takeAfterTx(db.get(Keys.addressTransactionIds(addressId, seqNr)), fromId)
+            (txType, txId) <- db.get(Keys.addressTransactionIds(addressId, seqNr))
             if types.isEmpty || types.contains(txType.toByte)
-            (h, tx) <- db.get(Keys.transactionInfo(txId))
-          } yield (h, tx)
+          } yield txId
 
-          txs.take(count).force
+          takeAfterTx(txIds, fromId)
+            .flatMap(id => db.get(Keys.transactionInfo(id)))
+            .take(count)
+            .force
         }
       }
 

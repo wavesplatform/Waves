@@ -235,7 +235,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         featureCheckBlocksPeriod = 1
       )
 
-  property(s"Exchange transaction with scripted matcher and orders needs extra fee ($ScriptExtraFee * 3)") {
+  property(s"Exchange transaction with scripted matcher and orders needs extra fee ($ScriptExtraFee)") {
     val allValidP = smartTradePreconditions(
       scriptGen("Order", true),
       scriptGen("Order", true),
@@ -244,7 +244,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(allValidP) {
       case (genesis, transfers, issueAndScripts, etx) =>
-        val enoughFee = CommonValidation.ScriptExtraFee * 3 + CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
+        val enoughFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
         val smallFee  = enoughFee - 1
         val exchangeWithSmallFee = ExchangeTransactionV2
           .create(MATCHER, etx.buyOrder, etx.sellOrder, 1000000, 1000000, 0, 0, smallFee, etx.timestamp)

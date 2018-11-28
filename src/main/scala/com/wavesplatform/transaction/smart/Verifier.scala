@@ -4,6 +4,7 @@ import cats.implicits._
 import com.google.common.base.Throwables
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
+import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
@@ -55,38 +56,35 @@ object Verifier extends Instrumented with ScorexLogging {
         })
 
   def verifyTx(blockchain: Blockchain, script: Script, height: Int, transaction: Transaction, isTokenScript: Boolean): ValidationResult[Transaction] =
-    logged(
-      s"transaction ${transaction.id()}",
-      Try {
-        ScriptRunner[EVALUATED](height, Coproduct[TxOrd](transaction), blockchain, script) match {
-          case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript))
-          case (log, Right(FALSE)) =>
-            Left(TransactionNotAllowedByScript(log, script.text, isTokenScript))
-          case (_, Right(TRUE)) => Right(transaction)
-          case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
-        }
-      } match {
-        case Failure(e) =>
-          Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", script.text, List.empty, isTokenScript))
-        case Success(s) => s
+    Try {
+      logged(
+        s"transaction ${transaction.id()}",
+        ScriptRunner[EVALUATED](height, Coproduct[TxOrd](transaction), blockchain, script, !isTokenScript)
+      ) match {
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript))
+        case (log, Right(FALSE)) =>
+          Left(TransactionNotAllowedByScript(log, script.text, isTokenScript))
+        case (_, Right(TRUE)) => Right(transaction)
+        case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
-    )
+    } match {
+      case Failure(e) =>
+        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", script.text, List.empty, isTokenScript))
+      case Success(s) => s
+    }
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
-    logged(
-      s"order ${order.idStr()}",
-      Try {
-        MatcherScriptRunner[EVALUATED](script, order) match {
-          case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript = false))
-          case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, script.text, isTokenScript = false))
-          case (_, Right(TRUE))       => Right(order)
-          case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
-        }
-      } match {
-        case Failure(e) => Left(ScriptExecutionError(s"Uncaught execution error: $e", script.text, List.empty, isTokenScript = false))
-        case Success(s) => s
+    Try {
+      logged(s"order ${order.idStr()}", MatcherScriptRunner[EVALUATED](script, order, isTokenScript = false)) match {
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript = false))
+        case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, script.text, isTokenScript = false))
+        case (_, Right(TRUE))       => Right(order)
+        case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
-    )
+    } match {
+      case Failure(e) => Left(ScriptExecutionError(s"Uncaught execution error: $e", script.text, List.empty, isTokenScript = false))
+      case Success(s) => s
+    }
 
   def verifyExchange(et: ExchangeTransaction,
                      blockchain: Blockchain,
@@ -159,8 +157,13 @@ object Verifier extends Instrumented with ScorexLogging {
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     }
 
-  private def logged[T](id: => String, result: Either[ValidationError, T]): Either[ValidationError, T] = {
-    log.debug(s"Script verification for $id ${result.fold(err => s"failed: $err", _ => "ok")}")
+  private def logged(id: => String, result: (Log, Either[String, EVALUATED])): (Log, Either[String, EVALUATED]) = {
+    val (execLog, execResult) = result
+    log.debug(s"Script for $id evaluated to $execResult")
+    execLog.foreach {
+      case (k, Right(v))  => log.debug(s"Evaluated `$k` to $v")
+      case (k, Left(err)) => log.debug(s"Failed to evaluate `$k`: $err")
+    }
     result
   }
 }

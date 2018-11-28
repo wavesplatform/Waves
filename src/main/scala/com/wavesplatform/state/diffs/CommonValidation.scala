@@ -140,7 +140,7 @@ object CommonValidation {
       case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
       case it: SetAssetScriptTransaction =>
         if (it.script.isEmpty) {
-          Left(GenericError("Cannot remove script from an asset issued with a script"))
+          Left(GenericError("Cannot set empty script"))
         } else {
           activationBarrier(BlockchainFeatures.SmartAssets)
         }
@@ -229,10 +229,6 @@ object CommonValidation {
     }
 
     def smartAccountScriptsCount: Int = tx match {
-      case etx: ExchangeTransaction =>
-        cond(blockchain.hasScript(etx.sender))(1, 0) +
-          cond(blockchain.hasScript(etx.sellOrder.sender))(1, 0) +
-          cond(blockchain.hasScript(etx.buyOrder.sender))(1, 0)
       case tx: Transaction with Authorized => cond(blockchain.hasScript(tx.sender))(1, 0)
       case _                               => 0
     }

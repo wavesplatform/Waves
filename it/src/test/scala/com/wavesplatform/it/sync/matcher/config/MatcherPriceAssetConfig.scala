@@ -3,22 +3,20 @@ package com.wavesplatform.it.sync.matcher.config
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.{empty, parseString}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
-import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
+import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.Base58
 
 import scala.util.Random
 
 // TODO: Make it trait
 object MatcherPriceAssetConfig {
 
-  private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig.withFallback(minerDisabled), minerDisabled, minerDisabled, empty()))
+  private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(2))
+    .zip(Seq(matcherConfig.withFallback(minerDisabled), minerDisabled, empty()))
     .map { case (n, o) => o.withFallback(n) }
 
   private val aliceSeed = _Configs(1).getString("account-seed")
@@ -31,6 +29,7 @@ object MatcherPriceAssetConfig {
   val usdAssetName = "USD-X"
   val wctAssetName = "WCT-X"
   val ethAssetName = "ETH-X"
+  val btcAssetName = "BTC-X"
 
   val IssueUsdTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
@@ -88,7 +87,7 @@ object MatcherPriceAssetConfig {
       2,
       AddressScheme.current.chainId,
       sender = bobPk,
-      name = "BTC-X".getBytes(),
+      name = btcAssetName.getBytes(),
       description = "asset description".getBytes(),
       quantity = defaultAssetQuantity,
       decimals = 8,
@@ -135,6 +134,11 @@ object MatcherPriceAssetConfig {
     priceAsset = Some(UsdId)
   )
 
+  val wavesBtcPair = AssetPair(
+    amountAsset = None,
+    priceAsset = Some(BtcId)
+  )
+
   val orderLimit = 10
 
   private val updatedMatcherConfig = parseString(s"""waves.matcher {
@@ -143,37 +147,4 @@ object MatcherPriceAssetConfig {
                                                     |}""".stripMargin)
 
   val Configs: Seq[Config] = _Configs.map(updatedMatcherConfig.withFallback(_))
-
-  def createSignedIssueRequest(tx: IssueTransactionV2): SignedIssueV2Request = {
-    import tx._
-    SignedIssueV2Request(
-      2,
-      Base58.encode(tx.sender.publicKey),
-      new String(name),
-      new String(description),
-      quantity,
-      decimals,
-      reissuable,
-      fee,
-      timestamp,
-      tx.proofs.base58().toList,
-      tx.script.map(_.bytes().base64)
-    )
-  }
-
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
-    import tx._
-    SignedIssueV1Request(
-      Base58.encode(tx.sender.publicKey),
-      new String(name),
-      new String(description),
-      quantity,
-      decimals,
-      reissuable,
-      fee,
-      timestamp,
-      signature.base58
-    )
-  }
-
 }

@@ -29,7 +29,8 @@ object DocExport {
           override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
           override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
           override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-        }
+        },
+        proofsEnabled = true
       )
 
       val cryptoContext = CryptoContext.build(Global)
@@ -159,8 +160,8 @@ object DocExport {
                      specials: java.util.List[Special])
 
       val mf      = new DefaultMustacheFactory()
-      val doc     = mf.compile(args(1))
-      val output  = new java.io.FileWriter(args(2)) //new java.io.StringWriter
+      val doc     = mf.compile(args(2))
+      val output  = new java.io.FileWriter(args(3)) //new java.io.StringWriter
       val (t, f)  = transactionDocs(transactionsType)
       val commons = transactionDocs(transactionsType, commonFields)
       val transactionClasses = Seq(

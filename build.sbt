@@ -1,13 +1,14 @@
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys.{sourceGenerators, _}
 import sbt._
-import sbtcrossproject.CrossPlugin.autoImport.crossProject
 import sbt.internal.inc.ReflectUtilities
 import sbtassembly.MergeStrategy
+import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 scalafmtOnCompile in ThisBuild := true
 Global / cancelable := true
+Global / coverageExcludedPackages := ".*"
 
 val versionSource = Def.task {
   // WARNING!!!
@@ -222,6 +223,7 @@ checkPRRaw in Global := {
     clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
   } finally {
     test.all(ScopeFilter(inProjects(langJVM, node), inConfigurations(Test))).value
+    (langJS / Compile / fastOptJS).value
     compile.all(ScopeFilter(inProjects(generator, benchmark), inConfigurations(Test))).value
   }
 }
@@ -231,6 +233,7 @@ lazy val lang =
     .withoutSuffixFor(JVMPlatform)
     .settings(
       version := "1.0.0",
+      coverageExcludedPackages := ".*",
       // the following line forces scala version across all dependencies
       scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true))),
       test in assembly := {},
@@ -255,6 +258,7 @@ lazy val lang =
       }
     )
     .jvmSettings(
+      coverageExcludedPackages := "",
       publishMavenStyle := true,
       credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
       publishTo := Some("Sonatype Nexus" at "https://oss.sonatype.org/service/local/staging/deploy/maven2"),
@@ -281,6 +285,7 @@ lazy val node = project
   .in(file("."))
   .settings(
     addCompilerPlugin(Dependencies.kindProjector),
+    coverageExcludedPackages := "",
     libraryDependencies ++=
       Dependencies.network ++
         Dependencies.db ++

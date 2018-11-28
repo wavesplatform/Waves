@@ -1,16 +1,14 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{EitherExt2, Sponsorship}
-import com.wavesplatform.utils.Base58
-import org.scalatest.CancelAfterFailure
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.transaction.assets.IssueTransactionV1
+import org.scalatest.CancelAfterFailure
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -68,12 +66,12 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 }
 
 object CustomFeeTransactionSuite {
-  val minerAddress             = Default(0).getString("address")
-  val senderAddress            = Default(3).getString("address")
+  val minerAddress             = Default.head.getString("address")
+  val senderAddress            = Default(2).getString("address")
   val defaultAssetQuantity     = 999999999999l
   val featureCheckBlocksPeriod = 13
 
-  private val seed = Default(3).getString("account-seed")
+  private val seed = Default(2).getString("account-seed")
   private val pk   = PrivateKeyAccount.fromSeed(seed).explicitGet()
   val assetTx = IssueTransactionV1
     .selfSigned(
@@ -104,22 +102,7 @@ object CustomFeeTransactionSuite {
   val Configs: Seq[Config] = Seq(
     minerConfig.withFallback(Default.head),
     notMinerConfig.withFallback(Default(1)),
-    notMinerConfig.withFallback(Default(2)),
-    notMinerConfig.withFallback(Default(3))
+    notMinerConfig.withFallback(Default(2))
   )
 
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
-    import tx._
-    SignedIssueV1Request(
-      Base58.encode(tx.sender.publicKey),
-      new String(name),
-      new String(description),
-      quantity,
-      decimals,
-      reissuable,
-      issueFee,
-      timestamp,
-      signature.base58
-    )
-  }
 }

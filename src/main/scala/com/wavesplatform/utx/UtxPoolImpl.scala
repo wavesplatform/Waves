@@ -181,7 +181,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
 
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     putRequestStats.increment()
-    measureSuccessful(
+    val result = measureSuccessful(
       processingTimeStats, {
         for {
           _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
@@ -198,6 +198,11 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
         }
       }
     )
+    result.fold(
+      err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err"),
+      r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}")
+    )
+    result
   }
 }
 

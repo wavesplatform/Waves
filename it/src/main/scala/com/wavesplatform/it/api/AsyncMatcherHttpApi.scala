@@ -87,17 +87,41 @@ object AsyncMatcherHttpApi extends Assertions {
         .as[MatcherStatusResponse]
     }
 
+    def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String): Future[Boolean] = {
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/$orderId") transform {
+        case Failure(UnexpectedStatusCodeException(_, 404, responseBody)) =>
+          Try(parse(responseBody).as[MessageMatcherResponse]) match {
+            case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
+            case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+          }
+        case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
+        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
+      }
+    }
+
     def transactionsByOrder(orderId: String): Future[Seq[ExchangeTransaction]] =
       matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
 
     def waitOrderInBlockchain(orderId: String, retryInterval: FiniteDuration = 1.second): Future[Seq[TransactionInfo]] =
-      transactionsByOrder(orderId).flatMap { txs =>
-        assert(txs.nonEmpty, s"There is no exchange transaction for $orderId")
-        Future.sequence { txs.map(tx => waitForTransaction(tx.id, retryInterval)) }
-      }
+      waitFor[Seq[ExchangeTransaction]](s"Exchange transactions for order $orderId")(_.transactionsByOrder(orderId), _.nonEmpty, retryInterval)
+        .flatMap { txs =>
+          assert(txs.nonEmpty, s"There is no exchange transaction for $orderId")
+          Future.sequence { txs.map(tx => waitForTransaction(tx.id, retryInterval)) }
+        }
 
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}").as[OrderBookResponse]
+
+    def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Future[Boolean] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}") transform {
+        case Failure(UnexpectedStatusCodeException(_, 404, responseBody)) =>
+          Try(parse(responseBody).as[MessageMatcherResponse]) match {
+            case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
+            case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+          }
+        case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
+        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
+      }
 
     def deleteOrderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       retrying(_delete(s"${matcherNode.matcherApiEndpoint}/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build())
@@ -217,12 +241,26 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 
-    def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
+    def expectIncorrectOrderPlacement(order: Order,
+                                      expectedStatusCode: Int,
+                                      expectedStatus: String,
+                                      expectedMessage: Option[String]): Future[Boolean] =
       matcherPost("/matcher/orderbook", order.json()) transform {
         case Failure(UnexpectedStatusCodeException(_, `expectedStatusCode`, responseBody)) =>
-          Try(parse(responseBody).as[MatcherStatusResponse]) match {
-            case Success(mr) if mr.status == expectedStatus => Success(true)
-            case Failure(f)                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+          expectedMessage match {
+            case None =>
+              Try(parse(responseBody).as[MatcherStatusResponse]) match {
+                case Success(mr) if mr.status == expectedStatus => Success(true)
+                case Failure(f)                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+              }
+            case _ =>
+              Try(parse(responseBody).as[MatcherErrorResponse]) match {
+                case Success(mr) if mr.status.get == expectedStatus && mr.message == expectedMessage =>
+                  Success(true)
+                case Failure(f) =>
+                  Failure(new RuntimeException(s"Failed to parse response: $f"))
+              }
+
           }
         case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
         case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))

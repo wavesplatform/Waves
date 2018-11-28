@@ -16,3 +16,7 @@ class ProduceError(errorMessage: String) extends Matcher[Either[_, _]] {
     }
   }
 }
+
+object ProduceError {
+  def produce(err: String): Matcher[Either[_, _]] = new ProduceError(err)
+}

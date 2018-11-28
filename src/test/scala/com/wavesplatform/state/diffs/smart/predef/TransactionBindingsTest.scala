@@ -2,19 +2,22 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.Testing.evaluated
 import com.wavesplatform.lang.Version.V2
+import com.wavesplatform.lang.Testing.evaluated
+import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
-import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.ProduceError._
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
+import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen}
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
@@ -22,7 +25,7 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.Json
-import shapeless.Coproduct // For string escapes.
+import shapeless.Coproduct
 
 class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val T = 'T'.toByte
@@ -487,6 +490,57 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
+  property("Bindings without proofs") {
+    val txTypeGen: Gen[String] = Gen.oneOf(
+      List(
+        "TransferTransaction",
+        "IssueTransaction",
+        "ReissueTransaction",
+        "BurnTransaction",
+        "SetAssetScriptTransaction",
+        "LeaseTransaction",
+        "LeaseCancelTransaction",
+        "CreateAliasTransaction",
+        "SponsorFeeTransaction"
+      )
+    )
+
+    forAll(txTypeGen, orderGen) { (txType, ord) =>
+      val src =
+        s"""
+          |let expectedProof = base58'satoshi'
+          |match tx {
+          |  case t: $txType => t.proofs[1] == expectedProof
+          |  case _ => true
+          |}
+        """.stripMargin
+
+      val expectedError = s"Compilation failed: Undefined field `proofs` of variable of type `Union(List($txType))`"
+
+      runWithoutProofs(src, Coproduct[In](ord)) should produce(expectedError)
+      runScript[EVALUATED](src, Coproduct[In](ord)) shouldBe Right(CONST_BOOLEAN(true))
+    }
+  }
+
+  def runWithoutProofs(script: String, t: In, networkByte: Byte = networkByte): Either[String, EVALUATED] = {
+    import cats.syntax.monoid._
+    import com.wavesplatform.lang.v1.CTX._
+
+    val Success(expr, _) = Parser.parseScript(script)
+    val ctx =
+      PureContext.build(V2) |+|
+        CryptoContext
+          .build(Global) |+|
+        WavesContext
+          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, EmptyBlockchain), false)
+
+    for {
+      compileResult <- compiler.ExpressionCompilerV1(ctx.compilerContext, expr)
+      (typedExpr, _) = compileResult
+      r <- EvaluatorV1[EVALUATED](ctx.evaluationContext, typedExpr)
+    } yield r
+  }
+
   def runWithSmartTradingActivated(script: String, t: In = null, networkByte: Byte = networkByte): Either[String, EVALUATED] = {
     import cats.syntax.monoid._
     import com.wavesplatform.lang.v1.CTX._
@@ -497,7 +551,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, null))
+          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, EmptyBlockchain), true)
 
     for {
       compileResult <- ExpressionCompilerV1(ctx.compilerContext, expr)

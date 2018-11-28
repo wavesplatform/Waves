@@ -22,7 +22,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
 
   treeTypeTest("contract compiles when uses annotation bindings and correct return type")(
-    ctx = Monoid.combine(compilerContext, WavesContext.build(Version.V3, Common.emptyBlockchainEnvironment()).compilerContext),
+    ctx = Monoid.combine(compilerContext, WavesContext.build(Version.V3, Common.emptyBlockchainEnvironment(), proofsEnabled = true).compilerContext),
     expr = {
       val script =
         """

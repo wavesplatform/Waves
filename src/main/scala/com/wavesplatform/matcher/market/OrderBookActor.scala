@@ -39,8 +39,9 @@ class OrderBookActor(parent: ActorRef,
 
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
-  private val matchTimer  = Kamon.timer("matcher.orderbook.match").refine("pair"    -> assetPair.toString)
-  private val cancelTimer = Kamon.timer("matcher.orderbook.persist").refine("event" -> "OrderCancelled")
+  private val matchTimer         = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
+  private val persistCancelTimer = Kamon.timer("matcher.orderbook.persist").refine("event" -> "OrderCancelled")
+  private val cancelTimer        = Kamon.timer("matcher.orderbook.cancel")
 
   private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
   private var orderBook          = OrderBook.empty
@@ -124,11 +125,11 @@ class OrderBookActor(parent: ActorRef,
   private def onCancelOrder(orderIdToCancel: ByteStr): Unit =
     OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
       case Some(oc) =>
-        val st = cancelTimer.start()
+        val st = persistCancelTimer.start()
         persist(oc) { _ =>
-          handleCancelEvent(oc)
-          sender() ! OrderCanceled(orderIdToCancel)
           st.stop()
+          cancelTimer.measure(handleCancelEvent(oc))
+          sender() ! OrderCanceled(orderIdToCancel)
         }
       case _ =>
         log.debug(s"Error cancelling $orderIdToCancel: order not found")
@@ -269,6 +270,7 @@ class OrderBookActor(parent: ActorRef,
     case RecoveryCompleted =>
       updateSnapshot(orderBook)
       log.debug(s"Recovery completed: $orderBook")
+      if (settings.makeSnapshotsAtStart) self ! SaveSnapshot
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook

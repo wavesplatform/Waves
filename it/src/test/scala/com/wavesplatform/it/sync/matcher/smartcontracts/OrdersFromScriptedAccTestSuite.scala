@@ -6,8 +6,11 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import play.api.libs.json.JsNumber
 
 import scala.concurrent.duration._
 
@@ -16,6 +19,11 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
   import OrdersFromScriptedAccTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = updatedConfigs
+
+  private val sDupNames =
+    """let x = (let x = 2
+      |3)
+      |x == 3""".stripMargin
 
   "issue asset and run test" - {
     // Alice issues new asset
@@ -28,6 +36,27 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       // check assets's balances
       matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
       matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
+
+      withClue("mining was too fast, can't continue") {
+        matcherNode.height shouldBe <(ActivationHeight)
+      }
+
+      withClue("duplicate names in contracts are denied") {
+        val setScriptTransaction = SetScriptTransaction
+          .selfSigned(SetScriptTransaction.supportedVersions.head,
+                      bobAcc,
+                      Some(ScriptCompiler(sDupNames).explicitGet()._1),
+                      0.014.waves,
+                      System.currentTimeMillis())
+          .explicitGet()
+
+        assertBadRequestAndResponse(
+          matcherNode
+            .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+            .id,
+          "VarNames: duplicate variable names are temporarily denied:"
+        )
+      }
 
       setContract(Some("true"), bobAcc)
     }
@@ -49,7 +78,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     }
 
     "scripted account can trade once SmartAccountTrading is activated" in {
-      setContract(Some("true"), bobAcc)
+      setContract(Some(sDupNames), bobAcc)
       val bobOrder =
         matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes)
       bobOrder.status shouldBe "OrderAccepted"
@@ -71,7 +100,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 }
 
 object OrdersFromScriptedAccTestSuite {
-  val ActivationHeight = 25
+  val ActivationHeight = 22
 
   import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 

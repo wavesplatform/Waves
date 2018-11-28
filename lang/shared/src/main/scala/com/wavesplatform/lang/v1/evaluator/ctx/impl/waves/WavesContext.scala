@@ -20,7 +20,9 @@ object WavesContext {
   import Types._
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  def build(version: Version, env: Environment): CTX = {
+  def build(version: Version,
+            env: Environment,
+            proofsEnabled: Boolean): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction =
@@ -251,20 +253,24 @@ object WavesContext {
       Coeval.evalOnce(
         env.inputEntity
           .eliminate(
-            tx => transactionObject(tx).asRight[String],
+            tx => transactionObject(tx, proofsEnabled).asRight[String],
             _.eliminate(
-              o => orderObject(o).asRight[String],
+              o => orderObject(o, proofsEnabled).asRight[String],
               _ => "Expected Transaction or Order".asLeft[CaseObj]
             )
           ))
 
     val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Right(CONST_LONG(env.height)))
 
+    val anyTransactionType =
+      if (proofsEnabled) anyTransactionTypeWithProofs
+      else anyTransactionTypeWithoutProofs
+
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
       NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTEVECTOR, "transaction Id")) {
         case CONST_BYTEVECTOR(id: ByteVector) :: Nil =>
-          val maybeDomainTx: Option[CaseObj] = env.transactionById(id.toArray).map(transactionObject)
+          val maybeDomainTx: Option[CaseObj] = env.transactionById(id.toArray).map(transactionObject(_, proofsEnabled))
           Right(fromOptionCO(maybeDomainTx))
         case _ => ???
       }
@@ -314,6 +320,10 @@ object WavesContext {
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
     val buyOrdTypeCoeval: Coeval[Either[String, CaseObj]]  = Coeval(Right(ordType(OrdType.Buy)))
 
+    val scriptInputType =
+      if (proofsEnabled) scriptInputTypeWithProofs
+      else scriptInputTypeWithoutProofs
+
     val commonVars = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
       ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
@@ -355,6 +365,10 @@ object WavesContext {
 
     lazy val writeSetType = CaseType("WriteSet", List("data" -> LIST(dataEntryType.typeRef)))
 
-    CTX(Types.wavesTypes ++ (if (version == V3) List(writeSetType) else List.empty), commonVars ++ vars(version), functions)
+    val types =
+      if (proofsEnabled) wavesTypesWithProofs
+      else wavesTypesWithoutProofs
+
+    CTX(types++ (if (version == V3) List(writeSetType) else List.empty), commonVars ++ vars(version), functions)
   }
 }

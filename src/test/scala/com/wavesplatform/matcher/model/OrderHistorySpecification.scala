@@ -800,32 +800,6 @@ class OrderHistorySpecification
     }
   }
 
-  property("History returns an expected number of orders") {
-    val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
-    val pair = AssetPair(None, mkAssetId("BTC"))
-    val orders = (0 to 3).map { i =>
-      val o = buy(pair, 100000000, 0.0008 + 0.00001 * i, Some(pk), Some(300000L), Some(100 + i))
-      oh.process(OrderAdded(LimitOrder(o)))
-      o
-    }
-
-    orders.patch(2, Nil, 1).map(x => OrderCanceled(LimitOrder(x), unmatchable = false)).foreach(oh.process)
-    oh.deleteOrder(pk, orders(1).id()) shouldBe 'right
-
-    /*
-     ----------------------------------------
-    |   0      |    1    |    2   |     3    |
-    +----------+---------+--------+----------+
-    | Canceled | Deleted | Active | Canceled |
-     ----------------------------------------
-     */
-
-    withClue("orders list") {
-      val orders = DBUtils.ordersByAddress(db, pk.toAddress, activeOnly = false, 3)
-      orders should have size 3
-    }
-  }
-
   property("History by pair - added orders more than history by pair limit (200 active)") {
     val pk   = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, mkAssetId("BTC"))

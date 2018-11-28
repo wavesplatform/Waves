@@ -101,7 +101,7 @@ object Dependencies {
   lazy val scalactic   = Seq("org.scalactic" %% "scalactic"  % "3.0.5")
   lazy val cats        = Seq("org.typelevel" %% "cats-core"  % "1.1.0")
   lazy val scalacheck = Seq(
-    "org.scalacheck"      %% "scalacheck"      % "1.13.5",
+    "org.scalacheck"      %% "scalacheck"      % "1.14.0",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
   lazy val kindProjector = "org.spire-math" %% "kind-projector"     % "0.9.6"

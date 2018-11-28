@@ -64,7 +64,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       // Each side get fair amount of assets
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrder.idStr()).headOption.getOrElse(fail("Expected an exchange transaction"))
-      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+      matcherNode.waitForTransaction(exchangeTx.id)
     }
 
     "get opened trading markets. USD price-asset " in {
@@ -151,7 +151,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
 
       // Each side get fair amount of assets
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrder.idStr()).headOption.getOrElse(fail("Expected an exchange transaction"))
-      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+      matcherNode.waitForTransaction(exchangeTx.id)
       matcherNode.cancelOrder(bobAcc, wavesUsdPair, bobOrder1Id)
     }
 
@@ -170,7 +170,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
 
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
-      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+      matcherNode.waitForTransaction(exchangeTx.id)
       matcherNode.cancelOrder(bobAcc, wctUsdPair, bobOrderId)
 
       matcherNode.waitOrderStatus(wctUsdPair, bobOrderId, "Cancelled", 1.minute)
@@ -201,7 +201,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
 
       val exchangeTx = matcherNode.transactionsByOrder(aliceOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
-      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+      matcherNode.waitForTransaction(exchangeTx.id)
 
       val executedAmount         = correctAmount(wctUsdBuyAmount, wctUsdPrice) // 142
       val bobReceiveUsdAmount    = receiveAmount(SELL, wctUsdBuyAmount, wctUsdPrice)
@@ -230,7 +230,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       matcherNode.waitOrderStatus(wctUsdPair, aliceOrderId, "Filled", 1.minute)
 
       val exchangeTx = matcherNode.transactionsByOrder(bobOrderId).headOption.getOrElse(fail("Expected an exchange transaction"))
-      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+      matcherNode.waitForTransaction(exchangeTx.id)
 
       matcherNode.reservedBalance(aliceAcc) shouldBe empty
       matcherNode.reservedBalance(bobAcc) shouldBe empty
@@ -256,7 +256,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     "bob lease all waves exact half matcher fee" in {
       val leasingAmount = bobNode.accountBalances(bobAcc.address)._1 - leasingFee - matcherFee / 2
       val leaseTxId     = bobNode.lease(bobAcc.address, matcherAcc.address, leasingAmount, leasingFee, 2).id
-      nodes.waitForHeightAriseAndTxPresent(leaseTxId)
+      matcherNode.waitForTransaction(leaseTxId)
       val bobOrderId =
         matcherNode.placeOrder(bobAcc, wctWavesPair, SELL, wctWavesSellAmount, wctWavesPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(wctWavesPair, bobOrderId, "Accepted", 1.minute)
@@ -270,7 +270,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       )
 
       val cancelLeaseTxId = bobNode.cancelLease(bobAcc.address, leaseTxId, leasingFee, 2).id
-      nodes.waitForHeightAriseAndTxPresent(cancelLeaseTxId)
+      matcherNode.waitForTransaction(cancelLeaseTxId)
     }
   }
 
@@ -289,7 +289,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       matcherNode.waitOrderStatus(ethWavesPair, submittedId, "Filled", 1.minute)
 
       val exchangeTx = matcherNode.transactionsByOrder(submittedId).headOption.getOrElse(fail("Expected an exchange transaction"))
-      nodes.waitForHeightAriseAndTxPresent(exchangeTx.id)
+      matcherNode.waitForTransaction(exchangeTx.id)
 
       matcherNode.reservedBalance(bobAcc) shouldBe empty
       matcherNode.cancelOrder(aliceAcc, ethWavesPair, counterId2)

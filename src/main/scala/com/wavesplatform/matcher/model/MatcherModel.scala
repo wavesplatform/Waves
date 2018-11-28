@@ -51,14 +51,16 @@ sealed trait LimitOrder {
   }
 }
 
-case class BuyLimitOrder(amount: Long, price: Price, fee: Long, order: Order) extends LimitOrder {
+case class BuyLimitOrder(amount: Long, fee: Long, order: Order) extends LimitOrder {
+  def price                                        = order.price
   def partial(amount: Long, fee: Long): LimitOrder = copy(amount = amount, fee = fee)
   def getReceiveAmount: Long                       = amountOfAmountAsset
   def getSpendAmount: Long                         = amountOfPriceAsset
   def getRawSpendAmount: Long                      = amountOfPriceAsset
 }
 
-case class SellLimitOrder(amount: Long, price: Price, fee: Long, order: Order) extends LimitOrder {
+case class SellLimitOrder(amount: Long, fee: Long, order: Order) extends LimitOrder {
+  def price                                        = order.price
   def partial(amount: Long, fee: Long): LimitOrder = copy(amount = amount, fee = fee)
   def getReceiveAmount: Long                       = amountOfPriceAsset
   def getSpendAmount: Long                         = amountOfAmountAsset
@@ -81,7 +83,7 @@ object LimitOrder {
   }
   case object NotFound extends OrderStatus {
     val name             = "NotFound"
-    def json: JsObject   = Json.obj("status" -> name)
+    def json: JsObject   = Json.obj("status" -> name, "message" -> "The limit order is not found")
     val isFinal: Boolean = true
     val ordering         = 5
   }
@@ -107,15 +109,15 @@ object LimitOrder {
   def apply(o: Order): LimitOrder = {
     val partialFee = getPartialFee(o.matcherFee, o.amount, o.amount)
     o.orderType match {
-      case OrderType.BUY  => BuyLimitOrder(o.amount, o.price, partialFee, o)
-      case OrderType.SELL => SellLimitOrder(o.amount, o.price, partialFee, o)
+      case OrderType.BUY  => BuyLimitOrder(o.amount, partialFee, o)
+      case OrderType.SELL => SellLimitOrder(o.amount, partialFee, o)
     }
   }
 
-  def limitOrder(remainingAmount: Long, price: Long, remainingFee: Long, o: Order): LimitOrder = {
+  def limitOrder(remainingAmount: Long, remainingFee: Long, o: Order): LimitOrder = {
     o.orderType match {
-      case OrderType.BUY  => BuyLimitOrder(remainingAmount, price, remainingFee, o)
-      case OrderType.SELL => SellLimitOrder(remainingAmount, price, remainingFee, o)
+      case OrderType.BUY  => BuyLimitOrder(remainingAmount, remainingFee, o)
+      case OrderType.SELL => SellLimitOrder(remainingAmount, remainingFee, o)
     }
   }
 

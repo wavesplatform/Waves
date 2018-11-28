@@ -199,7 +199,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         """.stripMargin
         ))
       .overrideBase(_.nonMiner)
-      .withDefault(3)
+      .withDefault(2)
       .withSpecial(_.raw("waves.miner.enable = yes"))
       .buildNonConflicting()
 

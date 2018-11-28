@@ -159,7 +159,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def place: Route = path("orderbook") {
     (pathEndOrSingleSlash & post) {
       json[Order] { order =>
-        placeTimer.measure {
+        placeTimer.measureFuture {
           orderValidator.validateNewOrder(order) match {
             case Left(e)  => Future.successful[MatcherResponse](OrderRejected(e))
             case Right(_) => (matcher ? order).mapTo[MatcherResponse]
@@ -172,7 +172,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def doCancel(order: Order): Future[MatcherResponse] = orderBook(order.assetPair) match {
     case Some(Right(orderBookRef)) =>
       log.trace(s"Canceling ${order.id()} for ${order.sender.address}")
-      (orderBookRef ? CancelOrder(order.id())).mapTo[MatcherResponse]
+      (orderBookRef ? CancelOrder(order.id())).mapTo[MatcherResponse].map {
+        case _: OrderCancelRejected =>
+          orderHistory ! Events.OrderCanceled(LimitOrder(order), unmatchable = false)
+          OrderCanceled(order.id())
+        case x => x
+      }
     case Some(Left(_)) => Future.successful(OrderBookUnavailable)
     case None =>
       log.debug(s"Order book for ${order.assetPair} was not found, canceling ${order.id()} anyway")
@@ -183,16 +188,18 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         }
   }
 
-  private def cancelOrder(orderId: ByteStr, senderPublicKey: Option[PublicKeyAccount]): ToResponseMarshallable = {
+  private def cancelOrder(orderId: ByteStr, senderPublicKey: Option[PublicKeyAccount], force: Boolean = false): ToResponseMarshallable = {
     val st = cancelTimer.start()
     DBUtils.orderInfo(db, orderId).status match {
-      case LimitOrder.NotFound      => StatusCodes.NotFound
-      case status if status.isFinal => StatusCodes.BadRequest -> Json.obj("message" -> s"Order is already ${status.name}")
+      case LimitOrder.NotFound                => StatusCodes.NotFound   -> LimitOrder.NotFound.json
+      case status if status.isFinal && !force => StatusCodes.BadRequest -> Json.obj("message" -> s"Order is already ${status.name}")
       case _ =>
         DBUtils.order(db, orderId) match {
           case None =>
-            log.warn(s"Order $orderId was not found in history")
-            StatusCodes.NotFound
+            StatusCodes.NotFound -> Json.obj(
+              "status"  -> "NotFound",
+              "message" -> "The order is not found"
+            )
           case Some(order) if senderPublicKey.exists(_ != order.senderPublicKey) =>
             OrderCancelRejected("Public key mismatch")
           case Some(order) =>
@@ -412,7 +419,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
     ))
   def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth) { orderId =>
-    complete(cancelOrder(orderId, None))
+    complete(cancelOrder(orderId, None, force = true))
   }
 
   @Path("/orders/{address}")

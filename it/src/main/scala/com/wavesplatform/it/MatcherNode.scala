@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -31,10 +32,11 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
   initialBalances()
 
   def initialBalances(): Unit = {
-    for (i <- List(matcherNode, aliceNode, bobNode).indices) {
-      val tx = nodes(i).transfer(nodes(i).address, addresses(i), 10000.waves, 0.001.waves).id
-      matcherNode.waitForTransaction(tx)
-    }
+    List(matcherNode, aliceNode, bobNode).indices
+      .map { i =>
+        nodes(i).transfer(nodes(i).address, addresses(i), 10000.waves, 0.001.waves).id
+      }
+      .foreach(nodes.waitForTransaction)
   }
 
   def initialScripts(): Unit = {
@@ -54,7 +56,7 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
     }
   }
 
-  def setContract(contractText: Option[String], acc: PrivateKeyAccount) = {
+  def setContract(contractText: Option[String], acc: PrivateKeyAccount): TransactionInfo = {
     val script = contractText.map { x =>
       val scriptText = x.stripMargin
       ScriptCompiler(scriptText).explicitGet()._1
