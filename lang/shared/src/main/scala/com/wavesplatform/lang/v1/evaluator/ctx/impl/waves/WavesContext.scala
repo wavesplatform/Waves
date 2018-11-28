@@ -107,7 +107,7 @@ object WavesContext {
       )
     )
 
-    val addressFromPublicKeyF: BaseFunction =
+    lazy val addressFromPublicKeyF: BaseFunction =
       UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to account address", ("@publicKey", BYTEVECTOR, "public key")) {
 
         FUNCTION_CALL(
@@ -178,7 +178,7 @@ object WavesContext {
       )
     )
 
-    val addressFromStringF: BaseFunction =
+    lazy val addressFromStringF: BaseFunction =
       UserFunction("addressFromString", optionAddress, "Decode account address", ("@string", STRING, "string address represntation")) {
 
         BLOCKV1(
@@ -331,7 +331,7 @@ object WavesContext {
       )
     )
 
-    val functions = Array(
+    lazy val functions = Array(
       txByIdF,
       txHeightByIdF,
       getIntegerFromStateF,
@@ -353,7 +353,7 @@ object WavesContext {
       wavesBalanceF
     )
 
-    val writeSetType = CaseType("WriteSet", List("data" -> LIST(dataEntryType.typeRef)))
+    lazy val writeSetType = CaseType("WriteSet", List("data" -> LIST(dataEntryType.typeRef)))
 
     CTX(Types.wavesTypes ++ (if (version == V3) List(writeSetType) else List.empty), commonVars ++ vars(version), functions)
   }

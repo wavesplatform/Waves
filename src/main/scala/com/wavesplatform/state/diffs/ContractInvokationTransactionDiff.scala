@@ -8,7 +8,19 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.DataItem
 import com.wavesplatform.lang.{Global, Version}
-import com.wavesplatform.state.{AccountDataInfo, BinaryDataEntry, Blockchain, BooleanDataEntry, ByteStr, DataEntry, Diff, IntegerDataEntry, LeaseBalance, Portfolio, StringDataEntry}
+import com.wavesplatform.state.{
+  AccountDataInfo,
+  BinaryDataEntry,
+  Blockchain,
+  BooleanDataEntry,
+  ByteStr,
+  DataEntry,
+  Diff,
+  IntegerDataEntry,
+  LeaseBalance,
+  Portfolio,
+  StringDataEntry
+}
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.smart.BlockchainContext.In
@@ -51,7 +63,7 @@ object ContractInvokationTransactionDiff {
                   height = height,
                   tx = tx,
                   portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
-                  accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d ).toMap))
+                  accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
                 )
               })
 
