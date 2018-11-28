@@ -6,9 +6,6 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.matcher.market.MatcherActor
-import com.wavesplatform.state.ByteStr.decodeBase58
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
@@ -44,11 +41,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
   "When matcher executes orders" - {
     "with one Smart Account and one Smart Asset" - {
       "then fee should be 0.003 + 0.004 (for Smart Asset only, not Smart Account)" in {
-        val oneSmartPair =
-          if (MatcherActor.compare(Some(asset0.getBytes), Some(asset1.getBytes)) < 0)
-            AssetPair(decodeBase58(asset1).toOption, decodeBase58(asset0).toOption)
-          else
-            AssetPair(decodeBase58(asset0).toOption, decodeBase58(asset1).toOption)
+        val oneSmartPair = createAssetPair(asset0, asset1)
 
         val aliceInitBalance   = matcherNode.accountBalances(aliceAcc.address)._1
         val bobInitBalance     = matcherNode.accountBalances(bobAcc.address)._1
@@ -86,11 +79,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
         "and total fee should be divided proportionally with partial filling" in {
           setContract(Some("true"), matcherNode.privateKey)
 
-          val bothSmartPair =
-            if (MatcherActor.compare(Some(asset2.getBytes), Some(asset1.getBytes)) < 0)
-              AssetPair(decodeBase58(asset1).toOption, decodeBase58(asset2).toOption)
-            else
-              AssetPair(decodeBase58(asset2).toOption, decodeBase58(asset1).toOption)
+          val bothSmartPair = createAssetPair(asset1, asset2)
 
           val aliceInitBalance   = matcherNode.accountBalances(aliceAcc.address)._1
           val bobInitBalance     = matcherNode.accountBalances(bobAcc.address)._1

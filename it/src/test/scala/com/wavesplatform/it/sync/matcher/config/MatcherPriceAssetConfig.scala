@@ -7,6 +7,8 @@ import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
+import com.wavesplatform.matcher.AssetPairBuilder
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
@@ -147,4 +149,13 @@ object MatcherPriceAssetConfig {
                                                     |}""".stripMargin)
 
   val Configs: Seq[Config] = _Configs.map(updatedMatcherConfig.withFallback(_))
+
+  def createAssetPair(asset1: String, asset2: String): AssetPair = {
+    val (a1, a2) = (AssetPair.extractAssetId(asset1).get, AssetPair.extractAssetId(asset2).get)
+    if (AssetPairBuilder.assetIdOrdering.compare(a1, a2) > 0)
+      AssetPair(a1, a2)
+    else
+      AssetPair(a2, a1)
+  }
+
 }
