@@ -169,7 +169,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                       miningConstraints.total
                     }
 
-                    val expiredTransactions = blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs > 2 * 60 * 60 * 1000)
+                    val expiredTransactions = blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs > 4 * 60 * 60 * 1000)
 
                     val diff = BlockDiffer
                       .fromBlock(
