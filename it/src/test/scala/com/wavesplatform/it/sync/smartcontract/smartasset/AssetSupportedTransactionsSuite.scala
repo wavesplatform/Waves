@@ -465,12 +465,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         reissuable = true,
         issueFee,
         2,
-        script = Some(ScriptCompiler(s"""
+        script = Some(
+          ScriptCompiler(
+            s"""
                                  let proof = base58'assetWProofs'
                                  match tx {
                                    case tx: SetAssetScriptTransaction | TransferTransaction | ReissueTransaction | BurnTransaction => tx.proofs[0] == proof
                                    case _ => false
-                                 }""".stripMargin, false).explicitGet()._1.bytes.value.base64),
+                                 }""".stripMargin,
+            false
+          ).explicitGet()._1.bytes.value.base64),
         waitForTx = true
       )
       .id
