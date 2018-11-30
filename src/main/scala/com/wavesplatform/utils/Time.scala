@@ -21,7 +21,7 @@ class TimeImpl extends Time with ScorexLogging with AutoCloseable {
   private val ExpirationTimeout    = 60.seconds
   private val RetryDelay           = 10.seconds
   private val ResponseTimeout      = 10.seconds
-  private val NtpServer            = "pool.ntp.org"
+  private val NtpServer            = System.getProperty("ntp.server", "pool.ntp.org")
 
   private implicit val scheduler: SchedulerService = Scheduler.singleThread(name = "time-impl")
 
@@ -30,13 +30,15 @@ class TimeImpl extends Time with ScorexLogging with AutoCloseable {
 
   @volatile private var offset = 0L
   private val updateTask: Task[Unit] = {
-    def newOffsetTask: Task[Option[java.lang.Long]] = Task {
+    def newOffsetTask: Task[Option[(InetAddress, java.lang.Long)]] = Task {
       try {
         client.open()
         val info = client.getTime(InetAddress.getByName(NtpServer))
         info.computeDetails()
-        Option(info.getOffset).map(offset =>
-          if (Math.abs(offset) > offsetPanicThreshold) throw new Exception("Offset is suspiciously large") else offset)
+        Option(info.getOffset).map { offset =>
+          val r = if (Math.abs(offset) > offsetPanicThreshold) throw new Exception("Offset is suspiciously large") else offset
+          (info.getAddress, r)
+        }
       } catch {
         case _: SocketTimeoutException =>
           None
@@ -50,8 +52,8 @@ class TimeImpl extends Time with ScorexLogging with AutoCloseable {
 
     newOffsetTask.flatMap {
       case None if !scheduler.isShutdown => updateTask.delayExecution(RetryDelay)
-      case Some(newOffset) if !scheduler.isShutdown =>
-        log.trace(s"Adjusting time with $newOffset milliseconds.")
+      case Some((server, newOffset)) if !scheduler.isShutdown =>
+        log.trace(s"Adjusting time with $newOffset milliseconds, source: ${server.getHostAddress}.")
         offset = newOffset
         updateTask.delayExecution(ExpirationTimeout)
       case _ => Task.unit
