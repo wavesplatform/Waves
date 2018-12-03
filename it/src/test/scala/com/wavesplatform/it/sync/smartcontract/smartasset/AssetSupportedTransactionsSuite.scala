@@ -448,5 +448,4 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                errNotAllowedByToken)
 
   }
-
 }
