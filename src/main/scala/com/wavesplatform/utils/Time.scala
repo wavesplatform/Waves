@@ -15,13 +15,12 @@ trait Time {
   def getTimestamp(): Long
 }
 
-class TimeImpl extends Time with ScorexLogging with AutoCloseable {
+class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {
 
   private val offsetPanicThreshold = 1000000L
   private val ExpirationTimeout    = 60.seconds
   private val RetryDelay           = 10.seconds
   private val ResponseTimeout      = 10.seconds
-  private val NtpServer            = System.getProperty("ntp.server", "pool.ntp.org")
 
   private implicit val scheduler: SchedulerService = Scheduler.singleThread(name = "time-impl")
 
@@ -33,7 +32,7 @@ class TimeImpl extends Time with ScorexLogging with AutoCloseable {
     def newOffsetTask: Task[Option[(InetAddress, java.lang.Long)]] = Task {
       try {
         client.open()
-        val info = client.getTime(InetAddress.getByName(NtpServer))
+        val info = client.getTime(InetAddress.getByName(ntpServer))
         info.computeDetails()
         Option(info.getOffset).map { offset =>
           val r = if (Math.abs(offset) > offsetPanicThreshold) throw new Exception("Offset is suspiciously large") else offset
@@ -77,5 +76,3 @@ class TimeImpl extends Time with ScorexLogging with AutoCloseable {
     scheduler.shutdown()
   }
 }
-
-object NTP extends TimeImpl

@@ -1,4 +1,5 @@
-package com.wavesplatform
+package com.wavesplatform.it
+
 import com.wavesplatform.utils.NTP
 import org.scalatest.{BeforeAndAfterAll, Suite}
 

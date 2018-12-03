@@ -4,18 +4,18 @@ import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import com.wavesplatform.OrderOps._
-import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.{NTPTime, TransactionGenBase}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.duration._
 
-class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase {
+class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime {
 
   private val defaultAssetPair = AssetPair(None, Some(ByteStr("asset".getBytes)))
 
@@ -72,7 +72,8 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
 
       "asks" in using {
         new OrderBookSnapshotHttpCache(
-          OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)), { _ =>
+          OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)),
+          ntpTime, { _ =>
             Some(
               OrderBook(
                 bids = TreeMap.empty,
@@ -102,7 +103,8 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
 
       "bids" in using {
         new OrderBookSnapshotHttpCache(
-          OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)), { _ =>
+          OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)),
+          ntpTime, { _ =>
             Some(
               OrderBook(
                 bids = TreeMap(bidLimitOrders.toSeq: _*)(OrderBook.bidsOrdering),
@@ -136,7 +138,8 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
       val bidLimitOrders = randomBidLimitOrders
       using {
         new OrderBookSnapshotHttpCache(
-          OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)), { _ =>
+          OrderBookSnapshotHttpCache.Settings(1.minute, List(3, 9)),
+          ntpTime, { _ =>
             Some(
               OrderBook(
                 bids = TreeMap(bidLimitOrders.toSeq: _*),
@@ -172,7 +175,8 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
       val depths         = List(1, 3, 7, 9)
       using {
         new OrderBookSnapshotHttpCache(
-          OrderBookSnapshotHttpCache.Settings(1.minute, depths), { _ =>
+          OrderBookSnapshotHttpCache.Settings(1.minute, depths),
+          ntpTime, { _ =>
             Some(
               OrderBook(
                 bids = TreeMap(bidLimitOrders.toSeq: _*),
@@ -197,7 +201,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
     }
   }
 
-  private def createDefaultCache = new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(50.millis, List(3, 9)), _ => None)
+  private def createDefaultCache = new OrderBookSnapshotHttpCache(OrderBookSnapshotHttpCache.Settings(50.millis, List(3, 9)), ntpTime, _ => None)
 
   private def orderBookFrom(x: HttpResponse): OrderBookResult = JsonSerializer.deserialize[OrderBookResult](
     x.entity

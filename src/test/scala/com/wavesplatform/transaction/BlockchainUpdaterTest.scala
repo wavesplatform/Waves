@@ -3,7 +3,8 @@ package com.wavesplatform.transaction
 import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
-import com.wavesplatform.db.WithState
+import com.wavesplatform.block.Block
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.history
@@ -11,9 +12,8 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.produce
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FreeSpec, Matchers}
-import com.wavesplatform.block.Block
 
-class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with ShouldVerb with WithState {
+class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with ShouldVerb with WithDomain {
 
   private val ApprovalPeriod = 100
 

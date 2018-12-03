@@ -18,6 +18,7 @@ import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
 import monix.execution.Scheduler
 import org.slf4j.bridge.SLF4JBridgeHandler
+
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
@@ -51,6 +52,7 @@ object Importer extends ScorexLogging {
       override def close(): Unit                                                                 = {}
     }
 
+    val time = new NTP(settings.ntpServer)
     blockchainFilename match {
       case Success(filename) =>
         log.info(s"Loading file '$filename'")
@@ -58,10 +60,10 @@ object Importer extends ScorexLogging {
         createInputStream(filename) match {
           case Success(inputStream) =>
             val db                = openDB(settings.dataDirectory)
-            val blockchainUpdater = StorageFactory(settings, db, NTP)
+            val blockchainUpdater = StorageFactory(settings, db, time)
             val pos               = new PoSSelector(blockchainUpdater, settings.blockchainSettings)
             val checkpoint        = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-            val extAppender       = BlockAppender(checkpoint, blockchainUpdater, NTP, utxPoolStub, pos, settings, scheduler) _
+            val extAppender       = BlockAppender(checkpoint, blockchainUpdater, time, utxPoolStub, pos, settings, scheduler) _
             checkGenesis(settings, blockchainUpdater)
             val bis           = new BufferedInputStream(inputStream)
             var quit          = false
@@ -107,10 +109,12 @@ object Importer extends ScorexLogging {
             inputStream.close()
             val duration = System.currentTimeMillis() - start
             log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
-          case Failure(ex) => log.error(s"Failed to open file '$filename")
+          case Failure(_) => log.error(s"Failed to open file '$filename")
         }
-      case Failure(ex) => log.error("Usage: Importer <config file> <blockchain file> [height]")
+      case Failure(_) => log.error("Usage: Importer <config file> <blockchain file> [height]")
     }
+
+    time.close()
   }
 
   def createInputStream(filename: String): Try[FileInputStream] =
