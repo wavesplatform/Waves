@@ -23,13 +23,9 @@ object EvaluatorV1 extends ExprEvaluator {
       ctx <- get[LoggedEvaluationContext, ExecutionError]
       blockEvaluation = evalExpr(let.value)
       lazyBlock       = LazyVal(blockEvaluation.ter(ctx), ctx.l(let.name))
-      savedVars = ctx.ec.letDefs
-      result <- id {
+      result <- local {
         modify[LoggedEvaluationContext, ExecutionError](lets.modify(_)(_.updated(let.name, lazyBlock)))
           .flatMap(_ => evalExpr(inner))
-      }
-      _ <- id {
-        modify[LoggedEvaluationContext, ExecutionError](lets.set(_)(savedVars))
       }
     } yield result
 
@@ -67,7 +63,7 @@ object EvaluatorV1 extends ExprEvaluator {
                 val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.ec.letDefs) {
                   case (r, (argValue, (argName, _))) => r + (argName -> LazyVal(argValue.pure[TrampolinedExecResult], ctx.l("(arg)" + argName)))
                 }
-                id {
+                local {
                   set(LoggedEvaluationContext.Lenses.lets.set(ctx)(letDefsWithArgs)).flatMap(_ => evalExpr(func.ev))
                 }
               }
