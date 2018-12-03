@@ -109,7 +109,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       .text("Oracle load test")
       .children(
         opt[Int]("transactions").abbr("t").optional().text("number of transactions").action { (x, c) =>
-          c.copy(multisig = c.multisig.copy(transactions = x))
+          c.copy(oracle = c.oracle.copy(transactions = x))
         },
         opt[Boolean]("enabled").abbr("e").optional().text("DataEnty value").action { (x, c) =>
           c.copy(multisig = c.multisig.copy(firstRun = x))
@@ -131,6 +131,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         opt[Boolean]("complexity").abbr("ct").optional().text(" script complexity").action { (x, c) =>
           c.copy(swarm = c.swarm.copy(complexity = x))
         },
+        opt[Int]("exchange").abbr("et").optional().text("number of exchange transactions").action { (x, c) =>
+          c.copy(swarm = c.swarm.copy(exchange = x))
+        }
       )
   }
 
@@ -159,7 +162,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
         case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts)
         case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.privateKeyAccounts)
-        case Mode.SWARM    => new SetScriptsTransactionGenerator(finalConfig.swarm, finalConfig.privateKeyAccounts)
+        case Mode.SWARM    => new SmartGenerator(finalConfig.swarm, finalConfig.privateKeyAccounts)
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
