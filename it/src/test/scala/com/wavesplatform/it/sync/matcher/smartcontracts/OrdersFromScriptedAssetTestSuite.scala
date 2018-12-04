@@ -53,7 +53,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     matcherNode.expectIncorrectOrderPlacement(order, 400, "OrderRejected")
   }
 
-  "when execute, if counter is expired then cancel it only, except submitted" in {
+  "if counter order has expired then cancel its only, not a submitted order" in {
     val pair = AssetPair.createAssetPair("WAVES", AllowAssetId).get
 
     // place expiring counter order
