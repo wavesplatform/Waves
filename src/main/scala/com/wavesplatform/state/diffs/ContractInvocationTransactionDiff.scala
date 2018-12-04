@@ -25,12 +25,12 @@ import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.v1.ScriptV2
-import com.wavesplatform.transaction.smart.{ContractInvokationTransaction, WavesEnvironment}
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, WavesEnvironment}
 import monix.eval.Coeval
 import scodec.bits.ByteVector
 
-object ContractInvokationTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int)(tx: ContractInvokationTransaction): Either[ValidationError, Diff] = {
+object ContractInvocationTransactionDiff {
+  def apply(blockchain: Blockchain, height: Int)(tx: ContractInvocationTransaction): Either[ValidationError, Diff] = {
     val sc = blockchain.accountScript(tx.contractAddress)
     sc match {
       case Some(ScriptV2(_, contract)) =>

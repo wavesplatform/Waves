@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTEVECTOR, CONST_STRING,
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.smart.{ContractInvokationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.v1.ScriptV2
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
@@ -48,9 +48,9 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       )),
     None
   )
-  val preconditionsAndSetContract: Gen[(List[GenesisTransaction], SetScriptTransaction, ContractInvokationTransaction)] = for {
+  val preconditionsAndSetContract: Gen[(List[GenesisTransaction], SetScriptTransaction, ContractInvocationTransaction)] = for {
     setScriptVersion <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
-    ciVersion        <- Gen.oneOf(ContractInvokationTransaction.supportedVersions.toSeq)
+    ciVersion        <- Gen.oneOf(ContractInvocationTransaction.supportedVersions.toSeq)
     master           <- accountGen
     invoker          <- accountGen
     ts               <- timestampGen
@@ -67,7 +67,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     )
     setContract = SetScriptTransaction.selfSigned(setScriptVersion, master, Some(script), fee, ts).explicitGet()
     fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTEVECTOR(ByteVector(arg))))
-    ci          = ContractInvokationTransaction.selfSigned(ciVersion, invoker, master, fc, fee, ts).explicitGet()
+    ci          = ContractInvocationTransaction.selfSigned(ciVersion, invoker, master, fc, fee, ts).explicitGet()
   } yield (List(genesis, genesis2), setContract, ci)
 
   property("invoking contract results contract's state") {

@@ -17,7 +17,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.{ContractInvokationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
@@ -533,12 +533,12 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
   val contractInvokationGen = for {
     sender          <- accountGen
     contractAddress <- accountGen
-    version         <- Gen.oneOf(ContractInvokationTransaction.supportedVersions.toSeq)
+    version         <- Gen.oneOf(ContractInvocationTransaction.supportedVersions.toSeq)
     fc              <- funcCallGen
     chainId = AddressScheme.current.chainId
     fee       <- smallFeeGen
     timestamp <- timestampGen
-  } yield ContractInvokationTransaction.selfSigned(version, sender, contractAddress, fc, fee, timestamp).explicitGet()
+  } yield ContractInvocationTransaction.selfSigned(version, sender, contractAddress, fc, fee, timestamp).explicitGet()
 
   val priceGen: Gen[Long]            = Gen.choose(1, 3 * 100000L * 100000000L)
   val matcherAmountGen: Gen[Long]    = Gen.choose(1, 3 * 100000L * 100000000L)

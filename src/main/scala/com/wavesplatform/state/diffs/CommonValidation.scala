@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.{smart, _}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.{ContractInvokationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
 import scala.concurrent.duration._
@@ -41,7 +41,7 @@ object CommonValidation {
     SetScriptTransaction.typeId                -> 10,
     SponsorFeeTransaction.typeId               -> 1000,
     SetAssetScriptTransaction.typeId           -> (1000 - 4),
-    smart.ContractInvokationTransaction.typeId -> 5
+    smart.ContractInvocationTransaction.typeId -> 5
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
@@ -150,7 +150,7 @@ object CommonValidation {
       case _: LeaseCancelTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: CreateAliasTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction         => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _: ContractInvokationTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
+      case _: ContractInvocationTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
       case _                                => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }

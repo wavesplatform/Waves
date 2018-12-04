@@ -15,7 +15,7 @@ import play.api.libs.json.Json
 
 import scala.util.{Failure, Success, Try}
 
-case class ContractInvokationTransaction private (version: Byte,
+case class ContractInvocationTransaction private (version: Byte,
                                                   chainId: Byte,
                                                   sender: PublicKeyAccount,
                                                   contractAddress: Address,
@@ -27,7 +27,7 @@ case class ContractInvokationTransaction private (version: Byte,
     with VersionedTransaction
     with FastHashId {
 
-  override val builder: TransactionParser = ContractInvokationTransaction
+  override val builder: TransactionParser = ContractInvocationTransaction
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(
@@ -47,7 +47,7 @@ case class ContractInvokationTransaction private (version: Byte,
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }
 
-object ContractInvokationTransaction extends TransactionParserFor[ContractInvokationTransaction] with TransactionParser.MultipleVersions {
+object ContractInvocationTransaction extends TransactionParserFor[ContractInvocationTransaction] with TransactionParser.MultipleVersions {
 
   override val typeId: Byte                 = 15
   override val supportedVersions: Set[Byte] = Set(1)
@@ -82,7 +82,7 @@ object ContractInvokationTransaction extends TransactionParserFor[ContractInvoka
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
-    } yield new ContractInvokationTransaction(version, networkByte, sender, contractAddress, fc, fee, timestamp, proofs)
+    } yield new ContractInvocationTransaction(version, networkByte, sender, contractAddress, fc, fee, timestamp, proofs)
 
   def signed(version: Byte,
              sender: PublicKeyAccount,
