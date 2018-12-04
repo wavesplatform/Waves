@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.transactions
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.crypto
+import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -10,13 +11,13 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, _}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.utils.{Base58, NTP}
+import com.wavesplatform.utils.Base58
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
 
 import scala.util.Random
 
-class SignAndBroadcastApiSuite extends BaseTransactionSuite {
+class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
   test("height should always be reported for transactions") {
     val txId = sender.transfer(firstAddress, secondAddress, 1.waves, fee = 1.waves).id
 
@@ -300,16 +301,16 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
       val buyer               = pkByAddress(firstAddress)
       val seller              = pkByAddress(secondAddress)
       val matcher             = pkByAddress(thirdAddress)
-      val time                = NTP.correctedTime()
-      val expirationTimestamp = time + Order.MaxLiveTime
+      val ts                  = ntpTime.correctedTime()
+      val expirationTimestamp = ts + Order.MaxLiveTime
       val buyPrice            = 1 * Order.PriceConstant
       val sellPrice           = (0.50 * Order.PriceConstant).toLong
       val mf                  = 300000L
       val buyAmount           = 2
       val sellAmount          = 3
       val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
-      val buy                 = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, time, expirationTimestamp, mf, o1ver)
-      val sell                = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, time, expirationTimestamp, mf, o2ver)
+      val buy                 = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, mf, o1ver)
+      val sell                = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, mf, o2ver)
 
       val amount = math.min(buy.amount, sell.amount)
       val tx =
@@ -324,7 +325,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
               buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
               sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
               fee = mf,
-              timestamp = NTP.correctedTime()
+              timestamp = ts
             )
             .explicitGet()
             .json()
@@ -339,7 +340,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite {
               buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
               sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
               fee = mf,
-              timestamp = NTP.correctedTime()
+              timestamp = ts
             )
             .explicitGet()
             .json()

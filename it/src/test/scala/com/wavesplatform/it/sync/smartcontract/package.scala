@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, Order}
-import com.wavesplatform.utils.NTP
+import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
 
 package object smartcontract {
@@ -112,12 +112,12 @@ package object smartcontract {
        | }
      """.stripMargin
 
-  def exchangeTx(pair: AssetPair, exTxFee: Long, orderFee: Long, accounts: PrivateKeyAccount*): JsObject = {
+  def exchangeTx(pair: AssetPair, exTxFee: Long, orderFee: Long, time: Time, accounts: PrivateKeyAccount*): JsObject = {
     val buyer       = accounts.head // first one
     val seller      = accounts.tail.head // second one
     val matcher     = accounts.last
     val sellPrice   = (0.50 * Order.PriceConstant).toLong
-    val (buy, sell) = orders(pair, 2, orderFee, buyer, seller, matcher)
+    val (buy, sell) = orders(pair, 2, orderFee, time, buyer, seller, matcher)
 
     val amount = math.min(buy.amount, sell.amount)
 
@@ -135,7 +135,7 @@ package object smartcontract {
         buyMatcherFee = buyMatcherFee,
         sellMatcherFee = sellMatcherFee,
         fee = matcherFee,
-        timestamp = NTP.correctedTime()
+        timestamp = time.correctedTime()
       )
       .right
       .get
@@ -144,19 +144,19 @@ package object smartcontract {
     tx
   }
 
-  def orders(pair: AssetPair, version: Byte, fee: Long, accounts: PrivateKeyAccount*): (Order, Order) = {
+  def orders(pair: AssetPair, version: Byte, fee: Long, time: Time, accounts: PrivateKeyAccount*): (Order, Order) = {
     val buyer               = accounts.head // first one
     val seller              = accounts.tail.head // second one
     val matcher             = accounts.last
-    val time                = NTP.correctedTime()
-    val expirationTimestamp = time + Order.MaxLiveTime
+    val ts                  = time.correctedTime()
+    val expirationTimestamp = ts + Order.MaxLiveTime
     val buyPrice            = 1 * Order.PriceConstant
     val sellPrice           = (0.50 * Order.PriceConstant).toLong
     val buyAmount           = 2
     val sellAmount          = 3
 
-    val buy  = Order.buy(buyer, matcher, pair, buyAmount, buyPrice, time, expirationTimestamp, fee, version)
-    val sell = Order.sell(seller, matcher, pair, sellAmount, sellPrice, time, expirationTimestamp, fee, version)
+    val buy  = Order.buy(buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee, version)
+    val sell = Order.sell(seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee, version)
 
     (buy, sell)
   }

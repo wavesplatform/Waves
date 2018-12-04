@@ -21,21 +21,24 @@ object BaseTargetChecker {
     val settings     = WavesSettings.fromConfig(sharedConfig)
     val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()
     val db           = openDB("/tmp/tmp-db")
-    val bu           = StorageFactory(settings, db, NTP)
+    val time         = new NTP("ntp.pool.org")
+    val bu           = StorageFactory(settings, db, time)
     val pos          = new PoSSelector(bu, settings.blockchainSettings)
     bu.processBlock(genesisBlock)
 
-    NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
-      case cfg if cfg.as[Boolean]("waves.miner.enable") =>
-        val account   = PublicKeyAccount(cfg.as[ByteStr]("public-key").arr)
-        val address   = account.toAddress
-        val balance   = bu.balance(address, None)
-        val consensus = genesisBlock.consensusData
-        val timeDelay = pos
-          .getValidBlockDelay(bu.height, account.publicKey, consensus.baseTarget, balance)
-          .explicitGet()
+    try {
+      NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
+        case cfg if cfg.as[Boolean]("waves.miner.enable") =>
+          val account   = PublicKeyAccount(cfg.as[ByteStr]("public-key").arr)
+          val address   = account.toAddress
+          val balance   = bu.balance(address, None)
+          val consensus = genesisBlock.consensusData
+          val timeDelay = pos
+            .getValidBlockDelay(bu.height, account.publicKey, consensus.baseTarget, balance)
+            .explicitGet()
 
-        f"$address: ${timeDelay * 1e-3}%10.3f s"
-    }
+          f"$address: ${timeDelay * 1e-3}%10.3f s"
+      }
+    } finally time.close()
   }
 }

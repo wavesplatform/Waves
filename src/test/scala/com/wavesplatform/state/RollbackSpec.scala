@@ -2,9 +2,9 @@ package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.db.WithState
-import com.wavesplatform.features._
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
+import com.wavesplatform.features._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
@@ -21,7 +21,7 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 
-class RollbackSpec extends FreeSpec with Matchers with WithState with TransactionGen with PropertyChecks with NoShrink {
+class RollbackSpec extends FreeSpec with Matchers with WithDomain with TransactionGen with PropertyChecks with NoShrink {
   private val time   = new TestTime
   private def nextTs = time.getTimestamp()
 

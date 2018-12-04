@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
+import com.wavesplatform.NTPTime
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.OrderAccepted
@@ -28,7 +29,8 @@ class MatcherActorSpecification
     with BeforeAndAfterEach
     with PathMockFactory
     with ImplicitSender
-    with Eventually {
+    with Eventually
+    with NTPTime {
 
   private val blockchain: Blockchain = stub[Blockchain]
   (blockchain.assetDescription _)
@@ -120,7 +122,7 @@ class MatcherActorSpecification
         new MatcherActor(
           ob,
           (assetPair, matcher) =>
-            OrderBookActor.props(matcher, assetPair, _ => {}, _ => {}, mock[UtxPool], mock[ChannelGroup], matcherSettings, txFactory),
+            OrderBookActor.props(matcher, assetPair, _ => {}, _ => {}, mock[UtxPool], mock[ChannelGroup], matcherSettings, txFactory, ntpTime),
           blockchain.assetDescription
         )
       ))

@@ -16,7 +16,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, HasScriptType, NegativeAmount, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils.{NTP, ScorexLogging, Time}
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -309,7 +309,7 @@ object OrderBookActor {
             allChannels: ChannelGroup,
             settings: MatcherSettings,
             createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction],
-            time: Time = NTP): Props =
+            time: Time): Props =
     Props(new OrderBookActor(parent, assetPair, updateSnapshot, updateMarketStatus, utx, allChannels, settings, createTransaction, time))
 
   def name(assetPair: AssetPair): String = assetPair.toString
