@@ -408,8 +408,6 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       s"""
                                         |match tx {
                                         |  case s : SetAssetScriptTransaction => true
-                                        |  case ss: SponsorFeeTransaction => ss.sender == addressFromPublicKey(base58'${ByteStr(
-           pkByAddress(firstAddress).publicKey).base58}')
                                         |  case _ => false
                                         |}
          """.stripMargin,
