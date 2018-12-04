@@ -5,7 +5,8 @@ import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.FunctionHeader
 import scodec.bits.ByteVector
 
-object Terms {
+object
+Terms {
   sealed abstract class EXPR
   sealed abstract class DECLARATION
   sealed trait EVALUATED
