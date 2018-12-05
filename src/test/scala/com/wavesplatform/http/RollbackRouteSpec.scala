@@ -38,17 +38,18 @@ class RollbackRouteSpec extends RouteSpec("/debug") with MockFactory with RestAP
       ng.height _ when () returns 2001
       blockchain.height _ when () returns 2001
       blockchain.heightOf _ when signature returns Some(signatureHeight)
+      blockchain.greatestReachedHeight _ when () returns 2001
 
       Delete(routePath(s"/rollback-to/$signatureString")) ~>
         api_key(apiKey) ~>
-        route should produce(CustomValidationError("Rollback of more than 1990 blocks is forbidden"))
+        route should produce(CustomValidationError("Rollback is possible only to the block at a height: 11"))
 
       Post(routePath("/rollback"), params) ~>
         api_key(apiKey) ~>
         route ~>
         check {
           status shouldBe StatusCodes.BadRequest
-          responseAs[String] shouldBe "Rollback of more than 1990 blocks is forbidden"
+          responseAs[String] shouldBe "Rollback is possible only to the block at a height: 11"
         }
     }
   }

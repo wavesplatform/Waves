@@ -9,6 +9,7 @@ import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
 
 trait Blockchain {
   def height: Int
+  def greatestReachedHeight: Int
   def score: BigInt
   def scoreOf(blockId: ByteStr): Option[BigInt]
 

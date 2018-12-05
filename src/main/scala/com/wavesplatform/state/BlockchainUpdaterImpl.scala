@@ -291,6 +291,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
   override def height: Int = blockchain.height + ngState.fold(0)(_ => 1)
 
+  override def greatestReachedHeight: Int = blockchain.greatestReachedHeight
+
   override def blockBytes(height: Int): Option[Array[Byte]] =
     blockchain
       .blockBytes(height)

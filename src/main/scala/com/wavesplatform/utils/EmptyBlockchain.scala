@@ -13,6 +13,8 @@ import com.wavesplatform.transaction.smart.script.Script
 object EmptyBlockchain extends Blockchain {
   override def height: Int = 0
 
+  override def greatestReachedHeight: Int = 0
+
   override def score: BigInt = 0
 
   override def scoreOf(blockId: ByteStr): Option[BigInt] = None

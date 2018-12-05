@@ -196,8 +196,9 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def rollback: Route = (path("rollback") & post & withAuth) {
     json[RollbackParams] { params =>
-      if (ng.height - params.rollbackTo > LevelDBWriter.MAX_DEPTH - 10)
-        (StatusCodes.BadRequest, s"Rollback of more than ${LevelDBWriter.MAX_DEPTH - 10} blocks is forbidden")
+      val canRollbackTo = blockchain.greatestReachedHeight - LevelDBWriter.MAX_DEPTH + 10
+      if (params.rollbackTo < canRollbackTo)
+        (StatusCodes.BadRequest, s"Rollback is possible only to the block at a height: $canRollbackTo")
       else {
         ng.blockAt(params.rollbackTo) match {
           case Some(block) =>
@@ -285,6 +286,7 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
     (delete & withAuth) {
+      val canRollbackTo = blockchain.greatestReachedHeight - LevelDBWriter.MAX_DEPTH + 10
       val signatureEi: Either[ValidationError, ByteStr] = for {
         signature <- ByteStr
           .decodeBase58(signature)
@@ -295,9 +297,9 @@ case class DebugApiRoute(ws: WavesSettings,
           .toRight(GenericError("Block with such signature not found"))
         _ <- Either
           .cond(
-            ng.height - height < (LevelDBWriter.MAX_DEPTH - 10),
+            height > canRollbackTo,
             (),
-            GenericError(s"Rollback of more than ${LevelDBWriter.MAX_DEPTH - 10} blocks is forbidden")
+            GenericError(s"Rollback is possible only to the block at a height: $canRollbackTo")
           )
       } yield signature
 

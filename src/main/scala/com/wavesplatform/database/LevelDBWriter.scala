@@ -67,6 +67,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   import LevelDBWriter._
 
+  override def greatestReachedHeight: Int = readOnly(_.get(Keys.greatestReachedHeight))
+
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
   private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
@@ -191,6 +193,13 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
+
+    val previousGreatestReachedHeight = rw.get(Keys.greatestReachedHeight)
+
+    if (previousGreatestReachedHeight < height) {
+      rw.put(Keys.greatestReachedHeight, height)
+    }
+
     rw.put(Keys.blockAt(height), Some(block))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
     val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -734,11 +743,11 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
-    val currentHeight = db.get(Keys.height)
+    val canGetAfterHeight = db.get(Keys.greatestReachedHeight) - MAX_DEPTH
 
     Either
       .cond(
-        currentHeight - height <= MAX_DEPTH,
+        height > canGetAfterHeight,
         (for {
           seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
           addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
@@ -747,7 +756,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
           balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
           if balance > 0
         } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq,
-        GenericError(s"Cannot get asset distribution at height less than ${currentHeight - MAX_DEPTH}")
+        GenericError(s"Cannot get asset distribution at height less than $canGetAfterHeight")
       )
   }
 
