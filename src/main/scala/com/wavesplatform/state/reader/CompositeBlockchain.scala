@@ -84,8 +84,6 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def height: Int = inner.height + (if (maybeDiff.isDefined) 1 else 0)
 
-  override def greatestReachedHeight: Int = inner.greatestReachedHeight
-
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
     addressTransactionsFromDiff(inner, maybeDiff)(address, types, count, fromId)
 
@@ -224,7 +222,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def append(diff: Diff, carryFee: Long, block: Block): Unit = inner.append(diff, carryFee, block)
 
-  override def rollbackTo(targetBlockId: ByteStr): Seq[Block] = inner.rollbackTo(targetBlockId)
+  override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = inner.rollbackTo(targetBlockId)
 }
 
 object CompositeBlockchain {

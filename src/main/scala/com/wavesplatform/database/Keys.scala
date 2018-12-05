@@ -116,5 +116,5 @@ object Keys {
   def assetScriptPresent(assetId: ByteStr)(height: Int): Key[Option[Unit]] =
     Key.opt("asset-script", hBytes(47, height, assetId.arr), (_ => ()), (_ => Array[Byte]()))
 
-  val greatestReachedHeight: Key[Int] = intKey("max-reached-height", 48)
+  val safeRollbackHeight: Key[Int] = intKey("safe-rollback-height", 48)
 }

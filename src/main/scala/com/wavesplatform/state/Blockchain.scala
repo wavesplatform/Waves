@@ -9,7 +9,6 @@ import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
 
 trait Blockchain {
   def height: Int
-  def greatestReachedHeight: Int
   def score: BigInt
   def scoreOf(blockId: ByteStr): Option[BigInt]
 
@@ -84,5 +83,5 @@ trait Blockchain {
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
   def append(diff: Diff, carryFee: Long, block: Block): Unit
-  def rollbackTo(targetBlockId: ByteStr): Seq[Block]
+  def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]]
 }

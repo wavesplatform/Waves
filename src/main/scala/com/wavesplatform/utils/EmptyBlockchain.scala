@@ -6,14 +6,12 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AccountDataInfo, AssetDescription, BalanceSnapshot, Blockchain, ByteStr, DataEntry, Diff, Portfolio, VolumeAndFee}
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
 
 object EmptyBlockchain extends Blockchain {
   override def height: Int = 0
-
-  override def greatestReachedHeight: Int = 0
 
   override def score: BigInt = 0
 
@@ -101,5 +99,5 @@ object EmptyBlockchain extends Blockchain {
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
   override def append(diff: Diff, carryFee: Long, block: Block): Unit                                  = ()
-  override def rollbackTo(targetBlockId: ByteStr): Seq[Block]                                          = Seq.empty
+  override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]]                          = Right(Seq.empty)
 }

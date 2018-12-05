@@ -1,6 +1,9 @@
 package com.wavesplatform.state
 
 import cats.implicits._
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
@@ -8,19 +11,16 @@ import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimen
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
-import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
-import kamon.Kamon
-import kamon.metric.MeasurementUnit
-import monix.reactive.Observable
-import monix.reactive.subjects.ConcurrentSubject
-import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
+import kamon.Kamon
+import kamon.metric.MeasurementUnit
+import monix.reactive.Observable
+import monix.reactive.subjects.ConcurrentSubject
 
 class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, time: Time)
     extends BlockchainUpdater
@@ -220,7 +220,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     } else {
       val discardedNgBlock = ng.map(_.bestLiquidBlock).toSeq
       ngState = None
-      Right(blockchain.rollbackTo(blockId) ++ discardedNgBlock)
+      blockchain
+        .rollbackTo(blockId)
+        .map(_ ++ discardedNgBlock)
+        .leftMap(err => GenericError(err))
     }
   }
 
@@ -290,8 +293,6 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     liquidBlockHeaderAndSize().filter(_._1.uniqueId == blockId) orElse blockchain.blockHeaderAndSize(blockId)
 
   override def height: Int = blockchain.height + ngState.fold(0)(_ => 1)
-
-  override def greatestReachedHeight: Int = blockchain.greatestReachedHeight
 
   override def blockBytes(height: Int): Option[Array[Byte]] =
     blockchain
@@ -534,7 +535,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
   override def append(diff: Diff, carry: Long, block: Block): Unit = blockchain.append(diff, carry, block)
 
-  override def rollbackTo(targetBlockId: AssetId): Seq[Block] = blockchain.rollbackTo(targetBlockId)
+  override def rollbackTo(targetBlockId: AssetId): Either[String, Seq[Block]] = blockchain.rollbackTo(targetBlockId)
 
   override def transactionHeight(id: AssetId): Option[Int] =
     ngState flatMap { ng =>

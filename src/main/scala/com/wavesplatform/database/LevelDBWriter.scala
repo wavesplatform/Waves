@@ -67,8 +67,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   import LevelDBWriter._
 
-  override def greatestReachedHeight: Int = readOnly(_.get(Keys.greatestReachedHeight))
-
   private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
   private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
@@ -78,6 +76,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   override protected def loadAddressId(address: Address): Option[BigInt] = readOnly(db => db.get(Keys.addressId(address)))
 
   override protected def loadHeight(): Int = readOnly(_.get(Keys.height))
+
+  override protected def safeRollbackHeight: Int = readOnly(_.get(Keys.safeRollbackHeight))
 
   override protected def loadScore(): BigInt = readOnly(db => db.get(Keys.score(db.get(Keys.height))))
 
@@ -194,10 +194,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     rw.put(Keys.height, height)
 
-    val previousGreatestReachedHeight = rw.get(Keys.greatestReachedHeight)
+    val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
 
-    if (previousGreatestReachedHeight < height) {
-      rw.put(Keys.greatestReachedHeight, height)
+    if (previousSafeRollbackHeight < (height - MAX_DEPTH)) {
+      rw.put(Keys.safeRollbackHeight, height - MAX_DEPTH)
     }
 
     rw.put(Keys.blockAt(height), Some(block))
@@ -743,7 +743,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
-    val canGetAfterHeight = db.get(Keys.greatestReachedHeight) - MAX_DEPTH
+    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
     Either
       .cond(
