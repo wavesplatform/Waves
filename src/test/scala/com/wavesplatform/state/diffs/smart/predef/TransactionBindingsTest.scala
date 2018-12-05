@@ -490,21 +490,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("Bindings w/wo proofs/order") {
-    val txTypeGen: Gen[String] = Gen.oneOf(
+    val assetSupportedTxTypeGen: Gen[String] = Gen.oneOf(
       List(
         "TransferTransaction",
-        "IssueTransaction",
         "ReissueTransaction",
         "BurnTransaction",
-        "SetAssetScriptTransaction",
-        "LeaseTransaction",
-        "LeaseCancelTransaction",
-        "CreateAliasTransaction",
-        "SponsorFeeTransaction"
+        "SetAssetScriptTransaction"
       )
     )
 
-    forAll(txTypeGen, orderGen) { (txType, in) =>
+    forAll(assetSupportedTxTypeGen, orderGen) { (txType, in) =>
       val src1 =
         s"""
           |let expectedProof = base58'satoshi'
@@ -525,24 +520,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
       val noProofsError = s"Compilation failed: Undefined field `proofs` of variable of type `Union(List($txType))`"
 
-      runCustom(
-        src1,
-        proofs = false,
-        order = true
-      ) should produce(noProofsError)
+      runForAsset(src1) should produce(noProofsError)
 
-      runCustom(
-        src2,
-        proofs = true,
-        order = false
-      ) shouldBe 'left
+      runForAsset(src2) shouldBe 'left
 
       runScript[EVALUATED](src1, Coproduct[In](in)) shouldBe Right(CONST_BOOLEAN(true))
       runScript[EVALUATED](src2, Coproduct[In](in)) shouldBe Right(CONST_LONG(1))
     }
   }
 
-  def runCustom(script: String, proofs: Boolean, order: Boolean): Either[String, EVALUATED] = {
+  def runForAsset(script: String): Either[String, EVALUATED] = {
     import cats.syntax.monoid._
     import com.wavesplatform.lang.v1.CTX._
 
@@ -553,7 +540,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(V2, new WavesEnvironment(networkByte, Coeval(null), null, EmptyBlockchain), proofsEnabled = proofs, orderEnabled = order)
+          .build(V2, new WavesEnvironment(networkByte, Coeval(null), null, EmptyBlockchain), isTokenContext = true)
 
     for {
       compileResult <- CompilerV1(ctx.compilerContext, expr)
@@ -572,7 +559,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, EmptyBlockchain), true, true)
+          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, EmptyBlockchain), isTokenContext = false)
 
     for {
       compileResult <- CompilerV1(ctx.compilerContext, expr)

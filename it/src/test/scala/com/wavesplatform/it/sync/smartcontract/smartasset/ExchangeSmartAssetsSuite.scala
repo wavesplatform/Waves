@@ -143,9 +143,9 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("use all functions from RIDE for asset script") {
-    val script1 = Some(ScriptCompiler(cryptoContextScript, isAssetScript = true).explicitGet()._1.bytes.value.base64)
-    val script2 = Some(ScriptCompiler(pureContextScript(dtx), isAssetScript = true).explicitGet()._1.bytes.value.base64)
-    val script3 = Some(ScriptCompiler(wavesContextScript(dtx), isAssetScript = true).explicitGet()._1.bytes.value.base64)
+    val script1 = Some(ScriptCompiler(cryptoContextScript(false), isAssetScript = true).explicitGet()._1.bytes.value.base64)
+    val script2 = Some(ScriptCompiler(pureContextScript(dtx, false), isAssetScript = true).explicitGet()._1.bytes.value.base64)
+    val script3 = Some(ScriptCompiler(wavesContextScript(dtx, false), isAssetScript = true).explicitGet()._1.bytes.value.base64)
 
     List(script1, script2, script3)
       .map { i =>

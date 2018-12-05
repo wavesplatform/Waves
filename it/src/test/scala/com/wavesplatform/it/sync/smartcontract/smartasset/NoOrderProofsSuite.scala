@@ -38,7 +38,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       )
     catch {
       case ex: java.lang.Exception => assert(ex.getMessage.contains("Compilation failed: Matching not exhaustive"))
-      case _ => throw new Exception("ScriptCompiler works incorrect for orders with smart assets")
+      case _                       => throw new Exception("ScriptCompiler works incorrect for orders with smart assets")
     }
 
   }

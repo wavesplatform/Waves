@@ -14,7 +14,7 @@ object JavaAdapter {
     new CompilerV1(
       Monoid.combineAll(Seq(
         CryptoContext.compilerContext(com.wavesplatform.lang.Global),
-        WavesContext.build(version, null, true, true).compilerContext,
+        WavesContext.build(version, null, false).compilerContext,
         PureContext.build(version).compilerContext
       )))
 

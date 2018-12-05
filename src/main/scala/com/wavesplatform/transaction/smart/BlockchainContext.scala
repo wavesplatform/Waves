@@ -19,14 +19,13 @@ object BlockchainContext {
             in: Coeval[In],
             h: Coeval[Int],
             blockchain: Blockchain,
-            orderEnabled: Boolean,
-            proofsEnabled: Boolean): EvaluationContext = {
+            isTokenContext: Boolean): EvaluationContext = {
     Monoid
       .combineAll(
         Seq(
           PureContext.build(version),
           CryptoContext.build(Global),
-          WavesContext.build(version, new WavesEnvironment(nByte, in, h, blockchain), orderEnabled, proofsEnabled)
+          WavesContext.build(version, new WavesEnvironment(nByte, in, h, blockchain), isTokenContext)
         ))
       .evaluationContext
   }

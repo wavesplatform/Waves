@@ -57,8 +57,7 @@ object JsAPI {
       override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
       override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     },
-    proofsEnabled = true,
-    orderEnabled = true
+    isTokenContext = false
   )
 
   val cryptoContext = CryptoContext.build(Global)
