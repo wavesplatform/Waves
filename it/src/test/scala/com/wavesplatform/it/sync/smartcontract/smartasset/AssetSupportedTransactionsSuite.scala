@@ -401,7 +401,6 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                "Asset is not reissuable")
   }
 
-
   test("try to send transactions forbidden by the asset's script") {
     val assetWOSupport = sender
       .issue(

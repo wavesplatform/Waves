@@ -262,16 +262,11 @@ object Types {
       )
   }
 
-  def buildWavesTypes(proofsEnabled: Boolean, onlyAssetSupportedTxs: Boolean): Seq[DefinedType] = {
+  def buildWavesTypes(proofsEnabled: Boolean): Seq[DefinedType] = {
 
-    val activeTxTypes   =
-      if (onlyAssetSupportedTxs) buildAssetSupportedTransactions(proofsEnabled)
-      else buildActiveTransactionTypes(proofsEnabled)
-
-    val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled)
-
-    val transactionsCommonType = UnionType("Transaction", activeTxTypes.map(_.typeRef))
-
+    val activeTxTypes                    = buildActiveTransactionTypes(proofsEnabled)
+    val obsoleteTxTypes                  = buildObsoleteTransactionTypes(proofsEnabled)
+    val transactionsCommonType           = UnionType("Transaction", activeTxTypes.map(_.typeRef))
     val transactionTypes: List[CaseType] = obsoleteTxTypes ++ activeTxTypes
 
     Seq(

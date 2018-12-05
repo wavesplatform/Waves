@@ -59,9 +59,9 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
   }
 
   test("set contracts and put exchange transaction in blockchain") {
-    val sc4 = Some(cryptoContextScript)
-    val sc5 = Some(pureContextScript(dtx))
-    val sc6 = Some(wavesContextScript(dtx))
+    val sc4 = Some(cryptoContextScript(true))
+    val sc5 = Some(pureContextScript(dtx, true))
+    val sc6 = Some(wavesContextScript(dtx, true))
 
     for ((contr1, contr2, mcontr) <- Seq(
            (sc1, sc1, sc1),

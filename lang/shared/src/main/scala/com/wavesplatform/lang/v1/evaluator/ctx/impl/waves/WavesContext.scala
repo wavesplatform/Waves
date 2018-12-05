@@ -264,14 +264,9 @@ object WavesContext {
     val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Right(CONST_LONG(env.height)))
 
     val anyTransactionType =
-      if (isTokenContext)
-        UNION(
-          (buildObsoleteTransactionTypes(proofsEnabled) ++
-            buildAssetSupportedTransactions(proofsEnabled)).map(_.typeRef))
-      else
-        UNION(
-          (buildObsoleteTransactionTypes(proofsEnabled) ++
-            buildActiveTransactionTypes(proofsEnabled)).map(_.typeRef))
+      UNION(
+        (buildObsoleteTransactionTypes(proofsEnabled) ++
+          buildActiveTransactionTypes(proofsEnabled)).map(_.typeRef))
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
@@ -385,7 +380,7 @@ object WavesContext {
       transactionsCommonType
     ) ++ transactionTypes
 
-    val types = buildWavesTypes(proofsEnabled, isTokenContext)
+    val types = buildWavesTypes(proofsEnabled)
 
     CTX(types, commonVars ++ vars(version.value), functions)
   }
