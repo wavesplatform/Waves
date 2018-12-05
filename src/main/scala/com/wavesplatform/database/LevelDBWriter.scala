@@ -77,6 +77,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   override protected def loadHeight(): Int = readOnly(_.get(Keys.height))
 
+  override protected def safeRollbackHeight: Int = readOnly(_.get(Keys.safeRollbackHeight))
+
   override protected def loadScore(): BigInt = readOnly(db => db.get(Keys.score(db.get(Keys.height))))
 
   override protected def loadLastBlock(): Option[Block] = readOnly(db => db.get(Keys.blockAt(db.get(Keys.height))))
@@ -191,6 +193,13 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
+
+    val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
+
+    if (previousSafeRollbackHeight < (height - MAX_DEPTH)) {
+      rw.put(Keys.safeRollbackHeight, height - MAX_DEPTH)
+    }
+
     rw.put(Keys.blockAt(height), Some(block))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
     val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -734,11 +743,11 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
-    val currentHeight = db.get(Keys.height)
+    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
     Either
       .cond(
-        currentHeight - height <= MAX_DEPTH,
+        height > canGetAfterHeight,
         (for {
           seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
           addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
@@ -747,7 +756,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
           balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
           if balance > 0
         } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq,
-        GenericError(s"Cannot get asset distribution at height less than ${currentHeight - MAX_DEPTH}")
+        GenericError(s"Cannot get asset distribution at height less than $canGetAfterHeight")
       )
   }
 

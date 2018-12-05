@@ -222,7 +222,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def append(diff: Diff, carryFee: Long, block: Block): Unit = inner.append(diff, carryFee, block)
 
-  override def rollbackTo(targetBlockId: ByteStr): Seq[Block] = inner.rollbackTo(targetBlockId)
+  override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = inner.rollbackTo(targetBlockId)
 }
 
 object CompositeBlockchain {
