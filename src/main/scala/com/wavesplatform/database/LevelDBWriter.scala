@@ -1,6 +1,5 @@
 package com.wavesplatform.database
 
-import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -15,7 +14,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
@@ -285,6 +284,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
 
     for ((addressId, addressData) <- data) {
+      rw.put(Keys.changedDataKeys(height, addressId), addressData.data.keys.toSeq)
+      addressData.data.keys.toSeq
       val newKeys = (
         for {
           (key, value) <- addressData.data
@@ -376,6 +377,12 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
               rw.filterHistory(Keys.assetBalanceHistory(addressId, assetId), currentHeight)
             }
 
+            for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
+              log.trace(s"Discarding $k for $address at $currentHeight")
+              rw.delete(Keys.data(addressId, k)(currentHeight))
+              rw.filterHistory(Keys.dataHistory(addressId, k), currentHeight)
+            }
+
             rw.delete(Keys.wavesBalance(addressId)(currentHeight))
             rw.filterHistory(Keys.wavesBalanceHistory(addressId), currentHeight)
 
@@ -435,15 +442,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
                   rw.delete(Keys.assetScript(asset)(currentHeight))
                   rw.filterHistory(Keys.assetScriptHistory(asset), currentHeight)
 
-                case tx: DataTransaction =>
-                  val address = tx.sender.toAddress
-                  for (addressId <- addressId(address)) {
-                    tx.data.foreach { e =>
-                      log.trace(s"Discarding ${e.key} for $address at $currentHeight")
-                      rw.delete(Keys.data(addressId, e.key)(currentHeight))
-                      rw.filterHistory(Keys.dataHistory(addressId, e.key), currentHeight)
-                    }
-                  }
+                case _: DataTransaction | _: ContractInvocationTransaction => // see changed data keys removal
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
