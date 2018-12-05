@@ -20,19 +20,16 @@ trait Caches extends Blockchain with ScorexLogging {
   protected def maxCacheSize: Int
 
   @volatile
-  private var heightCache = loadHeight()
+  protected var current = (loadHeight(), loadScore(), loadLastBlock())
+
   protected def loadHeight(): Int
-  override def height: Int = heightCache
+  override def height: Int = current._1
 
-  @volatile
-  private var scoreCache = loadScore()
   protected def loadScore(): BigInt
-  override def score: BigInt = scoreCache
+  override def score: BigInt = current._2
 
-  @volatile
-  private var lastBlockCache = loadLastBlock()
   protected def loadLastBlock(): Option[Block]
-  override def lastBlock: Option[Block] = lastBlockCache
+  override def lastBlock: Option[Block] = current._3
 
   private val transactionIds                                       = new util.HashMap[ByteStr, Long]()
   protected def forgetTransaction(id: ByteStr): Unit               = transactionIds.remove(id)
@@ -122,9 +119,6 @@ trait Caches extends Blockchain with ScorexLogging {
                          sponsorship: Map[AssetId, Sponsorship]): Unit
 
   override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
-    heightCache += 1
-    scoreCache += block.blockScore()
-    lastBlockCache = Some(block)
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
@@ -178,6 +172,8 @@ trait Caches extends Blockchain with ScorexLogging {
       newTransactions += id -> ((tx, addresses.map(addressId)))
     }
 
+    current = ((current._1 + 1), (current._2 + block.blockScore()), Some(block))
+
     doAppend(
       block,
       carryFee,
@@ -210,9 +206,7 @@ trait Caches extends Blockchain with ScorexLogging {
   override def rollbackTo(targetBlockId: ByteStr): Seq[Block] = {
     val discardedBlocks = doRollback(targetBlockId)
 
-    heightCache = loadHeight()
-    scoreCache = loadScore()
-    lastBlockCache = loadLastBlock()
+    current = (loadHeight(), loadScore(), loadLastBlock())
 
     activatedFeaturesCache = loadActivatedFeatures()
     approvedFeaturesCache = loadApprovedFeatures()

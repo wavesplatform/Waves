@@ -679,19 +679,59 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     b.result()
   }
 
-  override def scoreOf(blockId: ByteStr): Option[BigInt] = readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
+  override def scoreOf(blockId: ByteStr): Option[BigInt] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      Some(c._2)
+    } else {
+      readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
+    }
+  }
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readOnly(_.get(Keys.blockHeader(height)))
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+    val c = current
+    if (height == c._1) {
+      c._3.map(b => (b, b.bytes().size))
+    } else {
+      readOnly(_.get(Keys.blockHeader(height)))
+    }
+  }
 
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] =
-    readOnly(db => db.get(Keys.heightOf(blockId)).flatMap(h => db.get(Keys.blockHeader(h))))
+  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      c._3.map(b => (b, b.bytes().size))
+    } else {
+      readOnly(db => db.get(Keys.heightOf(blockId)).flatMap(h => db.get(Keys.blockHeader(h))))
+    }
+  }
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = readOnly(_.get(Keys.blockBytes(height)))
+  override def blockBytes(height: Int): Option[Array[Byte]] = {
+    val c = current
+    if (height == c._1) {
+      c._3.map(_.bytes())
+    } else {
+      readOnly(_.get(Keys.blockBytes(height)))
+    }
+  }
 
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] =
-    readOnly(db => db.get(Keys.heightOf(blockId)).flatMap(h => db.get(Keys.blockBytes(h))))
+  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      c._3.map(_.bytes())
+    } else {
+      readOnly(db => db.get(Keys.heightOf(blockId)).flatMap(h => db.get(Keys.blockBytes(h))))
+    }
+  }
 
-  override def heightOf(blockId: ByteStr): Option[Int] = readOnly(_.get(Keys.heightOf(blockId)))
+  override def heightOf(blockId: ByteStr): Option[Int] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      Some(c._1)
+    } else {
+      readOnly(_.get(Keys.heightOf(blockId)))
+    }
+  }
 
   override def lastBlockIds(howMany: Int): immutable.IndexedSeq[ByteStr] = readOnly { db =>
     // since this is called from outside of the main blockchain updater thread, instead of using cached height,
