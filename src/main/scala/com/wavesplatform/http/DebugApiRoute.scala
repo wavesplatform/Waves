@@ -13,13 +13,12 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.crypto
-import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, NG, Portfolio}
-import com.wavesplatform.transaction.ValidationError.{GenericError, InvalidRequestSignature}
+import com.wavesplatform.transaction.ValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.utils.{Base58, ScorexLogging, Time}
@@ -196,15 +195,11 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def rollback: Route = (path("rollback") & post & withAuth) {
     json[RollbackParams] { params =>
-      if (ng.height - params.rollbackTo > LevelDBWriter.MAX_DEPTH - 10)
-        (StatusCodes.BadRequest, s"Rollback of more than ${LevelDBWriter.MAX_DEPTH - 10} blocks is forbidden")
-      else {
-        ng.blockAt(params.rollbackTo) match {
-          case Some(block) =>
-            rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
-          case None =>
-            (StatusCodes.BadRequest, "Block at height not found")
-        }
+      ng.blockAt(params.rollbackTo) match {
+        case Some(block) =>
+          rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
+        case None =>
+          (StatusCodes.BadRequest, "Block at height not found")
       }
     } ~ complete(StatusCodes.BadRequest)
   }
@@ -285,22 +280,11 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
     (delete & withAuth) {
-      val signatureEi: Either[ValidationError, ByteStr] = for {
-        signature <- ByteStr
+      val signatureEi: Either[ValidationError, ByteStr] =
+        ByteStr
           .decodeBase58(signature)
           .toEither
           .leftMap(_ => InvalidRequestSignature)
-        height <- blockchain
-          .heightOf(signature)
-          .toRight(GenericError("Block with such signature not found"))
-        _ <- Either
-          .cond(
-            ng.height - height < (LevelDBWriter.MAX_DEPTH - 10),
-            (),
-            GenericError(s"Rollback of more than ${LevelDBWriter.MAX_DEPTH - 10} blocks is forbidden")
-          )
-      } yield signature
-
       signatureEi
         .fold(
           err => complete(ApiError.fromValidationError(err)),

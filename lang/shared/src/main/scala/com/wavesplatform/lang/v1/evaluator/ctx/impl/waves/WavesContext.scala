@@ -20,8 +20,10 @@ object WavesContext {
   import Types._
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  def build(version: ScriptVersion, env: Environment, orderEnabled: Boolean, proofsEnabled: Boolean): CTX = {
+  def build(version: ScriptVersion, env: Environment, isTokenContext: Boolean): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
+
+    val proofsEnabled = !isTokenContext
 
     def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction =
       NativeFunction(
@@ -247,7 +249,7 @@ object WavesContext {
         case _ => ???
       }
 
-    val inputEntityCoeval: Coeval[Either[String, CaseObj]] =
+    val inputEntityCoeval: Coeval[Either[String, CaseObj]] = {
       Coeval.evalOnce(
         env.inputEntity
           .eliminate(
@@ -257,12 +259,14 @@ object WavesContext {
               _ => "Expected Transaction or Order".asLeft[CaseObj]
             )
           ))
+    }
 
     val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Right(CONST_LONG(env.height)))
 
     val anyTransactionType =
-      if (proofsEnabled) anyTransactionTypeWithProofs
-      else anyTransactionTypeWithoutProofs
+      UNION(
+        (buildObsoleteTransactionTypes(proofsEnabled) ++
+          buildActiveTransactionTypes(proofsEnabled)).map(_.typeRef))
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
@@ -318,7 +322,11 @@ object WavesContext {
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
     val buyOrdTypeCoeval: Coeval[Either[String, CaseObj]]  = Coeval(Right(ordType(OrdType.Buy)))
 
-    val scriptInputType = Types.scriptInputType(proofsEnabled, orderEnabled)
+    val scriptInputType =
+      if (isTokenContext)
+        UNION(buildAssetSupportedTransactions(proofsEnabled).map(_.typeRef))
+      else
+        UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled)).map(_.typeRef))
 
     val commonVars = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
@@ -354,6 +362,23 @@ object WavesContext {
       assetBalanceF,
       wavesBalanceF
     )
+
+    val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled)
+    val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled)
+
+    val transactionsCommonType = UnionType("Transaction", activeTxTypes.map(_.typeRef))
+
+    val transactionTypes: List[CaseType] = obsoleteTxTypes ++ activeTxTypes
+
+    Seq(
+      addressType,
+      aliasType,
+      transfer,
+      assetPairType,
+      dataEntryType,
+      buildOrderType(proofsEnabled),
+      transactionsCommonType
+    ) ++ transactionTypes
 
     val types = buildWavesTypes(proofsEnabled)
 

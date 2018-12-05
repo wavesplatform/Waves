@@ -70,7 +70,7 @@ class OrderValidator(db: DB,
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
         Left("Trading of scripted asset isn't allowed yet")
       else {
-        try ScriptRunner[EVALUATED](blockchain.height, Coproduct(tx), blockchain, script, proofsEnabled = false, orderEnabled = false) match {
+        try ScriptRunner[EVALUATED](blockchain.height, Coproduct(tx), blockchain, script, isTokenScript = true) match {
           case (_, Left(execError)) => Left(s"Error executing script of asset $assetId: $execError")
           case (_, Right(FALSE))    => Left(s"Order rejected by script of asset $assetId")
           case (_, Right(TRUE))     => Right(())

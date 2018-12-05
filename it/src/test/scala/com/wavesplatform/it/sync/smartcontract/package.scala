@@ -7,7 +7,7 @@ import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
 
 package object smartcontract {
-  def cryptoContextScript: String =
+  def cryptoContextScript(accountScript: Boolean): String =
     s"""
        |match tx {
        |  case ext : ExchangeTransaction =>
@@ -17,12 +17,12 @@ package object smartcontract {
        |    let str58 = fromBase58String(toBase58String(tx.id)) == tx.id
        |    let str64 = fromBase64String(toBase64String(tx.id)) == tx.id
        |    bks && sig && str58 && str64
-       |  case s : SetScriptTransaction => true
+       |  ${if (accountScript) "case s : SetScriptTransaction => true" else ""}
        |  case _ => false
        |}
      """.stripMargin
 
-  def pureContextScript(dtx: DataTransaction): String =
+  def pureContextScript(dtx: DataTransaction, accountScript: Boolean): String =
     s"""
        | match tx {
        |  case ext : ExchangeTransaction =>
@@ -62,12 +62,12 @@ package object smartcontract {
        |    let pure = basic && ne && gteLong && getListSize && unary && frAction #&& bytesOps && strOps
        |
        |    pure && height > 0
-       |  case s : SetScriptTransaction => true
+       |  ${if (accountScript) "case s : SetScriptTransaction => true" else ""}
        |  case _ => false
        | }
      """.stripMargin
 
-  def wavesContextScript(dtx: DataTransaction): String =
+  def wavesContextScript(dtx: DataTransaction, accountScript: Boolean): String =
     s"""
        | match tx {
        |  case ext : ExchangeTransaction =>
@@ -107,7 +107,7 @@ package object smartcontract {
        |     let balances = assetBalance(ext.sender, unit) > 0 && wavesBalance(ext.sender) != 0
        |
        |     entries && balances && aFromPK && aFromStr && height > 0
-       |  case s : SetScriptTransaction => true
+       |  ${if (accountScript) "case s : SetScriptTransaction => true" else ""}
        |  case _ => false
        | }
      """.stripMargin

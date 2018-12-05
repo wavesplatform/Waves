@@ -240,54 +240,33 @@ object Types {
     List(genesisTransactionType, buildPaymentTransactionType(proofsEnabled))
   }
 
+  def buildAssetSupportedTransactions(proofsEnabled: Boolean) = List(
+    buildReissueTransactionType(proofsEnabled),
+    buildBurnTransactionType(proofsEnabled),
+    buildMassTransferTransactionType(proofsEnabled),
+    buildExchangeTransactionType(proofsEnabled),
+    buildTransferTransactionType(proofsEnabled),
+    buildSetAssetScriptTransactionType(proofsEnabled),
+  )
+
   def buildActiveTransactionTypes(proofsEnabled: Boolean): List[CaseType] = {
-    List(
-      buildTransferTransactionType(proofsEnabled),
-      buildIssueTransactionType(proofsEnabled),
-      buildReissueTransactionType(proofsEnabled),
-      buildBurnTransactionType(proofsEnabled),
-      buildLeaseTransactionType(proofsEnabled),
-      buildLeaseCancelTransactionType(proofsEnabled),
-      buildMassTransferTransactionType(proofsEnabled),
-      buildCreateAliasTransactionType(proofsEnabled),
-      buildSetScriptTransactionType(proofsEnabled),
-      buildSetAssetScriptTransactionType(proofsEnabled),
-      buildSponsorFeeTransactionType(proofsEnabled),
-      buildExchangeTransactionType(proofsEnabled),
-      buildDataTransactionType(proofsEnabled)
-    )
-  }
-
-  def scriptInputType(proofsEnabled: Boolean, orderEnabled: Boolean) = {
-    val txstpe = buildActiveTransactionTypes(proofsEnabled)
-    if (orderEnabled)
-      UNION.create((buildOrderType(proofsEnabled) :: txstpe).map(_.typeRef))
-    else
-      UNION.create(txstpe.map(_.typeRef))
-  }
-
-  val anyTransactionTypeWithProofs = {
-    val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled = true)
-    val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled = true)
-
-    UNION
-      .create((activeTxTypes ++ obsoleteTxTypes).map(_.typeRef))
-  }
-
-  val anyTransactionTypeWithoutProofs = {
-    val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled = false)
-    val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled = false)
-
-    UNION
-      .create((activeTxTypes ++ obsoleteTxTypes).map(_.typeRef))
+    buildAssetSupportedTransactions(proofsEnabled) ++
+      List(
+        buildIssueTransactionType(proofsEnabled),
+        buildLeaseTransactionType(proofsEnabled),
+        buildLeaseCancelTransactionType(proofsEnabled),
+        buildCreateAliasTransactionType(proofsEnabled),
+        buildSetScriptTransactionType(proofsEnabled),
+        buildSponsorFeeTransactionType(proofsEnabled),
+        buildDataTransactionType(proofsEnabled)
+      )
   }
 
   def buildWavesTypes(proofsEnabled: Boolean): Seq[DefinedType] = {
-    val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled)
-    val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled)
 
-    val transactionsCommonType = UnionType("Transaction", activeTxTypes.map(_.typeRef))
-
+    val activeTxTypes                    = buildActiveTransactionTypes(proofsEnabled)
+    val obsoleteTxTypes                  = buildObsoleteTransactionTypes(proofsEnabled)
+    val transactionsCommonType           = UnionType("Transaction", activeTxTypes.map(_.typeRef))
     val transactionTypes: List[CaseType] = obsoleteTxTypes ++ activeTxTypes
 
     Seq(

@@ -4,12 +4,11 @@ import java.util
 
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
-import com.wavesplatform.state._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block
+import com.wavesplatform.state._
+import com.wavesplatform.transaction.{AssetId, Transaction}
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -24,6 +23,8 @@ trait Caches extends Blockchain with ScorexLogging {
 
   protected def loadHeight(): Int
   override def height: Int = current._1
+
+  protected def safeRollbackHeight: Int
 
   protected def loadScore(): BigInt
   override def score: BigInt = current._2
@@ -203,15 +204,24 @@ trait Caches extends Blockchain with ScorexLogging {
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]
 
-  override def rollbackTo(targetBlockId: ByteStr): Seq[Block] = {
-    val discardedBlocks = doRollback(targetBlockId)
+  override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = {
+    for {
+      height <- heightOf(targetBlockId)
+        .toRight(s"No block with signature: $targetBlockId found in blockchain")
+      _ <- Either
+        .cond(
+          height > safeRollbackHeight,
+          (),
+          s"Rollback is possible only to the block at a height: $safeRollbackHeight"
+        )
+      discardedBlocks = doRollback(targetBlockId)
+    } yield {
+      current = (loadHeight(), loadScore(), loadLastBlock())
 
-    current = (loadHeight(), loadScore(), loadLastBlock())
-
-    activatedFeaturesCache = loadActivatedFeatures()
-    approvedFeaturesCache = loadApprovedFeatures()
-
-    discardedBlocks
+      activatedFeaturesCache = loadActivatedFeatures()
+      approvedFeaturesCache = loadApprovedFeatures()
+      discardedBlocks
+    }
   }
 }
 
