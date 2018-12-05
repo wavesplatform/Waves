@@ -42,12 +42,24 @@ case class ContractInvocationTransaction private (version: Byte,
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val json = Coeval.evalOnce(
     jsonBase()
-      ++ Json.obj("version" -> version, "contract" -> contractAddress.bytes, "functionCall" -> fc.toString))
+      ++ Json.obj("version" -> version, "contract" -> contractAddress.bytes) ++ ContractInvocationTransaction.functionCallToJson(fc))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }
 
 object ContractInvocationTransaction extends TransactionParserFor[ContractInvocationTransaction] with TransactionParser.MultipleVersions {
+
+  import play.api.libs.json._
+  def functionCallToJson(fc: Terms.FUNCTION_CALL) = Json.obj(
+    "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].name),
+    "args" -> JsArray(fc.args.map {
+      case Terms.CONST_LONG(l)       => Json.obj("key" -> "", "type" -> "integer", "value" -> l)
+      case Terms.CONST_BOOLEAN(l)    => Json.obj("key" -> "", "type" -> "boolean", "value" -> l)
+      case Terms.CONST_BYTEVECTOR(l) => Json.obj("key" -> "", "type" -> "binary", "value" -> ByteStr(l.toArray).base64)
+      case Terms.CONST_STRING(l)     => Json.obj("key" -> "", "type" -> "string", "value" -> l)
+      case _                         => ???
+    })
+  )
 
   override val typeId: Byte                 = 15
   override val supportedVersions: Set[Byte] = Set(1)
