@@ -8,6 +8,7 @@ import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.state._
 
 class ExtraFeeTestSuite extends MatcherSuiteBase {
 
