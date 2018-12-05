@@ -116,5 +116,6 @@ object Keys {
   def assetScriptPresent(assetId: ByteStr)(height: Int): Key[Option[Unit]] =
     Key.opt("asset-script", hBytes(47, height, assetId.arr), (_ => ()), (_ => Array[Byte]()))
 
-  def changedDataKeys(height: Int, addressId: BigInt): Key[Seq[String]] = Key("changed-data-keys", hAddr(48, height, addressId), readStrings, writeStrings)
+  def changedDataKeys(height: Int, addressId: BigInt): Key[Seq[String]] =
+    Key("changed-data-keys", hAddr(48, height, addressId), readStrings, writeStrings)
 }

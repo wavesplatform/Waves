@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction
-import com.wavesplatform.transaction.{DataTransaction, Proofs, ValidationError}
+import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
 import scodec.bits.ByteVector
@@ -15,7 +15,7 @@ import scala.annotation.meta.field
 
 object ContractInvocationRequest {
   implicit val unsignedContractInvocationRequestReads = Json.reads[ContractInvocationRequest]
-  implicit val unsignedContractInvocationRequestReads = Json.reads[SignedContractInvocationRequest]
+  implicit val signedContractInvocationRequestReads   = Json.reads[SignedContractInvocationRequest]
 
   def buildFunctionCall(f: String, args: List[DataEntry[_]]): FUNCTION_CALL =
     FUNCTION_CALL(
@@ -50,7 +50,7 @@ case class SignedContractInvocationRequest(
     @(ApiModelProperty @field)(required = true, value = "1000") timestamp: Long,
     @(ApiModelProperty @field)(required = true) proofs: List[String])
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, DataTransaction] =
+  def toTx: Either[ValidationError, ContractInvocationTransaction] =
     for {
       _sender          <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _contractAddress <- Address.fromString(contractAddress)

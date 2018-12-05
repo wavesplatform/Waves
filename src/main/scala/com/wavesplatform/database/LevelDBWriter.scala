@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
+import cats.Monoid
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
