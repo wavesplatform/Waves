@@ -329,9 +329,9 @@ object WavesContext {
 
     val scriptInputType =
       if (isTokenContext)
-        UNION(buildAssetSupportedTransactions(proofsEnabled = false).map(_.typeRef))
+        UNION(buildAssetSupportedTransactions(proofsEnabled).map(_.typeRef))
       else
-        UNION((buildOrderType(proofsEnabled = true) :: buildActiveTransactionTypes(proofsEnabled = true)).map(_.typeRef))
+        UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled)).map(_.typeRef))
 
     val commonVars = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
@@ -385,7 +385,7 @@ object WavesContext {
       transactionsCommonType
     ) ++ transactionTypes
 
-    val types = buildWavesTypes(isTokenContext)
+    val types = buildWavesTypes(proofsEnabled, isTokenContext)
 
     CTX(types, commonVars ++ vars(version.value), functions)
   }

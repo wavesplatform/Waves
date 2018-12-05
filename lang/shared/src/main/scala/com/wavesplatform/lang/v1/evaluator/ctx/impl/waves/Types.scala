@@ -262,12 +262,11 @@ object Types {
       )
   }
 
-  def buildWavesTypes(isTokenScript: Boolean): Seq[DefinedType] = {
-    val proofsEnabled = !isTokenScript
+  def buildWavesTypes(proofsEnabled: Boolean, onlyAssetSupportedTxs: Boolean): Seq[DefinedType] = {
 
     val activeTxTypes   =
-      if (isTokenScript) buildAssetSupportedTransactions(proofsEnabled = false)
-      else buildActiveTransactionTypes(proofsEnabled = true)
+      if (onlyAssetSupportedTxs) buildAssetSupportedTransactions(proofsEnabled)
+      else buildActiveTransactionTypes(proofsEnabled)
 
     val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled)
 
