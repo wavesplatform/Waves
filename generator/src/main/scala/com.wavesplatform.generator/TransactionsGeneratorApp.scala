@@ -11,9 +11,8 @@ import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.network.client.NetworkSender
-import com.wavesplatform.settings.inetSocketAddressReader
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.LoggerFacade
+import com.wavesplatform.utils.{LoggerFacade, NTP}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
@@ -26,7 +25,9 @@ import scala.util.{Failure, Random, Success}
 
 object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
 
-  implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // IDEA bug
+  // IDEA bugs
+  implicit val inetSocketAddressReader        = com.wavesplatform.settings.inetSocketAddressReader
+  implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
 
   val log = LoggerFacade(LoggerFactory.getLogger("generator"))
 
@@ -109,7 +110,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       .text("Oracle load test")
       .children(
         opt[Int]("transactions").abbr("t").optional().text("number of transactions").action { (x, c) =>
-          c.copy(multisig = c.multisig.copy(transactions = x))
+          c.copy(oracle = c.oracle.copy(transactions = x))
         },
         opt[Boolean]("enabled").abbr("e").optional().text("DataEnty value").action { (x, c) =>
           c.copy(multisig = c.multisig.copy(firstRun = x))
@@ -131,6 +132,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         opt[Boolean]("complexity").abbr("ct").optional().text(" script complexity").action { (x, c) =>
           c.copy(swarm = c.swarm.copy(complexity = x))
         },
+        opt[Int]("exchange").abbr("et").optional().text("number of exchange transactions").action { (x, c) =>
+          c.copy(swarm = c.swarm.copy(exchange = x))
+        }
       )
   }
 
@@ -159,7 +163,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
         case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts)
         case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.privateKeyAccounts)
-        case Mode.SWARM    => new SetScriptsTransactionGenerator(finalConfig.swarm, finalConfig.privateKeyAccounts)
+        case Mode.SWARM    => new SmartGenerator(finalConfig.swarm, finalConfig.privateKeyAccounts)
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
@@ -169,8 +173,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
       sys.addShutdownHook(sender.close())
 
+      val time = new NTP("pool.ntp.org")
       val (universe, initialTransactions) = preconditions
-        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk)
+        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time))
 
       Universe.AccountsWithBalances = universe.accountsWithBalances
       Universe.IssuedAssets = universe.issuedAssets
@@ -183,6 +188,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
       def close(status: Int): Unit = {
         sender.close()
+        time.close()
         threadPool.shutdown()
         System.exit(status)
       }

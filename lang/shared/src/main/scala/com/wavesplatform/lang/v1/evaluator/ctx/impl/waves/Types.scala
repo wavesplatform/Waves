@@ -258,11 +258,13 @@ object Types {
     )
   }
 
-  val scriptInputTypeWithProofs =
-    UNION.create((buildOrderType(true) :: buildActiveTransactionTypes(true)).map(_.typeRef))
-
-  val scriptInputTypeWithoutProofs =
-    UNION.create((buildOrderType(false) :: buildActiveTransactionTypes(false)).map(_.typeRef))
+  def scriptInputType(proofsEnabled: Boolean, orderEnabled: Boolean) = {
+    val txstpe = buildActiveTransactionTypes(proofsEnabled)
+    if (orderEnabled)
+      UNION.create((buildOrderType(proofsEnabled) :: txstpe).map(_.typeRef))
+    else
+      UNION.create(txstpe.map(_.typeRef))
+  }
 
   val anyTransactionTypeWithProofs = {
     val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled = true)
@@ -280,25 +282,22 @@ object Types {
       .create((activeTxTypes ++ obsoleteTxTypes).map(_.typeRef))
   }
 
-  val wavesTypesWithProofs: Seq[DefinedType] = {
-    val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled = true)
-    val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled = true)
+  def buildWavesTypes(proofsEnabled: Boolean): Seq[DefinedType] = {
+    val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled)
+    val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled)
 
     val transactionsCommonType = UnionType("Transaction", activeTxTypes.map(_.typeRef))
 
     val transactionTypes: List[CaseType] = obsoleteTxTypes ++ activeTxTypes
 
-    Seq(addressType, aliasType, transfer, buildOrderType(true), assetPairType, dataEntryType, transactionsCommonType) ++ transactionTypes
-  }
-
-  val wavesTypesWithoutProofs: Seq[DefinedType] = {
-    val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled = false)
-    val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled = false)
-
-    val transactionsCommonType = UnionType("Transaction", activeTxTypes.map(_.typeRef))
-
-    val transactionTypes: List[CaseType] = obsoleteTxTypes ++ activeTxTypes
-
-    Seq(addressType, aliasType, transfer, buildOrderType(false), assetPairType, dataEntryType, transactionsCommonType) ++ transactionTypes
+    Seq(
+      addressType,
+      aliasType,
+      transfer,
+      assetPairType,
+      dataEntryType,
+      buildOrderType(proofsEnabled),
+      transactionsCommonType
+    ) ++ transactionTypes
   }
 }

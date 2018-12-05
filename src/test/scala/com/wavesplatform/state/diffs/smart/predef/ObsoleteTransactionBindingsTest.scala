@@ -75,7 +75,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT * 3, ts).explicitGet()
     payment                     = PaymentTransaction.create(master, recipient, ENOUGH_AMT * 2, fee, ts).explicitGet()
     untypedScript               = Parser.parseScript(script(genesis, payment)).get.value
-    typedScript                 = ScriptV1(ExpressionCompilerV1(compilerContext(V1), untypedScript).explicitGet()._1).explicitGet()
+    typedScript                 = ScriptV1(ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction
       .selfSigned(1, recipient, Some(typedScript), 100000000L, ts)
       .explicitGet()

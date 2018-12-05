@@ -20,9 +20,7 @@ object WavesContext {
   import Types._
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  def build(version: Version,
-            env: Environment,
-            proofsEnabled: Boolean): CTX = {
+  def build(version: Version, env: Environment, orderEnabled: Boolean, proofsEnabled: Boolean): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction =
@@ -320,9 +318,7 @@ object WavesContext {
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
     val buyOrdTypeCoeval: Coeval[Either[String, CaseObj]]  = Coeval(Right(ordType(OrdType.Buy)))
 
-    val scriptInputType =
-      if (proofsEnabled) scriptInputTypeWithProofs
-      else scriptInputTypeWithoutProofs
+    val scriptInputType = Types.scriptInputType(proofsEnabled, orderEnabled)
 
     val commonVars = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
@@ -365,9 +361,7 @@ object WavesContext {
 
     lazy val writeSetType = CaseType("WriteSet", List("data" -> LIST(dataEntryType.typeRef)))
 
-    val types =
-      if (proofsEnabled) wavesTypesWithProofs
-      else wavesTypesWithoutProofs
+    val types = buildWavesTypes(proofsEnabled)
 
     CTX(types++ (if (version == V3) List(writeSetType) else List.empty), commonVars ++ vars(version), functions)
   }

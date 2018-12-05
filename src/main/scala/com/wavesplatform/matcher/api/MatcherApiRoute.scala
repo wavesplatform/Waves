@@ -23,7 +23,7 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetAcc
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.{Base58, NTP, ScorexLogging, Time}
+import com.wavesplatform.utils.{Base58, ScorexLogging, Time}
 import io.netty.util.concurrent.DefaultThreadFactory
 import io.swagger.annotations._
 import javax.ws.rs.Path
@@ -407,7 +407,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def checkGetSignature(pk: PublicKeyAccount, timestamp: String, signature: String): Try[PublicKeyAccount] = Try {
     val sig = Base58.decode(signature).get
     val ts  = timestamp.toLong
-    require(math.abs(ts - NTP.correctedTime()).millis < matcherSettings.maxTimestampDiff, "Incorrect timestamp")
+    require(math.abs(ts - time.correctedTime()).millis < matcherSettings.maxTimestampDiff, "Incorrect timestamp")
     require(crypto.verify(sig, pk.publicKey ++ Longs.toByteArray(ts), pk.publicKey), "Incorrect signature")
     pk
   }
@@ -534,7 +534,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
     withAssetPair(p) { pair =>
       complete((matcher ? DeleteOrderBookRequest(pair)).map { _ =>
-        GetOrderBookResponse(NTP.correctedTime(), pair, Seq(), Seq()).toHttpResponse
+        GetOrderBookResponse(time.correctedTime(), pair, Seq(), Seq()).toHttpResponse
       })
     }
   }

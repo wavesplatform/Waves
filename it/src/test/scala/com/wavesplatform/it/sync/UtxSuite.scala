@@ -12,7 +12,7 @@ import monix.execution.Scheduler
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 
 import scala.concurrent.duration._
-import scala.util.Random
+import scala.util.{Random, Try}
 
 class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {
   override protected def nodeConfigs: Seq[Config] = UtxSuite.Configs
@@ -38,32 +38,32 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
 
     nodes.waitForHeightAriseAndTxPresent(transferToAccount.id().base58)
 
-    val validTx = TransferTransactionV1
+    val firstTransfer = TransferTransactionV1
       .selfSigned(None, account, miner.privateKey, AMOUNT - ENOUGH_FEE, System.currentTimeMillis(), None, ENOUGH_FEE, Array.emptyByteArray)
       .explicitGet()
 
-    val invalidTx = TransferTransactionV1
+    val secondTransfer = TransferTransactionV1
       .selfSigned(None, account, notMiner.privateKey, AMOUNT - ENOUGH_FEE, System.currentTimeMillis(), None, ENOUGH_FEE, Array.emptyByteArray)
       .explicitGet()
 
-    miner.signedBroadcast(validTx.json())
-    notMiner.signedBroadcast(invalidTx.json())
+    val tx1Id = miner.signedBroadcast(firstTransfer.json()).id
+    val tx2Id = notMiner.signedBroadcast(secondTransfer.json()).id
 
-    assert((notMiner.utx map (_.id)) contains invalidTx.id().base58)
+    waitForEmptyUtx(nodes)
 
-    nodes.waitForHeightAriseAndTxPresent(validTx.id().base58)
+    val exactlyOneTxInBlockchain =
+      txInBlockchain(tx1Id, nodes) ^ txInBlockchain(tx2Id, nodes)
 
-    waitForTxDisappearFromUtx(invalidTx.id().base58, notMiner, 6.minutes)
+    assert(exactlyOneTxInBlockchain, "Only one tx should be in blockchain")
   }
 
-  def waitForTxDisappearFromUtx(txId: String, node: Node, timeout: FiniteDuration): Unit = {
-
+  def waitForEmptyUtx(nodes: Seq[Node]): Unit = {
     implicit val sch: Scheduler = monix.execution.Scheduler.global
 
     def loop(): Task[Unit] = {
-      val utxIds = node.utx.map(_.id)
+      val utxIds = nodes.map(_.utx.size)
 
-      if (utxIds contains txId) {
+      if (utxIds.sum != 0) {
         Task
           .sleep(1.second)
           .flatMap(_ => loop())
@@ -72,7 +72,13 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
       }
     }
 
-    loop().runSyncUnsafe(timeout)
+    loop().runSyncUnsafe(6.minutes)
+  }
+
+  def txInBlockchain(txId: String, nodes: Seq[Node]): Boolean = {
+    nodes.forall { node =>
+      Try(node.transactionInfo(txId)).isSuccess
+    }
   }
 }
 

@@ -21,9 +21,9 @@ package object predef {
   def runScript[T <: EVALUATED](script: String, version: Version, t: In, blockchain: Blockchain, networkByte: Byte): Either[String, T] = {
     val Success(expr, _) = Parser.parseScript(script)
     for {
-      compileResult <- ExpressionCompilerV1(compilerContext(version), expr)
+      compileResult <- ExpressionCompilerV1(compilerContext(version, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
-      evalContext    = BlockchainContext.build(version, networkByte, Coeval.evalOnce(t), Coeval.evalOnce(blockchain.height), blockchain, true)
+      evalContext    = BlockchainContext.build(version, networkByte, Coeval.evalOnce(t), Coeval.evalOnce(blockchain.height), blockchain, true, true)
       r <- EvaluatorV1[T](evalContext, typedExpr)
     } yield r
   }

@@ -392,10 +392,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   property("Disable use OrderV1 on SmartAccount") {
     val enoughFee        = 100000000
     val script           = "true"
-    val txScriptCompiled = ScriptCompiler(script).explicitGet()._1
+    val txScriptCompiled = ScriptCompiler(script, isAssetScript = false).explicitGet()._1
 
-    val sellerScript = Some(ScriptCompiler(script).explicitGet()._1)
-    val buyerScript  = Some(ScriptCompiler(script).explicitGet()._1)
+    val sellerScript = Some(ScriptCompiler(script, isAssetScript = false).explicitGet()._1)
+    val buyerScript  = Some(ScriptCompiler(script, isAssetScript = false).explicitGet()._1)
 
     val chainId = AddressScheme.current.chainId
 
@@ -507,10 +507,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
                               txScript: String): Gen[(GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction)] = {
     val enoughFee = 100000000
 
-    val txScriptCompiled = ScriptCompiler(txScript).explicitGet()._1
+    val txScriptCompiled = ScriptCompiler(txScript, isAssetScript = false).explicitGet()._1
 
-    val sellerScript = Some(ScriptCompiler(sellerScriptSrc).explicitGet()._1)
-    val buyerScript  = Some(ScriptCompiler(buyerScriptSrc).explicitGet()._1)
+    val sellerScript = Some(ScriptCompiler(sellerScriptSrc, isAssetScript = false).explicitGet()._1)
+    val buyerScript  = Some(ScriptCompiler(buyerScriptSrc, isAssetScript = false).explicitGet()._1)
 
     val chainId = AddressScheme.current.chainId
 

@@ -25,8 +25,8 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
     // check assets's balances
-    aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
-    aliceNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
+    matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
+    matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
 
     "make order and after matcher's restart try to cancel it" in {
       // Alice places sell order

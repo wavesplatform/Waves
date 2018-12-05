@@ -49,7 +49,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
       .map(x => Parser.parseScript(x).get.value)
 
     typedScript = {
-      val compilerScript = ExpressionCompilerV1(compilerContext(V1), untypedScript).explicitGet()._1
+      val compilerScript = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
       ScriptV1(compilerScript).explicitGet()
     }
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(1, recipient, Some(typedScript), 100000000L, ts).explicitGet()

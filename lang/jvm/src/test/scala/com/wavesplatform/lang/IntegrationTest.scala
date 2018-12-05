@@ -7,7 +7,7 @@ import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LONG}
+import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompilerV1, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._

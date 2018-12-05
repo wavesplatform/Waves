@@ -17,7 +17,7 @@ import com.wavesplatform.state._
 class CompilerBenchmark {
 
   @Benchmark
-  def serialize_test(st: St, bh: Blackhole): Unit = bh.consume(ScriptCompiler(st.scriptString).explicitGet()._1)
+  def serialize_test(st: St, bh: Blackhole): Unit = bh.consume(ScriptCompiler(st.scriptString, isAssetScript = false).explicitGet()._1)
 }
 
 object CompilerBenchmark {

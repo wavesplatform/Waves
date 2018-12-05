@@ -1,19 +1,18 @@
 package com.wavesplatform.it.sync.smartcontract.smartasset
 
+import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.smartcontract._
-import com.wavesplatform.it.sync.smartcontract.{cryptoContextScript, pureContextScript, wavesContextScript}
+import com.wavesplatform.it.sync.smartcontract.{cryptoContextScript, pureContextScript, wavesContextScript, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.NTP
 import org.scalatest.CancelAfterFailure
 import scorex.crypto.encode.Base64
 
-class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFailure {
+class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFailure with NTPTime {
   private val acc0 = pkByAddress(firstAddress)
   private val acc1 = pkByAddress(secondAddress)
   private val acc2 = pkByAddress(thirdAddress)
@@ -29,7 +28,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
     val entry4 = StringDataEntry("str", "test")
 
-    dtx = DataTransaction.selfSigned(1, acc0, List(entry1, entry2, entry3, entry4), minFee, NTP.correctedTime()).explicitGet()
+    dtx = DataTransaction.selfSigned(1, acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()
     sender.signedBroadcast(dtx.json(), waitForTx = true)
   }
 
@@ -37,14 +36,18 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     /*
     combination of smart accounts and smart assets
      */
-    val s = Some(ScriptCompiler(s"""
+    val s = Some(
+      ScriptCompiler(
+        s"""
                                        |match tx {
                                        |case s : SetAssetScriptTransaction => true
                                        |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${ByteStr(acc2.publicKey).base58}')
-                                       |case _ => false}""".stripMargin).explicitGet()._1.bytes.value.base64)
+                                       |case _ => false}""".stripMargin,
+        isAssetScript = true
+      ).explicitGet()._1.bytes.value.base64)
 
     val sAsset = sender
-      .issue(firstAddress, "SmartAsset", "TestCoin", someAssetAmount, 0, reissuable = false, issueFee, 2, s, true)
+      .issue(firstAddress, "SmartAsset", "TestCoin", someAssetAmount, 0, reissuable = false, issueFee, 2, s, waitForTx = true)
       .id
 
     val smartPair = AssetPair(ByteStr.decodeBase58(sAsset).toOption, None)
@@ -56,19 +59,24 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
 
       setContracts((contr1, acc0), (contr2, acc1), (mcontr, acc2))
 
-      sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, acc1, acc0, acc2), waitForTx = true)
+      sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, ntpTime, acc1, acc0, acc2),
+                             waitForTx = true)
     }
 
-    val sUpdated = Some(ScriptCompiler(s"""
+    val sUpdated = Some(
+      ScriptCompiler(
+        s"""
                                           |match tx {
                                           |case s : SetAssetScriptTransaction => true
                                           |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${ByteStr(acc1.publicKey).base58}')
-                                          |case _ => false}""".stripMargin).explicitGet()._1.bytes.value.base64)
+                                          |case _ => false}""".stripMargin,
+        isAssetScript = true
+      ).explicitGet()._1.bytes.value.base64)
 
     sender.setAssetScript(sAsset, firstAddress, setAssetScriptFee, sUpdated, waitForTx = true)
 
     assertBadRequestAndMessage(
-      sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, acc1, acc0, acc2)),
+      sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, ntpTime, acc1, acc0, acc2)),
       errNotAllowedByToken)
 
     setContracts((None, acc0), (None, acc1), (None, acc2))
@@ -86,13 +94,17 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     sender.transfer(secondAddress, firstAddress, 1000, minFee + smartFee, Some(assetB), waitForTx = true)
     sender.transfer(firstAddress, secondAddress, 1000, minFee + smartFee, Some(assetA), waitForTx = true)
 
-    val script = Some(ScriptCompiler(s"""
+    val script = Some(
+      ScriptCompiler(
+        s"""
                                         |let assetA = base58'$assetA'
                                         |let assetB = base58'$assetB'
                                         |match tx {
                                         |case s : SetAssetScriptTransaction => true
                                         |case e: ExchangeTransaction => (e.sellOrder.assetPair.priceAsset == assetA || e.sellOrder.assetPair.amountAsset == assetA) && (e.sellOrder.assetPair.priceAsset == assetB || e.sellOrder.assetPair.amountAsset == assetB)
-                                        |case _ => false}""".stripMargin).explicitGet()._1.bytes.value.base64)
+                                        |case _ => false}""".stripMargin,
+        isAssetScript = true
+      ).explicitGet()._1.bytes.value.base64)
 
     sender.setAssetScript(assetA, firstAddress, setAssetScriptFee, script, waitForTx = true)
     sender.setAssetScript(assetB, secondAddress, setAssetScriptFee, script, waitForTx = true)
@@ -102,17 +114,18 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
       priceAsset = Some(ByteStr.decodeBase58(assetB).get)
     )
 
-    sender.signedBroadcast(exchangeTx(smartAssetPair, matcherFee + 2 * smartFee, matcherFee + 2 * smartFee, acc1, acc0, acc2), waitForTx = true)
+    sender.signedBroadcast(exchangeTx(smartAssetPair, matcherFee + 2 * smartFee, matcherFee + 2 * smartFee, ntpTime, acc1, acc0, acc2),
+                           waitForTx = true)
 
     withClue("check fee for smart accounts and smart AssetPair - extx.fee == 0.015.waves") {
       setContracts((sc1, acc0), (sc1, acc1), (sc1, acc2))
 
       assertBadRequestAndMessage(
-        sender.signedBroadcast(exchangeTx(smartAssetPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, acc1, acc0, acc2)),
+        sender.signedBroadcast(exchangeTx(smartAssetPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, ntpTime, acc1, acc0, acc2)),
         "com.wavesplatform.transaction.assets.exchange.ExchangeTransactionV2 does not exceed minimal value of 1500000"
       )
 
-      sender.signedBroadcast(exchangeTx(smartAssetPair, smartMatcherFee + 2 * smartFee, smartMatcherFee + 2 * smartFee, acc1, acc0, acc2),
+      sender.signedBroadcast(exchangeTx(smartAssetPair, smartMatcherFee + 2 * smartFee, smartMatcherFee + 2 * smartFee, ntpTime, acc1, acc0, acc2),
                              waitForTx = true)
       setContracts((None, acc0), (None, acc1), (None, acc2))
     }
@@ -122,16 +135,17 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
         amountAsset = Some(ByteStr.decodeBase58(assetA).get),
         priceAsset = None
       )
-      assertBadRequestAndMessage(sender.signedBroadcast(exchangeTx(incorrectSmartAssetPair, smartMatcherFee, smartMatcherFee, acc1, acc0, acc2)),
-                                 errNotAllowedByToken)
+      assertBadRequestAndMessage(
+        sender.signedBroadcast(exchangeTx(incorrectSmartAssetPair, smartMatcherFee, smartMatcherFee, ntpTime, acc1, acc0, acc2)),
+        errNotAllowedByToken)
     }
 
   }
 
   test("use all functions from RIDE for asset script") {
-    val script1 = Some(ScriptCompiler(cryptoContextScript).explicitGet()._1.bytes.value.base64)
-    val script2 = Some(ScriptCompiler(pureContextScript(dtx)).explicitGet()._1.bytes.value.base64)
-    val script3 = Some(ScriptCompiler(wavesContextScript(dtx)).explicitGet()._1.bytes.value.base64)
+    val script1 = Some(ScriptCompiler(cryptoContextScript, isAssetScript = true).explicitGet()._1.bytes.value.base64)
+    val script2 = Some(ScriptCompiler(pureContextScript(dtx), isAssetScript = true).explicitGet()._1.bytes.value.base64)
+    val script3 = Some(ScriptCompiler(wavesContextScript(dtx), isAssetScript = true).explicitGet()._1.bytes.value.base64)
 
     List(script1, script2, script3)
       .map { i =>
@@ -141,7 +155,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
 
         val smartPair = AssetPair(ByteStr.decodeBase58(asset).toOption, None)
 
-        sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee, smartMatcherFee, acc1, acc0, acc2), waitForTx = true)
+        sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee, smartMatcherFee, ntpTime, acc1, acc0, acc2), waitForTx = true)
       }
   }
 }

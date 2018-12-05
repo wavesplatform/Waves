@@ -102,7 +102,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       gen2 = GenesisTransaction
         .create(recipient, ENOUGH_AMT, timestamp)
         .explicitGet()
-      (script, _) = ScriptCompiler(s"false").explicitGet()
+      (script, _) = ScriptCompiler(s"false", isAssetScript = false).explicitGet()
       issueTx = IssueTransactionV1
         .selfSigned(
           sender = contract,
@@ -174,7 +174,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       gen2 = GenesisTransaction
         .create(sponsor, ENOUGH_AMT, timestamp)
         .explicitGet()
-      (script, _) = ScriptCompiler(s"true").explicitGet()
+      (script, _) = ScriptCompiler(s"true", isAssetScript = false).explicitGet()
       issueTx = IssueTransactionV1
         .selfSigned(
           sender = sponsor,

@@ -19,7 +19,7 @@ import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, O
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, EitherExt2}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
@@ -29,6 +29,7 @@ import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 class Matcher(actorSystem: ActorSystem,
+              time: Time,
               utx: UtxPool,
               allChannels: ChannelGroup,
               blockchain: Blockchain,
@@ -40,7 +41,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
-  private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings, NTP)
+  private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings, time)
   private val orderValidator = new OrderValidator(
     db,
     blockchain,
@@ -49,12 +50,13 @@ class Matcher(actorSystem: ActorSystem,
     pairBuilder.validateAssetPair,
     settings.matcherSettings,
     matcherPrivateKey,
-    NTP
+    time
   )
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
     matcherSettings.orderBookSnapshotHttpCache,
+    time,
     p => Option(orderBookCache.get(p))
   )
 
@@ -76,7 +78,7 @@ class Matcher(actorSystem: ActorSystem,
       orderBooksSnapshotCache,
       settings,
       db,
-      NTP
+      time
     )
   )
 
@@ -93,6 +95,7 @@ class Matcher(actorSystem: ActorSystem,
       utx,
       allChannels,
       matcherSettings,
+      time,
       blockchain.assetDescription,
       transactionCreator.createTransaction
     ),
@@ -148,6 +151,7 @@ class Matcher(actorSystem: ActorSystem,
 
 object Matcher extends ScorexLogging {
   def apply(actorSystem: ActorSystem,
+            time: Time,
             wallet: Wallet,
             utx: UtxPool,
             allChannels: ChannelGroup,
@@ -159,7 +163,7 @@ object Matcher extends ScorexLogging {
         pk      <- wallet.privateKeyAccount(address)
       } yield pk).explicitGet()
 
-      val matcher = new Matcher(actorSystem, utx, allChannels, blockchain, settings, privateKey)
+      val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, settings, privateKey)
       matcher.runMatcher()
       Some(matcher)
     } catch {

@@ -47,18 +47,20 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     ))
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
-      complete(
-        ScriptCompiler(code).fold(
-          e => ScriptCompilerError(e), {
-            case (script, complexity) =>
-              Json.obj(
-                "script"     -> script.bytes().base64,
-                "complexity" -> complexity,
-                "extraFee"   -> CommonValidation.ScriptExtraFee
-              )
-          }
+      parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
+        complete(
+          ScriptCompiler(code, isAssetScript).fold(
+            e => ScriptCompilerError(e), {
+              case (script, complexity) =>
+                Json.obj(
+                  "script"     -> script.bytes().base64,
+                  "complexity" -> complexity,
+                  "extraFee"   -> CommonValidation.ScriptExtraFee
+                )
+            }
+          )
         )
-      )
+      }
     }
   }
 

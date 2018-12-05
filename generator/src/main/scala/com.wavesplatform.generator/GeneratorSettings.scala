@@ -17,7 +17,7 @@ case class GeneratorSettings(chainId: String,
                              dynWide: DynamicWideTransactionGenerator.Settings,
                              multisig: MultisigTransactionGenerator.Settings,
                              oracle: OracleTransactionGenerator.Settings,
-                             swarm: SetScriptsTransactionGenerator.Settings) {
+                             swarm: SmartGenerator.Settings) {
   val addressScheme: Char                        = chainId.head
   val privateKeyAccounts: Seq[PrivateKeyAccount] = accounts.map(s => PrivateKeyAccount.fromSeed(s).explicitGet())
 }

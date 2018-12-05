@@ -40,7 +40,7 @@ package object sync {
 
   val supportedVersions = List(null, "2") //sign and broadcast use default for V1
 
-  val script       = ScriptCompiler(s"""true""".stripMargin).explicitGet()._1
+  val script       = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false).explicitGet()._1
   val scriptBase64 = script.bytes.value.base64
 
   val errNotAllowedByToken = "Transaction is not allowed by token-script"

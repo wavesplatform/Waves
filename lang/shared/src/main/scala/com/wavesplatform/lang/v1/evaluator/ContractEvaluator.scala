@@ -1,12 +1,10 @@
 package com.wavesplatform.lang.v1.evaluator
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.domain.DataItem
-import com.wavesplatform.lang.v1.traits.domain.DataItem.Bool
 import scodec.bits.ByteVector
 
 object ContractEvaluator {
@@ -39,6 +37,7 @@ object ContractEvaluator {
                 case (CONST_STRING(k), CONST_LONG(b))       => DataItem.Lng(k, b)
                 case (CONST_STRING(k), CONST_BYTEVECTOR(b)) => DataItem.Bin(k, b)
               }
+            case _ => ???
           }
           Right(WriteSet(r.toList))
         case t => Left(s"Unexpected exec result $t")

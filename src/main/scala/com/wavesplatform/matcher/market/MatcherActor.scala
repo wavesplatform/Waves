@@ -13,7 +13,7 @@ import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.state.{AssetDescription, ByteStr}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.{AssetId, ValidationError}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
@@ -230,6 +230,7 @@ object MatcherActor {
             utx: UtxPool,
             allChannels: ChannelGroup,
             settings: MatcherSettings,
+            time: Time,
             assetDescription: ByteStr => Option[AssetDescription],
             createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction]): Props =
     Props(
@@ -237,7 +238,7 @@ object MatcherActor {
         orderBooks,
         (assetPair, matcher) =>
           OrderBookActor
-            .props(matcher, assetPair, updateSnapshot(assetPair), updateMarketStatus(assetPair), utx, allChannels, settings, createTransaction),
+            .props(matcher, assetPair, updateSnapshot(assetPair), updateMarketStatus(assetPair), utx, allChannels, settings, createTransaction, time),
         assetDescription
       ))
 

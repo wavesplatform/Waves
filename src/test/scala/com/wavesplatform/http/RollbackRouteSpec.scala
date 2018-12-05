@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
+import com.wavesplatform.NTPTime
 import com.wavesplatform.api.http.CustomValidationError
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.http.ApiMarshallers._
@@ -12,7 +13,7 @@ import play.api.libs.json.Json
 
 import scala.util.Random
 
-class RollbackRouteSpec extends RouteSpec("/debug") with MockFactory with RestAPISettingsHelper {
+class RollbackRouteSpec extends RouteSpec("/debug") with MockFactory with RestAPISettingsHelper with NTPTime {
   private val sampleConfig  = com.typesafe.config.ConfigFactory.load()
   private val wavesSettings = WavesSettings.fromConfig(sampleConfig).copy(restAPISettings = restAPISettings)
   private val configObject  = sampleConfig.root()
@@ -30,7 +31,7 @@ class RollbackRouteSpec extends RouteSpec("/debug") with MockFactory with RestAP
       val ng         = stub[NG]
 
       val route =
-        DebugApiRoute(wavesSettings, blockchain, null, ng, null, null, null, null, null, null, null, null, null, null, configObject).route
+        DebugApiRoute(wavesSettings, ntpTime, blockchain, null, ng, null, null, null, null, null, null, null, null, null, null, configObject).route
 
       val params = Json.toJson(RollbackParams(signatureHeight, false))
 

@@ -16,7 +16,7 @@ import scala.util.{Failure, Success, Try}
 
 object ScriptCompiler extends ScorexLogging {
 
-  def apply(scriptText: String): Either[String, (Script, Long)] = {
+  def apply(scriptText: String, isAssetScript: Boolean): Either[String, (Script, Long)] = {
     val directives = DirectiveParser(scriptText)
 
     val scriptWithoutDirectives =
@@ -26,14 +26,14 @@ object ScriptCompiler extends ScorexLogging {
 
     for {
       ver        <- extractVersion(directives)
-      expr       <- tryCompile(scriptWithoutDirectives, ver, directives)
+      expr       <- tryCompile(scriptWithoutDirectives, ver, isAssetScript, directives)
       script     <- ScriptV1.apply(ver, expr)
       complexity <- ScriptEstimator(varNames(ver), functionCosts(ver), expr)
     } yield (script, complexity)
   }
 
-  def tryCompile(src: String, version: Version, directives: List[Directive]): Either[String, EXPR] = {
-    val compiler = new ExpressionCompilerV1(compilerContext(version))
+  def tryCompile(src: String, version: Version, isAssetScript: Boolean, directives: List[Directive]): Either[String, EXPR] = {
+    val compiler = new ExpressionCompilerV1(compilerContext(version, isAssetScript))
     try {
       compiler.compile(src, directives)
     } catch {

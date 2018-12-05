@@ -219,7 +219,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   private def createScript(code: String) = {
     val Parsed.Success(expr, _) = Parser.parseScript(code).get
-    ScriptV1(ExpressionCompilerV1(compilerContext(V1), expr).explicitGet()._1).explicitGet()
+    ScriptV1(ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransactionV1)] =

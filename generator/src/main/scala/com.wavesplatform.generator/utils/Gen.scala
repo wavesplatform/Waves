@@ -31,7 +31,7 @@ object Gen {
         |${recString(10)} || true
       """.stripMargin
 
-    val script = ScriptCompiler(s).explicitGet()
+    val script = ScriptCompiler(s, isAssetScript = false).explicitGet()
 
     script._1
   }
@@ -60,7 +60,7 @@ object Gen {
          |}
        """.stripMargin
 
-    val script = ScriptCompiler(src).explicitGet()
+    val script = ScriptCompiler(src, isAssetScript = false).explicitGet()
 
     script._1
   }
@@ -97,7 +97,7 @@ object Gen {
        |$finalStatement
       """.stripMargin
 
-    val (script, _) = ScriptCompiler(src)
+    val (script, _) = ScriptCompiler(src, isAssetScript = false)
       .explicitGet()
     log.info(s"${script.text}")
     script
