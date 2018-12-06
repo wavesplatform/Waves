@@ -134,6 +134,7 @@ object ContractSerDe {
   }
 
   private[lang] def serializeFUNC(out: ByteArrayOutputStream, f: FUNC): Unit = {
+
     out.writeString(f.name)
     out.writeInt(f.args.size)
     f.args.foreach(out.writeString)
@@ -155,9 +156,11 @@ object ContractSerDe {
 
   private[lang] def serializeContractFunction(out: ByteArrayOutputStream, cf: ContractFunction): Unit = {
     serializeCallAnnotation(out, cf.c)
-    cf.p.fold(out.write(0)) { pa =>
-      out.writeInt(1)
-      serializePayableAnnotation(out, pa)
+    cf.p match {
+      case None => out.writeInt(0)
+      case Some(pa) =>
+        out.writeInt(1)
+        serializePayableAnnotation(out, pa)
     }
     serializeFUNC(out, cf.u)
   }
