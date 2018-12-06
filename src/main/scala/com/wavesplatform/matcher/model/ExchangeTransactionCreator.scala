@@ -1,6 +1,8 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.OrderExecuted
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator._
@@ -27,7 +29,19 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
     val (buyFee, sellFee) = calculateMatcherFee(buy, sell, event.executedAmount)
 
     val txFee = getMinFee(blockchain, settings.orderMatchTxFee, matcherPrivateKey, Some(buy.sender), Some(sell.sender), counter.order.assetPair)
-    ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, event.executedAmount, price, buyFee, sellFee, txFee, time.getTimestamp())
+    if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
+      ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, event.executedAmount, price, buyFee, sellFee, txFee, time.getTimestamp())
+    else
+      for {
+        buyV1  <- toV1(buy)
+        sellV1 <- toV1(sell)
+        tx     <- ExchangeTransactionV1.create(matcherPrivateKey, buyV1, sellV1, event.executedAmount, price, buyFee, sellFee, txFee, time.getTimestamp())
+      } yield tx
+  }
+
+  private def toV1(order: Order): Either[ValidationError, OrderV1] = order match {
+    case x: OrderV1 => Right(x)
+    case _          => Left(ValidationError.ActivationError("SmartAccountTrading has not been activated yet"))
   }
 }
 

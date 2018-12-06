@@ -42,6 +42,8 @@ class OrderValidatorSpecification
   "OrderValidator" should {
     "allow buying WAVES for BTC without balance for order fee" in
       portfolioTest(defaultPortfolio) { (ov, bc) =>
+        activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
+
         val o = newBuyOrder
         (bc.accountScript _).when(o.sender.toAddress).returns(None)
         ov.validateNewOrder(o) shouldBe 'right
@@ -79,7 +81,7 @@ class OrderValidatorSpecification
         portfolioTest(defaultPortfolio) { (ov, bc) =>
           activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
           (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
-          (bc.height _).when().returns(50).once()
+          (bc.height _).when().returns(50).anyNumberOfTimes()
 
           ov.validateNewOrder(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
         }
@@ -89,7 +91,7 @@ class OrderValidatorSpecification
         portfolioTest(defaultPortfolio) { (ov, bc) =>
           activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
           (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
-          (bc.height _).when().returns(50).once()
+          (bc.height _).when().returns(50).anyNumberOfTimes()
 
           ov.validateNewOrder(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
         }
@@ -99,7 +101,7 @@ class OrderValidatorSpecification
         portfolioTest(defaultPortfolio) { (_, bc) =>
           activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
           (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.FALSE).explicitGet()))
-          (bc.height _).when().returns(150).once()
+          (bc.height _).when().returns(150).anyNumberOfTimes()
 
           val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
           val ov = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
@@ -203,30 +205,34 @@ class OrderValidatorSpecification
       val permitScript = ScriptV1(Terms.TRUE).explicitGet()
       val denyScript   = ScriptV1(Terms.FALSE).explicitGet()
 
-      "two assets are smart and they permit an order" in test { (ov, bc, o) =>
+      "two assets are smart and they permit an order" when test { (ov, bc, o) =>
         (bc.assetScript _).when(asset1).returns(Some(permitScript))
         (bc.assetScript _).when(asset2).returns(Some(permitScript))
 
         ov.validateNewOrder(o) shouldBe 'right
       }
 
-      "first asset is smart and it deny an order" in test { (ov, bc, o) =>
+      "first asset is smart and it deny an order" when test { (ov, bc, o) =>
         (bc.assetScript _).when(asset1).returns(Some(denyScript))
         (bc.assetScript _).when(asset2).returns(None)
 
         ov.validateNewOrder(o) should produce("Order rejected by script of asset")
       }
 
-      "second asset is smart and it deny an order" in test { (ov, bc, o) =>
+      "second asset is smart and it deny an order" when test { (ov, bc, o) =>
         (bc.assetScript _).when(asset1).returns(None)
         (bc.assetScript _).when(asset2).returns(Some(denyScript))
 
         ov.validateNewOrder(o) should produce("Order rejected by script of asset")
       }
 
-      def test(f: (OrderValidator, Blockchain, Order) => Any): Unit = forAll(Gen.oneOf(1, 2)) { version =>
-        portfolioTest(portfolio) { (ov, bc) =>
-          activate(bc, BlockchainFeatures.SmartAssets -> 0)
+      def test(f: (OrderValidator, Blockchain, Order) => Any): Unit = (1 to 2).foreach { version =>
+        s"v$version" in portfolioTest(portfolio) { (ov, bc) =>
+          val features = Seq(BlockchainFeatures.SmartAssets -> 0) ++ {
+            if (version == 1) Seq.empty
+            else Seq(BlockchainFeatures.SmartAccountTrading -> 0)
+          }
+          activate(bc, features: _*)
           (bc.assetDescription _).when(asset1).returns(mkAssetDescription(8))
           (bc.assetDescription _).when(asset2).returns(mkAssetDescription(8))
 
@@ -243,6 +249,17 @@ class OrderValidatorSpecification
           (bc.accountScript _).when(o.sender.toAddress).returns(None)
           f(ov, bc, o)
         }
+      }
+    }
+
+    "deny OrderV2 if SmartAccountTrading hasn't been activated yet" in forAll(accountGen) { account =>
+      portfolioTest(defaultPortfolio) { (_, bc) =>
+        activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
+        (bc.height _).when().returns(0).anyNumberOfTimes()
+
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+        val ov = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
+        ov.validateNewOrder(newBuyOrder(account, version = 2)) should produce("Orders of version 1 are only accepted")
       }
     }
   }
