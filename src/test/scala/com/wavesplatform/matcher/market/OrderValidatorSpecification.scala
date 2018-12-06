@@ -252,7 +252,7 @@ class OrderValidatorSpecification
       }
     }
 
-    "deny OrderV1 if SmartAccountTrading hasn't been activated yet" in forAll(accountGen) { account =>
+    "deny OrderV2 if SmartAccountTrading hasn't been activated yet" in forAll(accountGen) { account =>
       portfolioTest(defaultPortfolio) { (_, bc) =>
         activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
         (bc.height _).when().returns(0).anyNumberOfTimes()
