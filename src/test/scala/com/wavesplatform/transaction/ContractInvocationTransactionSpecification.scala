@@ -39,7 +39,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
                          "timestamp": 1526910778245,
                          "proofs": ["CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T"],
                          "version": 1,
-                         "contract" : "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                         "contractAddress" : "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                          "function" : "foo",
                          "args" : [
                            { "key" : "",
@@ -64,6 +64,8 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
       .get
 
     js shouldEqual tx.json()
+
+    TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
   }
 
   property("Signed ContractInvocationTransactionRequest parser") {

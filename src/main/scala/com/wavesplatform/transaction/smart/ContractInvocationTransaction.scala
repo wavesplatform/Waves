@@ -42,7 +42,7 @@ case class ContractInvocationTransaction private (version: Byte,
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val json = Coeval.evalOnce(
     jsonBase()
-      ++ Json.obj("version" -> version, "contract" -> contractAddress.bytes) ++ ContractInvocationTransaction.functionCallToJson(fc))
+      ++ Json.obj("version" -> version, "contractAddress" -> contractAddress.bytes) ++ ContractInvocationTransaction.functionCallToJson(fc))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }
