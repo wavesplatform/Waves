@@ -177,7 +177,8 @@ object AsyncHttpApi extends Assertions {
       100.millis
     )
 
-    def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 5.seconds)
+    def waitForHeight(expectedHeight: Int): Future[Int] =
+      waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 100.milliseconds)
 
     def rawTransactionInfo(txId: String): Future[JsValue] = get(s"/transactions/info/$txId").map(r => Json.parse(r.getResponseBody))
 
