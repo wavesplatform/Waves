@@ -391,7 +391,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     }
 
     "smart accounts" - {
-      "signed txs from scripted account not allowed" in {
+      "signed txs from scripted account is not allowed" in {
         val enoughFeeTxWithScriptedAccount =
           for {
             (sender, senderBalance, utx, ts) <- withScriptedAccount(true)
@@ -403,7 +403,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         utx.putIfNew(tx) should produce("signature from scripted account")
       }
 
-      "any transaction from scripted account not allowed if smartAccounts disabled in utx pool" - {
+      "any transaction from scripted account is not allowed if smartAccounts disabled in utx pool" - {
 
         def enoughFeeTxWithScriptedAccount(version: Int): Gen[(UtxPoolImpl, TransferTransaction)] =
           for {

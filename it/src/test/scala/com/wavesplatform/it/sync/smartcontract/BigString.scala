@@ -43,7 +43,7 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
         }
         """.stripMargin
 
-    val script = ScriptCompiler(scriptText).explicitGet()._1
+    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()

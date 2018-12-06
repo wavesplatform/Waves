@@ -5,11 +5,12 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.utils.compilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 
 class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -26,7 +27,7 @@ class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matche
          | }
       """.stripMargin
     val untyped         = Parser(scriptText).get.value
-    val transferAllowed = CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
+    val transferAllowed = CompilerV1(compilerContext(V1, isAssetScript = false), untyped).explicitGet()._1
 
     forAll(preconditionsTransferAndLease(transferAllowed)) {
       case (genesis, script, lease, transfer) =>

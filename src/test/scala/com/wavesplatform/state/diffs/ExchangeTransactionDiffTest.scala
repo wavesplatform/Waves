@@ -5,6 +5,7 @@ import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.directives.DirectiveParser
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
@@ -234,7 +235,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         featureCheckBlocksPeriod = 1
       )
 
-  property("Exchange transaction with scripted matcher needs extra fee") {
+  property(s"Exchange transaction with scripted matcher and orders needs extra fee ($ScriptExtraFee)") {
     val allValidP = smartTradePreconditions(
       scriptGen("Order", true),
       scriptGen("Order", true),
@@ -243,9 +244,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(allValidP) {
       case (genesis, transfers, issueAndScripts, etx) =>
-        val smallFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(ExchangeTransaction.typeId)
+        val enoughFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
+        val smallFee  = enoughFee - 1
         val exchangeWithSmallFee = ExchangeTransactionV2
           .create(MATCHER, etx.buyOrder, etx.sellOrder, 1000000, 1000000, 0, 0, smallFee, etx.timestamp)
+          .explicitGet()
+
+        val exchangeWithEnoughFee = ExchangeTransactionV2
+          .create(MATCHER, etx.buyOrder, etx.sellOrder, 1000000, 1000000, 0, 0, enoughFee, etx.timestamp)
           .explicitGet()
 
         val preconBlocks = Seq(
@@ -254,9 +260,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
           TestBlock.create(issueAndScripts)
         )
 
-        val blockWithEx = TestBlock.create(Seq(exchangeWithSmallFee))
+        val blockWithSmallFeeETx  = TestBlock.create(Seq(exchangeWithSmallFee))
+        val blockWithEnoughFeeETx = TestBlock.create(Seq(exchangeWithEnoughFee))
 
-        assertLeft(preconBlocks, blockWithEx, fsV2)("InsufficientFee")
+        assertLeft(preconBlocks, blockWithSmallFeeETx, fsV2)("does not exceed minimal value of")
+        assertDiffEi(preconBlocks, blockWithEnoughFeeETx, fsV2)(_ shouldBe 'right)
     }
   }
 
@@ -384,10 +392,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   property("Disable use OrderV1 on SmartAccount") {
     val enoughFee        = 100000000
     val script           = "true"
-    val txScriptCompiled = ScriptCompiler(script).explicitGet()._1
+    val txScriptCompiled = ScriptCompiler(script, isAssetScript = false).explicitGet()._1
 
-    val sellerScript = Some(ScriptCompiler(script).explicitGet()._1)
-    val buyerScript  = Some(ScriptCompiler(script).explicitGet()._1)
+    val sellerScript = Some(ScriptCompiler(script, isAssetScript = false).explicitGet()._1)
+    val buyerScript  = Some(ScriptCompiler(script, isAssetScript = false).explicitGet()._1)
 
     val chainId = AddressScheme.current.chainId
 
@@ -490,7 +498,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     for {
       expr       <- compiler.compile(scriptWithoutDirectives, directives)
       script     <- ScriptV1(expr)
-      complexity <- ScriptEstimator(ctx.varDefs.keySet, functionCosts, expr)
+      complexity <- ScriptEstimator(ctx.varDefs.keySet, functionCosts(V1), expr)
     } yield (script, complexity)
   }
 
@@ -499,10 +507,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
                               txScript: String): Gen[(GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction)] = {
     val enoughFee = 100000000
 
-    val txScriptCompiled = ScriptCompiler(txScript).explicitGet()._1
+    val txScriptCompiled = ScriptCompiler(txScript, isAssetScript = false).explicitGet()._1
 
-    val sellerScript = Some(ScriptCompiler(sellerScriptSrc).explicitGet()._1)
-    val buyerScript  = Some(ScriptCompiler(buyerScriptSrc).explicitGet()._1)
+    val sellerScript = Some(ScriptCompiler(sellerScriptSrc, isAssetScript = false).explicitGet()._1)
+    val buyerScript  = Some(ScriptCompiler(buyerScriptSrc, isAssetScript = false).explicitGet()._1)
 
     val chainId = AddressScheme.current.chainId
 

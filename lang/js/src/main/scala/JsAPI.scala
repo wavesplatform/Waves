@@ -19,7 +19,6 @@ import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
 
 object JsAPI {
-
   private def toJs(ast: EXPR): js.Object = {
     def r(expr: EXPR): js.Object = {
       expr match {
@@ -31,9 +30,8 @@ object JsAPI {
           jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
         case IF(cond, ifTrue, ifFalse) =>
           jObj.applyDynamic("apply")("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
-        case REF(key) => jObj.applyDynamic("apply")("type" -> "REF", "key"    -> key)
-        case TRUE     => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> true)
-        case FALSE    => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> false)
+        case REF(key)         => jObj.applyDynamic("apply")("type" -> "REF", "key"    -> key)
+        case CONST_BOOLEAN(b) => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> b)
         case FUNCTION_CALL(function, args) =>
           jObj.applyDynamic("apply")("type" -> "CALL", "name" -> (function match {
             case Native(name) => name.toString()
@@ -45,16 +43,23 @@ object JsAPI {
     r(ast)
   }
 
-  val wavesContext = WavesContext.build(new Environment {
-    override def height: Int                                                                                     = 0
-    override def networkByte: Byte                                                                               = 1: Byte
-    override def inputEntity: Tx :+: Ord :+: CNil                                                                = null
-    override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transactionHeightById(id: Array[Byte]): Option[Int]                                             = ???
-    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
-    override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-    override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-  })
+  val version = com.wavesplatform.lang.ScriptVersion.Versions.V1
+
+  val wavesContext = WavesContext.build(
+    version,
+    new Environment {
+      override def height: Long                                                                                    = 0
+      override def networkByte: Byte                                                                               = 1: Byte
+      override def inputEntity: Tx :+: Ord :+: CNil                                                                = null
+      override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+      override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
+      override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
+      override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+      override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+    },
+    proofsEnabled = true,
+    orderEnabled = true
+  )
 
   val cryptoContext = CryptoContext.build(Global)
 
@@ -67,7 +72,7 @@ object JsAPI {
   }
 
   @JSExportTopLevel("fullContext")
-  val fullContext: CTX = Monoid.combineAll(Seq(PureContext.ctx, cryptoContext, wavesContext))
+  val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(version), cryptoContext, wavesContext))
 
   @JSExportTopLevel("getTypes")
   def getTypes() = fullContext.types.map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v.typeRef))).toJSArray
@@ -85,7 +90,7 @@ object JsAPI {
             "doc"        -> f.docString,
             "resultType" -> typeRepr(f.signature.result),
             "args" -> ((f.argsDoc zip f.signature.args) map { arg =>
-              js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._2), "doc" -> arg._1._2)
+              js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._1._2)
             }).toJSArray
         ))
       .toJSArray

@@ -4,12 +4,10 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
-  val script                        = ScriptCompiler(s"""true""".stripMargin).explicitGet()._1.bytes.value.base64
-  val supportedVersions: List[Byte] = List(1) // add "2" after IssueTransactionV2 activation
+  val supportedVersions: List[Byte] = List(1, 2)
 
   test("asset issue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     for (v <- supportedVersions) {
@@ -61,6 +59,24 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
                                "negative waves balance")
   }
 
+  test("Try to put incorrect script") {
+    val assetName        = "myasset"
+    val assetDescription = "my asset description"
+
+    assertBadRequestAndMessage(
+      sender.issue(firstAddress,
+                   assetName,
+                   assetDescription,
+                   someAssetAmount,
+                   2,
+                   reissuable = false,
+                   issueFee,
+                   version = 2,
+                   script = Some("base64:AQa3b8tZ")),
+      "ScriptParseError(Invalid checksum)"
+    )
+  }
+
   val invalidAssetValue =
     Table(
       ("assetVal", "decimals", "message"),
@@ -80,8 +96,22 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     }
   }
 
+  val invalid_assets_names =
+    Table(
+      ("abc", "invalid name"),
+      (null, "failed to parse json message"),
+      ("UpperCaseAssetCoinTest", "invalid name"),
+      ("~!|#$%^&*()_+=\";:/?><|\\][{}", "invalid name")
+    )
+
+  forAll(invalid_assets_names) { (assetName: String, message: String) =>
+    test(s"Not able to create asset named $assetName") {
+      assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetName, someAssetAmount, 2, reissuable = false, issueFee), message)
+    }
+  }
+
   def scriptText(version: Int) = version match {
-    case 2 => Some(script)
+    case 2 => Some(scriptBase64)
     case _ => None
   }
 

@@ -20,8 +20,8 @@ import play.api.libs.json._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable, Future}
+import scala.util._
 import scala.util.control.NonFatal
-import scala.util.{Failure, Try}
 
 object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
@@ -47,11 +47,11 @@ object SyncHttpApi extends Assertions {
     case _          => Assertions.fail("Expecting bad request")
   }
 
-  def assertBadRequestAndMessage[R](f: => R, errorMessage: String, statusCode: Int = BadRequest.intValue): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == statusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
+  def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion = Try(f) match {
+    case Failure(e @ UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      Assertions.assert(statusCode == expectedStatusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
-    case _          => Assertions.fail(s"Expecting bad request")
+    case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
   }
 
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
@@ -61,19 +61,23 @@ object SyncHttpApi extends Assertions {
     case _          => Assertions.fail(s"Expecting not found error")
   }
 
-  val RequestAwaitTime = 15.seconds
+  val RequestAwaitTime = 50.seconds
 
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime) =
     try Await.result(awaitable, atMost)
     catch {
       case usce: UnexpectedStatusCodeException => throw usce
       case te: TimeoutException                => throw te
-      case NonFatal(cause) =>
-        throw new Exception(cause)
+      case NonFatal(cause)                     => throw new Exception(cause)
     }
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
+
+    private def maybeWaitForTransaction(tx: Transaction, wait: Boolean): Transaction = {
+      if (wait) waitForTransaction(tx.id)
+      tx
+    }
 
     def get(path: String): Response =
       sync(async(n).get(path))
@@ -100,6 +104,8 @@ object SyncHttpApi extends Assertions {
     def accountBalances(acc: String): (Long, Long) =
       sync(async(n).accountBalances(acc))
 
+    def balanceDetails(acc: String): BalanceDetails = sync(async(n).balanceDetails(acc))
+
     def assertBalances(acc: String, balance: Long)(implicit pos: Position): Unit =
       sync(async(n).assertBalances(acc, balance, effectiveBalance = balance))
 
@@ -112,8 +118,8 @@ object SyncHttpApi extends Assertions {
     def assetBalance(address: String, asset: String): AssetBalance =
       sync(async(n).assetBalance(address, asset))
 
-    def assetsDetails(assetId: String): AssetInfo =
-      sync(async(n).assetsDetails(assetId))
+    def assetsDetails(assetId: String, fullInfo: Boolean = false): AssetInfo =
+      sync(async(n).assetsDetails(assetId, fullInfo))
 
     def addressScriptInfo(address: String): AddressApiRoute.AddressScriptInfo =
       sync(async(n).scriptInfo(address))
@@ -129,8 +135,10 @@ object SyncHttpApi extends Assertions {
               reissuable: Boolean,
               fee: Long,
               version: Byte = 1,
-              script: Option[String] = None): Transaction =
-      sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script))
+              script: Option[String] = None,
+              waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script)), waitForTx)
+    }
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Transaction =
       sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
@@ -147,8 +155,9 @@ object SyncHttpApi extends Assertions {
     def scriptCompile(code: String): CompiledScript =
       sync(async(n).scriptCompile(code))
 
-    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Transaction =
-      sync(async(n).burn(sourceAddress, assetId, quantity, fee))
+    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).burn(sourceAddress, assetId, quantity, fee)), waitForTx)
+    }
 
     def getAddresses: Seq[String] = sync(async(n).getAddresses)
 
@@ -160,8 +169,9 @@ object SyncHttpApi extends Assertions {
         Json.obj("type" -> 6, "quantity" -> quantity, "assetId" -> assetId, "sender" -> sourceAddress, "fee" -> fee, "version" -> version))
     }
 
-    def sponsorAsset(sourceAddress: String, assetId: String, baseFee: Long, fee: Long): Transaction =
-      sync(async(n).sponsorAsset(sourceAddress, assetId, baseFee, fee))
+    def sponsorAsset(sourceAddress: String, assetId: String, baseFee: Long, fee: Long, waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).sponsorAsset(sourceAddress, assetId, baseFee, fee)), waitForTx)
+    }
 
     def cancelSponsorship(sourceAddress: String, assetId: String, fee: Long): Transaction =
       sync(async(n).cancelSponsorship(sourceAddress, assetId, fee))
@@ -181,11 +191,18 @@ object SyncHttpApi extends Assertions {
                  fee: Long,
                  assetId: Option[String] = None,
                  feeAssetId: Option[String] = None,
-                 version: Byte = 1): Transaction =
-      sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version))
+                 version: Byte = 1,
+                 waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version)), waitForTx)
+    }
 
-    def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Transaction =
-      sync(async(n).massTransfer(sourceAddress, transfers, fee, assetId))
+    def massTransfer(sourceAddress: String,
+                     transfers: List[Transfer],
+                     fee: Long,
+                     assetId: Option[String] = None,
+                     waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).massTransfer(sourceAddress, transfers, fee, assetId)), waitForTx)
+    }
 
     def lease(sourceAddress: String, recipient: String, leasingAmount: Long, leasingFee: Long, version: Byte = 1): Transaction =
       sync(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee))
@@ -208,8 +225,9 @@ object SyncHttpApi extends Assertions {
     def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: Byte = 1): Transaction =
       sync(async(n).cancelLease(sourceAddress, leaseId, fee))
 
-    def signedBroadcast(tx: JsObject): Transaction =
-      sync(async(n).signedBroadcast(tx))
+    def signedBroadcast(tx: JsObject, waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).signedBroadcast(tx)), waitForTx)
+    }
 
     def signedIssue(tx: SignedIssueV1Request): Transaction =
       sync(async(n).signedIssue(tx))
@@ -229,8 +247,9 @@ object SyncHttpApi extends Assertions {
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
       sync(async(n).waitForTransaction(txId))
 
-    def signAndBroadcast(tx: JsObject): Transaction =
-      sync(async(n).signAndBroadcast(tx))
+    def signAndBroadcast(tx: JsObject, waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).signAndBroadcast(tx)), waitForTx)
+    }
 
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
@@ -273,6 +292,10 @@ object SyncHttpApi extends Assertions {
 
     def connect(address: InetSocketAddress): Unit =
       sync(async(n).connect(address))
+
+    def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None, waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).setAssetScript(assetId, sender, fee, script)), waitForTx)
+    }
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
@@ -287,6 +310,9 @@ object SyncHttpApi extends Assertions {
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
       sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
+
+    def waitForTransaction(transactionId: String)(implicit pos: Position): Unit =
+      sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime)
 
     def waitForHeightArise(): Int =
       sync(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)

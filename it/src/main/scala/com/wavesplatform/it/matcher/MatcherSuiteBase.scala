@@ -18,21 +18,19 @@ abstract class MatcherSuiteBase
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
-  val defaultAssetQuantity = 999999999999l
+  val defaultAssetQuantity = 999999999999L
 
-  val smartFee   = 0.004.waves
-  val minFee     = 0.001.waves + smartFee
-  val issueFee   = 1.waves + smartFee
-  val leasingFee = 0.002.waves + smartFee
+  val smartFee         = 0.004.waves
+  val minFee           = 0.001.waves + smartFee
+  val issueFee         = 1.waves + smartFee
+  val leasingFee       = 0.002.waves + smartFee
+  val tradeFee         = 0.003.waves
+  val smartTradeFee    = tradeFee + smartFee
+  val twoSmartTradeFee = tradeFee + 2 * smartFee
 
   protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .withDefault(4)
       .buildNonConflicting()
 
-  override protected def nodes: Seq[Node] = dockerNodes()
-
-  protected override def beforeAll(): Unit = {
-    super.beforeAll()
-  }
 }

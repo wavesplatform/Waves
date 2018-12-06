@@ -10,10 +10,11 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 
-trait Caches extends Blockchain {
+trait Caches extends Blockchain with ScorexLogging {
   import Caches._
 
   protected def maxCacheSize: Int
@@ -81,7 +82,10 @@ trait Caches extends Blockchain {
 
   override def assetScript(asset: AssetId): Option[Script] = assetScriptCache.get(asset)
   override def hasAssetScript(asset: AssetId): Boolean =
-    Option(assetScriptCache.getIfPresent(asset)).flatten.isDefined || hasAssetScriptBytes(asset)
+    assetScriptCache.getIfPresent(asset) match {
+      case null => hasAssetScriptBytes(asset)
+      case x    => x.nonEmpty
+    }
 
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): BigInt
@@ -135,6 +139,9 @@ trait Caches extends Blockchain {
     def addressId(address: Address): BigInt = (newAddressIds.get(address) orElse addressIdCache.get(address)).get
 
     lastAddressId += newAddressIds.size
+
+    log.trace(s"CACHE newAddressIds = $newAddressIds")
+    log.trace(s"CACHE lastAddressId = $lastAddressId")
 
     val wavesBalances = Map.newBuilder[BigInt, Long]
     val assetBalances = Map.newBuilder[BigInt, Map[ByteStr, Long]]
@@ -195,6 +202,7 @@ trait Caches extends Blockchain {
     for ((address, portfolio)    <- newPortfolios.result()) portfolioCache.put(address, portfolio)
     for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     scriptCache.putAll(diff.scripts.asJava)
+    assetScriptCache.putAll(diff.assetScripts.asJava)
   }
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]

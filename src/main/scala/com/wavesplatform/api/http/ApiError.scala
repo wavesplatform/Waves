@@ -264,7 +264,7 @@ case class TransactionNotAllowedByScript(tx: Transaction, log: Log, scriptSrc: S
 
   override val id: Int             = 307
   override val code: StatusCode    = StatusCodes.BadRequest
-  override val message: String     = s"Transaction not allowed by ${if (isTokenScript) "token" else "account"}-script"
+  override val message: String     = s"Transaction is not allowed by ${if (isTokenScript) "token" else "account"}-script"
   override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
 }
 

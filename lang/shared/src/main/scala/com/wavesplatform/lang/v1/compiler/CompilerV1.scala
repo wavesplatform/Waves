@@ -18,8 +18,8 @@ import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 
 class CompilerV1(ctx: CompilerContext) extends ExprCompiler {
-  override type V = V1.type
-  override val version: V = V1
+  override type Ver = V1.type
+  override val version: Ver = V1
 
   override def compile(input: String, directives: List[Directive]): Either[String, version.ExprT] = {
     Parser(input) match {
@@ -90,7 +90,7 @@ object CompilerV1 {
         case u: UNION => u.pure[CompileM]
         case _        => raiseError[CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
       }
-      tmpArgId       = ctx.tmpArgsIdx
+      tmpArgId  = ctx.tmpArgsIdx
       refTmpKey = "$match" + tmpArgId
       _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId + 1))
       allowShadowVarName = typedExpr._1 match {
@@ -142,7 +142,7 @@ object CompilerV1 {
       ctx         <- get[CompilerContext, CompilationError]
       field       <- handlePart(fieldPart)
       compiledRef <- compileExpr(refExpr)
-      result <-  mkGetter(p, ctx, compiledRef._2.l, field, compiledRef._1).toCompileM
+      result      <- mkGetter(p, ctx, compiledRef._2.l, field, compiledRef._1).toCompileM
     } yield result
   }
 

@@ -27,7 +27,8 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
         s"""
            |let ind = $ind
            |true
-          """.stripMargin
+          """.stripMargin,
+        isAssetScript = false
       ).explicitGet()
 
       script

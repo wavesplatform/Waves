@@ -12,7 +12,7 @@ Seq(
   "org.scoverage"      % "sbt-scoverage"            % "1.5.1",
   "se.marcuslonnberg"  % "sbt-docker"               % "1.4.1",
   "com.typesafe.sbt"   % "sbt-git"                  % "0.9.3",
-  "org.scala-js"       % "sbt-scalajs"              % "0.6.22",
+  "org.scala-js"       % "sbt-scalajs"              % "0.6.25",
   "org.portable-scala" % "sbt-crossproject"         % "0.3.1",
   "org.portable-scala" % "sbt-scalajs-crossproject" % "0.3.1",
   "com.lucidchart"     % "sbt-scalafmt"             % "1.15",

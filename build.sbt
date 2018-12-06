@@ -1,13 +1,14 @@
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys.{sourceGenerators, _}
 import sbt._
-import sbtcrossproject.CrossPlugin.autoImport.crossProject
 import sbt.internal.inc.ReflectUtilities
 import sbtassembly.MergeStrategy
+import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 scalafmtOnCompile in ThisBuild := true
 Global / cancelable := true
+Global / coverageExcludedPackages := ".*"
 
 val versionSource = Def.task {
   // WARNING!!!
@@ -45,7 +46,7 @@ logBuffered := false
 
 inThisBuild(
   Seq(
-    scalaVersion := "2.12.6",
+    scalaVersion := "2.12.7",
     organization := "com.wavesplatform",
     crossPaths := false,
     scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
@@ -208,13 +209,21 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
   p: ProjectReference
 }
 
-addCommandAlias("checkPR", """;set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings"); Global / checkPRRaw""")
+addCommandAlias(
+  "checkPR",
+  """;
+    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
+    |Global / checkPRRaw;
+    |set scalacOptions in ThisBuild -= "-Xfatal-warnings";
+  """.stripMargin
+)
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw in Global := {
   try {
     clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
   } finally {
     test.all(ScopeFilter(inProjects(langJVM, node), inConfigurations(Test))).value
+    (langJS / Compile / fastOptJS).value
     compile.all(ScopeFilter(inProjects(generator, benchmark), inConfigurations(Test))).value
   }
 }
@@ -224,6 +233,7 @@ lazy val lang =
     .withoutSuffixFor(JVMPlatform)
     .settings(
       version := "1.0.0",
+      coverageExcludedPackages := ".*",
       // the following line forces scala version across all dependencies
       scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true))),
       test in assembly := {},
@@ -247,6 +257,7 @@ lazy val lang =
       }
     )
     .jvmSettings(
+      coverageExcludedPackages := "",
       publishMavenStyle := true,
       credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
       publishTo := Some("Sonatype Nexus" at "https://oss.sonatype.org/service/local/staging/deploy/maven2"),
@@ -261,7 +272,7 @@ lazy val lang =
       scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
       developers := List(Developer("petermz", "Peter Zhelezniakov", "peterz@rambler.ru", url("https://wavesplatform.com"))),
       libraryDependencies ++= Seq(
-        "org.scala-js"                      %% "scalajs-stubs" % "0.6.22" % "provided",
+        "org.scala-js"                      %% "scalajs-stubs" % "1.0.0-RC1" % "provided",
         "com.github.spullara.mustache.java" % "compiler" % "0.9.5"
       ) ++ Dependencies.logging.map(_       % "test") // scrypto logs an error if a signature verification was failed
     )
@@ -273,6 +284,7 @@ lazy val node = project
   .in(file("."))
   .settings(
     addCompilerPlugin(Dependencies.kindProjector),
+    coverageExcludedPackages := "",
     libraryDependencies ++=
       Dependencies.network ++
         Dependencies.db ++

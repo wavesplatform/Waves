@@ -17,10 +17,13 @@ import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
 import com.typesafe.config.{Config, ConfigRenderOptions}
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.block.Block
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.settings._
 import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
@@ -28,9 +31,6 @@ import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
-import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.block.Block
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -64,25 +64,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     close()
   }
 
-  private[it] val configTemplate = parseResources("template.conf")
-
-  AddressScheme.current = new AddressScheme {
-    override val chainId = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
-  }
-
-  private[it] val genesisOverride = {
-    val genesisTs          = System.currentTimeMillis()
-    val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
-         |  timestamp = $genesisTs
-         |  block-timestamp = $genesisTs
-         |}""".stripMargin)
-
-    val genesisConfig    = configTemplate.withFallback(timestampOverrides)
-    val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
-    val genesisSignature = Block.genesis(gs).explicitGet().uniqueId
-
-    timestampOverrides.withFallback(parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature"))
-  }
+  private val genesisOverride = Docker.genesisOverride
 
   // a random network in 10.x.x.x range
   private val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
@@ -242,8 +224,10 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
       val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
       val configOverrides: String = {
+        val ntpServer = Option(System.getenv("NTP_SERVER")).fold("")(x => s"-Dwaves.ntp-server=$x ")
+
         var config = s"$javaOptions ${renderProperties(asProperties(overrides))} " +
-          s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort "
+          s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort $ntpServer"
 
         if (enableProfiling) {
           config += s"-agentpath:/usr/local/YourKit-JavaProfiler-2018.04/bin/linux-x86-64/libyjpagent.so=port=$ProfilerPort,listen=all," +
@@ -349,6 +333,24 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       3.minutes
     )
     node
+  }
+
+  def restartNode(node: DockerNode, configUpdates: Config = empty): DockerNode = {
+    Await.result(node.waitForHeightArise, 3.minutes)
+
+    if (configUpdates != empty) {
+      val renderedConfig = renderProperties(asProperties(configUpdates))
+
+      log.debug("Set new config directly in the script for starting node")
+      val shPath = "/opt/waves/start-waves.sh"
+      val scriptCmd: Array[String] =
+        Array("sh", "-c", s"sed -i 's|$$WAVES_OPTS.*-jar|$$WAVES_OPTS $renderedConfig -jar|' $shPath && chmod +x $shPath")
+
+      val execScriptCmd = client.execCreate(node.containerId, scriptCmd).id()
+      client.execStart(execScriptCmd)
+    }
+
+    restartContainer(node)
   }
 
   override def close(): Unit = {
@@ -582,6 +584,25 @@ object Docker {
   private val ProfilerPort       = 10001
   private val jsonMapper         = new ObjectMapper
   private val propsMapper        = new JavaPropsMapper
+
+  val configTemplate = parseResources("template.conf")
+  def genesisOverride = {
+    val genesisTs          = System.currentTimeMillis()
+    val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
+                                            |  timestamp = $genesisTs
+                                            |  block-timestamp = $genesisTs
+                                            |}""".stripMargin)
+
+    val genesisConfig    = configTemplate.withFallback(timestampOverrides)
+    val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
+    val genesisSignature = Block.genesis(gs).explicitGet().uniqueId
+
+    timestampOverrides.withFallback(parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature"))
+  }
+
+  AddressScheme.current = new AddressScheme {
+    override val chainId = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
+  }
 
   def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
 
