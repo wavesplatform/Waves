@@ -65,13 +65,20 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
     "trading is deprecated" in {
       assertBadRequestAndResponse(
+        matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1, 10.minutes),
+        "Trading on scripted account isn't allowed yet"
+      )
+    }
+
+    "can't place an OrderV2 before the activation" in {
+      assertBadRequestAndResponse(
         matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes),
-        "Trading on scripted account isn't allowed yet."
+        "Orders of version 1 are only accepted, because SmartAccountTrading has not been activated yet"
       )
     }
 
     "invalid setScript at account" in {
-      matcherNode.waitForHeight(ActivationHeight, 3.minutes)
+      matcherNode.waitForHeight(ActivationHeight, 5.minutes)
       setContract(Some("true && (height > 0)"), bobAcc)
       assertBadRequestAndResponse(
         matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes),

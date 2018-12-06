@@ -97,17 +97,6 @@ class OrderValidatorSpecification
         }
       }
 
-//      "xxx" in forAll(accountGen) { scripted =>
-//        portfolioTest(defaultPortfolio) { (_, bc) =>
-//          activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
-//          (bc.height _).when().returns(150).anyNumberOfTimes()
-//
-//          val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
-//          val ov = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
-//          ov.validateNewOrder(newBuyOrder(scripted, version = 2)) should produce("Order rejected by script")
-//        }
-//      }
-
       "sender's address has a script returning FALSE" in forAll(accountGen) { scripted =>
         portfolioTest(defaultPortfolio) { (_, bc) =>
           activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
@@ -262,11 +251,21 @@ class OrderValidatorSpecification
         }
       }
     }
+
+    "deny OrderV1 if SmartAccountTrading hasn't been activated yet" in forAll(accountGen) { account =>
+      portfolioTest(defaultPortfolio) { (_, bc) =>
+        activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
+        (bc.height _).when().returns(0).anyNumberOfTimes()
+
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+        val ov = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
+        ov.validateNewOrder(newBuyOrder(account, version = 2)) should produce("Orders of version 1 are only accepted")
+      }
+    }
   }
 
   private def portfolioTest(p: Portfolio)(f: (OrderValidator, Blockchain) => Any): Unit = {
     val bc = stub[Blockchain]
-
     (bc.assetScript _).when(wbtc).returns(None)
     (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8)).anyNumberOfTimes()
     val transactionCreator = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
