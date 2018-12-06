@@ -2,19 +2,25 @@ package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
 import com.wavesplatform.lang.Version
-import com.wavesplatform.lang.Version._
-import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.Version.{V1, _}
 import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
 import com.wavesplatform.lang.v1.ScriptEstimator
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompilerV1}
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1.ScriptV1Impl
-import com.wavesplatform.utils._
 import com.wavesplatform.transaction.smart.script.v1.{ScriptV1, ScriptV2}
+import com.wavesplatform.utils._
 
 import scala.util.{Failure, Success, Try}
 
 object ScriptCompiler extends ScorexLogging {
+
+  def contract(scriptText: String): Either[String, Script] = {
+    val ctx = compilerContext(V3, isAssetScript = false)
+    ContractCompiler(ctx, Parser.parseContract(scriptText).get.value)
+      .map(s => ScriptV2(V3, s))
+  }
 
   def apply(scriptText: String, isAssetScript: Boolean): Either[String, (Script, Long)] = {
     val directives = DirectiveParser(scriptText)

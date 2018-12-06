@@ -1,7 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract.smartasset
 
-import java.util.concurrent.TimeoutException
-
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{someAssetAmount, _}

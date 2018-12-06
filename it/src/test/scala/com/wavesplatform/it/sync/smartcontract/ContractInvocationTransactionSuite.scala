@@ -1,19 +1,13 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import cats.kernel.Monoid
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.compiler.compilerContext
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTEVECTOR, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.{Common, Version}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.smart.script.v1.ScriptV2
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
@@ -81,13 +75,9 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
         |
         """.stripMargin
 
-    val ctx =
-      Monoid.combine(compilerContext,
-                     WavesContext.build(Version.V3, Common.emptyBlockchainEnvironment(), proofsEnabled = true, orderEnabled = true).compilerContext)
-
-    val script = ContractCompiler(ctx, Parser.parseContract(scriptText).get.value).explicitGet()
+    val script = ScriptCompiler.contract(scriptText).explicitGet()
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, contract, Some(ScriptV2(Version.V3, script)), setScriptFee, System.currentTimeMillis())
+      .selfSigned(SetScriptTransaction.supportedVersions.head, contract, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender
