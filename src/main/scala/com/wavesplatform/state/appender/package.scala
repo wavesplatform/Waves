@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector, TransactionsOrdering}
+import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
@@ -99,7 +99,6 @@ package object appender extends ScorexLogging {
       effectiveBalance <- genBalance(height).left.map(GenericError(_))
       _                <- validateBlockVersion(height, block, settings.blockchainSettings.functionalitySettings)
       _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
-      _                <- validateTransactionSorting(height, block, settings.blockchainSettings.functionalitySettings)
       _                <- pos.validateBaseTarget(height, block, parent, grandParent)
       _                <- pos.validateGeneratorSignature(height, block)
       _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
@@ -128,18 +127,4 @@ package object appender extends ScorexLogging {
       GenericError(s"Block Version 3 can only appear at height greater than $version3Height")
     )
   }
-
-  private def validateTransactionSorting(height: Int, block: Block, settings: FunctionalitySettings): Either[ValidationError, Unit] = {
-    val blockTime = block.timestamp
-    for {
-      _ <- Either.cond(
-        blockTime < settings.requireSortedTransactionsAfter
-          || height > settings.dontRequireSortedTransactionsAfter
-          || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
-        (),
-        GenericError("transactions are not sorted")
-      )
-    } yield ()
-  }
-
 }

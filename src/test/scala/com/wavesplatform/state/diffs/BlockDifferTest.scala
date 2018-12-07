@@ -114,7 +114,6 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       featureCheckBlocksPeriod = ngAtHeight / 2,
       blocksForFeatureActivation = 1,
       allowTemporaryNegativeUntil = 0L,
-      requireSortedTransactionsAfter = 0L,
       generationBalanceDepthFrom50To1000AfterHeight = 0,
       minimalGeneratingBalanceAfter = 0L,
       allowTransactionsFromFutureUntil = Long.MaxValue,
