@@ -36,6 +36,7 @@ object ContractEvaluator {
                 case (CONST_STRING(k), CONST_STRING(b))     => DataItem.Str(k, b)
                 case (CONST_STRING(k), CONST_LONG(b))       => DataItem.Lng(k, b)
                 case (CONST_STRING(k), CONST_BYTEVECTOR(b)) => DataItem.Bin(k, b)
+                case _ => ???
               }
             case _ => ???
           }
