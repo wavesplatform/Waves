@@ -45,8 +45,8 @@ class MatcherUtxPool(underlying: UtxPool, matcherSettings: MatcherSettings, even
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = underlying.transactionById(transactionId)
 
-  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], MultiDimensionalMiningConstraint) =
-    underlying.packUnconfirmed(rest, sortInBlock)
+  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) =
+    underlying.packUnconfirmed(rest)
 
   override def batched[Result](f: UtxBatchOps => Result): Result = {
     val ops = new BatchOpsImpl(underlying.createBatchOps)
