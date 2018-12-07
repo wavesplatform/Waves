@@ -283,7 +283,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
 
         val maxNumber             = Math.max(utx.all.size / 2, 3)
         val rest                  = limitByNumber(maxNumber)
-        val (packed, restUpdated) = utx.packUnconfirmed(rest, sortInBlock = false)
+        val (packed, restUpdated) = utx.packUnconfirmed(rest)
 
         packed.lengthCompare(maxNumber) should be <= 0
         if (maxNumber <= utx.all.size) restUpdated.isEmpty shouldBe true
@@ -296,7 +296,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
 
         time.advance(offset)
 
-        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), sortInBlock = false)
+        val (packed, _) = utx.packUnconfirmed(limitByNumber(100))
         packed shouldBe 'empty
         utx.all shouldBe 'empty
     }
@@ -308,7 +308,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
 
         time.advance(offset)
 
-        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), sortInBlock = false)
+        val (packed, _) = utx.packUnconfirmed(limitByNumber(100))
         packed.size shouldBe 2
         utx.all.size shouldBe 2
     }
@@ -347,7 +347,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
           val poolSizeBefore     = utxPool.size
 
           time.advance(settings.maxTransactionAge * 2)
-          utxPool.packUnconfirmed(limitByNumber(100), sortInBlock = false)
+          utxPool.packUnconfirmed(limitByNumber(100))
 
           poolSizeBefore should be > utxPool.size
           val utxPortfolioAfter = utxPool.portfolio(sender)

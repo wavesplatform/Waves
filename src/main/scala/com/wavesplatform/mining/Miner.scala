@@ -159,7 +159,7 @@ class MinerImpl(allChannels: ChannelGroup,
         consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
         estimators                         = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
         mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
-        (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, isSortingRequired())
+        (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint)
         _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
         block <- Block
           .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version))
@@ -172,8 +172,6 @@ class MinerImpl(allChannels: ChannelGroup,
     val chanCount = allChannels.size()
     Either.cond(chanCount >= minerSettings.quorum, (), s"Quorum not available ($chanCount/${minerSettings.quorum}), not forging block.")
   }
-
-  private def isSortingRequired(): Boolean = blockchainUpdater.height <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
   private def blockFeatures(version: Byte): Set[Short] = {
     if (version <= 2) Set.empty[Short]
@@ -199,7 +197,7 @@ class MinerImpl(allChannels: ChannelGroup,
     } else {
       val (unconfirmed, updatedTotalConstraint) = measureLog("packing unconfirmed transactions for microblock") {
         val mdConstraint                       = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-        val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, sortInBlock = false)
+        val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint)
         (unconfirmed, updatedMdConstraint.constraints.head)
       }
 

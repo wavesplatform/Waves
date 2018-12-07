@@ -22,7 +22,7 @@ trait UtxPool extends AutoCloseable {
 
   def transactionById(transactionId: ByteStr): Option[Transaction]
 
-  def packUnconfirmed(rest: MultiDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], MultiDimensionalMiningConstraint)
+  def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint)
 
   def batched[Result](f: UtxBatchOps => Result): Result = f(createBatchOps)
 

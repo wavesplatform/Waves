@@ -145,6 +145,8 @@ class OrderValidator(db: DB,
 
         for {
           _ <- (Right(order): ValidationResult)
+            .ensure("Orders of version 1 are only accepted, because SmartAccountTrading has not been activated yet")(
+              _.version == 1 || blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
             .ensure("Incorrect matcher public key")(_.matcherPublicKey == matcherPublicKey)
             .ensure("Invalid address")(_ => !blacklistedAddresses.contains(senderAddress))
             .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)

@@ -19,7 +19,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        feature-check-blocks-period = 10000
         |        blocks-for-feature-activation = 9000
         |        allow-temporary-negative-until = 1
-        |        require-sorted-transactions-after = 3
         |        generation-balance-depth-from-50-to-1000-after-height = 4
         |        minimal-generating-balance-after = 5
         |        allow-transactions-from-future-until = 6
@@ -55,7 +54,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.featureCheckBlocksPeriod should be(10000)
     settings.functionalitySettings.blocksForFeatureActivation should be(9000)
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1)
-    settings.functionalitySettings.requireSortedTransactionsAfter should be(3)
     settings.functionalitySettings.generationBalanceDepthFrom50To1000AfterHeight should be(4)
     settings.functionalitySettings.minimalGeneratingBalanceAfter should be(5)
     settings.functionalitySettings.allowTransactionsFromFutureUntil should be(6)
@@ -88,7 +86,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
 
     settings.addressSchemeCharacter should be('T')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1477958400000L)
-    settings.functionalitySettings.requireSortedTransactionsAfter should be(1477958400000L)
     settings.functionalitySettings.generationBalanceDepthFrom50To1000AfterHeight should be(0)
     settings.functionalitySettings.minimalGeneratingBalanceAfter should be(0)
     settings.functionalitySettings.allowTransactionsFromFutureUntil should be(1478100000000L)
@@ -125,7 +122,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
 
     settings.addressSchemeCharacter should be('W')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1479168000000L)
-    settings.functionalitySettings.requireSortedTransactionsAfter should be(1479168000000L)
     settings.functionalitySettings.generationBalanceDepthFrom50To1000AfterHeight should be(232000L)
     settings.functionalitySettings.minimalGeneratingBalanceAfter should be(1479168000000L)
     settings.functionalitySettings.allowTransactionsFromFutureUntil should be(1479168000000L)

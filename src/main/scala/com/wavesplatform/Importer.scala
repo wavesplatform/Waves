@@ -41,15 +41,15 @@ object Importer extends ScorexLogging {
 
     implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
     val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction)                                                     = ???
-      override def removeAll(txs: Traversable[Transaction]): Unit                                = {}
-      override def accountPortfolio(addr: Address)                                               = ???
-      override def portfolio(addr: Address)                                                      = ???
-      override def all                                                                           = ???
-      override def size                                                                          = ???
-      override def transactionById(transactionId: ByteStr)                                       = ???
-      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, sortInBlock: Boolean) = ???
-      override def close(): Unit                                                                 = {}
+      override def putIfNew(tx: Transaction)                               = ???
+      override def removeAll(txs: Traversable[Transaction]): Unit          = {}
+      override def accountPortfolio(addr: Address)                         = ???
+      override def portfolio(addr: Address)                                = ???
+      override def all                                                     = ???
+      override def size                                                    = ???
+      override def transactionById(transactionId: ByteStr)                 = ???
+      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint) = ???
+      override def close(): Unit                                           = {}
     }
 
     val time = new NTP(settings.ntpServer)
