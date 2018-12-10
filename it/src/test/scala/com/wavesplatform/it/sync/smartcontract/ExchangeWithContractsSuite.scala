@@ -70,7 +70,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
            (None, None, sc4),
            (None, None, sc5),
            (None, None, sc6),
-           (sc4, sc5, sc6),
+           (sc5, None, sc6),
          )) {
 
       setContracts(
