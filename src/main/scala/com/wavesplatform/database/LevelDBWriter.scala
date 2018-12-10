@@ -215,8 +215,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
     log.trace(s"WRITE lastAddressId = $lastAddressId")
 
-    val threshold         = height - maxRollbackDepth
-    val balanceThreshHold = height - balanceSnapshotMaxRollbackDepth
+    val threshold        = height - maxRollbackDepth
+    val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
@@ -226,7 +226,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         newAddressesForWaves += addressId
       }
       rw.put(Keys.wavesBalance(addressId)(height), balance)
-      expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshHold, Keys.wavesBalance(addressId))
+      expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshold, Keys.wavesBalance(addressId))
       addressId
     }
 
@@ -240,7 +240,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     for ((addressId, leaseBalance) <- leaseBalances) {
       rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
-      expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshHold, Keys.leaseBalance(addressId))
+      expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
     }
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[ByteStr, Set[BigInt]]
