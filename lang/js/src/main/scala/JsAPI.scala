@@ -38,17 +38,16 @@ object JsAPI {
             case Native(name) => name.toString()
             case User(name)   => name
           }), "args" -> args.map(r).toJSArray)
+        case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
       }
     }
 
     r(ast)
   }
 
-  private def toJs(c: Contract) : js.Object = {
+  private def toJs(c: Contract): js.Object = {
     toJs(TRUE) // later
   }
-
-
 
   def wavesContext(v: com.wavesplatform.lang.Version.Version) = WavesContext.build(
     v,
@@ -65,10 +64,10 @@ object JsAPI {
     isTokenContext = false
   )
 
-  val v1 = com.wavesplatform.lang.Version.V1
-  val v3= com.wavesplatform.lang.Version.V3
-  val exprWavesContext =wavesContext(v1)
-  val contractWavesContext =wavesContext(v3)
+  val v1                   = com.wavesplatform.lang.Version.V1
+  val v3                   = com.wavesplatform.lang.Version.V3
+  val exprWavesContext     = wavesContext(v1)
+  val contractWavesContext = wavesContext(v3)
 
   val cryptoContext = CryptoContext.build(Global)
 
@@ -135,7 +134,7 @@ object JsAPI {
       )
   }
 
-  @JSExportTopLevel("compile")
+  @JSExportTopLevel("compileContract")
   def compileContract(input: String): js.Dynamic = {
 
     def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
