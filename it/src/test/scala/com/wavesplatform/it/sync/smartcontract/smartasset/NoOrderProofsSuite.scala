@@ -10,12 +10,14 @@ import com.wavesplatform.transaction.assets.BurnTransactionV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import play.api.libs.json.JsNumber
+
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 class NoOrderProofsSuite extends BaseTransactionSuite {
   test("try to use Order in asset scripts") {
-    try sender
-      .issue(
+    Try {
+      sender.issue(
         firstAddress,
         "assetWProofs",
         "Test coin for assetWProofs test",
@@ -27,18 +29,17 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         script = Some(
           ScriptCompiler(
             s"""
-            match tx {
-            case o: Order => true
-            case _ => false
-            }""".stripMargin,
-            true
+              |match tx {
+              |  case o: Order => true
+              |  case _ => false
+              |}""".stripMargin,
+            isAssetScript = true
           ).explicitGet()._1.bytes.value.base64)
       )
-    catch {
-      case ex: java.lang.Exception => assert(ex.getMessage.contains("Compilation failed: Matching not exhaustive"))
-      case _: Throwable            => throw new Exception("ScriptCompiler works incorrect for orders with smart assets")
+    } match {
+      case Success(_) => fail("ScriptCompiler didn't throw expected error")
+      case Failure(f) => f.getMessage should include("Compilation failed: Matching not exhaustive")
     }
-
   }
 
   test("try to use proofs in assets script") {
