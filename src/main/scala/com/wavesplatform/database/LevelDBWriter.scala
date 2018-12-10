@@ -27,8 +27,6 @@ import scala.collection.{SeqView, immutable, mutable}
 
 object LevelDBWriter {
 
-  val MAX_DEPTH = 2000
-
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
     db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(leaseId)(h)))
 
@@ -63,7 +61,11 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int = 100000) extends Caches with ScorexLogging {
+class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int = 100000, val maxRollbackDepth: Int = 2000)
+    extends Caches
+    with ScorexLogging {
+
+  private val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
 
   import LevelDBWriter._
 
@@ -196,8 +198,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
 
-    if (previousSafeRollbackHeight < (height - MAX_DEPTH)) {
-      rw.put(Keys.safeRollbackHeight, height - MAX_DEPTH)
+    if (previousSafeRollbackHeight < (height - maxRollbackDepth)) {
+      rw.put(Keys.safeRollbackHeight, height - maxRollbackDepth)
     }
 
     rw.put(Keys.blockAt(height), Some(block))
@@ -213,7 +215,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
     log.trace(s"WRITE lastAddressId = $lastAddressId")
 
-    val threshold = height - MAX_DEPTH
+    val threshold         = height - maxRollbackDepth
+    val balanceThreshHold = height - balanceSnapshotMaxRollbackDepth
 
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
@@ -223,7 +226,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         newAddressesForWaves += addressId
       }
       rw.put(Keys.wavesBalance(addressId)(height), balance)
-      expiredKeys ++= updateHistory(rw, wbh, kwbh, threshold, Keys.wavesBalance(addressId))
+      expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshHold, Keys.wavesBalance(addressId))
       addressId
     }
 
@@ -237,7 +240,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     for ((addressId, leaseBalance) <- leaseBalances) {
       rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
-      expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), threshold, Keys.leaseBalance(addressId))
+      expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshHold, Keys.leaseBalance(addressId))
     }
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[ByteStr, Set[BigInt]]
