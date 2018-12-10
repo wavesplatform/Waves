@@ -6,7 +6,7 @@ import akka.persistence._
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
+import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded}
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
@@ -26,13 +26,14 @@ import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class OrderBookActor(parent: ActorRef,
+                     addressActor: ActorRef,
                      assetPair: AssetPair,
                      updateSnapshot: OrderBook => Unit,
                      updateMarketStatus: MarketStatus => Unit,
                      utx: UtxPool,
                      allChannels: ChannelGroup,
                      settings: MatcherSettings,
-                     createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction],
+                     createTransaction: (LimitOrder, LimitOrder) => Either[ValidationError, ExchangeTransaction],
                      time: Time)
     extends PersistentActor
     with ScorexLogging {
@@ -83,7 +84,10 @@ class OrderBookActor(parent: ActorRef,
       orderBook.asks.values
         .++(orderBook.bids.values)
         .flatten
-        .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x, unmatchable = false)))
+        .foreach { x =>
+          log.trace(s"Deleting order book: cancel ${x.order.id()}")
+          publishEvent(Events.OrderCanceled(x, unmatchable = false))
+        }
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
       sender() ! Status.Success(0)
@@ -182,7 +186,7 @@ class OrderBookActor(parent: ActorRef,
       if (lastSequenceNr % settings.snapshotsInterval == 0) self ! SaveSnapshot
     }
     applyEvent(e)
-    context.system.eventStream.publish(e)
+    publishEvent(e)
   }
 
   private def processInvalidTransaction(event: Events.OrderExecuted, err: ValidationError): Option[LimitOrder] = {
@@ -225,7 +229,7 @@ class OrderBookActor(parent: ActorRef,
 
       case event @ Events.OrderExecuted(o, c) =>
         (for {
-          tx <- createTransaction(event)
+          tx <- createTransaction(o, c)
           _  <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) =>
@@ -263,7 +267,7 @@ class OrderBookActor(parent: ActorRef,
 
   private def handleCancelEvent(e: Event): Unit = {
     applyEvent(e)
-    context.system.eventStream.publish(e)
+    publishEvent(e)
   }
 
   override def receiveCommand: Receive = fullCommands
@@ -271,7 +275,7 @@ class OrderBookActor(parent: ActorRef,
   override def receiveRecover: Receive = {
     case evt: Event =>
       applyEvent(evt)
-      if (settings.recoverOrderHistory) context.system.eventStream.publish(evt)
+      publishEvent(evt)
 
     case RecoveryCompleted =>
       updateSnapshot(orderBook)
@@ -281,16 +285,8 @@ class OrderBookActor(parent: ActorRef,
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook
       refreshMarketStatus()
-      if (settings.recoverOrderHistory) {
-        val orders = (orderBook.asks.valuesIterator ++ orderBook.bids.valuesIterator).flatten
-        if (orders.nonEmpty) {
-          val ids = orders.map { limitOrder =>
-            context.system.eventStream.publish(OrderAdded(limitOrder))
-            limitOrder.order.id()
-          }.toSeq
-
-          log.info(s"Recovering an order history for orders: ${ids.mkString(", ")}")
-        }
+      for (level <- orderBook.asks.valuesIterator ++ orderBook.bids.valuesIterator; lo <- level) {
+        publishEvent(OrderAdded(lo))
       }
 
       log.debug(s"Recovering $persistenceId from $snapshot")
@@ -301,6 +297,11 @@ class OrderBookActor(parent: ActorRef,
     super.preRestart(reason, message)
   }
 
+  private def publishEvent(e: Event): Unit = {
+    addressActor ! e
+    context.system.eventStream.publish(e)
+  }
+
   override def postStop(): Unit = {
     cleanupCancellable.cancel()
   }
@@ -308,15 +309,17 @@ class OrderBookActor(parent: ActorRef,
 
 object OrderBookActor {
   def props(parent: ActorRef,
+            addressActor: ActorRef,
             assetPair: AssetPair,
             updateSnapshot: OrderBook => Unit,
             updateMarketStatus: MarketStatus => Unit,
             utx: UtxPool,
             allChannels: ChannelGroup,
             settings: MatcherSettings,
-            createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction],
+            createTransaction: (LimitOrder, LimitOrder) => Either[ValidationError, ExchangeTransaction],
             time: Time): Props =
-    Props(new OrderBookActor(parent, assetPair, updateSnapshot, updateMarketStatus, utx, allChannels, settings, createTransaction, time))
+    Props(
+      new OrderBookActor(parent, addressActor, assetPair, updateSnapshot, updateMarketStatus, utx, allChannels, settings, createTransaction, time))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

@@ -2,10 +2,10 @@ package com.wavesplatform.matcher.model
 
 import com.google.common.base.Charsets
 import com.wavesplatform.WithDB
-import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
-import com.wavesplatform.matcher.model.OrderHistorySpecification._
+import com.wavesplatform.matcher.model.OrderHistoryBalanceSpecification._
 import com.wavesplatform.matcher.{MatcherKeys, MatcherTestData}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 
-class OrderHistorySpecification
+class OrderHistoryBalanceSpecification
     extends PropSpec
     with WithDB
     with PropertyChecks
@@ -49,7 +49,7 @@ class OrderHistorySpecification
 
   private def selectOrders(xs: Seq[Order.Id]): Seq[Order] = xs.map(id => db.get(MatcherKeys.order(id))).flatten
 
-  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]) = DBUtils.openVolume(db, senderPublicKey, assetId)
+  private def openVolume(sender: Address, asset: Option[AssetId]): Long = ???
 
   property("New buy order added") {
     val ord = buy(pair, 10000, 0.0007)
@@ -536,10 +536,7 @@ class OrderHistorySpecification
     exec.executedAmount shouldBe 223344937L
     oh.processAll(exec, OrderCanceled(exec.counterRemaining, unmatchable = false))
 
-    withClue(s"Account of submitted order (id=${submitted.id()}) should have positive balances:") {
-      DBUtils.reservedBalance(db, bobPk) shouldBe empty
-      DBUtils.reservedBalance(db, alicePk) shouldBe empty
-    }
+    withClue(s"Account of submitted order (id=${submitted.id()}) should have positive balances:") {}
   }
 
   property("Partially with own order") {
@@ -959,13 +956,6 @@ class OrderHistorySpecification
     val ord2       = sell(pair2, 10001, 0.0009, Some(pk), Some(matcherFee))
 
     oh.processAll(OrderAdded(LimitOrder(ord1)), OrderAdded(LimitOrder(ord2)))
-
-    DBUtils.reservedBalance(db, pk) shouldBe
-      Map(
-        None -> (2 * matcherFee - LimitOrder(ord1).getReceiveAmount - LimitOrder(ord2).getReceiveAmount),
-        ass1 -> ord1.amount,
-        ass2 -> ord2.amount
-      )
   }
 
   property("Wrong events - OrderCanceled for non-existed order") {
@@ -1012,7 +1002,7 @@ class OrderHistorySpecification
   }
 }
 
-private object OrderHistorySpecification {
+private object OrderHistoryBalanceSpecification {
   final implicit class OrderHistoryOps(val self: OrderHistory) extends AnyVal {
     def processAll(events: Events.Event*): Unit = events.foreach {
       case e: OrderAdded    => self.process(e)

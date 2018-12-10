@@ -11,7 +11,8 @@ case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[ByteStr, Lo
 
   lazy val isEmpty: Boolean = this == Portfolio.empty
 
-  def balanceOf(assetId: Option[AssetId]): Long = assetId.flatMap(assets.get).getOrElse(balance)
+  def balanceOf(assetId: Option[AssetId]): Long = assetId.fold(balance)(assets.getOrElse(_, 0L))
+
   def remove(assetId: Option[AssetId], amount: Long): Option[Portfolio] = {
     val origAmount = assetId match {
       case None    => balance

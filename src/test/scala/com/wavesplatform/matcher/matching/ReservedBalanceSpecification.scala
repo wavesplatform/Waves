@@ -3,11 +3,10 @@ package com.wavesplatform.matcher.matching
 import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.WithDB
 import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.matcher.api.DBUtils
-import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, PartiallyFilled}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderHistory}
+import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
@@ -78,7 +77,7 @@ class ReservedBalanceSpecification
 
   var oh = new OrderHistory(db, matcherSettings)
 
-  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]) = DBUtils.openVolume(db, senderPublicKey, assetId)
+  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]): Long = ???
 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
     oh.process(OrderAdded(LimitOrder(counter)))
@@ -117,7 +116,7 @@ class ReservedBalanceSpecification
       }
 
       withClue(s"Counter sender should not have reserves") {
-        DBUtils.openVolume(db, counter.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
         openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
       }
 

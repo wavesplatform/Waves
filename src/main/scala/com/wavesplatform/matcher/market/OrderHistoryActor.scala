@@ -31,6 +31,7 @@ class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor with Sc
     case ev: OrderAdded =>
       log.debug(s"OrderAdded(${ev.order.order.idStr()}, amount=${ev.order.amount})")
       addedTimer.measure(orderHistory.process(ev))
+      log.info(s"Processed OrderAdded for ${ev.order.order.id()}")
     case ev: OrderExecuted =>
       log.debug(s"OrderExecuted(s=${ev.submitted.order.idStr()}, c=${ev.counter.order.idStr()}, amount=${ev.executedAmount})")
       executedTimer.measure(orderHistory.process(ev))

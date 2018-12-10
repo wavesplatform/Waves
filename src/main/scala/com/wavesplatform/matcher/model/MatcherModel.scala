@@ -1,10 +1,12 @@
 package com.wavesplatform.matcher.model
 
+import cats.kernel.Monoid
+import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state.{ByteStr, Portfolio}
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.{AssetAcc, AssetId}
 import play.api.libs.json.{JsObject, JsValue, Json}
 
 import scala.math.BigDecimal.RoundingMode
@@ -28,13 +30,14 @@ sealed trait LimitOrder {
   def getSpendAmount: Long
   def getReceiveAmount: Long
 
-  def spentAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
-  def rcvAcc: AssetAcc   = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
-  def feeAcc: AssetAcc   = AssetAcc(order.senderPublicKey, None)
-
   def spentAsset: Option[ByteStr] = order.getSpendAssetId
   def rcvAsset: Option[ByteStr]   = order.getReceiveAssetId
-  def feeAsset: Option[ByteStr]   = None
+  val feeAsset: Option[ByteStr]   = None
+
+  def requiredBalance: Map[Option[AssetId], Long] = Monoid.combine(
+    Map(spentAsset -> getRawSpendAmount),
+    Map(feeAsset   -> (if (feeAsset != rcvAsset) fee else (fee - getReceiveAmount).max(0L)))
+  )
 
   def minAmountOfAmountAsset: Long         = minimalAmountOfAmountAssetByPrice(price)
   def amountOfPriceAsset: Long             = (BigDecimal(amount) * price / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
@@ -44,8 +47,8 @@ sealed trait LimitOrder {
   def isValid: Boolean =
     amount > 0 && amount >= minAmountOfAmountAsset && amount < Order.MaxAmount && getSpendAmount > 0 && getReceiveAmount > 0
 
-  protected def minimalAmountOfAmountAssetByPrice(p: Long): Long = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
-  protected def correctedAmountOfAmountAsset(a: Long, p: Long): Long = {
+  private def minimalAmountOfAmountAssetByPrice(p: Long): Long = (BigDecimal(Order.PriceConstant) / p).setScale(0, RoundingMode.CEILING).toLong
+  private def correctedAmountOfAmountAsset(a: Long, p: Long): Long = {
     val settledTotal = (BigDecimal(p) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
     (BigDecimal(settledTotal) / p * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
   }

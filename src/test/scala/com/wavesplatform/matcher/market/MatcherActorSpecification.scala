@@ -122,7 +122,7 @@ class MatcherActorSpecification
         new MatcherActor(
           ob,
           (assetPair, matcher) =>
-            OrderBookActor.props(matcher, assetPair, _ => {}, _ => {}, mock[UtxPool], mock[ChannelGroup], matcherSettings, txFactory, ntpTime),
+            OrderBookActor.props(matcher, ???, assetPair, _ => {}, _ => {}, mock[UtxPool], mock[ChannelGroup], matcherSettings, txFactory, ntpTime),
           blockchain.assetDescription
         )
       ))

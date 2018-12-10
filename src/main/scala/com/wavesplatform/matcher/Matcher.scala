@@ -4,21 +4,22 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.gracefulStop
 import akka.stream.ActorMaterializer
-import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
+import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor, OrderHistoryActor}
+import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, EitherExt2}
-import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -42,16 +43,6 @@ class Matcher(actorSystem: ActorSystem,
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings, time)
-  private val orderValidator = new OrderValidator(
-    db,
-    blockchain,
-    transactionCreator,
-    utx.portfolio,
-    pairBuilder.validateAssetPair,
-    settings.matcherSettings,
-    matcherPrivateKey,
-    time
-  )
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
@@ -67,14 +58,48 @@ class Matcher(actorSystem: ActorSystem,
     orderBooksSnapshotCache.invalidate(assetPair)
   }
 
-  lazy val matcherApiRoutes = Seq(
+  private def orderBookProps(pair: AssetPair, matcherActor: ActorRef): Props = OrderBookActor.props(
+    matcherActor,
+    addressActors,
+    pair,
+    updateOrderBookCache(pair),
+    marketStatuses.put(pair, _),
+    utx,
+    allChannels,
+    matcherSettings,
+    transactionCreator.createTransaction,
+    time
+  )
+
+  private lazy val matcher       = actorSystem.actorOf(MatcherActor.props(orderBooks, blockchain.assetDescription, orderBookProps), MatcherActor.name)
+  private lazy val addressActors = actorSystem.actorOf(Props(new AddressDirectory(utx.portfolio, matcher, matcherSettings)), "addresses")
+
+  private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
+  private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)
+
+  private def validateOrder(o: Order) =
+    for {
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
+                                               blacklistedAddresses,
+                                               matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get))(o)
+      _ <- OrderValidator.timeAware(time)(o)
+      _ <- OrderValidator.blockchainAware(blockchain,
+                                          transactionCreator.createTransaction,
+                                          settings.matcherSettings.orderMatchTxFee,
+                                          matcherPublicKey.toAddress,
+                                          time)(o)
+      _ <- pairBuilder.validateAssetPair(o.assetPair)
+    } yield o
+
+  private lazy val matcherApiRoutes = Seq(
     MatcherApiRoute(
       pairBuilder,
-      orderValidator,
+      matcherPublicKey,
       matcher,
-      orderHistory,
+      addressActors,
       p => Option(orderBooks.get()).flatMap(_.get(p)),
       p => Option(marketStatuses.get(p)),
+      validateOrder,
       orderBooksSnapshotCache,
       settings,
       db,
@@ -86,25 +111,9 @@ class Matcher(actorSystem: ActorSystem,
     classOf[MatcherApiRoute]
   )
 
-  lazy val matcher: ActorRef = actorSystem.actorOf(
-    MatcherActor.props(
-      pairBuilder.validateAssetPair,
-      orderBooks,
-      updateOrderBookCache,
-      p => ms => marketStatuses.put(p, ms),
-      utx,
-      allChannels,
-      matcherSettings,
-      time,
-      blockchain.assetDescription,
-      transactionCreator.createTransaction
-    ),
-    MatcherActor.name
-  )
-
   private lazy val db = openDB(matcherSettings.dataDir)
 
-  private lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(db, matcherSettings), OrderHistoryActor.name)
+  private val orderHistory = actorSystem.actorOf(OrderHistoryActor.props(db, matcherSettings), OrderHistoryActor.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
 
@@ -146,6 +155,7 @@ class Matcher(actorSystem: ActorSystem,
     log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
 
     actorSystem.actorOf(MatcherTransactionWriter.props(db, matcherSettings), MatcherTransactionWriter.name)
+    actorSystem.eventStream.subscribe(orderHistory, classOf[Event])
   }
 }
 

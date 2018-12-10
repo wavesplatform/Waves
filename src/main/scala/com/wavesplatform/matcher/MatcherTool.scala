@@ -14,10 +14,9 @@ import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
-import com.wavesplatform.matcher.model.{LimitOrder, OrderBook}
+import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{ByteStr, EitherExt2}
-import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
@@ -75,88 +74,6 @@ object MatcherTool extends ScorexLogging {
     db.iterateOver("matcher:".getBytes(UTF_8))(e => keysToDelete += e.getKey)
 
     db.readWrite(rw => keysToDelete.result().foreach(rw.delete(_, "matcher-legacy-entries")))
-  }
-
-  private def recalculateReservedBalance(db: DB): Unit = {
-    log.info("Recalculating reserved balances")
-    val calculatedReservedBalances = new JHashMap[Address, Map[Option[AssetId], Long]]()
-    val ordersToDelete             = Seq.newBuilder[ByteStr]
-    var discrepancyCounter         = 0
-
-    db.iterateOver(MatcherKeys.OrderInfoPrefix) { e =>
-      val orderId   = e.extractId()
-      val orderInfo = MatcherKeys.decodeOrderInfo(e.getValue)
-      if (!orderInfo.status.isFinal) {
-        db.get(MatcherKeys.order(orderId)) match {
-          case None =>
-            log.info(s"Missing order $orderId")
-            ordersToDelete += orderId
-          case Some(order) =>
-            calculatedReservedBalances.compute(
-              order.sender, { (_, prevBalances) =>
-                val lo             = LimitOrder(order)
-                val spendId        = order.getSpendAssetId
-                val spendRemaining = lo.getRawSpendAmount - orderInfo.totalSpend(lo)
-                val remainingFee   = releaseFee(lo, orderInfo.remainingFee, 0)
-
-                val r = Option(prevBalances).fold(Map(spendId -> spendRemaining)) { prevBalances =>
-                  prevBalances.updated(spendId, prevBalances.getOrElse(spendId, 0L) + spendRemaining)
-                }
-
-                r.updated(None, r.getOrElse(None, 0L) + remainingFee)
-              }
-            )
-        }
-      }
-    }
-
-    log.info("Loading stored reserved balances")
-    val allReservedBalances = getAddresses(db).asScala.map(a => a -> DBUtils.reservedBalance(db, a)).toMap
-
-    if (allReservedBalances.size != calculatedReservedBalances.size()) {
-      log.info(s"Calculated balances: ${calculatedReservedBalances.size()}, stored balances: ${allReservedBalances.size}")
-    }
-
-    val corrections = Seq.newBuilder[((Address, Option[AssetId]), Long)]
-    var assetsToAdd = Map.empty[Address, Set[Option[AssetId]]]
-
-    for (address <- allReservedBalances.keySet ++ calculatedReservedBalances.keySet().asScala) {
-      val calculated = calculatedReservedBalances.getOrDefault(address, Map.empty)
-      val stored     = allReservedBalances.getOrElse(address, Map.empty)
-      if (calculated != stored) {
-        for (assetId <- calculated.keySet ++ stored.keySet) {
-          val calculatedBalance = calculated.getOrElse(assetId, 0L)
-          val storedBalance     = stored.getOrElse(assetId, 0L)
-
-          if (calculatedBalance != storedBalance) {
-            if (!stored.contains(assetId)) assetsToAdd += address -> (assetsToAdd.getOrElse(address, Set.empty) + assetId)
-
-            discrepancyCounter += 1
-            corrections += (address, assetId) -> calculatedBalance
-          }
-        }
-      }
-    }
-
-    log.info(s"Found $discrepancyCounter discrepancies; writing reserved balances")
-
-    db.readWrite { rw =>
-      for ((address, newAssetIds) <- assetsToAdd) {
-        val k         = MatcherKeys.openVolumeSeqNr(address)
-        val currSeqNr = rw.get(k)
-
-        rw.put(k, currSeqNr + newAssetIds.size)
-        for ((assetId, i) <- newAssetIds.zipWithIndex) {
-          rw.put(MatcherKeys.openVolumeAsset(address, currSeqNr + 1 + i), assetId)
-        }
-      }
-
-      for (((address, assetId), value) <- corrections.result()) {
-        rw.put(MatcherKeys.openVolume(address, assetId), Some(value))
-      }
-    }
-
-    log.info("Completed")
   }
 
   private def collectActiveOrders(db: DB): Map[AssetPair, Map[ByteStr, Order]] = {
@@ -332,11 +249,6 @@ object MatcherTool extends ScorexLogging {
         orderInfoKey.parse(db.get(orderInfoKey.keyBytes)).foreach { oi =>
           println(s"Order info: $oi")
         }
-      case "cb" => recalculateReservedBalance(db)
-      case "rb" =>
-        for ((assetId, balance) <- DBUtils.reservedBalance(db, Address.fromString(args(2)).explicitGet())) {
-          log.info(s"${AssetPair.assetIdStr(assetId)}: $balance")
-        }
       case "ddd" =>
         log.warn("DELETING LEGACY ENTRIES")
         deleteLegacyEntries(db)
@@ -378,22 +290,6 @@ object MatcherTool extends ScorexLogging {
     val AddressPortfolio      = SK("portfolios", addr)
     val Transactions          = SK("transactions", byteStr)
     val OrdersToTxIds         = SK("ord-to-tx-ids", byteStr)
-  }
-
-  /**
-    * @return How much reserved fee we should return during this update
-    */
-  private def releaseFee(totalReceiveAmount: Long, matcherFee: Long, prevRemaining: Long, updatedRemaining: Long): Long = {
-    val executedBefore = matcherFee - prevRemaining
-    val restReserved   = math.max(matcherFee - totalReceiveAmount - executedBefore, 0L)
-
-    val executed = prevRemaining - updatedRemaining
-    math.min(executed, restReserved)
-  }
-
-  private def releaseFee(lo: LimitOrder, prevRemaining: Long, updatedRemaining: Long): Long = {
-    if (lo.rcvAsset == lo.feeAsset) releaseFee(lo.getReceiveAmount, lo.order.matcherFee, prevRemaining, updatedRemaining)
-    else prevRemaining - updatedRemaining
   }
 
   private def getAddresses(db: DB): JHashSet[Address] = {

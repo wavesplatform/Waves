@@ -5,7 +5,6 @@ import com.wavesplatform.database.{DBExt, RW, ReadOnlyDB}
 import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.model.OrderInfo
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import org.iq80.leveldb.DB
 
@@ -22,6 +21,7 @@ object DBUtils {
 
       // We show all active orders even they count exceeds the pair limit
       def getAll(ro: ReadOnlyDB, address: Address): IndexedSeq[ActiveOrdersIndex.Node] = c(address).getAll(ro)
+      def has(ro: ReadOnlyDB, address: Address, id: Order.Id): Boolean                 = c(address).has(ro, id)
 
       private def c(address: Address) = new ActiveOrdersIndex(address, MaxElements)
     }
@@ -87,15 +87,6 @@ object DBUtils {
       .sortBy { case (order, info) => (info.status, -order.timestamp) }
   }
 
-  def reservedBalance(db: DB, address: Address): Map[Option[AssetId], Long] = db.readOnly { ro =>
-    (for {
-      idx <- 1 to ro.get(MatcherKeys.openVolumeSeqNr(address))
-      assetId = ro.get(MatcherKeys.openVolumeAsset(address, idx))
-      volume <- ro.get(MatcherKeys.openVolume(address, assetId))
-      if volume != 0
-    } yield assetId -> volume).toMap
-  }
-
   def order(db: DB, orderId: ByteStr): Option[Order] = db.get(MatcherKeys.order(orderId))
 
   def orderInfo(db: DB, orderId: ByteStr): OrderInfo = db.get(MatcherKeys.orderInfo(orderId))
@@ -108,12 +99,4 @@ object DBUtils {
       tx <- ro.get(MatcherKeys.exchangeTransaction(txId))
     } yield tx
   }
-
-  def openVolume(db: DB, address: Address, assetId: Option[AssetId]): Long = db.get(MatcherKeys.openVolume(address, assetId)).getOrElse(0L)
-  def activeOrderCount(db: DB, address: Address): Int = {
-    val key = MatcherKeys.activeOrdersSize(address)
-    key.parse(db.get(key.keyBytes)).getOrElse(0)
-  }
-
-  def lastOrderTimestamp(db: DB, address: Address): Option[Long] = db.get(MatcherKeys.lastCommandTimestamp(address))
 }

@@ -22,20 +22,20 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
     (calcFee(buy, amount), calcFee(sell, amount))
   }
 
-  def createTransaction(event: OrderExecuted): Either[ValidationError, ExchangeTransaction] = {
-    import event.{counter, submitted}
+  def createTransaction(submitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
+    val executedAmount    = OrderExecuted(submitted, counter).executedAmount
     val price             = counter.price
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
-    val (buyFee, sellFee) = calculateMatcherFee(buy, sell, event.executedAmount)
+    val (buyFee, sellFee) = calculateMatcherFee(buy, sell, executedAmount)
 
-    val txFee = getMinFee(blockchain, settings.orderMatchTxFee, matcherPrivateKey, Some(buy.sender), Some(sell.sender), counter.order.assetPair)
+    val txFee = minFee(blockchain, settings.orderMatchTxFee, matcherPrivateKey, counter.order.assetPair)
     if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
-      ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, event.executedAmount, price, buyFee, sellFee, txFee, time.getTimestamp())
+      ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, time.getTimestamp())
     else
       for {
         buyV1  <- toV1(buy)
         sellV1 <- toV1(sell)
-        tx     <- ExchangeTransactionV1.create(matcherPrivateKey, buyV1, sellV1, event.executedAmount, price, buyFee, sellFee, txFee, time.getTimestamp())
+        tx     <- ExchangeTransactionV1.create(matcherPrivateKey, buyV1, sellV1, executedAmount, price, buyFee, sellFee, txFee, time.getTimestamp())
       } yield tx
   }
 
@@ -48,14 +48,9 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
 object ExchangeTransactionCreator {
 
   /**
-    * @note see Verifier.verifyExchange
+    * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
-  def getMinFee(blockchain: Blockchain,
-                orderMatchTxFee: Long,
-                matcherAddress: Address,
-                order1Sender: Option[Address],
-                order2Sender: Option[Address],
-                assetPair: AssetPair): Long = {
+  def minFee(blockchain: Blockchain, orderMatchTxFee: Long, matcherAddress: Address, assetPair: AssetPair): Long = {
     def assetFee(assetId: AssetId): Long   = if (blockchain.hasAssetScript(assetId)) CommonValidation.ScriptExtraFee else 0L
     def accountFee(address: Address): Long = if (blockchain.hasScript(address)) CommonValidation.ScriptExtraFee else 0L
 
@@ -64,5 +59,4 @@ object ExchangeTransactionCreator {
       assetPair.amountAsset.fold(0L)(assetFee) +
       assetPair.priceAsset.fold(0L)(assetFee)
   }
-
 }

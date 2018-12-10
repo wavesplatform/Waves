@@ -80,11 +80,11 @@ object MatcherKeys {
   val ActiveOrdersPrefix: Short            = 5
   val ActiveOrdersPrefixBytes: Array[Byte] = Shorts.toByteArray(ActiveOrdersPrefix)
   val ActiveOrdersKeyName: String          = "matcher-active-orders"
-  def activeOrders(address: Address, seqNr: Int): Key[ActiveOrdersIndex.Node] =
-    Key(ActiveOrdersKeyName,
-        bytes(ActiveOrdersPrefix, address.bytes.arr ++ Ints.toByteArray(seqNr)),
-        ActiveOrdersIndex.Node.read,
-        ActiveOrdersIndex.Node.write)
+  def activeOrders(address: Address, seqNr: Int): Key[Option[ActiveOrdersIndex.Node]] =
+    Key.opt(ActiveOrdersKeyName,
+            bytes(ActiveOrdersPrefix, address.bytes.arr ++ Ints.toByteArray(seqNr)),
+            ActiveOrdersIndex.Node.read,
+            ActiveOrdersIndex.Node.write)
 
   def openVolume(address: Address, assetId: Option[AssetId]): Key[Option[Long]] =
     Key.opt("matcher-open-volume", bytes(6, address.bytes.arr ++ assetIdToBytes(assetId)), Longs.fromByteArray, Longs.toByteArray)

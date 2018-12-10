@@ -5,17 +5,12 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
 import com.google.common.base.Charsets
-import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{DuringShutdown, OrderBookUnavailable}
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.Events.OrderExecuted
-import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.state.{AssetDescription, ByteStr}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import com.wavesplatform.transaction.{AssetId, ValidationError}
-import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json._
 import scorex.utils._
 
@@ -99,6 +94,9 @@ class MatcherActor(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, Actor
 
     case order: Order =>
       runFor(order.assetPair)((sender, orderBook) => orderBook.tell(order, sender))
+
+    case (assetPair: AssetPair, cancelOrder: CancelOrder) =>
+      runFor(assetPair)((sender, orderBook) => orderBook.tell(cancelOrder, sender))
 
     case deleteOrder: DeleteOrderBookRequest =>
       runFor(deleteOrder.assetPair) { (sender, ref) =>
@@ -221,26 +219,12 @@ class MatcherActor(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, Actor
 }
 
 object MatcherActor {
-  def name = "matcher"
+  def name: String = "matcher"
 
-  def props(validateAssetPair: AssetPair => Either[String, AssetPair],
-            orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-            updateSnapshot: AssetPair => OrderBook => Unit,
-            updateMarketStatus: AssetPair => MarketStatus => Unit,
-            utx: UtxPool,
-            allChannels: ChannelGroup,
-            settings: MatcherSettings,
-            time: Time,
+  def props(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             assetDescription: ByteStr => Option[AssetDescription],
-            createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction]): Props =
-    Props(
-      new MatcherActor(
-        orderBooks,
-        (assetPair, matcher) =>
-          OrderBookActor
-            .props(matcher, assetPair, updateSnapshot(assetPair), updateMarketStatus(assetPair), utx, allChannels, settings, createTransaction, time),
-        assetDescription
-      ))
+            orderBookProps: (AssetPair, ActorRef) => Props): Props =
+    Props(new MatcherActor(orderBooks, orderBookProps, assetDescription))
 
   private case class ShutdownStatus(initiated: Boolean,
                                     oldMessagesDeleted: Boolean,
