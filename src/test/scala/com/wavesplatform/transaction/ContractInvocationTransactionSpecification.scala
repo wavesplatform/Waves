@@ -31,8 +31,8 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
 
   property("JSON format validation for ContractInvocationTransaction") {
     val js = Json.parse("""{
-                         "type": 15,
-                         "id": "HVJr2Co9NYVcDrauaV4e2CdViayv5KWBdi5pcZSznw2P",
+                         "type": 16,
+                         "id": "AujdgmwxSt8Gk9dPBDUm7mDAyc4vP1SWoVNgUHFvS9hu",
                          "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                          "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                          "fee": 100000,
