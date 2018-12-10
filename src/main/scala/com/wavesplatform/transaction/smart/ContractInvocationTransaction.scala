@@ -61,7 +61,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
     })
   )
 
-  override val typeId: Byte                 = 15
+  override val typeId: Byte                 = 16
   override val supportedVersions: Set[Byte] = Set(1)
 
   private def networkByte = AddressScheme.current.chainId
