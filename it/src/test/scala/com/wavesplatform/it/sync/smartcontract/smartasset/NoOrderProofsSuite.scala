@@ -10,6 +10,7 @@ import com.wavesplatform.transaction.assets.BurnTransactionV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import play.api.libs.json.JsNumber
+
 import scala.concurrent.duration._
 
 class NoOrderProofsSuite extends BaseTransactionSuite {
