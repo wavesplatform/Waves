@@ -125,7 +125,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
+  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val b      = blockchain
@@ -152,7 +152,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
       .reduce((_, s) => s)
 
     invalidTxs.foreach(remove)
-    val txs = if (sortInBlock) reversedValidTxs.sorted(TransactionsOrdering.InBlock) else reversedValidTxs.reverse
+    val txs = reversedValidTxs.reverse
     (txs, finalConstraint)
   }
 

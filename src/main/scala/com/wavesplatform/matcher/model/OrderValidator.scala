@@ -70,7 +70,7 @@ class OrderValidator(db: DB,
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
         Left("Trading of scripted asset isn't allowed yet")
       else {
-        try ScriptRunner[EVALUATED](blockchain.height, Coproduct(tx), blockchain, script, proofsEnabled = false, orderEnabled = false) match {
+        try ScriptRunner[EVALUATED](blockchain.height, Coproduct(tx), blockchain, script, isTokenScript = true) match {
           case (_, Left(execError)) => Left(s"Error executing script of asset $assetId: $execError")
           case (_, Right(FALSE))    => Left(s"Order rejected by script of asset $assetId")
           case (_, Right(TRUE))     => Right(())
@@ -145,6 +145,8 @@ class OrderValidator(db: DB,
 
         for {
           _ <- (Right(order): ValidationResult)
+            .ensure("Orders of version 1 are only accepted, because SmartAccountTrading has not been activated yet")(
+              _.version == 1 || blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
             .ensure("Incorrect matcher public key")(_.matcherPublicKey == matcherPublicKey)
             .ensure("Invalid address")(_ => !blacklistedAddresses.contains(senderAddress))
             .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)

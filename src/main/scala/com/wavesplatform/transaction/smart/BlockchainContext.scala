@@ -15,19 +15,13 @@ import shapeless._
 object BlockchainContext {
 
   type In = Transaction :+: Order :+: CNil
-  def build(version: Version,
-            nByte: Byte,
-            in: Coeval[In],
-            h: Coeval[Int],
-            blockchain: Blockchain,
-            orderEnabled: Boolean,
-            proofsEnabled: Boolean): EvaluationContext = {
+  def build(version: Version, nByte: Byte, in: Coeval[In], h: Coeval[Int], blockchain: Blockchain, isTokenContext: Boolean): EvaluationContext = {
     Monoid
       .combineAll(
         Seq(
           PureContext.build(version),
           CryptoContext.build(Global),
-          WavesContext.build(version, new WavesEnvironment(nByte, in, h, blockchain), orderEnabled, proofsEnabled)
+          WavesContext.build(version, new WavesEnvironment(nByte, in, h, blockchain), isTokenContext)
         ))
       .evaluationContext
   }

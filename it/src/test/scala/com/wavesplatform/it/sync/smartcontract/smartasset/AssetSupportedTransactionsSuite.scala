@@ -402,27 +402,6 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
                                "Asset is not reissuable")
   }
 
-  test("sponsorship of smart asset") {
-    assertBadRequestAndMessage(sender.sponsorAsset(firstAddress, asset, baseFee = 2, fee = sponsorFee + smartFee), errNotAllowedByToken)
-
-    val scr = ScriptCompiler(
-      s"""
-                                        |match tx {
-                                        |  case s : SetAssetScriptTransaction => true
-                                        |  case ss: SponsorFeeTransaction => ss.sender == addressFromPublicKey(base58'${ByteStr(
-           pkByAddress(firstAddress).publicKey).base58}')
-                                        |  case _ => false
-                                        |}
-         """.stripMargin,
-      isAssetScript = true
-    ).explicitGet()._1.bytes.value.base64
-    sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
-
-    assertBadRequestAndMessage(sender.sponsorAsset(firstAddress, asset, baseFee = 2, fee = sponsorFee + smartFee),
-                               "Reason: Sponsorship smart assets is disabled.")
-
-  }
-
   test("try to send transactions forbidden by the asset's script") {
     val assetWOSupport = sender
       .issue(

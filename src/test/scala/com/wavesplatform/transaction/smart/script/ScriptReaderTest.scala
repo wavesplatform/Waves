@@ -21,12 +21,12 @@ class ScriptReaderTest extends FreeSpec with Matchers {
   }
 
   "should parse all bytes for V3" in {
-    val sc = ScriptV2(V3,Contract(List.empty,List(ContractFunction(CallableAnnotation("sender"),None,
-      Terms.FUNC("foo",List("a"),Terms.REF("a")))),None))
+    val sc =
+      ScriptV2(V3,
+               Contract(List.empty, List(ContractFunction(CallableAnnotation("sender"), None, Terms.FUNC("foo", List("a"), Terms.REF("a")))), None))
 
-      val allBytes = sc.bytes().arr
+    val allBytes = sc.bytes().arr
     ScriptReader.fromBytes(allBytes) shouldBe Right(sc)
   }
-
 
 }

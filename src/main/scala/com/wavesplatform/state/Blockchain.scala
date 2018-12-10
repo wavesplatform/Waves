@@ -83,5 +83,5 @@ trait Blockchain {
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
   def append(diff: Diff, carryFee: Long, block: Block): Unit
-  def rollbackTo(targetBlockId: ByteStr): Seq[Block]
+  def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]]
 }
