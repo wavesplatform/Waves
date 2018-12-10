@@ -255,7 +255,8 @@ lazy val lang =
     .jsSettings(
       scalaJSLinkerConfig ~= {
         _.withModuleKind(ModuleKind.CommonJSModule)
-      }
+      },
+      libraryDependencies += "org.rudogma" %%% "supertagged" % "1.4",
     )
     .jvmSettings(
       coverageExcludedPackages := "",
