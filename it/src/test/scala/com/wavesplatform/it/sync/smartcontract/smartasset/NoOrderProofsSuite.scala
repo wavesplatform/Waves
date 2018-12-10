@@ -1,7 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract.smartasset
 
-import java.util.concurrent.TimeoutException
-
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{someAssetAmount, _}
@@ -38,7 +36,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       )
     catch {
       case ex: java.lang.Exception => assert(ex.getMessage.contains("Compilation failed: Matching not exhaustive"))
-      case _                       => throw new Exception("ScriptCompiler works incorrect for orders with smart assets")
+      case _: Throwable            => throw new Exception("ScriptCompiler works incorrect for orders with smart assets")
     }
 
   }
