@@ -70,6 +70,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
            (None, None, sc4),
            (None, None, sc5),
            (None, None, sc6),
+           (sc4, sc5, sc6),
          )) {
 
       setContracts(
@@ -78,7 +79,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         (mcontr, acc2),
       )
 
-      sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, acc1, acc0, acc2)).id
+      sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, acc1, acc0, acc2), waitForTx = true)
 
       //TODO : add assert balances
     }
