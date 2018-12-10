@@ -5,7 +5,7 @@ import java.util
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{AssetId, Transaction}
 import com.wavesplatform.transaction.smart.script.Script
@@ -19,7 +19,7 @@ trait Caches extends Blockchain with ScorexLogging {
   protected def maxCacheSize: Int
 
   @volatile
-  protected var current = (loadHeight(), loadScore(), loadLastBlock())
+  private var current = (loadHeight(), loadScore(), loadLastBlock())
 
   protected def loadHeight(): Int
   override def height: Int = current._1
@@ -31,6 +31,66 @@ trait Caches extends Blockchain with ScorexLogging {
 
   protected def loadLastBlock(): Option[Block]
   override def lastBlock: Option[Block] = current._3
+
+  def loadScoreOf(blockId: ByteStr): Option[BigInt]
+  override def scoreOf(blockId: ByteStr): Option[BigInt] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      Some(c._2)
+    } else {
+      loadScoreOf(blockId)
+    }
+  }
+
+  def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+    val c = current
+    if (height == c._1) {
+      c._3.map(b => (b, b.bytes().size))
+    } else {
+      loadBlockHeaderAndSize(height)
+    }
+  }
+
+  def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]
+  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      c._3.map(b => (b, b.bytes().size))
+    } else {
+      loadBlockHeaderAndSize(blockId)
+    }
+  }
+
+  def loadBlockBytes(height: Int): Option[Array[Byte]]
+  override def blockBytes(height: Int): Option[Array[Byte]] = {
+    val c = current
+    if (height == c._1) {
+      c._3.map(_.bytes())
+    } else {
+      loadBlockBytes(height)
+    }
+  }
+
+  def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]]
+  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      c._3.map(_.bytes())
+    } else {
+      loadBlockBytes(blockId)
+    }
+  }
+
+  def loadHeightOf(blockId: ByteStr): Option[Int]
+  override def heightOf(blockId: ByteStr): Option[Int] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      Some(c._1)
+    } else {
+      loadHeightOf(blockId)
+    }
+  }
 
   private val transactionIds                                       = new util.HashMap[ByteStr, Long]()
   protected def forgetTransaction(id: ByteStr): Unit               = transactionIds.remove(id)
