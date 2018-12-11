@@ -304,7 +304,7 @@ object AssetsApiRoute {
 
   def validateAssetId(assetParam: String): Either[ValidationError, AssetId] = {
     for {
-      _ <- Either.cond(assetParam.length != AssetIdStringLength, (), GenericError("Unexpected assetId length"))
+      _ <- Either.cond(assetParam.length <= AssetIdStringLength, (), GenericError("Unexpected assetId length"))
       assetId <- Base58
         .decode(assetParam)
         .fold(

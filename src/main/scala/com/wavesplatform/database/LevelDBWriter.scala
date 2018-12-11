@@ -24,7 +24,7 @@ import org.iq80.leveldb.DB
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.parallel.ParSeq
-import scala.collection.{SeqView, immutable, mutable}
+import scala.collection.{GenIterableLike, SeqView, immutable, mutable}
 
 object LevelDBWriter {
 
@@ -743,7 +743,14 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
                                          fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
-    lazy val maybeAddressId = fromAddress.map(addr => db.get(Keys.addressId(addr)))
+    lazy val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
+
+    def takeAfter(s: ParSeq[BigInt], a: Option[BigInt]): ParSeq[BigInt] = {
+      a match {
+        case None    => s
+        case Some(v) => s.dropWhile(_ != v).drop(1)
+      }
+    }
 
     lazy val addressIds: ParSeq[BigInt] =
       for {
@@ -751,15 +758,13 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         addressId <- db
           .get(Keys.addressesForAsset(assetId, seqNr))
           .par
-          .dropWhile(maybeAddressId.contains)
-          .slice(1, count + 1)
       } yield addressId
 
     Either
       .cond(
         height > canGetAfterHeight,
         (for {
-          addressId <- addressIds
+          addressId <- takeAfter(addressIds, maybeAddressId).take(count)
           history = db.get(Keys.assetBalanceHistory(addressId, assetId))
           actualHeight <- history.partition(_ > height)._2.headOption
           balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
