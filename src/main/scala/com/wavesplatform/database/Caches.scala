@@ -92,7 +92,7 @@ trait Caches extends Blockchain with ScorexLogging {
     }
   }
 
-  val rememberBlocks = 130 //240
+  protected def rememberBlocksInterval: Long
 
   private val blocksTs                               = new util.HashMap[Int, Long]
   private var olderStoredBlockTimestamp              = Long.MaxValue
@@ -100,7 +100,7 @@ trait Caches extends Blockchain with ScorexLogging {
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
   private var miss: Int                              = 0
   override def containsTransaction(tx: Transaction): Boolean = transactionIds.containsKey(tx.id()) || {
-    if (tx.timestamp - 90 * 60 * 1000 <= olderStoredBlockTimestamp) {
+    if (tx.timestamp - 120 * 60 * 1000 <= olderStoredBlockTimestamp) {
       miss += 1
       log.info(s"Cache miss, do lookup (total $miss)")
       transactionHeight(tx.id()).nonEmpty
@@ -109,13 +109,14 @@ trait Caches extends Blockchain with ScorexLogging {
     }
   }
   def forgetBlocks(): Unit = {
+    var olderBlock = Int.MaxValue;
     {
-      val biterator  = blocksTs.entrySet().iterator()
-      var olderBlock = Int.MaxValue
+      val biterator = blocksTs.entrySet().iterator()
+      val bts       = lastBlock.fold(0L)(_.timestamp)
       while (biterator.hasNext) {
         val e = biterator.next()
         val b = e.getKey
-        if (b < height - rememberBlocks) {
+        if (b < bts - rememberBlocksInterval) {
           biterator.remove()
         } else if (b < olderBlock) {
           olderBlock = b
@@ -127,7 +128,7 @@ trait Caches extends Blockchain with ScorexLogging {
       val iterator = transactionIds.entrySet().iterator()
       while (iterator.hasNext) {
         val e = iterator.next()
-        if (e.getValue._2 < height - rememberBlocks) {
+        if (e.getValue._2 < olderBlock) {
           iterator.remove()
         }
       }
