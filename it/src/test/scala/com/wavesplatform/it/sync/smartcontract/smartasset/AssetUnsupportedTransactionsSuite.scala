@@ -45,7 +45,7 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
         fail("ScriptCompiler didn't throw expected error")
       } catch {
         case ex: java.lang.Exception => ex.getMessage should include("Matching not exhaustive: possibleTypes are")
-        case _                       => fail("ScriptCompiler works incorrect for orders with smart assets")
+        case _: Throwable            => fail("ScriptCompiler works incorrect for orders with smart assets")
       }
     }
   }
