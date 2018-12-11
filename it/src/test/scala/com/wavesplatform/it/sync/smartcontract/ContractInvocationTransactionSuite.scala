@@ -75,7 +75,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
         | 
         | @Verifier(t)
         | func verify() = {
-        |  TRUE
+        |  true
         | }
         |
         |
