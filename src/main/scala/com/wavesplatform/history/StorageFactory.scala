@@ -12,7 +12,12 @@ object StorageFactory extends ScorexLogging {
 
   def apply(settings: WavesSettings, db: DB, time: Time): BlockchainUpdater with NG = {
     checkVersion(db)
-    val levelDBWriter = new LevelDBWriter(db, settings.blockchainSettings.functionalitySettings, settings.maxCacheSize)
+    val levelDBWriter = new LevelDBWriter(
+      db,
+      settings.blockchainSettings.functionalitySettings,
+      settings.maxCacheSize,
+      settings.maxRollbackDepth
+    )
     new BlockchainUpdaterImpl(levelDBWriter, settings, time)
   }
 

@@ -9,6 +9,7 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 case class WavesSettings(directory: String,
                          dataDirectory: String,
                          maxCacheSize: Int,
+                         maxRollbackDepth: Int,
                          ntpServer: String,
                          networkSettings: NetworkSettings,
                          walletSettings: WalletSettings,
@@ -32,6 +33,7 @@ object WavesSettings {
     val directory               = config.as[String](s"$configPath.directory")
     val dataDirectory           = config.as[String](s"$configPath.data-directory")
     val maxCacheSize            = config.as[Int](s"$configPath.max-cache-size")
+    val maxRollbackDepth        = config.as[Int](s"$configPath.max-rollback-depth")
     val ntpServer               = config.as[String](s"$configPath.ntp-server")
     val networkSettings         = config.as[NetworkSettings]("waves.network")
     val walletSettings          = config.as[WalletSettings]("waves.wallet")
@@ -49,6 +51,7 @@ object WavesSettings {
       directory,
       dataDirectory,
       maxCacheSize,
+      maxRollbackDepth,
       ntpServer,
       networkSettings,
       walletSettings,
