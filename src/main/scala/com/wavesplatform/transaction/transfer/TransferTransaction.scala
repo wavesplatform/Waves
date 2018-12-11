@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.validation._
 import com.wavesplatform.utils.{Base58, base58Length}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
   def assetId: Option[AssetId]
@@ -51,9 +51,12 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
       Deser.serializeArray(attachment)
     )
   }
+  override def checkedAssets(): Seq[AssetId] = assetId.toSeq
 }
 
 object TransferTransaction {
+
+  val typeId: Byte = 4
 
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)

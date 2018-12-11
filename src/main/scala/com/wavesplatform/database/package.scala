@@ -210,16 +210,26 @@ package object database {
   }
 
   def readAssetInfo(data: Array[Byte]): AssetInfo = {
-    val ndi = newDataInput(data)
-    AssetInfo(ndi.readBoolean(), ndi.readBigInt(), ndi.readScriptOption())
+    val ndi     = newDataInput(data)
+    val reissue = ndi.readBoolean()
+    val volume  = ndi.readBigInt()
+    AssetInfo(reissue, volume)
   }
 
   def writeAssetInfo(ai: AssetInfo): Array[Byte] = {
     val ndo = newDataOutput()
     ndo.writeBoolean(ai.isReissuable)
     ndo.writeBigInt(ai.volume)
-    ndo.writeScriptOption(ai.script)
     ndo.toByteArray
+  }
+
+  implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
+    import com.wavesplatform.crypto.DigestSize
+    def extractId(offset: Int = 2, length: Int = DigestSize): ByteStr = {
+      val id = ByteStr(new Array[Byte](length))
+      Array.copy(e.getKey, offset, id.arr, 0, length)
+      id
+    }
   }
 
   implicit class DBExt(val db: DB) extends AnyVal {
@@ -229,13 +239,28 @@ package object database {
       finally snapshot.close()
     }
 
+    /**
+      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
+      */
     def readWrite[A](f: RW => A): A = {
-      val rw = new RW(db)
-      try f(rw)
-      finally rw.close()
+      val snapshot    = db.getSnapshot
+      val readOptions = new ReadOptions().snapshot(snapshot)
+      val batch       = db.createWriteBatch()
+      val rw          = new RW(db, readOptions, batch)
+      try {
+        val r = f(rw)
+        db.write(batch)
+        r
+      } finally {
+        batch.close()
+        snapshot.close()
+      }
     }
 
     def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))
+
+    def iterateOver(prefix: Short)(f: JMap.Entry[Array[Byte], Array[Byte]] => Unit): Unit =
+      iterateOver(Shorts.toByteArray(prefix))(f)
 
     def iterateOver(prefix: Array[Byte])(f: JMap.Entry[Array[Byte], Array[Byte]] => Unit): Unit = {
       val iterator = db.iterator()

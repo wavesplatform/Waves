@@ -1,87 +1,99 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.api.http.assets.SignedExchangeRequest
+import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.IssueTransactionV1
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import com.wavesplatform.utils.{Base58, NTP}
+import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.json._
 
-class ExchangeTransactionSuite extends BaseTransactionSuite {
-
+class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   test("cannot exchange non-issued assets") {
+    for ((o1ver, o2ver, tver) <- Seq(
+           (1: Byte, 1: Byte, 1: Byte),
+           (1: Byte, 1: Byte, 2: Byte),
+           (1: Byte, 2: Byte, 2: Byte),
+           (2: Byte, 1: Byte, 2: Byte),
+           (2: Byte, 2: Byte, 2: Byte)
+         )) {
+      val assetName        = "myasset"
+      val assetDescription = "my asset description"
 
-    val assetName        = "myasset"
-    val assetDescription = "my asset description"
+      val IssueTx: IssueTransactionV1 = IssueTransactionV1
+        .selfSigned(
+          sender = sender.privateKey,
+          name = assetName.getBytes(),
+          description = assetDescription.getBytes(),
+          quantity = someAssetAmount,
+          decimals = 2,
+          reissuable = true,
+          fee = 1.waves,
+          timestamp = System.currentTimeMillis()
+        )
+        .right
+        .get
 
-    val IssueTx: IssueTransactionV1 = IssueTransactionV1
-      .selfSigned(
-        sender = sender.privateKey,
-        name = assetName.getBytes(),
-        description = assetDescription.getBytes(),
-        quantity = someAssetAmount,
-        decimals = 2,
-        reissuable = true,
-        fee = 1.waves,
-        timestamp = System.currentTimeMillis()
-      )
-      .right
-      .get
+      val assetId = IssueTx.id().base58
 
-    val assetId = IssueTx.id().base58
+      val buyer               = pkByAddress(firstAddress)
+      val seller              = pkByAddress(secondAddress)
+      val matcher             = pkByAddress(thirdAddress)
+      val ts                  = ntpTime.correctedTime()
+      val expirationTimestamp = ts + Order.MaxLiveTime
+      val buyPrice            = 2 * Order.PriceConstant
+      val sellPrice           = 2 * Order.PriceConstant
+      val buyAmount           = 1
+      val sellAmount          = 1
+      val assetPair           = AssetPair.createAssetPair("WAVES", assetId).get
+      val buy                 = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, o1ver)
+      val sell                = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, o2ver)
 
-    val buyer               = pkByAddress(firstAddress)
-    val seller              = pkByAddress(firstAddress)
-    val matcher             = pkByAddress(thirdAddress)
-    val time                = NTP.correctedTime()
-    val expirationTimestamp = time + Order.MaxLiveTime
-    val buyPrice            = 2 * Order.PriceConstant
-    val sellPrice           = 2 * Order.PriceConstant
-    val buyAmount           = 1
-    val sellAmount          = 1
-    val assetPair           = AssetPair.createAssetPair("WAVES", assetId).get
-    val buy                 = Order.buy(buyer, matcher, assetPair, buyPrice, buyAmount, time, expirationTimestamp, matcherFee)
-    val sell                = Order.sell(seller, matcher, assetPair, sellPrice, sellAmount, time, expirationTimestamp, matcherFee)
+      val amount = 1
+      if (tver != 1) {
+        val tx = ExchangeTransactionV2
+          .create(
+            matcher = matcher,
+            buyOrder = buy,
+            sellOrder = sell,
+            amount = amount,
+            price = sellPrice,
+            buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
+            sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
+            fee = matcherFee,
+            timestamp = ntpTime.correctedTime()
+          )
+          .right
+          .get
 
-    val amount = 1
-    val tx = ExchangeTransaction
-      .create(
-        matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
-        price = sellPrice,
-        amount = amount,
-        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
-        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
-        fee = matcherFee,
-        timestamp = NTP.correctedTime()
-      )
-      .right
-      .get
+        assertBadRequestAndMessage(
+          sender.postJson("/transactions/broadcast", tx.json() + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt))),
+          "Assets should be issued before they can be traded"
+        )
+      } else {
+        val tx = ExchangeTransactionV1
+          .create(
+            matcher = matcher,
+            buyOrder = buy.asInstanceOf[OrderV1],
+            sellOrder = sell.asInstanceOf[OrderV1],
+            amount = amount,
+            price = sellPrice,
+            buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
+            sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
+            fee = matcherFee,
+            timestamp = ntpTime.correctedTime()
+          )
+          .right
+          .get
 
-    implicit val o: Writes[Order] = Writes[Order](_.json())
+        assertBadRequestAndMessage(
+          sender.postJson("/transactions/broadcast", tx.json() + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt))),
+          "Assets should be issued before they can be traded"
+        )
+      }
+    }
 
-    implicit val w: Writes[SignedExchangeRequest] =
-      Json.writes[SignedExchangeRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt)))
-
-    def request(tx: ExchangeTransaction): SignedExchangeRequest =
-      SignedExchangeRequest(
-        Base58.encode(tx.sender.publicKey),
-        tx.buyOrder,
-        tx.sellOrder,
-        tx.price,
-        tx.amount,
-        matcherFee,
-        tx.buyMatcherFee,
-        tx.sellMatcherFee,
-        tx.timestamp,
-        tx.signature.base58
-      )
-
-    assertBadRequestAndMessage(sender.postJson("/transactions/broadcast", request(tx)), "Assets should be issued before they can be traded")
   }
 
 }

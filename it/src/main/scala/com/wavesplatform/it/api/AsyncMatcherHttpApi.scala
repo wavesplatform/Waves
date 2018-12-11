@@ -1,30 +1,43 @@
 package com.wavesplatform.it.api
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.crypto
 import com.wavesplatform.http.api_key
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.utils.Base58
-import org.asynchttpclient.Dsl.{get => _get}
+import org.asynchttpclient.Dsl.{delete => _delete, get => _get}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
 import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
-import play.api.libs.json.Writes
+import play.api.libs.json.{Json, Writes}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object AsyncMatcherHttpApi extends Assertions {
 
   val DefaultMatcherFee: Int = 300000
+
+  def cancelRequest(sender: PrivateKeyAccount, orderId: String): CancelOrderRequest = {
+    val req       = CancelOrderRequest(sender, Some(ByteStr.decodeBase58(orderId).get), None, Array.emptyByteArray)
+    val signature = crypto.sign(sender, req.toSign)
+    req.copy(signature = signature)
+  }
+
+  def batchCancelRequest(sender: PrivateKeyAccount, timestamp: Long): CancelOrderRequest = {
+    val req       = CancelOrderRequest(sender, None, Some(timestamp), Array.emptyByteArray)
+    val signature = crypto.sign(sender, req.toSign)
+    req.copy(signature = signature)
+  }
 
   implicit class MatcherAsyncHttpApi(matcherNode: Node) extends NodeAsyncHttpApi(matcherNode) {
 
@@ -43,11 +56,14 @@ object AsyncMatcherHttpApi extends Assertions {
         .build()
     )
 
-    def matcherGetWithSignature(path: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+    def matcherGetWithSignature(path: String,
+                                sender: PrivateKeyAccount,
+                                timestamp: Long = System.currentTimeMillis(),
+                                f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying {
         _get(s"${matcherNode.matcherApiEndpoint}$path")
-          .setHeader("Timestamp", ts)
-          .setHeader("Signature", signature)
+          .setHeader("Timestamp", timestamp)
+          .setHeader("Signature", Base58.encode(crypto.sign(sender, sender.publicKey ++ Longs.toByteArray(timestamp))))
           .build()
       }
 
@@ -67,18 +83,52 @@ object AsyncMatcherHttpApi extends Assertions {
       )
 
     def orderStatus(orderId: String, assetPair: AssetPair, waitForStatus: Boolean = true): Future[MatcherStatusResponse] = {
-      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset/$orderId", waitForStatus = waitForStatus)
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/$orderId", waitForStatus = waitForStatus)
         .as[MatcherStatusResponse]
+    }
+
+    def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String): Future[Boolean] = {
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/$orderId") transform {
+        case Failure(UnexpectedStatusCodeException(_, 404, responseBody)) =>
+          Try(parse(responseBody).as[MessageMatcherResponse]) match {
+            case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
+            case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+          }
+        case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
+        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
+      }
     }
 
     def transactionsByOrder(orderId: String): Future[Seq[ExchangeTransaction]] =
       matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
 
-    def orderBook(assetPair: AssetPair): Future[OrderBookResponse] = {
-      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset").as[OrderBookResponse]
-    }
+    def waitOrderInBlockchain(orderId: String, retryInterval: FiniteDuration = 1.second): Future[Seq[TransactionInfo]] =
+      waitFor[Seq[ExchangeTransaction]](s"Exchange transactions for order $orderId")(_.transactionsByOrder(orderId), _.nonEmpty, retryInterval)
+        .flatMap { txs =>
+          assert(txs.nonEmpty, s"There is no exchange transaction for $orderId")
+          Future.sequence { txs.map(tx => waitForTransaction(tx.id, retryInterval)) }
+        }
+
+    def orderBook(assetPair: AssetPair): Future[OrderBookResponse] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}").as[OrderBookResponse]
+
+    def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Future[Boolean] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}") transform {
+        case Failure(UnexpectedStatusCodeException(_, 404, responseBody)) =>
+          Try(parse(responseBody).as[MessageMatcherResponse]) match {
+            case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
+            case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+          }
+        case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
+        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
+      }
+
+    def deleteOrderBook(assetPair: AssetPair): Future[OrderBookResponse] =
+      retrying(_delete(s"${matcherNode.matcherApiEndpoint}/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build())
+        .as[OrderBookResponse]
+
+    def marketStatus(assetPair: AssetPair): Future[MarketStatusResponse] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/status").as[MarketStatusResponse]
 
     def parseAssetPair(assetPair: AssetPair): (String, String) = {
       val amountAsset = assetPair.amountAsset match {
@@ -92,75 +142,50 @@ object AsyncMatcherHttpApi extends Assertions {
       (amountAsset, priceAsset)
     }
 
-    def cancelOrder(sender: Node, assetPair: AssetPair, orderId: Option[String], timestamp: Option[Long] = None): Future[MatcherStatusResponse] =
-      cancelOrder(sender.privateKey, assetPair, orderId, timestamp)
+    def cancelOrder(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String): Future[MatcherStatusResponse] =
+      matcherPost(s"/matcher/orderbook/${assetPair.toUri}/cancel", cancelRequest(sender, orderId)).as[MatcherStatusResponse]
 
-    def cancelOrder(sender: PrivateKeyAccount,
-                    assetPair: AssetPair,
-                    orderId: Option[String],
-                    timestamp: Option[Long]): Future[MatcherStatusResponse] = {
-      val privateKey                = sender.privateKey
-      val publicKey                 = PublicKeyAccount(sender.publicKey)
-      val request                   = CancelOrderRequest(publicKey, orderId.map(ByteStr.decodeBase58(_).get), timestamp, Array.emptyByteArray)
-      val sig                       = crypto.sign(privateKey, request.toSign)
-      val signedRequest             = request.copy(signature = sig)
-      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", signedRequest.json).as[MatcherStatusResponse]
+    def expectCancelRejected(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String): Future[Unit] = {
+      val requestUri = s"/matcher/orderbook/${assetPair.toUri}/cancel"
+      matcherPost(requestUri, cancelRequest(sender, orderId)).transform {
+        case Failure(UnexpectedStatusCodeException(_, 400, body)) if (Json.parse(body) \ "status").as[String] == "OrderCancelRejected" => Success(())
+        case Failure(cause)                                                                                                            => Failure(cause)
+        case Success(resp)                                                                                                             => Failure(UnexpectedStatusCodeException(requestUri, resp.getStatusCode, resp.getResponseBody))
+      }
     }
 
-    def cancelAllOrders(sender: Node, timestamp: Option[Long]): Future[MatcherStatusResponse] = {
-      val privateKey    = sender.privateKey
-      val publicKey     = sender.publicKey
-      val request       = CancelOrderRequest(publicKey, None, timestamp, Array.emptyByteArray)
-      val sig           = crypto.sign(privateKey, request.toSign)
-      val signedRequest = request.copy(signature = sig)
-      matcherPost(s"/matcher/orderbook/cancel", signedRequest.json).as[MatcherStatusResponse]
-    }
+    def cancelOrdersForPair(sender: PrivateKeyAccount, assetPair: AssetPair, timestamp: Long): Future[MatcherStatusResponse] =
+      matcherPost(s"/matcher/orderbook/${assetPair.toUri}/cancel", Json.toJson(batchCancelRequest(sender, timestamp)))
+        .as[MatcherStatusResponse]
 
-    def cancelOrderWithApiKey(orderId: String): Future[MatcherStatusResponse] = {
+    def cancelAllOrders(sender: PrivateKeyAccount, timestamp: Long): Future[MatcherStatusResponse] =
+      matcherPost(s"/matcher/orderbook/cancel", Json.toJson(batchCancelRequest(sender, timestamp))).as[MatcherStatusResponse]
+
+    def cancelOrderWithApiKey(orderId: String): Future[MatcherStatusResponse] =
       postWithAPiKey(s"/matcher/orders/cancel/$orderId").as[MatcherStatusResponse]
-    }
 
-    def fullOrdersHistory(sender: Node): Future[Seq[OrderbookHistory]] = {
-      val ts = System.currentTimeMillis()
-      matcherGetWithSignature(s"/matcher/orderbook/${sender.publicKeyStr}", ts, signature(sender, ts)).as[Seq[OrderbookHistory]]
-    }
+    def fullOrdersHistory(sender: PrivateKeyAccount): Future[Seq[OrderbookHistory]] =
+      matcherGetWithSignature(s"/matcher/orderbook/${Base58.encode(sender.publicKey)}", sender).as[Seq[OrderbookHistory]]
 
-    def orderHistoryByPair(sender: Node, assetPair: AssetPair): Future[Seq[OrderbookHistory]] = {
-      val ts                        = System.currentTimeMillis()
-      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherGetWithSignature(s"/matcher/orderbook/$amountAsset/$priceAsset/publicKey/${sender.publicKeyStr}", ts, signature(sender, ts))
+    def orderHistoryByPair(sender: PrivateKeyAccount, assetPair: AssetPair, activeOnly: Boolean = false): Future[Seq[OrderbookHistory]] = {
+      matcherGetWithSignature(s"/matcher/orderbook/${assetPair.toUri}/publicKey/${Base58.encode(sender.publicKey)}?activeOnly=$activeOnly", sender)
         .as[Seq[OrderbookHistory]]
     }
 
-    def activeOrderHistory(sender: Node): Future[Seq[OrderbookHistory]] = {
-      val ts = System.currentTimeMillis()
-      matcherGetWithSignature(s"/matcher/orderbook/${sender.publicKeyStr}?activeOnly=true", ts, signature(sender, ts)).as[Seq[OrderbookHistory]]
+    def activeOrderHistory(sender: PrivateKeyAccount): Future[Seq[OrderbookHistory]] = {
+      matcherGetWithSignature(s"/matcher/orderbook/${Base58.encode(sender.publicKey)}?activeOnly=true", sender).as[Seq[OrderbookHistory]]
     }
 
-    def reservedBalance(sender: Node): Future[Map[String, Long]] = reservedBalance(sender.privateKey)
+    def reservedBalance(sender: PrivateKeyAccount): Future[Map[String, Long]] =
+      matcherGetWithSignature(s"/matcher/balance/reserved/${Base58.encode(sender.publicKey)}", sender).as[Map[String, Long]]
 
-    def reservedBalance(sender: PrivateKeyAccount): Future[Map[String, Long]] = {
-      val ts         = System.currentTimeMillis()
-      val privateKey = sender.privateKey
-      val publicKey  = sender.publicKey
-      val signature  = ByteStr(crypto.sign(privateKey, publicKey ++ Longs.toByteArray(ts)))
+    def tradableBalance(sender: Node, assetPair: AssetPair): Future[Map[String, Long]] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.address}").as[Map[String, Long]]
 
-      matcherGetWithSignature(s"/matcher/balance/reserved/${Base58.encode(sender.publicKey)}", ts, signature).as[Map[String, Long]]
-    }
+    def tradableBalance(sender: PrivateKeyAccount, assetPair: AssetPair): Future[Map[String, Long]] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.address}").as[Map[String, Long]]
 
-    def tradableBalance(sender: Node, assetPair: AssetPair): Future[Map[String, Long]] = {
-      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset/tradableBalance/${sender.address}").as[Map[String, Long]]
-    }
-
-    def tradableBalance(sender: PrivateKeyAccount, assetPair: AssetPair): Future[Map[String, Long]] = {
-      val (amountAsset, priceAsset) = parseAssetPair(assetPair)
-      matcherGet(s"/matcher/orderbook/$amountAsset/$priceAsset/tradableBalance/${sender.address}").as[Map[String, Long]]
-    }
-
-    def tradingMarkets(): Future[MarketDataInfo] =
-      matcherGet(s"/matcher/orderbook").as[MarketDataInfo]
+    def tradingMarkets(): Future[MarketDataInfo] = matcherGet(s"/matcher/orderbook").as[MarketDataInfo]
 
     def waitOrderStatus(assetPair: AssetPair,
                         orderId: String,
@@ -185,56 +210,67 @@ object AsyncMatcherHttpApi extends Assertions {
         5.seconds)
     }
 
-    def prepareOrder(sender: Node,
+    def prepareOrder(sender: PrivateKeyAccount,
                      pair: AssetPair,
                      orderType: OrderType,
-                     price: Long,
                      amount: Long,
+                     price: Long,
+                     fee: Long,
+                     version: Byte,
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = matcherNode.publicKey
       val unsigned =
-        Order(sender.publicKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, DefaultMatcherFee, Array())
-      val signature = crypto.sign(sender.privateKey, unsigned.toSign)
-      unsigned.copy(signature = signature)
+        Order(sender, matcherPublicKey, pair, orderType, amount, price, creationTime, timeToLiveTimestamp, fee, Proofs.empty, version)
+      Order.sign(unsigned, sender)
     }
 
     def placeOrder(order: Order): Future[MatcherResponse] =
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
-    def placeOrder(sender: Node,
+    def placeOrder(sender: PrivateKeyAccount,
                    pair: AssetPair,
                    orderType: OrderType,
-                   price: Long,
                    amount: Long,
+                   price: Long,
+                   fee: Long,
+                   version: Byte,
                    timeToLive: Duration = 30.days - 1.seconds): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, price, amount, timeToLive)
+      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 
-    def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
+    def expectIncorrectOrderPlacement(order: Order,
+                                      expectedStatusCode: Int,
+                                      expectedStatus: String,
+                                      expectedMessage: Option[String]): Future[Boolean] =
       matcherPost("/matcher/orderbook", order.json()) transform {
         case Failure(UnexpectedStatusCodeException(_, `expectedStatusCode`, responseBody)) =>
-          Try(parse(responseBody).as[MatcherStatusResponse]) match {
-            case Success(mr) if mr.status == expectedStatus => Success(true)
-            case Failure(f)                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+          expectedMessage match {
+            case None =>
+              Try(parse(responseBody).as[MatcherStatusResponse]) match {
+                case Success(mr) if mr.status == expectedStatus => Success(true)
+                case Failure(f)                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+              }
+            case _ =>
+              Try(parse(responseBody).as[MatcherErrorResponse]) match {
+                case Success(mr) if mr.status.get == expectedStatus && mr.message == expectedMessage =>
+                  Success(true)
+                case Failure(f) =>
+                  Failure(new RuntimeException(s"Failed to parse response: $f"))
+              }
+
           }
         case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
         case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
       }
 
-    def ordersByAddress(sender: Node, activeOnly: Boolean): Future[Seq[OrderbookHistory]] =
-      ordersByAddress(sender.privateKey.toAddress.stringRepr, activeOnly)
+    def ordersByAddress(sender: PrivateKeyAccount, activeOnly: Boolean): Future[Seq[OrderbookHistory]] =
+      ordersByAddress(sender.address, activeOnly)
 
     def ordersByAddress(senderAddress: String, activeOnly: Boolean): Future[Seq[OrderbookHistory]] =
       matcherGetWithApiKey(s"/matcher/orders/$senderAddress?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
-
-    private def signature(node: Node, timestamp: Long) = {
-      val privateKey = node.privateKey
-      val publicKey  = node.publicKey.publicKey
-      ByteStr(crypto.sign(privateKey, publicKey ++ Longs.toByteArray(timestamp)))
-    }
 
   }
 
@@ -242,4 +278,7 @@ object AsyncMatcherHttpApi extends Assertions {
     def withApiKey(x: String): RequestBuilder = self.setHeader(api_key.name, x)
   }
 
+  implicit class AssetPairExt(val p: AssetPair) extends AnyVal {
+    def toUri: String = s"${AssetPair.assetIdStr(p.amountAsset)}/${AssetPair.assetIdStr(p.priceAsset)}"
+  }
 }

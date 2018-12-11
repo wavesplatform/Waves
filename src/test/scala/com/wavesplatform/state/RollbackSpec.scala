@@ -2,9 +2,9 @@ package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.db.WithState
-import com.wavesplatform.features._
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
+import com.wavesplatform.features._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
@@ -19,9 +19,9 @@ import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction,
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.{Assertions, FreeSpec, Matchers}
 
-class RollbackSpec extends FreeSpec with Matchers with WithState with TransactionGen with PropertyChecks with NoShrink {
+class RollbackSpec extends FreeSpec with Matchers with WithDomain with TransactionGen with PropertyChecks with NoShrink {
   private val time   = new TestTime
   private def nextTs = time.getTimestamp()
 
@@ -34,7 +34,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
   private def transfer(sender: PrivateKeyAccount, recipient: Address, amount: Long) =
     TransferTransactionV1.selfSigned(None, sender, recipient, amount, nextTs, None, 1, Array.empty[Byte]).explicitGet()
 
-  private def randomOp(sender: PrivateKeyAccount, recipient: Address, amount: Long, op: Int) = {
+  private def randomOp(sender: PrivateKeyAccount, recipient: Address, amount: Long, op: Int, nextTs: => Long = nextTs) = {
     import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
     op match {
       case 1 =>
@@ -92,8 +92,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
               ))
           }
 
-          val stransactions1 = d.addressTransactions(sender).sortBy(_._2.timestamp)
-          val rtransactions1 = d.addressTransactions(recipient).sortBy(_._2.timestamp)
+          val stransactions1 = d.addressTransactions(sender).explicitGet().sortBy(_._2.timestamp)
+          val rtransactions1 = d.addressTransactions(recipient).explicitGet().sortBy(_._2.timestamp)
 
           d.removeAfter(genesisSignature)
 
@@ -106,8 +106,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
               ))
           }
 
-          val stransactions2 = d.addressTransactions(sender).sortBy(_._2.timestamp)
-          val rtransactions2 = d.addressTransactions(recipient).sortBy(_._2.timestamp)
+          val stransactions2 = d.addressTransactions(sender).explicitGet().sortBy(_._2.timestamp)
+          val rtransactions2 = d.addressTransactions(recipient).explicitGet().sortBy(_._2.timestamp)
 
           stransactions1 shouldBe stransactions2
           rtransactions1 shouldBe rtransactions2
@@ -454,6 +454,46 @@ class RollbackSpec extends FreeSpec with Matchers with WithState with Transactio
 
           d.removeAfter(transferBlockId)
           d.carryFee shouldBe carry(transfer.fee)
+        }
+    }
+
+    "relean rollbacked transaction" in forAll(accountGen, accountGen, Gen.listOfN(66, Gen.choose(1, 10))) {
+      case (sender, recipient, txCount) =>
+        withDomain(createSettings(MassTransfer -> 0)) { d =>
+          val ts = nextTs
+
+          d.appendBlock(genesisBlock(ts, sender, com.wavesplatform.state.diffs.ENOUGH_AMT))
+
+          val transferAmount = 100
+
+          val interval = (3 * 60 * 60 * 1000 + 30 * 60 * 1000) / txCount.size
+
+          val transfers =
+            txCount.zipWithIndex.map(tc =>
+              Range(0, tc._1).map(i => randomOp(sender, recipient, transferAmount, tc._1 % 3, ts + interval * tc._2 + i)).flatten)
+
+          val blocks = for ((transfer, i) <- transfers.zipWithIndex) yield {
+            val tsb   = ts + interval * i
+            val block = TestBlock.create(tsb, d.lastBlockId, transfer)
+            d.appendBlock(block)
+            (d.lastBlockId, tsb)
+          }
+
+          val middleBlock = blocks(txCount.size / 2)
+
+          d.removeAfter(middleBlock._1)
+
+          try {
+            d.appendBlock(
+              TestBlock.create(
+                middleBlock._2 + 10,
+                middleBlock._1,
+                transfers(0)
+              ))
+            throw new Exception("Duplicate transaction wasn't checked")
+          } catch {
+            case e: Throwable => Assertions.assert(e.getMessage().contains("AlreadyInTheState"))
+          }
         }
     }
   }

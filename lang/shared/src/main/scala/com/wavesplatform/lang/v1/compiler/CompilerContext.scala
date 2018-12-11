@@ -10,7 +10,7 @@ import shapeless._
 case class CompilerContext(predefTypes: Map[String, DefinedType], varDefs: VariableTypes, functionDefs: FunctionTypes, tmpArgsIdx: Int = 0) {
   private lazy val allFuncDefs: FunctionTypes = predefTypes.collect {
     case (_, t @ CaseType(typeName, fields)) =>
-      typeName -> List(FunctionTypeSignature(CASETYPEREF(typeName, fields), fields.map(_._2), FunctionHeader.User(typeName)))
+      typeName -> List(FunctionTypeSignature(CASETYPEREF(typeName, fields), fields, FunctionHeader.User(typeName)))
   } ++ functionDefs
 
   def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = allFuncDefs.getOrElse(name, List.empty)
@@ -24,7 +24,7 @@ object CompilerContext {
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
   )
 
-  type VariableTypes = Map[String, FINAL]
+  type VariableTypes = Map[String, (FINAL, String)]
   type FunctionTypes = Map[String, List[FunctionTypeSignature]]
 
   val empty = CompilerContext(Map.empty, Map.empty, Map.empty, 0)

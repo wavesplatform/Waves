@@ -41,6 +41,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
                          "fee": 100000,
                          "timestamp": 1526910778245,
                          "signature": "CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T",
+                         "proofs": ["CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T"],
                          "version": 1,
                          "alias": "myalias"
                         }

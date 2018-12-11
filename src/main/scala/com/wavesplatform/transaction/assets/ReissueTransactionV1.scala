@@ -6,7 +6,7 @@ import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.util.{Failure, Success, Try}
 
 case class ReissueTransactionV1 private (sender: PublicKeyAccount,
@@ -30,7 +30,7 @@ case class ReissueTransactionV1 private (sender: PublicKeyAccount,
 
 object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = 5
+  override val typeId: Byte = ReissueTransaction.typeId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {

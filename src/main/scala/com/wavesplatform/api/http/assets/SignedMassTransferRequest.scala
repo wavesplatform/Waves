@@ -1,16 +1,26 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json._
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
 object SignedMassTransferRequest {
-  implicit val reads = Json.reads[SignedMassTransferRequest]
+  implicit val MassTransferRequestReads: Reads[SignedMassTransferRequest] = (
+    (JsPath \ "version").read[Byte] and
+      (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "assetId").readNullable[String] and
+      (JsPath \ "transfers").read[List[Transfer]] and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "attachment").readNullable[String] and
+      (JsPath \ "proofs").read[List[ProofStr]]
+  )(SignedMassTransferRequest.apply _)
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")

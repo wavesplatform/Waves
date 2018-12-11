@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.database.{Keys, LevelDBWriter, RW}
+import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.BlockchainUpdater
@@ -8,7 +8,7 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import org.iq80.leveldb.DB
 
 object StorageFactory extends ScorexLogging {
-  private val StorageVersion = 2
+  private val StorageVersion = 3
 
   def apply(settings: WavesSettings, db: DB, time: Time): BlockchainUpdater with NG = {
     checkVersion(db)
@@ -16,8 +16,7 @@ object StorageFactory extends ScorexLogging {
     new BlockchainUpdaterImpl(levelDBWriter, settings, time)
   }
 
-  private def checkVersion(db: DB) = {
-    val rw      = new RW(db)
+  private def checkVersion(db: DB): Unit = db.readWrite { rw =>
     val version = rw.get(Keys.version)
     val height  = rw.get(Keys.height)
     if (version != StorageVersion) {
@@ -32,6 +31,5 @@ object StorageFactory extends ScorexLogging {
         forceStopApplication(UnsupportedFeature)
       }
     }
-    rw.close()
   }
 }

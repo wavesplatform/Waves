@@ -5,7 +5,7 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.block._
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.transaction.Transaction
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.util.{Random, Try}
 
 object TestBlock {

@@ -1,10 +1,12 @@
 package com.wavesplatform.transaction.api.http.assets
 
-import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.utils.Base58
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 import com.wavesplatform.api.http.assets._
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.Proofs
 
 class SignedRequestsTest extends FunSuite with Matchers {
 
@@ -222,16 +224,45 @@ class SignedRequestsTest extends FunSuite with Matchers {
  }"""
 
     val req = Json.parse(js1).validate[SignedSponsorFeeRequest].get.toTx.right.get
-    //req.proofs shouldBe List("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7")
+    req.proofs shouldBe Proofs(
+      Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
     req.fee shouldBe 100000000L
     req.minSponsoredAssetFee shouldBe Some(100000)
 
     for (js <- Seq(js2, js3, js4)) {
       val req = Json.parse(js).validate[SignedSponsorFeeRequest].get.toTx.right.get
-      //req.proofs shouldBe List("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7")
+      Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
       req.fee shouldBe 100000000L
       req.minSponsoredAssetFee shouldBe None
     }
+  }
+
+  test("SetAssetScriptRequest json parsing works") {
+    val json =
+      """
+        |{
+        |"version": 1,
+        |"senderPublicKey":"D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5",
+        |"assetId":"Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L",
+        |"script":"base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==",
+        |"timestamp": 1520945679531,
+        |"fee": 100000,
+        |"proofs": [
+        | "3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7"
+        |]
+        |}
+      """.stripMargin
+    val req = Json.parse(json).validate[SignedSetAssetScriptRequest].get
+    req.assetId shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
+    req.proofs shouldBe Seq("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7")
+    req.fee shouldBe 100000L
+    req.timestamp shouldBe 1520945679531L
+
+    val tx = req.toTx.explicitGet()
+    tx.assetId.base58 shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
+    tx.script shouldBe Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet())
+    tx.fee shouldBe 100000L
+    tx.timestamp shouldBe 1520945679531L
   }
 
 }

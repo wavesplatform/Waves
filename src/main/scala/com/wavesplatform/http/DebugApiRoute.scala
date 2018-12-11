@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentMap
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import cats.implicits._
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
@@ -15,18 +16,18 @@ import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, NG, Portfolio}
+import com.wavesplatform.transaction.ValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
-import com.wavesplatform.utils.{Base58, NTP, ScorexLogging}
+import com.wavesplatform.transaction.smart.Verifier
+import com.wavesplatform.utils.{Base58, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
-
-import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.smart.Verifier
 import monix.eval.{Coeval, Task}
 import play.api.libs.json._
 
@@ -37,6 +38,7 @@ import scala.util.{Failure, Success}
 @Path("/debug")
 @Api(value = "/debug")
 case class DebugApiRoute(ws: WavesSettings,
+                         time: Time,
                          blockchain: Blockchain,
                          wallet: Wallet,
                          ng: NG,
@@ -278,12 +280,16 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
     (delete & withAuth) {
-      ByteStr.decodeBase58(signature) match {
-        case Success(sig) =>
-          complete(rollbackToBlock(sig, returnTransactionsToUtx = false))
-        case _ =>
-          complete(InvalidSignature)
-      }
+      val signatureEi: Either[ValidationError, ByteStr] =
+        ByteStr
+          .decodeBase58(signature)
+          .toEither
+          .leftMap(_ => InvalidRequestSignature)
+      signatureEi
+        .fold(
+          err => complete(ApiError.fromValidationError(err)),
+          sig => complete(rollbackToBlock(sig, false))
+        )
     }
   }
 
@@ -331,7 +337,7 @@ case class DebugApiRoute(ws: WavesSettings,
         val diffEi = for {
           tx <- TransactionFactory.fromSignedRequest(jsv)
           _  <- Verifier(blockchain, h)(tx)
-          ei <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, NTP.correctedTime(), h)(blockchain, tx)
+          ei <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
         } yield ei
         val timeSpent = (System.nanoTime - t0) / 1000 / 1000.0
         val response  = Json.obj("valid" -> diffEi.isRight, "validationTime" -> timeSpent)

@@ -10,7 +10,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import monix.eval.Coeval
 import play.api.libs.json.Json
-import scorex.crypto.signatures.Curve25519.KeyLength
+import com.wavesplatform.crypto.KeyLength
 
 import scala.util.{Failure, Success, Try}
 
@@ -36,8 +36,8 @@ case class SetScriptTransaction private (version: Byte,
       Longs.toByteArray(timestamp)
     ))
 
-  override val assetFee = (None, fee)
-  override val json     = Coeval.evalOnce(jsonBase() ++ Json.obj("version" -> version, "script" -> script.map(_.bytes().base64)))
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val json                              = Coeval.evalOnce(jsonBase() ++ Json.obj("version" -> version, "script" -> script.map(_.bytes().base64)))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }

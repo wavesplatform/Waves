@@ -11,7 +11,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, EitherExt2}
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalatest.{FreeSpecLike, Matchers}
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 
@@ -114,7 +114,6 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       featureCheckBlocksPeriod = ngAtHeight / 2,
       blocksForFeatureActivation = 1,
       allowTemporaryNegativeUntil = 0L,
-      requireSortedTransactionsAfter = 0L,
       generationBalanceDepthFrom50To1000AfterHeight = 0,
       minimalGeneratingBalanceAfter = 0L,
       allowTransactionsFromFutureUntil = Long.MaxValue,

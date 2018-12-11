@@ -84,7 +84,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       case (genesis, issue, sponsor) =>
         val setupBlocks = Seq(block(Seq(genesis, issue)))
         assertDiffEi(setupBlocks, block(Seq(sponsor)), s) { blockDiffEi =>
-          blockDiffEi should produce("SponsorFeeTransaction transaction has not been activated")
+          blockDiffEi should produce("SponsorFeeTransaction has not been activated")
         }
     }
   }
@@ -229,7 +229,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .right
         .get
       insufficientFee = SponsorFeeTransaction
-        .selfSigned(1, notSponsor, assetId, Some(minFee), 1 * Constants.UnitsInWave - 1, ts + 1)
+        .selfSigned(1, master, assetId, Some(minFee), 1 * Constants.UnitsInWave - 1, ts + 1)
         .right
         .get
     } yield (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee)

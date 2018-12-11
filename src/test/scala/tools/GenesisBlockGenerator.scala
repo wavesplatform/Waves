@@ -13,7 +13,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.wallet.Wallet
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.concurrent.duration._
 
 object GenesisBlockGenerator extends App {

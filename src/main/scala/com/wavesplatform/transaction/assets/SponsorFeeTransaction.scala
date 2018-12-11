@@ -7,7 +7,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction._
-import scorex.crypto.signatures.Curve25519._
+import com.wavesplatform.crypto._
 import scala.util.{Failure, Success, Try}
 
 case class SponsorFeeTransaction private (version: Byte,
@@ -44,6 +44,8 @@ case class SponsorFeeTransaction private (version: Byte,
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte, builder.typeId, version), bodyBytes(), proofs.bytes()))
+
+  override def checkedAssets(): Seq[AssetId] = Seq(assetId)
 }
 
 object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction] with TransactionParser.MultipleVersions {

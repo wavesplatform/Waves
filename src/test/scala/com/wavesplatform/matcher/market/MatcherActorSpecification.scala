@@ -1,153 +1,57 @@
 package com.wavesplatform.matcher.market
 
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import akka.http.scaladsl.model.StatusCodes
-import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
-import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
-import com.wavesplatform.matcher.fixtures.RestartableActor
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
-import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
-import com.wavesplatform.matcher.model.OrderBook
-import com.wavesplatform.matcher.{AssetPairBuilder, MatcherTestData}
-import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
-import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
+import akka.actor.{Actor, ActorRef, Kill, Props, Terminated}
+import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
+import com.wavesplatform.NTPTime
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.matcher.MatcherTestData
+import com.wavesplatform.matcher.api.OrderAccepted
+import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData}
+import com.wavesplatform.matcher.market.MatcherActorSpecification.FailAtStartActor
+import com.wavesplatform.matcher.model.ExchangeTransactionCreator
+import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.IssueTransactionV1
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.utils.{NTP, ScorexLogging}
+import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.utils.{EmptyBlockchain, randomBytes}
 import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import org.scalatest.BeforeAndAfterEach
+import org.scalatest.concurrent.Eventually
+
+import scala.concurrent.duration.DurationInt
 
 class MatcherActorSpecification
-    extends TestKit(ActorSystem.apply("MatcherTest2"))
-    with WordSpecLike
-    with Matchers
-    with BeforeAndAfterAll
-    with ImplicitSender
+    extends MatcherSpec("MatcherActor")
     with MatcherTestData
     with BeforeAndAfterEach
-    with ScorexLogging
-    with PathMockFactory {
+    with PathMockFactory
+    with ImplicitSender
+    with Eventually
+    with NTPTime {
 
-  val blockchain: Blockchain = stub[Blockchain]
-
-  val settings = matcherSettings.copy(
-    account = MatcherAccount.address,
-  )
-
-  val pairBuilder = new AssetPairBuilder(settings, blockchain)
-
-  val functionalitySettings = TestFunctionalitySettings.Stub
-  val wallet                = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
-  wallet.generateNewAccount()
-
-  val orderHistoryRef = TestActorRef(new Actor {
-    def receive: Receive = {
-      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(o.id(), Right(o))
-      case _                   =>
-    }
-  })
-
-  val obc                                              = new ConcurrentHashMap[AssetPair, OrderBook]
-  val ob                                               = new AtomicReference(Map.empty[AssetPair, ActorRef])
-  def update(ap: AssetPair)(snapshot: OrderBook): Unit = obc.put(ap, snapshot)
-
-  var actor: ActorRef = system.actorOf(Props(
-    new MatcherActor(orderHistoryRef, pairBuilder, ob, update, wallet, mock[UtxPool], mock[ChannelGroup], settings, blockchain, functionalitySettings)
-    with RestartableActor))
-
-  val i1 = IssueTransactionV1
-    .selfSigned(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
-    .right
-    .get
-  val i2 = IssueTransactionV1
-    .selfSigned(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L)
-    .right
-    .get
-  (blockchain.assetDescription _)
-    .when(i2.id())
-    .returns(Some(AssetDescription(i2.sender, "ForbiddenName".getBytes, "".getBytes, 8, false, i2.quantity, None, 0)))
+  private val blockchain: Blockchain = stub[Blockchain]
   (blockchain.assetDescription _)
     .when(*)
-    .returns(Some(AssetDescription(PublicKeyAccount(Array(0: Byte)), "Unknown".getBytes, "".getBytes, 8, false, i1.quantity, None, 0)))
-  (blockchain.portfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseBalance.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
-
-  override protected def beforeEach(): Unit = {
-    val tp = TestProbe()
-    tp.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
-    tp.expectMsg(akka.actor.Status.Success(""))
-    obc.clear()
-    super.beforeEach()
-
-    actor = system.actorOf(
-      Props(
-        new MatcherActor(orderHistoryRef,
-                         pairBuilder,
-                         ob,
-                         update,
-                         wallet,
-                         mock[UtxPool],
-                         mock[ChannelGroup],
-                         settings,
-                         blockchain,
-                         functionalitySettings) with RestartableActor))
-  }
+    .returns(Some(AssetDescription(PrivateKeyAccount(Array.empty), "Unknown".getBytes, Array.emptyByteArray, 8, reissuable = false, 1, None, 0)))
+    .anyNumberOfTimes()
 
   "MatcherActor" should {
-
-    "AssetPair with same assets" in {
-      def sameAssetsOrder(): Order =
-        Order.apply(
-          PrivateKeyAccount("123".getBytes()),
-          MatcherAccount,
-          AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")),
-          OrderType.BUY,
-          100000000L,
-          100L,
-          1L,
-          1000L,
-          100000L
-        )
-
-      val invalidOrder = sameAssetsOrder()
-      actor ! invalidOrder
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
-    }
-
-    "accept orders with AssetPair with same assets" in {
-      def sameAssetsOrder(): Order =
-        Order.apply(
-          PrivateKeyAccount("123".getBytes()),
-          MatcherAccount,
-          AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")),
-          OrderType.BUY,
-          100000000L,
-          100L,
-          1L,
-          1000L,
-          100000L
-        )
-
-      val invalidOrder = sameAssetsOrder()
-      actor ! invalidOrder
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Amount and price assets must be different"))
-    }
-
     "return all open markets" in {
-      val a1 = strToSomeAssetId("123")
-      val a2 = strToSomeAssetId("234")
+      val actor = defaultActor()
 
-      val pair  = AssetPair(a2, a1)
-      val order = buy(pair, 1, 2000)
+      val pair  = AssetPair(randomAssetId, randomAssetId)
+      val order = buy(pair, 2000, 1)
+
+      (blockchain.accountScript _)
+        .when(order.sender.toAddress)
+        .returns(None)
+
+      (blockchain.accountScript _)
+        .when(order.matcherPublicKey.toAddress)
+        .returns(None)
 
       actor ! order
       expectMsg(OrderAccepted(order))
@@ -155,37 +59,86 @@ class MatcherActorSpecification
       actor ! GetMarkets
 
       expectMsgPF() {
-        case GetMarketsResponse(publicKey, Seq(MarketData(_, "Unknown", "Unknown", _, _, _))) =>
-          publicKey shouldBe MatcherAccount.publicKey
+        case s @ Seq(MarketData(_, "Unknown", "Unknown", _, _, _)) =>
+          s.size shouldBe 1
       }
     }
-  }
 
-  "GetMarketsResponse" should {
-    "serialize to json" in {
-      val waves  = "WAVES"
-      val a1Name = "BITCOIN"
-      val a1     = strToSomeAssetId(a1Name)
+    "mark an order book as failed" when {
+      "it crashes at start" in {
+        val pair = AssetPair(randomAssetId, randomAssetId)
+        val ob   = emptyOrderBookRefs
+        val actor = waitInitialization(
+          TestActorRef(
+            new MatcherActor(
+              ob,
+              (_, _) => Props(classOf[FailAtStartActor], pair),
+              blockchain.assetDescription
+            )
+          ))
 
-      val a2Name = "US DOLLAR"
-      val a2     = strToSomeAssetId(a2Name)
+        actor ! buy(pair, 2000, 1)
+        eventually { ob.get()(pair) shouldBe 'left }
+      }
 
-      val pair1 = AssetPair(a1, None)
-      val pair2 = AssetPair(a1, a2)
+      "it crashes during the work" in {
+        val ob    = emptyOrderBookRefs
+        val actor = defaultActor(ob)
 
-      val now = NTP.correctedTime()
-      val json =
-        GetMarketsResponse(Array(), Seq(MarketData(pair1, a1Name, waves, now, None, None), MarketData(pair2, a1Name, a2Name, now, None, None))).json
+        val a1, a2, a3 = randomAssetId
 
-      ((json \ "markets")(0) \ "priceAsset").as[String] shouldBe AssetPair.WavesName
-      ((json \ "markets")(0) \ "priceAssetName").as[String] shouldBe waves
-      ((json \ "markets")(0) \ "amountAsset").as[String] shouldBe a1.get.base58
-      ((json \ "markets")(0) \ "amountAssetName").as[String] shouldBe a1Name
-      ((json \ "markets")(0) \ "created").as[Long] shouldBe now
+        val pair1  = AssetPair(a1, a2)
+        val order1 = buy(pair1, 2000, 1)
 
-      ((json \ "markets")(1) \ "amountAssetName").as[String] shouldBe a1Name
+        val pair2  = AssetPair(a2, a3)
+        val order2 = buy(pair2, 2000, 1)
+
+        actor ! order1
+        actor ! order2
+        receiveN(2)
+
+        ob.get()(pair1) shouldBe 'right
+        ob.get()(pair2) shouldBe 'right
+
+        val toKill = actor.getChild(List(OrderBookActor.name(pair1)).iterator)
+
+        val probe = TestProbe()
+        probe.watch(toKill)
+        toKill.tell(Kill, actor)
+        probe.expectMsgType[Terminated]
+
+        ob.get()(pair1) shouldBe 'left
+      }
     }
+
+    "delete order books" is pending
+    "forward new orders to order books" is pending
   }
 
-  def strToSomeAssetId(s: String): Option[AssetId] = Some(ByteStr(s.getBytes()))
+  private def defaultActor(ob: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]] = emptyOrderBookRefs): TestActorRef[MatcherActor] = {
+    val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings, ntpTime).createTransaction _
+    waitInitialization(
+      TestActorRef(
+        new MatcherActor(
+          ob,
+          (assetPair, matcher) =>
+            OrderBookActor.props(matcher, assetPair, _ => {}, _ => {}, mock[UtxPool], mock[ChannelGroup], matcherSettings, txFactory, ntpTime),
+          blockchain.assetDescription
+        )
+      ))
+  }
+
+  private def waitInitialization(x: TestActorRef[MatcherActor]): TestActorRef[MatcherActor] = eventually(timeout(1.second)) {
+    x.underlyingActor.recoveryFinished shouldBe true
+    x
+  }
+  private def emptyOrderBookRefs             = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private def randomAssetId: Option[AssetId] = Some(ByteStr(randomBytes()))
+}
+
+object MatcherActorSpecification {
+  private class FailAtStartActor(pair: AssetPair) extends Actor {
+    throw new RuntimeException("I don't want to work today")
+    override def receive: Receive = Actor.emptyBehavior
+  }
 }

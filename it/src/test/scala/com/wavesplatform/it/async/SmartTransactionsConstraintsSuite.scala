@@ -11,6 +11,7 @@ import org.scalatest._
 import play.api.libs.json.{JsNumber, Json}
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.SignedSetScriptRequest
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.utils.Base58
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
@@ -91,7 +92,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
       .selfSigned(
         version = 1,
         sender = sender,
-        script = Some(ScriptV1(Terms.TRUE, checkSize = false).explicitGet()),
+        script = Some(ScriptV1(V1, Terms.TRUE, checkSize = false).explicitGet()),
         fee = 1000000,
         timestamp = System.currentTimeMillis() - 5.minutes.toMillis
       )

@@ -40,6 +40,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
                        "fee": 1000000,
                        "timestamp": 1526646300260,
                        "signature": "4T76AXcksn2ixhyMNu4m9UyY54M3HDTw5E2HqUsGV4phogs2vpgBcN5oncu4sbW4U3KU197yfHMxrc3kZ7e6zHG3",
+                       "proofs": ["4T76AXcksn2ixhyMNu4m9UyY54M3HDTw5E2HqUsGV4phogs2vpgBcN5oncu4sbW4U3KU197yfHMxrc3kZ7e6zHG3"],
                        "version": 1,
                        "leaseId": "EXhjYjy8a1dURbttrGzfcft7cddDnPnoa3vqaBLCTFVY",
                        "chainId": null

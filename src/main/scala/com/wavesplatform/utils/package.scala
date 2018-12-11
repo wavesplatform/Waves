@@ -6,15 +6,14 @@ import cats.kernel.Monoid
 import com.google.common.base.Throwables
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.compiler.CompilerContext
-import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator}
-import com.wavesplatform.transaction.smart.{BlockchainContext, WavesEnvironment}
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
+import com.wavesplatform.lang.{Global, ScriptVersion}
+import com.wavesplatform.state._
+import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
 import org.joda.time.Duration
@@ -87,9 +86,43 @@ package object utils extends ScorexLogging {
     }
   }
 
-  lazy val dummyNetworkByte: Byte                           = AddressScheme.current.chainId
-  lazy val dummyEvaluationContext: EvaluationContext        = BlockchainContext.build(dummyNetworkByte, Coeval(???), Coeval(???), null)
-  lazy val functionCosts: Map[FunctionHeader, Coeval[Long]] = estimate(dummyEvaluationContext)
+  private val lazyAssetContexts: Map[ScriptVersion, Coeval[CTX]] =
+    Seq
+      .tabulate(2) { v =>
+        val version = ScriptVersion.fromInt(v + 1).get
+        version -> Coeval.evalOnce(
+          Monoid
+            .combineAll(Seq(
+              PureContext.build(version),
+              CryptoContext.build(Global),
+              WavesContext
+                .build(version, new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain), isTokenContext = true)
+            )))
+      }
+      .toMap
+
+  private val lazyContexts: Map[ScriptVersion, Coeval[CTX]] =
+    Seq
+      .tabulate(2) { v =>
+        val version = ScriptVersion.fromInt(v + 1).get
+        version -> Coeval.evalOnce(
+          Monoid
+            .combineAll(Seq(
+              PureContext.build(version),
+              CryptoContext.build(Global),
+              WavesContext.build(version,
+                                 new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain),
+                                 isTokenContext = false)
+            )))
+      }
+      .toMap
+
+  def dummyEvalContext(version: ScriptVersion): EvaluationContext = lazyContexts(version)().evaluationContext
+
+  private val lazyFunctionCosts: Map[ScriptVersion, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
+    lazyContexts.mapValues(_.map(ctx => estimate(ctx.evaluationContext)))
+
+  def functionCosts(version: ScriptVersion): Map[FunctionHeader, Coeval[Long]] = lazyFunctionCosts(version)()
 
   def estimate(ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
@@ -100,7 +133,7 @@ package object utils extends ScorexLogging {
       val cost = func match {
         case f: UserFunction =>
           import f.signature.args
-          Coeval.evalOnce(ScriptEstimator(costs, f.ev(args.map(_ => TRUE).toList)).right.get - args.size)
+          Coeval.evalOnce(ScriptEstimator(ctx.letDefs.keySet ++ args.map(_._1), costs, f.ev).explicitGet() + args.size * 5)
         case f: NativeFunction => Coeval.now(f.cost)
       }
       costs += func.header -> cost
@@ -109,13 +142,11 @@ package object utils extends ScorexLogging {
     costs.toMap
   }
 
-  lazy val dummyCompilerContext: CompilerContext =
-    Monoid.combineAll(
-      Seq(
-        CryptoContext.compilerContext(Global),
-        WavesContext.build(new WavesEnvironment(dummyNetworkByte, Coeval(???), Coeval(???), null)).compilerContext,
-        PureContext.compilerContext
-      ))
+  def compilerContext(version: ScriptVersion, isAssetScript: Boolean): CompilerContext =
+    if (isAssetScript) lazyAssetContexts(version)().compilerContext
+    else lazyContexts(version)().compilerContext
+
+  def varNames(version: ScriptVersion): Set[String] = compilerContext(version, isAssetScript = false).varDefs.keySet
 
   @tailrec
   final def untilTimeout[T](timeout: FiniteDuration, delay: FiniteDuration = 100.milliseconds, onFailure: => Unit = {})(fn: => T): T = {

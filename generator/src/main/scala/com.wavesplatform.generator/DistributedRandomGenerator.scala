@@ -3,7 +3,7 @@ package com.wavesplatform.generator
 import scala.collection.immutable.TreeMap
 
 class DistributedRandomGenerator[T](probabilities: Map[T, Double]) {
-  assert(probabilities.values.sum == 1)
+  assert(Math.round(probabilities.values.sum) == 1)
   def getRandom: T = {
     val rand = Math.random
     val g = probabilities

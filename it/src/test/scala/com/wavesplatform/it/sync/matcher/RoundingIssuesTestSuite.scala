@@ -1,63 +1,50 @@
 package com.wavesplatform.it.sync.matcher
 
-import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
-import com.wavesplatform.it.ReportingTestName
+import com.typesafe.config.Config
 import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.IssueTransactionV1
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
-import com.wavesplatform.utils.Base58
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import com.wavesplatform.it.matcher.MatcherSuiteBase
+import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
+import com.wavesplatform.transaction.assets.exchange.OrderType
 
 import scala.concurrent.duration._
-import scala.util.Random
 
-class RoundingIssuesTestSuite
-    extends FreeSpec
-    with Matchers
-    with BeforeAndAfterAll
-    with CancelAfterFailure
-    with NodesFromDocker
-    with ReportingTestName {
-
-  import RoundingIssuesTestSuite._
+class RoundingIssuesTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private def matcherNode = nodes.head
-
-  private def aliceNode = nodes(1)
-
-  private def bobNode = nodes(2)
-
-  Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).foreach(matcherNode.signedIssue)
-  nodes.waitForHeightArise()
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).map(matcherNode.signedIssue).foreach { tx =>
+      matcherNode.waitForTransaction(tx.id)
+    }
+    Seq(
+      aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2),
+      aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(EthId.toString), None, 2),
+      bobNode.transfer(bobNode.address, bobAcc.address, defaultAssetQuantity, 100000, Some(BtcId.toString), None, 2)
+    ).foreach { tx =>
+      matcherNode.waitForTransaction(tx.id)
+    }
+  }
 
   "should correctly fill an order with small amount" in {
-    val aliceBalanceBefore = matcherNode.accountBalances(aliceNode.address)._1
-    val bobBalanceBefore   = matcherNode.accountBalances(bobNode.address)._1
+    val aliceBalanceBefore = matcherNode.accountBalances(aliceAcc.address)._1
+    val bobBalanceBefore   = matcherNode.accountBalances(bobAcc.address)._1
 
-    val counter   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 238, 3100000000L)
+    val counter   = matcherNode.prepareOrder(aliceAcc, wavesUsdPair, OrderType.BUY, 3100000000L, 238)
     val counterId = matcherNode.placeOrder(counter).message.id
 
-    val submitted   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 235, 425532L)
+    val submitted   = matcherNode.prepareOrder(bobAcc, wavesUsdPair, OrderType.SELL, 425532L, 235)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
     val filledAmount = 420169L
     matcherNode.waitOrderStatusAndAmount(wavesUsdPair, submittedId, "Filled", Some(filledAmount), 1.minute)
     matcherNode.waitOrderStatusAndAmount(wavesUsdPair, counterId, "PartiallyFilled", Some(filledAmount), 1.minute)
 
-    matcherNode.cancelOrder(aliceNode, wavesUsdPair, Some(counterId))
-    val tx = matcherNode.transactionsByOrder(counterId).head
-
-    matcherNode.waitForTransaction(tx.id)
+    val tx = matcherNode.waitOrderInBlockchain(counterId).head
+    matcherNode.cancelOrder(aliceAcc, wavesUsdPair, counterId)
     val rawExchangeTx = matcherNode.rawTransactionInfo(tx.id)
 
     (rawExchangeTx \ "price").as[Long] shouldBe counter.price
@@ -65,42 +52,40 @@ class RoundingIssuesTestSuite
     (rawExchangeTx \ "buyMatcherFee").as[Long] shouldBe 40L
     (rawExchangeTx \ "sellMatcherFee").as[Long] shouldBe 296219L
 
-    val aliceBalanceAfter = matcherNode.accountBalances(aliceNode.address)._1
-    val bobBalanceAfter   = matcherNode.accountBalances(bobNode.address)._1
+    val aliceBalanceAfter = matcherNode.accountBalances(aliceAcc.address)._1
+    val bobBalanceAfter   = matcherNode.accountBalances(bobAcc.address)._1
 
     (aliceBalanceAfter - aliceBalanceBefore) shouldBe (-40L + 420169L)
     (bobBalanceAfter - bobBalanceBefore) shouldBe (-296219L - 420169L)
   }
 
   "reserved balance should not be negative" in {
-    val counter   = matcherNode.prepareOrder(aliceNode, ethBtcPair, OrderType.BUY, 31887L, 923431000L)
+    val counter   = matcherNode.prepareOrder(bobAcc, ethBtcPair, OrderType.BUY, 923431000L, 31887L)
     val counterId = matcherNode.placeOrder(counter).message.id
 
-    val submitted   = matcherNode.prepareOrder(bobNode, ethBtcPair, OrderType.SELL, 31887L, 223345000L)
+    val submitted   = matcherNode.prepareOrder(aliceAcc, ethBtcPair, OrderType.SELL, 223345000L, 31887L)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
     val filledAmount = 223344937L
     matcherNode.waitOrderStatusAndAmount(ethBtcPair, submittedId, "Filled", Some(filledAmount), 1.minute)
     matcherNode.waitOrderStatusAndAmount(ethBtcPair, counterId, "PartiallyFilled", Some(filledAmount), 1.minute)
 
-    withClue("Bob's reserved balance before cancel")(matcherNode.reservedBalance(bobNode) shouldBe empty)
+    withClue("Alice's reserved balance before cancel")(matcherNode.reservedBalance(aliceAcc) shouldBe empty)
 
-    matcherNode.cancelOrder(aliceNode, ethBtcPair, Some(counterId))
-    val tx = matcherNode.transactionsByOrder(counterId).head
+    matcherNode.waitOrderInBlockchain(counterId)
+    matcherNode.cancelOrder(bobAcc, ethBtcPair, counterId)
 
-    matcherNode.waitForTransaction(tx.id)
-
-    withClue("Alice's reserved balance after cancel")(matcherNode.reservedBalance(aliceNode) shouldBe empty)
+    withClue("Bob's reserved balance after cancel")(matcherNode.reservedBalance(bobAcc) shouldBe empty)
   }
 
   "should correctly fill 2 counter orders" in {
-    val counter1 = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 60L, 98333333L)
+    val counter1 = matcherNode.prepareOrder(bobAcc, wavesUsdPair, OrderType.SELL, 98333333L, 60L)
     matcherNode.placeOrder(counter1).message.id
 
-    val counter2   = matcherNode.prepareOrder(bobNode, wavesUsdPair, OrderType.SELL, 70L, 100000000L)
+    val counter2   = matcherNode.prepareOrder(bobAcc, wavesUsdPair, OrderType.SELL, 100000000L, 70L)
     val counter2Id = matcherNode.placeOrder(counter2).message.id
 
-    val submitted   = matcherNode.prepareOrder(aliceNode, wavesUsdPair, OrderType.BUY, 1000L, 100000000L)
+    val submitted   = matcherNode.prepareOrder(aliceAcc, wavesUsdPair, OrderType.BUY, 100000000L, 1000L)
     val submittedId = matcherNode.placeOrder(submitted).message.id
 
     matcherNode.waitOrderStatusAndAmount(wavesUsdPair, counter2Id, "PartiallyFilled", Some(2857143L), 1.minute)
@@ -109,119 +94,8 @@ class RoundingIssuesTestSuite
     withClue("orderBook check") {
       val ob = matcherNode.orderBook(wavesUsdPair)
       ob.bids shouldBe empty
-      ob.asks shouldBe List(LevelResponse(70L, 97142857L)) // = 100000000 - 2857143
+      ob.asks shouldBe List(LevelResponse(97142857L, 70L)) // = 100000000 - 2857143
     }
   }
 
-}
-
-object RoundingIssuesTestSuite {
-
-  import ConfigFactory._
-  import com.wavesplatform.it.NodeConfigs._
-
-  private val ForbiddenAssetId = "FdbnAsset"
-  private val Decimals: Byte   = 2
-
-  private val minerDisabled = parseString("waves.miner.enable = no")
-  private val matcherConfig = parseString(s"""
-                                             |waves.matcher {
-                                             |  enable = yes
-                                             |  account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
-                                             |  bind-address = "0.0.0.0"
-                                             |  order-match-tx-fee = 300000
-                                             |  blacklisted-assets = ["$ForbiddenAssetId"]
-                                             |  balance-watching.enable = yes
-                                             |}""".stripMargin)
-
-  private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(3))
-    .zip(Seq(matcherConfig, minerDisabled, minerDisabled, empty()))
-    .map { case (n, o) => o.withFallback(n) }
-
-  private val aliceSeed = _Configs(1).getString("account-seed")
-  private val alicePk   = PrivateKeyAccount.fromSeed(aliceSeed).right.get
-
-  private val bobSeed = _Configs(2).getString("account-seed")
-  private val bobPk   = PrivateKeyAccount.fromSeed(bobSeed).right.get
-
-  val IssueUsdTx: IssueTransactionV1 = IssueTransactionV1
-    .selfSigned(
-      sender = alicePk,
-      name = "USD-X".getBytes(),
-      description = "asset description".getBytes(),
-      quantity = defaultAssetQuantity,
-      decimals = Decimals,
-      reissuable = false,
-      fee = 1.waves,
-      timestamp = System.currentTimeMillis()
-    )
-    .right
-    .get
-
-  val UsdId: AssetId = IssueUsdTx.id()
-
-  val IssueEthTx: IssueTransactionV1 = IssueTransactionV1
-    .selfSigned(
-      sender = bobPk,
-      name = "ETH-X".getBytes(),
-      description = "asset description".getBytes(),
-      quantity = defaultAssetQuantity,
-      decimals = 8,
-      reissuable = false,
-      fee = 1.waves,
-      timestamp = System.currentTimeMillis()
-    )
-    .right
-    .get
-
-  val EthId: AssetId = IssueEthTx.id()
-
-  val IssueBtcTx: IssueTransactionV1 = IssueTransactionV1
-    .selfSigned(
-      sender = alicePk,
-      name = "BTC-X".getBytes(),
-      description = "asset description".getBytes(),
-      quantity = defaultAssetQuantity,
-      decimals = 8,
-      reissuable = false,
-      fee = 1.waves,
-      timestamp = System.currentTimeMillis()
-    )
-    .right
-    .get
-
-  val BtcId: AssetId = IssueBtcTx.id()
-
-  val wavesUsdPair = AssetPair(
-    amountAsset = None,
-    priceAsset = Some(UsdId)
-  )
-
-  val ethBtcPair = AssetPair(
-    amountAsset = Some(EthId),
-    priceAsset = Some(BtcId)
-  )
-
-  private val updatedMatcherConfig = parseString(s"""
-                                                    |waves.matcher {
-                                                    |  price-assets = ["$UsdId", "$BtcId", "WAVES"]
-                                                    |}
-     """.stripMargin)
-
-  private val Configs = _Configs.map(updatedMatcherConfig.withFallback(_))
-
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
-    import tx._
-    SignedIssueV1Request(
-      Base58.encode(tx.sender.publicKey),
-      new String(name),
-      new String(description),
-      quantity,
-      decimals,
-      reissuable,
-      fee,
-      timestamp,
-      signature.base58
-    )
-  }
 }

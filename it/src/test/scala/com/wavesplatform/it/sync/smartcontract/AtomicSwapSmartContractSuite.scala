@@ -7,14 +7,11 @@ import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.v1.compiler.CompilerV1
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.dummyCompilerContext
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
 
@@ -55,14 +52,13 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val toAliceBC1TxId = sender.transfer(sender.address, AliceBC1, 10 * transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(toAliceBC1TxId)
 
-    val toSwapBC1TxId = sender.transfer(sender.address, swapBC1, minFee, minFee).id
+    val toSwapBC1TxId = sender.transfer(sender.address, swapBC1, setScriptFee, minFee).id
     nodes.waitForHeightAriseAndTxPresent(toSwapBC1TxId)
   }
 
   test("step2: Create and setup smart contract for swapBC1") {
     val beforeHeight = sender.height
-    val sc1 = {
-      val untyped = Parser(s"""
+    val scriptText   = s"""
     let Bob = Address(base58'$BobBC1')
     let Alice = Address(base58'$AliceBC1')
 
@@ -73,17 +69,15 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
         txToBob || backToAliceAfterHeight
       case other => false
-    }""".stripMargin).get.value
-      CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
-    }
+    }""".stripMargin
 
     val pkSwapBC1 = pkByAddress(swapBC1)
-    val script    = ScriptV1(sc1).explicitGet()
+    val script    = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
     val sc1SetTx = SetScriptTransaction
       .selfSigned(version = SetScriptTransaction.supportedVersions.head,
                   sender = pkSwapBC1,
                   script = Some(script),
-                  fee = minFee,
+                  fee = setScriptFee,
                   timestamp = System.currentTimeMillis())
       .explicitGet()
 
@@ -107,10 +101,10 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           assetId = None,
           sender = pkByAddress(AliceBC1),
           recipient = AddressOrAlias.fromString(swapBC1).explicitGet(),
-          amount = transferAmount + minFee + smartFee,
+          amount = transferAmount + setScriptFee + smartFee,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = minFee + smartFee,
+          feeAmount = setScriptFee + smartFee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -132,7 +126,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = minFee + smartFee,
+          feeAmount = setScriptFee + smartFee,
           attachment = Array.emptyByteArray
         )
         .explicitGet()
@@ -157,7 +151,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
-          feeAmount = minFee + smartFee,
+          feeAmount = setScriptFee + smartFee,
           attachment = Array.emptyByteArray,
           proofs = Proofs.empty
         )
@@ -171,7 +165,9 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val versionedTransferId = sender.signedBroadcast(signed.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))).id
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
 
-    notMiner.assertBalances(swapBC1, swapBalance - transferAmount - (minFee + smartFee), swapEffBalance - transferAmount - (minFee + smartFee))
+    notMiner.assertBalances(swapBC1,
+                            swapBalance - transferAmount - (setScriptFee + smartFee),
+                            swapEffBalance - transferAmount - (setScriptFee + smartFee))
     notMiner.assertBalances(BobBC1, bobBalance + transferAmount, bobEffBalance + transferAmount)
     notMiner.assertBalances(AliceBC1, aliceBalance, aliceEffBalance)
 
@@ -191,7 +187,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         amount = transferAmount,
         timestamp = System.currentTimeMillis(),
         feeAssetId = None,
-        feeAmount = minFee + smartFee,
+        feeAmount = setScriptFee + smartFee,
         attachment = Array.emptyByteArray
       )
       .explicitGet()
@@ -200,7 +196,9 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       sender.signedBroadcast(selfSignedToAlice.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))).id
     nodes.waitForHeightAriseAndTxPresent(transferToAlice)
 
-    notMiner.assertBalances(swapBC1, swapBalance - transferAmount - (minFee + smartFee), swapEffBalance - transferAmount - (minFee + smartFee))
+    notMiner.assertBalances(swapBC1,
+                            swapBalance - transferAmount - (setScriptFee + smartFee),
+                            swapEffBalance - transferAmount - (setScriptFee + smartFee))
     notMiner.assertBalances(BobBC1, bobBalance, bobEffBalance)
     notMiner.assertBalances(AliceBC1, aliceBalance + transferAmount, aliceEffBalance + transferAmount)
   }

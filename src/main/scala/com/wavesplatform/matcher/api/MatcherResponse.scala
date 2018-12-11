@@ -1,31 +1,52 @@
 package com.wavesplatform.matcher.api
 
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.http.scaladsl.marshalling.ToResponseMarshaller
+import akka.http.scaladsl.model.{StatusCodes => C, _}
+import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.assets.exchange.Order
 import play.api.libs.json.{JsNull, JsValue, Json}
 
-trait MatcherResponse {
-  def json: JsValue
-  def code: StatusCode
+abstract class MatcherResponse(val statusCode: StatusCode, val json: JsValue) {
+  def this(code: StatusCode, message: String) =
+    this(code,
+         Json.obj(
+           "success" -> (code == C.OK),
+           "message" -> message,
+           "result"  -> JsNull // For backward compatibility
+         ))
 }
 
-trait GenericMatcherResponse extends MatcherResponse {
-  def success: Boolean
-  def message: String
+object MatcherResponse {
+  import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
+  import com.wavesplatform.http.ApiMarshallers._
+  implicit val trm: ToResponseMarshaller[MatcherResponse] =
+    fromStatusCodeAndValue[StatusCode, JsValue].compose(mr => mr.statusCode -> mr.json)
 
-  def result: JsValue = JsNull
+  implicit def tuple2MatcherResponse(v: (StatusCode, String)): MatcherResponse = MatcherResponse(v._1, v._2)
 
-  def json: JsValue = Json.obj(
-    "success" -> success,
-    "message" -> message,
-    "result"  -> result
-  )
-  def code: StatusCode = if (success) StatusCodes.OK else StatusCodes.BadRequest
+  def apply(code: StatusCode, message: String): MatcherResponse = SimpleResponse(code, message)
 }
 
-case class StatusCodeMatcherResponse(override val code: StatusCode, message: String) extends GenericMatcherResponse {
-  override def success: Boolean = code == StatusCodes.OK
-}
+case class SimpleResponse(code: StatusCode, message: String) extends MatcherResponse(code, message)
 
-case class BadMatcherResponse(override val code: StatusCode, message: String) extends GenericMatcherResponse {
-  override def success: Boolean = code == StatusCodes.OK
-}
+case class NotImplemented(message: String) extends MatcherResponse(C.NotImplemented, message)
+
+case object InvalidSignature extends MatcherResponse(C.BadRequest, "Invalid signature")
+
+case object OperationTimedOut
+    extends MatcherResponse(C.InternalServerError, Json.obj("status" -> "OperationTimedOut", "message" -> "Operation is timed out, please try later"))
+
+case class OrderAccepted(order: Order) extends MatcherResponse(C.OK, Json.obj("status" -> "OrderAccepted", "message" -> order.json()))
+
+case class OrderRejected(message: String) extends MatcherResponse(C.BadRequest, Json.obj("status" -> "OrderRejected", "message" -> message))
+
+case class OrderCanceled(orderId: ByteStr) extends MatcherResponse(C.OK, Json.obj("status" -> "OrderCanceled", "orderId" -> orderId))
+
+case class OrderDeleted(orderId: ByteStr) extends MatcherResponse(C.OK, Json.obj("status" -> "OrderDeleted", "orderId" -> orderId))
+
+case class OrderCancelRejected(message: String)
+    extends MatcherResponse(C.BadRequest, Json.obj("status" -> "OrderCancelRejected", "message" -> message))
+
+case object OrderBookUnavailable extends MatcherResponse(C.ServiceUnavailable, "Order book is unavailable. Please contact the administrator")
+
+case object DuringShutdown extends MatcherResponse(C.ServiceUnavailable, "System is going shutdown")

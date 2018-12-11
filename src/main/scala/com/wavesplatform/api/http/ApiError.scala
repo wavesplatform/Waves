@@ -5,6 +5,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
+import com.wavesplatform.lang.ExprEvaluator.Log
 import com.wavesplatform.transaction.{Transaction, ValidationError}
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -251,46 +252,32 @@ case class ScriptCompilerError(errorMessage: String) extends ApiError {
   override val message: String  = errorMessage
 }
 
-case class ScriptExecutionError(tx: Transaction, error: String, scriptSrc: String, vars: Map[String, LazyVal], isTokenScript: Boolean)
-    extends ApiError {
-  override val id: Int          = 306
-  override val code: StatusCode = StatusCodes.BadRequest
-  override val message: String  = s"Error while executing ${if (isTokenScript) "token" else "account"}-script: $error"
-  override lazy val json: JsObject = {
-    val (calculated, notCalculated) = vars.partition(_._2.evaluated.read())
-    Json.obj(
-      "error"       -> id,
-      "message"     -> message,
-      "transaction" -> tx.json(),
-      "script"      -> scriptSrc,
-      "vars" -> Json.obj(
-        "used" -> Json.arr(
-          calculated.map({ case (k, v) => Json.obj(k -> Json.toJson(v)(ApiError.lvWrites)) })
-        ),
-        "notused" -> Json.arr(notCalculated.keys)
-      )
-    )
-  }
+case class ScriptExecutionError(tx: Transaction, error: String, scriptSrc: String, log: Log, isTokenScript: Boolean) extends ApiError {
+  override val id: Int             = 306
+  override val code: StatusCode    = StatusCodes.BadRequest
+  override val message: String     = s"Error while executing ${if (isTokenScript) "token" else "account"}-script: $error"
+  override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
+
 }
 
-case class TransactionNotAllowedByScript(tx: Transaction, vars: Map[String, LazyVal], scriptSrc: String, isTokenScript: Boolean) extends ApiError {
+case class TransactionNotAllowedByScript(tx: Transaction, log: Log, scriptSrc: String, isTokenScript: Boolean) extends ApiError {
 
-  override val id: Int          = 307
-  override val code: StatusCode = StatusCodes.BadRequest
-  override val message: String  = s"Transaction not allowed by ${if (isTokenScript) "token" else "account"}-script"
-  override lazy val json: JsObject = {
-    val (calculated, notCalculated) = vars.partition(_._2.evaluated.read())
+  override val id: Int             = 307
+  override val code: StatusCode    = StatusCodes.BadRequest
+  override val message: String     = s"Transaction is not allowed by ${if (isTokenScript) "token" else "account"}-script"
+  override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
+}
+
+object ScriptErrorJson {
+  def apply(errId: Int, tx: Transaction, message: String, scriptSrc: String, log: Log): JsObject =
     Json.obj(
-      "error"       -> id,
+      "error"       -> errId,
       "message"     -> message,
       "transaction" -> tx.json(),
       "script"      -> scriptSrc,
-      "vars" -> Json.obj(
-        "used" -> Json.arr(
-          calculated.map({ case (k, v) => Json.obj(k -> Json.toJson(v)(ApiError.lvWrites)) })
-        ),
-        "notused" -> Json.arr(notCalculated.keys)
-      )
+      "vars" -> Json.arr(log.map {
+        case (k, Right(v))  => Json.obj("name" -> k, "value" -> JsString(v.toString))
+        case (k, Left(err)) => Json.obj("name" -> k, "error" -> JsString(err))
+      })
     )
-  }
 }

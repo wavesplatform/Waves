@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.RequestGen
-import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.utx.UtxPool

@@ -1,14 +1,13 @@
 package com.wavesplatform.state
 
 import cats.Monoid
-import com.wavesplatform.db.WithState
-import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.FunctionalitySettings
-import org.scalatest.Matchers
 import com.wavesplatform.block.Block
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.mining.MiningConstraint
+import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings => TFS}
 import com.wavesplatform.transaction.{Transaction, ValidationError}
-import com.wavesplatform.settings.{TestFunctionalitySettings => TFS}
+import org.scalatest.Matchers
 
 package object diffs extends WithState with Matchers {
   val ENOUGH_AMT: Long = Long.MaxValue / 3

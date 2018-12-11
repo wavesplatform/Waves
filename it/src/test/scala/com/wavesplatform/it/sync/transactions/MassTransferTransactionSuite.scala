@@ -22,7 +22,6 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   private def fakeSignature = Base58.encode(Array.fill(64)(Random.nextInt.toByte))
 
   test("asset mass transfer changes asset balances and sender's.waves balance is decreased by fee.") {
-
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
 
@@ -41,7 +40,6 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("waves mass transfer changes waves balances") {
-
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     val (balance3, eff3) = notMiner.accountBalances(thirdAddress)

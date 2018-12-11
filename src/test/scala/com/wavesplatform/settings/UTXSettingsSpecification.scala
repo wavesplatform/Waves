@@ -16,6 +16,7 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
         |    cleanup-interval = 10m
         |    blacklist-sender-addresses = ["a"]
         |    allow-blacklisted-transfer-to = ["b"]
+        |    allow-transactions-from-smart-accounts = false
         |  }
         |}""".stripMargin).resolve()
     val settings = config.as[UtxSettings]("waves.utx")
@@ -24,5 +25,6 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
     settings.cleanupInterval shouldBe 10.minutes
     settings.blacklistSenderAddresses shouldBe Set("a")
     settings.allowBlacklistedTransferTo shouldBe Set("b")
+    settings.allowTransactionsFromSmartAccounts shouldBe false
   }
 }

@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction
 
 import com.google.common.base.Throwables
-import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.lang.ExprEvaluator.Log
+import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.Order
 
 import scala.util.Either
@@ -47,9 +47,13 @@ object ValidationError {
     override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
   }
 
-  case class ScriptExecutionError(error: String, scriptSrc: String, letDefs: Map[String, LazyVal], isTokenScript: Boolean) extends ValidationError
+  trait HasScriptType extends ValidationError {
+    def isTokenScript: Boolean
+  }
 
-  case class TransactionNotAllowedByScript(letDefs: Map[String, LazyVal], scriptSrc: String, isTokenScript: Boolean) extends ValidationError
+  case class ScriptExecutionError(error: String, scriptSrc: String, log: Log, isTokenScript: Boolean) extends ValidationError with HasScriptType
+
+  case class TransactionNotAllowedByScript(log: Log, scriptSrc: String, isTokenScript: Boolean) extends ValidationError with HasScriptType
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"

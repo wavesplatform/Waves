@@ -1,6 +1,9 @@
 package com.wavesplatform.database
+import java.util
 
 trait Key[V] {
+  def name: String
+
   def keyBytes: Array[Byte]
 
   def parse(bytes: Array[Byte]): V
@@ -8,10 +11,19 @@ trait Key[V] {
   def encode(v: V): Array[Byte]
 
   override lazy val toString: String = BigInt(keyBytes).toString(16)
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case that: Key[V] => that.keyBytes.sameElements(keyBytes)
+    case _            => false
+  }
+
+  override def hashCode(): Int = util.Arrays.hashCode(keyBytes)
 }
 
 object Key {
-  def apply[V](key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
+  def apply[V](keyName: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
+    override def name: String = keyName
+
     override def keyBytes: Array[Byte] = key
 
     override def parse(bytes: Array[Byte]) = parser(bytes)
@@ -19,6 +31,6 @@ object Key {
     override def encode(v: V) = encoder(v)
   }
 
-  def opt[V](key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
-    apply[Option[V]](key, Option(_).map(parser), _.fold[Array[Byte]](null)(encoder))
+  def opt[V](name: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
+    apply[Option[V]](name, key, Option(_).map(parser), _.fold[Array[Byte]](null)(encoder))
 }

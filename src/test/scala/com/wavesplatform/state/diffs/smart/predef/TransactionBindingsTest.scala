@@ -1,18 +1,36 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.state._
-import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
-import org.scalatest.prop.PropertyChecks
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.ScriptVersion.Versions.V2
+import com.wavesplatform.lang.Testing.evaluated
+import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, EVALUATED}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.ProduceError._
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import com.wavesplatform.transaction.smart.BlockchainContext.In
+import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
-import com.wavesplatform.transaction.assets.exchange.Order
-import play.api.libs.json.Json // For string escapes.
+import com.wavesplatform.utils.EmptyBlockchain
+import com.wavesplatform.{NoShrink, TransactionGen}
+import fastparse.core.Parsed.Success
+import monix.eval.Coeval
+import org.scalacheck.Gen
+import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
+import play.api.libs.json.Json
+import shapeless.Coproduct
 
 class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+  val T = 'T'.toByte
+
   def letProof(p: Proofs, prefix: String)(i: Int) =
-    s"let ${prefix.replace(".", "")}proof$i = ${prefix}.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).base58}'"
+    s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).base58}'"
 
   def provenPart(t: ProvenTransaction): String = {
     val version = t match {
@@ -31,7 +49,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
      """.stripMargin
   }
 
-  def assertProofs(p: String) = {
+  def assertProofs(p: String): String = {
     val prefix = p.replace(".", "")
     s"${prefix}proof0 && ${prefix}proof1 && ${prefix}proof2 && ${prefix}proof3 && ${prefix}proof4 && ${prefix}proof5 && ${prefix}proof6 && ${prefix}proof7"
   }
@@ -41,8 +59,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   property("TransferTransaction binding") {
     forAll(Gen.oneOf(transferV1Gen, transferV2Gen)) { t =>
       // `version`  is not properly bound yet
-
-      val result = runScript[Boolean](
+      val result = runScript(
         s"""
            |match tx {
            | case t : TransferTransaction  =>
@@ -63,10 +80,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case other => throw()
            | }
            |""".stripMargin,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -89,18 +106,18 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  | }
                  |""".stripMargin
 
-      val result = runScript[Boolean](
+      val result = runScript(
         s,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
   property("BurnTransaction binding") {
     forAll(burnGen) { t =>
-      val result = runScript[Boolean](
+      val result = runScript(
         s"""
           |match tx {
           | case t : BurnTransaction =>
@@ -111,16 +128,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
   property("ReissueTransaction binding") {
     forAll(reissueGen) { t =>
-      val result = runScript[Boolean](
+      val result = runScript(
         s"""
           |match tx {
           | case t : ReissueTransaction =>
@@ -132,16 +149,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
   property("CreateAliasTransaction binding") {
     forAll(createAliasGen) { t =>
-      val result = runScript[Boolean](
+      val result = runScript(
         s"""
           |match tx {
           | case t : CreateAliasTransaction =>
@@ -151,16 +168,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
   property("LeaseTransaction binding") {
     forAll(leaseGen) { t =>
-      val result = runScript[Boolean](
+      val result = runScript(
         s"""
           |match tx {
           | case t : LeaseTransaction =>
@@ -174,16 +191,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
   property("LeaseCancelTransaction binding") {
     forAll(leaseCancelGen) { t =>
-      val result = runScript[Boolean](
+      val result = runScript(
         s"""
           |match tx {
           | case t : LeaseCancelTransaction =>
@@ -193,16 +210,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
   property("SponsorFeeTransaction binding (+ cancel sponsorship transaction)") {
     forAll(Gen.oneOf(sponsorFeeGen, cancelFeeSponsorshipGen)) { t =>
-      val result = runScript[Boolean](
+      val result = runScript(
         s"""
           |match tx {
           | case t : SponsorFeeTransaction =>
@@ -214,16 +231,16 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           | case other => throw()
           | }
           |""".stripMargin,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
   property("SetScriptTransaction binding") {
     forAll(setScriptTransactionGen) { t =>
-      val result = runScript[Boolean](
+      val result = runScript(
         s"""
            |match tx {
            | case t : SetScriptTransaction =>
@@ -235,15 +252,37 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case other => throw()
            | }
            |""".stripMargin,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
+    }
+  }
+
+  property("SetAssetScriptTransaction binding") {
+    forAll(setAssetScriptTransactionGen.sample.get._2) { t =>
+      val result = runScript(
+        s"""
+           |match tx {
+           | case t : SetAssetScriptTransaction =>
+           |   ${provenPart(t)}
+           |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
+             .map(_.bytes().base64)
+             .getOrElse("")}' else isDefined(t.script) == false
+           |    let assetId = t.assetId == base58'${t.assetId.base58}'
+           |   ${assertProvenPart("t")} && script && assetId
+           | case other => throw() 
+           | }
+           |""".stripMargin,
+        Coproduct(t),
+        T
+      )
+      result shouldBe evaluated(true)
     }
   }
 
   property("DataTransaction binding") {
-    forAll(dataTransactionGen(10)) { t =>
+    forAll(dataTransactionGen(10, useForScript = true)) { t =>
       def pg(i: Int) = {
         val v = t.data(i) match {
           case e: IntegerDataEntry => e.value.toString
@@ -264,18 +303,18 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |match tx {
                  | case t : DataTransaction =>
                  |   ${provenPart(t)}
-                 |   ${Range(0, t.data.length).map(pg).mkString("\n")}
+                 |   ${t.data.indices.map(pg).mkString("\n")}
                  |   $resString
                  | case other => throw()
                  | }
                  |""".stripMargin
 
-      val result = runScript[Boolean](
+      val result = runScript(
         s,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -293,7 +332,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         if (t.transfers.isEmpty) assertProvenPart("t")
         else
           assertProvenPart("t") + s" &&" + {
-            Range(0, t.transfers.length)
+            t.transfers.indices
               .map(i => s"recipient$i && amount$i")
               .mkString(" && ")
           }
@@ -308,19 +347,19 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
                       |     let attachment = t.attachment == base58'${ByteStr(t.attachment).base58}'
-                      |     ${Range(0, t.transfers.length).map(pg).mkString("\n")}
+                      |     ${t.transfers.indices.map(pg).mkString("\n")}
                       |   ${provenPart(t)}
                       |   $resString && assetId && transferCount && totalAmount && attachment
                       | case other => throw()
                       | }
                       |""".stripMargin
 
-      val result = runScript[Boolean](
+      val result = runScript(
         script,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
@@ -329,7 +368,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       def pg(ord: Order) = {
         val oType = ord.orderType.toString
         val script = s"""
-           |   let ${oType}Id = t.${oType}Order.id == base58'${ord.id.value}'
+           |   let ${oType}Id = t.${oType}Order.id == base58'${ord.idStr()}'
            |   let ${oType}Sender = t.${oType}Order.sender == addressFromPublicKey(base58'${ByteStr(ord.sender.publicKey).base58}')
            |   let ${oType}SenderPk = t.${oType}Order.senderPublicKey == base58'${ByteStr(ord.sender.publicKey).base58}'
            |   let ${oType}MatcherPk = t.${oType}Order.matcherPublicKey == base58'${ByteStr(ord.matcherPublicKey.publicKey).base58}'
@@ -349,7 +388,6 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                           .getOrElse(ByteStr.empty)
                           .base58}'
            |   else isDefined(t.${oType}Order.assetPair.priceAsset) == false
-           |   # let ${oType}OrderType = t.${oType}Order.orderType ==
          """.stripMargin
 
         val lets = List(
@@ -366,7 +404,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           "AssetPairAmount",
           "AssetPairPrice",
           "Proofs"
-        ).map(i => s"${oType}$i")
+        ).map(i => s"$oType$i")
           .mkString(" && ")
 
         (script, lets)
@@ -386,13 +424,147 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                 | }
                 |""".stripMargin
 
-      val result = runScript[Boolean](
+      val result = runScript(
         s,
-        t,
-        'T'
+        Coproduct(t),
+        T
       )
-      result shouldBe Right(true)
+      result shouldBe evaluated(true)
     }
   }
 
+  property("Order binding") {
+    forAll(orderGen) { t =>
+      val s = s"""
+                 |match tx {
+                 | case t : Order =>
+                 |   let id = t.id == base58'${t.id()}'
+                 |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
+                 |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
+                 |   let matcherPublicKey = t.matcherPublicKey == base58'${ByteStr(t.matcherPublicKey.publicKey).base58}'
+                 |   let timestamp = t.timestamp == ${t.timestamp}
+                 |   let price = t.price == ${t.price}
+                 |   let amount = t.amount == ${t.amount}
+                 |   let expiration = t.expiration == ${t.expiration}
+                 |   let matcherFee = t.matcherFee == ${t.matcherFee}
+                 |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
+                 |   ${Range(0, 8).map(letProof(t.proofs, "t")).mkString("\n")}
+                 |  let assetPairAmount = if (${t.assetPair.amountAsset.isDefined}) then extract(t.assetPair.amountAsset) == base58'${t.assetPair.amountAsset
+                   .getOrElse(ByteStr.empty)
+                   .base58}'
+                 |   else isDefined(t.assetPair.amountAsset) == false
+                 |   let assetPairPrice = if (${t.assetPair.priceAsset.isDefined}) then extract(t.assetPair.priceAsset) == base58'${t.assetPair.priceAsset
+                   .getOrElse(ByteStr.empty)
+                   .base58}'
+                 |   else isDefined(t.assetPair.priceAsset) == false
+                 | id && sender && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee && bodyBytes && ${assertProofs(
+                   "t")} && assetPairAmount && assetPairPrice
+                 | case other => throw()
+                 | }
+                 |""".stripMargin
+
+      val result = runScript(
+        s,
+        Coproduct[In](t),
+        T
+      )
+      result shouldBe evaluated(true)
+    }
+  }
+
+  property("Order type bindings") {
+    forAll(orderGen) { ord =>
+      val src =
+        s"""
+           |match tx {
+           |  case o: Order =>
+           |    let orderType = o.orderType
+           |    orderType == ${if (ord.orderType == OrderType.BUY) "Buy" else "Sell"}
+           |  case _ => throw()
+           |}
+       """.stripMargin
+
+      runScript(src, Coproduct[In](ord), T) shouldBe an[Left[_, _]]
+      runWithSmartTradingActivated(src, Coproduct[In](ord), 'T') shouldBe evaluated(true)
+    }
+  }
+
+  property("Bindings w/wo proofs/order") {
+    val assetSupportedTxTypeGen: Gen[String] = Gen.oneOf(
+      List(
+        "TransferTransaction",
+        "ReissueTransaction",
+        "BurnTransaction",
+        "SetAssetScriptTransaction"
+      )
+    )
+
+    forAll(assetSupportedTxTypeGen, orderGen) { (txType, in) =>
+      val src1 =
+        s"""
+          |let expectedProof = base58'satoshi'
+          |match tx {
+          |  case t: $txType => t.proofs[1] == expectedProof
+          |  case _ => true
+          |}
+        """.stripMargin
+
+      val src2 =
+        s"""
+           |match tx {
+           |  case o: Order => 1
+           |  case t: $txType => 2
+           |  case _ => 3
+           |}
+         """.stripMargin
+
+      val noProofsError = s"Compilation failed: Undefined field `proofs` of variable of type `Union(List($txType))`"
+
+      runForAsset(src1) should produce(noProofsError)
+
+      runForAsset(src2) shouldBe 'left
+
+      runScript[EVALUATED](src1, Coproduct[In](in)) shouldBe Right(CONST_BOOLEAN(true))
+      runScript[EVALUATED](src2, Coproduct[In](in)) shouldBe Right(CONST_LONG(1))
+    }
+  }
+
+  def runForAsset(script: String): Either[String, EVALUATED] = {
+    import cats.syntax.monoid._
+    import com.wavesplatform.lang.v1.CTX._
+
+    val Success(expr, _) = Parser(script)
+    val ctx =
+      PureContext
+        .build(V2) |+|
+        CryptoContext
+          .build(Global) |+|
+        WavesContext
+          .build(V2, new WavesEnvironment(networkByte, Coeval(null), null, EmptyBlockchain), isTokenContext = true)
+
+    for {
+      compileResult <- CompilerV1(ctx.compilerContext, expr)
+      (typedExpr, _) = compileResult
+      r <- EvaluatorV1[EVALUATED](ctx.evaluationContext, typedExpr)
+    } yield r
+  }
+
+  def runWithSmartTradingActivated(script: String, t: In = null, networkByte: Byte = networkByte): Either[String, EVALUATED] = {
+    import cats.syntax.monoid._
+    import com.wavesplatform.lang.v1.CTX._
+
+    val Success(expr, _) = Parser(script)
+    val ctx =
+      PureContext.build(V2) |+|
+        CryptoContext
+          .build(Global) |+|
+        WavesContext
+          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, EmptyBlockchain), isTokenContext = false)
+
+    for {
+      compileResult <- CompilerV1(ctx.compilerContext, expr)
+      (typedExpr, _) = compileResult
+      r <- EvaluatorV1[EVALUATED](ctx.evaluationContext, typedExpr)
+    } yield r
+  }
 }

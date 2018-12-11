@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -9,7 +10,7 @@ import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction}
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.utils.compilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -18,10 +19,10 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
 
   def script(g: GenesisTransaction, p: PaymentTransaction): String =
     s"""
-      | let gen = extract(transactionById(base58'${g.id().base58}'))
-      | let pay = extract(transactionById(base58'${p.id().base58}'))
+      | let genTx = extract(transactionById(base58'${g.id().base58}'))
+      | let payTx = extract(transactionById(base58'${p.id().base58}'))
       |
-      | let genTotal = match gen {
+      | let genTotal = match genTx {
       |   case gen: GenesisTransaction =>
       |     let genId = gen.id == base58'${g.id().base58}'
       |     let genFee = gen.fee == ${g.assetFee._2}
@@ -33,7 +34,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
       |    case _ => false
       |  }
       |
-      | let payTotal = match pay {
+      | let payTotal = match payTx {
       |   case pay: PaymentTransaction =>
       |     let payId = pay.id == base58'${p.id().base58}'
       |     let payFee = pay.fee == ${p.assetFee._2}
@@ -74,7 +75,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT * 3, ts).explicitGet()
     payment                     = PaymentTransaction.create(master, recipient, ENOUGH_AMT * 2, fee, ts).explicitGet()
     untypedScript               = Parser(script(genesis, payment)).get.value
-    typedScript                 = ScriptV1(CompilerV1(dummyCompilerContext, untypedScript).explicitGet()._1).explicitGet()
+    typedScript                 = ScriptV1(CompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction
       .selfSigned(1, recipient, Some(typedScript), 100000000L, ts)
       .explicitGet()
@@ -82,7 +83,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
   } yield (genesis, payment, setScriptTransaction, nextTransfer)
 
   val settings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 100)
-  property("Diff doesn't break invariant before block version 3") {
+  property("Obsolete transaction bindings") {
     forAll(preconditionsAndPayments) {
       case ((genesis, payment, setScriptTransaction, nextTransfer)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, payment, setScriptTransaction))), TestBlock.create(Seq(nextTransfer)), settings) {

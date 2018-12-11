@@ -64,7 +64,7 @@ object DisableHijackedAliases extends ScorexLogging {
     try {
       iterator.seek(prefixBytes)
       while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefixBytes)) {
-        rw.delete(iterator.next().getKey)
+        rw.delete(iterator.next().getKey, "hijacked-aliases")
       }
     } finally {
       iterator.close()

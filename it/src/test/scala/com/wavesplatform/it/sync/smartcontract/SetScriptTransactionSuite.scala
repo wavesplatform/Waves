@@ -2,19 +2,16 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{minFee, transferAmount}
+import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v1.compiler.CompilerV1
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
-import com.wavesplatform.utils.dummyCompilerContext
-import org.scalatest.CancelAfterFailure
-import play.api.libs.json.{JsNumber, Json}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
+import org.scalatest.CancelAfterFailure
+import play.api.libs.json.{JsNumber, Json}
 
 class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val fourthAddress: String = sender.createAddress()
@@ -47,24 +44,22 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   }
 
   test("set acc0 as 2of2 multisig") {
-    val scriptText = {
-      val untyped = Parser(s"""
+    val scriptText = s"""
+        match tx {
+          case t: Transaction => {
+            let A = base58'${ByteStr(acc1.publicKey)}'
+            let B = base58'${ByteStr(acc2.publicKey)}'
+            let AC = sigVerify(tx.bodyBytes,tx.proofs[0],A)
+            let BC = sigVerify(tx.bodyBytes,tx.proofs[1],B)
+            AC && BC
+          }
+          case _ => false
+        }
+      """.stripMargin
 
-        let A = base58'${ByteStr(acc1.publicKey)}'
-        let B = base58'${ByteStr(acc2.publicKey)}'
-
-        let AC = sigVerify(tx.bodyBytes,tx.proofs[0],A)
-        let BC = sigVerify(tx.bodyBytes,tx.proofs[1],B)
-
-         AC && BC
-
-      """.stripMargin).get.value
-      CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
-    }
-
-    val script = ScriptV1(scriptText).explicitGet()
+    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), minFee, System.currentTimeMillis())
+      .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender
@@ -134,7 +129,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         version = SetScriptTransaction.supportedVersions.head,
         sender = acc0,
         script = None,
-        fee = minFee + 0.004.waves,
+        fee = setScriptFee + 0.004.waves,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs.empty
       )

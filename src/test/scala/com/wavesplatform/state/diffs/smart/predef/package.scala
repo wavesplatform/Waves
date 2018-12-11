@@ -1,30 +1,57 @@
 package com.wavesplatform.state.diffs.smart
 
+import com.wavesplatform.lang.ScriptVersion
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{Blockchain, ByteStr}
 import com.wavesplatform.transaction.smart.BlockchainContext
+import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
-import com.wavesplatform.utils.dummyCompilerContext
+import com.wavesplatform.utils.{EmptyBlockchain, compilerContext}
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
+import shapeless.Coproduct
 
 package object predef {
   val networkByte: Byte = 'u'
 
-  def runScript[T](script: String, tx: Transaction = null, networkByte: Byte = networkByte): Either[String, T] = {
+  def runScript[T <: EVALUATED](script: String, version: ScriptVersion, t: In, blockchain: Blockchain, networkByte: Byte): Either[String, T] = {
     val Success(expr, _) = Parser(script)
     for {
-      compileResult <- CompilerV1(dummyCompilerContext, expr)
-      (typedExpr, tpe) = compileResult
-      er               = EvaluatorV1[T](BlockchainContext.build(networkByte, Coeval(tx), Coeval(???), null), typedExpr)
-      r <- er._2
+      compileResult <- CompilerV1(compilerContext(version, isAssetScript = false), expr)
+      (typedExpr, _) = compileResult
+      evalContext = BlockchainContext.build(version,
+                                            networkByte,
+                                            Coeval.evalOnce(t),
+                                            Coeval.evalOnce(blockchain.height),
+                                            blockchain,
+                                            isTokenContext = false)
+      r <- EvaluatorV1[T](evalContext, typedExpr)
     } yield r
   }
 
+  def runScript[T <: EVALUATED](script: String, t: In = null): Either[String, T] =
+    runScript[T](script, V1, t, EmptyBlockchain, networkByte)
+
+  def runScript[T <: EVALUATED](script: String, t: In, networkByte: Byte): Either[String, T] =
+    runScript[T](script, V1, t, EmptyBlockchain, networkByte)
+
+  def runScript[T <: EVALUATED](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] =
+    runScript[T](script, V1, Coproduct(tx), blockchain, networkByte)
+
+  private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
+
   def scriptWithAllFunctions(tx: DataTransaction, t: TransferTransaction): String =
+    s"""${dropLastLine(scriptWithPureFunctions(tx, t))}
+       |${dropLastLine(scriptWithWavesFunctions(tx, t))}
+       |${dropLastLine(scriptWithCryptoFunctions)}
+       |if rnd then pure && waves else crypto""".stripMargin
+
+  def scriptWithPureFunctions(tx: DataTransaction, t: TransferTransaction): String =
     s"""
        | # Pure context
        | # 1) basic(+ eq) -> mulLong, divLong, modLong, sumLong, subLong, sumString, sumByteVector
@@ -33,17 +60,17 @@ package object predef {
        | let longAll = 1000 * 2 == 2000 && 1000 / 2 == 500 && 1000 % 2 == 0 && 1000 + 2 == 1002 && 1000 - 2 == 998
        | let sumString = "ha" + "-" +"ha" == "ha-ha"
        | let sumByteVector = match tx {
-       |     case d: DataTransaction =>
-       |      let body = d.bodyBytes
+       |     case d0: DataTransaction =>
+       |      let body = d0.bodyBytes
        |      body + base64'${ByteStr(tx.bodyBytes.apply()).base64}' == base64'${ByteStr(tx.bodyBytes.apply()).base64}' + base64'${ByteStr(
          tx.bodyBytes.apply()).base64}'
-       |     case d: TransferTransaction => true
+       |     case _: TransferTransaction => true
        |     case _ => false
        |   }
        |
        | let eqUnion = match tx {
-       |   case d: DataTransaction => true
-       |   case d: TransferTransaction => d.recipient == Address(base58'${t.recipient.bytes.base58}')
+       |   case _: DataTransaction => true
+       |   case t0: TransferTransaction => t0.recipient == Address(base58'${t.recipient.bytes.base58}')
        |   case _ => false
        | }
        |   
@@ -52,14 +79,14 @@ package object predef {
        | # 2) ne
        | let nePrim = 1000 != 999 && "ha" +"ha" != "ha-ha" && tx.bodyBytes != base64'hahaha'
        | let neDataEntryAndGetElement = match tx {
-       |    case d: DataTransaction => d.data[0] != DataEntry("ha", true)
-       |    case d: TransferTransaction => true
+       |    case d1: DataTransaction => d1.data[0] != DataEntry("ha", true)
+       |    case _: TransferTransaction => true
        |    case _ => false
        |  }
        |
        | let neOptionAndExtractHeight = match tx {
-       |   case d: DataTransaction => true
-       |   case d: TransferTransaction => extract(transactionHeightById(tx.id)) != 0
+       |   case _: DataTransaction => true
+       |   case _: TransferTransaction => extract(transactionHeightById(tx.id)) != 0
        |   case _ => false
        | }
        |
@@ -70,8 +97,8 @@ package object predef {
        |
        |# 4) getListSize
        | let getListSize = match tx {
-       |    case d: DataTransaction => size(d.data) != 0
-       |    case d: TransferTransaction => true
+       |    case d2: DataTransaction => size(d2.data) != 0
+       |    case _: TransferTransaction => true
        |    case _ => false
        |  }
        |
@@ -82,19 +109,21 @@ package object predef {
        |#    takeRightString, dropRightString, isDefined
        | let frAction = fraction(12, 3, 4) == 9
        | let bytesOps = match tx {
-       |     case d: DataTransaction =>
-       |       size(d.bodyBytes) != 0 && take(d.bodyBytes, 1) != base58'ha' && drop(d.bodyBytes, 1) != base58'ha' && takeRight(d.bodyBytes, 1) != base58'ha' && dropRight(d.bodyBytes, 1) != base58'ha'
-       |     case d: TransferTransaction => isDefined(d.feeAssetId) == false
+       |     case d3: DataTransaction =>
+       |       size(d3.bodyBytes) != 0 && take(d3.bodyBytes, 1) != base58'ha' && drop(d3.bodyBytes, 1) != base58'ha' && takeRight(d3.bodyBytes, 1) != base58'ha' && dropRight(d3.bodyBytes, 1) != base58'ha'
+       |     case t1: TransferTransaction => isDefined(t1.feeAssetId) == false
        |     case _ => false
        |   }
        | let strOps = size("haha") != 0 && take("haha", 1) != "" && drop("haha", 0) != "" && takeRight("haha", 1) != "" && dropRight("haha", 0) != ""
        |
        | let pure = basic && ne && gteLong && getListSize && unary && frAction && bytesOps && strOps
-       |
-       | # Waves context
+       | pure""".stripMargin
+
+  def scriptWithWavesFunctions(tx: DataTransaction, t: TransferTransaction): String =
+    s""" # Waves context
        | let txById = match tx {
-       |     case d: DataTransaction => true
-       |     case d: TransferTransaction =>
+       |     case _: DataTransaction => true
+       |     case _: TransferTransaction =>
        |       let g = extract(transactionById(base58'${tx.id().base58}'))
        |       g.id == base58'${tx.id().base58}'
        |     case _ => false
@@ -117,13 +146,13 @@ package object predef {
        |
        |     dataByKey && dataByIndex
        |
-       |   case t: TransferTransaction =>
+       |   case _: TransferTransaction =>
        |     let add = Address(base58'${t.recipient.bytes.base58}')
        |     let long = extract(getInteger(add,"${tx.data(0).key}")) == ${tx.data(0).value}
-       |     let bool = extract(getBoolean(add,"${tx.data(1).key}")) == ${tx.data(1).value}
+       |     let bool1 = extract(getBoolean(add,"${tx.data(1).key}")) == ${tx.data(1).value}
        |     let bin = extract(getBinary(add,"${tx.data(2).key}")) ==  base58'${tx.data(2).value}'
-       |     let str = extract(getString(add,"${tx.data(3).key}")) == "${tx.data(3).value}"
-       |     long && bool && bin && str
+       |     let str1 = extract(getString(add,"${tx.data(3).key}")) == "${tx.data(3).value}"
+       |     long && bool1 && bin && str1
        |
        |   case a: CreateAliasTransaction => throw("oh no")
        |   case b: BurnTransaction => throw()
@@ -132,15 +161,18 @@ package object predef {
        |
        | let aFromPK = addressFromPublicKey(tx.senderPublicKey) == tx.sender
        | let aFromStrOrRecip = match tx {
-       |   case d: DataTransaction => addressFromString("${tx.sender.address}") == Address(base58'${tx.sender.bytes.base58}')
-       |   case d: TransferTransaction => addressFromRecipient(d.recipient) == Address(base58'${t.recipient.bytes.base58}')
+       |   case _: DataTransaction => addressFromString("${tx.sender.address}") == Address(base58'${tx.sender.bytes.base58}')
+       |   case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'${t.recipient.bytes.base58}')
        |   case _ => false
        | }
        |
        | let balances = assetBalance(tx.sender, unit) > 0 && wavesBalance(tx.sender) != 0
        |
        | let waves = txById && entries && balances && aFromPK && aFromStrOrRecip && height > 0
-       |
+       | waves""".stripMargin
+
+  def scriptWithCryptoFunctions: String =
+    s"""
        | # Crypto context
        | let bks = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58''
        | let sig = sigVerify(base58'333', base58'123', base58'567') != true
@@ -148,8 +180,6 @@ package object predef {
        | let str64 = fromBase64String(toBase64String(tx.id)) == tx.id
        |
        | let crypto = bks && sig && str58 && str64
-       |
-       | if rnd then pure && waves else crypto
-    """.stripMargin
+       | crypto""".stripMargin
 
 }

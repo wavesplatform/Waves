@@ -2,47 +2,25 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
 import cats.implicits._
+import com.wavesplatform.lang.ExprEvaluator.LogCallback
 import com.wavesplatform.lang.TrampolinedExecResult
-import com.wavesplatform.lang.v1.task.CoevalRef
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import monix.eval.Coeval
 
 sealed trait LazyVal {
-  val evaluated: CoevalRef[Boolean] = CoevalRef.of(false)
-
-  val value: TrampolinedExecResult[Any]
-
-  override def toString: String = {
-    val valueStringRepr: String = evaluated.read
-      .map(ev => {
-        if (ev) {
-          value.value
-            .attempt()
-            .fold(
-              err => s"Error evaluating value: $err",
-              _.fold(
-                err => s"Error evaluating value: $err",
-                v => v.toString
-              )
-            )
-        } else "Not evaluated"
-      })
-      .value
-
-    s"Value: $valueStringRepr"
-  }
+  val value: TrampolinedExecResult[EVALUATED]
 }
 
 object LazyVal {
-  private case class LazyValImpl(v: TrampolinedExecResult[Any]) extends LazyVal {
-    override val value: TrampolinedExecResult[Any] = EitherT(
-      Coeval.evalOnce(
-        evaluated.write(true).apply()
-      ) *>
+  private case class LazyValImpl(v: TrampolinedExecResult[EVALUATED], lc: LogCallback) extends LazyVal {
+    override val value: TrampolinedExecResult[EVALUATED] = EitherT(
         Coeval.evalOnce(
-          v.value.apply()
+          v.value
+            .flatTap(a => Coeval.evalOnce(lc(a)))
+            .apply()
         )
     )
   }
 
-  def apply(v: TrampolinedExecResult[Any]): LazyVal = LazyValImpl(v)
+  def apply(v: TrampolinedExecResult[EVALUATED], lc: LogCallback = _ => ()): LazyVal = LazyValImpl(v, lc)
 }

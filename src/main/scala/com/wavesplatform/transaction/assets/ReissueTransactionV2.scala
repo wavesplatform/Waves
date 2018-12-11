@@ -34,7 +34,7 @@ case class ReissueTransactionV2 private (version: Byte,
 }
 
 object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] with TransactionParser.MultipleVersions {
-  override val typeId: Byte                 = 5
+  override val typeId: Byte                 = ReissueTransaction.typeId
   override def supportedVersions: Set[Byte] = Set(2)
   private def networkByte                   = AddressScheme.current.chainId
 

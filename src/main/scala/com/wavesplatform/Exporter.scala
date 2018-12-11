@@ -30,8 +30,9 @@ object Exporter extends ScorexLogging {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
+    val time             = new NTP(settings.ntpServer)
     val db               = openDB(settings.dataDirectory)
-    val blockchain       = StorageFactory(settings, db, NTP)
+    val blockchain       = StorageFactory(settings, db, time)
     val blockchainHeight = blockchain.height
     val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
     log.info(s"Blockchain height is $blockchainHeight exporting to $height")
@@ -56,6 +57,8 @@ object Exporter extends ScorexLogging {
         output.close()
       case Failure(ex) => log.error(s"Failed to create file '$outputFilename': $ex")
     }
+
+    time.close()
   }
 
   private def createOutputStream(filename: String): Try[FileOutputStream] =

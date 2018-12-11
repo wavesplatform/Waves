@@ -18,8 +18,8 @@ import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 
 class CompilerV1(ctx: CompilerContext) extends ExprCompiler {
-  override type V = V1.type
-  override val version: V = V1
+  override type Ver = V1.type
+  override val version: Ver = V1
 
   override def compile(input: String, directives: List[Directive]): Either[String, version.ExprT] = {
     Parser(input) match {
@@ -63,15 +63,15 @@ object CompilerV1 {
                         condExpr: Expressions.EXPR,
                         ifTrueExpr: Expressions.EXPR,
                         ifFalseExpr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
-    get[CompilerContext, CompilationError].flatMap(ctx => {
-      (for {
-        cond       <- compileExpr(condExpr).run(ctx).map(_._2)()
-        _          <- Either.cond(cond._2 equivalent BOOLEAN, (), UnexpectedType(p.start, p.end, BOOLEAN.toString, cond._2.toString))
-        ifTrue     <- compileExpr(ifTrueExpr).run(ctx).map(_._2)()
-        ifFalse    <- compileExpr(ifFalseExpr).run(ctx).map(_._2)()
-        compiledIf <- mkIf(p, cond._1, ifTrue, ifFalse)
-      } yield compiledIf).toCompileM
-    })
+    for {
+      cond <- local {
+        compileExpr(condExpr)
+          .ensureOr(c => UnexpectedType(p.start, p.end, BOOLEAN.toString, c._2.toString))(_._2 equivalent BOOLEAN)
+      }
+      ifTrue     <- local(compileExpr(ifTrueExpr))
+      ifFalse    <- local(compileExpr(ifFalseExpr))
+      compiledIf <- liftEither(mkIf(p, cond._1, ifTrue, ifFalse))
+    } yield compiledIf
   }
 
   def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[FINAL] =
@@ -90,8 +90,9 @@ object CompilerV1 {
         case u: UNION => u.pure[CompileM]
         case _        => raiseError[CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
       }
-      refTmpKey = "$match" + ctx.tmpArgsIdx
-      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = ctx.tmpArgsIdx + 1))
+      tmpArgId  = ctx.tmpArgsIdx
+      refTmpKey = "$match" + tmpArgId
+      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId + 1))
       allowShadowVarName = typedExpr._1 match {
         case REF(k) => Some(k)
         case _      => None
@@ -113,6 +114,8 @@ object CompilerV1 {
             )
             .toCompileM
         })
+      _ <- set[CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId))
+
     } yield compiledMatch
   }
 
@@ -127,8 +130,10 @@ object CompilerV1 {
         .traverse[CompileM, String](handlePart)
         .ensure(NonExistingType(p.start, p.end, letName, ctx.predefTypes.keys.toList))(_.forall(ctx.predefTypes.contains))
       typeUnion = if (letTypes.isEmpty) compiledLet._2 else UNION.create(letTypes.map(ctx.predefTypes).map(_.typeRef))
-      _            <- modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> typeUnion)))
-      compiledBody <- compileExpr(body)
+      compiledBody <- local {
+        modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (typeUnion -> s"Defined at ${p.start}"))))
+          .flatMap(_ => compileExpr(body))
+      }
     } yield (BLOCK(LET(letName, compiledLet._1), compiledBody._1), compiledBody._2)
   }
 
@@ -137,11 +142,7 @@ object CompilerV1 {
       ctx         <- get[CompilerContext, CompilationError]
       field       <- handlePart(fieldPart)
       compiledRef <- compileExpr(refExpr)
-      result <- (compiledRef._2 match {
-        case (t @ CASETYPEREF(_, fielsd)) => mkGetter(p, ctx, List(t), field, compiledRef._1)
-        case UNION(tl)                    => mkGetter(p, ctx, tl, field, compiledRef._1)
-        case _                            => Generic(p.start, p.end, "Unexpected ref type: neither simple type nor union type").asLeft[(EXPR, FINAL)]
-      }).toCompileM
+      result      <- mkGetter(p, ctx, compiledRef._2.l, field, compiledRef._1).toCompileM
     } yield result
   }
 
@@ -175,7 +176,7 @@ object CompilerV1 {
       result <- ctx.varDefs
         .get(key)
         .fold(raiseError[CompilerContext, CompilationError, (EXPR, FINAL)](DefNotFound(p.start, p.end, key)))(t =>
-          (REF(key): EXPR, t: FINAL).pure[CompileM])
+          (REF(key): EXPR, t._1: FINAL).pure[CompileM])
     } yield result
   }
 
@@ -191,7 +192,7 @@ object CompilerV1 {
     else {
       val typedExpressionArgumentsAndTypedPlaceholders = resolvedArgs.zip(argTypes)
 
-      val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case (typedExpr, tph) => (typedExpr._2, tph) }
+      val typePairs = typedExpressionArgumentsAndTypedPlaceholders.map { case (typedExpr, tph) => (typedExpr._2, tph._2) }
       for {
         resolvedTypeParams <- TypeInferrer(typePairs, predefTypes).leftMap(Generic(p.start, p.end, _))
         args = typedExpressionArgumentsAndTypedPlaceholders.map(_._1._1)
@@ -242,8 +243,7 @@ object CompilerV1 {
       }
     }
 
-    val default: Either[CompilationError, Expressions.EXPR] = Right(
-      Expressions.FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "throw"), List.empty))
+    val default: Either[CompilationError, Expressions.EXPR] = Right(Expressions.FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "throw"), List.empty))
     cases.foldRight(default) {
       case (mc, furtherEi) =>
         furtherEi match {

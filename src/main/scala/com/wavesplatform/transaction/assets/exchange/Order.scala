@@ -1,82 +1,56 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.google.common.primitives.Longs
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.crypto
-import com.wavesplatform.serialization.{BytesSerializable, Deser, JsonSerializable}
+import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.transaction.ValidationError.{GenericError, InvalidSignature}
+import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.utils.Base58
 import io.swagger.annotations.ApiModelProperty
-import monix.eval.{Coeval, Task}
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.crypto.signatures.Curve25519.{KeyLength, SignatureLength}
 
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
-sealed trait OrderType {
-  def bytes: Array[Byte]
-}
-
-object OrderType {
-
-  case object BUY extends OrderType {
-    def bytes: Array[Byte] = Array(0.toByte)
-
-    override def toString: String = "buy"
-  }
-
-  case object SELL extends OrderType {
-    def bytes: Array[Byte] = Array(1.toByte)
-
-    override def toString: String = "sell"
-  }
-
-  def apply(value: Int): OrderType = value match {
-    case 0 => OrderType.BUY
-    case 1 => OrderType.SELL
-    case _ => throw new RuntimeException(s"Unexpected OrderType: $value")
-  }
-
-  def apply(value: String): OrderType = value match {
-    case "buy"  => OrderType.BUY
-    case "sell" => OrderType.SELL
-    case _      => throw new RuntimeException("Unexpected OrderType")
-  }
-
-  def reverse(orderType: OrderType): OrderType = orderType match {
-    case BUY  => SELL
-    case SELL => BUY
-  }
-}
-
 /**
   * Order to matcher service for asset exchange
   */
-case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
-                 @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
-                 assetPair: AssetPair,
-                 @ApiModelProperty(dataType = "java.lang.String", example = "buy") orderType: OrderType,
-                 @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8", example = "100000000") price: Long,
-                 @ApiModelProperty("Amount in AssetPair.second") amount: Long,
-                 @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
-                 @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
-                 @ApiModelProperty(example = "100000") matcherFee: Long,
-                 @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
-    extends BytesSerializable
-    with JsonSerializable
-    with Signed {
+trait Order extends BytesSerializable with JsonSerializable with Proven {
+  def senderPublicKey: PublicKeyAccount
+
+  def matcherPublicKey: PublicKeyAccount
+
+  def assetPair: AssetPair
+
+  def orderType: OrderType
+
+  def amount: Long
+
+  def price: Long
+
+  def timestamp: Long
+
+  def expiration: Long
+
+  def matcherFee: Long
+
+  def proofs: Proofs
+
+  def version: Byte
+
+  def signature: Array[Byte] = proofs.proofs(0).arr
 
   import Order._
 
-  val sender: PublicKeyAccount        = senderPublicKey
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
+  @ApiModelProperty(hidden = true)
+  val sender = senderPublicKey
 
+  @ApiModelProperty(hidden = true)
   def isValid(atTime: Long): Validation = {
-    isValidAmount(price, amount) &&
+    isValidAmount(amount, price) &&
     assetPair.isValid &&
     (matcherFee > 0) :| "matcherFee should be > 0" &&
     (matcherFee < MaxAmount) :| "matcherFee too large" &&
@@ -85,31 +59,25 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     (expiration >= atTime) :| "expiration should be > currentTime"
   }
 
-  def isValidAmount(matchPrice: Long, matchAmount: Long): Validation = {
+  //  @ApiModelProperty(hidden = true)
+  def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
     (matchAmount > 0) :| "amount should be > 0" &&
     (matchPrice > 0) :| "price should be > 0" &&
     (matchAmount < MaxAmount) :| "amount too large" &&
-    getSpendAmount(matchPrice, matchAmount).isRight :| "SpendAmount too large" &&
-    (getSpendAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-    getReceiveAmount(matchPrice, matchAmount).isRight :| "ReceiveAmount too large" &&
-    (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
+    getSpendAmount(matchAmount, matchPrice).isRight :| "SpendAmount too large" &&
+    (getSpendAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
+    getReceiveAmount(matchAmount, matchPrice).isRight :| "ReceiveAmount too large" &&
+    (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
-  def toSign: Array[Byte] =
-    senderPublicKey.publicKey ++ matcherPublicKey.publicKey ++
-      assetPair.bytes ++ orderType.bytes ++
-      Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
-      Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
-      Longs.toByteArray(matcherFee)
-
   @ApiModelProperty(hidden = true)
-  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(toSign)))
-
+  val bodyBytes: Coeval[Array[Byte]]
   @ApiModelProperty(hidden = true)
-  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ signature)
-
+  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
   @ApiModelProperty(hidden = true)
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign)
+  val idStr: Coeval[String] = Coeval.evalOnce(id().base58)
+  @ApiModelProperty(hidden = true)
+  val bytes: Coeval[Array[Byte]]
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {
@@ -124,7 +92,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   }
 
   @ApiModelProperty(hidden = true)
-  def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
+  def getSpendAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
       if (orderType == OrderType.SELL) matchAmount
@@ -137,7 +105,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     }.toEither.left.map(x => GenericError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] =
+  def getReceiveAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       if (orderType == OrderType.BUY) matchAmount
       else {
@@ -146,31 +114,34 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     }.toEither.left.map(x => GenericError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
+  override val json: Coeval[JsObject] = Coeval.evalOnce({
+    val sig = Base58.encode(signature)
     Json.obj(
-      "id"               -> id().base58,
+      "version"          -> version,
+      "id"               -> idStr(),
       "sender"           -> senderPublicKey.address,
       "senderPublicKey"  -> Base58.encode(senderPublicKey.publicKey),
       "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
       "assetPair"        -> assetPair.json,
       "orderType"        -> orderType.toString,
-      "price"            -> price,
       "amount"           -> amount,
+      "price"            -> price,
       "timestamp"        -> timestamp,
       "expiration"       -> expiration,
       "matcherFee"       -> matcherFee,
-      "signature"        -> Base58.encode(signature)
-    ))
+      "signature"        -> sig,
+      "proofs"           -> proofs.proofs
+    )
+  })
 
+  @ApiModelProperty(hidden = true)
   def jsonStr: String = Json.stringify(json())
 
-  override def canEqual(that: Any): Boolean = that.isInstanceOf[Order]
-
+  @ApiModelProperty(hidden = true)
   override def equals(obj: Any): Boolean = {
     obj match {
       case o: Order =>
-        o.canEqual(this) &&
-          senderPublicKey == o.senderPublicKey &&
+        senderPublicKey == o.senderPublicKey &&
           matcherPublicKey == o.matcherPublicKey &&
           assetPair == o.assetPair &&
           orderType == o.orderType &&
@@ -183,21 +154,56 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     }
   }
 
-  override def hashCode(): Int = id().hashCode()
-
   @ApiModelProperty(hidden = true)
-  def getSignedDescendants: Coeval[Seq[Signed]] = signedDescendants
-  @ApiModelProperty(hidden = true)
-  def getSignaturesValidMemoized: Task[Either[InvalidSignature, Order.this.type]] = signaturesValidMemoized
-  @ApiModelProperty(hidden = true)
-  def getSignaturesValid: Coeval[Either[InvalidSignature, Order.this.type]] = signaturesValid
+  override def hashCode(): Int = idStr.hashCode()
 }
 
 object Order {
-  val MaxLiveTime: Long     = 30L * 24L * 60L * 60L * 1000L
-  val PriceConstant         = 100000000L
-  val MaxAmount: Long       = 100 * PriceConstant * PriceConstant
-  private val AssetIdLength = 32
+  type Id = ByteStr
+
+  val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
+  val PriceConstant     = 100000000L
+  val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
+
+  def apply(senderPublicKey: PublicKeyAccount,
+            matcherPublicKey: PublicKeyAccount,
+            assetPair: AssetPair,
+            orderType: OrderType,
+            amount: Long,
+            price: Long,
+            timestamp: Long,
+            expiration: Long,
+            matcherFee: Long,
+            proofs: Proofs,
+            version: Byte = 1): Order = {
+    if (version == 1) {
+      OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
+    } else {
+      OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
+    }
+  }
+
+  def apply(senderPublicKey: PublicKeyAccount,
+            matcherPublicKey: PublicKeyAccount,
+            assetPair: AssetPair,
+            orderType: OrderType,
+            amount: Long,
+            price: Long,
+            timestamp: Long,
+            expiration: Long,
+            matcherFee: Long,
+            signature: Array[Byte]): Order = {
+    OrderV1(senderPublicKey,
+            matcherPublicKey,
+            assetPair,
+            orderType,
+            amount,
+            price,
+            timestamp,
+            expiration,
+            matcherFee,
+            Proofs(Seq(ByteStr(signature))))
+  }
 
   def correctAmount(a: Long, price: Long): Long = {
     val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
@@ -209,85 +215,52 @@ object Order {
   def buy(sender: PrivateKeyAccount,
           matcher: PublicKeyAccount,
           pair: AssetPair,
-          price: Long,
           amount: Long,
+          price: Long,
           timestamp: Long,
           expiration: Long,
-          matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.BUY, price, amount, timestamp, expiration, matcherFee, Array())
-    val sig      = crypto.sign(sender, unsigned.toSign)
-    unsigned.copy(signature = sig)
+          matcherFee: Long,
+          version: Byte = 1): Order = {
+    val unsigned = Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+    sign(unsigned, sender)
   }
 
   def sell(sender: PrivateKeyAccount,
            matcher: PublicKeyAccount,
            pair: AssetPair,
-           price: Long,
            amount: Long,
+           price: Long,
            timestamp: Long,
            expiration: Long,
-           matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.SELL, price, amount, timestamp, expiration, matcherFee, Array())
-    val sig      = crypto.sign(sender, unsigned.toSign)
-    unsigned.copy(signature = sig)
+           matcherFee: Long,
+           version: Byte = 1): Order = {
+    val unsigned = Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+    sign(unsigned, sender)
   }
 
   def apply(sender: PrivateKeyAccount,
             matcher: PublicKeyAccount,
             pair: AssetPair,
             orderType: OrderType,
-            price: Long,
             amount: Long,
+            price: Long,
             timestamp: Long,
             expiration: Long,
-            matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee, Array())
-    val sig      = crypto.sign(sender, unsigned.toSign)
-    unsigned.copy(signature = sig)
-  }
-
-  def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
-    var from   = 0
-    val sender = PublicKeyAccount(bytes.slice(from, from + KeyLength))
-    from += KeyLength
-    val matcher = PublicKeyAccount(bytes.slice(from, from + KeyLength))
-    from += KeyLength
-    val (amountAssetId, s0) = Deser.parseByteArrayOption(bytes, from, AssetIdLength)
-    from = s0
-    val (priceAssetId, s1) = Deser.parseByteArrayOption(bytes, from, AssetIdLength)
-    from = s1
-    val orderType = bytes(from)
-    from += 1
-    val price = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val amount = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val expiration = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val matcherFee = Longs.fromByteArray(bytes.slice(from, from + 8))
-    from += 8
-    val signature = bytes.slice(from, from + SignatureLength)
-    from += SignatureLength
-    Order(
-      sender,
-      matcher,
-      AssetPair(amountAssetId.map(ByteStr(_)), priceAssetId.map(ByteStr(_))),
-      OrderType(orderType),
-      price,
-      amount,
-      timestamp,
-      expiration,
-      matcherFee,
-      signature
-    )
+            matcherFee: Long,
+            version: Byte): Order = {
+    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+    sign(unsigned, sender)
   }
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
     require(unsigned.senderPublicKey == sender)
-    val sig = crypto.sign(sender, unsigned.toSign)
-    unsigned.copy(signature = sig)
+    val sig = crypto.sign(sender, unsigned.bodyBytes())
+    unsigned match {
+      case o @ OrderV2(_, _, _, _, _, _, _, _, _, _) =>
+        o.copy(proofs = Proofs(Seq(ByteStr(sig))))
+      case o @ OrderV1(_, _, _, _, _, _, _, _, _, _) =>
+        o.copy(proofs = Proofs(Seq(ByteStr(sig))))
+    }
   }
 
   def splitByType(o1: Order, o2: Order): (Order, Order) = {
@@ -299,4 +272,5 @@ object Order {
   def assetIdBytes(assetId: Option[AssetId]): Array[Byte] = {
     assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
   }
+
 }

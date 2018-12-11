@@ -14,22 +14,22 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
   property("compile script with specified version") {
     val script = scriptWithVersion("1".some)
-    ScriptCompiler(script) shouldBe Right((expectedScript, 13))
+    ScriptCompiler(script, isAssetScript = false) shouldBe Right((expectedScript, 13))
   }
 
   property("use version 1 if not specified") {
     val script = scriptWithVersion(none)
-    ScriptCompiler(script) shouldBe Right((expectedScript, 13))
+    ScriptCompiler(script, isAssetScript = false) shouldBe Right((expectedScript, 13))
   }
 
   property("fails on unsupported version") {
-    val script = scriptWithVersion("2".some)
-    ScriptCompiler(script) shouldBe Left("Unsupported language version")
+    val script = scriptWithVersion("8".some)
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Unsupported language version")
   }
 
   property("fails on incorrect version value") {
     val script = scriptWithVersion("oOooOps".some)
-    ScriptCompiler(script) shouldBe Left("Can't parse language version")
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Can't parse language version")
   }
 
   private val expectedExpr = BLOCK(

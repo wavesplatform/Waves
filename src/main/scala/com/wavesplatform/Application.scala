@@ -18,7 +18,7 @@ import com.wavesplatform.api.http.{CompositeHttpService, PeersApiRoute, UtilsApi
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, Time, forceStopApplication}
+import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, forceStopApplication}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
@@ -34,7 +34,7 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
 import scala.util.Try
 
-class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
+class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -51,11 +51,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   def run(): Unit = {
-    val time: Time             = NTP
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
-    val utxStorage = new UtxPoolImpl(NTP, settings.utxSettings)
+    val utxStorage = new UtxPoolImpl(time, settings.utxSettings)
     maybeUtx = Some(utxStorage)
 
     val network =
@@ -81,12 +80,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
       )
 
-      val apiTypes = Seq(
-        typeOf[UtilsApiRoute],
-        typeOf[PeersApiRoute],
-        typeOf[AssetsBroadcastApiRoute],
-        typeOf[LeaseBroadcastApiRoute],
-        typeOf[AliasBroadcastApiRoute]
+      val apiTypes: Set[Class[_]] = Set(
+        classOf[UtilsApiRoute],
+        classOf[PeersApiRoute],
+        classOf[AssetsBroadcastApiRoute],
+        classOf[LeaseBroadcastApiRoute],
+        classOf[AliasBroadcastApiRoute]
       )
       val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
@@ -195,7 +194,8 @@ object Application extends ScorexLogging {
       SystemMetrics.startCollecting()
     }
 
-    val isMetricsStarted = Metrics.start(settings.metrics)
+    val time             = new NTP(settings.ntpServer)
+    val isMetricsStarted = Metrics.start(settings.metrics, time)
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       import actorSystem.dispatcher
@@ -223,7 +223,7 @@ object Application extends ScorexLogging {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      new Application(actorSystem, settings, config.root()).run()
+      new Application(actorSystem, settings, config.root(), time).run()
     }
   }
 }

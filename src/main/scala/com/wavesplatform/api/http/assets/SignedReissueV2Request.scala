@@ -1,12 +1,13 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import io.swagger.annotations.ApiModelProperty
-import play.api.libs.json.{Format, Json}
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.assets.ReissueTransactionV2
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import io.swagger.annotations.ApiModelProperty
+import play.api.libs.functional.syntax._
+import play.api.libs.json.{JsPath, Reads}
 
 case class SignedReissueV2Request(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
                                   senderPublicKey: String,
@@ -37,5 +38,14 @@ case class SignedReissueV2Request(@ApiModelProperty(value = "Base58 encoded Issu
 }
 
 object SignedReissueV2Request {
-  implicit val assetReissueRequestReads: Format[SignedReissueV2Request] = Json.format
+  implicit val assetReissueRequestReads: Reads[SignedReissueV2Request] = (
+    (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "version").read[Byte] and
+      (JsPath \ "assetId").read[String] and
+      (JsPath \ "quantity").read[Long] and
+      (JsPath \ "reissuable").read[Boolean] and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "proofs").read[List[ProofStr]]
+  )(SignedReissueV2Request.apply _)
 }

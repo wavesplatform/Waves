@@ -13,9 +13,8 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.api.http.swagger.SwaggerDocService
 import com.wavesplatform.utils.ScorexLogging
 
-import scala.reflect.runtime.universe.Type
-
-case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes: Seq[ApiRoute], settings: RestAPISettings) extends ScorexLogging {
+case class CompositeHttpService(system: ActorSystem, apiTypes: Set[Class[_]], routes: Seq[ApiRoute], settings: RestAPISettings)
+    extends ScorexLogging {
 
   val swaggerService = new SwaggerDocService(system, ActorMaterializer()(system), apiTypes, settings)
 

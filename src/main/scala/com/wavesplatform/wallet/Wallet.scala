@@ -60,9 +60,14 @@ object Wallet extends ScorexLogging {
 
   def apply(settings: WalletSettings): Wallet = new WalletImpl(settings.file, settings.password, settings.seed)
 
-  private class WalletImpl(maybeFile: Option[File], password: String, maybeSeedFromConfig: Option[ByteStr]) extends ScorexLogging with Wallet {
+  private class WalletImpl(maybeFile: Option[File], passwordOpt: Option[String], maybeSeedFromConfig: Option[ByteStr])
+      extends ScorexLogging
+      with Wallet {
 
-    private val key = JsonFileStorage.prepareKey(password)
+    private lazy val key = {
+      val password = passwordOpt.getOrElse(PasswordProvider.askPassword())
+      JsonFileStorage.prepareKey(password)
+    }
 
     private def loadOrImport(f: File): Option[WalletData] =
       try {

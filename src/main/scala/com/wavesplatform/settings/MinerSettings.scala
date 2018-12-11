@@ -8,6 +8,7 @@ import scala.concurrent.duration.FiniteDuration
 case class MinerSettings(enable: Boolean,
                          quorum: Int,
                          intervalAfterLastBlockThenGenerationIsAllowed: FiniteDuration,
+                         noQuorumMiningDelay: FiniteDuration,
                          microBlockInterval: FiniteDuration,
                          minimalBlockGenerationOffset: FiniteDuration,
                          maxTransactionsInKeyBlock: Int,
@@ -28,6 +29,7 @@ object MinerSettings {
     val enable                      = config.as[Boolean]("enable")
     val quorum                      = config.as[Int]("quorum")
     val microBlockInterval          = config.as[FiniteDuration]("micro-block-interval")
+    val noQuorumMiningDelay         = config.as[FiniteDuration]("no-quorum-mining-delay")
     val offset                      = config.as[Option[FiniteDuration]]("minimal-block-generation-offset").getOrElse(0.millis)
     val blockInterval               = config.as[FiniteDuration]("interval-after-last-block-then-generation-is-allowed")
     val minMicroBlockAge            = config.as[FiniteDuration]("min-micro-block-age")
@@ -38,6 +40,7 @@ object MinerSettings {
       enable,
       quorum,
       blockInterval,
+      noQuorumMiningDelay,
       microBlockInterval,
       offset,
       maxTransactionsInKeyBlock,

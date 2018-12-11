@@ -1,19 +1,19 @@
 package com.wavesplatform.db
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.Block
 import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.{BlockchainUpdaterImpl, _}
-import com.wavesplatform.{TransactionGen, WithDB}
-import org.scalacheck.Gen
-import org.scalatest.{FreeSpec, Matchers}
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.utils.{Time, TimeImpl}
-import com.wavesplatform.block.Block
-import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
+import com.wavesplatform.utils.Time
+import com.wavesplatform.{TransactionGen, WithDB}
+import org.scalacheck.Gen
+import org.scalatest.{FreeSpec, Matchers}
 
 class ScriptCacheTest extends FreeSpec with Matchers with WithDB with TransactionGen {
 
@@ -27,7 +27,8 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
         s"""
            |let ind = $ind
            |true
-          """.stripMargin
+          """.stripMargin,
+        isAssetScript = false
       ).explicitGet()
 
       script
@@ -127,13 +128,12 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
   }
 
   def withBlockchain(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: (Seq[PrivateKeyAccount], BlockchainUpdater with NG) => Unit): Unit = {
-    val time          = new TimeImpl
     val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, CACHE_SIZE)
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, time)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
     try {
-      val (accounts, blocks) = gen(time).sample.get
+      val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
         bcu.processBlock(block).explicitGet()
@@ -142,7 +142,6 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
       f(accounts, bcu)
       bcu.shutdown()
     } finally {
-      time.close()
       bcu.shutdown()
       db.close()
     }

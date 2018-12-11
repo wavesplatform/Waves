@@ -3,7 +3,7 @@ package com.wavesplatform.account
 import com.wavesplatform.utils.base58Length
 import com.wavesplatform.utils.Base58
 import com.wavesplatform.transaction.ValidationError.InvalidAddress
-import scorex.crypto.signatures.Curve25519
+import com.wavesplatform.crypto._
 
 trait PublicKeyAccount {
   def publicKey: Array[Byte]
@@ -20,7 +20,7 @@ trait PublicKeyAccount {
 
 object PublicKeyAccount {
 
-  val KeyStringLength: Int = base58Length(Curve25519.KeyLength)
+  val KeyStringLength: Int = base58Length(KeyLength)
 
   private case class PublicKeyAccountImpl(publicKey: Array[Byte]) extends PublicKeyAccount
 

@@ -47,6 +47,9 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
       tx.copy(proofs = Proofs(signatures))
     }
 
+    println(System.currentTimeMillis())
+    println(s"${res.length} tx generated")
+
     if (settings.firstRun) setScript +: res
     else res
   }

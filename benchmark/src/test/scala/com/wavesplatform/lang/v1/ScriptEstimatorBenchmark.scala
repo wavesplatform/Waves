@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.TimeUnit
 
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.ScriptEstimatorBenchmark.St
 import com.wavesplatform.utils
 import monix.eval.Coeval
@@ -16,13 +17,13 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 10)
 class ScriptEstimatorBenchmark {
   @Benchmark
-  def apply_test(st: St, bh: Blackhole): Unit = bh.consume(ScriptEstimator(st.functionCosts, st.expr))
+  def apply_test(st: St, bh: Blackhole): Unit = bh.consume(ScriptEstimator(Set.empty, st.functionCosts, st.expr))
 }
 
 object ScriptEstimatorBenchmark {
 
   class St extends BigSum {
-    val functionCosts: Map[FunctionHeader, Coeval[Long]] = utils.functionCosts
+    val functionCosts: Map[FunctionHeader, Coeval[Long]] = utils.functionCosts(V1)
   }
 
 }

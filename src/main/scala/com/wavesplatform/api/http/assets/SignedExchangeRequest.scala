@@ -6,7 +6,8 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange._
 
 object SignedExchangeRequest {
   implicit val orderFormat: Format[Order]                                 = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
@@ -19,10 +20,10 @@ case class SignedExchangeRequest(@ApiModelProperty(value = "Base58 encoded sende
                                  order1: Order,
                                  @ApiModelProperty(value = "Sell Order")
                                  order2: Order,
-                                 @ApiModelProperty(required = true)
-                                 price: Long,
                                  @ApiModelProperty(required = true, example = "1000000")
                                  amount: Long,
+                                 @ApiModelProperty(required = true)
+                                 price: Long,
                                  @ApiModelProperty(required = true)
                                  fee: Long,
                                  @ApiModelProperty(required = true)
@@ -38,6 +39,13 @@ case class SignedExchangeRequest(@ApiModelProperty(value = "Base58 encoded sende
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      _t         <- ExchangeTransaction.create(order1, order2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, _signature)
+      o1         <- castOrder(order1)
+      o2         <- castOrder(order2)
+      _t         <- ExchangeTransactionV1.create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, _signature)
     } yield _t
+
+  def castOrder(o: Order): Either[ValidationError, OrderV1] = o match {
+    case o1 @ OrderV1(_, _, _, _, _, _, _, _, _, _) => Right(o1)
+    case _                                          => Left(GenericError("ExchangeTransaction of version 1 can only contain orders of version 1"))
+  }
 }

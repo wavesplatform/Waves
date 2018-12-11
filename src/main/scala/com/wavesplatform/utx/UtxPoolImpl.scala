@@ -3,7 +3,6 @@ package com.wavesplatform.utx
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
-import cats.data.NonEmptyList
 import com.wavesplatform.account.Address
 import com.wavesplatform.mining.{MiningConstraint, MultiDimensionalMiningConstraint}
 import com.wavesplatform.settings.UtxSettings
@@ -71,9 +70,6 @@ class UtxPoolImpl(time: Time, utxSettings: UtxSettings) extends ScorexLogging wi
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = None
 
-  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], MultiDimensionalMiningConstraint) =
-    (Seq.empty, MultiDimensionalMiningConstraint(NonEmptyList.one(MiningConstraint.Unlimited)))
-
   override private[utx] def createBatchOps: UtxBatchOps = new BatchOpsImpl()
 
   private class BatchOpsImpl() extends UtxBatchOps {
@@ -81,6 +77,10 @@ class UtxPoolImpl(time: Time, utxSettings: UtxSettings) extends ScorexLogging wi
   }
 
   override def close(): Unit = {}
+
+  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
+    (Seq(), MultiDimensionalMiningConstraint(MiningConstraint.Unlimited, MiningConstraint.Unlimited))
+  }
 }
 
 object UtxPoolImpl {

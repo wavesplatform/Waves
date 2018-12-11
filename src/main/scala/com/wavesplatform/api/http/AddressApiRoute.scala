@@ -261,7 +261,8 @@ case class AddressApiRoute(settings: RestAPISettings,
         required = true,
         paramType = "body",
         dataType = "com.wavesplatform.api.http.DataRequest",
-        defaultValue = "{\n\t\"version\": 1,\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000,\n\t\"data\": {}\n}"
+        defaultValue =
+          "{\n\t\"version\": 1,\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000,\n\t\"data\": [{\"key\":\"intValue\", \"type\":\"integer\", \"value\":17},{\"key\":\"stringValue\", \"type\":\"string\", \"value\":\"seventeen\"},{\"key\":\"boolValue\", \"type\":\"boolean\", \"value\":false},{\"key\":\"binaryArray\", \"type\":\"binary\", \"value\":\"EQ==\"}]\n}"
       )
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
@@ -366,8 +367,9 @@ case class AddressApiRoute(settings: RestAPISettings,
 
   private def addressScriptInfoJson(account: Address): Either[ValidationError, AddressScriptInfo] =
     for {
-      script     <- Right(blockchain.accountScript(account))
-      complexity <- script.fold[Either[ValidationError, Long]](Right(0))(x => ScriptCompiler.estimate(x).left.map(GenericError(_)))
+      script <- Right(blockchain.accountScript(account))
+      complexity <- script.fold[Either[ValidationError, Long]](Right(0))(script =>
+        ScriptCompiler.estimate(script, script.version).left.map(GenericError(_)))
     } yield
       AddressScriptInfo(
         address = account.address,
