@@ -86,13 +86,17 @@ object EmptyBlockchain extends Blockchain {
 
   override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = 0
 
-  override def assetDistribution(assetId: ByteStr): Map[Address, Long] = Map.empty
+  override def assetDistribution(assetId: ByteStr, count: Int, fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] =
+    Right(Map.empty)
 
   override def wavesDistribution(height: Int): Map[Address, Long] = Map.empty
 
   override def allActiveLeases: Set[LeaseTransaction] = Set.empty
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
+  override def assetDistributionAtHeight(assetId: AssetId,
+                                         height: Int,
+                                         count: Int,
+                                         fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *

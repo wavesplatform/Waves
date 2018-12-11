@@ -23,6 +23,7 @@ import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.parallel.ParSeq
 import scala.collection.{SeqView, immutable, mutable}
 
 object LevelDBWriter {
@@ -733,24 +734,32 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       .mapValues(_.size)
   }
 
-  override def assetDistribution(assetId: ByteStr): Map[Address, Long] = readOnly { db =>
-    (for {
-      seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
-      addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
-      balance   <- db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId))
-      if balance > 0
-    } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
-  }
+  override def assetDistribution(assetId: ByteStr, count: Int, fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] =
+    assetDistributionAtHeight(assetId, height, count, fromAddress)
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
+  override def assetDistributionAtHeight(assetId: AssetId,
+                                         height: Int,
+                                         count: Int,
+                                         fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
+
+    lazy val maybeAddressId = fromAddress.map(addr => db.get(Keys.addressId(addr)))
+
+    lazy val addressIds: ParSeq[BigInt] =
+      for {
+        seqNr <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
+        addressId <- db
+          .get(Keys.addressesForAsset(assetId, seqNr))
+          .par
+          .dropWhile(maybeAddressId.contains)
+          .slice(1, count + 1)
+      } yield addressId
 
     Either
       .cond(
         height > canGetAfterHeight,
         (for {
-          seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
-          addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
+          addressId <- addressIds
           history = db.get(Keys.assetBalanceHistory(addressId, assetId))
           actualHeight <- history.partition(_ > height)._2.headOption
           balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
