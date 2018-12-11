@@ -169,8 +169,6 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                       miningConstraints.total
                     }
 
-                    val expiredTransactions = blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs > 4 * 60 * 60 * 1000)
-
                     val diff = BlockDiffer
                       .fromBlock(
                         functionalitySettings,
@@ -180,14 +178,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                         constraint
                       )
 
-                    diff.left.foreach { _ =>
-                      log.trace(s"Could not append new block, remembering ${expiredTransactions.size} transaction(s)")
-                      blockchain.learnTransactions(expiredTransactions)
-                    }
-
                     diff.map { hardenedDiff =>
                       blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
                       TxsInBlockchainStats.record(ng.transactions.size)
+                      blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs._1 > 4 * 60 * 60 * 1000)
                       Some((hardenedDiff, discarded.flatMap(_.transactionData)))
                     }
                   } else {
@@ -398,9 +392,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     ng.bestLiquidDiff.transactions.contains(id) || blockchain.containsTransaction(id)
   }
 
-  override def forgetTransactions(pred: (AssetId, Long) => Boolean): Map[AssetId, Long] = blockchain.forgetTransactions(pred)
-
-  override def learnTransactions(values: Map[AssetId, Long]): Unit = blockchain.learnTransactions(values)
+  override def forgetTransactions(pred: (AssetId, (Long, Int, Long)) => Boolean): Unit = blockchain.forgetTransactions(pred)
 
   override def assetDescription(id: AssetId): Option[AssetDescription] = ngState.fold(blockchain.assetDescription(id)) { ng =>
     val diff = ng.bestLiquidDiff

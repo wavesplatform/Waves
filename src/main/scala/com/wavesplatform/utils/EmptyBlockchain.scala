@@ -57,9 +57,7 @@ object EmptyBlockchain extends Blockchain {
 
   override def containsTransaction(id: ByteStr): Boolean = false
 
-  override def forgetTransactions(pred: (ByteStr, Long) => Boolean): Map[ByteStr, Long] = Map.empty
-
-  override def learnTransactions(values: Map[ByteStr, Long]): Unit = ()
+  override def forgetTransactions(pred: (ByteStr, (Long, Int, Long)) => Boolean): Unit = ()
 
   override def assetDescription(id: ByteStr): Option[AssetDescription] = None
 

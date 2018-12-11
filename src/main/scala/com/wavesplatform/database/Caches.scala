@@ -92,21 +92,17 @@ trait Caches extends Blockchain with ScorexLogging {
     }
   }
 
-  private val transactionIds                                       = new util.HashMap[ByteStr, Long]()
-  protected def forgetTransaction(id: ByteStr): Unit               = transactionIds.remove(id)
-  override def containsTransaction(id: ByteStr): Boolean           = transactionIds.containsKey(id)
-  override def learnTransactions(values: Map[ByteStr, Long]): Unit = transactionIds.putAll(values.asJava)
-  override def forgetTransactions(pred: (ByteStr, Long) => Boolean): Map[ByteStr, Long] = {
-    val removedTransactions = Map.newBuilder[ByteStr, Long]
-    val iterator            = transactionIds.entrySet().iterator()
+  private val transactionIds                             = new util.HashMap[ByteStr, (Long, Int, Long)]()
+  protected def forgetTransaction(id: ByteStr): Unit     = transactionIds.remove(id)
+  override def containsTransaction(id: ByteStr): Boolean = transactionIds.containsKey(id)
+  override def forgetTransactions(pred: (ByteStr, (Long, Int, Long)) => Boolean): Unit = {
+    val iterator = transactionIds.entrySet().iterator()
     while (iterator.hasNext) {
       val e = iterator.next()
       if (pred(e.getKey, e.getValue)) {
-        removedTransactions += e.getKey -> e.getValue
         iterator.remove()
       }
     }
-    removedTransactions.result()
   }
 
   private val portfolioCache: LoadingCache[Address, Portfolio] = cache(maxCacheSize, loadPortfolio)
@@ -180,6 +176,7 @@ trait Caches extends Blockchain with ScorexLogging {
                          sponsorship: Map[AssetId, Sponsorship]): Unit
 
   override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
+    val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
@@ -229,11 +226,11 @@ trait Caches extends Blockchain with ScorexLogging {
 
     val newTransactions = Map.newBuilder[ByteStr, (Transaction, Set[BigInt])]
     for ((id, (_, tx, addresses)) <- diff.transactions) {
-      transactionIds.put(id, tx.timestamp)
+      transactionIds.put(id, (tx.timestamp, newHeight, block.timestamp))
       newTransactions += id -> ((tx, addresses.map(addressId)))
     }
 
-    current = ((current._1 + 1), (current._2 + block.blockScore()), Some(block))
+    current = (newHeight, (current._2 + block.blockScore()), Some(block))
 
     doAppend(
       block,
