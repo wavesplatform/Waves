@@ -9,7 +9,7 @@ import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{Authorized, Proven, Transaction}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.{BlockchainContext, RealTransactionWrapper, Verifier}
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1.ScriptV1Impl
@@ -44,11 +44,12 @@ object ScriptRunner {
           blockchain,
           isTokenScript
         )
-        val evalContract = ContractEvaluator.verify(vf, in.eliminate(RealTransactionWrapper.apply, ???))
+        val evalContract = ContractEvaluator.verify(vf, in.eliminate(RealTransactionWrapper.apply, _.eliminate(???, ???)))
         EvaluatorV1.evalWithLogging(ctx, evalContract)
 
       case ScriptV2(_, Contract(_, _, None)) =>
-        (List.empty, Verifier.verifyAsEllipticCurveSignature(in) match {
+        val t: Proven with Authorized = in.eliminate(_.asInstanceOf[Proven with Authorized], _.eliminate(???, ???))
+        (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](t) match {
           case Right(_) => Right(TRUE)
           case Left(_)  => Right(FALSE)
         })
