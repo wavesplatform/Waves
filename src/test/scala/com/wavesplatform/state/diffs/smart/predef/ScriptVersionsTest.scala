@@ -21,13 +21,13 @@ import org.scalatest.{FreeSpec, Matchers}
 import shapeless.Coproduct
 
 class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with TransactionGen {
-  def eval[T <: EVALUATED](script: String, version: Version, tx: Transaction = null, blockchain: Blockchain = EmptyBlockchain): Either[String, T] = {
+  def eval[T <: EVALUATED](script: String, version: Version, tx: Transaction = null, blockchain: Blockchain = EmptyBlockchain): Either[String, EVALUATED] = {
     val Success(expr, _) = Parser.parseScript(script)
     for {
       compileResult <- ExpressionCompilerV1(compilerContext(version, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
       s <- ScriptV1(version, typedExpr, checkSize = false)
-      r <- ScriptRunner[T](blockchain.height, Coproduct(tx), blockchain, s, isTokenScript = false)._2
+      r <- ScriptRunner(blockchain.height, Coproduct(tx), blockchain, s, isTokenScript = false)._2
     } yield r
 
   }

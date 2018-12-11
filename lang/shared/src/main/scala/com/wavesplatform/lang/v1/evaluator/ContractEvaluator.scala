@@ -1,10 +1,13 @@
 package com.wavesplatform.lang.v1.evaluator
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.Contract.VerifierFunction
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.task.imports.raiseError
-import com.wavesplatform.lang.v1.traits.domain.DataItem
+import com.wavesplatform.lang.v1.traits.domain.{DataItem, Tx}
 import scodec.bits.ByteVector
 
 object ContractEvaluator {
@@ -22,6 +25,18 @@ object ContractEvaluator {
         EvaluatorV1.evalExpr(expr)
     }
   }
+
+  def verify(v: VerifierFunction, tx:Tx): EvalM[EVALUATED] = {
+      val t = Bindings.transactionObject(tx, proofsEnabled = true)
+        val expr =
+          BLOCKV2(
+            LET(v.v.txArgName, t),
+            BLOCKV2(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))
+          ))
+        EvaluatorV1.evalExpr(expr)
+    }
+  }
+
 
   case class WriteSet(l: List[DataItem[_]])
   object WriteSet {
