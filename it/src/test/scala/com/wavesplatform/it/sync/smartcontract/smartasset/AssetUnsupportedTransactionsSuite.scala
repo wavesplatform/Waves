@@ -6,28 +6,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-import scala.util.{Failure, Success, Try}
-
 class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
-  var asset = ""
-
-  protected override def beforeAll(): Unit = {
-    super.beforeAll()
-    asset = sender
-      .issue(
-        firstAddress,
-        "MyAsset",
-        "Test Asset",
-        someAssetAmount,
-        0,
-        reissuable = true,
-        issueFee,
-        2,
-        Some(scriptBase64),
-        waitForTx = true
-      )
-      .id
-  }
 
   forAll(
     Table(
@@ -41,24 +20,32 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
       "IssueTransaction"
     )) { tx =>
     test(s"Smart Asset script should not support $tx") {
-      Try {
-        sender.setAssetScript(
-          asset,
+      try {
+        sender.issue(
           firstAddress,
-          setAssetScriptFee + smartFee,
+          "MyAsset",
+          "Test Asset",
+          someAssetAmount,
+          0,
+          reissuable = true,
+          issueFee,
+          2,
           Some(
             ScriptCompiler(
               s"""
-                |match tx {
-                |  case s : $tx => true
-                |  case _ => true
-                |}""".stripMargin,
+                 |match tx {
+                 |  case s : $tx => true
+                 |  case _ => true
+                 |}""".stripMargin,
               isAssetScript = true
-            ).explicitGet()._1.bytes.value.base64)
+            ).explicitGet()._1.bytes.value.base64),
+          waitForTx = true
         )
-      } match {
-        case Success(_) => fail("ScriptCompiler didn't throw expected error")
-        case Failure(f) => f.getMessage should include("Matching not exhaustive: possibleTypes are")
+
+        fail("ScriptCompiler didn't throw expected error")
+      } catch {
+        case ex: java.lang.Exception => ex.getMessage should include("Matching not exhaustive: possibleTypes are")
+        case _                       => fail("ScriptCompiler works incorrect for orders with smart assets")
       }
     }
   }
