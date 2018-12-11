@@ -7,6 +7,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTEVECTOR, FUNCTION_CALL}
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
@@ -27,7 +28,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
           assetId = None,
           sender = sender.privateKey,
           recipient = contract,
-          amount = 2.waves,
+          amount = 5.waves,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
           feeAmount = minFee,
@@ -49,7 +50,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
           assetId = None,
           sender = sender.privateKey,
           recipient = caller,
-          amount = 2.waves,
+          amount = 5.waves,
           timestamp = System.currentTimeMillis(),
           feeAssetId = None,
           feeAmount = minFee,
@@ -70,6 +71,11 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
         | @Callable(sender)
         | func foo(a:ByteVector) = {
         |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender)))
+        | }
+        | 
+        | @Verifier(t)
+        | func verify() = {
+        |  TRUE
         | }
         |
         |
@@ -119,5 +125,30 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
 
     sender.getData(contract.address, "a") shouldBe BinaryDataEntry("a", arg)
+    sender.getData(contract.address, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
+  }
+
+  test("verifier works") {
+    val arg               = ByteStr(Array(42: Byte))
+    val fc: FUNCTION_CALL = FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_BYTEVECTOR(ByteVector(arg.arr))))
+
+    val tx =
+      DataTransaction
+        .selfSigned(
+          version = 1: Byte,
+          sender = caller,
+          data = List(StringDataEntry("a", "e")),
+          feeAmount = 1.waves,
+          timestamp = System.currentTimeMillis()
+        )
+        .explicitGet()
+
+    val contractInvocationId = sender
+      .signedBroadcast(tx.json() + ("type" -> JsNumber(ContractInvocationTransaction.typeId.toInt)))
+      .id
+
+    nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
+
+    sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "e")
   }
 }

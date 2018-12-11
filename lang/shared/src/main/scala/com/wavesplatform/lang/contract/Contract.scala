@@ -49,7 +49,7 @@ object Contract {
   case class PayableAnnotation(amountArgName: String, tokenArgName: String) extends Annotation {
     lazy val dic = Map(amountArgName -> LONG, tokenArgName -> BYTEVECTOR)
   }
-  case class VerifierAnnotation(txArgName: String) extends Annotation { lazy val dic = Map(txArgName -> WavesContext.transactionsCommonType.typeRef) }
+  case class VerifierAnnotation(txArgName: String) extends Annotation { lazy val dic = Map(txArgName -> WavesContext.verifierInput.typeRef) }
 
   sealed trait AnnotatedFunction
   case class ContractFunction(c: CallableAnnotation, p: Option[PayableAnnotation], u: Terms.FUNC) extends AnnotatedFunction
