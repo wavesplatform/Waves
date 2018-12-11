@@ -116,7 +116,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
     val sc9 = s"""
                  |match tx {
-                 |  case t : Order => height > 0
+                 |  case t : Order => height < 0
                  |  case s : SetScriptTransaction => true
                  |  case _ => throw()
                  | }
@@ -330,8 +330,10 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
       }
 
       "place order and then set contract" in {
-        for (i <- Seq(sc2, sc7, sc8, sc9)) {
-          log.debug(s"contract: $i")
+        for ((contract, i) <- Seq(sc2, sc7, sc8, sc9).zip(Seq(2, 7, 8, 9))) {
+          info(s"$i")
+          log.debug(s"contract $contract")
+
           val aliceBalance = matcherNode.accountBalances(aliceAcc.address)._1
 
           val aliceOrd1 = matcherNode
@@ -346,7 +348,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             .id
           matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
 
-          setContract(Some(i), aliceAcc)
+          setContract(Some(contract), aliceAcc)
 
           val bobOrd1 = matcherNode
             .placeOrder(bobAcc, predefAssetPair, OrderType.SELL, 100, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)

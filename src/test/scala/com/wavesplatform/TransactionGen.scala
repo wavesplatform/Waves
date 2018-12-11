@@ -611,28 +611,31 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
       trans
     }
 
+  private type OrderConstructor = (PrivateKeyAccount, PublicKeyAccount, AssetPair, Long, Long, Long, Long, Long) => Order
+
   def exchangeV2GeneratorP(buyer: PrivateKeyAccount,
                            seller: PrivateKeyAccount,
                            amountAssetId: Option[ByteStr],
                            priceAssetId: Option[ByteStr],
-                           fixedMatcherFee: Option[Long] = None) = {
+                           fixedMatcherFee: Option[Long] = None,
+                           orderVersions: Set[Byte] = Set(1, 2)): Gen[ExchangeTransactionV2] = {
+    def mkBuyOrder(version: Byte): OrderConstructor  = if (version == 1) OrderV1.buy else OrderV2.buy
+    def mkSellOrder(version: Byte): OrderConstructor = if (version == 1) OrderV1.sell else OrderV2.sell
+
     for {
       (_, matcher, _, _, price, amount1, timestamp, expiration, genMatcherFee) <- orderParamGen
       amount2: Long                                                            <- matcherAmountGen
       matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
       matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
       assetPair = AssetPair(amountAssetId, priceAssetId)
-      o1 <- Gen.oneOf(
-        OrderV1.buy(buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee),
-        OrderV2.buy(buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee)
-      )
-      o2 <- Gen.oneOf(
-        OrderV1.sell(seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee),
-        OrderV2.sell(seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee)
-      )
+      mkO1 <- Gen.oneOf(orderVersions.map(mkBuyOrder).toSeq)
+      mkO2 <- Gen.oneOf(orderVersions.map(mkSellOrder).toSeq)
     } yield {
       val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
       val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
+
+      val o1 = mkO1(seller, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee)
+      val o2 = mkO2(seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee)
 
       ExchangeTransactionV2
         .create(matcher, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100)
