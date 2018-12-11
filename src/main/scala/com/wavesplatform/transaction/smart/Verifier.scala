@@ -5,7 +5,6 @@ import com.google.common.base.Throwables
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ExprEvaluator.Log
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
-import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.{GenericError, HasScriptType, ScriptExecutionError, TransactionNotAllowedByScript}
@@ -75,7 +74,7 @@ object Verifier extends Instrumented with ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
     Try {
-      logged(s"order ${order.idStr()}", MatcherScriptRunner[EVALUATED](script, order, isTokenScript = false)) match {
+      logged(s"order ${order.idStr()}", ScriptRunner[EVALUATED](height, Coproduct[TxOrd](order), blockchain, script, isTokenScript = false)) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript = false))
         case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, script.text, isTokenScript = false))
         case (_, Right(TRUE))       => Right(order)
