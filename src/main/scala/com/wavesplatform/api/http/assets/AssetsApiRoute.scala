@@ -323,7 +323,7 @@ object AssetsApiRoute {
       _ <- Either
         .cond(limit > 0, (), GenericError("Limit should be greater than 0"))
       _ <- Either
-        .cond(limit < settings.transactionByAddressLimit, (), GenericError(s"Limit should be less than ${settings.transactionByAddressLimit}"))
+        .cond(limit < settings.distributionAddressLimit, (), GenericError(s"Limit should be less than ${settings.transactionByAddressLimit}"))
     } yield limit
   }
 }

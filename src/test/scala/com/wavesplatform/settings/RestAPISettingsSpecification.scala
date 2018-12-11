@@ -15,6 +15,7 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
         |    cors: yes
         |    api-key-different-host: yes
         |    transactions-by-address-limit = 10000
+        |    distribution-address-limit = 10000
         |  }
         |}
       """.stripMargin)
@@ -27,6 +28,7 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
     settings.cors should be(true)
     settings.apiKeyDifferentHost should be(true)
     settings.transactionByAddressLimit should be(10000)
+    settings.distributionAddressLimit should be(10000)
   }
 
 }
