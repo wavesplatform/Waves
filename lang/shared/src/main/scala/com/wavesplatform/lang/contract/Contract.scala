@@ -4,6 +4,7 @@ import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 
 /*
  Contact is a list of annotated definitions
@@ -48,7 +49,7 @@ object Contract {
   case class PayableAnnotation(amountArgName: String, tokenArgName: String) extends Annotation {
     lazy val dic = Map(amountArgName -> LONG, tokenArgName -> BYTEVECTOR)
   }
-  case class VerifierAnnotation(txArgName: String) extends Annotation { lazy val dic = Map(txArgName -> ???) }
+  case class VerifierAnnotation(txArgName: String) extends Annotation { lazy val dic = Map(txArgName -> WavesContext.transactionsCommonType.typeRef) }
 
   sealed trait AnnotatedFunction
   case class ContractFunction(c: CallableAnnotation, p: Option[PayableAnnotation], u: Terms.FUNC) extends AnnotatedFunction

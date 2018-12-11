@@ -2,17 +2,19 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction}
+import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNCTION_CALL, REF}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.{Common, Version}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import scodec.bits.ByteVector
 
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
   private def treeTypeTest(
@@ -30,6 +32,11 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | @Callable(sender)
           | func foo(a:ByteVector) = {
           |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender)))
+          | }
+          | 
+          | @Verifier(t)
+          | func verify() = {
+          |   t.id == base58''
           | }
           |
           |
@@ -55,7 +62,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
             )
           )
         )),
-        None
+        Some(VerifierFunction(
+          VerifierAnnotation("t"),
+          FUNC("verify", List.empty, FUNCTION_CALL(Native(FunctionIds.EQ), List(GETTER(REF("t"), "id"), CONST_BYTEVECTOR(ByteVector.empty))))
+        ))
       ))
   )
 

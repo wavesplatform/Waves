@@ -58,7 +58,9 @@ object ContractCompiler {
   private def compileContract(contract: Expressions.CONTRACT): CompileM[Contract] = {
     for {
       l <- contract.fs.traverse[CompileM, AnnotatedFunction](compileAnnotatedFunc)
-    } yield Contract(List.empty, l.map(_.asInstanceOf[ContractFunction]), None)
+      v  = l.find(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
+      fs = l.filter(_.isInstanceOf[ContractFunction]).map(_.asInstanceOf[ContractFunction])
+    } yield Contract(List.empty, fs, v)
   }
 
   def apply(c: CompilerContext, contract: Expressions.CONTRACT): Either[String, Contract] =
