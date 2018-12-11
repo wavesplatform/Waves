@@ -50,6 +50,8 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
 
     val txHeight = nodeA.transactionInfo(tx.id).height
 
+    nodes.waitForHeightArise()
+
     docker.restartContainer(dockerNodes().head)
     docker.restartContainer(dockerNodes()(1))
 
