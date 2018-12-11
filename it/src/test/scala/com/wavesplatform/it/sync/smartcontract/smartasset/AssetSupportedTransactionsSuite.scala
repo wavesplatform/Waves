@@ -272,7 +272,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     assertBadRequestAndMessage(sender.burn(firstAddress, asset, 10, smartMinFee), errNotAllowedByToken)
   }
 
-  test("unburable asset") {
+  test("unburnable asset") {
     val unBurnable = sender
       .issue(
         firstAddress,
@@ -384,12 +384,11 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val scr = ScriptCompiler(
       s"""
-                             |match tx {
-                             |  case s : SetAssetScriptTransaction => true
-                             |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
-                             |  case _ => false
-                             |}
-         """.stripMargin,
+        |match tx {
+        |  case s : SetAssetScriptTransaction => true
+        |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
+        |  case _ => false
+        |}""".stripMargin,
       isAssetScript = true
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(assetNonReissue, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)

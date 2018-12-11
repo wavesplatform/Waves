@@ -688,19 +688,29 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     b.result()
   }
 
-  override def scoreOf(blockId: ByteStr): Option[BigInt] = readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
+  def loadScoreOf(blockId: ByteStr): Option[BigInt] = {
+    readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
+  }
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readOnly(_.get(Keys.blockHeader(height)))
+  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+    readOnly(_.get(Keys.blockHeader(height)))
+  }
 
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] =
+  override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
     readOnly(db => db.get(Keys.heightOf(blockId)).flatMap(h => db.get(Keys.blockHeader(h))))
+  }
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = readOnly(_.get(Keys.blockBytes(height)))
+  override def loadBlockBytes(height: Int): Option[Array[Byte]] = {
+    readOnly(_.get(Keys.blockBytes(height)))
+  }
 
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] =
+  override def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]] = {
     readOnly(db => db.get(Keys.heightOf(blockId)).flatMap(h => db.get(Keys.blockBytes(h))))
+  }
 
-  override def heightOf(blockId: ByteStr): Option[Int] = readOnly(_.get(Keys.heightOf(blockId)))
+  override def loadHeightOf(blockId: ByteStr): Option[Int] = {
+    readOnly(_.get(Keys.heightOf(blockId)))
+  }
 
   override def lastBlockIds(howMany: Int): immutable.IndexedSeq[ByteStr] = readOnly { db =>
     // since this is called from outside of the main blockchain updater thread, instead of using cached height,

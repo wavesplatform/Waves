@@ -262,6 +262,25 @@ class OrderValidatorSpecification
         ov.validateNewOrder(newBuyOrder(account, version = 2)) should produce("Orders of version 1 are only accepted")
       }
     }
+
+    "deny blockchain functions in account script" in forAll(accountGen) { account =>
+      portfolioTest(defaultPortfolio) { (_, bc) =>
+        activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
+        (bc.height _).when().returns(0).anyNumberOfTimes()
+
+        val scriptText =
+          """match tx {
+            |  case o: Order => height >= 0
+            |  case _ => true
+            |}""".stripMargin
+        val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
+        (bc.accountScript _).when(account.toAddress).returns(Some(script)).anyNumberOfTimes()
+
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+        val ov = new OrderValidator(db, bc, tc, _ => defaultPortfolio, Right(_), matcherSettings, MatcherAccount, ntpTime)
+        ov.validateNewOrder(newBuyOrder(account, version = 2)) should produce("height is inaccessible when running script on matcher")
+      }
+    }
   }
 
   private def portfolioTest(p: Portfolio)(f: (OrderValidator, Blockchain) => Any): Unit = {

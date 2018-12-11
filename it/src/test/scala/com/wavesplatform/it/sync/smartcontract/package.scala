@@ -24,17 +24,14 @@ package object smartcontract {
 
   def pureContextScript(dtx: DataTransaction, accountScript: Boolean): String =
     s"""
-       | match tx {
-       |  case ext : ExchangeTransaction =>
-       |    # Pure context
+       |# Pure context
+       |    let ext = tx
        |    let longAll = 1000 * 2 == 2000 && 1000 / 2 == 500 && 1000 % 2 == 0 && 1000 + 2 == 1002 && 1000 - 2 == 998
        |    let sumString = "ha" + "-" +"ha" == "ha-ha"
        |    let body = ext.bodyBytes
        |    let sumByteVector = body + ext.bodyBytes == body + body
-       |
        |    let eqUnion = ext.sender != Address(base58'')
        |    let basic = longAll && sumString && sumByteVector && eqUnion
-       |
        |    let nePrim = 1000 != 999 && "ha" +"ha" != "ha-ha" && ext.bodyBytes != base64'hahaha'
        |    let dtx = extract(transactionById(base58'${dtx.id().base58}'))
        |    let neDataEntryAndGetElement = match dtx {
@@ -42,27 +39,24 @@ package object smartcontract {
        |       case _ => false
        |    }
        |    let neOptionAndExtractHeight = extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
-       |
        |    let ne = nePrim && neDataEntryAndGetElement && neOptionAndExtractHeight
        |    let gteLong = 1000 > 999 && 1000 >= 999
-       |
        |    let getListSize = match dtx {
        |      case dddtx : DataTransaction => size(dddtx.data) != 0
        |      case _ => false
        |    }
-       |
        |    let unary = -1 == -1 && false == !true
-       |
        |    let frAction = fraction(12, 3, 4) == 9
        |    let bytesOps = size(ext.bodyBytes) != 0 && take(ext.bodyBytes, 1) != base58'ha' && drop(ext.bodyBytes, 1) != base58'ha' &&
        |    takeRight(ext.bodyBytes, 1) != base58'ha' && dropRight(ext.bodyBytes, 1) != base58'ha'
        |    let strOps = size("haha") != 0 && take("haha", 1) != "" && drop("haha", 0) != "" && takeRight("haha", 1) != "" &&
        |    dropRight("haha", 0) != ""
-       |
        |    let pure = basic && ne && gteLong && getListSize && unary && frAction #&& bytesOps && strOps
        |
+       | match tx {
+       |  case ex : ExchangeTransaction =>
        |    pure && height > 0
-       |  ${if (accountScript) "case s : SetScriptTransaction => true" else ""}
+       |  ${if (accountScript) "case s : SetScriptTransaction | Order => pure && height > 0 " else ""}
        |  case _ => false
        | }
      """.stripMargin

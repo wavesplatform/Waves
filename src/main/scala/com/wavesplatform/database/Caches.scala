@@ -5,7 +5,7 @@ import java.util
 import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{AssetId, Transaction}
 import com.wavesplatform.transaction.smart.script.Script
@@ -19,21 +19,78 @@ trait Caches extends Blockchain with ScorexLogging {
   protected def maxCacheSize: Int
 
   @volatile
-  private var heightCache = loadHeight()
+  private var current = (loadHeight(), loadScore(), loadLastBlock())
+
   protected def loadHeight(): Int
-  override def height: Int = heightCache
+  override def height: Int = current._1
 
   protected def safeRollbackHeight: Int
 
-  @volatile
-  private var scoreCache = loadScore()
   protected def loadScore(): BigInt
-  override def score: BigInt = scoreCache
+  override def score: BigInt = current._2
 
-  @volatile
-  private var lastBlockCache = loadLastBlock()
   protected def loadLastBlock(): Option[Block]
-  override def lastBlock: Option[Block] = lastBlockCache
+  override def lastBlock: Option[Block] = current._3
+
+  def loadScoreOf(blockId: ByteStr): Option[BigInt]
+  override def scoreOf(blockId: ByteStr): Option[BigInt] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      Some(c._2)
+    } else {
+      loadScoreOf(blockId)
+    }
+  }
+
+  def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+    val c = current
+    if (height == c._1) {
+      c._3.map(b => (b, b.bytes().size))
+    } else {
+      loadBlockHeaderAndSize(height)
+    }
+  }
+
+  def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]
+  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      c._3.map(b => (b, b.bytes().size))
+    } else {
+      loadBlockHeaderAndSize(blockId)
+    }
+  }
+
+  def loadBlockBytes(height: Int): Option[Array[Byte]]
+  override def blockBytes(height: Int): Option[Array[Byte]] = {
+    val c = current
+    if (height == c._1) {
+      c._3.map(_.bytes())
+    } else {
+      loadBlockBytes(height)
+    }
+  }
+
+  def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]]
+  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      c._3.map(_.bytes())
+    } else {
+      loadBlockBytes(blockId)
+    }
+  }
+
+  def loadHeightOf(blockId: ByteStr): Option[Int]
+  override def heightOf(blockId: ByteStr): Option[Int] = {
+    val c = current
+    if (c._3.exists(_.uniqueId == blockId)) {
+      Some(c._1)
+    } else {
+      loadHeightOf(blockId)
+    }
+  }
 
   private val transactionIds                                       = new util.HashMap[ByteStr, Long]()
   protected def forgetTransaction(id: ByteStr): Unit               = transactionIds.remove(id)
@@ -123,9 +180,6 @@ trait Caches extends Blockchain with ScorexLogging {
                          sponsorship: Map[AssetId, Sponsorship]): Unit
 
   override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
-    heightCache += 1
-    scoreCache += block.blockScore()
-    lastBlockCache = Some(block)
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
@@ -179,6 +233,8 @@ trait Caches extends Blockchain with ScorexLogging {
       newTransactions += id -> ((tx, addresses.map(addressId)))
     }
 
+    current = ((current._1 + 1), (current._2 + block.blockScore()), Some(block))
+
     doAppend(
       block,
       carryFee,
@@ -220,9 +276,7 @@ trait Caches extends Blockchain with ScorexLogging {
         )
       discardedBlocks = doRollback(targetBlockId)
     } yield {
-      heightCache = loadHeight()
-      scoreCache = loadScore()
-      lastBlockCache = loadLastBlock()
+      current = (loadHeight(), loadScore(), loadLastBlock())
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()
