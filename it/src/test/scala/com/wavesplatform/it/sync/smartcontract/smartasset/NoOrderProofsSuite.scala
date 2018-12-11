@@ -15,8 +15,8 @@ import scala.concurrent.duration._
 
 class NoOrderProofsSuite extends BaseTransactionSuite {
   test("try to use Order in asset scripts") {
-    try sender
-      .issue(
+    try {
+      sender.issue(
         firstAddress,
         "assetWProofs",
         "Test coin for assetWProofs test",
@@ -28,18 +28,19 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         script = Some(
           ScriptCompiler(
             s"""
-            match tx {
-            case o: Order => true
-            case _ => false
-            }""".stripMargin,
-            true
+              |match tx {
+              |  case o: Order => true
+              |  case _ => false
+              |}""".stripMargin,
+            isAssetScript = true
           ).explicitGet()._1.bytes.value.base64)
       )
-    catch {
-      case ex: java.lang.Exception => assert(ex.getMessage.contains("Compilation failed: Matching not exhaustive"))
-      case _: Throwable            => throw new Exception("ScriptCompiler works incorrect for orders with smart assets")
-    }
 
+      fail("ScriptCompiler didn't throw expected error")
+    } catch {
+      case ex: java.lang.Exception => ex.getMessage should include("Compilation failed: Matching not exhaustive")
+      case _                       => fail("ScriptCompiler works incorrect for orders with smart assets")
+    }
   }
 
   test("try to use proofs in assets script") {
