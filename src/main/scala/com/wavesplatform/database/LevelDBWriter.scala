@@ -24,7 +24,7 @@ import org.iq80.leveldb.DB
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.parallel.ParSeq
-import scala.collection.{GenIterableLike, SeqView, immutable, mutable}
+import scala.collection.{SeqView, immutable, mutable}
 
 object LevelDBWriter {
 
