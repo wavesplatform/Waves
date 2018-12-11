@@ -24,9 +24,9 @@ class UtxPoolImpl(time: Time, utxSettings: UtxSettings) extends ScorexLogging wi
       r = tx match {
         case stx: SignedTransaction =>
           val v = stx.signatureValid()
-          if (v) log.info(s"UTX Transaction processed: ${stx.signature.base58}")
+          if (v) log.info(s"UTX Transaction processed: ${stx.id.value.base58}")
           else
-            log.warn(s"INVALID UTX transaction: ${stx.signature.base58}")
+            log.warn(s"INVALID UTX transaction: ${stx.id.value.base58}")
           v
         case _ => false
       }
