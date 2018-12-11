@@ -181,7 +181,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                     diff.map { hardenedDiff =>
                       blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
                       TxsInBlockchainStats.record(ng.transactions.size)
-                      blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs._1 > 4 * 60 * 60 * 1000)
+                      //blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs._1 > 4 * 60 * 60 * 1000)
                       Some((hardenedDiff, discarded.flatMap(_.transactionData)))
                     }
                   } else {
@@ -388,11 +388,9 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
     addressTransactionsFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, types, count, fromId)
 
-  override def containsTransaction(id: AssetId): Boolean = ngState.fold(blockchain.containsTransaction(id)) { ng =>
-    ng.bestLiquidDiff.transactions.contains(id) || blockchain.containsTransaction(id)
+  override def containsTransaction(tx: Transaction): Boolean = ngState.fold(blockchain.containsTransaction(tx)) { ng =>
+    ng.bestLiquidDiff.transactions.contains(tx.id()) || blockchain.containsTransaction(tx)
   }
-
-  override def forgetTransactions(pred: (AssetId, (Long, Int, Long)) => Boolean): Unit = blockchain.forgetTransactions(pred)
 
   override def assetDescription(id: AssetId): Option[AssetDescription] = ngState.fold(blockchain.assetDescription(id)) { ng =>
     val diff = ng.bestLiquidDiff

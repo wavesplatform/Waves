@@ -92,15 +92,44 @@ trait Caches extends Blockchain with ScorexLogging {
     }
   }
 
-  private val transactionIds                             = new util.HashMap[ByteStr, (Long, Int, Long)]()
-  protected def forgetTransaction(id: ByteStr): Unit     = transactionIds.remove(id)
-  override def containsTransaction(id: ByteStr): Boolean = transactionIds.containsKey(id)
-  override def forgetTransactions(pred: (ByteStr, (Long, Int, Long)) => Boolean): Unit = {
-    val iterator = transactionIds.entrySet().iterator()
-    while (iterator.hasNext) {
-      val e = iterator.next()
-      if (pred(e.getKey, e.getValue)) {
-        iterator.remove()
+  val rememberBlocks = 130 //240
+
+  private val blocksTs                               = new util.HashMap[Int, Long]
+  private var olderStoredBlockTimestamp              = Long.MaxValue
+  private val transactionIds                         = new util.HashMap[ByteStr, (Long, Int, Long)]()
+  protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
+  private var miss: Int                              = 0
+  override def containsTransaction(tx: Transaction): Boolean = transactionIds.containsKey(tx.id()) || {
+    if (tx.timestamp - 90 * 60 * 1000 <= olderStoredBlockTimestamp) {
+      miss += 1
+      log.info(s"Cache miss, do lookup (total $miss)")
+      transactionHeight(tx.id()).nonEmpty
+    } else {
+      false
+    }
+  }
+  def forgetBlocks(): Unit = {
+    {
+      val biterator  = blocksTs.entrySet().iterator()
+      var olderBlock = Int.MaxValue
+      while (biterator.hasNext) {
+        val e = biterator.next()
+        val b = e.getKey
+        if (b < height - rememberBlocks) {
+          biterator.remove()
+        } else if (b < olderBlock) {
+          olderBlock = b
+        }
+      }
+      olderStoredBlockTimestamp = blocksTs.getOrDefault(olderBlock, Long.MaxValue)
+    }
+    {
+      val iterator = transactionIds.entrySet().iterator()
+      while (iterator.hasNext) {
+        val e = iterator.next()
+        if (e.getValue._2 < height - rememberBlocks) {
+          iterator.remove()
+        }
       }
     }
   }
@@ -257,6 +286,7 @@ trait Caches extends Blockchain with ScorexLogging {
     for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
+    forgetBlocks()
   }
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]
