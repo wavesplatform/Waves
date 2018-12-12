@@ -181,7 +181,6 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                     diff.map { hardenedDiff =>
                       blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
                       TxsInBlockchainStats.record(ng.transactions.size)
-                      //blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs._1 > 4 * 60 * 60 * 1000)
                       Some((hardenedDiff, discarded.flatMap(_.transactionData)))
                     }
                   } else {

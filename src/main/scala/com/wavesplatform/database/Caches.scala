@@ -12,6 +12,7 @@ import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 
 trait Caches extends Blockchain with ScorexLogging {
   import Caches._
@@ -95,12 +96,12 @@ trait Caches extends Blockchain with ScorexLogging {
   protected def rememberBlocksInterval: Long
 
   private val blocksTs                               = new util.HashMap[Int, Long] // Height -> block timestamp
-  private var oldestStoredBlockTimestamp              = Long.MaxValue
+  private var oldestStoredBlockTimestamp             = Long.MaxValue
   private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
   private var miss: Int                              = 0
   override def containsTransaction(tx: Transaction): Boolean = transactionIds.containsKey(tx.id()) || {
-    if (tx.timestamp - 2.hours.toMillis <= olderStoredBlockTimestamp) {
+    if (tx.timestamp - 2.hours.toMillis <= oldestStoredBlockTimestamp) {
       miss += 1
       log.info(s"Cache miss, do lookup (total $miss)")
       transactionHeight(tx.id()).nonEmpty
@@ -109,7 +110,7 @@ trait Caches extends Blockchain with ScorexLogging {
     }
   }
   protected def forgetBlocks(): Unit = {
-    var olderBlock = Int.MaxValue;
+    var oldestBlock = Int.MaxValue;
     {
       val biterator = blocksTs.entrySet().iterator()
       val bts       = lastBlock.fold(0L)(_.timestamp)
@@ -118,17 +119,18 @@ trait Caches extends Blockchain with ScorexLogging {
         val b = e.getKey
         if (b < bts - rememberBlocksInterval) {
           biterator.remove()
-        } else if (b < olderBlock) {
-          olderBlock = b
+        } else if (b < oldestBlock) {
+          oldestBlock = b
         }
       }
-      olderStoredBlockTimestamp = blocksTs.getOrDefault(olderBlock, Long.MaxValue)
+      oldestStoredBlockTimestamp = blocksTs.getOrDefault(oldestBlock, Long.MaxValue)
     }
+//    transactionIds.removeIf(_.getKey < oldestBlock)
     {
       val iterator = transactionIds.entrySet().iterator()
       while (iterator.hasNext) {
         val e = iterator.next()
-        if (e.getValue < olderBlock) {
+        if (e.getValue < oldestBlock) {
           iterator.remove()
         }
       }
