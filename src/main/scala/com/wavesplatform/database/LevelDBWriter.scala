@@ -783,7 +783,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
           balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
           if balance > 0
         } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq,
-        GenericError(s"Cannot get asset distribution at height less than $canGetAfterHeight")
+        GenericError(s"Cannot get asset distribution at height less than ${canGetAfterHeight + 1}")
       )
   }
 
