@@ -108,7 +108,7 @@ trait Caches extends Blockchain with ScorexLogging {
       false
     }
   }
-  def forgetBlocks(): Unit = {
+  protected def forgetBlocks(): Unit = {
     var olderBlock = Int.MaxValue;
     {
       val biterator = blocksTs.entrySet().iterator()
