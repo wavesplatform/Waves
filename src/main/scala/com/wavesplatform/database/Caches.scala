@@ -100,7 +100,7 @@ trait Caches extends Blockchain with ScorexLogging {
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
   private var miss: Int                              = 0
   override def containsTransaction(tx: Transaction): Boolean = transactionIds.containsKey(tx.id()) || {
-    if (tx.timestamp - 120 * 60 * 1000 <= olderStoredBlockTimestamp) {
+    if (tx.timestamp - 2.hours.toMillis <= olderStoredBlockTimestamp) {
       miss += 1
       log.info(s"Cache miss, do lookup (total $miss)")
       transactionHeight(tx.id()).nonEmpty
