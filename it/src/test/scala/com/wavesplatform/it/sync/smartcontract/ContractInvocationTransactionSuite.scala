@@ -144,7 +144,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
         .explicitGet()
 
     val contractInvocationId = sender
-      .signedBroadcast(tx.json() + ("type" -> JsNumber(ContractInvocationTransaction.typeId.toInt)))
+      .signedBroadcast(tx.json() + ("type" -> JsNumber(DataTransaction.typeId.toInt)))
       .id
 
     nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
