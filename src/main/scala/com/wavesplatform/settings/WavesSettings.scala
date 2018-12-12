@@ -36,7 +36,7 @@ object WavesSettings {
     val dataDirectory           = config.as[String](s"$configPath.data-directory")
     val maxCacheSize            = config.as[Int](s"$configPath.max-cache-size")
     val maxRollbackDepth        = config.as[Int](s"$configPath.max-rollback-depth")
-    val rememberBlocks          = config.as[Option[FiniteDuration]](s"$configPath.remember-blocks-interval-in-cache").getOrElse((120L * 60L * 1000L).millis)
+    val rememberBlocks          = config.as[FiniteDuration](s"$configPath.remember-blocks-interval-in-cache")
     val ntpServer               = config.as[String](s"$configPath.ntp-server")
     val networkSettings         = config.as[NetworkSettings]("waves.network")
     val walletSettings          = config.as[WalletSettings]("waves.wallet")
