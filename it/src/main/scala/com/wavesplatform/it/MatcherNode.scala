@@ -2,20 +2,18 @@ package com.wavesplatform.it
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.{BeforeAndAfterAll, Suite}
-import play.api.libs.json.JsNumber
 
 trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
   this: Suite =>
 
-  def matcherNode = nodes.head
-  def aliceNode   = nodes(1)
-  def bobNode     = nodes(2)
+  def matcherNode: Node = nodes.head
+  def aliceNode: Node   = nodes(1)
+  def bobNode: Node     = nodes(2)
 
   protected lazy val matcherAddress: String = matcherNode.createAddress()
   protected lazy val aliceAddress: String   = aliceNode.createAddress()
@@ -47,15 +45,12 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
         .right
         .get
 
-      val setScriptId = matcherNode
-        .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
-        .id
-
-      matcherNode.waitForTransaction(setScriptId)
+      matcherNode
+        .signedBroadcast(setScriptTransaction.json(), waitForTx = true)
     }
   }
 
-  def setContract(contractText: Option[String], acc: PrivateKeyAccount): TransactionInfo = {
+  def setContract(contractText: Option[String], acc: PrivateKeyAccount): String = {
     val script = contractText.map { x =>
       val scriptText = x.stripMargin
       ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
@@ -65,10 +60,8 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
       .right
       .get
 
-    val setScriptId = matcherNode
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+    matcherNode
+      .signedBroadcast(setScriptTransaction.json(), waitForTx = true)
       .id
-
-    matcherNode.waitForTransaction(setScriptId)
   }
 }

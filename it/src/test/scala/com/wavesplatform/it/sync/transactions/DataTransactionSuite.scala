@@ -10,7 +10,6 @@ import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.utils.Base58
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
-
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
 
@@ -57,7 +56,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     )
 
     for ((tx, diag) <- invalidTxs) {
-      assertBadRequestAndResponse(sender.broadcastRequest(tx.json() + ("type" -> JsNumber(DataTransaction.typeId.toInt))), diag)
+      assertBadRequestAndResponse(sender.broadcastRequest(tx.json()), diag)
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 
