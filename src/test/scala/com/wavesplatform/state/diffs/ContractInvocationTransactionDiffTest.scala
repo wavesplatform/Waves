@@ -67,7 +67,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     )
     setContract = SetScriptTransaction.selfSigned(setScriptVersion, master, Some(script), fee, ts).explicitGet()
     fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTEVECTOR(ByteVector(arg))))
-    ci          = ContractInvocationTransaction.selfSigned(ciVersion, invoker, master, fc, fee, ts).explicitGet()
+    ci          = ContractInvocationTransaction.selfSigned(ciVersion, invoker, master, fc, ???, fee, ts).explicitGet()
   } yield (List(genesis, genesis2), setContract, ci)
 
   property("invoking contract results contract's state") {

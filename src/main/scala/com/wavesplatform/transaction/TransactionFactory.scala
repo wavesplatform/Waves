@@ -644,6 +644,7 @@ object TransactionFactory {
         sender,
         contract,
         ContractInvocationRequest.buildFunctionCall(request.contractAddress, request.args),
+        ???,
         request.fee,
         request.timestamp.getOrElse(time.getTimestamp()),
         signer
@@ -659,6 +660,7 @@ object TransactionFactory {
         sender,
         contract,
         fc,
+        ???,
         request.fee,
         0,
         Proofs.empty

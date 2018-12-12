@@ -61,6 +61,7 @@ case class SignedContractInvocationRequest(
         _sender,
         _contractAddress,
         ContractInvocationRequest.buildFunctionCall(function, args),
+        ???,
         fee,
         timestamp,
         _proofs

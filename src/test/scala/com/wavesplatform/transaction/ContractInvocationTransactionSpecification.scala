@@ -40,6 +40,10 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
                          "proofs": ["CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T"],
                          "version": 1,
                          "contractAddress" : "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                         "payment" : {
+                            "assetId" : 3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh,
+                            "amount" : 7500
+                         }
                          "function" : "foo",
                          "args" : [
                            { "key" : "",
@@ -56,9 +60,10 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTEVECTOR(ByteVector(Base64.decode("YWxpY2U=").get)))),
+        Some((Some(ByteStr.decodeBase58("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh").get), 7500)),
         100000,
         1526910778245L,
-        Proofs(List(ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get))
+        Proofs(List(ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get)),
       )
       .right
       .get

@@ -7,9 +7,11 @@ import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
+import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{ByteStr, _}
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import monix.eval.Coeval
 import play.api.libs.json.Json
 
@@ -20,6 +22,7 @@ case class ContractInvocationTransaction private (version: Byte,
                                                   sender: PublicKeyAccount,
                                                   contractAddress: Address,
                                                   fc: Terms.FUNCTION_CALL,
+                                                  payment: Payment,
                                                   fee: Long,
                                                   timestamp: Long,
                                                   proofs: Proofs)
@@ -35,6 +38,7 @@ case class ContractInvocationTransaction private (version: Byte,
       sender.publicKey,
       contractAddress.bytes.arr,
       Serde.serialize(fc),
+      Deser.serializeOption(payment)(pmt => Deser.serializeOption(pmt._1)(_.arr) ++ Longs.toByteArray(pmt._2)),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     ))
@@ -48,6 +52,8 @@ case class ContractInvocationTransaction private (version: Byte,
 }
 
 object ContractInvocationTransaction extends TransactionParserFor[ContractInvocationTransaction] with TransactionParser.MultipleVersions {
+
+  type Payment = Option[(Option[AssetId], Long)]
 
   import play.api.libs.json._
   def functionCallToJson(fc: Terms.FUNCTION_CALL) = Json.obj(
@@ -68,19 +74,25 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
-      val chainId         = bytes(0)
-      val sender          = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
-      val contractAddress = Address.fromBytes(bytes.drop(KeyLength + 1).take(Address.AddressLength)).explicitGet()
-      val fcStart         = KeyLength + 1 + Address.AddressLength
-      val rest            = bytes.drop(fcStart)
-      val (fc, remaining) = Serde.deserialize(rest, all = false).explicitGet()
-      val feeTsProofs     = rest.takeRight(remaining)
-      val fee             = Longs.fromByteArray(feeTsProofs.slice(0, 8))
-      val timestamp       = Longs.fromByteArray(feeTsProofs.slice(8, 16))
+      val chainId            = bytes(0)
+      val sender             = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
+      val contractAddress    = Address.fromBytes(bytes.drop(KeyLength + 1).take(Address.AddressLength)).explicitGet()
+      val fcStart            = KeyLength + 1 + Address.AddressLength
+      val rest               = bytes.drop(fcStart)
+      val (fc, remaining)    = Serde.deserialize(rest, all = false).explicitGet()
+      val paymentFeeTsProofs = rest.takeRight(remaining)
+      val (payment: Option[(Option[AssetId], Long)], offset) = Deser.parseOption(paymentFeeTsProofs, 0)(arr => {
+        val (maybeAsset: Option[AssetId], offset) = Deser.parseOption(arr, 0)(ByteStr(_))
+        val amt: Long                             = Longs.fromByteArray(arr.drop(offset))
+        (maybeAsset, amt)
+      })
+      val feeTsProofs = paymentFeeTsProofs.drop(offset)
+      val fee         = Longs.fromByteArray(feeTsProofs.slice(0, 8))
+      val timestamp   = Longs.fromByteArray(feeTsProofs.slice(8, 16))
       (for {
         _      <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
         proofs <- Proofs.fromBytes(feeTsProofs.drop(16))
-        tx     <- create(version, sender, contractAddress, fc.asInstanceOf[FUNCTION_CALL], fee, timestamp, proofs)
+        tx     <- create(version, sender, contractAddress, fc.asInstanceOf[FUNCTION_CALL], payment, fee, timestamp, proofs)
       } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
@@ -88,23 +100,30 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
              sender: PublicKeyAccount,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
+             p: Payment,
              fee: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] =
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
+      _ <- p match {
+        case Some((token, amt)) => Either.cond(amt > 0, (), ValidationError.NegativeAmount(0, token.toString))
+        case _                  => Right(())
+      }
+
       _ <- Either.cond(fc.args.forall(_.isInstanceOf[EVALUATED]), (), GenericError("all arguments of contractInvocation must be EVALUATED"))
-    } yield new ContractInvocationTransaction(version, networkByte, sender, contractAddress, fc, fee, timestamp, proofs)
+    } yield new ContractInvocationTransaction(version, networkByte, sender, contractAddress, fc, p, fee, timestamp, proofs)
 
   def signed(version: Byte,
              sender: PublicKeyAccount,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
+             p: Payment,
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
-    create(version, sender, contractAddress, fc, fee, timestamp, Proofs.empty).right.map { unsigned =>
+    create(version, sender, contractAddress, fc, p, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
 
@@ -112,7 +131,8 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
                  sender: PrivateKeyAccount,
                  contractAddress: Address,
                  fc: Terms.FUNCTION_CALL,
+                 p: Payment,
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
-    signed(version, sender, contractAddress, fc, fee, timestamp, sender)
+    signed(version, sender, contractAddress, fc, p, fee, timestamp, sender)
 }
