@@ -69,14 +69,31 @@ object ContractInvocationTransactionDiff {
                   // TODO:
                   //  - ensure all amounts are positive
                   //  - sum doesn't overflow
-                  //  - whatever else massTransfer ensures
+                  //  - whatever else tranfser/massTransfer ensures
+                  //  - assetId is defined
                   import cats.implicits._
                   val paymentMap = Monoid.combineAll(pmts).mapValues(Portfolio(_, LeaseBalance.empty, Map.empty))
-                  val feePart = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
+                  val feePart = Map(
+                    tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)
+                  )
+                  val payablePart: Map[Address, Portfolio] = tx.payment match {
+                    case None => Map.empty
+                    case Some((assetOpt, amt)) =>
+                      assetOpt match {
+                        case Some(asset) =>
+                          Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
+                            Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                          )
+                        case None =>
+                          Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
+                            .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
+                      }
+                  }
+                  val transfers = Monoid.combineAll(Seq(payablePart, feePart, paymentMap))
                   Diff(
                     height = height,
                     tx = tx,
-                    portfolios = Monoid.combine(paymentMap, feePart),
+                    portfolios = transfers,
                     accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
                   )
                 }
