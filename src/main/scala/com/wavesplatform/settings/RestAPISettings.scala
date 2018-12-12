@@ -24,7 +24,7 @@ object RestAPISettings {
       cors = config.as[Boolean](s"$configPath.cors"),
       apiKeyDifferentHost = config.as[Boolean](s"$configPath.api-key-different-host"),
       transactionByAddressLimit = config.as[Int](s"$configPath.transactions-by-address-limit"),
-      distributionAddressLimit= config.as[Int](s"$configPath.distribution-address-limit")
+      distributionAddressLimit = config.as[Int](s"$configPath.distribution-address-limit")
     )
   }
 }

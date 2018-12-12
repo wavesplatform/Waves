@@ -144,6 +144,12 @@ class OrderBookActor(parent: ActorRef,
 
   private def applyEvent(e: Event): Unit = {
     log.trace(s"Apply event $e")
+    log.info(e match {
+      case Events.OrderAdded(order) => s"OrderAdded(${order.order.idStr()}, amount=${order.amount})"
+      case exec @ Events.OrderExecuted(submitted, counter) =>
+        s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${exec.executedAmount})"
+      case Events.OrderCanceled(order, unmatchable) => s"OrderCanceled(${order.order.idStr()}, system=$unmatchable)"
+    })
     orderBook = OrderBook.updateState(orderBook, e)
     refreshMarketStatus()
     updateSnapshot(orderBook)
