@@ -62,11 +62,7 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB,
-                    fs: FunctionalitySettings,
-                    val maxCacheSize: Int = 100000,
-                    val maxRollbackDepth: Int = 2000,
-                    val rememberBlocksInterval: Long = 120 * 60 * 1000)
+class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int, val maxRollbackDepth: Int, val rememberBlocksInterval: Long)
     extends Caches
     with ScorexLogging {
 
