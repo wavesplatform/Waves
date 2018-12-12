@@ -5,12 +5,13 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.metrics.Metrics
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import scala.concurrent.duration._
 
 case class WavesSettings(directory: String,
                          dataDirectory: String,
                          maxCacheSize: Int,
                          maxRollbackDepth: Int,
-                         rememberBlocks: Long,
+                         rememberBlocks: FiniteDuration,
                          ntpServer: String,
                          networkSettings: NetworkSettings,
                          walletSettings: WalletSettings,
@@ -35,7 +36,7 @@ object WavesSettings {
     val dataDirectory           = config.as[String](s"$configPath.data-directory")
     val maxCacheSize            = config.as[Int](s"$configPath.max-cache-size")
     val maxRollbackDepth        = config.as[Int](s"$configPath.max-rollback-depth")
-    val rememberBlocks          = config.as[Option[Long]](s"$configPath.remember-blocks-interval-in-cache").getOrElse(120L * 60L * 1000L)
+    val rememberBlocks          = config.as[Option[FiniteDuration]](s"$configPath.remember-blocks-interval-in-cache").getOrElse((120L * 60L * 1000L).millis)
     val ntpServer               = config.as[String](s"$configPath.ntp-server")
     val networkSettings         = config.as[NetworkSettings]("waves.network")
     val walletSettings          = config.as[WalletSettings]("waves.wallet")

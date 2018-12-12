@@ -10,6 +10,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.{AssetId, Transaction}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.metrics.LevelDBStats
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -99,11 +100,9 @@ trait Caches extends Blockchain with ScorexLogging {
   private var oldestStoredBlockTimestamp             = Long.MaxValue
   private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
-  private var miss: Int                              = 0
   override def containsTransaction(tx: Transaction): Boolean = transactionIds.containsKey(tx.id()) || {
     if (tx.timestamp - 2.hours.toMillis <= oldestStoredBlockTimestamp) {
-      miss += 1
-      log.info(s"Cache miss, do lookup (total $miss)")
+      LevelDBStats.miss.record(1)
       transactionHeight(tx.id()).nonEmpty
     } else {
       false

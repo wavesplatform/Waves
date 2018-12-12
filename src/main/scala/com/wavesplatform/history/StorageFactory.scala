@@ -17,7 +17,7 @@ object StorageFactory extends ScorexLogging {
       settings.blockchainSettings.functionalitySettings,
       settings.maxCacheSize,
       settings.maxRollbackDepth,
-      settings.rememberBlocks
+      settings.rememberBlocks.toMillis
     )
     new BlockchainUpdaterImpl(levelDBWriter, settings, time)
   }
