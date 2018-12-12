@@ -94,9 +94,9 @@ trait Caches extends Blockchain with ScorexLogging {
 
   protected def rememberBlocksInterval: Long
 
-  private val blocksTs                               = new util.HashMap[Int, Long]
+  private val blocksTs                               = new util.HashMap[Int, Long] // Height -> block timestamp
   private var olderStoredBlockTimestamp              = Long.MaxValue
-  private val transactionIds                         = new util.HashMap[ByteStr, (Long, Int, Long)]()
+  private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
   private var miss: Int                              = 0
   override def containsTransaction(tx: Transaction): Boolean = transactionIds.containsKey(tx.id()) || {
@@ -128,7 +128,7 @@ trait Caches extends Blockchain with ScorexLogging {
       val iterator = transactionIds.entrySet().iterator()
       while (iterator.hasNext) {
         val e = iterator.next()
-        if (e.getValue._2 < olderBlock) {
+        if (e.getValue < olderBlock) {
           iterator.remove()
         }
       }
@@ -256,7 +256,7 @@ trait Caches extends Blockchain with ScorexLogging {
 
     val newTransactions = Map.newBuilder[ByteStr, (Transaction, Set[BigInt])]
     for ((id, (_, tx, addresses)) <- diff.transactions) {
-      transactionIds.put(id, (tx.timestamp, newHeight, block.timestamp))
+      transactionIds.put(id, newHeight)
       newTransactions += id -> ((tx, addresses.map(addressId)))
     }
 
