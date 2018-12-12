@@ -384,11 +384,13 @@ object WavesContext {
       transactionsCommonType
     ) ++ transactionTypes
 
-    lazy val writeSetType = CaseType("WriteSet", List("data" -> LIST(dataEntryType.typeRef)))
+    lazy val writeSetType       = CaseType("WriteSet", List("data"       -> LIST(dataEntryType.typeRef)))
+    lazy val transferSetType     = CaseType("TransferSet", List("transfers" -> LIST(transfer.typeRef)))
+    lazy val contractResultType = CaseType("ContractResult", List("data" -> writeSetType.typeRef, "payments" -> transferSetType.typeRef))
 
     val types = buildWavesTypes(proofsEnabled)
 
-    CTX(types++ (if (version == V3) List(writeSetType) else List.empty), commonVars ++ vars(version), functions)
+    CTX(types ++ (if (version == V3) List(writeSetType, transferSetType, contractResultType) else List.empty), commonVars ++ vars(version), functions)
   }
 
   val verifierInput =

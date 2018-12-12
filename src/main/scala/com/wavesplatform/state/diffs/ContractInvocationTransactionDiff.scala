@@ -1,14 +1,15 @@
 package com.wavesplatform.state.diffs
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.DataItem
+import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
 import com.wavesplatform.lang.{Global, Version}
 import com.wavesplatform.state.{
+  EitherExt2,
   AccountDataInfo,
   BinaryDataEntry,
   Blockchain,
@@ -53,20 +54,33 @@ object ContractInvocationTransactionDiff {
               ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invokation(functionName, tx.fc, ByteVector(tx.sender.toAddress.bytes.arr)))
             res.left
               .map(a => GenericError(a.toString))
-              .map(ws => {
-                val r: Seq[DataEntry[_]] = ws.l.map {
-                  case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
-                  case DataItem.Str(k, b)  => StringDataEntry(k, b)
-                  case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
-                  case DataItem.Bin(k, b)  => BinaryDataEntry(k, ByteStr(b.toArray))
+              .map {
+                case ContractResult(ds, ps) => {
+                  val r: Seq[DataEntry[_]] = ds.map {
+                    case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
+                    case DataItem.Str(k, b)  => StringDataEntry(k, b)
+                    case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
+                    case DataItem.Bin(k, b)  => BinaryDataEntry(k, ByteStr(b.toArray))
+                  }
+                  val pmts = ps.map {
+
+                    case (Recipient.Address(addrBytes), amt) => Map(Address.fromBytes(addrBytes.toArray).explicitGet() -> amt)
+                  }
+                  // TODO:
+                  //  - ensure all amounts are positive
+                  //  - sum doesn't overflow
+                  //  - whatever else massTransfer ensures
+                  import cats.implicits._
+                  val paymentMap = Monoid.combineAll(pmts).mapValues(Portfolio(_, LeaseBalance.empty, Map.empty))
+                  val feePart = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
+                  Diff(
+                    height = height,
+                    tx = tx,
+                    portfolios = Monoid.combine(paymentMap, feePart),
+                    accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
+                  )
                 }
-                Diff(
-                  height = height,
-                  tx = tx,
-                  portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
-                  accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
-                )
-              })
+              }
 
         }
 

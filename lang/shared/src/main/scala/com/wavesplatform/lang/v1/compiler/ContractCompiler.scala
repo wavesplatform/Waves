@@ -39,8 +39,10 @@ object ContractCompiler {
           _ <- Either
             .cond(tpe match {
               case CASETYPEREF("WriteSet", _) => true
+              case CASETYPEREF("PaymentSet", _) => true
+              case CASETYPEREF("ContractResult", _) => true
               case _                          => false
-            }, (), Generic(0, 0, s"ContractFunction must return WriteSet, but got '$tpe'"))
+            }, (), Generic(0, 0, s"ContractFunction must return WriteSet/PaymentSet/ContractResult, but got '$tpe'"))
             .toCompileM
         } yield ContractFunction(c, None, func)
       case (List(c: VerifierAnnotation), (func, tpe, _)) =>
