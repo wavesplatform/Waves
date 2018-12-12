@@ -95,7 +95,7 @@ trait Caches extends Blockchain with ScorexLogging {
 
   protected def rememberBlocksInterval: Long
 
-  private val blocksTs                               = new util.HashMap[Int, Long] // Height -> block timestamp
+  private val blocksTs                               = new util.TreeMap[Int, Long] // Height -> block timestamp, assume sorted by key.
   private var oldestStoredBlockTimestamp             = Long.MaxValue
   private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
@@ -110,31 +110,17 @@ trait Caches extends Blockchain with ScorexLogging {
     }
   }
   protected def forgetBlocks(): Unit = {
-    var oldestBlock = Int.MaxValue;
-    {
-      val biterator = blocksTs.entrySet().iterator()
-      val bts       = lastBlock.fold(0L)(_.timestamp)
-      while (biterator.hasNext) {
-        val e = biterator.next()
-        val b = e.getKey
-        if (b < bts - rememberBlocksInterval) {
-          biterator.remove()
-        } else if (b < oldestBlock) {
-          oldestBlock = b
-        }
-      }
-      oldestStoredBlockTimestamp = blocksTs.getOrDefault(oldestBlock, Long.MaxValue)
+    val iterator = blocksTs.entrySet().iterator()
+    val (oldestBlock, oldestTs) = if (iterator.hasNext) {
+      val e = iterator.next()
+      e.getKey -> e.getValue
+    } else {
+      0 -> Long.MaxValue
     }
-//    transactionIds.removeIf(_.getKey < oldestBlock)
-    {
-      val iterator = transactionIds.entrySet().iterator()
-      while (iterator.hasNext) {
-        val e = iterator.next()
-        if (e.getValue < oldestBlock) {
-          iterator.remove()
-        }
-      }
-    }
+    oldestStoredBlockTimestamp = oldestTs
+    val bts = lastBlock.fold(0L)(_.timestamp) - rememberBlocksInterval
+    blocksTs.entrySet().removeIf(_.getValue < bts)
+    transactionIds.entrySet().removeIf(_.getValue < oldestBlock)
   }
 
   private val portfolioCache: LoadingCache[Address, Portfolio] = cache(maxCacheSize, loadPortfolio)
