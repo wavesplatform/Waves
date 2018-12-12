@@ -95,7 +95,7 @@ trait Caches extends Blockchain with ScorexLogging {
   protected def rememberBlocksInterval: Long
 
   private val blocksTs                               = new util.HashMap[Int, Long] // Height -> block timestamp
-  private var olderStoredBlockTimestamp              = Long.MaxValue
+  private var oldestStoredBlockTimestamp              = Long.MaxValue
   private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
   private var miss: Int                              = 0
