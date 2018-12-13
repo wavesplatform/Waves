@@ -55,20 +55,23 @@ class OrderBookActor(owner: ActorRef,
   private def fullCommands: Receive = readOnlyCommands orElse executeCommands orElse snapshotsCommands
 
   private def executeCommands: Receive = {
-    case request: QueueEventWithMeta if request.offset > lastProcessedOffset =>
-      request.event match {
-        case x: QueueEvent.Placed   => onAddOrder(request, x.order)
-        case x: QueueEvent.Canceled => onCancelOrder(request.offset, x.orderId)
-        case _: QueueEvent.OrderBookDeleted =>
-          sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq(), Seq()))
-          updateSnapshot(OrderBook.empty)
-          orderBook.asks.values
-            .++(orderBook.bids.values)
-            .flatten
-            .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x, unmatchable = false)))
-          context.stop(self)
+    case request: QueueEventWithMeta =>
+      if (request.offset <= lastProcessedOffset) sender() ! AlreadyProcessed
+      else {
+        request.event match {
+          case x: QueueEvent.Placed   => onAddOrder(request, x.order)
+          case x: QueueEvent.Canceled => onCancelOrder(request.offset, x.orderId)
+          case _: QueueEvent.OrderBookDeleted =>
+            sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq(), Seq()))
+            updateSnapshot(OrderBook.empty)
+            orderBook.asks.values
+              .++(orderBook.bids.values)
+              .flatten
+              .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x, unmatchable = false)))
+            context.stop(self)
+        }
+        lastProcessedOffset = request.offset
       }
-      lastProcessedOffset = request.offset
   }
 
   private def snapshotsCommands: Receive = {
