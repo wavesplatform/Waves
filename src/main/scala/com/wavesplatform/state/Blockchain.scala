@@ -45,9 +45,7 @@ trait Blockchain {
                           count: Int,
                           fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]]
 
-  def containsTransaction(id: ByteStr): Boolean
-  def forgetTransactions(pred: (ByteStr, Long) => Boolean): Map[ByteStr, Long]
-  def learnTransactions(values: Map[ByteStr, Long]): Unit
+  def containsTransaction(tx: Transaction): Boolean
 
   def assetDescription(id: ByteStr): Option[AssetDescription]
 

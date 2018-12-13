@@ -10,8 +10,10 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.{AssetId, Transaction}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.metrics.LevelDBStats
 
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 
 trait Caches extends Blockchain with ScorexLogging {
   import Caches._
@@ -92,21 +94,32 @@ trait Caches extends Blockchain with ScorexLogging {
     }
   }
 
-  private val transactionIds                                       = new util.HashMap[ByteStr, Long]()
-  protected def forgetTransaction(id: ByteStr): Unit               = transactionIds.remove(id)
-  override def containsTransaction(id: ByteStr): Boolean           = transactionIds.containsKey(id)
-  override def learnTransactions(values: Map[ByteStr, Long]): Unit = transactionIds.putAll(values.asJava)
-  override def forgetTransactions(pred: (ByteStr, Long) => Boolean): Map[ByteStr, Long] = {
-    val removedTransactions = Map.newBuilder[ByteStr, Long]
-    val iterator            = transactionIds.entrySet().iterator()
-    while (iterator.hasNext) {
-      val e = iterator.next()
-      if (pred(e.getKey, e.getValue)) {
-        removedTransactions += e.getKey -> e.getValue
-        iterator.remove()
-      }
+  protected def rememberBlocksInterval: Long
+
+  private val blocksTs                               = new util.TreeMap[Int, Long] // Height -> block timestamp, assume sorted by key.
+  private var oldestStoredBlockTimestamp             = Long.MaxValue
+  private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
+  protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
+  override def containsTransaction(tx: Transaction): Boolean = transactionIds.containsKey(tx.id()) || {
+    if (tx.timestamp - 2.hours.toMillis <= oldestStoredBlockTimestamp) {
+      LevelDBStats.miss.record(1)
+      transactionHeight(tx.id()).nonEmpty
+    } else {
+      false
     }
-    removedTransactions.result()
+  }
+  protected def forgetBlocks(): Unit = {
+    val iterator = blocksTs.entrySet().iterator()
+    val (oldestBlock, oldestTs) = if (iterator.hasNext) {
+      val e = iterator.next()
+      e.getKey -> e.getValue
+    } else {
+      0 -> Long.MaxValue
+    }
+    oldestStoredBlockTimestamp = oldestTs
+    val bts = lastBlock.fold(0L)(_.timestamp) - rememberBlocksInterval
+    blocksTs.entrySet().removeIf(_.getValue < bts)
+    transactionIds.entrySet().removeIf(_.getValue < oldestBlock)
   }
 
   private val portfolioCache: LoadingCache[Address, Portfolio] = cache(maxCacheSize, loadPortfolio)
@@ -180,6 +193,7 @@ trait Caches extends Blockchain with ScorexLogging {
                          sponsorship: Map[AssetId, Sponsorship]): Unit
 
   override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
+    val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
@@ -229,11 +243,11 @@ trait Caches extends Blockchain with ScorexLogging {
 
     val newTransactions = Map.newBuilder[ByteStr, (Transaction, Set[BigInt])]
     for ((id, (_, tx, addresses)) <- diff.transactions) {
-      transactionIds.put(id, tx.timestamp)
+      transactionIds.put(id, newHeight)
       newTransactions += id -> ((tx, addresses.map(addressId)))
     }
 
-    current = ((current._1 + 1), (current._2 + block.blockScore()), Some(block))
+    current = (newHeight, (current._2 + block.blockScore()), Some(block))
 
     doAppend(
       block,
@@ -260,6 +274,8 @@ trait Caches extends Blockchain with ScorexLogging {
     for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
+    blocksTs.put(newHeight, block.timestamp)
+    forgetBlocks()
   }
 
   protected def doRollback(targetBlockId: ByteStr): Seq[Block]

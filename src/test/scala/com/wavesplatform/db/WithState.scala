@@ -14,7 +14,7 @@ trait WithState {
   protected def withState[A](fs: FunctionalitySettings)(f: Blockchain => A): A = {
     val path = Files.createTempDirectory("leveldb-test")
     val db   = openDB(path.toAbsolutePath.toString)
-    try f(new LevelDBWriter(db, fs))
+    try f(new LevelDBWriter(db, fs, 100000, 2000, 120 * 60 * 1000))
     finally {
       db.close()
       TestHelpers.deleteRecursively(path)
