@@ -40,7 +40,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
     ProducerSettings(config, new StringSerializer, serializer)
   }
 
-  private val commandProducer = Source
+  private val producer = Source
     .queue[(QueueEvent, Promise[QueueEventWithMeta.Offset])](1, OverflowStrategy.backpressure)
     .map {
       case (payload, p) =>
@@ -80,13 +80,13 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
 
   override def storeEvent(event: QueueEvent): Future[QueueEventWithMeta.Offset] = {
     val p = Promise[QueueEventWithMeta.Offset]()
-    commandProducer.offer((event, p))
+    producer.offer((event, p))
     p.future
   }
 
   override def close(timeout: FiniteDuration): Unit = {
-    commandProducer.complete()
-    Await.result(commandProducer.watchCompletion(), timeout)
+    producer.complete()
+    Await.result(producer.watchCompletion(), timeout)
     consumer.foreach(x => Await.result(x.shutdown(), timeout))
   }
 
