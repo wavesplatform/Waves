@@ -30,9 +30,9 @@ class MatcherActor(matcherSettings: MatcherSettings,
 
   import MatcherActor._
 
-  private var tradedPairs: Map[AssetPair, MarketData]       = Map.empty
-  private var childrenNames: Map[ActorRef, AssetPair]       = Map.empty
-  private var lastSnapshotOffset: QueueEventWithMeta.Offset = 0L
+  private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
+  private var childrenNames: Map[ActorRef, AssetPair] = Map.empty
+  private var lastSnapshotNr: Long                    = 0L
 
   private var snapshotOffsets: Map[AssetPair, QueueEventWithMeta.Offset] = Map.empty
 
@@ -121,6 +121,8 @@ class MatcherActor(matcherSettings: MatcherSettings,
   private def forwardToOrderBook: Receive = {
     case GetMarkets => sender() ! tradedPairs.values.toSeq
 
+    case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotOffsets)
+
     case request: QueueEventWithMeta =>
       request.event match {
         case QueueEvent.OrderBookDeleted(assetPair) =>
@@ -149,9 +151,9 @@ class MatcherActor(matcherSettings: MatcherSettings,
       context.children.foreach(context.unwatch)
       context.become(snapshotsCommands orElse shutdownFallback)
 
-      if (lastSnapshotOffset < lastSequenceNr) saveSnapshot(Snapshot(tradedPairs.keySet))
+      if (lastSnapshotNr < lastSequenceNr) saveSnapshot(Snapshot(tradedPairs.keySet))
       else {
-        log.debug(s"No changes, lastSnapshotOffset = $lastSnapshotOffset, lastSequenceNr = $lastSequenceNr")
+        log.debug(s"No changes, lastSnapshotNr = $lastSnapshotNr, lastSequenceNr = $lastSequenceNr")
         shutdownStatus = shutdownStatus.copy(
           oldMessagesDeleted = true,
           oldSnapshotsDeleted = true
@@ -178,7 +180,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
     case OrderBookCreated(pair) => if (orderBook(pair).isEmpty) createOrderBook(pair)
 
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
-      lastSnapshotOffset = metadata.sequenceNr
+      lastSnapshotNr = metadata.sequenceNr
       log.info(s"Loaded the snapshot with nr = ${metadata.sequenceNr}")
       snapshot.tradedPairsSet.foreach(createOrderBook)
 
@@ -223,7 +225,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
 
   private def snapshotsCommands: Receive = {
     case SaveSnapshotSuccess(metadata) =>
-      lastSnapshotOffset = metadata.sequenceNr
+      lastSnapshotNr = metadata.sequenceNr
       log.info(s"Snapshot saved with metadata $metadata")
       deleteMessages(metadata.sequenceNr - 1)
       deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
@@ -328,6 +330,9 @@ object MatcherActor {
   case class OrderBookCreated(pair: AssetPair)
 
   case object GetMarkets
+
+  case object GetSnapshotOffsets
+  case class SnapshotOffsetsResponse(offsets: Map[AssetPair, QueueEventWithMeta.Offset])
 
   case class MatcherRecovered(oldestCommandNr: Long)
 
