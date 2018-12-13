@@ -274,6 +274,7 @@ trait Caches extends Blockchain with ScorexLogging {
     for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
+    blocksTs.put(newHeight, block.timestamp)
     forgetBlocks()
   }
 
