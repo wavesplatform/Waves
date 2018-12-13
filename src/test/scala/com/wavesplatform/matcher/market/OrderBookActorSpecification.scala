@@ -7,7 +7,7 @@ import akka.testkit.{ImplicitSender, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.OrderOps._
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.api.{OrderAccepted, OrderCanceled}
+import com.wavesplatform.matcher.api.{AlreadyProcessed, OrderAccepted, OrderCanceled}
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -398,7 +398,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       getOrders(actor) shouldEqual expectedOrders
     }
 
-    "ignores outdated requests" in obcTest { (pair, actor) =>
+    "ignore outdated requests" in obcTest { (pair, actor) =>
       (1 to 10).foreach { i =>
         actor ! wrap(i, buy(pair, 100000000, 0.00041))
       }
@@ -407,10 +407,10 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       (1 to 10).foreach { i =>
         actor ! wrap(i, buy(pair, 100000000, 0.00041))
       }
-      expectNoMessage(200.millis)
+      all(receiveN(10)) shouldBe AlreadyProcessed
     }
 
-    "response on SaveSnapshotCommand" in obcTest { (pair, actor) =>
+    "respond on SaveSnapshotCommand" in obcTest { (pair, actor) =>
       (1 to 10).foreach { i =>
         actor ! wrap(i, buy(pair, 100000000, 0.00041))
       }
