@@ -34,9 +34,7 @@ object MatcherDefaultConfig {
                                      |  blacklisted-assets = ["$ForbiddenAssetId"]
                                      |  balance-watching.enable = yes
                                      |  rest-order-limit=$orderLimit
-                                     |  # events-queue.type = "kafka"
-                                     |}
-                                     |# akka.kafka.consumer.kafka-clients.bootstrap.servers = "10.56.1.169:34302"""".stripMargin)
+                                     |}""".stripMargin)
 
   val Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(2))
     .zip(Seq(matcherConfig, minerDisabled, minerEnabled))
