@@ -89,7 +89,7 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def orderStatusExpectInvalidAssetId(orderId: String, assetPair: AssetPair, assetId: String): Future[Boolean] = {
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}/$orderId") transform {
-        case Failure(UnexpectedStatusCodeException(_, 404, responseBody)) =>
+        case Failure(UnexpectedStatusCodeException(_, _, 404, responseBody)) =>
           Try(parse(responseBody).as[MessageMatcherResponse]) match {
             case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
             case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
@@ -114,7 +114,7 @@ object AsyncMatcherHttpApi extends Assertions {
 
     def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Future[Boolean] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}") transform {
-        case Failure(UnexpectedStatusCodeException(_, 404, responseBody)) =>
+        case Failure(UnexpectedStatusCodeException(_, _, 404, responseBody)) =>
           Try(parse(responseBody).as[MessageMatcherResponse]) match {
             case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
             case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
@@ -148,9 +148,10 @@ object AsyncMatcherHttpApi extends Assertions {
     def expectCancelRejected(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String): Future[Unit] = {
       val requestUri = s"/matcher/orderbook/${assetPair.toUri}/cancel"
       matcherPost(requestUri, cancelRequest(sender, orderId)).transform {
-        case Failure(UnexpectedStatusCodeException(_, 400, body)) if (Json.parse(body) \ "status").as[String] == "OrderCancelRejected" => Success(())
-        case Failure(cause)                                                                                                            => Failure(cause)
-        case Success(resp)                                                                                                             => Failure(UnexpectedStatusCodeException(requestUri, resp.getStatusCode, resp.getResponseBody))
+        case Failure(UnexpectedStatusCodeException(_, _, 400, body)) if (Json.parse(body) \ "status").as[String] == "OrderCancelRejected" =>
+          Success(())
+        case Failure(cause) => Failure(cause)
+        case Success(resp)  => Failure(UnexpectedStatusCodeException("POST", requestUri, resp.getStatusCode, resp.getResponseBody))
       }
     }
 
@@ -246,7 +247,7 @@ object AsyncMatcherHttpApi extends Assertions {
                                       expectedStatus: String,
                                       expectedMessage: Option[String]): Future[Boolean] =
       matcherPost("/matcher/orderbook", order.json()) transform {
-        case Failure(UnexpectedStatusCodeException(_, `expectedStatusCode`, responseBody)) =>
+        case Failure(UnexpectedStatusCodeException(_, _, `expectedStatusCode`, responseBody)) =>
           expectedMessage match {
             case None =>
               Try(parse(responseBody).as[MatcherStatusResponse]) match {

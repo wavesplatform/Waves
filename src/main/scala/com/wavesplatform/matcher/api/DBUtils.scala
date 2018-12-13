@@ -22,6 +22,7 @@ object DBUtils {
 
       // We show all active orders even they count exceeds the pair limit
       def getAll(ro: ReadOnlyDB, address: Address): IndexedSeq[ActiveOrdersIndex.Node] = c(address).getAll(ro)
+      def has(ro: ReadOnlyDB, address: Address, id: Order.Id): Boolean                 = c(address).has(ro, id)
 
       private def c(address: Address) = new ActiveOrdersIndex(address, MaxElements)
     }

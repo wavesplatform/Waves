@@ -202,9 +202,9 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     def unconfirmedTxInfo(txId: String)(implicit tag: String): Future[Transaction] = get(s"/transactions/unconfirmed/info/$txId").as[Transaction]
 
     def findTransactionInfo(txId: String)(implicit tag: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
-      case Success(tx)                                       => Success(Some(tx))
-      case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
-      case Failure(ex)                                       => Failure(ex)
+      case Success(tx)                                          => Success(Some(tx))
+      case Failure(UnexpectedStatusCodeException(_, _, 404, _)) => Success(None)
+      case Failure(ex)                                          => Failure(ex)
     }
 
     def ensureTxDoesntExist(txId: String)(implicit tag: String): Future[Unit] =

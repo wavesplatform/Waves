@@ -1,50 +1,46 @@
 package com.wavesplatform.matcher.market
 
-import akka.actor.{ActorRef, Props, Status}
-import akka.http.scaladsl.model._
+import akka.actor.{ActorRef, Props}
 import akka.persistence._
-import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.api._
+import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
+import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded}
+import com.wavesplatform.matcher.model.ExchangeTransactionCreator.CreateTransaction
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.network._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, HasScriptType, NegativeAmount, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxPool
-import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import play.api.libs.json._
 
 import scala.annotation.tailrec
-import scala.concurrent.ExecutionContext.Implicits.global
 
-class OrderBookActor(parent: ActorRef,
+class OrderBookActor(owner: ActorRef,
                      assetPair: AssetPair,
                      updateSnapshot: OrderBook => Unit,
                      updateMarketStatus: MarketStatus => Unit,
-                     utx: UtxPool,
-                     allChannels: ChannelGroup,
+                     broadcastTx: ExchangeTransaction => Unit,
                      settings: MatcherSettings,
-                     createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction],
+                     createTransaction: CreateTransaction,
                      time: Time)
     extends PersistentActor
     with ScorexLogging {
 
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
-  private val matchTimer         = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
-  private val persistCancelTimer = Kamon.timer("matcher.orderbook.persist").refine("event" -> "OrderCancelled")
-  private val cancelTimer        = Kamon.timer("matcher.orderbook.cancel")
+  private var lastSavedSnapshotNr: Option[Long] = Some(-1L)
+  private var lastProcessedOffset: Long         = -1L
 
-  private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
-  private var orderBook          = OrderBook.empty
+  private val matchTimer = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
+  private var orderBook  = OrderBook.empty
 
   private var lastMarketStatus = MarketStatus(assetPair, orderBook.bids.headOption, orderBook.asks.headOption, None)
   private def refreshMarketStatus(newLastOrder: Option[Order] = None): Unit = {
@@ -56,49 +52,40 @@ class OrderBookActor(parent: ActorRef,
     updateMarketStatus(lastMarketStatus)
   }
 
-  private def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
+  private def fullCommands: Receive = readOnlyCommands orElse executeCommands orElse snapshotsCommands
 
   private def executeCommands: Receive = {
-    case order: Order        => onAddOrder(order)
-    case cancel: CancelOrder => onCancelOrder(cancel.orderId)
-    case OrderCleanup        => onOrderCleanup(orderBook, time.correctedTime())
+    case request: QueueEventWithMeta if request.offset > lastProcessedOffset =>
+      request.event match {
+        case x: QueueEvent.Placed   => onAddOrder(request, x.order)
+        case x: QueueEvent.Canceled => onCancelOrder(request.offset, x.orderId)
+        case _: QueueEvent.OrderBookDeleted =>
+          sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq(), Seq()))
+          updateSnapshot(OrderBook.empty)
+          orderBook.asks.values
+            .++(orderBook.bids.values)
+            .flatten
+            .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x, unmatchable = false)))
+          context.stop(self)
+      }
+      lastProcessedOffset = request.offset
   }
 
   private def snapshotsCommands: Receive = {
-    case SaveSnapshot =>
-      log.info("Starting saving a snapshot")
-      saveSnapshot(Snapshot(orderBook))
-
     case SaveSnapshotSuccess(metadata) =>
       log.info(s"Snapshot has been saved: $metadata")
-      deleteMessages(metadata.sequenceNr)
+      owner ! OrderBookSnapshotUpdated(assetPair, lastProcessedOffset)
       deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
 
     case SaveSnapshotFailure(metadata, reason) =>
+      lastSavedSnapshotNr = None
       log.error(s"Failed to save snapshot: $metadata", reason)
 
-    case _: DeleteOrderBookRequest =>
-      updateSnapshot(OrderBook.empty)
-      orderBook.asks.values
-        .++(orderBook.bids.values)
-        .flatten
-        .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x, unmatchable = false)))
-      deleteMessages(lastSequenceNr)
-      deleteSnapshots(SnapshotSelectionCriteria.Latest)
-      sender() ! Status.Success(0)
-      context.stop(self)
-
-    case DeleteSnapshotsSuccess(criteria) =>
-      log.debug(s"$persistenceId DeleteSnapshotsSuccess with $criteria")
-
-    case DeleteSnapshotsFailure(criteria, cause) =>
-      log.error(s"$persistenceId DeleteSnapshotsFailure with $criteria, reason: $cause")
-
-    case DeleteMessagesSuccess(toSequenceNr) =>
-      log.debug(s"$persistenceId DeleteMessagesSuccess up to $toSequenceNr")
-
-    case DeleteMessagesFailure(cause: Throwable, toSequenceNr: Long) =>
-      log.error(s"$persistenceId DeleteMessagesFailure up to $toSequenceNr, reason: $cause")
+    case SaveSnapshot =>
+      if (lastSavedSnapshotNr.forall(_ < lastProcessedOffset)) {
+        lastSavedSnapshotNr = Some(lastProcessedOffset)
+        saveSnapshot()
+      }
   }
 
   private def readOnlyCommands: Receive = {
@@ -110,35 +97,20 @@ class OrderBookActor(parent: ActorRef,
       sender() ! GetOrdersResponse(orderBook.bids.values.flatten.toSeq)
   }
 
-  private def onOrderCleanup(orderBook: OrderBook, ts: Long): Unit = {
-    orderBook.asks.values
-      .++(orderBook.bids.values)
-      .flatten
-      .filterNot { x =>
-        val validation = x.order.isValid(ts)
-        validation
-      }
-      .map(_.order.id())
-      .foreach(onCancelOrder)
-  }
-
-  private def onCancelOrder(orderIdToCancel: ByteStr): Unit =
+  private def onCancelOrder(requestId: QueueEventWithMeta.Offset, orderIdToCancel: ByteStr): Unit = sender() ! {
     OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
       case Some(oc) =>
-        val st = persistCancelTimer.start()
-        persist(oc) { _ =>
-          st.stop()
-          cancelTimer.measure(handleCancelEvent(oc))
-          sender() ! OrderCanceled(orderIdToCancel)
-        }
+        handleCancelEvent(oc)
+        OrderCanceled(orderIdToCancel)
       case _ =>
         log.debug(s"Error cancelling $orderIdToCancel: order not found")
-        sender() ! OrderCancelRejected("Order not found")
+        OrderCancelRejected("Order not found")
     }
+  }
 
-  private def onAddOrder(order: Order): Unit = {
+  private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = {
     log.trace(s"Order accepted: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
-    matchTimer.measure(matchOrder(LimitOrder(order)))
+    matchTimer.measure(matchOrder(eventWithMeta, LimitOrder(order)))
     sender() ! OrderAccepted(order)
   }
 
@@ -156,8 +128,8 @@ class OrderBookActor(parent: ActorRef,
   }
 
   @tailrec
-  private def matchOrder(limitOrder: LimitOrder): Unit = {
-    val (submittedRemains, counterRemains) = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
+  private def matchOrder(eventWithMeta: QueueEventWithMeta, limitOrder: LimitOrder): Unit = {
+    val (submittedRemains, counterRemains) = handleMatchEvent(eventWithMeta, OrderBook.matchOrder(orderBook, limitOrder))
     if (counterRemains.isDefined) {
       if (!counterRemains.get.isValid) {
         val canceled = Events.OrderCanceled(counterRemains.get, unmatchable = true)
@@ -166,7 +138,7 @@ class OrderBookActor(parent: ActorRef,
     }
     if (submittedRemains.isDefined) {
       if (submittedRemains.get.isValid) {
-        matchOrder(submittedRemains.get)
+        matchOrder(eventWithMeta, submittedRemains.get)
       } else {
         val canceled = Events.OrderCanceled(submittedRemains.get, unmatchable = true)
         processEvent(canceled)
@@ -175,11 +147,6 @@ class OrderBookActor(parent: ActorRef,
   }
 
   private def processEvent(e: Event): Unit = {
-    val st = Kamon.timer("matcher.orderbook.persist").refine("event" -> e.getClass.getSimpleName).start()
-    persist(e) { _ =>
-      st.stop()
-      if (lastSequenceNr % settings.snapshotsInterval == 0) self ! SaveSnapshot
-    }
     applyEvent(e)
     context.system.eventStream.publish(e)
   }
@@ -190,7 +157,6 @@ class OrderBookActor(parent: ActorRef,
       Some(event.submitted)
     }
 
-    log.debug(s"Failed to execute order: $err")
     err match {
       case OrderValidationError(order, _) if order == event.submitted.order => None
       case OrderValidationError(order, _) if order == event.counter.order   => cancelCounterOrder()
@@ -216,20 +182,17 @@ class OrderBookActor(parent: ActorRef,
     }
   }
 
-  private def handleMatchEvent(e: Event): (Option[LimitOrder], Option[LimitOrder]) = {
+  private def handleMatchEvent(eventWithMeta: QueueEventWithMeta, e: Event): (Option[LimitOrder], Option[LimitOrder]) = {
     e match {
       case e: Events.OrderAdded =>
         processEvent(e)
         (None, None)
 
       case event @ Events.OrderExecuted(o, c) =>
-        (for {
-          tx <- createTransaction(event)
-          _  <- utx.putIfNew(tx)
-        } yield tx) match {
+        createTransaction(event, eventWithMeta.timestamp) match {
           case Right(tx) =>
             refreshMarketStatus(Some(o.order))
-            allChannels.broadcastTx(tx)
+            broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx))
             (
@@ -269,17 +232,15 @@ class OrderBookActor(parent: ActorRef,
   override def receiveCommand: Receive = fullCommands
 
   override def receiveRecover: Receive = {
-    case evt: Event =>
-      applyEvent(evt)
-      if (settings.recoverOrderHistory) context.system.eventStream.publish(evt)
-
     case RecoveryCompleted =>
       updateSnapshot(orderBook)
+      owner ! OrderBookSnapshotUpdated(assetPair, lastProcessedOffset)
       log.debug(s"Recovery completed: $orderBook")
-      if (settings.makeSnapshotsAtStart) self ! SaveSnapshot
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook
+      lastProcessedOffset = snapshot.lastProcessedCommandNr
+
       refreshMarketStatus()
       if (settings.recoverOrderHistory) {
         val orders = (orderBook.asks.valuesIterator ++ orderBook.bids.valuesIterator).flatten
@@ -301,9 +262,7 @@ class OrderBookActor(parent: ActorRef,
     super.preRestart(reason, message)
   }
 
-  override def postStop(): Unit = {
-    cleanupCancellable.cancel()
-  }
+  private def saveSnapshot(): Unit = saveSnapshot(Snapshot(lastProcessedOffset, orderBook))
 }
 
 object OrderBookActor {
@@ -311,35 +270,24 @@ object OrderBookActor {
             assetPair: AssetPair,
             updateSnapshot: OrderBook => Unit,
             updateMarketStatus: MarketStatus => Unit,
-            utx: UtxPool,
-            allChannels: ChannelGroup,
+            broadcastTx: ExchangeTransaction => Unit,
             settings: MatcherSettings,
-            createTransaction: OrderExecuted => Either[ValidationError, ExchangeTransaction],
+            createTransaction: CreateTransaction,
             time: Time): Props =
-    Props(new OrderBookActor(parent, assetPair, updateSnapshot, updateMarketStatus, utx, allChannels, settings, createTransaction, time))
+    Props(new OrderBookActor(parent, assetPair, updateSnapshot, updateMarketStatus, broadcastTx, settings, createTransaction, time))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  case class DeleteOrderBookRequest(assetPair: AssetPair)
-
-  case class CancelOrder(orderId: ByteStr)
-
-  case object OrderCleanup
-
-  case class GetOrderBookResponse(ts: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) {
-    def toHttpResponse: HttpResponse = HttpResponse(
-      entity = HttpEntity(
-        ContentTypes.`application/json`,
-        JsonSerializer.serialize(OrderBookResult(ts, pair, bids, asks))
-      )
-    )
+  sealed trait HasAssetPair {
+    def assetPair: AssetPair
   }
 
-  object GetOrderBookResponse {
-    def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(System.currentTimeMillis(), pair, Seq(), Seq())
-  }
+  case class DeleteOrderBookRequest(assetPair: AssetPair) extends HasAssetPair
 
-  case class MarketStatus(pair: AssetPair, bid: Option[(Price, Level[LimitOrder])], ask: Option[(Price, Level[LimitOrder])], last: Option[Order])
+  case class CancelOrder(assetPair: AssetPair, orderId: ByteStr) extends HasAssetPair
+
+  case class MarketStatus(assetPair: AssetPair, bid: Option[(Price, Level[LimitOrder])], ask: Option[(Price, Level[LimitOrder])], last: Option[Order])
+      extends HasAssetPair
 
   // Direct requests
   case object GetOrdersRequest
@@ -350,8 +298,8 @@ object OrderBookActor {
 
   case class GetOrdersResponse(orders: Seq[LimitOrder])
 
-  case object SaveSnapshot
+  case class Snapshot(lastProcessedCommandNr: Long, orderBook: OrderBook)
 
-  case class Snapshot(orderBook: OrderBook)
-
+  // Internal messages
+  case class OrderBookSnapshotUpdated(assetPair: AssetPair, lastProcessedCommandNr: Long)
 }
