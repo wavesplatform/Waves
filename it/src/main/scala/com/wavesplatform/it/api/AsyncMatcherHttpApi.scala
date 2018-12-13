@@ -7,6 +7,7 @@ import com.wavesplatform.http.api_key
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -273,6 +274,11 @@ object AsyncMatcherHttpApi extends Assertions {
     def ordersByAddress(senderAddress: String, activeOnly: Boolean): Future[Seq[OrderbookHistory]] =
       matcherGetWithApiKey(s"/matcher/orders/$senderAddress?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
 
+    def getCurrentOffset: Future[QueueEventWithMeta.Offset] = matcherGetWithApiKey("/matcher/debug/currentOffset").as[QueueEventWithMeta.Offset]
+    def getOldestSnapshotOffset: Future[QueueEventWithMeta.Offset] =
+      matcherGetWithApiKey("/matcher/debug/oldestSnapshotOffset").as[QueueEventWithMeta.Offset]
+    def getAllSnapshotOffsets: Future[Map[String, QueueEventWithMeta.Offset]] =
+      matcherGetWithApiKey("/matcher/debug/allSnapshotOffsets").as[Map[String, QueueEventWithMeta.Offset]]
   }
 
   implicit class RequestBuilderOps(self: RequestBuilder) {

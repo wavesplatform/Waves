@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
+import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
@@ -203,6 +204,10 @@ object SyncMatcherHttpApi extends Assertions {
 
     def ordersByAddress(sender: PrivateKeyAccount, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderbookHistory] =
       sync(async(m).ordersByAddress(sender, activeOnly), waitTime)
+
+    def getCurrentOffset: QueueEventWithMeta.Offset                   = sync(async(m).getCurrentOffset)
+    def getOldestSnapshotOffset: QueueEventWithMeta.Offset            = sync(async(m).getOldestSnapshotOffset)
+    def getAllSnapshotOffsets: Map[String, QueueEventWithMeta.Offset] = sync(async(m).getAllSnapshotOffsets)
   }
 
 }
