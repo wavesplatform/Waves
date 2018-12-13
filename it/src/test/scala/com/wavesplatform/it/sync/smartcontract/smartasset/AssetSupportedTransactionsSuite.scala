@@ -200,8 +200,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     sender.signedBroadcast(blackTx.json(), waitForTx = true)
 
-    assertBadRequestAndMessage(sender.signedBroadcast(incorrectTx.json()),
-                               errNotAllowedByToken)
+    assertBadRequestAndMessage(sender.signedBroadcast(incorrectTx.json()), errNotAllowedByToken)
   }
 
   test("burner is from the list (white or black)") {

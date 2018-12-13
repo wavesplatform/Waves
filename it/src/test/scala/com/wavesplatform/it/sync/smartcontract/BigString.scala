@@ -72,8 +72,7 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
     val signedLeasing =
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
-    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json()).id,
-                               "String is too large")
+    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json()).id, "String is too large")
 
     val leasingId = Base58.encode(unsignedLeasing.id().arr)
 
