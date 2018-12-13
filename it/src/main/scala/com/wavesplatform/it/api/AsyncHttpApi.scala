@@ -35,7 +35,7 @@ import scala.util.{Failure, Success}
 
 object AsyncHttpApi extends Assertions {
 
-  implicit class NodeAsyncHttpApi(n: Node) extends Assertions with Matchers {
+  implicit class NodeAsyncHttpApi(val n: Node) extends Assertions with Matchers {
 
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())

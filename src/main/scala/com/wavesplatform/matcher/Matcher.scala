@@ -123,7 +123,8 @@ class Matcher(actorSystem: ActorSystem,
   lazy val matcher: ActorRef = actorSystem.actorOf(
     MatcherActor.props(
       matcherSettings,
-      (self, oldestSnapshotOffset) =>
+      (self, oldestSnapshotOffset) => {
+        currentOffset.set(oldestSnapshotOffset)
         matcherQueue.startConsume(
           oldestSnapshotOffset + 1,
           eventWithMeta => {
@@ -131,18 +132,22 @@ class Matcher(actorSystem: ActorSystem,
             implicit val timeout: Timeout = 2.seconds
 
             // TODO: doesn't required until newestSnapshotOffset
-            self.ask(eventWithMeta).mapTo[MatcherResponse].map { r =>
-              val newP = Promise[MatcherResponse]
-              val rPromise = Option(requests.putIfAbsent(eventWithMeta.offset, newP)) match {
-                case Some(p) => p
-                case None    => newP
-              }
+            self
+              .ask(eventWithMeta)
+              .mapTo[MatcherResponse]
+              .map { r =>
+                val newP = Promise[MatcherResponse]
+                val rPromise = Option(requests.putIfAbsent(eventWithMeta.offset, newP)) match {
+                  case Some(p) => p
+                  case None    => newP
+                }
 
-              currentOffset.getAndAccumulate(eventWithMeta.offset, math.max(_, _))
-              rPromise.trySuccess(r)
-            }
+                currentOffset.getAndAccumulate(eventWithMeta.offset, math.max(_, _))
+                rPromise.trySuccess(r)
+              }
           }
-      ),
+        )
+      },
       pairBuilder.validateAssetPair,
       orderBooks,
       updateOrderBookCache,
