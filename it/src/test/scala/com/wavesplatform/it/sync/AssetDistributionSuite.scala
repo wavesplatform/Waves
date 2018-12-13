@@ -8,6 +8,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import play.api.libs.json._
 import com.wavesplatform.it.util._
 
+
 class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   val node: Node = nodes.head
@@ -49,6 +50,15 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     addresses.forall { addr =>
       (jsonResponse \ addr.address).as[Long] == transferAmount
+    } shouldBe true
+
+    val jsonResponse3 = Json.parse(
+      node
+        .get(s"/assets/${issueTx.id}/distribution/${node.height}/limit/100?after=${issuer.address}")
+        .getResponseBody)
+
+    addresses.forall { addr =>
+      (jsonResponse3 \ addr.address).as[Long] == transferAmount
     } shouldBe true
   }
 
