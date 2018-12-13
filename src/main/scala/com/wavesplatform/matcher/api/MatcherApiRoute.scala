@@ -14,11 +14,11 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.crypto
 import com.wavesplatform.matcher.AssetPairBuilder
 import com.wavesplatform.matcher.Matcher.StoreEvent
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData}
+import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor
 import com.wavesplatform.matcher.model._
-import com.wavesplatform.matcher.queue.QueueEvent
+import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.ByteStr
@@ -51,7 +51,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            wavesSettings: WavesSettings,
                            isDuringShutdown: () => Boolean,
                            db: DB,
-                           time: Time)
+                           time: Time,
+                           currentOffset: () => QueueEventWithMeta.Offset)
     extends ApiRoute
     with ScorexLogging {
 
@@ -73,7 +74,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       matcherPublicKey ~ getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ getTradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-        getSettings
+        getSettings ~ getCurrentOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
     }
   }
 
@@ -566,6 +567,51 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def getTransactionsByOrder: Route = (path("transactions" / ByteStrPM) & get) { orderId =>
     complete(StatusCodes.OK -> Json.toJson(DBUtils.transactionsForOrder(db, orderId)))
+  }
+
+  @Path("/debug/currentOffset")
+  @ApiOperation(value = "Get a current offset in the queue", notes = "", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
+    ))
+  def getCurrentOffset: Route = (path("debug" / "currentOffset") & get & withAuth) {
+    complete(StatusCodes.OK -> currentOffset())
+  }
+
+  @Path("/debug/oldestSnapshotOffset")
+  @ApiOperation(value = "Get the oldest snapshot's offset in the queue", notes = "", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
+    ))
+  def getOldestSnapshotOffset: Route = (path("debug" / "oldestSnapshotOffset") & get & withAuth) {
+    complete {
+      (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
+        StatusCodes.OK -> x.offsets.valuesIterator.min
+      }
+    }
+  }
+
+  @Path("/debug/allSnapshotOffsets")
+  @ApiOperation(value = "Get all snapshots' offsets in the queue", notes = "", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
+    ))
+  def getAllSnapshotOffsets: Route = (path("debug" / "allSnapshotOffsets") & get & withAuth) {
+    complete {
+      (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
+        val js = Json.obj(
+          x.offsets.map {
+            case (assetPair, offset) =>
+              assetPair.key -> Json.toJsFieldJsValueWrapper(offset)
+          }.toSeq: _*
+        )
+
+        StatusCodes.OK -> js
+      }
+    }
   }
 }
 
