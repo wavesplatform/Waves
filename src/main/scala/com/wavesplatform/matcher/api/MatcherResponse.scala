@@ -58,3 +58,5 @@ case object OrderBookUnavailable extends WrappedMatcherResponse(C.ServiceUnavail
 case object DuringShutdown extends WrappedMatcherResponse(C.ServiceUnavailable, "System is going shutdown")
 
 case class GetOrderBookResponse(orderBookResult: OrderBookResult) extends MatcherResponse(C.OK, OrderBookResult.toJson(orderBookResult))
+
+case object AlreadyProcessed extends WrappedMatcherResponse(C.Accepted, "This event has been already processed")
