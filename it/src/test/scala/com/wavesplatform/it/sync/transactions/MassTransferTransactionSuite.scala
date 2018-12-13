@@ -128,7 +128,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val invalidTransfers = Seq(
       (request(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
       (request(transfers = List.fill(MaxTransferCount + 1)(Transfer(secondAddress, 1)), fee = calcMassTransferFee(MaxTransferCount + 1)),
-       "Number of transfers is greater than 100"),
+       s"Number of transfers ${MaxTransferCount + 1} is greater than 100"),
       (request(transfers = List(Transfer(secondAddress, -1))), "One of the transfers has negative amount"),
       (request(fee = 0), "insufficient fee"),
       (request(fee = 99999), "Fee .* does not exceed minimal value"),
