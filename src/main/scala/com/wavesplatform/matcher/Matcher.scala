@@ -45,6 +45,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private implicit val materializer: ActorMaterializer = ActorMaterializer()(actorSystem)
 
+  private val currentOffset      = new AtomicReference[QueueEventWithMeta.Offset](-1L)
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings)
@@ -110,7 +111,8 @@ class Matcher(actorSystem: ActorSystem,
       settings,
       isDuringShutdown,
       db,
-      time
+      time,
+      () => currentOffset.get()
     )
   )
 
@@ -136,6 +138,7 @@ class Matcher(actorSystem: ActorSystem,
                 case None    => newP
               }
 
+              currentOffset.getAndAccumulate(eventWithMeta.offset, math.max(_, _))
               rPromise.trySuccess(r)
             }
           }
