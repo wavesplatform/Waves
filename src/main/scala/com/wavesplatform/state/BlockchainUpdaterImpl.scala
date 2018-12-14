@@ -491,7 +491,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       } else {
         val distributionFromNG =
           changedBalances(_.assets.getOrElse(assetId, 0) != 0, portfolio(_).assets.getOrElse(assetId, 0))
-        innerDistribution |+| distributionFromNG.asRight
+        innerDistribution.map(_ ++ distributionFromNG)
       }
     }
   }
