@@ -179,7 +179,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     } else {
       val distributionFromDiff =
         changedBalances(_.assets.getOrElse(assetId, 0) != 0, portfolio(_).assets.getOrElse(assetId, 0))
-      innerDistribution |+| distributionFromDiff.asRight
+      innerDistribution.map(_ ++ distributionFromDiff)
     }
   }
 
