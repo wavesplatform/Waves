@@ -47,6 +47,12 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     (jsonResponse \ issuer.address).as[Long] shouldBe (issueAmount - addresses.length * transferAmount)
 
+    val r3 = node
+      .get(s"/assets/${issueTx.id}/distribution")
+      .getResponseBody
+
+    r3 shouldEqual r2
+
     addresses.forall { addr =>
       (jsonResponse \ addr.address).as[Long] == transferAmount
     } shouldBe true

@@ -747,8 +747,16 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       .mapValues(_.size)
   }
 
-  override def assetDistribution(assetId: ByteStr, count: Int, fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] =
-    assetDistributionAtHeight(assetId, height, count, fromAddress)
+  override def assetDistribution(assetId: ByteStr): Map[Address, Long] = readOnly { db =>
+    (for {
+      seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
+      addressId <- db.get(Keys.addressesForWaves(seqNr)).par
+      history = db.get(Keys.assetBalanceHistory(addressId, assetId))
+      actualHeight <- history.partition(_ > height)._2.headOption
+      balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
+      if balance > 0
+    } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+  }
 
   override def assetDistributionAtHeight(assetId: AssetId,
                                          height: Int,
