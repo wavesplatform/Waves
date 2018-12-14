@@ -45,7 +45,8 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
                        "reissuable": true,
                        "decimals": 8,
                        "description": "Gigacoin",
-                       "script":null
+                       "script":null,
+                       "cheinId":84
                        }
     """)
 
