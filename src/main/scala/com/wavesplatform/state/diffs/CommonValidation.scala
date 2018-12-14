@@ -101,7 +101,7 @@ object CommonValidation {
     case _: PaymentTransaction => Right(tx)
     case _ =>
       val id = tx.id()
-      Either.cond(!blockchain.containsTransaction(id), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
+      Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
   }
 
   def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, height: Int, tx: T): Either[ValidationError, T] = {

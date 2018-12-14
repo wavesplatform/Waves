@@ -9,8 +9,6 @@ import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.BurnTransactionV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import play.api.libs.json.JsNumber
-
 import scala.concurrent.duration._
 
 class NoOrderProofsSuite extends BaseTransactionSuite {
@@ -86,7 +84,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       .get
 
     assertBadRequestAndMessage(
-      sender.signedBroadcast(incorrectTrTx.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))),
+      sender.signedBroadcast(incorrectTrTx.json()),
       errProofMsg
     )
 
@@ -105,7 +103,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       .get
 
     assertBadRequestAndMessage(
-      sender.signedBroadcast(incorrectBrTx.json() + ("type" -> JsNumber(BurnTransactionV2.typeId.toInt))),
+      sender.signedBroadcast(incorrectBrTx.json()),
       errProofMsg
     )
   }

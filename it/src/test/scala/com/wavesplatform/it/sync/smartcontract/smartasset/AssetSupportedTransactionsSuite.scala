@@ -7,7 +7,6 @@ import com.wavesplatform.state.{ByteStr, IntegerDataEntry}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import play.api.libs.json.JsNumber
 import scala.concurrent.duration._
 
 class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
@@ -199,10 +198,9 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val dataTx = sender.putData(firstAddress, List(IntegerDataEntry(s"${blackTx.id.value.base58}", 42)), minFee).id
     nodes.waitForHeightAriseAndTxPresent(dataTx)
 
-    sender.signedBroadcast(blackTx.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt)), waitForTx = true)
+    sender.signedBroadcast(blackTx.json(), waitForTx = true)
 
-    assertBadRequestAndMessage(sender.signedBroadcast(incorrectTx.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))),
-                               errNotAllowedByToken)
+    assertBadRequestAndMessage(sender.signedBroadcast(incorrectTx.json()), errNotAllowedByToken)
   }
 
   test("burner is from the list (white or black)") {

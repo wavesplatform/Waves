@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
-import play.api.libs.json.JsNumber
 
 class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with CancelAfterFailure with ReportingTestName with NodesFromDocker {
   import UTXAllowance._
@@ -39,7 +38,7 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
         .get
 
       val setScriptId = i
-        .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+        .signedBroadcast(setScriptTransaction.json())
         .id
 
       nodes.waitForHeightAriseAndTxPresent(setScriptId)
@@ -62,7 +61,7 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
         .right
         .get
     assertBadRequestAndMessage(
-      nodeA.signedBroadcast(txA.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))).id,
+      nodeA.signedBroadcast(txA.json()),
       "transactions from scripted accounts are denied from UTX pool"
     )
 
@@ -82,7 +81,7 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
         .right
         .get
 
-    val txBId = nodeB.signedBroadcast(txB.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))).id
+    val txBId = nodeB.signedBroadcast(txB.json()).id
     nodes.waitForHeightArise()
     nodeA.findTransactionInfo(txBId) shouldBe None
   }

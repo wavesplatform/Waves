@@ -27,7 +27,7 @@ trait BaseState {
     LevelDBFactory.factory.open(new File(dir), options)
   }
 
-  val state: LevelDBWriter = new LevelDBWriter(db, fsSettings)
+  val state: LevelDBWriter = new LevelDBWriter(db, fsSettings, 100000, 2000, 120 * 60 * 1000)
 
   private var _richAccount: PrivateKeyAccount = _
   def richAccount: PrivateKeyAccount          = _richAccount

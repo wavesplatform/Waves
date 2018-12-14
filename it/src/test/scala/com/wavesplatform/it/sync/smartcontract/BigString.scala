@@ -10,9 +10,8 @@ import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.lease.LeaseTransactionV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.{Base58}
+import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.JsNumber
 
 class BigString extends BaseTransactionSuite with CancelAfterFailure {
   private val acc0 = pkByAddress(firstAddress)
@@ -49,7 +48,7 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
       .explicitGet()
 
     val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .signedBroadcast(setScriptTransaction.json())
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
@@ -73,8 +72,7 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
     val signedLeasing =
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
-    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json() + ("type" -> JsNumber(LeaseTransactionV2.typeId.toInt))).id,
-                               "String is too large")
+    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json()).id, "String is too large")
 
     val leasingId = Base58.encode(unsignedLeasing.id().arr)
 

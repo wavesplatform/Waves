@@ -10,8 +10,6 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import org.scalatest.{Assertion, CancelAfterFailure, FreeSpec, Matchers}
-import play.api.libs.json.JsNumber
-
 import scala.concurrent.duration._
 
 class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with ReportingTestName with CancelAfterFailure {
@@ -91,8 +89,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
             .get
 
         val iTx = invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis)
-        assertBadRequestAndResponse(sponsor.broadcastRequest(iTx.json() + ("type" -> JsNumber(SponsorFeeTransaction.typeId.toInt))),
-                                    "Transaction .* is from far future")
+        assertBadRequestAndResponse(sponsor.broadcastRequest(iTx.json()), "Transaction .* is from far future")
       }
     }
 

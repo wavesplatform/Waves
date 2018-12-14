@@ -122,7 +122,7 @@ object WavesEnvironmentBenchmark {
     }
 
     val environment: Environment = {
-      val state = new LevelDBWriter(db, wavesSettings.blockchainSettings.functionalitySettings)
+      val state = new LevelDBWriter(db, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000)
       new WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new NotImplementedError("tx is not implemented")),

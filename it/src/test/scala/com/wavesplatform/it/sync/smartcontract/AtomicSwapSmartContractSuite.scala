@@ -13,7 +13,6 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.JsNumber
 
 /*
 Scenario:
@@ -82,7 +81,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       .explicitGet()
 
     val setScriptId = sender
-      .signedBroadcast(sc1SetTx.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .signedBroadcast(sc1SetTx.json())
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
@@ -110,7 +109,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         .explicitGet()
 
     val transferId = sender
-      .signedBroadcast(txToSwapBC1.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt)))
+      .signedBroadcast(txToSwapBC1.json())
       .id
     nodes.waitForHeightAriseAndTxPresent(transferId)
   }
@@ -131,7 +130,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    assertBadRequest(sender.signedBroadcast(txToSwapBC1.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))))
+    assertBadRequest(sender.signedBroadcast(txToSwapBC1.json()))
   }
 
   test("step5: Bob makes transfer; after revert Alice takes funds back") {
@@ -162,7 +161,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val signed   = unsigned.copy(proofs = Proofs(Seq(proof, sigAlice)))
 
     nodes.waitForHeightArise()
-    val versionedTransferId = sender.signedBroadcast(signed.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))).id
+    val versionedTransferId = sender.signedBroadcast(signed.json()).id
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
 
     notMiner.assertBalances(swapBC1,
@@ -193,7 +192,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       .explicitGet()
 
     val transferToAlice =
-      sender.signedBroadcast(selfSignedToAlice.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))).id
+      sender.signedBroadcast(selfSignedToAlice.json()).id
     nodes.waitForHeightAriseAndTxPresent(transferToAlice)
 
     notMiner.assertBalances(swapBC1,

@@ -8,8 +8,6 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json._
-
 import scala.concurrent.duration._
 
 class TransferTransactionV1Suite extends BaseTransactionSuite with CancelAfterFailure {
@@ -61,7 +59,7 @@ class TransferTransactionV1Suite extends BaseTransactionSuite with CancelAfterFa
     )
 
     for ((tx, diag) <- invalidTxs) {
-      assertBadRequestAndResponse(sender.broadcastRequest(tx.json() + ("type" -> JsNumber(TransferTransactionV1.typeId.toInt))), diag)
+      assertBadRequestAndResponse(sender.broadcastRequest(tx.json()), diag)
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 

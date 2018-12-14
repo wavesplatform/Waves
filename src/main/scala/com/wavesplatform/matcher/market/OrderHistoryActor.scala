@@ -29,12 +29,16 @@ class OrderHistoryActor(db: DB, settings: MatcherSettings) extends Actor with Sc
 
   override def receive: Receive = {
     case ev: OrderAdded =>
+      log.debug(s"OrderAdded(${ev.order.order.idStr()}, amount=${ev.order.amount})")
       addedTimer.measure(orderHistory.process(ev))
     case ev: OrderExecuted =>
+      log.debug(s"OrderExecuted(s=${ev.submitted.order.idStr()}, c=${ev.counter.order.idStr()}, amount=${ev.executedAmount})")
       executedTimer.measure(orderHistory.process(ev))
     case ev: OrderCanceled =>
+      log.debug(s"OrderCanceled(${ev.limitOrder.order.idStr()}, system=${ev.unmatchable})")
       cancelledTimer.measure(orderHistory.process(ev))
     case ForceCancelOrderFromHistory(id) =>
+      log.debug(s"ForceCancelOrderFromHistory($id)")
       forceCancelOrder(id)
     case BatchCancel(address, _, ts) =>
       sender() ! orderHistory.updateTimestamp(address, ts)

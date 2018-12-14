@@ -13,7 +13,6 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
-
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -178,7 +177,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     )
 
     for ((tx, diag) <- invalidTxs) {
-      assertBadRequestAndResponse(sender.broadcastRequest(tx.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))), diag)
+      assertBadRequestAndResponse(sender.broadcastRequest(tx.json()), diag)
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 
@@ -268,7 +267,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       .get
 
     val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .signedBroadcast(setScriptTransaction.json())
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
@@ -290,7 +289,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       nonIssuerUnsignedTx.copy(proofs = Proofs(Seq(sigTxB)))
 
     val tx =
-      sender.signedBroadcast(signedTxByB.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))).id
+      sender.signedBroadcast(signedTxByB.json()).id
 
     nodes.waitForHeightAriseAndTxPresent(tx)
 
@@ -312,7 +311,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       nonIssuerUnsignedTx2.copy(proofs = Proofs(Seq(sigTxB2)))
 
     assertBadRequestAndMessage(
-      sender.signedBroadcast(signedTxByB2.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))),
+      sender.signedBroadcast(signedTxByB2.json()),
       errNotAllowedByToken
     )
   }

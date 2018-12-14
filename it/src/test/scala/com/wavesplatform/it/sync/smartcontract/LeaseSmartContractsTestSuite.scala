@@ -12,7 +12,6 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTrans
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.JsNumber
 
 class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val acc0 = pkByAddress(firstAddress)
@@ -46,7 +45,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
       .explicitGet()
 
     val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .signedBroadcast(setScriptTransaction.json())
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
@@ -71,7 +70,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
     val leasingId =
-      sender.signedBroadcast(signedLeasing.json() + ("type" -> JsNumber(LeaseTransactionV2.typeId.toInt))).id
+      sender.signedBroadcast(signedLeasing.json()).id
 
     nodes.waitForHeightAriseAndTxPresent(leasingId)
 
@@ -100,7 +99,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
       unsignedCancelLeasing.copy(proofs = Proofs(Seq(ByteStr.empty, sigLeasingCancelA, sigLeasingCancelB)))
 
     val leasingCancelId =
-      sender.signedBroadcast(signedLeasingCancel.json() + ("type" -> JsNumber(LeaseCancelTransactionV2.typeId.toInt))).id
+      sender.signedBroadcast(signedLeasingCancel.json()).id
 
     nodes.waitForHeightAriseAndTxPresent(leasingCancelId)
 

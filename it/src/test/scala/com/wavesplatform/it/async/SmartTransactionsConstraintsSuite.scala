@@ -15,7 +15,6 @@ import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.utils.Base58
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._

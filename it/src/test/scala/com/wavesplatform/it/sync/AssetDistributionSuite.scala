@@ -5,7 +5,6 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import org.scalatest.CancelAfterFailure
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.util._
 
 class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailure {
 

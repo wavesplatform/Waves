@@ -45,9 +45,7 @@ trait Blockchain {
                           count: Int,
                           fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]]
 
-  def containsTransaction(id: ByteStr): Boolean
-  def forgetTransactions(pred: (ByteStr, Long) => Boolean): Map[ByteStr, Long]
-  def learnTransactions(values: Map[ByteStr, Long]): Unit
+  def containsTransaction(tx: Transaction): Boolean
 
   def assetDescription(id: ByteStr): Option[AssetDescription]
 
@@ -71,7 +69,7 @@ trait Blockchain {
 
   def balance(address: Address, mayBeAssetId: Option[AssetId]): Long
 
-  def assetDistribution(assetId: ByteStr, count: Int, fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]]
+  def assetDistribution(assetId: ByteStr): Map[Address, Long]
   def assetDistributionAtHeight(assetId: AssetId, height: Int, count: Int, fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]]
   def wavesDistribution(height: Int): Map[Address, Long]
 

@@ -50,4 +50,24 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
     }
   }
 
+  test("cannot sponsor scripted asset") {
+    val assetId = sender
+      .issue(
+        firstAddress,
+        "MyAsset",
+        "Test Asset",
+        someAssetAmount,
+        0,
+        reissuable = true,
+        issueFee,
+        2,
+        Some(scriptBase64),
+        waitForTx = true
+      )
+      .id
+    assertBadRequestAndMessage(sender.sponsorAsset(firstAddress, assetId, 100, sponsorFee + smartFee),
+                               "State check failed. Reason: Sponsorship smart assets is disabled.")
+
+  }
+
 }
