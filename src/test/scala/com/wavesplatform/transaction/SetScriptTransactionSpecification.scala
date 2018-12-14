@@ -40,7 +40,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
                        ],
                        "version": 1,
                        "script": null,
-                       "cheinId":84
+                       "chainId":84
                        }
     """),
        SetScriptTransaction

@@ -46,7 +46,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
                        "decimals": 8,
                        "description": "Gigacoin",
                        "script":null,
-                       "cheinId":84
+                       "chainId":84
                        }
     """)
 
