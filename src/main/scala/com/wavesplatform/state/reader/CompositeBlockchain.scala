@@ -161,10 +161,12 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       if pred(p)
     } yield address -> f(address)
 
-  override def assetDistribution(assetId: ByteStr, count: Int, fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] =
-    inner
-      .assetDistribution(assetId, count, fromAddress)
-      .map(_ ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L)))
+  override def assetDistribution(assetId: ByteStr): Map[Address, Long] = {
+    val fromInner = inner.assetDistribution(assetId)
+    val fromDiff  = changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
+
+    fromInner ++ fromDiff
+  }
 
   override def assetDistributionAtHeight(assetId: AssetId,
                                          height: Int,
