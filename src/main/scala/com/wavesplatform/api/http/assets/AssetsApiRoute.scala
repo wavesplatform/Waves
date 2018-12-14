@@ -73,6 +73,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     }
   }
 
+  @Deprecated
   @Path("/{assetId}/distribution")
   @ApiOperation(value = "Asset balance distribution", notes = "Asset balance distribution by account", httpMethod = "GET")
   @ApiImplicitParams(
