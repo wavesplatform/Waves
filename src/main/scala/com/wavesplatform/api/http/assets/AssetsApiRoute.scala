@@ -60,21 +60,15 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     }
 
   def assetDistributionTask(params: DistributionParams): Task[ToResponseMarshallable] = {
-    val (assetId, maybeHeight, limit, maybeAfter) = params
-    val currHeightDistributionTask: Task[Either[ValidationError, Map[Address, Long]]] =
-      Task
-        .eval(blockchain.assetDistribution(assetId, limit, maybeAfter))
+    val (assetId, height, limit, maybeAfter) = params
 
-    val distributionTask = maybeHeight
-      .fold(currHeightDistributionTask) { height =>
-        Task.eval(
-          blockchain
-            .assetDistributionAtHeight(assetId, height, limit, maybeAfter)
-        )
-      }
+    val distributionTask = Task.eval(
+      blockchain
+        .assetDistributionAtHeight(assetId, height, limit, maybeAfter)
+    )
 
     distributionTask.map {
-      case Right(dst) => Json.toJson(dst.map { case (a, b) => a.stringRepr -> b }): ToResponseMarshallable
+      case Right(dst) => AssetsApiRoute.distributionToJson(dst): ToResponseMarshallable
       case Left(err)  => ApiError.fromValidationError(err)
     }
   }
@@ -86,12 +80,16 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
     ))
   def balanceDistribution: Route =
-    (get & path(Segment / "distribution" / "limit" / IntNumber) & parameter('after.?)) { (assetParam, limitParam, afterParam) =>
-      val paramsEi = AssetsApiRoute.validateDistributionParams(settings, blockchain, assetParam, None, limitParam, afterParam)
+    (get & path(Segment / "distribution")) { (assetParam) =>
+      val assetIdEi = AssetsApiRoute
+        .validateAssetId(assetParam)
 
-      val distributionTask = paramsEi match {
-        case Left(err)     => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
-        case Right(params) => assetDistributionTask(params)
+      val distributionTask = assetIdEi match {
+        case Left(err) => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
+        case Right(assetId) =>
+          Task
+            .eval(blockchain.assetDistribution(assetId))
+            .map(dst => AssetsApiRoute.distributionToJson(dst): ToResponseMarshallable)
       }
 
       complete {
@@ -105,7 +103,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       }
     }
 
-  @Path("/{assetId}/distribution/{height}")
+  @Path("/{assetId}/distribution/{height}/limit/{limit}")
   @ApiOperation(
     value = "Asset balance distribution at height",
     notes = "Asset balance distribution by account at specified height",
@@ -115,13 +113,15 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     Array(
       new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "integer", paramType = "path"),
+      new ApiImplicitParam(name = "limit", value = "Number of addresses to be returned", required = true, dataType = "integer", paramType = "path"),
+      new ApiImplicitParam(name = "after", value = "address to paginate after", required = false, dataType = "string", paramType = "query")
     ))
   def balanceDistributionAtHeight: Route =
     (get & path(Segment / "distribution" / IntNumber / "limit" / IntNumber) & parameter('after.?)) {
       (assetParam, heightParam, limitParam, afterParam) =>
         val paramsEi: Either[ValidationError, DistributionParams] =
           AssetsApiRoute
-            .validateDistributionParams(settings, blockchain, assetParam, Some(heightParam), limitParam, afterParam)
+            .validateDistributionParams(settings, blockchain, assetParam, heightParam, limitParam, afterParam)
 
         val resultTask = paramsEi match {
           case Left(err)     => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
@@ -286,17 +286,17 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 object AssetsApiRoute {
   val MAX_DISTRIBUTION_TASKS = 5
 
-  type DistributionParams = (AssetId, Option[Int], Int, Option[Address])
+  type DistributionParams = (AssetId, Int, Int, Option[Address])
 
   def validateDistributionParams(settings: RestAPISettings,
                                  blockchain: Blockchain,
                                  assetParam: String,
-                                 heightParam: Option[Int],
+                                 heightParam: Int,
                                  limitParam: Int,
                                  afterParam: Option[String]): Either[ValidationError, DistributionParams] = {
     for {
       limit   <- validateLimit(settings, limitParam)
-      height  <- heightParam.traverse[Either[ValidationError, ?], Int](validateHeight(blockchain, _))
+      height  <- validateHeight(blockchain, heightParam)
       assetId <- validateAssetId(assetParam)
       after   <- afterParam.traverse[Either[ValidationError, ?], Address](Address.fromString)
     } yield (assetId, height, limit, after)
@@ -325,5 +325,9 @@ object AssetsApiRoute {
       _ <- Either
         .cond(limit < settings.distributionAddressLimit, (), GenericError(s"Limit should be less than ${settings.transactionByAddressLimit}"))
     } yield limit
+  }
+
+  def distributionToJson(dst: Map[Address, Long]) = {
+    Json.toJson(dst.map { case (a, b) => a.stringRepr -> b })
   }
 }

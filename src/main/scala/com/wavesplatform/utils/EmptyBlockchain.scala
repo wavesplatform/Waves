@@ -82,8 +82,7 @@ object EmptyBlockchain extends Blockchain {
 
   override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = 0
 
-  override def assetDistribution(assetId: ByteStr, count: Int, fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] =
-    Right(Map.empty)
+  override def assetDistribution(assetId: ByteStr): Map[Address, Long] = Map.empty
 
   override def wavesDistribution(height: Int): Map[Address, Long] = Map.empty
 
