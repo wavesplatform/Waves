@@ -288,7 +288,7 @@ trait Caches extends Blockchain with ScorexLogging {
         .cond(
           height > safeRollbackHeight,
           (),
-          s"Rollback is possible only to the block at a height: $safeRollbackHeight"
+          s"Rollback is possible only to the block at a height: ${safeRollbackHeight + 1}"
         )
       discardedBlocks = doRollback(targetBlockId)
     } yield {
