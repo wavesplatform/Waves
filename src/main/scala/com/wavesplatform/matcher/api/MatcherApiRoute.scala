@@ -127,15 +127,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def marketStatus: Route = (path("orderbook" / AssetPairPM / "status") & get) { p =>
     withAssetPair(p, redirectToInverse = true) { pair =>
       getMarketStatus(pair).fold(complete(StatusCodes.NotFound -> Json.obj("message" -> "Invalid asset pair"))) { ms =>
-        complete(
-          StatusCodes.OK -> Json.obj(
-            "lastPrice" -> ms.last.map(_.price),
-            "lastSide"  -> ms.last.map(_.orderType.toString),
-            "bid"       -> ms.bid.map(_._1),
-            "bidAmount" -> ms.bid.map(_._2.map(_.amount).sum),
-            "ask"       -> ms.ask.map(_._1),
-            "askAmount" -> ms.ask.map(_._2.map(_.amount).sum)
-          ))
+        complete(StatusCodes.OK -> ms)
       }
     }
   }
