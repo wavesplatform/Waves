@@ -119,21 +119,20 @@ class MatcherActorSpecification
     val pair12 = AssetPair(Some(ByteStr(Array(1))), Some(ByteStr(Array(2)))) // snapshots every 13 messages
     val pair78 = AssetPair(Some(ByteStr(Array(6))), Some(ByteStr(Array(7)))) // snapshots every 8 messages
 
-    // snapshots for pair12 should be created every 13 messages
     "forces an order book to create a snapshot" when {
       "it didn't do snapshots for a long time" when {
         "first time" in snapshotTest(pair12) { (matcherActor, probes) =>
-          sendBuyOrders(matcherActor, pair12, 0 to 14)
-          probes.head.expectMsg(OrderBookSnapshotUpdated(pair12, 14))
+          sendBuyOrders(matcherActor, pair12, 0 to 16)
+          probes.head.expectMsg(OrderBookSnapshotUpdated(pair12, 16))
         }
 
         "later" in snapshotTest(pair12) { (matcherActor, probes) =>
           val probe = probes.head
-          sendBuyOrders(matcherActor, pair12, 0 to 14)
-          probe.expectMsg(OrderBookSnapshotUpdated(pair12, 14))
+          sendBuyOrders(matcherActor, pair12, 0 to 16)
+          probe.expectMsg(OrderBookSnapshotUpdated(pair12, 16))
 
-          sendBuyOrders(matcherActor, pair12, 15 to 28)
-          probe.expectMsg(OrderBookSnapshotUpdated(pair12, 28))
+          sendBuyOrders(matcherActor, pair12, 17 to 33)
+          probe.expectMsg(OrderBookSnapshotUpdated(pair12, 32))
         }
 
         "multiple order books" in snapshotTest(pair12, pair78) { (matcherActor, probes) =>
@@ -142,12 +141,12 @@ class MatcherActorSpecification
           probe12.expectNoMessage(200.millis)
           probe78.expectNoMessage(200.millis)
 
-          sendBuyOrders(matcherActor, pair78, 9 to 15)
+          sendBuyOrders(matcherActor, pair78, 9 to 17)
           probe12.expectNoMessage(200.millis)
-          probe78.expectMsg(OrderBookSnapshotUpdated(pair78, 10))
+          probe78.expectMsg(OrderBookSnapshotUpdated(pair78, 16))
 
-          sendBuyOrders(matcherActor, pair12, 15 to 18)
-          probe12.expectMsg(OrderBookSnapshotUpdated(pair12, 15))
+          sendBuyOrders(matcherActor, pair12, 17 to 18)
+          probe12.expectMsg(OrderBookSnapshotUpdated(pair12, 17))
           probe78.expectNoMessage(200.millis)
         }
       }
@@ -155,11 +154,11 @@ class MatcherActorSpecification
       "received a lot of messages and tries to maintain a snapshot's offset" in snapshotTest(pair12) { (matcherActor, probes) =>
         val probe = probes.head
         sendBuyOrders(matcherActor, pair12, 0 to 30)
-        probe.expectMsg(OrderBookSnapshotUpdated(pair12, 14))
+        probe.expectMsg(OrderBookSnapshotUpdated(pair12, 16))
         probe.expectNoMessage(200.millis)
 
         sendBuyOrders(matcherActor, pair12, 31 to 40)
-        probe.expectMsg(OrderBookSnapshotUpdated(pair12, 31))
+        probe.expectMsg(OrderBookSnapshotUpdated(pair12, 32))
       }
     }
   }
@@ -173,7 +172,6 @@ class MatcherActorSpecification
 
   /**
     * @param f (MatcherActor, TestProbe) => Any
-    * @return
     */
   private def snapshotTest(assetPairs: AssetPair*)(f: (ActorRef, List[TestProbe]) => Any): Any = {
     val r = assetPairs.map(fakeOrderBookActor).toList
@@ -225,9 +223,7 @@ class MatcherActorSpecification
           matcherSettings,
           (_, _) => (),
           ob,
-          (assetPair, matcher) =>
-            OrderBookActor
-              .props(matcher, assetPair, _ => {}, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
+          (assetPair, matcher) => OrderBookActor.props(matcher, assetPair, _ => {}, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
           blockchain.assetDescription
         )
       ))
