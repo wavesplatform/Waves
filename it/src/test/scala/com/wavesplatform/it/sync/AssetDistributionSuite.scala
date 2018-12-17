@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import org.scalatest.CancelAfterFailure
@@ -50,6 +51,27 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     assetDisFull.values.forall(_ == transferAmount)
     !assetDisFull.keySet.contains(issuer.address)
+  }
+
+  test("'Asset distribution' works properly") {
+    val recievers = for (i <- 0 until 10) yield PrivateKeyAccount(s"receiver#$i".getBytes)
+
+    val issueTx = node.issue(issuer.address, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
+
+    node
+      .massTransfer(
+        issuer.address,
+        recievers.map(rc => MassTransferTransaction.Transfer(rc.address, 10)).toList,
+        minFee + minFee * recievers.length,
+        Some(issueTx),
+        waitForTx = true
+      )
+
+    val distribution = node.assetDistribution(issueTx, None, None, None)
+
+    distribution.size shouldBe (recievers.size + 1)
+    distribution(issuer.address) shouldBe (issueAmount - 10 * recievers.length)
+    assert(recievers.forall(rc => distribution(rc.address) == 10), "Distribution correct")
   }
 
 }
