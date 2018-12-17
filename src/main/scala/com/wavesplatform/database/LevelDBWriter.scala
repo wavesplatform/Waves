@@ -749,11 +749,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   override def assetDistribution(assetId: ByteStr): Map[Address, Long] = readOnly { db =>
     (for {
-      seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
-      addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-      history = db.get(Keys.assetBalanceHistory(addressId, assetId))
-      actualHeight <- history.partition(_ > height)._2.headOption
-      balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
+      seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
+      addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
+      balance = db.get(Keys.assetBalance(addressId, assetId)(height))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
   }
@@ -787,7 +785,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         (for {
           addressId <- takeAfter(addressIds, maybeAddressId).take(count)
           history = db.get(Keys.assetBalanceHistory(addressId, assetId))
-          actualHeight <- history.partition(_ > height)._2.headOption
+          actualHeight <- history.filterNot(_ > height).headOption
           balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
           if balance > 0
         } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq,
