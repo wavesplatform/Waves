@@ -127,6 +127,12 @@ object SyncHttpApi extends Assertions {
     def assetsBalance(address: String): FullAssetsInfo =
       sync(async(n).assetsBalance(address))
 
+    def assetDistribution(asset: String,
+                          initialHeight: Option[Int] = None,
+                          limit: Option[Int] = None,
+                          after: Option[String] = None): Map[String, Long] =
+      sync(async(n).assetDistribution(asset, initialHeight, limit, after))
+
     def issue(sourceAddress: String,
               name: String,
               description: String,
