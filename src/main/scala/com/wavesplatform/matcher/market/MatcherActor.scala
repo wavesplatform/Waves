@@ -19,7 +19,6 @@ import com.wavesplatform.utx.UtxPool
 import play.api.libs.json._
 import scorex.utils._
 
-// TODO: should send snapshot requests to OBA
 class MatcherActor(matcherSettings: MatcherSettings,
                    recoveryCompletedWithCommandNr: (ActorRef, Long) => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
@@ -32,7 +31,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
 
   private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
   private var childrenNames: Map[ActorRef, AssetPair] = Map.empty
-  private var lastSnapshotNr: Long                    = 0L
+  private var lastSnapshotSequenceNr: Long            = 0L
 
   private var snapshotOffsets: Map[AssetPair, QueueEventWithMeta.Offset] = Map.empty
 
@@ -84,7 +83,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
   }
 
   private def snapshotOffset(pair: AssetPair): Long = {
-    val half = matcherSettings.snapshotsInterval / 2 - 1
+    val half = matcherSettings.snapshotsInterval / 2
     half + (pair.key.hashCode % half)
   }
 
@@ -151,9 +150,9 @@ class MatcherActor(matcherSettings: MatcherSettings,
       context.children.foreach(context.unwatch)
       context.become(snapshotsCommands orElse shutdownFallback)
 
-      if (lastSnapshotNr < lastSequenceNr) saveSnapshot(Snapshot(tradedPairs.keySet))
+      if (lastSnapshotSequenceNr < lastSequenceNr) saveSnapshot(Snapshot(tradedPairs.keySet))
       else {
-        log.debug(s"No changes, lastSnapshotNr = $lastSnapshotNr, lastSequenceNr = $lastSequenceNr")
+        log.debug(s"No changes, lastSnapshotSequenceNr = $lastSnapshotSequenceNr, lastSequenceNr = $lastSequenceNr")
         shutdownStatus = shutdownStatus.copy(
           oldMessagesDeleted = true,
           oldSnapshotsDeleted = true
@@ -180,7 +179,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
     case OrderBookCreated(pair) => if (orderBook(pair).isEmpty) createOrderBook(pair)
 
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
-      lastSnapshotNr = metadata.sequenceNr
+      lastSnapshotSequenceNr = metadata.sequenceNr
       log.info(s"Loaded the snapshot with nr = ${metadata.sequenceNr}")
       snapshot.tradedPairsSet.foreach(createOrderBook)
 
@@ -225,7 +224,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
 
   private def snapshotsCommands: Receive = {
     case SaveSnapshotSuccess(metadata) =>
-      lastSnapshotNr = metadata.sequenceNr
+      lastSnapshotSequenceNr = metadata.sequenceNr
       log.info(s"Snapshot saved with metadata $metadata")
       deleteMessages(metadata.sequenceNr - 1)
       deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))

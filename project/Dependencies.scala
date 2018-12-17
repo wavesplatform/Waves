@@ -67,8 +67,7 @@ object Dependencies {
     akkaModule("persistence-tck") % "test",
     "com.github.dnvriend"         %% "akka-persistence-inmemory" % "2.5.15.1" % "test",
     "com.typesafe.akka"           %% "akka-stream-kafka" % "1.0-M1",
-    // "org.apache.kafka"            % "kafka-clients" % "2.1.0",
-    "org.ethereum" % "leveldbjni-all" % "1.18.3"
+    "org.ethereum"                % "leveldbjni-all" % "1.18.3"
   )
 
   lazy val metrics = Seq(

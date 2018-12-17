@@ -1,8 +1,9 @@
 package com.wavesplatform.matcher
 
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
+import java.lang.{Long => jLong}
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
@@ -10,10 +11,11 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{ask, gracefulStop}
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.db._
-import com.wavesplatform.matcher.api.{MatcherApiRoute, MatcherResponse, OrderBookSnapshotHttpCache}
+import com.wavesplatform.matcher.api.{AlreadyProcessed, MatcherApiRoute, MatcherResponse, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
@@ -86,16 +88,14 @@ class Matcher(actorSystem: ActorSystem,
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
 
-  private val requests = new ConcurrentHashMap[QueueEventWithMeta.Offset, Promise[MatcherResponse]]()
+  private val requests: LoadingCache[jLong, Promise[MatcherResponse]] = CacheBuilder
+    .newBuilder()
+    .expireAfterWrite(6.seconds.toSeconds, TimeUnit.SECONDS)
+    .build[jLong, Promise[MatcherResponse]](CacheLoader.from((_: jLong) => Promise[MatcherResponse]))
 
   private def storeEvent(event: QueueEvent): Future[MatcherResponse] = {
     import scala.concurrent.ExecutionContext.Implicits.global
-    matcherQueue
-      .storeEvent(event)
-      .flatMap { offset =>
-        val newP = Promise[MatcherResponse]
-        Option(requests.putIfAbsent(offset, newP)).getOrElse(newP).future
-      }
+    matcherQueue.storeEvent(event).flatMap(offset => requests.get(jLong.valueOf(offset)).future)
   }
 
   lazy val matcherApiRoutes: Seq[MatcherApiRoute] = Seq(
@@ -129,21 +129,18 @@ class Matcher(actorSystem: ActorSystem,
           oldestSnapshotOffset + 1,
           eventWithMeta => {
             import actorSystem.dispatcher
-            implicit val timeout: Timeout = 2.seconds
+            implicit val timeout: Timeout = 5.seconds
 
-            // TODO: doesn't required until newestSnapshotOffset
             self
               .ask(eventWithMeta)
               .mapTo[MatcherResponse]
               .map { r =>
-                val newP = Promise[MatcherResponse]
-                val rPromise = Option(requests.putIfAbsent(eventWithMeta.offset, newP)) match {
-                  case Some(p) => p
-                  case None    => newP
-                }
-
                 currentOffset.getAndAccumulate(eventWithMeta.offset, math.max(_, _))
-                rPromise.trySuccess(r)
+
+                r match {
+                  case AlreadyProcessed =>
+                  case _                => requests.get(jLong.valueOf(eventWithMeta.offset)).trySuccess(r)
+                }
               }
           }
         )

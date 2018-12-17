@@ -73,7 +73,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
         }
         .batch(max = settings.consumerBufferSize, ConsumerMessage.CommittableOffsetBatch(_))(_.updated(_))
         .mapAsync(5)(_.commitScaladsl())
-        .toMat(Sink.seq)(Keep.left)
+        .toMat(Sink.ignore)(Keep.left)
         .run()
     }
   }
