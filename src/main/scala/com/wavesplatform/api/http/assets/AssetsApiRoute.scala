@@ -122,7 +122,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       (assetParam, heightParam, limitParam, afterParam) =>
         val paramsEi: Either[ValidationError, DistributionParams] =
           AssetsApiRoute
-            .validateDistributionParams(settings, blockchain, assetParam, heightParam, limitParam, afterParam)
+            .validateDistributionParams(blockchain, assetParam, heightParam, limitParam, settings.distributionAddressLimit, afterParam)
 
         val resultTask = paramsEi match {
           case Left(err)     => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
@@ -289,14 +289,14 @@ object AssetsApiRoute {
 
   type DistributionParams = (AssetId, Int, Int, Option[Address])
 
-  def validateDistributionParams(settings: RestAPISettings,
-                                 blockchain: Blockchain,
+  def validateDistributionParams(blockchain: Blockchain,
                                  assetParam: String,
                                  heightParam: Int,
                                  limitParam: Int,
+                                 maxLimit: Int,
                                  afterParam: Option[String]): Either[ValidationError, DistributionParams] = {
     for {
-      limit   <- validateLimit(settings, limitParam)
+      limit   <- validateLimit(limitParam, maxLimit)
       height  <- validateHeight(blockchain, heightParam)
       assetId <- validateAssetId(assetParam)
       after   <- afterParam.traverse[Either[ValidationError, ?], Address](Address.fromString)
@@ -319,12 +319,12 @@ object AssetsApiRoute {
     Either.cond(height > 0 && height <= blockchain.height, height, GenericError(s"Height should be in range (1 - ${blockchain.height})"))
   }
 
-  def validateLimit(settings: RestAPISettings, limit: Int): Either[ValidationError, Int] = {
+  def validateLimit(limit: Int, maxLimit: Int): Either[ValidationError, Int] = {
     for {
       _ <- Either
         .cond(limit > 0, (), GenericError("Limit should be greater than 0"))
       _ <- Either
-        .cond(limit < settings.distributionAddressLimit, (), GenericError(s"Limit should be less than ${settings.transactionByAddressLimit}"))
+        .cond(limit < maxLimit, (), GenericError(s"Limit should be less than $maxLimit"))
     } yield limit
   }
 
