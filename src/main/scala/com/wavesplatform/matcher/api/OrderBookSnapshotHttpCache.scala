@@ -6,8 +6,7 @@ import akka.http.scaladsl.model.HttpResponse
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache.Settings
 import com.wavesplatform.matcher.market.OrderBookActor.GetOrderBookResponse
-import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
-import com.wavesplatform.matcher.model.{LevelAgg, LimitOrder, OrderBook}
+import com.wavesplatform.matcher.model.OrderBook
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.Time
 import kamon.Kamon
@@ -25,8 +24,6 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
     .expireAfterAccess(settings.cacheTimeout.length, settings.cacheTimeout.unit)
     .build[Key, HttpResponse](new CacheLoader[Key, HttpResponse] {
       override def load(key: Key): HttpResponse = {
-        def aggregateLevel(l: (Price, Level[LimitOrder])) = LevelAgg(l._2.foldLeft(0L)((b, o) => b + o.amount), l._1)
-
         val orderBook = orderBookSnapshot(key.pair).getOrElse(OrderBook.empty)
         GetOrderBookResponse(
           time.correctedTime(),

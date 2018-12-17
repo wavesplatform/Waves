@@ -46,14 +46,15 @@ class OrderBookActor(parent: ActorRef,
   private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
   private var orderBook          = OrderBook.empty
 
-  private var lastMarketStatus = MarketStatus(assetPair, orderBook.bids.headOption, orderBook.asks.headOption, None)
-  private def refreshMarketStatus(newLastOrder: Option[Order] = None): Unit = {
-    lastMarketStatus = lastMarketStatus.copy(
-      bid = orderBook.bids.headOption,
-      ask = orderBook.asks.headOption,
-      last = newLastOrder.orElse(lastMarketStatus.last)
-    )
-    updateMarketStatus(lastMarketStatus)
+  private var lastTrade = Option.empty[LastTrade]
+
+  private def refreshMarketStatus(lastEvent: Option[Event] = None): Unit = {
+    lastEvent.foreach {
+      case x: Events.OrderExecuted => lastTrade = Some(LastTrade(x.counter.price, x.executedAmount, x.submitted.order.orderType))
+      case _                       => // no need to update last trade
+    }
+
+    updateMarketStatus(MarketStatus(lastTrade, orderBook.bids.headOption, orderBook.asks.headOption))
   }
 
   private def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
@@ -151,7 +152,7 @@ class OrderBookActor(parent: ActorRef,
       case Events.OrderCanceled(order, unmatchable) => s"OrderCanceled(${order.order.idStr()}, system=$unmatchable)"
     })
     orderBook = OrderBook.updateState(orderBook, e)
-    refreshMarketStatus()
+    refreshMarketStatus(Some(e))
     updateSnapshot(orderBook)
   }
 
@@ -228,7 +229,6 @@ class OrderBookActor(parent: ActorRef,
           _  <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) =>
-            refreshMarketStatus(Some(o.order))
             allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx))
@@ -339,7 +339,29 @@ object OrderBookActor {
     def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(System.currentTimeMillis(), pair, Seq(), Seq())
   }
 
-  case class MarketStatus(pair: AssetPair, bid: Option[(Price, Level[LimitOrder])], ask: Option[(Price, Level[LimitOrder])], last: Option[Order])
+  case class MarketStatus(
+      lastTrade: Option[LastTrade],
+      bestBid: Option[(Price, Level[LimitOrder])],
+      bestAsk: Option[(Price, Level[LimitOrder])],
+  )
+
+  object MarketStatus {
+    implicit val fmt: Writes[MarketStatus] = { ms =>
+      val b = ms.bestBid.map(aggregateLevel)
+      val a = ms.bestAsk.map(aggregateLevel)
+      Json.obj(
+        "lastPrice"  -> ms.lastTrade.map(_.price),
+        "lastAmount" -> ms.lastTrade.map(_.amount),
+        "lastSide"   -> ms.lastTrade.map(_.side.toString),
+        "bid"        -> b.map(_.price),
+        "bidAmount"  -> b.map(_.amount),
+        "ask"        -> a.map(_.price),
+        "askAmount"  -> a.map(_.amount)
+      )
+    }
+  }
+
+  case class LastTrade(price: Long, amount: Long, side: OrderType)
 
   // Direct requests
   case object GetOrdersRequest
