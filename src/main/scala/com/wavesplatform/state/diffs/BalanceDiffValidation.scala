@@ -18,27 +18,32 @@ object BalanceDiffValidation extends ScorexLogging with Instrumented {
     val positiveBalanceErrors: Map[Address, String] = changedAccounts
       .flatMap(acc => {
         val portfolioDiff = d.portfolios(acc)
-        val oldPortfolio  = b.portfolio(acc)
+        if (portfolioDiff.balance < 0 || portfolioDiff.assets.values
+              .exists(_ < 0) || portfolioDiff.effectiveBalance < 0 || portfolioDiff.balance < portfolioDiff.lease.out) {
+          val oldPortfolio = b.portfolio(acc)
 
-        val newPortfolio = oldPortfolio.combine(portfolioDiff)
+          val newPortfolio = oldPortfolio.combine(portfolioDiff)
 
-        lazy val negativeBalance          = newPortfolio.balance < 0
-        lazy val negativeAssetBalance     = newPortfolio.assets.values.exists(_ < 0)
-        lazy val negativeEffectiveBalance = newPortfolio.effectiveBalance < 0
-        lazy val leasedMoreThanOwn        = newPortfolio.balance < newPortfolio.lease.out && currentHeight > fs.allowLeasedBalanceTransferUntilHeight
+          lazy val negativeBalance          = newPortfolio.balance < 0
+          lazy val negativeAssetBalance     = newPortfolio.assets.values.exists(_ < 0)
+          lazy val negativeEffectiveBalance = newPortfolio.effectiveBalance < 0
+          lazy val leasedMoreThanOwn        = newPortfolio.balance < newPortfolio.lease.out && currentHeight > fs.allowLeasedBalanceTransferUntilHeight
 
-        val err = if (negativeBalance) {
-          Some(s"negative waves balance: $acc, old: ${oldPortfolio.balance}, new: ${newPortfolio.balance}")
-        } else if (negativeAssetBalance) {
-          Some(s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(newPortfolio)}")
-        } else if (negativeEffectiveBalance) {
-          Some(s"negative effective balance: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(newPortfolio)}")
-        } else if (leasedMoreThanOwn && oldPortfolio.lease.out == newPortfolio.lease.out) {
-          Some(s"$acc trying to spend leased money")
-        } else if (leasedMoreThanOwn) {
-          Some(s"leased being more than own: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(newPortfolio)}")
-        } else None
-        err.map(acc -> _)
+          val err = if (negativeBalance) {
+            Some(s"negative waves balance: $acc, old: ${oldPortfolio.balance}, new: ${newPortfolio.balance}")
+          } else if (negativeAssetBalance) {
+            Some(s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(newPortfolio)}")
+          } else if (negativeEffectiveBalance) {
+            Some(s"negative effective balance: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(newPortfolio)}")
+          } else if (leasedMoreThanOwn && oldPortfolio.lease.out == newPortfolio.lease.out) {
+            Some(s"$acc trying to spend leased money")
+          } else if (leasedMoreThanOwn) {
+            Some(s"leased being more than own: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(newPortfolio)}")
+          } else None
+          err.map(acc -> _)
+        } else {
+          None
+        }
       })
       .toMap
 
