@@ -114,15 +114,16 @@ object MatcherKeys {
   def lastCommandTimestamp(address: Address): Key[Option[Long]] =
     Key.opt("matcher-last-command-timestamp", bytes(18, address.bytes.arr), Longs.fromByteArray, Longs.toByteArray)
 
-  val lpqNewestIdx: Key[Long] = longKey("lpq-newest-idx", 19: Short, default = -1)
+  // lq - local queue
+  val lqNewestIdx: Key[Long] = longKey("lq-newest-idx", 19: Short, default = -1)
 
-  val LpqElementPrefix: Short            = 20
-  val LpqElementPrefixBytes: Array[Byte] = Shorts.toByteArray(LpqElementPrefix)
-  val LpqElementKeyName: String          = "lpq-element"
+  val LqElementPrefix: Short            = 20
+  val LqElementPrefixBytes: Array[Byte] = Shorts.toByteArray(LqElementPrefix)
+  val LqElementKeyName: String          = "lq-element"
   def lpqElement(idx: Long): Key[Option[QueueEventWithMeta]] =
     Key.opt(
-      LpqElementKeyName,
-      bytes(LpqElementPrefix, Longs.toByteArray(idx)),
+      LqElementKeyName,
+      bytes(LqElementPrefix, Longs.toByteArray(idx)),
       xs => QueueEventWithMeta(idx, Longs.fromByteArray(xs.take(8)), QueueEvent.fromBytes(xs.drop(8))),
       QueueEventWithMeta.toBytes(_).drop(8)
     )

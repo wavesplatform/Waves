@@ -1,7 +1,6 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Props}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.persistence._
 import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.api._
@@ -37,8 +36,8 @@ class OrderBookActor(owner: ActorRef,
 
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
-  private var lastSavedSnapshotNr: Option[Long] = Some(-1L)
-  private var lastProcessedOffset: Long         = -1L
+  private var lastSnapshotNr: Option[Long] = Some(-1L)
+  private var lastProcessedOffset: Long    = -1L
 
   private val matchTimer = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
   private var orderBook  = OrderBook.empty
@@ -60,6 +59,7 @@ class OrderBookActor(owner: ActorRef,
     case request: QueueEventWithMeta =>
       if (request.offset <= lastProcessedOffset) sender() ! AlreadyProcessed
       else {
+        lastProcessedOffset = request.offset
         request.event match {
           case x: QueueEvent.Placed   => onAddOrder(request, x.order)
           case x: QueueEvent.Canceled => onCancelOrder(request.offset, x.orderId)
@@ -72,7 +72,6 @@ class OrderBookActor(owner: ActorRef,
               .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x, unmatchable = false)))
             context.stop(self)
         }
-        lastProcessedOffset = request.offset
       }
   }
 
@@ -83,12 +82,12 @@ class OrderBookActor(owner: ActorRef,
       deleteSnapshots(SnapshotSelectionCriteria.Latest.copy(maxSequenceNr = metadata.sequenceNr - 1))
 
     case SaveSnapshotFailure(metadata, reason) =>
-      lastSavedSnapshotNr = None
+      lastSnapshotNr = None
       log.error(s"Failed to save snapshot: $metadata", reason)
 
     case SaveSnapshot =>
-      if (lastSavedSnapshotNr.forall(_ < lastProcessedOffset)) {
-        lastSavedSnapshotNr = Some(lastProcessedOffset)
+      if (lastSnapshotNr.forall(_ < lastProcessedOffset)) {
+        lastSnapshotNr = Some(lastProcessedOffset)
         saveSnapshot()
       }
   }
@@ -289,19 +288,6 @@ object OrderBookActor {
   case class DeleteOrderBookRequest(assetPair: AssetPair) extends HasAssetPair
 
   case class CancelOrder(assetPair: AssetPair, orderId: ByteStr) extends HasAssetPair
-
-  case class GetOrderBookResponse(ts: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) {
-    def toHttpResponse: HttpResponse = HttpResponse(
-      entity = HttpEntity(
-        ContentTypes.`application/json`,
-        JsonSerializer.serialize(OrderBookResult(ts, pair, bids, asks))
-      )
-    )
-  }
-
-  object GetOrderBookResponse {
-    def empty(pair: AssetPair): GetOrderBookResponse = GetOrderBookResponse(System.currentTimeMillis(), pair, Seq(), Seq())
-  }
 
   case class MarketStatus(
       lastTrade: Option[LastTrade],
