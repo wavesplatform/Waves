@@ -69,7 +69,7 @@ trait Blockchain {
 
   def balance(address: Address, mayBeAssetId: Option[AssetId]): Long
 
-  def assetDistribution(assetId: ByteStr, count: Int, fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]]
+  def assetDistribution(assetId: ByteStr): Map[Address, Long]
   def assetDistributionAtHeight(assetId: AssetId, height: Int, count: Int, fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]]
   def wavesDistribution(height: Int): Map[Address, Long]
 
