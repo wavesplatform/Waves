@@ -2,6 +2,7 @@ package com.wavesplatform.it.api
 
 import java.io.IOException
 import java.net.InetSocketAddress
+import java.util.UUID
 import java.util.concurrent.TimeoutException
 
 import com.wavesplatform.api.http.alias.CreateAliasV1Request
@@ -500,18 +501,20 @@ object AsyncHttpApi extends Assertions {
                  statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200,
                  waitForStatus: Boolean = false): Future[Response] = {
       def executeRequest: Future[Response] = {
-        n.log.trace(s"Executing request '$r'")
-        if (r.getStringData != null) n.log.debug(s"Request's body '${r.getStringData}'")
+        val id = UUID.randomUUID()
+        n.log.trace(s"[$id] Executing request '$r'")
+        if (r.getStringData != null) n.log.debug(s"[$id] Request's body '${r.getStringData}'")
         n.client
           .executeRequest(
             r,
             new AsyncCompletionHandler[Response] {
               override def onCompleted(response: Response): Response = {
                 if (response.getStatusCode == statusCode) {
-                  n.log.debug(s"Request: ${r.getMethod} ${r.getUrl}\nResponse: ${response.getResponseBody}")
+                  n.log.debug(s"[$id] Request: ${r.getMethod} ${r.getUrl}\nResponse: ${response.getResponseBody}")
                   response
                 } else {
-                  n.log.debug(s"Request: ${r.getMethod} ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
+                  n.log.debug(
+                    s"[$id] Request: ${r.getMethod} ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
                   throw UnexpectedStatusCodeException(r.getMethod, r.getUrl, response.getStatusCode, response.getResponseBody)
                 }
               }
@@ -521,10 +524,10 @@ object AsyncHttpApi extends Assertions {
           .toScala
           .recoverWith {
             case e: UnexpectedStatusCodeException if e.statusCode == 503 || waitForStatus =>
-              n.log.debug(s"Failed to execute request '$r' with error: ${e.getMessage}")
+              n.log.debug(s"[$id] Failed to execute request '$r' with error: ${e.getMessage}")
               timer.schedule(executeRequest, interval)
             case e @ (_: IOException | _: TimeoutException) =>
-              n.log.debug(s"Failed to execute request '$r' with error: ${e.getMessage}")
+              n.log.debug(s"[$id] Failed to execute request '$r' with error: ${e.getMessage}")
               timer.schedule(executeRequest, interval)
           }
       }
