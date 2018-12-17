@@ -10,7 +10,7 @@ import org.iq80.leveldb.{DB, ReadOptions}
 
 class LocalQueueStore(db: DB) {
 
-  private val newestIdx = new AtomicLong(db.get(lpqNewestIdx))
+  private val newestIdx = new AtomicLong(db.get(lqNewestIdx))
 
   def enqueue(event: QueueEvent, timestamp: Long): QueueEventWithMeta.Offset = {
     val idx      = newestIdx.incrementAndGet()
@@ -18,7 +18,7 @@ class LocalQueueStore(db: DB) {
 
     db.readWrite { rw =>
       rw.put(eventKey, Some(QueueEventWithMeta(idx, timestamp, event)))
-      rw.put(lpqNewestIdx, idx)
+      rw.put(lqNewestIdx, idx)
     }
 
     idx
@@ -26,7 +26,7 @@ class LocalQueueStore(db: DB) {
 
   def getFrom(offset: QueueEventWithMeta.Offset): Vector[QueueEventWithMeta] =
     new ReadOnlyDB(db, new ReadOptions())
-      .read(LpqElementKeyName, LpqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, Int.MaxValue) { e =>
+      .read(LqElementKeyName, LqElementPrefixBytes, lpqElement(math.max(offset, 0)).keyBytes, Int.MaxValue) { e =>
         val offset = Longs.fromByteArray(e.getKey.slice(Shorts.BYTES, Shorts.BYTES + Longs.BYTES))
         lpqElement(offset).parse(e.getValue).getOrElse(throw new RuntimeException(s"Can't find a queue event at $offset"))
       }

@@ -134,19 +134,17 @@ object Events {
   case class OrderExecuted(submitted: LimitOrder, counter: LimitOrder) extends Event {
     def executedAmount: Long = math.min(submitted.executionAmount(counter), counter.amountOfAmountAsset)
 
-    def counterRemainingAmount: Long            = math.max(counter.amount - executedAmount, 0)
-    def counterExecutedFee: Long                = LimitOrder.getPartialFee(counter.order.matcherFee, counter.order.amount, executedAmount)
-    def counterRemainingFee: Long               = math.max(counter.fee - counterExecutedFee, 0)
-    def counterExecuted: LimitOrder             = counter.partial(amount = executedAmount, fee = counterExecutedFee)
-    def counterRemaining: LimitOrder            = counter.partial(amount = counterRemainingAmount, fee = counterRemainingFee)
-    def counterRemainingOpt: Option[LimitOrder] = if (counterRemainingAmount <= 0) None else Some(counterRemaining)
+    def counterRemainingAmount: Long = math.max(counter.amount - executedAmount, 0)
+    def counterExecutedFee: Long     = LimitOrder.getPartialFee(counter.order.matcherFee, counter.order.amount, executedAmount)
+    def counterRemainingFee: Long    = math.max(counter.fee - counterExecutedFee, 0)
+    def counterExecuted: LimitOrder  = counter.partial(amount = executedAmount, fee = counterExecutedFee)
+    def counterRemaining: LimitOrder = counter.partial(amount = counterRemainingAmount, fee = counterRemainingFee)
 
-    def submittedRemainingAmount: Long            = math.max(submitted.amount - executedAmount, 0)
-    def submittedExecutedFee: Long                = LimitOrder.getPartialFee(submitted.order.matcherFee, submitted.order.amount, executedAmount)
-    def submittedRemainingFee: Long               = math.max(submitted.fee - submittedExecutedFee, 0)
-    def submittedExecuted: LimitOrder             = submitted.partial(amount = executedAmount, fee = submittedExecutedFee)
-    def submittedRemaining: LimitOrder            = submitted.partial(amount = submittedRemainingAmount, fee = submittedRemainingFee)
-    def submittedRemainingOpt: Option[LimitOrder] = if (submittedRemainingAmount <= 0) None else Some(submittedRemaining)
+    def submittedRemainingAmount: Long = math.max(submitted.amount - executedAmount, 0)
+    def submittedExecutedFee: Long     = LimitOrder.getPartialFee(submitted.order.matcherFee, submitted.order.amount, executedAmount)
+    def submittedRemainingFee: Long    = math.max(submitted.fee - submittedExecutedFee, 0)
+    def submittedExecuted: LimitOrder  = submitted.partial(amount = executedAmount, fee = submittedExecutedFee)
+    def submittedRemaining: LimitOrder = submitted.partial(amount = submittedRemainingAmount, fee = submittedRemainingFee)
   }
 
   case class OrderAdded(order: LimitOrder) extends Event
