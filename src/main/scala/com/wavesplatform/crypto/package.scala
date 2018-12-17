@@ -29,7 +29,9 @@ package object crypto {
 
   def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = Curve25519.createKeyPair(seed)
 
-  // see https://github.com/jedisct1/libsodium/blob/ab4ab23d5744a8e060864a7cec1a7f9b059f9ddd/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c#L17
+  // see
+  // https://github.com/jedisct1/libsodium/blob/ab4ab23d5744a8e060864a7cec1a7f9b059f9ddd/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c#L17
+  // https://boringssl.googlesource.com/boringssl/+/master/third_party/wycheproof_testvectors/x25519_test.json
   private val blacklist: Array[Array[Byte]] = Array(
     // 0 (order 4)
     Array(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -54,16 +56,9 @@ package object crypto {
       0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f)
   ).map(_.map(_.toByte))
 
-  def isWeakPublicKey(publicKey: Array[Byte]): Boolean = {
-    val c = Array.fill(7)(0)
-
-    for (j <- publicKey.indices; i <- blacklist.indices)
-      c(i) |= publicKey(j) ^ blacklist(i)(j)
-
-    for (i <- blacklist.indices)
-      c(i) |= (publicKey.last & 0x7f) ^ blacklist(i).last
-
-    val k = c.foldLeft(0)((acc, b) => acc | (0xff & b) - 1)
-    ((k >> 8) & 1) == 1
-  }
+  def isWeakPublicKey(publicKey: Array[Byte]): Boolean =
+    blacklist.exists { wk =>
+      publicKey.view.init == wk.view.init &&
+      (publicKey.last == wk.last || (publicKey.last & 0xff) == wk.last + 0x80)
+    }
 }
