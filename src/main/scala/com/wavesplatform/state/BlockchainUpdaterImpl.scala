@@ -473,10 +473,12 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         } yield address -> f(address)
       }
 
-  override def assetDistribution(assetId: AssetId, count: Int, fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] =
-    blockchain
-      .assetDistribution(assetId, count, fromAddress)
-      .map(_ ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L)))
+  override def assetDistribution(assetId: AssetId): Map[Address, Long] = {
+    val fromInner = blockchain.assetDistribution(assetId)
+    val fromNg    = changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
+
+    fromInner ++ fromNg
+  }
 
   override def assetDistributionAtHeight(assetId: AssetId,
                                          height: Int,
@@ -489,7 +491,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       } else {
         val distributionFromNG =
           changedBalances(_.assets.getOrElse(assetId, 0) != 0, portfolio(_).assets.getOrElse(assetId, 0))
-        innerDistribution |+| distributionFromNG.asRight
+        innerDistribution.map(_ ++ distributionFromNG)
       }
     }
   }
