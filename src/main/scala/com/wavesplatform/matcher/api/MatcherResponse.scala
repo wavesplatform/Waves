@@ -24,8 +24,11 @@ object MatcherResponse {
   import com.wavesplatform.http.ApiMarshallers._
 
   implicit val trm: ToResponseMarshaller[MatcherResponse] =
-    fromStatusCodeAndHeadersAndValue[String].compose(mr =>
-      (mr.statusCode, List(headers.`Content-Type`(ContentTypes.`application/json`)), mr.jsonBody))
+    fromStatusCodeAndHeadersAndValue[String]
+      .compose[MatcherResponse](mr => (mr.statusCode, List.empty, mr.jsonBody))
+      .map { x =>
+        x.copy(entity = x.entity.withContentType(ContentTypes.`application/json`))
+      }
 
   implicit def tuple2MatcherResponse(v: (StatusCode, String)): MatcherResponse = MatcherResponse(v._1, v._2)
 
