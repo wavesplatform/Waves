@@ -60,7 +60,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
     consumer = Some {
       Consumer
         .committableSource(consumerSettings, Subscriptions.assignmentWithOffset(new TopicPartition(settings.topic, 0) -> fromOffset))
-        .buffer(settings.consumerBufferSize, OverflowStrategy.dropTail)
+        .buffer(settings.consumerBufferSize, OverflowStrategy.backpressure)
         .mapAsync(1) { msg =>
           val req = QueueEventWithMeta(msg.record.offset(), msg.record.timestamp(), msg.record.value())
           process(req)

@@ -1,25 +1,17 @@
 package com.wavesplatform.it.sync.matcher
 
-import java.util.concurrent.TimeUnit
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.Docker.DockerNode
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.api.{MatcherStatusResponse, OrderBookResponse, OrderbookHistory}
-import com.wavesplatform.it.matcher.MatcherSuiteBase
-import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.matcher.MatcherRecoveryTestSuite._
+import com.wavesplatform.it.matcher.{MatcherCommand, MatcherState, MatcherSuiteBase}
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
-import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalacheck.Gen
 
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.duration.DurationInt
 import scala.util.Random
-import scala.util.control.NonFatal
 
 class MatcherRecoveryTestSuite extends MatcherSuiteBase {
   private def configOverrides = ConfigFactory.parseString("""waves.matcher {
@@ -39,24 +31,17 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
 
   Seq(issue1, issue2).map(matcherNode.signedIssue).map(x => nodes.waitForTransaction(x.id))
 
-  private val orders = Gen.containerOfN[Vector, Order](placesNumber, orderGen(assetPairs)).sample.get
+  private val orders = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcherNode.publicKey, aliceAcc, assetPairs)).sample.get
 
   "Place, fill and cancel a lot of orders" in {
-    val cancels  = (1 to cancelsNumber).map(_ => random(orders))
-    val requests = Random.shuffle(orders.map(Command.Place)) ++ cancels.map(Command.Cancel)
-    requests.foreach {
-      case Command.Place(order) => matcherNode.placeOrder(order)
-      case Command.Cancel(order) =>
-        try matcherNode.cancelOrder(aliceAcc, order.assetPair, order.idStr())
-        catch {
-          case NonFatal(_) => // not interesting
-        }
-    }
-
-    waitAllRequestsProcessed(10, 100, 200.millis)
+    val cancels  = (1 to cancelsNumber).map(_ => choose(orders))
+    val commands = Random.shuffle(orders.map(MatcherCommand.Place(matcherNode, _))) ++ cancels.map(MatcherCommand.Cancel(matcherNode, aliceAcc, _))
+    executeCommands(commands)
   }
 
-  private var stateBefore: State = _
+  "Wait all requests are processed - 1" in matcherNode.waitForStableOffset(10, 100, 200.millis)
+
+  private var stateBefore: MatcherState = _
 
   "Store the current state" in {
     stateBefore = state
@@ -72,103 +57,14 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
     docker.restartContainer(matcherNode.asInstanceOf[DockerNode])
   }
 
-  "Wait all requests are processed" in {
+  "Wait all requests are processed - 2" in {
     matcherNode.waitFor[QueueEventWithMeta.Offset]("all requests are processed")(_.getCurrentOffset, _ == stateBefore.offset, 300.millis)
   }
 
   "Verify the state" in {
     val stateAfter = state
-    stateAfter shouldBe stateBefore
+    stateBefore shouldBe stateAfter
   }
 
-  private def orderGen(assetPairs: Seq[AssetPair]): Gen[Order] =
-    for {
-      assetPair      <- Gen.oneOf(assetPairs)
-      tpe            <- Gen.oneOf(OrderType.BUY, OrderType.SELL)
-      amount         <- Gen.choose(10, 100)
-      price          <- Gen.choose(10, 100)
-      orderVersion   <- Gen.oneOf(1: Byte, 2: Byte)
-      expirationDiff <- Gen.choose(600000, 6000000)
-    } yield {
-      val ts = System.currentTimeMillis()
-      if (tpe == OrderType.BUY)
-        Order.buy(
-          aliceAcc,
-          matcherNode.publicKey,
-          assetPair,
-          amount,
-          price * Order.PriceConstant,
-          System.currentTimeMillis(),
-          ts + expirationDiff,
-          matcherFee,
-          orderVersion
-        )
-      else
-        Order.sell(
-          aliceAcc,
-          matcherNode.publicKey,
-          assetPair,
-          amount,
-          price * Order.PriceConstant,
-          System.currentTimeMillis(),
-          ts + expirationDiff,
-          matcherFee,
-          orderVersion
-        )
-    }
-
-  private def random(orders: IndexedSeq[Order]) = orders(Random.nextInt(orders.size))
-
-  private def state: State = clean {
-    State(
-      offset = matcherNode.getCurrentOffset,
-      snapshots = matcherNode.getAllSnapshotOffsets,
-      orderBooks = assetPairs.map(x => x        -> matcherNode.orderBook(x)).toMap,
-      orderStatuses = orders.map(x => x.idStr() -> matcherNode.orderStatus(x.idStr(), x.assetPair)).toMap,
-      reservedBalances = matcherNode.reservedBalance(aliceAcc),
-      orderHistory = assetPairs.map(x => x -> matcherNode.orderHistoryByPair(aliceAcc, x)).toMap
-    )
-  }
-
-  private def waitAllRequestsProcessed(confirmations: Int, maxTries: Int, interval: FiniteDuration): Boolean =
-    Await.result(waitAllRequestsProcessedAsync(confirmations, maxTries, interval), (maxTries + 1) * interval)
-
-  private def waitAllRequestsProcessedAsync(confirmations: Int, maxTries: Int, interval: FiniteDuration): Future[Boolean] = {
-    val p = Promise[Boolean]
-
-    def loop(n: Int, currRow: Int, currOffset: QueueEventWithMeta.Offset): Unit =
-      if (currRow >= confirmations) p.success(true)
-      else if (n > maxTries) p.success(false)
-      else
-        GlobalTimer.instance.newTimeout(
-          _ => {
-            val freshOffset = matcherNode.getCurrentOffset
-            if (freshOffset == currOffset) loop(n + 1, currRow + 1, freshOffset)
-            else loop(n + 1, 0, freshOffset)
-          },
-          interval.toMillis,
-          TimeUnit.MILLISECONDS
-        )
-
-    loop(0, 0, matcherNode.getCurrentOffset)
-    p.future
-  }
-
-  private def clean(x: State): State = x.copy(
-    orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(timestamp = 0L) }
-  )
-}
-
-object MatcherRecoveryTestSuite {
-  private sealed trait Command extends Product with Serializable
-  private object Command {
-    case class Place(order: Order)  extends Command
-    case class Cancel(order: Order) extends Command
-  }
-  private case class State(offset: QueueEventWithMeta.Offset,
-                           snapshots: Map[String, QueueEventWithMeta.Offset],
-                           orderBooks: Map[AssetPair, OrderBookResponse],
-                           orderStatuses: Map[String, MatcherStatusResponse],
-                           reservedBalances: Map[String, Long],
-                           orderHistory: Map[AssetPair, Seq[OrderbookHistory]])
+  private def state = matcherNode.matcherState(assetPairs, orders, Seq(aliceAcc))
 }
