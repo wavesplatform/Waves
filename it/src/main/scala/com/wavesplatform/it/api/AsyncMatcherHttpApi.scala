@@ -4,8 +4,10 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.crypto
 import com.wavesplatform.http.api_key
-import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
+import com.wavesplatform.it.matcher.MatcherState
+import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
+import com.wavesplatform.it.{Node, matcher}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.state.ByteStr
@@ -19,6 +21,7 @@ import org.scalatest.Assertions
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json.{Json, Writes}
 
+import scala.collection.immutable.TreeMap
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -279,6 +282,60 @@ object AsyncMatcherHttpApi extends Assertions {
       matcherGetWithApiKey("/matcher/debug/oldestSnapshotOffset").as[QueueEventWithMeta.Offset]
     def getAllSnapshotOffsets: Future[Map[String, QueueEventWithMeta.Offset]] =
       matcherGetWithApiKey("/matcher/debug/allSnapshotOffsets").as[Map[String, QueueEventWithMeta.Offset]]
+
+    def waitForStableOffset(confirmations: Int, maxTries: Int, interval: FiniteDuration): Future[Either[Unit, QueueEventWithMeta.Offset]] = {
+      def loop(n: Int, currConfirmations: Int, currOffset: QueueEventWithMeta.Offset): Future[Either[Unit, QueueEventWithMeta.Offset]] =
+        if (currConfirmations >= confirmations) Future.successful(Right(currOffset))
+        else if (n > maxTries) Future.successful(Left(()))
+        else
+          GlobalTimer.instance
+            .sleep(interval)
+            .flatMap(_ => matcherNode.getCurrentOffset)
+            .flatMap { freshOffset =>
+              if (freshOffset == currOffset) loop(n + 1, currConfirmations + 1, freshOffset)
+              else loop(n + 1, 0, freshOffset)
+            }
+
+      loop(0, 0, -1)
+    }
+
+    def matcherState(assetPairs: Seq[AssetPair], orders: IndexedSeq[Order], accounts: Seq[PrivateKeyAccount]): Future[MatcherState] =
+      for {
+        offset           <- matcherNode.getCurrentOffset
+        snapshots        <- matcherNode.getAllSnapshotOffsets
+        orderBooks       <- Future.traverse(assetPairs)(x => matcherNode.orderBook(x).map(r => x -> r))
+        orderStatuses    <- Future.traverse(orders)(x => matcherNode.orderStatus(x.idStr(), x.assetPair).map(r => x.idStr() -> r))
+        reservedBalances <- Future.traverse(accounts)(x => matcherNode.reservedBalance(x).map(r => x -> r))
+
+        accountsOrderHistory = accounts.flatMap(a => assetPairs.map(p => a -> p))
+        orderHistory <- Future.traverse(accountsOrderHistory) {
+          case (account, pair) => matcherNode.orderHistoryByPair(account, pair).map(r => (account, pair, r))
+        }
+      } yield {
+        val orderHistoryMap = orderHistory
+          .groupBy(_._1) // group by accounts
+          .map {
+            case (account, xs) =>
+              val assetPairHistory = xs.groupBy(_._2).map { // group by asset pair
+                case (assetPair, historyRecords) => assetPair -> historyRecords.flatMap(_._3) // same as historyRecords.head._3
+              }
+
+              account -> (TreeMap.empty[AssetPair, Seq[OrderbookHistory]] ++ assetPairHistory)
+          }
+
+        clean {
+          matcher.MatcherState(offset,
+                               TreeMap(snapshots.toSeq: _*),
+                               TreeMap(orderBooks: _*),
+                               TreeMap(orderStatuses: _*),
+                               TreeMap(reservedBalances: _*),
+                               TreeMap(orderHistoryMap.toSeq: _*))
+        }
+      }
+
+    private def clean(x: MatcherState): MatcherState = x.copy(
+      orderBooks = x.orderBooks.map { case (k, v) => k -> v.copy(timestamp = 0L) }
+    )
   }
 
   implicit class RequestBuilderOps(self: RequestBuilder) {
@@ -288,4 +345,7 @@ object AsyncMatcherHttpApi extends Assertions {
   implicit class AssetPairExt(val p: AssetPair) extends AnyVal {
     def toUri: String = s"${AssetPair.assetIdStr(p.amountAsset)}/${AssetPair.assetIdStr(p.priceAsset)}"
   }
+
+  private implicit val assetPairOrd: Ordering[AssetPair]                 = Ordering.by[AssetPair, String](_.key)
+  private implicit val privateKeyAccountOrd: Ordering[PrivateKeyAccount] = Ordering.by[PrivateKeyAccount, String](_.stringRepr)
 }
