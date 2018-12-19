@@ -6,10 +6,11 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator, Serde}
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.crypto
 import com.wavesplatform.utils.{functionCosts, varNames}
 import monix.eval.Coeval
+import com.wavesplatform.state._
 
 object ScriptV1 {
   private val checksumLength = 4
@@ -29,9 +30,10 @@ object ScriptV1 {
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s
 
-  private class ScriptV1[V <: ScriptVersion](override val version: V, override val expr: EXPR) extends Script {
+  private class ScriptV1[V <: ScriptVersion](override val version: V, override val expr: EXPR) extends Script { self =>
     override type Ver = V
-    override val text: String = expr.toString
+    override val text: String             = expr.toString
+    override val complexity: Coeval[Long] = Coeval.evalOnce(ScriptCompiler.estimate(self, V1).explicitGet())
     override val bytes: Coeval[ByteStr] =
       Coeval.evalOnce {
         val s = Array(version.value.toByte) ++ Serde.serialize(expr)
