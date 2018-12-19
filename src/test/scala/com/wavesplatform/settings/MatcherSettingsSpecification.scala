@@ -50,7 +50,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |
         |      kafka {
         |        topic = "some-events"
-        |        consumer-buffer-size = 100
+        |        consumer {
+        |          buffer-size = 100
+        |          min-backoff = 11s
+        |          max-backoff = 2d
+        |        }
         |      }
         |    }
         |  }
@@ -82,7 +86,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.eventsQueue shouldBe EventsQueueSettings(
       tpe = "kafka",
       local = LocalMatcherQueue.Settings(1.day),
-      kafka = KafkaMatcherQueue.Settings("some-events", 100)
+      kafka = KafkaMatcherQueue.Settings("some-events", KafkaMatcherQueue.ConsumerSettings(100, 11.seconds, 2.days))
     )
   }
 }
