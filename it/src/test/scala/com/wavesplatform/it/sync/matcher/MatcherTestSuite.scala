@@ -29,13 +29,20 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
   "Check cross ordering between Alice and Bob" - {
     // Alice issues new asset
     val aliceAsset = aliceNode
-      .issue(aliceAcc.address, amountAssetName, "AliceCoin for matcher's tests", AssetQuantity, aliceCoinDecimals, reissuable = false, issueFee, 2)
+      .issue(aliceAcc.address,
+             amountAssetName,
+             "AliceCoin for matcher's tests",
+             AssetQuantity,
+             aliceCoinDecimals,
+             reissuable = false,
+             smartIssueFee,
+             2)
       .id
     val bobAsset = bobNode
-      .issue(bobAcc.address, "BobCoin1", "Bob's asset", someAssetAmount, 5, false, issueFee)
+      .issue(bobAcc.address, "BobCoin1", "Bob's asset", someAssetAmount, 5, false, smartIssueFee)
       .id
     val bobAsset2 = bobNode
-      .issue(bobAcc.address, "BobCoin2", "Bob's asset", someAssetAmount, 0, false, issueFee)
+      .issue(bobAcc.address, "BobCoin2", "Bob's asset", someAssetAmount, 0, false, smartIssueFee)
       .id
 
     Seq(aliceAsset, bobAsset, bobAsset2).foreach(matcherNode.waitForTransaction(_))
