@@ -87,10 +87,14 @@ class MatcherActor(matcherSettings: MatcherSettings,
     half + (pair.key.hashCode % half)
   }
 
+  private var minSnapshotOffset = Long.MinValue
   private def shouldDoSnapshot(request: QueueEventWithMeta): Boolean = {
     import request.event.assetPair
-    snapshotOffsets.get(assetPair).fold(false) { oldestSnapshotNr =>
-      request.offset >= (oldestSnapshotNr + snapshotOffset(assetPair))
+    request.offset > minSnapshotOffset && snapshotOffsets.get(assetPair).fold(false) { oldestSnapshotNr =>
+      val minOffset = oldestSnapshotNr + snapshotOffset(assetPair)
+      val r         = request.offset >= minOffset
+      if (r) log.info(s"$assetPair should do a snapshot at $minOffset, now is ${request.offset}")
+      r
     }
   }
 
@@ -189,19 +193,23 @@ class MatcherActor(matcherSettings: MatcherSettings,
         recoveryCompletedWithCommandNr(self, -1)
       } else {
         log.info(s"Recovery completed, waiting order books to restore: ${orderBooks.get().keys.mkString(", ")}")
-        context.become(collectOrderBooks(orderBooks.get().size, Long.MaxValue))
+        context.become(collectOrderBooks(orderBooks.get().size, Long.MaxValue, Long.MinValue))
       }
   }
 
-  private def collectOrderBooks(restOrderBooksNumber: Long, oldestCommandNr: Long): Receive = {
+  private def collectOrderBooks(restOrderBooksNumber: Long, oldestCommandNr: Long, newestCommandNr: Long): Receive = {
     case OrderBookSnapshotUpdated(assetPair, lastProcessedCommandNr) =>
       val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
       val updatedOldestCommandNr      = math.min(oldestCommandNr, lastProcessedCommandNr)
+      val updatedNewestCommandNr      = math.max(newestCommandNr, lastProcessedCommandNr)
+
       snapshotOffsets += assetPair -> lastProcessedCommandNr
 
-      if (updatedRestOrderBooksNumber > 0) context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestCommandNr))
+      if (updatedRestOrderBooksNumber > 0)
+        context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestCommandNr, updatedNewestCommandNr))
       else {
         context.become(receiveCommand)
+        minSnapshotOffset = updatedNewestCommandNr
         recoveryCompletedWithCommandNr(self, updatedOldestCommandNr)
         unstashAll()
       }
@@ -212,9 +220,10 @@ class MatcherActor(matcherSettings: MatcherSettings,
       }
 
       val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
-      if (updatedRestOrderBooksNumber > 0) context.become(collectOrderBooks(updatedRestOrderBooksNumber, oldestCommandNr))
+      if (updatedRestOrderBooksNumber > 0) context.become(collectOrderBooks(updatedRestOrderBooksNumber, oldestCommandNr, newestCommandNr))
       else {
         context.become(receiveCommand)
+        minSnapshotOffset = newestCommandNr
         recoveryCompletedWithCommandNr(self, oldestCommandNr)
         unstashAll()
       }
