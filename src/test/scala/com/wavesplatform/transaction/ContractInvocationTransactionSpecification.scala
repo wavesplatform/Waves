@@ -42,10 +42,6 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
                          "proofs": ["CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T"],
                          "version": 1,
                          "contractAddress" : "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
-                         "payment" : {
-                            "assetId" : "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
-                            "amount" : 7500
-                         },
                          "call": {
                             "function" : "foo",
                              "args" : [
