@@ -140,7 +140,7 @@ object JsAPI {
     def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
 
     def serialize(expr: Contract): Either[String, Array[Byte]] = {
-      val s = 1.toByte +: ContractSerDe.serialize(expr)
+      val s = 3.toByte +: ContractSerDe.serialize(expr)
       Right(s ++ hash(s).take(4))
     }
 
