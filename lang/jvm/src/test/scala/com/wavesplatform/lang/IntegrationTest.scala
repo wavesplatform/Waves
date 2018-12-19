@@ -307,7 +307,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(5)
   }
 
-  ignore("context won't change after execution of a user function") {
+  property("context won't change after execution of a user function") {
     val doubleFst = UserFunction("ID", LONG, "D", ("x", LONG, "X")) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
     }
@@ -325,7 +325,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     ev[CONST_LONG](context, expr) shouldBe evaluated(2003l)
   }
 
-  ignore("context won't change after execution of an inner block") {
+  property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
       PureContext.build(V1).evaluationContext,
       EvaluationContext(

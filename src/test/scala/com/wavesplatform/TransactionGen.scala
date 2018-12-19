@@ -542,9 +542,9 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
     version         <- Gen.oneOf(ContractInvocationTransaction.supportedVersions.toSeq)
     fc              <- funcCallGen
     po <- Gen.option(for {
-     asset <- Gen.option(bytes32gen.map(ByteStr(_)))
-     amt <- positiveLongGen
-    } yield (asset, amt))
+      asset <- Gen.option(bytes32gen.map(ByteStr(_)))
+      amt   <- positiveLongGen
+    } yield ContractInvocationTransaction.Payment(amt, asset))
     chainId = AddressScheme.current.chainId
     fee       <- smallFeeGen
     timestamp <- timestampGen

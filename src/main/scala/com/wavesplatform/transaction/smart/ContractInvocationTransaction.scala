@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import monix.eval.Coeval
-import play.api.libs.json.Json
+import play.api.libs.json.Format
 
 import scala.util.{Failure, Success, Try}
 
@@ -22,7 +22,7 @@ case class ContractInvocationTransaction private (version: Byte,
                                                   sender: PublicKeyAccount,
                                                   contractAddress: Address,
                                                   fc: Terms.FUNCTION_CALL,
-                                                  payment: Payment,
+                                                  payment: Option[Payment],
                                                   fee: Long,
                                                   timestamp: Long,
                                                   proofs: Proofs)
@@ -38,22 +38,28 @@ case class ContractInvocationTransaction private (version: Byte,
       sender.publicKey,
       contractAddress.bytes.arr,
       Serde.serialize(fc),
-      Deser.serializeOption(payment)(pmt => Deser.serializeOption(pmt._1)(_.arr) ++ Longs.toByteArray(pmt._2)),
+      Deser.serializeOption(payment)(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId)(_.arr)),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     ))
-
+  import play.api.libs.json.Json
+  import ContractInvocationTransaction.paymentPartFormat
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val json = Coeval.evalOnce(
     jsonBase()
-      ++ Json.obj("version" -> version, "contractAddress" -> contractAddress.bytes) ++ ContractInvocationTransaction.functionCallToJson(fc))
-
+      ++ Json.obj(
+        "version"         -> version,
+        "contractAddress" -> contractAddress.bytes,
+        "call"            -> ContractInvocationTransaction.functionCallToJson(fc),
+        "payment"         -> payment
+      ))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 }
 
 object ContractInvocationTransaction extends TransactionParserFor[ContractInvocationTransaction] with TransactionParser.MultipleVersions {
-
-  type Payment = Option[(Option[AssetId], Long)]
+  import play.api.libs.json.Json
+  case class Payment(amount: Long, assetId: Option[AssetId])
+  implicit val paymentPartFormat: Format[ContractInvocationTransaction.Payment] = Json.format
 
   import play.api.libs.json._
   def functionCallToJson(fc: Terms.FUNCTION_CALL) = Json.obj(
@@ -92,7 +98,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       (for {
         _      <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
         proofs <- Proofs.fromBytes(feeTsProofs.drop(16))
-        tx     <- create(version, sender, contractAddress, fc.asInstanceOf[FUNCTION_CALL], payment, fee, timestamp, proofs)
+        tx     <- create(version, sender, contractAddress, fc.asInstanceOf[FUNCTION_CALL], payment.map(p => Payment(p._2, p._1)), fee, timestamp, proofs)
       } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
@@ -100,7 +106,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
              sender: PublicKeyAccount,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
-             p: Payment,
+             p: Option[Payment],
              fee: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] =
@@ -108,8 +114,8 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
       _ <- p match {
-        case Some((token, amt)) => Either.cond(amt > 0, (), ValidationError.NegativeAmount(0, token.toString))
-        case _                  => Right(())
+        case Some(Payment(amt, token)) => Either.cond(amt > 0, (), ValidationError.NegativeAmount(0, token.toString))
+        case _                         => Right(())
       }
 
       _ <- Either.cond(fc.args.forall(_.isInstanceOf[EVALUATED]), (), GenericError("all arguments of contractInvocation must be EVALUATED"))
@@ -119,7 +125,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
              sender: PublicKeyAccount,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
-             p: Payment,
+             p: Option[Payment],
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
@@ -131,7 +137,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
                  sender: PrivateKeyAccount,
                  contractAddress: Address,
                  fc: Terms.FUNCTION_CALL,
-                 p: Payment,
+                 p: Option[Payment],
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
     signed(version, sender, contractAddress, fc, p, fee, timestamp, sender)

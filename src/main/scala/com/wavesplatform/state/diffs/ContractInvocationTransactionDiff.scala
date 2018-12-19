@@ -8,20 +8,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
 import com.wavesplatform.lang.{Global, Version}
-import com.wavesplatform.state.{
-  EitherExt2,
-  AccountDataInfo,
-  BinaryDataEntry,
-  Blockchain,
-  BooleanDataEntry,
-  ByteStr,
-  DataEntry,
-  Diff,
-  IntegerDataEntry,
-  LeaseBalance,
-  Portfolio,
-  StringDataEntry
-}
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.smart.BlockchainContext.In
@@ -38,7 +25,7 @@ object ContractInvocationTransactionDiff {
         val functionName = tx.fc.function.asInstanceOf[FunctionHeader.User].name
         contract.cfs.find(_.u.name == functionName) match {
           case None => Left(GenericError(s"No function '$functionName' at address ${tx.contractAddress}"))
-          case Some(f) =>
+          case Some(_) =>
             val ctx = Monoid
               .combineAll(
                 Seq(
@@ -53,8 +40,8 @@ object ContractInvocationTransactionDiff {
             val res =
               ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invokation(functionName, tx.fc, ByteVector(tx.sender.toAddress.bytes.arr)))
             res.left
-              .map(a => GenericError(a.toString))
-              .map {
+              .map(a => GenericError(a.toString): ValidationError)
+              .flatMap {
                 case ContractResult(ds, ps) => {
                   val r: Seq[DataEntry[_]] = ds.map {
                     case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
@@ -62,45 +49,46 @@ object ContractInvocationTransactionDiff {
                     case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
                     case DataItem.Bin(k, b)  => BinaryDataEntry(k, ByteStr(b.toArray))
                   }
-                  val pmts = ps.map {
+                  val pmts: Seq[Map[Address, Long]] = ps.map {
 
                     case (Recipient.Address(addrBytes), amt) => Map(Address.fromBytes(addrBytes.toArray).explicitGet() -> amt)
                   }
-                  // TODO:
-                  //  - ensure all amounts are positive
-                  //  - sum doesn't overflow
-                  //  - whatever else tranfser/massTransfer ensures
-                  //  - assetId is defined
-                  import cats.implicits._
-                  val paymentMap = Monoid.combineAll(pmts).mapValues(Portfolio(_, LeaseBalance.empty, Map.empty))
-                  val feePart = Map(
-                    tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)
-                  )
-                  val payablePart: Map[Address, Portfolio] = tx.payment match {
-                    case None => Map.empty
-                    case Some((assetOpt, amt)) =>
-                      assetOpt match {
-                        case Some(asset) =>
-                          Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
-                            Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
-                          )
-                        case None =>
-                          Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
-                            .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
-                      }
+                  for {
+                    _ <- Either.cond(pmts.flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, ""))
+                    _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - ensure all amounts are positive
+                    _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - sum doesn't overflow
+                    _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - assetId is defined
+                    _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - whatever else tranfser/massTransfer ensures
+                  } yield {
+                    import cats.implicits._
+                    val paymentMap = Monoid.combineAll(pmts).mapValues(Portfolio(_, LeaseBalance.empty, Map.empty))
+                    val feePart = Map(
+                      tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)
+                    )
+                    val payablePart: Map[Address, Portfolio] = tx.payment match {
+                      case None => Map.empty
+                      case Some(ContractInvocationTransaction.Payment(amt, assetOpt)) =>
+                        assetOpt match {
+                          case Some(asset) =>
+                            Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
+                              Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                            )
+                          case None =>
+                            Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
+                              .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
+                        }
+                    }
+                    val transfers = Monoid.combineAll(Seq(payablePart, feePart, paymentMap))
+                    Diff(
+                      height = height,
+                      tx = tx,
+                      portfolios = transfers,
+                      accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
+                    )
                   }
-                  val transfers = Monoid.combineAll(Seq(payablePart, feePart, paymentMap))
-                  Diff(
-                    height = height,
-                    tx = tx,
-                    portfolios = transfers,
-                    accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
-                  )
                 }
               }
-
         }
-
       case _ => Left(GenericError(s"No contract at address ${tx.contractAddress}"))
     }
 

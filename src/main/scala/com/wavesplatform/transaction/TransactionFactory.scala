@@ -643,7 +643,7 @@ object TransactionFactory {
         request.version,
         sender,
         contract,
-        ContractInvocationRequest.buildFunctionCall(request.contractAddress, request.args),
+        ContractInvocationRequest.buildFunctionCall(request.call),
         ???,
         request.fee,
         request.timestamp.getOrElse(time.getTimestamp()),
@@ -654,7 +654,7 @@ object TransactionFactory {
   def contractInvocation(request: ContractInvocationRequest, sender: PublicKeyAccount): Either[ValidationError, ContractInvocationTransaction] =
     for {
       contract <- Address.fromString(request.contractAddress)
-      fc = ContractInvocationRequest.buildFunctionCall(request.contractAddress, request.args)
+      fc = ContractInvocationRequest.buildFunctionCall(request.call)
       tx <- ContractInvocationTransaction.create(
         request.version,
         sender,
