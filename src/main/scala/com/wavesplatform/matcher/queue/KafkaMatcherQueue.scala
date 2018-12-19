@@ -43,10 +43,10 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
   }
 
   private val producer = Source
-    .queue[(QueueEvent, Promise[QueueEventWithMeta.Offset])](1, OverflowStrategy.backpressure)
+    .queue[(QueueEvent, Promise[QueueEventWithMeta.Offset])](settings.producer.bufferSize, OverflowStrategy.backpressure)
     .map {
       case (payload, p) =>
-        ProducerMessage.single(new ProducerRecord(settings.topic, "assetPair", payload), passThrough = p)
+        ProducerMessage.single(new ProducerRecord[String, QueueEvent](settings.topic, null, payload), passThrough = p)
     }
     .via(Producer.flexiFlow(producerSettings))
     .map {
@@ -101,6 +101,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
 }
 
 object KafkaMatcherQueue {
-  case class Settings(topic: String, consumer: ConsumerSettings)
+  case class Settings(topic: String, consumer: ConsumerSettings, producer: ProducerSettings)
   case class ConsumerSettings(bufferSize: Int, minBackoff: FiniteDuration, maxBackoff: FiniteDuration)
+  case class ProducerSettings(bufferSize: Int)
 }
