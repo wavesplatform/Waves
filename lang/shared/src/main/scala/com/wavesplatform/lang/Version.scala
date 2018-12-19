@@ -17,4 +17,11 @@ object Version extends TaggedType[Int] {
     case 2 => V2
     case 3 => V3
   }
+
+  def parse(i:Int) : Either[String,Version] =  i match {
+    case 1 => Right(V1)
+    case 2 => Right(V2)
+    case 3 => Right(V3)
+    case _ => Left(s"Invalid Version: $i")
+  }
 }

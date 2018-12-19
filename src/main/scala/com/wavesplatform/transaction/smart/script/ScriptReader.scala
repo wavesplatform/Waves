@@ -20,13 +20,7 @@ object ScriptReader {
 
     (for {
       _ <- Either.cond(checkSum.sameElements(computedCheckSum), (), ScriptParseError("Invalid checksum"))
-      ver = Version(version.toInt)
-      sv <- Either
-        .cond(
-          SupportedVersions(ver),
-          ver,
-          ScriptParseError(s"Invalid version: $version")
-        )
+      sv <- Version.parse(version.toInt)
       s <- if (sv == V1 || sv == V2)
         for {
           _     <- ScriptV1.validateBytes(scriptBytes)

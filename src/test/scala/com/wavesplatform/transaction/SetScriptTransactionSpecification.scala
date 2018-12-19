@@ -4,6 +4,7 @@ import com.wavesplatform.state._
 import org.scalacheck.Gen
 import play.api.libs.json._
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.api.http.assets.SignedSetScriptRequest
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 class SetScriptTransactionSpecification extends GenericTransactionSpecification[SetScriptTransaction] {
@@ -69,6 +70,30 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
         val tx2 = SetScriptTransaction.create(version, acc, Some(script), 1, 1, proofs2).explicitGet()
         tx1.id() shouldBe tx2.id()
     }
+  }
+
+  property("parse valid contract json") {
+    val json =
+      """
+          |      {
+          |  "type": 13,
+          |  "version": 1,
+          |  "senderPublicKey": "Cq5itmx4wbYuogySAoUp58MimLLkQrFFLr1tpJy2BYp1",
+          |  "chainId": 87,
+          |  "fee": 1000000,
+          |  "timestamp": 1545230299891,
+          |  "proofs": [
+          |    "4vbZ5drLQ3r35QMb5ECUeBoVP5XyJRqoyPsKne6DgRo9PWS9U6SgcEbQt7WN6R6638GMgEauvsNaz3STrMGyxZvH"
+          |  ],
+          |  "id": "GGBbSvzeBkZeMWB9BQ9BTvpveKzK8c9rBZ9rgmMVisnP",
+          |  "script": "base64:AwAAAAAAAAAAAAAAAQAAAAZzZW5kZXIAAAAAAAAAA2ZvbwAAAAEAAAABYQAAAGIJAQAAAAhXcml0ZVNldAAAAAEJAAROAAAAAgkBAAAACURhdGFFbnRyeQAAAAICAAAAAWEFAAAAAWEJAQAAAAlEYXRhRW50cnkAAAACAgAAAAZzZW5kZXIFAAAABnNlbmRlcgAAAAAr+/Gd"
+          |}
+      """.stripMargin
+
+    val res = Json.parse(json).as[SignedSetScriptRequest]
+    println(res)
+    res.toTx shouldBe 'right
+
   }
 
 }
