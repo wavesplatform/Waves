@@ -91,7 +91,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
       """
         |
         | @Ann(foo)
-        | @Ioann(zoo)
+        | @Ioann(zoo, shazoo)
         | func bar(arg:Baz) = {
         |    3
         | }
@@ -105,7 +105,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         ANNOTATEDFUNC(
           AnyPos,
           List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo"))),
-            Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ioann"), List(PART.VALID(AnyPos, "zoo")))),
+            Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ioann"), List(PART.VALID(AnyPos, "zoo"), PART.VALID(AnyPos, "shazoo")))),
           Expressions.FUNC(
             AnyPos,
             PART.VALID(AnyPos, "bar"),

@@ -176,7 +176,7 @@ object Parser {
     }
   }
 
-  val annotationP: P[ANNOTATION] = ("@" ~ anyVarName ~ "(" ~ anyVarName.rep ~ ")").map {
+  val annotationP: P[ANNOTATION] = ("@" ~ anyVarName ~ "(" ~ anyVarName.rep(sep = ",") ~ ")").map {
     case (name: PART[String], args: Seq[PART[String]]) => ANNOTATION(AnyPos, name, args)
   }
 
