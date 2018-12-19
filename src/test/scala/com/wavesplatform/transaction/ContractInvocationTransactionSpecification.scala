@@ -74,6 +74,8 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
 
     tx.json() shouldEqual js
 
+    println(tx.bytes().map(_.toInt).toList)
+
     TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
   }
 

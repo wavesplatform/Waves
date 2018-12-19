@@ -86,4 +86,35 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
     )
   }
 
+  property("simple 2-annotated function") {
+    val code =
+      """
+        |
+        | @Ann(foo)
+        | @Ioann(zoo)
+        | func bar(arg:Baz) = {
+        |    3
+        | }
+        |
+        |
+        |""".stripMargin
+    parse(code) shouldBe CONTRACT(
+      AnyPos,
+      List.empty,
+      List(
+        ANNOTATEDFUNC(
+          AnyPos,
+          List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo"))),
+            Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ioann"), List(PART.VALID(AnyPos, "zoo")))),
+          Expressions.FUNC(
+            AnyPos,
+            PART.VALID(AnyPos, "bar"),
+            List((PART.VALID(AnyPos, "arg"), List(PART.VALID(AnyPos, "Baz")))),
+            CONST_LONG(AnyPos, 3)
+          )
+        )
+      )
+    )
+  }
+
 }

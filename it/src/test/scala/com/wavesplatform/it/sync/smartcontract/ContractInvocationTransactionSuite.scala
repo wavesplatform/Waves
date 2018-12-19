@@ -113,6 +113,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
           sender = caller,
           contractAddress = contract,
           fc = fc,
+          p = None,
           timestamp = System.currentTimeMillis(),
           fee = 1.waves
         )
