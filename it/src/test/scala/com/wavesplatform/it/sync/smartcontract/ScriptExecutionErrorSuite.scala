@@ -13,7 +13,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.JsNumber
 
 class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val acc0 = pkByAddress(firstAddress)
@@ -35,16 +34,12 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     val compiled = ScriptCompiler(scriptSrc, isAssetScript = false).explicitGet()._1
 
-    val tx = sender.signedBroadcast(
-      SetScriptTransaction.selfSigned(1, acc2, Some(compiled), setScriptFee, ts).explicitGet().json() +
-        ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+    val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(1, acc2, Some(compiled), setScriptFee, ts).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
     val alias = Alias.fromString(s"alias:${AddressScheme.current.chainId.toChar}:asdasdasdv").explicitGet()
     assertBadRequestAndResponse(
-      sender.signedBroadcast(
-        CreateAliasTransactionV2.selfSigned(acc2, 2, alias, minFee, ts).explicitGet().json() +
-          ("type" -> JsNumber(CreateAliasTransactionV2.typeId.toInt))),
+      sender.signedBroadcast(CreateAliasTransactionV2.selfSigned(acc2, 2, alias, minFee, ts).explicitGet().json()),
       "Your transaction has incorrect type."
     )
   }
@@ -61,7 +56,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
       SetScriptTransaction
         .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), setScriptFee, ts)
         .explicitGet()
-        .json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+        .json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
     assertBadRequestAndResponse(
@@ -69,7 +64,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
         TransferTransactionV2
           .selfSigned(2, None, acc0, acc1.toAddress, 1000, ts, None, minFee, Array())
           .explicitGet()
-          .json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))),
+          .json()),
       "not a boolean"
     )
   }

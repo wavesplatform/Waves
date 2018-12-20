@@ -367,30 +367,16 @@ object WavesContext {
       wavesBalanceF
     )
 
-    val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled)
-    val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled)
-
-    val transactionsCommonType = UnionType("Transaction", activeTxTypes.map(_.typeRef))
-
-    val transactionTypes: List[CaseType] = obsoleteTxTypes ++ activeTxTypes
-
-    Seq(
-      addressType,
-      aliasType,
-      transfer,
-      assetPairType,
-      dataEntryType,
-      buildOrderType(proofsEnabled),
-      transactionsCommonType
-    ) ++ transactionTypes
-
-    lazy val writeSetType       = CaseType("WriteSet", List("data"       -> LIST(dataEntryType.typeRef)))
-    lazy val transferSetType     = CaseType("TransferSet", List("transfers" -> LIST(transfer.typeRef)))
-    lazy val contractResultType = CaseType("ContractResult", List("data" -> writeSetType.typeRef, "payments" -> transferSetType.typeRef))
+    lazy val writeSetType            = CaseType("WriteSet", List("data"         -> LIST(dataEntryType.typeRef)))
+    val contractTransfer             = CaseType("Transfer", List("recipient"    -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+    lazy val contractTransferSetType = CaseType("TransferSet", List("transfers" -> LIST(contractTransfer.typeRef)))
+    lazy val contractResultType      = CaseType("ContractResult", List("data"   -> writeSetType.typeRef, "payments" -> contractTransferSetType.typeRef))
 
     val types = buildWavesTypes(proofsEnabled)
 
-    CTX(types ++ (if (version == V3) List(writeSetType, transferSetType, contractResultType) else List.empty), commonVars ++ vars(version), functions)
+    CTX(types ++ (if (version == V3) List(writeSetType, contractTransfer, contractTransferSetType, contractResultType) else List.empty),
+        commonVars ++ vars(version),
+        functions)
   }
 
   val verifierInput =

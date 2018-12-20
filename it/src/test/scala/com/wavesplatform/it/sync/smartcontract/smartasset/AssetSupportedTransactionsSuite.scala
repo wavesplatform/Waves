@@ -7,7 +7,6 @@ import com.wavesplatform.state.{ByteStr, IntegerDataEntry}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import play.api.libs.json.JsNumber
 import com.wavesplatform.state._
 import scala.concurrent.duration._
 
@@ -200,10 +199,9 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val dataTx = sender.putData(firstAddress, List(IntegerDataEntry(s"${blackTx.id.value.base58}", 42)), minFee).id
     nodes.waitForHeightAriseAndTxPresent(dataTx)
 
-    sender.signedBroadcast(blackTx.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt)), waitForTx = true)
+    sender.signedBroadcast(blackTx.json(), waitForTx = true)
 
-    assertBadRequestAndMessage(sender.signedBroadcast(incorrectTx.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt))),
-                               errNotAllowedByToken)
+    assertBadRequestAndMessage(sender.signedBroadcast(incorrectTx.json()), errNotAllowedByToken)
   }
 
   test("burner is from the list (white or black)") {
@@ -273,7 +271,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     assertBadRequestAndMessage(sender.burn(firstAddress, asset, 10, smartMinFee), errNotAllowedByToken)
   }
 
-  test("unburable asset") {
+  test("unburnable asset") {
     val unBurnable = sender
       .issue(
         firstAddress,
@@ -385,12 +383,11 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val scr = ScriptCompiler(
       s"""
-                             |match tx {
-                             |  case s : SetAssetScriptTransaction => true
-                             |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
-                             |  case _ => false
-                             |}
-         """.stripMargin,
+        |match tx {
+        |  case s : SetAssetScriptTransaction => true
+        |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).base58}')
+        |  case _ => false
+        |}""".stripMargin,
       isAssetScript = true
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(assetNonReissue, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)

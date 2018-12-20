@@ -48,40 +48,70 @@ object ContractEvaluator {
   }
 }
 
-case class ContractResult(ds: List[DataItem[_]], ts: List[(Address, Long)])
+case class ContractResult(ds: List[DataItem[_]], ts: List[(Address, Long, Option[ByteVector])])
 object ContractResult {
-  def fromObj(e: EVALUATED): Either[ExecutionError, ContractResult] = {
-    e match {
-      case CaseObj(tpe, fields) if tpe.name == "WriteSet" =>
-        val xs: IndexedSeq[EVALUATED] = fields("data").asInstanceOf[ARR].xs
-        val r: IndexedSeq[DataItem[_]] = xs.map {
-          case CaseObj(tpe, fields) if tpe.name == "DataEntry" =>
-            (fields("key"), fields("value")) match {
-              case (CONST_STRING(k), CONST_BOOLEAN(b))    => DataItem.Bool(k, b)
-              case (CONST_STRING(k), CONST_STRING(b))     => DataItem.Str(k, b)
-              case (CONST_STRING(k), CONST_LONG(b))       => DataItem.Lng(k, b)
-              case (CONST_STRING(k), CONST_BYTEVECTOR(b)) => DataItem.Bin(k, b)
-              case _                                      => ???
-            }
-          case _ => ???
-        }
-        Right(ContractResult(r.toList, List.empty))
-      case CaseObj(tpe, fields) if tpe.name == "TransferSet" =>
-        val xs: IndexedSeq[EVALUATED] = fields("transfers").asInstanceOf[ARR].xs
-        val r = xs.map {
-          case CaseObj(tpe, fields) if tpe.name == "Transfer" =>
-            (fields("recipient"), fields("amount")) match {
-              case (CaseObj(Types.addressType.typeRef, fields2), CONST_LONG(b)) =>
-                fields2("bytes") match {
-                  case CONST_BYTEVECTOR(addBytes) => (Address(addBytes), b)
-                  case v                          => ???
-                }
-              case v => ???
-            }
-          case v => ???
-        }
-        Right(ContractResult(List.empty, r.toList))
-    }
+  private def processWriteSet(c: CaseObj) = c match {
+    case CaseObj(_, fields) =>
+      val xs: IndexedSeq[EVALUATED] = fields("data").asInstanceOf[ARR].xs
+      xs.map {
+        case CaseObj(tpe, fields) if tpe.name == "DataEntry" =>
+          (fields("key"), fields("value")) match {
+            case (CONST_STRING(k), CONST_BOOLEAN(b))    => DataItem.Bool(k, b)
+            case (CONST_STRING(k), CONST_STRING(b))     => DataItem.Str(k, b)
+            case (CONST_STRING(k), CONST_LONG(b))       => DataItem.Lng(k, b)
+            case (CONST_STRING(k), CONST_BYTEVECTOR(b)) => DataItem.Bin(k, b)
+            case _                                      => ???
+          }
+        case _ => ???
+      }
   }
 
+  private def processTransferSet(c: CaseObj) = c match {
+    case CaseObj(tpe, fields) =>
+      val xs: IndexedSeq[EVALUATED] = fields("transfers").asInstanceOf[ARR].xs
+      xs.map {
+        case CaseObj(_, fields) if tpe.name == "Transfer" =>
+          (fields("recipient"), fields("amount"), fields("asset")) match {
+            case (CaseObj(Types.addressType.typeRef, fields2), CONST_LONG(b), t) =>
+              val token = t match {
+                case CONST_BYTEVECTOR(tokenId)  => Some(tokenId)
+                case CaseObj(_, m) if m.isEmpty => None
+                case _                          => ???
+              }
+
+              fields2("bytes") match {
+                case CONST_BYTEVECTOR(addBytes) => (Address(addBytes), b, token)
+                case v                          => ???
+              }
+            case v => ???
+          }
+        case v => ???
+      }
+  }
+
+  private def processContractSet(c: CaseObj) = c match {
+    case CaseObj(_, fields) =>
+      val writes = fields("data") match {
+        case c @ CaseObj(tpe, _) if tpe.name == "WriteSet" => processWriteSet(c)
+        case _                                             => ???
+      }
+      val payments = fields("payments") match {
+        case c @ CaseObj(tpe, _) if tpe.name == "WriteSet" => processTransferSet(c)
+        case _                                             => ???
+      }
+      ContractResult(writes.toList, payments.toList)
+  }
+
+  def fromObj(e: EVALUATED): Either[ExecutionError, ContractResult] = Right {
+    e match {
+      case c @ CaseObj(tpe, _) =>
+        tpe.name match {
+          case "WriteSet"       => ContractResult(processWriteSet(c).toList, List.empty)
+          case "TransferSet"    => ContractResult(List.empty, processTransferSet(c).toList)
+          case "ContractResult" => processContractSet(c)
+          case _                => ???
+        }
+      case _ => ???
+    }
+  }
 }

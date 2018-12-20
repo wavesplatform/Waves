@@ -49,19 +49,29 @@ object ContractInvocationTransactionDiff {
                     case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
                     case DataItem.Bin(k, b)  => BinaryDataEntry(k, ByteStr(b.toArray))
                   }
-                  val pmts: Seq[Map[Address, Long]] = ps.map {
-
-                    case (Recipient.Address(addrBytes), amt) => Map(Address.fromBytes(addrBytes.toArray).explicitGet() -> amt)
+                  val pmts: List[Map[Address, Map[Option[ByteStr], Long]]] = ps.map {
+                    case (Recipient.Address(addrBytes), amt, maybeAsset) =>
+                      Map(Address.fromBytes(addrBytes.toArray).explicitGet() -> Map(maybeAsset.map(a => ByteStr(a.toArray)) -> amt))
                   }
                   for {
-                    _ <- Either.cond(pmts.flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, ""))
-                    _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - ensure all amounts are positive
+                    _ <- Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, ""))
+                    _ <- Either.cond(
+                      pmts
+                        .flatMap(_.values)
+                        .flatMap(_.keys)
+                        .flatten
+                        .forall(blockchain.assetDescription(_).isDefined),
+                      (),
+                      GenericError(s"Unissued assets are not allowed")
+                    )
                     _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - sum doesn't overflow
-                    _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - assetId is defined
                     _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - whatever else tranfser/massTransfer ensures
                   } yield {
                     import cats.implicits._
-                    val paymentMap = Monoid.combineAll(pmts).mapValues(Portfolio(_, LeaseBalance.empty, Map.empty))
+                    val addressToMaybeStrToLong: Map[Address, Map[Option[ByteStr], Long]] = Monoid.combineAll(pmts)
+                    val paymentMap = addressToMaybeStrToLong
+                      .mapValues(mp => mp.toList.map(x => Portfolio.build(x._1, x._2)))
+                      .mapValues(l => Monoid.combineAll(l))
                     val feePart = Map(
                       tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)
                     )

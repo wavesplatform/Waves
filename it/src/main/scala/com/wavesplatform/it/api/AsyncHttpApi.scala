@@ -186,6 +186,19 @@ object AsyncHttpApi extends Assertions {
     def transactionsByAddress(address: String, limit: Int): Future[Seq[Seq[TransactionInfo]]] =
       get(s"/transactions/address/$address/limit/$limit").as[Seq[Seq[TransactionInfo]]]
 
+    def assetDistribution(asset: String,
+                          initialHeight: Option[Int],
+                          limit: Option[Int] = None,
+                          after: Option[String] = None): Future[Map[String, Long]] = {
+      val h   = if (initialHeight.isDefined) s"/${initialHeight.get}" else ""
+      val l   = if (limit.isDefined) s"/limit/${limit.get}" else ""
+      val a   = if (after.isDefined) s"?after=${after.get}" else ""
+      val req = s"/assets/$asset/distribution" + h + l + a
+      println(req)
+
+      get(req).as[Map[String, Long]]
+    }
+
     def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
     def transfer(sourceAddress: String,

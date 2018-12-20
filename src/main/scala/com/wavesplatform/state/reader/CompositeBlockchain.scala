@@ -114,10 +114,7 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     inner.collectLposPortfolios(pf) ++ b.result()
   }
 
-  override def containsTransaction(id: ByteStr): Boolean = diff.transactions.contains(id) || inner.containsTransaction(id)
-
-  override def forgetTransactions(pred: (AssetId, Long) => Boolean) = inner.forgetTransactions(pred)
-  override def learnTransactions(values: Map[AssetId, Long]): Unit  = inner.learnTransactions(values)
+  override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
@@ -164,18 +161,25 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       if pred(p)
     } yield address -> f(address)
 
-  override def assetDistribution(assetId: ByteStr): Map[Address, Long] =
-    inner.assetDistribution(assetId) ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
+  override def assetDistribution(assetId: ByteStr): Map[Address, Long] = {
+    val fromInner = inner.assetDistribution(assetId)
+    val fromDiff  = changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = {
-    val innerDistribution = inner.assetDistributionAtHeight(assetId, height)
+    fromInner ++ fromDiff
+  }
+
+  override def assetDistributionAtHeight(assetId: AssetId,
+                                         height: Int,
+                                         count: Int,
+                                         fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] = {
+    val innerDistribution = inner.assetDistributionAtHeight(assetId, height, count, fromAddress)
 
     if (height < this.height) {
       innerDistribution
     } else {
       val distributionFromDiff =
         changedBalances(_.assets.getOrElse(assetId, 0) != 0, portfolio(_).assets.getOrElse(assetId, 0))
-      innerDistribution |+| distributionFromDiff.asRight
+      innerDistribution.map(_ ++ distributionFromDiff)
     }
   }
 

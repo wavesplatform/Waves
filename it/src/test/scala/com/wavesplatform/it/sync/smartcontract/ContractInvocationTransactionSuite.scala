@@ -130,26 +130,24 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
   }
 
   test("verifier works") {
-    val arg               = ByteStr(Array(42: Byte))
-    val fc: FUNCTION_CALL = FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_BYTEVECTOR(ByteVector(arg.arr))))
 
     val tx =
       DataTransaction
         .selfSigned(
           version = 1: Byte,
           sender = caller,
-          data = List(StringDataEntry("a", "e")),
+          data = List(StringDataEntry("a", "OOO")),
           feeAmount = 1.waves,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()
 
-    val contractInvocationId = sender
+    val dataTxId = sender
       .signedBroadcast(tx.json() + ("type" -> JsNumber(DataTransaction.typeId.toInt)))
       .id
 
-    nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
+    nodes.waitForHeightAriseAndTxPresent(dataTxId)
 
-    sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "e")
+    sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "OOO")
   }
 }

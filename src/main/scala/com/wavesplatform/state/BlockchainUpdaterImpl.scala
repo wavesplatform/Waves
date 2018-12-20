@@ -169,8 +169,6 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                       miningConstraints.total
                     }
 
-                    val expiredTransactions = blockchain.forgetTransactions((_, txTs) => block.timestamp - txTs > 4 * 60 * 60 * 1000)
-
                     val diff = BlockDiffer
                       .fromBlock(
                         functionalitySettings,
@@ -179,11 +177,6 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                         block,
                         constraint
                       )
-
-                    diff.left.foreach { _ =>
-                      log.trace(s"Could not append new block, remembering ${expiredTransactions.size} transaction(s)")
-                      blockchain.learnTransactions(expiredTransactions)
-                    }
 
                     diff.map { hardenedDiff =>
                       blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
@@ -394,13 +387,9 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
     addressTransactionsFromDiff(blockchain, ngState.map(_.bestLiquidDiff))(address, types, count, fromId)
 
-  override def containsTransaction(id: AssetId): Boolean = ngState.fold(blockchain.containsTransaction(id)) { ng =>
-    ng.bestLiquidDiff.transactions.contains(id) || blockchain.containsTransaction(id)
+  override def containsTransaction(tx: Transaction): Boolean = ngState.fold(blockchain.containsTransaction(tx)) { ng =>
+    ng.bestLiquidDiff.transactions.contains(tx.id()) || blockchain.containsTransaction(tx)
   }
-
-  override def forgetTransactions(pred: (AssetId, Long) => Boolean): Map[AssetId, Long] = blockchain.forgetTransactions(pred)
-
-  override def learnTransactions(values: Map[AssetId, Long]): Unit = blockchain.learnTransactions(values)
 
   override def assetDescription(id: AssetId): Option[AssetDescription] = ngState.fold(blockchain.assetDescription(id)) { ng =>
     val diff = ng.bestLiquidDiff
@@ -484,18 +473,25 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         } yield address -> f(address)
       }
 
-  override def assetDistribution(assetId: AssetId): Map[Address, Long] =
-    blockchain.assetDistribution(assetId) ++ changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
+  override def assetDistribution(assetId: AssetId): Map[Address, Long] = {
+    val fromInner = blockchain.assetDistribution(assetId)
+    val fromNg    = changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = {
-    val innerDistribution = blockchain.assetDistributionAtHeight(assetId, height)
+    fromInner ++ fromNg
+  }
+
+  override def assetDistributionAtHeight(assetId: AssetId,
+                                         height: Int,
+                                         count: Int,
+                                         fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] = {
+    val innerDistribution = blockchain.assetDistributionAtHeight(assetId, height, count, fromAddress)
     ngState.fold(innerDistribution) { ng =>
       if (height < this.height) {
         innerDistribution
       } else {
         val distributionFromNG =
           changedBalances(_.assets.getOrElse(assetId, 0) != 0, portfolio(_).assets.getOrElse(assetId, 0))
-        innerDistribution |+| distributionFromNG.asRight
+        innerDistribution.map(_ ++ distributionFromNG)
       }
     }
   }

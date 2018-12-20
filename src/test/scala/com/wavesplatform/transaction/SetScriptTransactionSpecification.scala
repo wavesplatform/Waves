@@ -39,6 +39,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
                        "tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY"
                        ],
                        "version": 1,
+                       "chainId": 84,
                        "script": null
                        }
     """),

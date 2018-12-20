@@ -8,9 +8,11 @@ import cats.implicits._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
@@ -27,7 +29,7 @@ import monix.execution.Scheduler
 import play.api.libs.json._
 
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.util.Success
 
 @Path("/assets")
 @Api(value = "assets")
@@ -57,26 +59,21 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       complete(balanceJson(address, assetId))
     }
 
-  def assetDistributionTask(assetId: AssetId, maybeHeight: Option[Int]): Task[ToResponseMarshallable] = {
-    val currHeightDistributionTask: Task[Either[ValidationError, Map[Address, Long]]] =
-      Task
-        .eval(blockchain.assetDistribution(assetId))
-        .map(_.asRight[ValidationError])
+  def assetDistributionTask(params: DistributionParams): Task[ToResponseMarshallable] = {
+    val (assetId, height, limit, maybeAfter) = params
 
-    val distributionTask = maybeHeight
-      .fold(currHeightDistributionTask) { height =>
-        Task.eval(
-          blockchain
-            .assetDistributionAtHeight(assetId, height)
-        )
-      }
+    val distributionTask = Task.eval(
+      blockchain
+        .assetDistributionAtHeight(assetId, height, limit, maybeAfter)
+    )
 
     distributionTask.map {
-      case Right(dst) => Json.toJson(dst.map { case (a, b) => a.stringRepr -> b }): ToResponseMarshallable
+      case Right(dst) => AssetsApiRoute.distributionToJson(dst): ToResponseMarshallable
       case Left(err)  => ApiError.fromValidationError(err)
     }
   }
 
+  @Deprecated
   @Path("/{assetId}/distribution")
   @ApiOperation(value = "Asset balance distribution", notes = "Asset balance distribution by account", httpMethod = "GET")
   @ApiImplicitParams(
@@ -84,14 +81,17 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
     ))
   def balanceDistribution: Route =
-    (get & path(Segment / "distribution")) { assetId =>
-      val distributionTask: Task[ToResponseMarshallable] =
-        Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
-          case Success(byteArray) =>
-            assetDistributionTask(ByteStr(byteArray), None)
-          case Failure(_) =>
-            Task.pure(ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId")))
-        }
+    (get & path(Segment / "distribution")) { (assetParam) =>
+      val assetIdEi = AssetsApiRoute
+        .validateAssetId(assetParam)
+
+      val distributionTask = assetIdEi match {
+        case Left(err) => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
+        case Right(assetId) =>
+          Task
+            .eval(blockchain.assetDistribution(assetId))
+            .map(dst => AssetsApiRoute.distributionToJson(dst): ToResponseMarshallable)
+      }
 
       complete {
         try {
@@ -104,7 +104,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       }
     }
 
-  @Path("/{assetId}/distribution/{height}")
+  @Path("/{assetId}/distribution/{height}/limit/{limit}")
   @ApiOperation(
     value = "Asset balance distribution at height",
     notes = "Asset balance distribution by account at specified height",
@@ -114,27 +114,30 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     Array(
       new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "integer", paramType = "path"),
+      new ApiImplicitParam(name = "limit", value = "Number of addresses to be returned", required = true, dataType = "integer", paramType = "path"),
+      new ApiImplicitParam(name = "after", value = "address to paginate after", required = false, dataType = "string", paramType = "query")
     ))
   def balanceDistributionAtHeight: Route =
-    (get & path(Segment / "distribution" / IntNumber)) { (assetId, height) =>
-      val distributionTask: Task[ToResponseMarshallable] =
-        Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
-          case Success(byteArray) =>
-            assetDistributionTask(ByteStr(byteArray), Some(height))
+    (get & path(Segment / "distribution" / IntNumber / "limit" / IntNumber) & parameter('after.?)) {
+      (assetParam, heightParam, limitParam, afterParam) =>
+        val paramsEi: Either[ValidationError, DistributionParams] =
+          AssetsApiRoute
+            .validateDistributionParams(blockchain, assetParam, heightParam, limitParam, settings.distributionAddressLimit, afterParam)
 
-          case Failure(_) =>
-            Task.pure(ApiError.fromValidationError(com.wavesplatform.transaction.ValidationError.GenericError("Must be base58-encoded assetId")))
+        val resultTask = paramsEi match {
+          case Left(err)     => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
+          case Right(params) => assetDistributionTask(params)
         }
 
-      complete {
-        try {
-          distributionTask.runAsyncLogErr(distributionTaskScheduler)
-        } catch {
-          case _: RejectedExecutionException =>
-            val errMsg = CustomValidationError("Asset distribution currently unavailable, try again later")
-            Future.successful(errMsg.json: ToResponseMarshallable)
+        complete {
+          try {
+            resultTask.runAsyncLogErr(distributionTaskScheduler)
+          } catch {
+            case _: RejectedExecutionException =>
+              val errMsg = CustomValidationError("Asset distribution currently unavailable, try again later")
+              Future.successful(errMsg.json: ToResponseMarshallable)
+          }
         }
-      }
     }
 
   @Path("/balance/{address}")
@@ -283,4 +286,49 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
 object AssetsApiRoute {
   val MAX_DISTRIBUTION_TASKS = 5
+
+  type DistributionParams = (AssetId, Int, Int, Option[Address])
+
+  def validateDistributionParams(blockchain: Blockchain,
+                                 assetParam: String,
+                                 heightParam: Int,
+                                 limitParam: Int,
+                                 maxLimit: Int,
+                                 afterParam: Option[String]): Either[ValidationError, DistributionParams] = {
+    for {
+      limit   <- validateLimit(limitParam, maxLimit)
+      height  <- validateHeight(blockchain, heightParam)
+      assetId <- validateAssetId(assetParam)
+      after   <- afterParam.traverse[Either[ValidationError, ?], Address](Address.fromString)
+    } yield (assetId, height, limit, after)
+  }
+
+  def validateAssetId(assetParam: String): Either[ValidationError, AssetId] = {
+    for {
+      _ <- Either.cond(assetParam.length <= AssetIdStringLength, (), GenericError("Unexpected assetId length"))
+      assetId <- Base58
+        .decode(assetParam)
+        .fold(
+          _ => GenericError("Must be base58-encoded assetId").asLeft[AssetId],
+          arr => ByteStr(arr).asRight[ValidationError]
+        )
+    } yield assetId
+  }
+
+  def validateHeight(blockchain: Blockchain, height: Int): Either[ValidationError, Int] = {
+    Either.cond(height > 0 && height <= blockchain.height, height, GenericError(s"Height should be in range (1 - ${blockchain.height})"))
+  }
+
+  def validateLimit(limit: Int, maxLimit: Int): Either[ValidationError, Int] = {
+    for {
+      _ <- Either
+        .cond(limit > 0, (), GenericError("Limit should be greater than 0"))
+      _ <- Either
+        .cond(limit < maxLimit, (), GenericError(s"Limit should be less than $maxLimit"))
+    } yield limit
+  }
+
+  def distributionToJson(dst: Map[Address, Long]) = {
+    Json.toJson(dst.map { case (a, b) => a.stringRepr -> b })
+  }
 }
