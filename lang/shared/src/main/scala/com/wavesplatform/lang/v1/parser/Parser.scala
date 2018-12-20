@@ -311,6 +311,8 @@ object Parser {
 
   lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
 
+  lazy val declaration = P(letP | funcP)
+
   def binaryOp(atom: P[EXPR], rest: List[List[BinaryOperation]]): P[EXPR] = rest match {
     case Nil => unaryOp(atom, unaryOps)
     case kinds :: restOps =>
@@ -332,9 +334,9 @@ object Parser {
   def parseScript(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
 
   def parseContract(str: String): core.Parsed[CONTRACT, Char, String] =
-    P(Start ~ (annotatedFunc.rep) ~ End)
+    P(Start ~ (declaration.rep) ~ (annotatedFunc.rep) ~ End)
       .map {
-        case fs => CONTRACT(AnyPos, List.empty, fs.toList)
+        case (ds, fs) => CONTRACT(AnyPos, ds.toList, fs.toList)
       }
       .parse(str)
 }
