@@ -130,8 +130,6 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
   }
 
   test("verifier works") {
-    val arg               = ByteStr(Array(42: Byte))
-    val fc: FUNCTION_CALL = FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_BYTEVECTOR(ByteVector(arg.arr))))
 
     val tx =
       DataTransaction

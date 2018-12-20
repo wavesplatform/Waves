@@ -41,7 +41,7 @@ object ContractEvaluator {
   }
 }
 
-case class ContractResult(ds: List[DataItem[_]], ts: List[(Address, Long)])
+case class ContractResult(ds: List[DataItem[_]], ts: List[(Address, Long, Option[ByteVector])])
 object ContractResult {
   private def processWriteSet(c: CaseObj) = c match {
     case CaseObj(_, fields) =>
@@ -64,10 +64,16 @@ object ContractResult {
       val xs: IndexedSeq[EVALUATED] = fields("transfers").asInstanceOf[ARR].xs
       xs.map {
         case CaseObj(_, fields) if tpe.name == "Transfer" =>
-          (fields("recipient"), fields("amount")) match {
-            case (CaseObj(Types.addressType.typeRef, fields2), CONST_LONG(b)) =>
+          (fields("recipient"), fields("amount"), fields("asset")) match {
+            case (CaseObj(Types.addressType.typeRef, fields2), CONST_LONG(b), t) =>
+              val token = t match {
+                case CONST_BYTEVECTOR(tokenId)  => Some(tokenId)
+                case CaseObj(_, m) if m.isEmpty => None
+                case _                          => ???
+              }
+
               fields2("bytes") match {
-                case CONST_BYTEVECTOR(addBytes) => (Address(addBytes), b)
+                case CONST_BYTEVECTOR(addBytes) => (Address(addBytes), b, token)
                 case v                          => ???
               }
             case v => ???
@@ -80,9 +86,11 @@ object ContractResult {
     case CaseObj(_, fields) =>
       val writes = fields("data") match {
         case c @ CaseObj(tpe, _) if tpe.name == "WriteSet" => processWriteSet(c)
+        case _                                             => ???
       }
       val payments = fields("payments") match {
         case c @ CaseObj(tpe, _) if tpe.name == "WriteSet" => processTransferSet(c)
+        case _                                             => ???
       }
       ContractResult(writes.toList, payments.toList)
   }
@@ -96,6 +104,7 @@ object ContractResult {
           case "ContractResult" => processContractSet(c)
           case _                => ???
         }
+      case _ => ???
     }
   }
 }

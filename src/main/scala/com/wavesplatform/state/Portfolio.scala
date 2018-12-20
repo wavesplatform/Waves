@@ -29,6 +29,12 @@ case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[ByteStr, Lo
 }
 
 object Portfolio {
+
+  def build(a: Option[AssetId], amount: Long): Portfolio = a match {
+    case None    => Portfolio(amount, LeaseBalance.empty, Map.empty)
+    case Some(t) => Portfolio(0L, LeaseBalance.empty, Map(t -> amount))
+  }
+
   val empty = Portfolio(0L, Monoid[LeaseBalance].empty, Map.empty)
 
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
