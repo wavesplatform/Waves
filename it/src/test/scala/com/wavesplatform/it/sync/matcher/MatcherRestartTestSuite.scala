@@ -20,7 +20,9 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
   "check order execution" - {
     // Alice issues new asset
     val aliceAsset =
-      aliceNode.issue(aliceAcc.address, "DisconnectCoin", "Alice's coin for disconnect tests", someAssetAmount, 0, reissuable = false, issueFee, 2).id
+      aliceNode
+        .issue(aliceAcc.address, "DisconnectCoin", "Alice's coin for disconnect tests", someAssetAmount, 0, reissuable = false, smartIssueFee, 2)
+        .id
     matcherNode.waitForTransaction(aliceAsset)
 
     val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
