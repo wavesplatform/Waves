@@ -1,5 +1,4 @@
 package com.wavesplatform.lang.v1.evaluator
-import cats.data.EitherT
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.VerifierFunction

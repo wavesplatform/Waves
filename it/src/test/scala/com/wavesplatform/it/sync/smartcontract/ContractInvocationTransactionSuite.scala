@@ -135,7 +135,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
       DataTransaction
         .selfSigned(
           version = 1: Byte,
-          sender = caller,
+          sender = contract,
           data = List(StringDataEntry("a", "OOO")),
           feeAmount = 1.waves,
           timestamp = System.currentTimeMillis()
