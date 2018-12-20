@@ -1,15 +1,18 @@
 package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
+import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+
 import scala.concurrent.duration._
 
 class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
@@ -36,7 +39,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
 
       withClue("mining was too fast, can't continue") {
-        matcherNode.height shouldBe <(ActivationHeight)
+        matcherNode.height shouldBe <(activationHeight)
       }
 
       withClue("duplicate names in contracts are denied") {
@@ -75,7 +78,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     }
 
     "invalid setScript at account" in {
-      matcherNode.waitForHeight(ActivationHeight, 5.minutes)
+      matcherNode.waitForHeight(activationHeight, 5.minutes)
       setContract(Some("true && (height > 0)"), bobAcc)
       assertBadRequestAndResponse(
         matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes),
@@ -106,13 +109,14 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 }
 
 object OrdersFromScriptedAccTestSuite {
-  val ActivationHeight = 25
-
-  import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
+  val activationHeight = 25
 
   private val matcherConfig = ConfigFactory.parseString(s"""
                                                            |waves {
-                                                           |  blockchain.custom.functionality.pre-activated-features = { 10 = $ActivationHeight }
+                                                           |  blockchain.custom.functionality.pre-activated-features = {
+                                                           |    ${BlockchainFeatures.SmartAccountTrading.id} = $activationHeight,
+                                                           |    ${BlockchainFeatures.SmartAssets.id} = 1000
+                                                           |  }
                                                            |}""".stripMargin)
 
   private val updatedConfigs: Seq[Config] = Configs.map(matcherConfig.withFallback(_))
