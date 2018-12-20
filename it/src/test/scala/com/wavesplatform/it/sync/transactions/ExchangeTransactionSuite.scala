@@ -7,7 +7,6 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange._
-import play.api.libs.json._
 
 class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   test("cannot exchange non-issued assets") {
@@ -68,7 +67,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           .get
 
         assertBadRequestAndMessage(
-          sender.postJson("/transactions/broadcast", tx.json() + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt))),
+          sender.postJson("/transactions/broadcast", tx.json()),
           "Assets should be issued before they can be traded"
         )
       } else {
@@ -88,7 +87,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           .get
 
         assertBadRequestAndMessage(
-          sender.postJson("/transactions/broadcast", tx.json() + ("type" -> JsNumber(ExchangeTransaction.typeId.toInt))),
+          sender.postJson("/transactions/broadcast", tx.json()),
           "Assets should be issued before they can be traded"
         )
       }

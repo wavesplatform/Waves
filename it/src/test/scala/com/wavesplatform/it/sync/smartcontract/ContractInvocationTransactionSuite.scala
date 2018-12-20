@@ -138,18 +138,18 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
         .selfSigned(
           version = 1: Byte,
           sender = caller,
-          data = List(StringDataEntry("a", "e")),
+          data = List(StringDataEntry("a", "OOO")),
           feeAmount = 1.waves,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()
 
-    val contractInvocationId = sender
+    val dataTxId = sender
       .signedBroadcast(tx.json() + ("type" -> JsNumber(DataTransaction.typeId.toInt)))
       .id
 
-    nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
+    nodes.waitForHeightAriseAndTxPresent(dataTxId)
 
-    sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "e")
+    sender.getData(contract.address, "a") shouldBe StringDataEntry("a", "OOO")
   }
 }

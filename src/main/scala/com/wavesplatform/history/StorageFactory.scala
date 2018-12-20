@@ -8,11 +8,17 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import org.iq80.leveldb.DB
 
 object StorageFactory extends ScorexLogging {
-  private val StorageVersion = 3
+  private val StorageVersion = 2
 
   def apply(settings: WavesSettings, db: DB, time: Time): BlockchainUpdater with NG = {
     checkVersion(db)
-    val levelDBWriter = new LevelDBWriter(db, settings.blockchainSettings.functionalitySettings, settings.maxCacheSize)
+    val levelDBWriter = new LevelDBWriter(
+      db,
+      settings.blockchainSettings.functionalitySettings,
+      settings.maxCacheSize,
+      settings.maxRollbackDepth,
+      settings.rememberBlocks.toMillis
+    )
     new BlockchainUpdaterImpl(levelDBWriter, settings, time)
   }
 

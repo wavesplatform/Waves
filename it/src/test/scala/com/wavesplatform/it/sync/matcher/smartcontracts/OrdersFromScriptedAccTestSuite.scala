@@ -10,8 +10,6 @@ import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import play.api.libs.json.JsNumber
-
 import scala.concurrent.duration._
 
 class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
@@ -54,8 +52,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
         assertBadRequestAndResponse(
           matcherNode
-            .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
-            .id,
+            .signedBroadcast(setScriptTransaction.json()),
           "VarNames: duplicate variable names are temporarily denied:"
         )
       }
@@ -78,7 +75,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     }
 
     "invalid setScript at account" in {
-      matcherNode.waitForHeight(ActivationHeight, 5.minutes)
+      matcherNode.waitForHeight(ActivationHeight, 6.minutes)
       setContract(Some("true && (height > 0)"), bobAcc)
       assertBadRequestAndResponse(
         matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes),
@@ -109,7 +106,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 }
 
 object OrdersFromScriptedAccTestSuite {
-  val ActivationHeight = 30
+  val ActivationHeight = 25
 
   import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 

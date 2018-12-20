@@ -10,7 +10,6 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import play.api.libs.json.JsNumber
 
 trait IntegrationSuiteWithThreeAddresses
     extends BeforeAndAfterAll
@@ -31,7 +30,7 @@ trait IntegrationSuiteWithThreeAddresses
   protected lazy val secondAddress: String = sender.createAddress()
   protected lazy val thirdAddress: String  = sender.createAddress()
 
-  def pkByAddress(address: String) = PrivateKeyAccount.fromSeed(sender.seed(address)).right.get
+  def pkByAddress(address: String): PrivateKeyAccount = PrivateKeyAccount.fromSeed(sender.seed(address)).right.get
 
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -96,7 +95,7 @@ trait IntegrationSuiteWithThreeAddresses
       .right
       .get
     sender
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .signedBroadcast(setScriptTransaction.json(), waitForTx = true)
       .id
   }
 

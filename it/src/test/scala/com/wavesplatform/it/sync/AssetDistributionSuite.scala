@@ -1,12 +1,11 @@
 package com.wavesplatform.it.sync
 
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import org.scalatest.CancelAfterFailure
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.it.api.SyncHttpApi._
-import play.api.libs.json._
-import com.wavesplatform.it.util._
 
 class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -15,41 +14,64 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
   val issuer = node.privateKey
 
   test("'Asset distribution at height' method works properly") {
-    val transferAmount = 0.01.waves
+    val transferAmount = 1000000
+    val issueAmount    = 1000000000
 
     val addresses     = nodes.map(_.privateKey.toAddress).filter(_ != issuer.toAddress).toList
     val initialHeight = node.height
 
-    val issueTx = node.issue(issuer.address, "TestCoin", "no description", issueAmount, 8, false, issueFee)
+    val issueTx = node.issue(issuer.address, "TestCoin", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
 
-    nodes.waitForHeightAriseAndTxPresent(issueTx.id)
-
-    val massTransferTx = node.massTransfer(
+    node.massTransfer(
       issuer.address,
       addresses.map(addr => MassTransferTransaction.Transfer(addr.address, transferAmount)),
       minFee + (minFee * addresses.size),
-      Some(issueTx.id)
+      Some(issueTx),
+      waitForTx = true
     )
 
-    nodes.waitForHeightAriseAndTxPresent(massTransferTx.id)
+    node.assetDistribution(issueTx, Some(initialHeight), Some(100)) shouldBe Map.empty
 
-    val r1 = node
-      .get(s"/assets/${issueTx.id}/distribution/$initialHeight")
-      .getResponseBody()
+    val assetDis = node
+      .assetDistribution(issueTx, Some(node.height), Some(100))
 
-    Json.parse(r1).as[JsObject].value.toList shouldBe List.empty
+    assetDis should be equals node.assetDistribution(issueTx)
 
-    val r2 = node
-      .get(s"/assets/${issueTx.id}/distribution/${node.height}")
-      .getResponseBody
+    val issuerAssetDis = assetDis.filterKeys(_ == issuer.address).values
 
-    val jsonResponse = Json.parse(r2)
+    issuerAssetDis.size shouldBe 1
+    issuerAssetDis.head shouldBe (issueAmount - addresses.length * transferAmount)
 
-    (jsonResponse \ issuer.address).as[Long] shouldBe (issueAmount - addresses.length * transferAmount)
+    val othersAssetDis = assetDis.filterKeys(_ != issuer.address)
 
-    addresses.forall { addr =>
-      (jsonResponse \ addr.address).as[Long] == transferAmount
-    } shouldBe true
+    othersAssetDis.values.forall(_ == transferAmount)
+
+    val assetDisFull = node
+      .assetDistribution(issueTx, Some(node.height), Some(100), Some(issuer.address))
+
+    assetDisFull.values.forall(_ == transferAmount)
+    !assetDisFull.keySet.contains(issuer.address)
+  }
+
+  test("'Asset distribution' works properly") {
+    val recievers = for (i <- 0 until 10) yield PrivateKeyAccount(s"receiver#$i".getBytes)
+
+    val issueTx = node.issue(issuer.address, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
+
+    node
+      .massTransfer(
+        issuer.address,
+        recievers.map(rc => MassTransferTransaction.Transfer(rc.address, 10)).toList,
+        minFee + minFee * recievers.length,
+        Some(issueTx),
+        waitForTx = true
+      )
+
+    val distribution = node.assetDistribution(issueTx, None, None, None)
+
+    distribution.size shouldBe (recievers.size + 1)
+    distribution(issuer.address) shouldBe (issueAmount - 10 * recievers.length)
+    assert(recievers.forall(rc => distribution(rc.address) == 10), "Distribution correct")
   }
 
 }

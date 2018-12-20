@@ -67,13 +67,15 @@ object ContractResult {
               case (CaseObj(Types.addressType.typeRef, fields2), CONST_LONG(b)) =>
                 fields2("bytes") match {
                   case CONST_BYTEVECTOR(addBytes) => (Address(addBytes), b)
-                  case v => ???
+                  case v                          => ???
                 }
               case v => ???
             }
           case v => ???
         }
         Right(ContractResult(List.empty, r.toList))
+
+      case CaseObj(tpe, fields) if tpe.name == "ContractResult" => ???
     }
   }
 

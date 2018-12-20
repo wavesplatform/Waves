@@ -10,10 +10,8 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{Base58}
+import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.JsNumber
-
 import scala.concurrent.duration._
 
 /*
@@ -64,7 +62,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
       .explicitGet()
 
     val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .signedBroadcast(setScriptTransaction.json())
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
@@ -88,7 +86,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val accountSig = ByteStr(crypto.sign(sender.privateKey, unsigned.bodyBytes()))
     val signed     = unsigned.copy(proofs = Proofs(Seq(accountSig)))
-    val toUsersID  = sender.signedBroadcast(signed.json() + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt))).id
+    val toUsersID  = sender.signedBroadcast(signed.json()).id
 
     nodes.waitForHeightAriseAndTxPresent(toUsersID)
 
@@ -106,7 +104,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     val signedToGovFail     = unsignedToGov.copy(proofs = Proofs(Seq(accountSigToGovFail)))
 
     assertBadRequestAndResponse(
-      sender.signedBroadcast(signedToGovFail.json() + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt))),
+      sender.signedBroadcast(signedToGovFail.json()),
       "Transaction is not allowed by account-script"
     )
 
@@ -127,7 +125,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val accountSigToGov = ByteStr(crypto.sign(sender.privateKey, unsignedToGovSecond.bodyBytes()))
     val signedToGovGood = unsignedToGovSecond.copy(proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.decode(toUsersID).get))))
-    val massTransferID  = sender.signedBroadcast(signedToGovGood.json() + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt))).id
+    val massTransferID  = sender.signedBroadcast(signedToGovGood.json()).id
 
     nodes.waitForHeightAriseAndTxPresent(massTransferID)
   }

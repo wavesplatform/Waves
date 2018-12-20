@@ -23,11 +23,10 @@ import cats.Monoid
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.parallel.ParSeq
 import scala.collection.{SeqView, immutable, mutable}
 
 object LevelDBWriter {
-
-  val MAX_DEPTH = 2000
 
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
     db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(leaseId)(h)))
@@ -63,7 +62,11 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int = 100000) extends Caches with ScorexLogging {
+class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int, val maxRollbackDepth: Int, val rememberBlocksInterval: Long)
+    extends Caches
+    with ScorexLogging {
+
+  private val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
 
   import LevelDBWriter._
 
@@ -196,8 +199,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
 
-    if (previousSafeRollbackHeight < (height - MAX_DEPTH)) {
-      rw.put(Keys.safeRollbackHeight, height - MAX_DEPTH)
+    if (previousSafeRollbackHeight < (height - maxRollbackDepth)) {
+      rw.put(Keys.safeRollbackHeight, height - maxRollbackDepth)
     }
 
     rw.put(Keys.blockAt(height), Some(block))
@@ -213,7 +216,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
     log.trace(s"WRITE lastAddressId = $lastAddressId")
 
-    val threshold = height - MAX_DEPTH
+    val threshold        = height - maxRollbackDepth
+    val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
@@ -223,7 +227,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         newAddressesForWaves += addressId
       }
       rw.put(Keys.wavesBalance(addressId)(height), balance)
-      expiredKeys ++= updateHistory(rw, wbh, kwbh, threshold, Keys.wavesBalance(addressId))
+      expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshold, Keys.wavesBalance(addressId))
       addressId
     }
 
@@ -237,7 +241,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     for ((addressId, leaseBalance) <- leaseBalances) {
       rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
-      expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), threshold, Keys.leaseBalance(addressId))
+      expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
     }
 
     val newAddressesForAsset = mutable.AnyRefMap.empty[ByteStr, Set[BigInt]]
@@ -688,19 +692,29 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     b.result()
   }
 
-  override def scoreOf(blockId: ByteStr): Option[BigInt] = readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
+  def loadScoreOf(blockId: ByteStr): Option[BigInt] = {
+    readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
+  }
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readOnly(_.get(Keys.blockHeader(height)))
+  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+    readOnly(_.get(Keys.blockHeader(height)))
+  }
 
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] =
+  override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
     readOnly(db => db.get(Keys.heightOf(blockId)).flatMap(h => db.get(Keys.blockHeader(h))))
+  }
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = readOnly(_.get(Keys.blockBytes(height)))
+  override def loadBlockBytes(height: Int): Option[Array[Byte]] = {
+    readOnly(_.get(Keys.blockBytes(height)))
+  }
 
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] =
+  override def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]] = {
     readOnly(db => db.get(Keys.heightOf(blockId)).flatMap(h => db.get(Keys.blockBytes(h))))
+  }
 
-  override def heightOf(blockId: ByteStr): Option[Int] = readOnly(_.get(Keys.heightOf(blockId)))
+  override def loadHeightOf(blockId: ByteStr): Option[Int] = {
+    readOnly(_.get(Keys.heightOf(blockId)))
+  }
 
   override def lastBlockIds(howMany: Int): immutable.IndexedSeq[ByteStr] = readOnly { db =>
     // since this is called from outside of the main blockchain updater thread, instead of using cached height,
@@ -737,26 +751,45 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     (for {
       seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
       addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
-      balance   <- db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId))
+      balance = db.get(Keys.assetBalance(addressId, assetId)(height))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
   }
 
-  override def assetDistributionAtHeight(assetId: AssetId, height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
+  override def assetDistributionAtHeight(assetId: AssetId,
+                                         height: Int,
+                                         count: Int,
+                                         fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
+
+    lazy val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
+
+    def takeAfter(s: ParSeq[BigInt], a: Option[BigInt]): ParSeq[BigInt] = {
+      a match {
+        case None    => s
+        case Some(v) => s.dropWhile(_ != v).drop(1)
+      }
+    }
+
+    lazy val addressIds: ParSeq[BigInt] =
+      for {
+        seqNr <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
+        addressId <- db
+          .get(Keys.addressesForAsset(assetId, seqNr))
+          .par
+      } yield addressId
 
     Either
       .cond(
         height > canGetAfterHeight,
         (for {
-          seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
-          addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
+          addressId <- takeAfter(addressIds, maybeAddressId).take(count)
           history = db.get(Keys.assetBalanceHistory(addressId, assetId))
-          actualHeight <- history.partition(_ > height)._2.headOption
+          actualHeight <- history.filterNot(_ > height).headOption
           balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
           if balance > 0
         } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq,
-        GenericError(s"Cannot get asset distribution at height less than $canGetAfterHeight")
+        GenericError(s"Cannot get asset distribution at height less than ${canGetAfterHeight + 1}")
       )
   }
 

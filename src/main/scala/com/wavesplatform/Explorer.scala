@@ -83,8 +83,14 @@ object Explorer extends ScorexLogging {
 
     log.info(s"Data directory: ${settings.dataDirectory}")
 
-    val db     = openDB(settings.dataDirectory)
-    val reader = new LevelDBWriter(db, settings.blockchainSettings.functionalitySettings)
+    val db = openDB(settings.dataDirectory)
+    val reader = new LevelDBWriter(
+      db,
+      settings.blockchainSettings.functionalitySettings,
+      maxCacheSize = settings.maxCacheSize,
+      maxRollbackDepth = settings.maxRollbackDepth,
+      rememberBlocksInterval = settings.rememberBlocks.toMillis
+    )
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
