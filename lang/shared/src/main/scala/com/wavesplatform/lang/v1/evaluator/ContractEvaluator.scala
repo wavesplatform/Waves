@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator
+import cats.data.EitherT
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.VerifierFunction
@@ -10,24 +11,46 @@ import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Tx}
 import scodec.bits.ByteVector
-
+import com.wavesplatform.lang.v1.task.imports._
 import scala.collection.mutable.ListBuffer
 
 object ContractEvaluator {
-  case class Invokation(name: String, fc: FUNCTION_CALL, invoker: ByteVector)
+  case class Invokation(name: String, fc: FUNCTION_CALL, invoker: ByteVector, payment: Option[(Long, Option[ByteVector])])
 
   def eval(c: Contract, i: Invokation): EvalM[EVALUATED] = {
     c.cfs.find(_.u.name == i.name) match {
       case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '${i.name} doesn't exist in the contract")
       case Some(f) =>
-        val zeroExpr = BLOCKV2(
-          LET(f.c.pubKeyArgName, CONST_BYTEVECTOR(i.invoker)),
-          BLOCKV2(f.u, i.fc)
-        )
-        val expr = c.dec.foldRight(zeroExpr) { (d, e) =>
-          BLOCKV2(d, e)
+        val zeroExpr = (f.p, i.payment) match {
+          case (None, None) =>
+            Right(
+              BLOCKV2(
+                LET(f.c.pubKeyArgName, CONST_BYTEVECTOR(i.invoker)),
+                BLOCKV2(f.u, i.fc)
+              ))
+          case (Some(pf), Some((amt, token))) =>
+            Right(
+              BLOCKV2(
+                LET(f.c.pubKeyArgName, CONST_BYTEVECTOR(i.invoker)),
+                BLOCKV2(
+                  LET(pf.amountArgName, CONST_LONG(amt)),
+                  BLOCKV2(
+                    LET(pf.tokenArgName, token match {
+                      case None    => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
+                      case Some(t) => CONST_BYTEVECTOR(t)
+                    }),
+                    BLOCKV2(f.u, i.fc)
+                  )
+                )
+              ))
+          case _ => Left("Bad payable")
         }
-        EvaluatorV1.evalExpr(expr)
+
+        for {
+          ze <- liftEither(zeroExpr)
+          expr = c.dec.foldRight(ze)((d, e) => BLOCKV2(d, e))
+          r <- EvaluatorV1.evalExpr(expr)
+        } yield r
     }
   }
 

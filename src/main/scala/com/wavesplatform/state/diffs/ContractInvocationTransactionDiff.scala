@@ -37,8 +37,10 @@ object ContractInvocationTransactionDiff {
                 ))
               .evaluationContext
 
+            val invoker                                          = ByteVector(tx.sender.toAddress.bytes.arr)
+            val maybePayment: Option[(Long, Option[ByteVector])] = tx.payment.map(p => (p.amount, p.assetId.map(a => ByteVector(a.arr))))
             val res =
-              ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invokation(functionName, tx.fc, ByteVector(tx.sender.toAddress.bytes.arr)))
+              ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invokation(functionName, tx.fc, invoker, maybePayment))
             res.left
               .map(a => GenericError(a.toString): ValidationError)
               .flatMap {
