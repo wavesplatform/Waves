@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import monix.eval.Coeval
-import play.api.libs.json.Format
+import play.api.libs.json.{Format, JsObject}
 
 import scala.util.{Failure, Success, Try}
 
@@ -45,7 +45,7 @@ case class ContractInvocationTransaction private (version: Byte,
   import play.api.libs.json.Json
   import ContractInvocationTransaction.paymentPartFormat
   override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val json = Coeval.evalOnce(
+  override val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase()
       ++ Json.obj(
         "version"         -> version,

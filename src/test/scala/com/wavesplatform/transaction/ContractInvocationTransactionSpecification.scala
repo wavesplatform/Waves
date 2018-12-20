@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.{ContractInvocationRequest, SignedContractInvocationRequest}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.utils.Base64
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import scodec.bits.ByteVector
 
 class ContractInvocationTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -32,16 +32,17 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
   }
 
   property("JSON format validation for ContractInvocationTransaction") {
+    AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val js = Json.parse("""{
                          "type": 16,
-                         "id": "7ZJojVuLsduueo3ktmZS4dxmeJXPWnM4n4aYC11L6TEP",
-                         "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
-                         "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                         "id": "3RRmhhMxbD9SUGUEokaBFmdWqT42vKRiM94tqxuXHE9q",
+                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
+                         "senderPublicKey": "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
                          "fee": 100000,
                          "timestamp": 1526910778245,
-                         "proofs": ["CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T"],
+                         "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
                          "version": 1,
-                         "contractAddress" : "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                         "contractAddress" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
                          "call": {
                             "function" : "foo",
                              "args" : [
@@ -53,28 +54,28 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
                           },
                          "payment" : {
                             "amount" : 7,
-                            "assetId" : "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh"
+                            "assetId" : "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK"
                             }
                         }
     """)
 
     val tx = ContractInvocationTransaction
-      .create(
+      .selfSigned(
         1,
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        PrivateKeyAccount("test3".getBytes()),
+        PrivateKeyAccount("test4".getBytes()),
         Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTEVECTOR(ByteVector(Base64.decode("YWxpY2U=").get)))),
-        Some(ContractInvocationTransaction.Payment(7, Some(ByteStr.decodeBase58("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh").get))),
+        Some(ContractInvocationTransaction.Payment(7, Some(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
         100000,
         1526910778245L,
-        Proofs(List(ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get)),
       )
       .right
       .get
 
-    tx.json() shouldEqual js
+    (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
 
-    println(tx.bytes().map(_.toInt).toList)
+    println("Bytes to sign")
+    println(tx.bodyBytes().map(_.toInt).toList)
 
     TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
   }
