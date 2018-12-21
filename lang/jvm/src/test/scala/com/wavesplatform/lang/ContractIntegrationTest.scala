@@ -36,6 +36,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |
         |@Callable(sender)
         |func foo(a:ByteVector) = {
+        |  let x = invocation.contractAddress
         |  if (fooHelper())
         |    then WriteSet(List(DataEntry("b", 1), DataEntry("sender", sender)))
         |    else WriteSet(List(DataEntry("a", a), DataEntry("sender", sender)))
@@ -63,7 +64,11 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     val result = ContractEvaluator(
       ctx.evaluationContext,
       compiled,
-      Invokation("foo", Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTEVECTOR(ByteVector.empty))), ByteVector.empty, None)
+      Invokation("foo",
+                 Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTEVECTOR(ByteVector.empty))),
+                 ByteVector.empty,
+                 None,
+                 ByteVector.empty)
     ).explicitGet()
 
     result shouldBe expectedResult

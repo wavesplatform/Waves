@@ -8,13 +8,19 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, Types}
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import com.wavesplatform.lang.v1.traits.domain.{DataItem, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
 import scodec.bits.ByteVector
 import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.traits.domain.Tx.Pmt
+
 import scala.collection.mutable.ListBuffer
 
 object ContractEvaluator {
-  case class Invokation(name: String, fc: FUNCTION_CALL, invoker: ByteVector, payment: Option[(Long, Option[ByteVector])])
+  case class Invokation(name: String,
+                        fc: FUNCTION_CALL,
+                        invoker: ByteVector,
+                        payment: Option[(Long, Option[ByteVector])],
+                        contractAddress: ByteVector)
 
   def eval(c: Contract, i: Invokation): EvalM[EVALUATED] = {
     c.cfs.find(_.u.name == i.name) match {
@@ -25,7 +31,13 @@ object ContractEvaluator {
             Right(
               BLOCKV2(
                 LET(f.c.pubKeyArgName, CONST_BYTEVECTOR(i.invoker)),
-                BLOCKV2(f.u, i.fc)
+                BLOCKV2(
+                  LET("invocation",
+                      Bindings.buildInvocation(Recipient.Address(i.invoker),
+                                               i.payment.map { case (a, t) => Pmt(t, a) },
+                                               Recipient.Address(i.contractAddress))),
+                  BLOCKV2(f.u, i.fc)
+                )
               ))
           case (Some(pf), Some((amt, token))) =>
             Right(

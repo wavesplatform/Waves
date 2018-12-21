@@ -92,6 +92,16 @@ object Bindings {
       )
     )
 
+  def buildInvocation(caller: Recipient.Address, payment: Option[Pmt], contractAddress:Recipient.Address) =
+    CaseObj(
+      invocationType.typeRef,
+      Map(
+        "caller"          -> mapRecipient(caller)._2,
+        "contractAddress" -> mapRecipient(contractAddress)._2,
+        "payment"         -> buildPayment(payment)
+      )
+    )
+
   def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType.typeRef, Map("bytes" -> sender.bytes))
 
   def transactionObject(tx: Tx, proofsEnabled: Boolean): CaseObj =

@@ -12,16 +12,18 @@ object Types {
   val aliasType          = CaseType("Alias", List("alias" -> STRING))
   val addressOrAliasType = UNION(addressType.typeRef, aliasType.typeRef)
 
-  val transfer    = CaseType("Transfer", List("recipient"    -> addressOrAliasType, "amount" -> LONG))
-  val optionByteVector     = UNION(BYTEVECTOR, UNIT)
+  val transfer         = CaseType("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
+  val optionByteVector = UNION(BYTEVECTOR, UNIT)
 
   val optionAddress        = UNION(addressType.typeRef, UNIT)
   val optionLong           = UNION(LONG, UNIT)
   val listByteVector: LIST = LIST(BYTEVECTOR)
   val listTransfers        = LIST(transfer.typeRef)
-  val paymentType = CaseType("AttachedPayment", List("asset" -> optionByteVector, "amount"   -> LONG))
+  val paymentType          = CaseType("AttachedPayment", List("asset" -> optionByteVector, "amount" -> LONG))
 
-  val optionPayment        = UNION(paymentType.typeRef, UNIT)
+  val optionPayment = UNION(paymentType.typeRef, UNIT)
+
+  val invocationType = CaseType("Invocation", List("caller" -> addressType.typeRef, "contractAddress" -> addressType.typeRef, "payment" -> optionPayment))
 
   private val header = List(
     "id"        -> BYTEVECTOR,

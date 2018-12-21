@@ -331,9 +331,7 @@ object WavesContext {
     val inputType = /*if (ci) buildContractInvokationTransactionType(true) else */ scriptInputType
     val commonVars = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
-      ("tx",
-       ((inputType, "Processing transaction"),
-       LazyVal(EitherT(inputEntityCoeval))))
+      ("tx", ((inputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
     )
 
     val vars = Map(
@@ -378,7 +376,7 @@ object WavesContext {
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
-      types ++ (if (version == V3) List(writeSetType, contractTransfer, contractTransferSetType, contractResultType) else List.empty),
+      types ++ (if (version == V3) List(writeSetType, contractTransfer, contractTransferSetType, contractResultType, invocationType) else List.empty),
       commonVars ++ vars(version),
       functions
     )
