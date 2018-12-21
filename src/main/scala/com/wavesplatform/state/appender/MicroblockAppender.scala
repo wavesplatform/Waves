@@ -20,8 +20,11 @@ import scala.util.{Left, Right}
 
 object MicroblockAppender extends ScorexLogging with Instrumented {
 
-  def apply(checkpoint: CheckpointService, blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, scheduler: Scheduler)(
-      microBlock: MicroBlock): Task[Either[ValidationError, Unit]] =
+  def apply(checkpoint: CheckpointService,
+            blockchainUpdater: BlockchainUpdater with Blockchain,
+            utxStorage: UtxPool,
+            scheduler: Scheduler,
+            verify: Boolean = true)(microBlock: MicroBlock): Task[Either[ValidationError, Unit]] =
     Task(
       measureSuccessful(
         microblockProcessingTimeStats,
@@ -31,7 +34,7 @@ object MicroblockAppender extends ScorexLogging with Instrumented {
             (),
             MicroBlockAppendError(s"[h = ${blockchainUpdater.height + 1}] is not valid with respect to checkpoint", microBlock)
           )
-          _ <- blockchainUpdater.processMicroBlock(microBlock)
+          _ <- blockchainUpdater.processMicroBlock(microBlock, verify)
         } yield utxStorage.removeAll(microBlock.transactionData)
       )).executeOn(scheduler)
 
