@@ -14,7 +14,7 @@ import org.scalacheck.Gen
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-// TODO: works only with kafka
+// Works only with kafka
 class MultipleMatchersTestSuite extends MatcherSuiteBase {
   private def configOverrides = ConfigFactory.parseString("""waves.matcher {
       |  price-assets = ["WAVES"]
