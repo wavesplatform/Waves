@@ -3,7 +3,7 @@ package com.wavesplatform.matcher
 import java.io.File
 import java.lang.{Long => jLong}
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
+import java.util.concurrent.{ConcurrentHashMap, Executors, TimeUnit}
 
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
@@ -30,7 +30,7 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 
 class Matcher(actorSystem: ActorSystem,
@@ -120,6 +120,8 @@ class Matcher(actorSystem: ActorSystem,
     classOf[MatcherApiRoute]
   )
 
+  private val exchangeTxPool = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
+
   lazy val matcher: ActorRef = actorSystem.actorOf(
     MatcherActor.props(
       matcherSettings,
@@ -151,7 +153,7 @@ class Matcher(actorSystem: ActorSystem,
       updateOrderBookCache,
       p => ms => marketStatuses.put(p, ms),
       utx,
-      tx => if (utx.putIfNew(tx).isRight) allChannels.broadcastTx(tx),
+      tx => exchangeTxPool.execute(() => if (utx.putIfNew(tx).isRight) allChannels.broadcastTx(tx)),
       matcherSettings,
       time,
       blockchain.assetDescription,
