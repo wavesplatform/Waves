@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{Blockchain, ByteStr, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
 import com.wavesplatform.utils.ScorexLogging
 
