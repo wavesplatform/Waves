@@ -133,9 +133,20 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
   }
 
+  private def loadLeaseBalance(db: ReadOnlyDB, addressId: BigInt): LeaseBalance = {
+    val lease = db.fromHistory(Keys.leaseBalanceHistory(addressId), Keys.leaseBalance(addressId)).getOrElse(LeaseBalance.empty)
+//    val portfolio = loadPortfolio(db, addressId)
+//    println(s"LevelDb LeaseBalance $lease")
+    lease
+  }
+
+  override protected def loadLeaseBalance(address: Address): LeaseBalance = readOnly { db =>
+    addressId(address).fold(LeaseBalance.empty)(loadLeaseBalance(db, _))
+  }
+
   private def loadLposPortfolio(db: ReadOnlyDB, addressId: BigInt) = Portfolio(
     db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
-    db.fromHistory(Keys.leaseBalanceHistory(addressId), Keys.leaseBalance(addressId)).getOrElse(LeaseBalance.empty),
+    loadLeaseBalance(db, addressId),
     Map.empty
   )
 
@@ -400,6 +411,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
             portfoliosToInvalidate += address
             balanceAtHeightCache.invalidate((currentHeight, addressId))
             leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
+            discardLeaseBalance(address)
 
             val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
             val txSeqNr  = rw.get(kTxSeqNr)

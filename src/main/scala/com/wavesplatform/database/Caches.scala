@@ -122,6 +122,11 @@ trait Caches extends Blockchain with ScorexLogging {
     transactionIds.entrySet().removeIf(_.getValue < oldestBlock)
   }
 
+  private val leaseBalanceCache: LoadingCache[Address, LeaseBalance] = cache(maxCacheSize, loadLeaseBalance)
+  protected def loadLeaseBalance(address: Address): LeaseBalance
+  protected def discardLeaseBalance(address: Address): Unit = leaseBalanceCache.invalidate(address)
+  override def leaseBalance(address: Address): LeaseBalance = loadLeaseBalance(address) //leaseBalanceCache.get(address)
+
   private val portfolioCache: LoadingCache[Address, Portfolio] = cache(maxCacheSize, loadPortfolio)
   protected def loadPortfolio(address: Address): Portfolio
   protected def discardPortfolio(address: Address): Unit = portfolioCache.invalidate(address)
