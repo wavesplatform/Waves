@@ -99,6 +99,17 @@ object AsyncMatcherHttpApi extends Assertions {
       }
     }
 
+    def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Future[Boolean] =
+      matcherGet(s"/matcher/orderbook/${assetPair.toUri}") transform {
+        case Failure(UnexpectedStatusCodeException(_, 404, responseBody)) =>
+          Try(parse(responseBody).as[MessageMatcherResponse]) match {
+            case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
+            case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
+          }
+        case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
+        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
+      }
+
     def transactionsByOrder(orderId: String): Future[Seq[ExchangeTransaction]] =
       matcherGet(s"/matcher/transactions/$orderId").as[Seq[ExchangeTransaction]]
 
@@ -112,35 +123,12 @@ object AsyncMatcherHttpApi extends Assertions {
     def orderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}").as[OrderBookResponse]
 
-    def orderBookExpectInvalidAssetId(assetPair: AssetPair, assetId: String): Future[Boolean] =
-      matcherGet(s"/matcher/orderbook/${assetPair.toUri}") transform {
-        case Failure(UnexpectedStatusCodeException(_, 404, responseBody)) =>
-          Try(parse(responseBody).as[MessageMatcherResponse]) match {
-            case Success(mr) if mr.message == s"Invalid Asset ID: $assetId" => Success(true)
-            case Failure(f)                                                 => Failure(new RuntimeException(s"Failed to parse response: $f"))
-          }
-        case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
-        case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
-      }
-
     def deleteOrderBook(assetPair: AssetPair): Future[OrderBookResponse] =
       retrying(_delete(s"${matcherNode.matcherApiEndpoint}/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build())
         .as[OrderBookResponse]
 
     def marketStatus(assetPair: AssetPair): Future[MarketStatusResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}/status").as[MarketStatusResponse]
-
-    def parseAssetPair(assetPair: AssetPair): (String, String) = {
-      val amountAsset = assetPair.amountAsset match {
-        case None => "WAVES"
-        case _    => assetPair.amountAsset.get.base58
-      }
-      val priceAsset = assetPair.priceAsset match {
-        case None => "WAVES"
-        case _    => assetPair.priceAsset.get.base58
-      }
-      (amountAsset, priceAsset)
-    }
 
     def cancelOrder(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String): Future[MatcherStatusResponse] =
       matcherPost(s"/matcher/orderbook/${assetPair.toUri}/cancel", cancelRequest(sender, orderId)).as[MatcherStatusResponse]
@@ -164,23 +152,22 @@ object AsyncMatcherHttpApi extends Assertions {
     def cancelOrderWithApiKey(orderId: String): Future[MatcherStatusResponse] =
       postWithAPiKey(s"/matcher/orders/cancel/$orderId").as[MatcherStatusResponse]
 
-    def fullOrdersHistory(sender: PrivateKeyAccount): Future[Seq[OrderbookHistory]] =
-      matcherGetWithSignature(s"/matcher/orderbook/${Base58.encode(sender.publicKey)}", sender).as[Seq[OrderbookHistory]]
+    def fullOrdersHistory(sender: PrivateKeyAccount, activeOnly: Option[Boolean] = None): Future[Seq[OrderbookHistory]] =
+      activeOnly match {
+        case None =>
+          matcherGetWithSignature(s"/matcher/orderbook/${Base58.encode(sender.publicKey)}", sender).as[Seq[OrderbookHistory]]
+        case _ =>
+          matcherGetWithSignature(s"/matcher/orderbook/${Base58.encode(sender.publicKey)}?activeOnly=${activeOnly.get}", sender)
+            .as[Seq[OrderbookHistory]]
+      }
 
     def orderHistoryByPair(sender: PrivateKeyAccount, assetPair: AssetPair, activeOnly: Boolean = false): Future[Seq[OrderbookHistory]] = {
       matcherGetWithSignature(s"/matcher/orderbook/${assetPair.toUri}/publicKey/${Base58.encode(sender.publicKey)}?activeOnly=$activeOnly", sender)
         .as[Seq[OrderbookHistory]]
     }
 
-    def activeOrderHistory(sender: PrivateKeyAccount): Future[Seq[OrderbookHistory]] = {
-      matcherGetWithSignature(s"/matcher/orderbook/${Base58.encode(sender.publicKey)}?activeOnly=true", sender).as[Seq[OrderbookHistory]]
-    }
-
     def reservedBalance(sender: PrivateKeyAccount): Future[Map[String, Long]] =
       matcherGetWithSignature(s"/matcher/balance/reserved/${Base58.encode(sender.publicKey)}", sender).as[Map[String, Long]]
-
-    def tradableBalance(sender: Node, assetPair: AssetPair): Future[Map[String, Long]] =
-      matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.address}").as[Map[String, Long]]
 
     def tradableBalance(sender: PrivateKeyAccount, assetPair: AssetPair): Future[Map[String, Long]] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}/tradableBalance/${sender.address}").as[Map[String, Long]]
@@ -267,10 +254,7 @@ object AsyncMatcherHttpApi extends Assertions {
       }
 
     def ordersByAddress(sender: PrivateKeyAccount, activeOnly: Boolean): Future[Seq[OrderbookHistory]] =
-      ordersByAddress(sender.address, activeOnly)
-
-    def ordersByAddress(senderAddress: String, activeOnly: Boolean): Future[Seq[OrderbookHistory]] =
-      matcherGetWithApiKey(s"/matcher/orders/$senderAddress?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
+      matcherGetWithApiKey(s"/matcher/orders/${sender.address}?activeOnly=$activeOnly").as[Seq[OrderbookHistory]]
 
   }
 
