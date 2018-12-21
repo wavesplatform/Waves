@@ -4,7 +4,7 @@ import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 import com.wavesplatform.api.http.alias.{CreateAliasV1Request, SignedCreateAliasV1Request}
 
-class AliasRequestTests extends FunSuite with Matchers {
+class AliasRequestTest extends FunSuite with Matchers {
   test("CreateAliasRequest") {
     val json =
       """
