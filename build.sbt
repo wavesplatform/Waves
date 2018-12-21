@@ -8,7 +8,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 scalafmtOnCompile in ThisBuild := true
 Global / cancelable := true
-Global / coverageExcludedPackages := "<empty>;*Specification.scala;*Spec.scala;*Suite.scala;*Test.scala"
+Global / coverageExcludedPackages := "<empty>;.*src/test/.*"
 
 val versionSource = Def.task {
   // WARNING!!!
