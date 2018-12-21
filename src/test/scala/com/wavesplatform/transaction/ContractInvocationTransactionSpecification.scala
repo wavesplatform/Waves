@@ -81,13 +81,14 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
   }
 
   property("Signed ContractInvocationTransactionRequest parser") {
+    AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedContractInvocationRequest(
       version = 1,
-      senderPublicKey = "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+      senderPublicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
       fee = 1,
       call = ContractInvocationRequest.FunctionCallPart("bar", List(BinaryDataEntry("", ByteStr.decodeBase64("YWxpY2U=").get))),
       payment = Some(Payment(1, None)),
-      contractAddress = "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+      contractAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )
