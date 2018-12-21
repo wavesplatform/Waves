@@ -45,7 +45,9 @@ object Contract {
       }
     }
   }
-  case class CallableAnnotation(pubKeyArgName: String) extends Annotation { lazy val dic = Map(pubKeyArgName -> BYTEVECTOR) }
+  case class CallableAnnotation(invocationArgName: String) extends Annotation {
+    lazy val dic = Map(invocationArgName -> com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.invocationType.typeRef)
+  }
   case class PayableAnnotation(amountArgName: String, tokenArgName: String) extends Annotation {
     lazy val dic = Map(amountArgName -> LONG, tokenArgName -> BYTEVECTOR)
   }

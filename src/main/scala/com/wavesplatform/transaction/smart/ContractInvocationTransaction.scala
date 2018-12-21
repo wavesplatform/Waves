@@ -6,7 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL, REF}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{ByteStr, _}
 import com.wavesplatform.transaction.ValidationError.GenericError
@@ -119,7 +119,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
         case _                         => Right(())
       }
 
-      _ <- Either.cond(fc.args.forall(_.isInstanceOf[EVALUATED]), (), GenericError("all arguments of contractInvocation must be EVALUATED"))
+      _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")), (), GenericError("all arguments of contractInvocation must be EVALUATED"))
     } yield new ContractInvocationTransaction(version, networkByte, sender, contractAddress, fc, p, fee, timestamp, proofs)
 
   def signed(version: Byte,

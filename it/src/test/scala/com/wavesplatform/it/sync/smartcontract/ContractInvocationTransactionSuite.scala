@@ -7,7 +7,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTEVECTOR, FUNCTION_CALL}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.DataTransaction
+import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
@@ -68,9 +68,9 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     val scriptText =
       """
         |
-        | @Callable(sender)
+        | @Callable(inv)
         | func foo(a:ByteVector) = {
-        |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender)))
+        |  WriteSet(List(DataEntry("a", a), DataEntry("sender", inv.caller.bytes)))
         | }
         | 
         | @Verifier(t)
@@ -133,12 +133,13 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
 
     val tx =
       DataTransaction
-        .selfSigned(
+        .create(
           version = 1: Byte,
           sender = contract,
           data = List(StringDataEntry("a", "OOO")),
           feeAmount = 1.waves,
-          timestamp = System.currentTimeMillis()
+          timestamp = System.currentTimeMillis(),
+          proofs = Proofs.empty
         )
         .explicitGet()
 

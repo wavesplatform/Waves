@@ -30,9 +30,7 @@ object ContractCompiler {
       annotationBindings = annotations.flatMap(_.dic.toList).map { case (n, t) => (n, (t, "Annotation-bound value")) }
       compiledBody <- local {
         for {
-          _ <- modify[CompilerContext, CompilationError](
-            vars.modify(_)(
-              _ ++ annotationBindings ++ List(("invocation", (com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.invocationType.typeRef, "")))))
+          _ <- modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))
           r <- compiler.ExpressionCompilerV1.compileFunc(AnyPos, af.f)
         } yield r
       }

@@ -165,7 +165,7 @@ object Serde {
             out.writeInt(args.size)
           }
           args.foldLeft(n)(aux)
-        case x => ??? //TODO: FIx exhaustivness
+        case x => println(x) ; ??? //TODO: FIx exhaustivness
       }
     }
 

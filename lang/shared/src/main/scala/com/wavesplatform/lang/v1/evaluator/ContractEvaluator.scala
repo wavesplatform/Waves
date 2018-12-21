@@ -26,36 +26,13 @@ object ContractEvaluator {
     c.cfs.find(_.u.name == i.name) match {
       case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '${i.name} doesn't exist in the contract")
       case Some(f) =>
-        val zeroExpr = (f.p, i.payment) match {
-          case (None, None) =>
-            Right(
-              BLOCKV2(
-                LET(f.c.pubKeyArgName, CONST_BYTEVECTOR(i.invoker)),
-                BLOCKV2(
-                  LET("invocation",
-                      Bindings.buildInvocation(Recipient.Address(i.invoker),
-                                               i.payment.map { case (a, t) => Pmt(t, a) },
-                                               Recipient.Address(i.contractAddress))),
-                  BLOCKV2(f.u, i.fc)
-                )
-              ))
-          case (Some(pf), Some((amt, token))) =>
-            Right(
-              BLOCKV2(
-                LET(f.c.pubKeyArgName, CONST_BYTEVECTOR(i.invoker)),
-                BLOCKV2(
-                  LET(pf.amountArgName, CONST_LONG(amt)),
-                  BLOCKV2(
-                    LET(pf.tokenArgName, token match {
-                      case None    => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-                      case Some(t) => CONST_BYTEVECTOR(t)
-                    }),
-                    BLOCKV2(f.u, i.fc)
-                  )
-                )
-              ))
-          case _ => Left("Bad payable")
-        }
+        val zeroExpr = Right(
+          BLOCKV2(
+            LET(f.c.invocationArgName,
+                Bindings
+                  .buildInvocation(Recipient.Address(i.invoker), i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.contractAddress))),
+            BLOCKV2(f.u, i.fc)
+          ))
 
         for {
           ze <- liftEither(zeroExpr)
@@ -104,7 +81,7 @@ object ContractResult {
     case CaseObj(tpe, fields) =>
       val xs: IndexedSeq[EVALUATED] = fields("transfers").asInstanceOf[ARR].xs
       xs.map {
-        case CaseObj(_, fields) if tpe.name == "Transfer" =>
+        case CaseObj(t, fields) if t.name == "ContractTransfer" =>
           (fields("recipient"), fields("amount"), fields("asset")) match {
             case (CaseObj(Types.addressType.typeRef, fields2), CONST_LONG(b), t) =>
               val token = t match {
@@ -119,7 +96,7 @@ object ContractResult {
               }
             case v => ???
           }
-        case v => ???
+        case _ => ???
       }
   }
 

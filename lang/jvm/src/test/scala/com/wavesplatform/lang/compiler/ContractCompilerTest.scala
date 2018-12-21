@@ -24,11 +24,12 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       val script =
         """
           |
-          | @Callable(sender)
+          | @Callable(invocation)
           | func foo(a:ByteVector) = {
-          |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender)))
+          |  let sender0 = invocation.caller.bytes
+          |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender0)))
           | }
-          | 
+          |
           | @Verifier(t)
           | func verify() = {
           |   t.id == base58''
@@ -42,18 +43,21 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Contract(
         List.empty,
         List(ContractFunction(
-          CallableAnnotation("sender"),
+          CallableAnnotation("invocation"),
           None,
           Terms.FUNC(
             "foo",
             List("a"),
-            FUNCTION_CALL(
-              User("WriteSet"),
-              List(FUNCTION_CALL(
-                Native(1102),
-                List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
-                     FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender"))))
-              ))
+            BLOCKV2(
+              LET("sender0", GETTER(GETTER(REF("invocation"), "caller"), "bytes")),
+              FUNCTION_CALL(
+                User("WriteSet"),
+                List(FUNCTION_CALL(
+                  Native(1102),
+                  List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
+                       FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender0"))))
+                ))
+              )
             )
           )
         )),
@@ -71,9 +75,9 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       val script =
         """
           |
-          | @Callable(sender)
+          | @Callable(invocation)
           | func foo(a:ByteVector) = {
-          |  a + sender
+          |  a + invocation.caller.bytes
           | }
           |
           |

@@ -34,12 +34,12 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |   fooHelper2() || false
         |}
         |
-        |@Callable(sender)
+        |@Callable(invocation)
         |func foo(a:ByteVector) = {
-        |  let x = invocation.contractAddress
+        |  let x = invocation.caller.bytes
         |  if (fooHelper())
-        |    then WriteSet(List(DataEntry("b", 1), DataEntry("sender", sender)))
-        |    else WriteSet(List(DataEntry("a", a), DataEntry("sender", sender)))
+        |    then WriteSet(List(DataEntry("b", 1), DataEntry("sender", x)))
+        |    else WriteSet(List(DataEntry("a", a), DataEntry("sender", x)))
         |}
         |
         |@Verifier(t)

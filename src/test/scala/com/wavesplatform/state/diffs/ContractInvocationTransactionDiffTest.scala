@@ -41,7 +41,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
               Native(1102),
               List(
                 FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("argument"), REF(argName))),
-                FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF(senderBinding)))
+                FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), GETTER(GETTER(REF(senderBinding), "caller"), "bytes")))
               )
             ))
           )
@@ -65,8 +65,10 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
               Native(1102),
               List(
                 FUNCTION_CALL(
-                  User("Transfer"),
-                  List(FUNCTION_CALL(User("Address"), List(CONST_BYTEVECTOR(ByteVector(recipientAddress.bytes.arr)))), CONST_LONG(recipientAmount))
+                  User("ContractTransfer"),
+                  List(FUNCTION_CALL(User("Address"), List(CONST_BYTEVECTOR(ByteVector(recipientAddress.bytes.arr)))),
+                       CONST_LONG(recipientAmount),
+                       REF("unit"))
                 )
               )
             ))
@@ -107,6 +109,22 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTEVECTOR(ByteVector(arg))))
       ci          = ContractInvocationTransaction.selfSigned(ciVersion, invoker, master, fc, None, fee, ts).explicitGet()
     } yield (List(genesis, genesis2), setContract, ci)
+
+  property("invoking contract results contract's state") {
+    forAll(for {
+      r <- preconditionsAndSetContract(dataContractGen)
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          case (blockDiff, newState) =>
+            newState.accountData(genesis(0).recipient) shouldBe AccountDataInfo(
+              Map(
+                "sender"   -> BinaryDataEntry("sender", ci.sender.toAddress.bytes),
+                "argument" -> BinaryDataEntry("argument", ByteStr(ci.fc.args(0).asInstanceOf[CONST_BYTEVECTOR].bs.toArray))
+              ))
+        }
+    }
+  }
 
   property("invoking payment contract results in accounts state") {
     forAll(for {

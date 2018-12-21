@@ -87,7 +87,7 @@ object ContractSerDe {
     tryEi(VerifierAnnotation(bb.getString))
 
   private[lang] def serializeCallAnnotation(out: ByteArrayOutputStream, a: CallableAnnotation): Unit =
-    out.writeString(a.pubKeyArgName)
+    out.writeString(a.invocationArgName)
 
   private[lang] def serializePayableAnnotation(out: ByteArrayOutputStream, p: PayableAnnotation): Unit = {
     out.writeString(p.amountArgName)
