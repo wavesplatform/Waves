@@ -78,6 +78,9 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
 
   override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Future[Unit]): Unit = {
     log.info(s"Start consuming from $fromOffset")
+    var currentOffset  = fromOffset
+    val topicPartition = new TopicPartition(settings.topic, 0)
+
     RestartSource
       .onFailuresWithBackoff(
         minBackoff = settings.consumer.minBackoff,
@@ -86,21 +89,17 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
         maxRestarts = -1
       ) { () =>
         Consumer
-          .committableSource(consumerSettings, Subscriptions.assignmentWithOffset(new TopicPartition(settings.topic, 0) -> fromOffset))
+          .plainSource(consumerSettings, Subscriptions.assignmentWithOffset(topicPartition -> currentOffset))
           .mapMaterializedValue(consumerControl.set)
           .buffer(settings.consumer.bufferSize, OverflowStrategy.backpressure)
           .mapAsync(1) { msg =>
-            val req = QueueEventWithMeta(msg.record.offset(), msg.record.timestamp(), msg.record.value())
-            process(req)
-              .recoverWith {
-                case e =>
-                  log.error(s"Matcher: Failed to process event at ${msg.record.offset()} offset: ${msg.record}")
-                  Future.failed(e)
-              }
-              .map(_ => msg.committableOffset)
+            log.trace(s"[offset=${msg.offset()}, ts=${msg.timestamp()}] Consumed ${msg.value()}")
+            val req = QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value())
+            process(req).transform { x =>
+              currentOffset = msg.offset()
+              x
+            }
           }
-          .batch(max = settings.consumer.bufferSize, ConsumerMessage.CommittableOffsetBatch(_))(_.updated(_))
-          .mapAsync(2)(_.commitScaladsl())
       }
       .runWith(Sink.ignore)
   }

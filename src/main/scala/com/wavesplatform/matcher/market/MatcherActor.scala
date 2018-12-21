@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.market
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
+import akka.actor.{Actor, ActorRef, PoisonPill, Props, SupervisorStrategy, Terminated}
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
 import com.google.common.base.Charsets
 import com.wavesplatform.matcher.MatcherSettings
@@ -20,7 +20,7 @@ import play.api.libs.json._
 import scorex.utils._
 
 class MatcherActor(matcherSettings: MatcherSettings,
-                   recoveryCompletedWithCommandNr: (ActorRef, Long) => Unit,
+                   recoveryCompletedWithCommandNr: (ActorRef, Long, Long) => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
                    assetDescription: ByteStr => Option[AssetDescription])
@@ -28,6 +28,8 @@ class MatcherActor(matcherSettings: MatcherSettings,
     with ScorexLogging {
 
   import MatcherActor._
+
+  override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
   private var childrenNames: Map[ActorRef, AssetPair] = Map.empty
@@ -190,7 +192,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
     case RecoveryCompleted =>
       if (orderBooks.get().isEmpty) {
         log.info("Recovery completed!")
-        recoveryCompletedWithCommandNr(self, -1)
+        recoveryCompletedWithCommandNr(self, -1, -1)
       } else {
         log.info(s"Recovery completed, waiting order books to restore: ${orderBooks.get().keys.mkString(", ")}")
         context.become(collectOrderBooks(orderBooks.get().size, Long.MaxValue, Long.MinValue))
@@ -210,7 +212,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
       else {
         context.become(receiveCommand)
         minSnapshotOffset = updatedNewestCommandNr
-        recoveryCompletedWithCommandNr(self, updatedOldestCommandNr)
+        recoveryCompletedWithCommandNr(self, updatedOldestCommandNr, updatedNewestCommandNr)
         unstashAll()
       }
 
@@ -224,7 +226,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
       else {
         context.become(receiveCommand)
         minSnapshotOffset = newestCommandNr
-        recoveryCompletedWithCommandNr(self, oldestCommandNr)
+        recoveryCompletedWithCommandNr(self, oldestCommandNr, newestCommandNr)
         unstashAll()
       }
 
@@ -294,7 +296,7 @@ object MatcherActor {
   def name = "matcher"
 
   def props(matcherSettings: MatcherSettings,
-            recoveryCompletedWithCommandNr: (ActorRef, Long) => Unit,
+            recoveryCompletedWithCommandNr: (ActorRef, Long, Long) => Unit,
             validateAssetPair: AssetPair => Either[String, AssetPair],
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             updateSnapshot: AssetPair => OrderBook => Unit,

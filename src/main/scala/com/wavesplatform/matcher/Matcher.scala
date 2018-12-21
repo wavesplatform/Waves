@@ -123,7 +123,7 @@ class Matcher(actorSystem: ActorSystem,
   lazy val matcher: ActorRef = actorSystem.actorOf(
     MatcherActor.props(
       matcherSettings,
-      (self, oldestSnapshotOffset) => {
+      (self, oldestSnapshotOffset, newestSnapshotOffset) => {
         currentOffset.set(oldestSnapshotOffset)
         matcherQueue.startConsume(
           oldestSnapshotOffset + 1,
@@ -137,7 +137,8 @@ class Matcher(actorSystem: ActorSystem,
               .map { r =>
                 currentOffset.getAndAccumulate(eventWithMeta.offset, math.max(_, _))
 
-                r match {
+                // We don't need to resolve old requests, those was did before restart, because we lost clients connections
+                if (eventWithMeta.offset > newestSnapshotOffset) r match {
                   case AlreadyProcessed =>
                   case _                => requests.get(jLong.valueOf(eventWithMeta.offset)).trySuccess(r)
                 }
