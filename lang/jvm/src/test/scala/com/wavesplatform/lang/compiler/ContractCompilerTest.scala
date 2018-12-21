@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.{Common, Version}
@@ -85,5 +86,53 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     compiler.ContractCompiler(ctx, expr) should produce("ContractFunction must return WriteSet/PaymentSet/ContractResult")
+  }
+
+  property("hodlContract") {
+    val ctx = Monoid.combineAll(Seq(PureContext.build(Version.V3), CryptoContext.build(com.wavesplatform.lang.Global), WavesContext.build(Version.V3, Common.emptyBlockchainEnvironment(), false))).compilerContext
+    val expr = {
+      val script =
+        """
+          |
+          |	@Callable(i)
+          |	func deposit() = {
+          |   let pmt = extract(i.payment)
+          |   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
+          |   else {
+          |	  	let currentKey = toBase58String(i.caller.bytes)
+          |	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+          |	  		case a:Int => a
+          |	  		case _ => 0
+          |	  	}
+          |	  	let newAmount = currentAmount + pmt.amount
+          |	  	WriteSet(List(DataEntry(currentKey, newAmount)))
+          |
+          |   }
+          |	}
+          |
+          | @Callable(i)
+          | func withdraw(amount: Int) = {
+          |	  	let currentKey = toBase58String(i.caller.bytes)
+          |	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+          |	  		case a:Int => a
+          |	  		case _ => 0
+          |	  	}
+          |		let newAmount = currentAmount - amount
+          |	 if (amount < 0)
+          |			then throw("Can't withdraw negative amount")
+          |  else if (newAmount < 0)
+          |			then throw("Not enough balance")
+          |			else ContractResult(
+          |					WriteSet(List(DataEntry(currentKey, newAmount))),
+          |					TransferSet(List(ContractTransfer(i.caller, amount, unit)))
+          |				)
+          |	}
+          |
+          |
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
 }
