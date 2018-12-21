@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account.{AddressScheme, DefaultAddressScheme, PrivateKeyAccount}
 import com.wavesplatform.api.http.{ContractInvocationRequest, SignedContractInvocationRequest}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -78,6 +78,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
     println(tx.bodyBytes().map(_.toInt).toList)
 
     TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
+    AddressScheme.current = DefaultAddressScheme
   }
 
   property("Signed ContractInvocationTransactionRequest parser") {
@@ -93,6 +94,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )
     req.toTx shouldBe 'right
+    AddressScheme.current = DefaultAddressScheme
   }
 
 }
