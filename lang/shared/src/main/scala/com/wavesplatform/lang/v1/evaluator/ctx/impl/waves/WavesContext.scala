@@ -266,7 +266,7 @@ object WavesContext {
     val anyTransactionType =
       UNION(
         (buildObsoleteTransactionTypes(proofsEnabled) ++
-          buildActiveTransactionTypes(proofsEnabled)).map(_.typeRef))
+          buildActiveTransactionTypes(proofsEnabled, version)).map(_.typeRef))
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
@@ -326,11 +326,14 @@ object WavesContext {
       if (isTokenContext)
         UNION(buildAssetSupportedTransactions(proofsEnabled).map(_.typeRef))
       else
-        UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled)).map(_.typeRef))
+        UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version)).map(_.typeRef))
 
+    val inputType = /*if (ci) buildContractInvokationTransactionType(true) else */ scriptInputType
     val commonVars = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
-      ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
+      ("tx",
+       ((inputType, "Processing transaction"),
+       LazyVal(EitherT(inputEntityCoeval))))
     )
 
     val vars = Map(
@@ -372,14 +375,16 @@ object WavesContext {
     lazy val contractTransferSetType = CaseType("TransferSet", List("transfers" -> LIST(contractTransfer.typeRef)))
     lazy val contractResultType      = CaseType("ContractResult", List("data"   -> writeSetType.typeRef, "payments" -> contractTransferSetType.typeRef))
 
-    val types = buildWavesTypes(proofsEnabled)
+    val types = buildWavesTypes(proofsEnabled, version)
 
-    CTX(types ++ (if (version == V3) List(writeSetType, contractTransfer, contractTransferSetType, contractResultType) else List.empty),
-        commonVars ++ vars(version),
-        functions)
+    CTX(
+      types ++ (if (version == V3) List(writeSetType, contractTransfer, contractTransferSetType, contractResultType) else List.empty),
+      commonVars ++ vars(version),
+      functions
+    )
   }
 
   val verifierInput =
-    UnionType("VerifierInput", (buildOrderType(true) :: buildActiveTransactionTypes(true)).map(_.typeRef))
+    UnionType("VerifierInput", (buildOrderType(true) :: buildActiveTransactionTypes(true, V3)).map(_.typeRef))
 
 }

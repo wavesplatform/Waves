@@ -11,6 +11,7 @@ object Tx {
   case class Header(id: ByteVector, fee: Long, timestamp: Long, version: Long)
   case class Proven(h: Header, sender: Recipient.Address, bodyBytes: ByteVector, senderPk: ByteVector, proofs: IndexedSeq[ByteVector])
   case class TransferItem(recipient: Recipient, amount: Long)
+  case class Pmt(asset: Option[ByteVector], amount: Long)
 
   case class Genesis(header: Header, amount: Long, recipient: Recipient) extends Tx
   case class Payment(p: Proven, amount: Long, recipient: Recipient)      extends Tx
@@ -31,6 +32,7 @@ object Tx {
       extends Tx
   case class ReIssue(p: Proven, quantity: Long, assetId: ByteVector, reissuable: Boolean) extends Tx
   case class Burn(p: Proven, quantity: Long, assetId: ByteVector)                         extends Tx
+  case class CI(p: Proven, contractAddress: Recipient, maybePayment: Option[Pmt])         extends Tx
   case class Lease(p: Proven, amount: Long, recipient: Recipient)                         extends Tx
   case class LeaseCancel(p: Proven, leaseId: ByteVector)                                  extends Tx
   case class CreateAlias(p: Proven, alias: String)                                        extends Tx
