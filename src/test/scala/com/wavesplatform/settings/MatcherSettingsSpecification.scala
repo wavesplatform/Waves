@@ -46,6 +46,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |
         |      local {
         |        polling-interval = 1d
+        |        max-elements-per-poll = 99
+        |        clean-before-consume = no
         |      }
         |
         |      kafka {
@@ -88,7 +90,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     )
     settings.eventsQueue shouldBe EventsQueueSettings(
       tpe = "kafka",
-      local = LocalMatcherQueue.Settings(1.day),
+      local = LocalMatcherQueue.Settings(1.day, 99, cleanBeforeConsume = false),
       kafka = KafkaMatcherQueue.Settings(
         "some-events",
         KafkaMatcherQueue.ConsumerSettings(100, 11.seconds, 2.days),
