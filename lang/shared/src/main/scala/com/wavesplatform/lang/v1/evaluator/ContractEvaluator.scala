@@ -102,12 +102,12 @@ object ContractResult {
 
   private def processContractSet(c: CaseObj) = c match {
     case CaseObj(_, fields) =>
-      val writes = fields("data") match {
+      val writes = fields(FieldNames.Data) match {
         case c @ CaseObj(tpe, _) if tpe.name == FieldNames.WriteSet => processWriteSet(c)
         case _                                             => ???
       }
       val payments = fields(FieldNames.Transfers) match {
-        case c @ CaseObj(tpe, _) if tpe.name == FieldNames.WriteSet => processTransferSet(c)
+        case c @ CaseObj(tpe, _) if tpe.name == FieldNames.TransferSet => processTransferSet(c)
         case _                                             => ???
       }
       ContractResult(writes.toList, payments.toList)

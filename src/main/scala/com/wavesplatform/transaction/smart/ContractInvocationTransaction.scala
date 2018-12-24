@@ -119,7 +119,9 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
         case _                         => Right(())
       }
 
-      _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")), (), GenericError("all arguments of contractInvocation must be EVALUATED"))
+      _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
+                       (),
+                       GenericError("all arguments of contractInvocation must be EVALUATED"))
     } yield new ContractInvocationTransaction(version, networkByte, sender, contractAddress, fc, p, fee, timestamp, proofs)
 
   def signed(version: Byte,

@@ -89,7 +89,14 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("hodlContract") {
-    val ctx = Monoid.combineAll(Seq(PureContext.build(Version.V3), CryptoContext.build(com.wavesplatform.lang.Global), WavesContext.build(Version.V3, Common.emptyBlockchainEnvironment(), false))).compilerContext
+    val ctx = Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(Version.V3),
+          CryptoContext.build(com.wavesplatform.lang.Global),
+          WavesContext.build(Version.V3, Common.emptyBlockchainEnvironment(), false)
+        ))
+      .compilerContext
     val expr = {
       val script =
         """
