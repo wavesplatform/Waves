@@ -26,10 +26,7 @@ trait UtxPool extends AutoCloseable {
 
   def batched[Result](f: UtxBatchOps => Result): Result = f(createBatchOps)
 
-  private[utx] def createBatchOps: UtxBatchOps = new UtxBatchOps {
-    override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = self.putIfNew(tx)
-  }
-
+  private[utx] def createBatchOps: UtxBatchOps = (tx: Transaction) => self.putIfNew(tx)
 }
 
 trait UtxBatchOps {

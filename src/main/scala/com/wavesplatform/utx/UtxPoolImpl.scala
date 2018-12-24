@@ -21,16 +21,10 @@ class UtxPoolImpl(time: Time, utxSettings: UtxSettings) extends ScorexLogging wi
   override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     for {
       _ <- checkNotBlacklisted(tx)
-      r = tx match {
-        case stx: SignedTransaction =>
-          val v = stx.signatureValid()
-          if (v) log.info(s"UTX Transaction processed: ${stx.id.value.base58}")
-          else
-            log.warn(s"INVALID UTX transaction: ${stx.id.value.base58}")
-          v
-        case _ => false
-      }
-    } yield (r, Diff.empty)
+    } yield {
+      log.info(s"UTX Transaction processed: ${tx.id.value.base58}")
+      (true, Diff.empty)
+    }
   }
 
   private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
