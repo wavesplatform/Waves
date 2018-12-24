@@ -73,13 +73,15 @@ object ContractInvocationTransactionDiff {
                     _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - whatever else tranfser/massTransfer ensures
                   } yield {
                     import cats.implicits._
-                    val addressToMaybeStrToLong: Map[Address, Map[Option[ByteStr], Long]] = Monoid.combineAll(pmts)
-                    val paymentMap = addressToMaybeStrToLong
+                    val paymentReceiversMap: Map[Address, Portfolio] = Monoid
+                      .combineAll(pmts)
                       .mapValues(mp => mp.toList.map(x => Portfolio.build(x._1, x._2)))
                       .mapValues(l => Monoid.combineAll(l))
                     val feePart = Map(
                       tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)
                     )
+                    val paymentFromContractMap = Map(tx.contractAddress -> Monoid.combineAll(paymentReceiversMap.values).negate)
+
                     val payablePart: Map[Address, Portfolio] = tx.payment match {
                       case None => Map.empty
                       case Some(ContractInvocationTransaction.Payment(amt, assetOpt)) =>
@@ -93,7 +95,7 @@ object ContractInvocationTransactionDiff {
                               .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
                         }
                     }
-                    val transfers = Monoid.combineAll(Seq(payablePart, feePart, paymentMap))
+                    val transfers = Monoid.combineAll(Seq(payablePart, feePart, paymentReceiversMap, paymentFromContractMap))
                     Diff(
                       height = height,
                       tx = tx,

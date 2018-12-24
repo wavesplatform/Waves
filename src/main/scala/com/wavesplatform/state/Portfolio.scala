@@ -64,6 +64,8 @@ object Portfolio {
 
     def minus(other: Portfolio): Portfolio =
       Portfolio(self.balance - other.balance, LeaseBalance.empty, Monoid.combine(self.assets, other.assets.mapValues(-_)))
+
+    def negate = Portfolio.empty minus self
   }
 
 }
