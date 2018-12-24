@@ -4,7 +4,7 @@ import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.VerifierFunction
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, Types}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, FieldNames, Types}
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
@@ -63,7 +63,7 @@ case class ContractResult(ds: List[DataItem[_]], ts: List[(Address, Long, Option
 object ContractResult {
   private def processWriteSet(c: CaseObj) = c match {
     case CaseObj(_, fields) =>
-      val xs: IndexedSeq[EVALUATED] = fields("data").asInstanceOf[ARR].xs
+      val xs: IndexedSeq[EVALUATED] = fields(FieldNames.Data).asInstanceOf[ARR].xs
       xs.map {
         case CaseObj(tpe, fields) if tpe.name == "DataEntry" =>
           (fields("key"), fields("value")) match {
@@ -79,9 +79,9 @@ object ContractResult {
 
   private def processTransferSet(c: CaseObj) = c match {
     case CaseObj(tpe, fields) =>
-      val xs: IndexedSeq[EVALUATED] = fields("transfers").asInstanceOf[ARR].xs
+      val xs: IndexedSeq[EVALUATED] = fields(FieldNames.Transfers).asInstanceOf[ARR].xs
       xs.map {
-        case CaseObj(t, fields) if t.name == "ContractTransfer" =>
+        case CaseObj(t, fields) if t.name == FieldNames.ContractTransfer =>
           (fields("recipient"), fields("amount"), fields("asset")) match {
             case (CaseObj(Types.addressType.typeRef, fields2), CONST_LONG(b), t) =>
               val token = t match {
@@ -103,11 +103,11 @@ object ContractResult {
   private def processContractSet(c: CaseObj) = c match {
     case CaseObj(_, fields) =>
       val writes = fields("data") match {
-        case c @ CaseObj(tpe, _) if tpe.name == "WriteSet" => processWriteSet(c)
+        case c @ CaseObj(tpe, _) if tpe.name == FieldNames.WriteSet => processWriteSet(c)
         case _                                             => ???
       }
-      val payments = fields("payments") match {
-        case c @ CaseObj(tpe, _) if tpe.name == "WriteSet" => processTransferSet(c)
+      val payments = fields(FieldNames.Transfers) match {
+        case c @ CaseObj(tpe, _) if tpe.name == FieldNames.WriteSet => processTransferSet(c)
         case _                                             => ???
       }
       ContractResult(writes.toList, payments.toList)
@@ -117,9 +117,9 @@ object ContractResult {
     e match {
       case c @ CaseObj(tpe, _) =>
         tpe.name match {
-          case "WriteSet"       => ContractResult(processWriteSet(c).toList, List.empty)
-          case "TransferSet"    => ContractResult(List.empty, processTransferSet(c).toList)
-          case "ContractResult" => processContractSet(c)
+          case FieldNames.WriteSet       => ContractResult(processWriteSet(c).toList, List.empty)
+          case FieldNames.TransferSet    => ContractResult(List.empty, processTransferSet(c).toList)
+          case FieldNames.ContractResult => processContractSet(c)
           case _                => ???
         }
       case _ => ???

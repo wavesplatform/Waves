@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.GenesisTransaction
@@ -36,7 +37,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
           funcName,
           List(argName),
           FUNCTION_CALL(
-            User("WriteSet"),
+            User(FieldNames.WriteSet),
             List(FUNCTION_CALL(
               Native(1102),
               List(
@@ -60,12 +61,12 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
           funcName,
           List(argName),
           FUNCTION_CALL(
-            User("TransferSet"),
+            User(FieldNames.TransferSet),
             List(FUNCTION_CALL(
               Native(1102),
               List(
                 FUNCTION_CALL(
-                  User("ContractTransfer"),
+                  User(FieldNames.ContractTransfer),
                   List(FUNCTION_CALL(User("Address"), List(CONST_BYTEVECTOR(ByteVector(recipientAddress.bytes.arr)))),
                        CONST_LONG(recipientAmount),
                        REF("unit"))

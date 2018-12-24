@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1.handlePart
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, CASETYPEREF}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, LET}
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -42,9 +43,9 @@ object ContractCompiler {
           _ <- Either
             .cond(
               tpe match {
-                case CASETYPEREF("WriteSet", _)       => true
-                case CASETYPEREF("PaymentSet", _)     => true
-                case CASETYPEREF("ContractResult", _) => true
+                case CASETYPEREF(FieldNames.WriteSet, _)       => true
+                case CASETYPEREF(FieldNames.TransferSet, _)     => true
+                case CASETYPEREF(FieldNames.ContractResult, _) => true
                 case _                                => false
               },
               (),

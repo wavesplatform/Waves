@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -52,7 +52,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
             BLOCKV2(
               LET("sender0", GETTER(GETTER(REF("invocation"), "caller"), "bytes")),
               FUNCTION_CALL(
-                User("WriteSet"),
+                User(FieldNames.WriteSet),
                 List(FUNCTION_CALL(
                   Native(1102),
                   List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),

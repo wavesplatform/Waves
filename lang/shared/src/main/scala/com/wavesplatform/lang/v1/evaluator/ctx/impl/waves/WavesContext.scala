@@ -368,10 +368,10 @@ object WavesContext {
       wavesBalanceF
     )
 
-    lazy val writeSetType            = CaseType("WriteSet", List("data"         -> LIST(dataEntryType.typeRef)))
-    val contractTransfer             = CaseType("ContractTransfer", List("recipient"    -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
-    lazy val contractTransferSetType = CaseType("TransferSet", List("transfers" -> LIST(contractTransfer.typeRef)))
-    lazy val contractResultType      = CaseType("ContractResult", List("data"   -> writeSetType.typeRef, "payments" -> contractTransferSetType.typeRef))
+    lazy val writeSetType            = CaseType(FieldNames.WriteSet, List(FieldNames.Data         -> LIST(dataEntryType.typeRef)))
+    val contractTransfer             = CaseType(FieldNames.ContractTransfer, List("recipient"    -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+    lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
+    lazy val contractResultType      = CaseType(FieldNames.ContractResult, List(FieldNames.Data   -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
 
     val types = buildWavesTypes(proofsEnabled, version)
 
