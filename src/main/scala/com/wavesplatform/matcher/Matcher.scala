@@ -32,6 +32,7 @@ import io.netty.channel.group.ChannelGroup
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 class Matcher(actorSystem: ActorSystem,
               time: Time,
@@ -126,26 +127,35 @@ class Matcher(actorSystem: ActorSystem,
     MatcherActor.props(
       matcherSettings,
       (self, oldestSnapshotOffset, newestSnapshotOffset) => {
+        import actorSystem.dispatcher
+        implicit val timeout: Timeout = 5.seconds
+
+        val ok = Success(())
+
         currentOffset.set(oldestSnapshotOffset)
         matcherQueue.startConsume(
           oldestSnapshotOffset + 1,
           eventWithMeta => {
             log.debug(s"[offset=${eventWithMeta.offset}, ts=${eventWithMeta.timestamp}] Consumed ${eventWithMeta.event}")
 
-            import actorSystem.dispatcher
-            implicit val timeout: Timeout = 5.seconds
-
+            // Ignoring possible timeouts or other errors
+            // If an order book doesn't process a message, it will re-process all its messages after fix + restart
             self
               .ask(eventWithMeta)
               .mapTo[MatcherResponse]
               .map { r =>
                 currentOffset.getAndAccumulate(eventWithMeta.offset, math.max(_, _))
-
                 // We don't need to resolve old requests, those was did before restart, because we lost clients connections
                 if (eventWithMeta.offset > newestSnapshotOffset) r match {
                   case AlreadyProcessed =>
                   case _                => requests.get(jLong.valueOf(eventWithMeta.offset)).trySuccess(r)
                 }
+              }
+              .transform {
+                case Failure(e) =>
+                  log.warn(s"An error during processing an event with offset ${eventWithMeta.offset}: ${e.getMessage}", e)
+                  ok
+                case _ => ok
               }
           }
         )
