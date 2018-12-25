@@ -93,7 +93,6 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
           .mapMaterializedValue(consumerControl.set)
           .buffer(settings.consumer.bufferSize, OverflowStrategy.backpressure)
           .mapAsync(1) { msg =>
-            log.trace(s"[offset=${msg.offset()}, ts=${msg.timestamp()}] Consumed ${msg.value()}")
             val req = QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value())
             process(req).transform { x =>
               currentOffset = msg.offset()

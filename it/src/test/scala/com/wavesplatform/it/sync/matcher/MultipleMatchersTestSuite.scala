@@ -6,7 +6,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.matcher.{MatcherCommand, MatcherSuiteBase}
+import com.wavesplatform.it.matcher.{MatcherCommand, MatcherState, MatcherSuiteBase}
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalacheck.Gen
@@ -86,5 +86,10 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   private def mkOrders(account: PrivateKeyAccount) =
     Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcherPublicKey, account, assetPairs)).sample.get
 
-  private def state(matcherNode: Node) = matcherNode.matcherState(assetPairs, orders, Seq(aliceAcc, bobAcc))
+  private def state(matcherNode: Node) = clean(matcherNode.matcherState(assetPairs, orders, Seq(aliceAcc, bobAcc)))
+
+  // Because we can't guarantee that SaveSnapshot message will come at same place in a orderbook's queue on both matchers
+  private def clean(state: MatcherState): MatcherState = state.copy(
+    snapshots = state.snapshots.map { case (k, _) => k -> 0L }
+  )
 }
