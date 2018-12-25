@@ -130,6 +130,8 @@ class Matcher(actorSystem: ActorSystem,
         matcherQueue.startConsume(
           oldestSnapshotOffset + 1,
           eventWithMeta => {
+            log.debug(s"[offset=${eventWithMeta.offset}, ts=${eventWithMeta.timestamp}] Consumed ${eventWithMeta.event}")
+
             import actorSystem.dispatcher
             implicit val timeout: Timeout = 5.seconds
 
