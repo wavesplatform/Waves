@@ -23,13 +23,13 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
 
   // issue one simple and two smart assets
   val asset0: String = aliceNode
-    .issue(aliceAcc.address, "Asset0", "Test", defaultAssetQuantity, 0, reissuable = false, issueFee, 2)
+    .issue(aliceAcc.address, "Asset0", "Test", defaultAssetQuantity, 0, reissuable = false, smartIssueFee, 2)
     .id
   val asset1: String = aliceNode
-    .issue(aliceAcc.address, "SmartAsset1", "Test", defaultAssetQuantity, 0, reissuable = false, issueFee, 2, trueScript)
+    .issue(aliceAcc.address, "SmartAsset1", "Test", defaultAssetQuantity, 0, reissuable = false, smartIssueFee, 2, trueScript)
     .id
   val asset2: String = bobNode
-    .issue(bobAcc.address, "SmartAsset2", "Test", defaultAssetQuantity, 0, reissuable = false, issueFee, 2, trueScript)
+    .issue(bobAcc.address, "SmartAsset2", "Test", defaultAssetQuantity, 0, reissuable = false, smartIssueFee, 2, trueScript)
     .id
   Seq(asset1, asset2).foreach(matcherNode.waitForTransaction(_))
 

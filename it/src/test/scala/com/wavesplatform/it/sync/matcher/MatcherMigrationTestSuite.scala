@@ -18,7 +18,14 @@ class MatcherMigrationTestSuite extends MatcherSuiteBase {
     // Alice issues new asset
     val aliceAsset =
       aliceNode
-        .issue(aliceAcc.address, "DisconnectCoin", "Alice's coin for disconnect tests", 1000 * someAssetAmount, 8, reissuable = false, issueFee, 2)
+        .issue(aliceAcc.address,
+               "DisconnectCoin",
+               "Alice's coin for disconnect tests",
+               1000 * someAssetAmount,
+               8,
+               reissuable = false,
+               smartIssueFee,
+               2)
         .id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
