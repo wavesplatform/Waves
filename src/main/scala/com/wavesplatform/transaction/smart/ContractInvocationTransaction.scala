@@ -88,8 +88,8 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       val (fc, remaining)    = Serde.deserialize(rest, all = false).explicitGet()
       val paymentFeeTsProofs = rest.takeRight(remaining)
       val (payment: Option[(Option[AssetId], Long)], offset) = Deser.parseOption(paymentFeeTsProofs, 0)(arr => {
-        val (maybeAsset: Option[AssetId], offset) = Deser.parseOption(arr, 0)(ByteStr(_))
-        val amt: Long                             = Longs.fromByteArray(arr.drop(offset))
+        val amt: Long                             = Longs.fromByteArray(arr.take(8))
+        val (maybeAsset: Option[AssetId], offset) = Deser.parseOption(arr, 8)(ByteStr(_))
         (maybeAsset, amt)
       })
       val feeTsProofs = paymentFeeTsProofs.drop(offset)

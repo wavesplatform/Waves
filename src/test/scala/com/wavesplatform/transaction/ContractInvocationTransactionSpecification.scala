@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.{ContractInvocationRequest, SignedContractInvo
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.smart.ContractInvocationTransaction
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.utils.Base64
 import org.scalatest._
@@ -20,14 +20,16 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
     forAll(contractInvokationGen) { transaction: ContractInvocationTransaction =>
       val bytes = transaction.bytes()
       val deser = ContractInvocationTransaction.parseBytes(bytes).get
-      deser.sender == transaction.sender
-      deser.contractAddress == transaction.contractAddress
-      deser.fc == transaction.fc
-      deser.payment == transaction.payment
-      deser.fee == transaction.fee
-      deser.timestamp == transaction.timestamp
-      deser.proofs == transaction.proofs
-
+      deser.sender shouldEqual  transaction.sender
+      deser.contractAddress shouldEqual transaction.contractAddress
+      deser.fc shouldEqual transaction.fc
+      deser.payment shouldEqual transaction.payment
+      deser.fee shouldEqual transaction.fee
+      deser.timestamp shouldEqual transaction.timestamp
+      deser.proofs shouldEqual transaction.proofs
+      bytes shouldEqual deser.bytes()
+      Verifier.verifyAsEllipticCurveSignature(transaction) shouldBe 'right
+      Verifier.verifyAsEllipticCurveSignature(deser) shouldBe 'right  // !!!!!!!!!!!!!!!
     }
   }
 
