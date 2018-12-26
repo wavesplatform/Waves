@@ -22,31 +22,33 @@ object BalanceDiffValidation extends ScorexLogging with Instrumented {
       lazy val oldWaves = b.balance(acc, None)
       lazy val oldLease = b.leaseBalance(acc)
       lazy val lease    = cats.Monoid.combine(oldLease, portfolioDiff.lease)
-      if (balance < 0) {
-        val newB = oldWaves + balance
+      (if (balance < 0) {
+         val newB = oldWaves + balance
 
-        if (newB < 0) {
-          return Some(acc -> s"negative waves balance: $acc, old: ${oldWaves}, new: ${newB}")
-        }
-        if (newB < lease.out && currentHeight > fs.allowLeasedBalanceTransferUntilHeight) {
-          return Some(acc -> (if (newB + lease.in - lease.out < 0) {
-                                s"negative effective balance: $acc, old: ${(oldWaves, oldLease)}, new: ${(newB, lease)}"
-                              } else if (portfolioDiff.lease.out == 0) {
-                                s"$acc trying to spend leased money"
-                              } else {
-                                s"leased being more than own: $acc, old: ${(oldWaves, oldLease)}, new: ${(newB, lease)}"
-                              }))
-        }
-      }
-      for ((a, c) <- portfolioDiff.assets) {
-        // Tokens it can produce overflow are exist.
-        val oldB = b.balance(acc, Some(a))
-        val newB = oldB + c
-        if (newB < 0) {
-          return Some(acc -> s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(b.portfolio(acc).combine(portfolioDiff))}")
-        }
-      }
-      return None
+         if (newB < 0) {
+           Some(acc -> s"negative waves balance: $acc, old: ${oldWaves}, new: ${newB}")
+         } else if (newB < lease.out && currentHeight > fs.allowLeasedBalanceTransferUntilHeight) {
+           Some(acc -> (if (newB + lease.in - lease.out < 0) {
+                          s"negative effective balance: $acc, old: ${(oldWaves, oldLease)}, new: ${(newB, lease)}"
+                        } else if (portfolioDiff.lease.out == 0) {
+                          s"$acc trying to spend leased money"
+                        } else {
+                          s"leased being more than own: $acc, old: ${(oldWaves, oldLease)}, new: ${(newB, lease)}"
+                        }))
+         } else {
+           None
+         }
+       } else {
+         None
+       }) orElse (portfolioDiff.assets find {
+        case (a, c) =>
+          // Tokens it can produce overflow are exist.
+          val oldB = b.balance(acc, Some(a))
+          val newB = oldB + c
+          newB < 0
+      } map { _ =>
+        acc -> s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(b.portfolio(acc).combine(portfolioDiff))}"
+      })
     }
 
     val positiveBalanceErrors: Map[Address, String] = changedAccounts.flatMap(check).toMap
