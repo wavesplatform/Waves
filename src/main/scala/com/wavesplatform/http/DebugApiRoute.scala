@@ -32,6 +32,7 @@ import monix.eval.{Coeval, Task}
 import play.api.libs.json._
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -193,7 +194,7 @@ case class DebugApiRoute(ws: WavesSettings,
     Array(
       new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
     ))
-  def rollback: Route = (path("rollback") & post & withAuth) {
+  def rollback: Route = (path("rollback") & post & withAuth & withRequestTimeout(15.minutes)) {
     json[RollbackParams] { params =>
       ng.blockAt(params.rollbackTo) match {
         case Some(block) =>
