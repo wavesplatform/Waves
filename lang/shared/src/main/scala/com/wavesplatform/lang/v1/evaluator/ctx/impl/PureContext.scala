@@ -222,6 +222,9 @@ object PureContext {
   lazy val listConstructor2 = NativeFunction("List", 1, CREATE_LIST2, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]",
     ("arg1", TYPEPARAM('T'), "arg1"), ("arg2", TYPEPARAM('T'), "arg2"))(xs => Right(ARR(xs.toIndexedSeq)))
 
+  lazy val listConstructor3 = NativeFunction("List", 1, CREATE_LIST3, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]",
+    ("arg1", TYPEPARAM('T'), "arg1"), ("arg2", TYPEPARAM('T'), "arg2"),  ("arg3", TYPEPARAM('T'), "arg3"))(xs => Right(ARR(xs.toIndexedSeq)))
+
   lazy val dropString: BaseFunction =
     NativeFunction("drop", 1, DROP_STRING, STRING, "Remmove sring prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => Right(CONST_STRING(xs.drop(trimLongToInt(number))))
@@ -357,8 +360,9 @@ object PureContext {
     extract,
     throwWithMessage,
     throwNoMessage,
-    listConstructor1,
-    listConstructor2
+    listConstructor1, // TODO for context v3
+    listConstructor2,
+    listConstructor3
   ) ++ operators
 
   private lazy val ctx = CTX(

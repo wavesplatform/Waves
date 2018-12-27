@@ -222,7 +222,7 @@ object ExpressionCompilerV1 {
             .collect({ case Right(ex) => ex })
 
           matchedSigs match {
-            case Nil         => FunctionNotFound(p.start, p.end, name, compiledArgs.map(_._2.toString)).asLeft[(EXPR, FINAL)]
+            case Nil         => OverloadNotFound(p.start, p.end, name, compiledArgs.map(_._2.toString)).asLeft[(EXPR, FINAL)]
             case call :: Nil => call.asRight[CompilationError]
             case _           => AmbiguousOverloading(p.start, p.end, name, signatures).asLeft[(EXPR, FINAL)]
           }

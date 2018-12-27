@@ -361,12 +361,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """
         |let x = DataEntry("foo",1)
         |let y = DataEntry("bar","2")
-        |List(x,y)
+        |let z = DataEntry("baz","2")
+        |List(x,y,z)
       """.stripMargin
     eval[EVALUATED](src) shouldBe Right(
       ARR(Vector(
         CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("foo"), "value" -> CONST_LONG(1))),
-        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("bar"), "value" -> CONST_STRING("2")))
+        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("bar"), "value" -> CONST_STRING("2"))),
+        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("baz"), "value" -> CONST_STRING("2")))
       )))
   }
 

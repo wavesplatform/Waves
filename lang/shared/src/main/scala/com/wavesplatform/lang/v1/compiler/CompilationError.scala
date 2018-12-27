@@ -55,6 +55,11 @@ object CompilationError {
   final case class FunctionNotFound(start: Int, end: Int, name: String, argTypes: List[String]) extends CompilationError {
     val message = s"Can't find a function '$name'(${argTypes.mkString(", ")})"
   }
+
+  final case class OverloadNotFound(start: Int, end: Int, name: String, argTypes: List[String]) extends CompilationError {
+    val message = s"Can't find a function overload '$name'(${argTypes.mkString(", ")})"
+  }
+
   final case class AmbiguousOverloading(start: Int, end: Int, name: String, candidates: List[FunctionTypeSignature]) extends CompilationError {
     val message = {
       val stringRepr = candidates.map(sig => s"'$name'(${sig.args.mkString(", ")})").mkString("; ")
