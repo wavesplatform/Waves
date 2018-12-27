@@ -170,7 +170,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     assertBadRequestAndMessage(sender
                                  .signedBroadcast(tx.json() + ("type" -> JsNumber(ContractInvocationTransaction.typeId.toInt))),
-                               "own")
+                               "Not enough balance")
   }
 
 
