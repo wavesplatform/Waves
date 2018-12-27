@@ -376,7 +376,7 @@ object WavesContext {
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
-      types ++ (if (version == V3) List(writeSetType, contractTransfer, contractTransferSetType, contractResultType, invocationType) else List.empty),
+      types ++ (if (version == V3) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType) else List.empty),
       commonVars ++ vars(version),
       functions
     )
