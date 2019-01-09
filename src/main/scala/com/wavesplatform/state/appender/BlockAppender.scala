@@ -28,12 +28,13 @@ object BlockAppender extends ScorexLogging with Instrumented {
             utxStorage: UtxPool,
             pos: PoSSelector,
             settings: WavesSettings,
-            scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
+            scheduler: Scheduler,
+            verify: Boolean = true)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       measureSuccessful(
         blockProcessingTimeStats, {
           if (blockchainUpdater.isLastBlockId(newBlock.reference)) {
-            appendBlock(checkpoint, blockchainUpdater, utxStorage, pos, time, settings)(newBlock).map(_ => Some(blockchainUpdater.score))
+            appendBlock(checkpoint, blockchainUpdater, utxStorage, pos, time, settings, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
           } else if (blockchainUpdater.contains(newBlock.uniqueId)) {
             Right(None)
           } else {

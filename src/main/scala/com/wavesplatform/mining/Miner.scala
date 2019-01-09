@@ -224,7 +224,7 @@ class MinerImpl(allChannels: ChannelGroup,
           microBlock <- EitherT.fromEither[Task](
             MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature))
           _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
-          _ <- EitherT(MicroblockAppender(checkpoint, blockchainUpdater, utx, appenderScheduler)(microBlock))
+          _ <- EitherT(MicroblockAppender(checkpoint, blockchainUpdater, utx, appenderScheduler, verify = false)(microBlock))
         } yield (microBlock, signedBlock)).value map {
           case Left(err) => Error(err)
           case Right((microBlock, signedBlock)) =>

@@ -17,7 +17,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
   private val aliceAsset =
     aliceNode
-      .issue(aliceAcc.address, "AliceCoinOrders", "AliceCoin for tests with order types", someAssetAmount, 0, reissuable = false, issueFee, 2)
+      .issue(aliceAcc.address, "AliceCoinOrders", "AliceCoin for tests with order types", someAssetAmount, 0, reissuable = false, smartIssueFee, 2)
       .id
 
   {
