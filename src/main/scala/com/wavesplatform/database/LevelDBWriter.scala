@@ -135,8 +135,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   private def loadLeaseBalance(db: ReadOnlyDB, addressId: BigInt): LeaseBalance = {
     val lease = db.fromHistory(Keys.leaseBalanceHistory(addressId), Keys.leaseBalance(addressId)).getOrElse(LeaseBalance.empty)
-//    val portfolio = loadPortfolio(db, addressId)
-//    println(s"LevelDb LeaseBalance $lease")
     lease
   }
 
