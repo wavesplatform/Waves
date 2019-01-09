@@ -22,8 +22,6 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
 
   override def leaseBalance(address: Address): LeaseBalance = {
-//    println(s"composite leaseBalance ${inner.leaseBalance(address)} ${diff.portfolios.getOrElse(address, Portfolio.empty).lease}")
-//    println(s"composite portfolio leaseBalance ${inner.portfolio(address).lease}")
     cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
   }
 
