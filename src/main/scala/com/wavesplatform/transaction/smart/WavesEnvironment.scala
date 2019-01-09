@@ -68,6 +68,7 @@ class WavesEnvironment(nByte: Byte, in: Coeval[Transaction :+: Order :+: CNil], 
       }
       address <- blockchain.resolveAlias(aoa)
       balance = blockchain.balance(address, maybeAssetId.map(ByteStr(_)))
+      safeBalance <- Either.cond(balance == 0L && blockchain.balance(address, None) != 0L, "Balance of absent asset", balance)
     } yield balance).left.map(_.toString)
   }
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
