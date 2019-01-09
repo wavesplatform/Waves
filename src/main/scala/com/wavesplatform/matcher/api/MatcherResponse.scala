@@ -1,15 +1,25 @@
 package com.wavesplatform.matcher.api
 
-import akka.http.scaladsl.marshalling.ToResponseMarshaller
+import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.{StatusCodes => C, _}
+import akka.util.ByteString
 import com.wavesplatform.matcher.model.OrderBookResult
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.Order
 import play.api.libs.json.{JsNull, JsValue, Json}
 
-sealed abstract class MatcherResponse(val statusCode: StatusCode, val jsonBody: String)
+sealed abstract class MatcherResponse(val response: HttpResponse)
 
-sealed abstract class WrappedMatcherResponse(statusCode: StatusCode, val json: JsValue) extends MatcherResponse(statusCode, Json.stringify(json)) {
+object MatcherResponse {
+  implicit val trm: ToResponseMarshaller[MatcherResponse] = Marshaller.opaque(_.response)
+}
+
+sealed abstract class WrappedMatcherResponse(statusCode: StatusCode, val json: JsValue)
+    extends MatcherResponse(
+      HttpResponse(
+        statusCode,
+        entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(Json.stringify(json)))
+      )) {
   def this(code: StatusCode, message: String) =
     this(code,
          Json.obj(
@@ -17,22 +27,6 @@ sealed abstract class WrappedMatcherResponse(statusCode: StatusCode, val json: J
            "message" -> message,
            "result"  -> JsNull // For backward compatibility
          ))
-}
-
-object MatcherResponse {
-  import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
-  import com.wavesplatform.http.ApiMarshallers._
-
-  implicit val trm: ToResponseMarshaller[MatcherResponse] =
-    fromStatusCodeAndHeadersAndValue[String]
-      .compose[MatcherResponse](mr => (mr.statusCode, List.empty, mr.jsonBody))
-      .map { x =>
-        x.copy(entity = x.entity.withContentType(ContentTypes.`application/json`))
-      }
-
-  implicit def tuple2MatcherResponse(v: (StatusCode, String)): MatcherResponse = MatcherResponse(v._1, v._2)
-
-  def apply(code: StatusCode, message: String): MatcherResponse = SimpleResponse(code, message)
 }
 
 case class SimpleResponse(code: StatusCode, message: String) extends WrappedMatcherResponse(code, message)
@@ -60,6 +54,9 @@ case object OrderBookUnavailable extends WrappedMatcherResponse(C.ServiceUnavail
 
 case object DuringShutdown extends WrappedMatcherResponse(C.ServiceUnavailable, "System is going shutdown")
 
-case class GetOrderBookResponse(orderBookResult: OrderBookResult) extends MatcherResponse(C.OK, OrderBookResult.toJson(orderBookResult))
+case class GetOrderBookResponse(orderBookResult: OrderBookResult)
+    extends MatcherResponse(
+      HttpResponse(C.OK, entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(OrderBookResult.toJson(orderBookResult))))
+    )
 
 case object AlreadyProcessed extends WrappedMatcherResponse(C.Accepted, "This event has been already processed")
