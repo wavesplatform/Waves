@@ -300,8 +300,14 @@ object AsyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
       postJson("/assets/reissue", ReissueV1Request(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
-    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Future[Transaction] =
-      postJson("/assets/burn", BurnV1Request(sourceAddress, assetId, quantity, fee)).as[Transaction]
+    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: Byte = 2): Future[Transaction] = {
+      version match {
+        case 2 =>
+          signAndBroadcast(
+            Json.obj("type" -> 6, "quantity" -> quantity, "assetId" -> assetId, "sender" -> sourceAddress, "fee" -> fee, "version" -> version))
+        case _ => postJson("/assets/burn", BurnV1Request(sourceAddress, assetId, quantity, fee)).as[Transaction]
+      }
+    }
 
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]
