@@ -2,6 +2,7 @@ package com.wavesplatform.matcher
 
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
+import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.model.Events
 import com.wavesplatform.state.{EitherExt2, Portfolio}
 import com.wavesplatform.utils.ScorexLogging
@@ -10,7 +11,9 @@ import scala.concurrent.duration._
 import scala.collection.mutable
 import scala.concurrent.Future
 
-class AddressDirectory(portfolio: Address => Portfolio, matcherRef: ActorRef, settings: MatcherSettings) extends Actor with ScorexLogging {
+class AddressDirectory(portfolio: Address => Portfolio, matcherRef: ActorRef, storeEvent: StoreEvent, settings: MatcherSettings)
+    extends Actor
+    with ScorexLogging {
   import AddressDirectory._
   import context._
 
@@ -29,7 +32,8 @@ class AddressDirectory(portfolio: Address => Portfolio, matcherRef: ActorRef, se
                            settings.maxTimestampDiff,
                            5.seconds,
                            _ => Future.failed(new Exception),
-                           _ => false)),
+                           _ => false,
+                           storeEvent)),
         address.toString
       ))
   }

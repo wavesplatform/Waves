@@ -74,8 +74,7 @@ class Matcher(actorSystem: ActorSystem,
     pair,
     updateOrderBookCache(pair),
     marketStatuses.put(pair, _),
-    utx,
-    allChannels,
+    tx => exchangeTxPool.execute(() => if (utx.putIfNew(tx).isRight) allChannels.broadcastTx(tx)),
     matcherSettings,
     transactionCreator.createTransaction,
     time
@@ -123,10 +122,10 @@ class Matcher(actorSystem: ActorSystem,
       matcherPublicKey,
       matcher,
       addressActors,
+      storeEvent,
       p => Option(orderBooks.get()).flatMap(_.get(p)),
       p => Option(marketStatuses.get(p)),
       validateOrder,
-      storeEvent,
       orderBooksSnapshotCache,
       settings,
       isDuringShutdown,
@@ -139,8 +138,6 @@ class Matcher(actorSystem: ActorSystem,
   lazy val matcherApiTypes: Set[Class[_]] = Set(
     classOf[MatcherApiRoute]
   )
-
-  private val exchangeTxPool = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
   private val exchangeTxPool = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
@@ -188,7 +185,7 @@ class Matcher(actorSystem: ActorSystem,
     MatcherActor.name
   )
 
-  private lazy val addressActors = actorSystem.actorOf(Props(new AddressDirectory(utx.portfolio, matcher, matcherSettings)), "addresses")
+  private lazy val addressActors = actorSystem.actorOf(Props(new AddressDirectory(utx.portfolio, matcher, storeEvent, matcherSettings)), "addresses")
 
   private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
   private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)

@@ -43,7 +43,7 @@ class ExchangeTransactionCreatorSpecification
 
               val bc = stub[Blockchain]
               (bc.activatedFeatures _).when().returns(Map.empty).anyNumberOfTimes()
-              val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+              val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
               tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()) should produce(
                 "SmartAccountTrading has not been activated yet")
             }
@@ -58,7 +58,7 @@ class ExchangeTransactionCreatorSpecification
 
         val bc = stub[Blockchain]
         (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
-        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
         tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()).explicitGet() shouldBe a[ExchangeTransactionV2]
       }
     }

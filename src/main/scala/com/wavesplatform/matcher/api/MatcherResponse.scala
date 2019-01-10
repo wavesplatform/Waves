@@ -8,18 +8,18 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.Order
 import play.api.libs.json.{JsNull, JsValue, Json}
 
-sealed abstract class MatcherResponse(val response: HttpResponse)
+sealed abstract class MatcherResponse(val statusCode: StatusCode, val content: String)
 
 object MatcherResponse {
-  implicit val trm: ToResponseMarshaller[MatcherResponse] = Marshaller.opaque(_.response)
+  implicit val trm: ToResponseMarshaller[MatcherResponse] = Marshaller.opaque { x =>
+    HttpResponse(
+      x.statusCode,
+      entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(x.content))
+    )
+  }
 }
 
-sealed abstract class WrappedMatcherResponse(statusCode: StatusCode, val json: JsValue)
-    extends MatcherResponse(
-      HttpResponse(
-        statusCode,
-        entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(Json.stringify(json)))
-      )) {
+sealed abstract class WrappedMatcherResponse(statusCode: StatusCode, val json: JsValue) extends MatcherResponse(statusCode, Json.stringify(json)) {
   def this(code: StatusCode, message: String) =
     this(code,
          Json.obj(
@@ -45,6 +45,10 @@ case class OrderRejected(message: String) extends WrappedMatcherResponse(C.BadRe
 
 case class OrderCanceled(orderId: ByteStr) extends WrappedMatcherResponse(C.OK, Json.obj("status" -> "OrderCanceled", "orderId" -> orderId))
 
+// TODO check input wasn't changed
+case class BatchCancelCompleted(orders: Map[Order.Id, WrappedMatcherResponse])
+    extends WrappedMatcherResponse(C.OK, Json.obj("status" -> "BatchCancelCompleted", "message" -> Json.arr(orders.values.map(_.json))))
+
 case class OrderDeleted(orderId: ByteStr) extends WrappedMatcherResponse(C.OK, Json.obj("status" -> "OrderDeleted", "orderId" -> orderId))
 
 case class OrderCancelRejected(message: String)
@@ -54,9 +58,6 @@ case object OrderBookUnavailable extends WrappedMatcherResponse(C.ServiceUnavail
 
 case object DuringShutdown extends WrappedMatcherResponse(C.ServiceUnavailable, "System is going shutdown")
 
-case class GetOrderBookResponse(orderBookResult: OrderBookResult)
-    extends MatcherResponse(
-      HttpResponse(C.OK, entity = HttpEntity.Strict(ContentTypes.`application/json`, ByteString(OrderBookResult.toJson(orderBookResult))))
-    )
+case class GetOrderBookResponse(orderBookResult: OrderBookResult) extends MatcherResponse(C.OK, OrderBookResult.toJson(orderBookResult))
 
 case object AlreadyProcessed extends WrappedMatcherResponse(C.Accepted, "This event has been already processed")

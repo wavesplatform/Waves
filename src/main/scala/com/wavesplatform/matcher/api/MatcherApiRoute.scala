@@ -30,8 +30,8 @@ import org.iq80.leveldb.DB
 import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
 @Path("/matcher")
@@ -40,10 +40,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherPublicKey: PublicKeyAccount,
                            matcher: ActorRef,
                            addressActor: ActorRef,
+                           storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
                            orderValidator: Order => Either[String, Order],
-                           storeEvent: StoreEvent,
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            wavesSettings: WavesSettings,
                            isDuringShutdown: () => Boolean,
@@ -59,12 +59,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   override val settings: RestAPISettings = restAPISettings
 
-  private val timer           = Kamon.timer("matcher.api-requests")
-  private val placeTimer      = timer.refine("action" -> "place")
-  private val cancelTimer     = timer.refine("action" -> "cancel")
-  private val openVolumeTimer = timer.refine("action" -> "open-volume")
-
-  private val batchCancelExecutor = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor(new DefaultThreadFactory("batch-cancel", true)))
+  private val timer      = Kamon.timer("matcher.api-requests")
+  private val placeTimer = timer.refine("action" -> "place")
 
   override lazy val route: Route = shutdownBarrier {
     pathPrefix("matcher") {
@@ -113,7 +109,9 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     }
 
   @inline
-  private def askAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Command): Future[A] = (addressActor ? Env(sender, msg)).mapTo[A]
+  private def askAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Command): Future[A] = {
+    (addressActor ? Env(sender, msg)).mapTo[A]
+  }
 
   @Path("/")
   @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET")
@@ -186,7 +184,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
             placeTimer.measureFuture {
               orderValidator(order) match {
                 case Right(_) =>
-                  placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order))) //storeEvent(QueueEvent.Placed(order))
+                  placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
                 case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
               }
             }
@@ -218,11 +216,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   private def handleCancelRequest(assetPair: Option[AssetPair], sender: Address, orderId: Option[ByteStr], timestamp: Option[Long]): Route =
     complete((timestamp, orderId) match {
-      case (Some(ts), None) =>
-        askAddressActor[Map[ByteStr, MatcherResponse]](sender, AddressActor.CancelAllOrders(assetPair, ts))
-          .map { result =>
-            StatusCodes.OK -> Json.obj("status" -> "BatchCancelCompleted", "message" -> Json.arr(result.values.map(_.json)))
-          }
+      case (Some(ts), None)  => askAddressActor[MatcherResponse](sender, AddressActor.CancelAllOrders(assetPair, ts))
       case (None, Some(oid)) => askAddressActor[MatcherResponse](sender, AddressActor.CancelOrder(oid))
       case _                 => OrderCancelRejected("Either timestamp or orderId must be specified")
     })

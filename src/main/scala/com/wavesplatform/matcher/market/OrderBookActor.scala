@@ -281,14 +281,6 @@ object OrderBookActor {
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
-  sealed trait HasAssetPair {
-    def assetPair: AssetPair
-  }
-
-  case class DeleteOrderBookRequest(assetPair: AssetPair) extends HasAssetPair
-
-  case class CancelOrder(assetPair: AssetPair, orderId: ByteStr) extends HasAssetPair
-
   case class MarketStatus(
       lastTrade: Option[LastTrade],
       bestBid: Option[(Price, Level[LimitOrder])],

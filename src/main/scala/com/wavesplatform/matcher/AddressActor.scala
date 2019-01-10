@@ -1,14 +1,14 @@
 package com.wavesplatform.matcher
 
 import akka.actor.{Actor, ActorRef}
-import akka.pattern.{ask, pipe}
-import akka.util.Timeout
+import akka.pattern.pipe
 import com.wavesplatform.account.Address
-import com.wavesplatform.matcher.api.{MatcherResponse, OrderCancelRejected, OrderRejected}
-import com.wavesplatform.matcher.market.OrderBookActor
+import com.wavesplatform.matcher.Matcher.StoreEvent
+import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
 import com.wavesplatform.matcher.model.{LimitOrder, OrderValidator}
+import com.wavesplatform.matcher.queue.QueueEvent
 import com.wavesplatform.state.{ByteStr, Portfolio}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -26,6 +26,7 @@ class AddressActor(
     cancelTimeout: FiniteDuration,
     loadOrderStatus: ByteStr => Future[OrderStatus],
     orderExists: ByteStr => Boolean,
+    storeEvent: StoreEvent,
 ) extends Actor
     with ScorexLogging {
 
@@ -77,28 +78,23 @@ class AddressActor(
           activeOrders += o.id() -> lo
           reserve(lo)
           latestOrderTs = latestOrderTs.max(lo.order.timestamp)
-          matcherRef.forward(o)
+          storeEvent(QueueEvent.Placed(o)).pipeTo(sender())
         case Left(error) =>
           sender() ! OrderRejected(error)
       }
     case CancelOrder(id) =>
       activeOrders.get(id) match {
-        case Some(lo) =>
-          log.debug(s"Forwarding CancelOrder to $matcherRef")
-          matcherRef.forward(lo.order.assetPair -> OrderBookActor.CancelOrder(id))
-        case None => sender() ! OrderCancelRejected(s"Order $id not found")
+        case Some(lo) => storeEvent(QueueEvent.Canceled(lo.order.assetPair, id)).pipeTo(sender())
+        case None     => sender() ! OrderCancelRejected(s"Order $id not found")
       }
     case CancelAllOrders(maybePair, timestamp) =>
       if ((timestamp - latestOrderTs).abs <= maxTimestampDrift.toMillis) {
         val batchCancelFutures = for {
           lo <- activeOrders.values
           if maybePair.forall(_ == lo.order.assetPair)
-        } yield
-          (matcherRef ? (lo.order.assetPair -> OrderBookActor.CancelOrder(lo.order.id())))(cancelTimeout: Timeout)
-            .mapTo[MatcherResponse]
-            .map(lo.order.id() -> _)
+        } yield storeEvent(QueueEvent.Canceled(lo.order.assetPair, lo.order.id())).map(x => lo.order.id() -> x.asInstanceOf[WrappedMatcherResponse])
 
-        Future.sequence(batchCancelFutures).map(_.toMap).pipeTo(sender())
+        Future.sequence(batchCancelFutures).map(_.toMap).map(BatchCancelCompleted).pipeTo(sender())
       } else {
         sender() ! OrderCancelRejected("Invalid timestamp")
       }
