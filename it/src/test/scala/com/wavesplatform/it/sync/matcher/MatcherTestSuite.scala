@@ -372,4 +372,20 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
       }
     }
   }
+
+  "Debug information was updated" in {
+    val currentOffset = matcherNode.getCurrentOffset
+    currentOffset should be > 0L
+
+    val oldestSnapshotOffset = matcherNode.getOldestSnapshotOffset
+    oldestSnapshotOffset should be <= currentOffset
+
+    val snapshotOffsets = matcherNode.getAllSnapshotOffsets
+    snapshotOffsets.foreach {
+      case (assetPair, offset) =>
+        withClue(assetPair) {
+          offset should be <= currentOffset
+        }
+    }
+  }
 }

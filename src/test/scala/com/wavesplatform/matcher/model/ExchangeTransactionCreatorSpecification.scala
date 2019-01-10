@@ -30,8 +30,8 @@ class ExchangeTransactionCreatorSpecification
 
         val bc = stub[Blockchain]
         (bc.activatedFeatures _).when().returns(Map.empty).anyNumberOfTimes()
-        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
-        tc.createTransaction(LimitOrder(submitted), LimitOrder(counter)).explicitGet() shouldBe a[ExchangeTransactionV1]
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
+        tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()).explicitGet() shouldBe a[ExchangeTransactionV1]
       }
 
       "return an error" when {
@@ -44,7 +44,8 @@ class ExchangeTransactionCreatorSpecification
               val bc = stub[Blockchain]
               (bc.activatedFeatures _).when().returns(Map.empty).anyNumberOfTimes()
               val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
-              tc.createTransaction(LimitOrder(submitted), LimitOrder(counter)) should produce("SmartAccountTrading has not been activated yet")
+              tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()) should produce(
+                "SmartAccountTrading has not been activated yet")
             }
         }
       }
@@ -58,7 +59,7 @@ class ExchangeTransactionCreatorSpecification
         val bc = stub[Blockchain]
         (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
         val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
-        tc.createTransaction(LimitOrder(submitted), LimitOrder(counter)).explicitGet() shouldBe a[ExchangeTransactionV2]
+        tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()).explicitGet() shouldBe a[ExchangeTransactionV2]
       }
     }
   }

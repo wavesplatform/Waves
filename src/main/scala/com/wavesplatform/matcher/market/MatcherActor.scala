@@ -2,19 +2,23 @@ package com.wavesplatform.matcher.market
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
+import akka.actor.{Actor, ActorRef, PoisonPill, Props, SupervisorStrategy, Terminated}
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
 import com.google.common.base.Charsets
+import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{DuringShutdown, OrderBookUnavailable}
 import com.wavesplatform.matcher.market.OrderBookActor._
+import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{AssetDescription, ByteStr}
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json._
 import scorex.utils._
 
-class MatcherActor(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
+class MatcherActor(matcherSettings: MatcherSettings,
+                   recoveryCompletedWithCommandNr: (ActorRef, Long, Long) => Unit,
+                   orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
                    assetDescription: ByteStr => Option[AssetDescription])
     extends PersistentActor
@@ -22,9 +26,13 @@ class MatcherActor(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, Actor
 
   import MatcherActor._
 
-  private var tradedPairs            = Map.empty[AssetPair, MarketData]
-  private var childrenNames          = Map.empty[ActorRef, AssetPair]
-  private var lastSnapshotSequenceNr = 0L
+  override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
+
+  private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
+  private var childrenNames: Map[ActorRef, AssetPair] = Map.empty
+  private var lastSnapshotSequenceNr: Long            = 0L
+
+  private var snapshotOffsets: Map[AssetPair, QueueEventWithMeta.Offset] = Map.empty
 
   private var shutdownStatus: ShutdownStatus = ShutdownStatus(
     initiated = false,
@@ -73,41 +81,65 @@ class MatcherActor(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, Actor
     orderBook
   }
 
+  private def snapshotOffset(pair: AssetPair): Long = {
+    val half = matcherSettings.snapshotsInterval / 2
+    half + (pair.key.hashCode % half)
+  }
+
+  private var minSnapshotOffset = Long.MinValue
+  private def shouldDoSnapshot(request: QueueEventWithMeta): Boolean = {
+    import request.event.assetPair
+    request.offset > minSnapshotOffset && snapshotOffsets.get(assetPair).fold(false) { oldestSnapshotNr =>
+      val minOffset = oldestSnapshotNr + snapshotOffset(assetPair)
+      val r         = request.offset >= minOffset
+      if (r) log.info(s"$assetPair should do a snapshot at $minOffset, now is ${request.offset}")
+      r
+    }
+  }
+
   /**
     * @param f (sender, orderBook)
     */
-  private def runFor(pair: AssetPair)(f: (ActorRef, ActorRef) => Unit): Unit = {
+  private def runFor(eventWithMeta: QueueEventWithMeta)(f: (ActorRef, ActorRef) => Unit): Unit = {
+    import eventWithMeta.event.assetPair
     val s = sender()
     if (shutdownStatus.initiated) s ! DuringShutdown
     else
-      orderBook(pair) match {
-        case Some(Right(ob)) => f(s, ob)
-        case Some(Left(_))   => s ! OrderBookUnavailable
+      orderBook(assetPair) match {
+        case Some(Right(ob)) =>
+          f(s, ob)
+          if (shouldDoSnapshot(eventWithMeta)) {
+            snapshotOffsets -= assetPair
+            ob ! SaveSnapshot
+          }
+        case Some(Left(_)) => s ! OrderBookUnavailable
         case None =>
-          val ob = createOrderBook(pair)
-          persistAsync(OrderBookCreated(pair))(_ => f(s, ob))
+          val ob = createOrderBook(assetPair)
+          persistAsync(OrderBookCreated(assetPair))(_ => ())
+          f(s, ob)
       }
   }
 
   private def forwardToOrderBook: Receive = {
     case GetMarkets => sender() ! tradedPairs.values.toSeq
 
-    case order: Order =>
-      runFor(order.assetPair)((sender, orderBook) => orderBook.tell(order, sender))
+    case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotOffsets)
 
-    case (assetPair: AssetPair, cancelOrder: CancelOrder) =>
-      runFor(assetPair)((sender, orderBook) => orderBook.tell(cancelOrder, sender))
+    case request: QueueEventWithMeta =>
+      request.event match {
+        case QueueEvent.OrderBookDeleted(assetPair) =>
+          runFor(request) { (sender, ref) =>
+            ref.tell(request, sender)
+            orderBooks.getAndUpdate(_.filterNot { x =>
+              x._2.right.exists(_ == ref)
+            })
 
-    case deleteOrder: DeleteOrderBookRequest =>
-      runFor(deleteOrder.assetPair) { (sender, ref) =>
-        ref.tell(deleteOrder, sender)
-        orderBooks.getAndUpdate(_.filterNot { x =>
-          x._2.right.exists(_ == ref)
-        })
+            tradedPairs -= assetPair
+            deleteMessages(lastSequenceNr)
+            saveSnapshot(Snapshot(tradedPairs.keySet))
+          }
 
-        tradedPairs -= deleteOrder.assetPair
-        deleteMessages(lastSequenceNr)
-        saveSnapshot(Snapshot(tradedPairs.keySet))
+        case _ => runFor(request)((sender, orderBook) => orderBook.tell(request, sender))
       }
 
     case Shutdown =>
@@ -134,21 +166,20 @@ class MatcherActor(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, Actor
         shutdownStatus = shutdownStatus.copy(orderBooksStopped = true)
         shutdownStatus.tryComplete()
       } else {
-        context.actorOf(Props(classOf[GracefulShutdownActor], context.children.toVector, self))
+        context.actorOf(Props(new GracefulShutdownActor(context.children.toVector, self)))
       }
 
     case Terminated(ref) =>
       orderBooks.getAndUpdate { m =>
         childrenNames.get(ref).fold(m)(m.updated(_, Left(())))
       }
+
+    case OrderBookSnapshotUpdated(assetPair, lastProcessedCommandNr) =>
+      snapshotOffsets += assetPair -> lastProcessedCommandNr
   }
 
   override def receiveRecover: Receive = {
-    case OrderBookCreated(pair) =>
-      if (orderBook(pair).isEmpty) {
-        log.info(s"Order book created for $pair")
-        createOrderBook(pair)
-      }
+    case OrderBookCreated(pair) => if (orderBook(pair).isEmpty) createOrderBook(pair)
 
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
       lastSnapshotSequenceNr = metadata.sequenceNr
@@ -156,7 +187,47 @@ class MatcherActor(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, Actor
       snapshot.tradedPairsSet.foreach(createOrderBook)
 
     case RecoveryCompleted =>
-      log.info("Recovery completed!")
+      if (orderBooks.get().isEmpty) {
+        log.info("Recovery completed!")
+        recoveryCompletedWithCommandNr(self, -1, -1)
+      } else {
+        log.info(s"Recovery completed, waiting order books to restore: ${orderBooks.get().keys.mkString(", ")}")
+        context.become(collectOrderBooks(orderBooks.get().size, Long.MaxValue, Long.MinValue))
+      }
+  }
+
+  private def collectOrderBooks(restOrderBooksNumber: Long, oldestCommandNr: Long, newestCommandNr: Long): Receive = {
+    case OrderBookSnapshotUpdated(assetPair, lastProcessedCommandNr) =>
+      val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
+      val updatedOldestCommandNr      = math.min(oldestCommandNr, lastProcessedCommandNr)
+      val updatedNewestCommandNr      = math.max(newestCommandNr, lastProcessedCommandNr)
+
+      snapshotOffsets += assetPair -> lastProcessedCommandNr
+
+      if (updatedRestOrderBooksNumber > 0)
+        context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestCommandNr, updatedNewestCommandNr))
+      else {
+        context.become(receiveCommand)
+        minSnapshotOffset = updatedNewestCommandNr
+        recoveryCompletedWithCommandNr(self, updatedOldestCommandNr, updatedNewestCommandNr)
+        unstashAll()
+      }
+
+    case Terminated(ref) =>
+      orderBooks.getAndUpdate { m =>
+        childrenNames.get(ref).fold(m)(m.updated(_, Left(())))
+      }
+
+      val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
+      if (updatedRestOrderBooksNumber > 0) context.become(collectOrderBooks(updatedRestOrderBooksNumber, oldestCommandNr, newestCommandNr))
+      else {
+        context.become(receiveCommand)
+        minSnapshotOffset = newestCommandNr
+        recoveryCompletedWithCommandNr(self, oldestCommandNr, newestCommandNr)
+        unstashAll()
+      }
+
+    case _ => stash()
   }
 
   private def snapshotsCommands: Receive = {
@@ -221,10 +292,19 @@ class MatcherActor(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, Actor
 object MatcherActor {
   def name: String = "matcher"
 
-  def props(orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
-            assetDescription: ByteStr => Option[AssetDescription],
-            orderBookProps: (AssetPair, ActorRef) => Props): Props =
-    Props(new MatcherActor(orderBooks, orderBookProps, assetDescription))
+  def props(matcherSettings: MatcherSettings,
+            recoveryCompletedWithCommandNr: (ActorRef, Long, Long) => Unit,
+            orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
+            orderBookProps: (AssetPair, ActorRef) => Props,
+            assetDescription: ByteStr => Option[AssetDescription]): Props =
+    Props(
+      new MatcherActor(
+        matcherSettings,
+        recoveryCompletedWithCommandNr,
+        orderBooks,
+        orderBookProps,
+        assetDescription
+      ))
 
   private case class ShutdownStatus(initiated: Boolean,
                                     oldMessagesDeleted: Boolean,
@@ -248,6 +328,11 @@ object MatcherActor {
   case class OrderBookCreated(pair: AssetPair)
 
   case object GetMarkets
+
+  case object GetSnapshotOffsets
+  case class SnapshotOffsetsResponse(offsets: Map[AssetPair, QueueEventWithMeta.Offset])
+
+  case class MatcherRecovered(oldestCommandNr: Long)
 
   case object Shutdown
 

@@ -81,7 +81,7 @@ object OrderValidator {
 
   def blockchainAware(
       blockchain: Blockchain,
-      transactionCreator: (LimitOrder, LimitOrder) => Either[ValidationError, ExchangeTransaction],
+      transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
       orderMatchTxFee: Long,
       matcherAddress: Address,
       time: Time,
@@ -91,7 +91,7 @@ object OrderValidator {
         case x: OrderV1 => x.copy(orderType = x.orderType.opposite)
         case x: OrderV2 => x.copy(orderType = x.orderType.opposite)
       }
-      transactionCreator(LimitOrder(fakeOrder), LimitOrder(order)).left.map(_.toString)
+      transactionCreator(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime()).left.map(_.toString)
     }
 
     def verifyAssetScript(assetId: Option[AssetId]) = assetId.fold[ValidationResult](Right(order)) { assetId =>

@@ -4,7 +4,9 @@ import java.io.File
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
+import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.state.EitherExt2
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
@@ -35,7 +37,8 @@ case class MatcherSettings(enable: Boolean,
                            orderTimestampDrift: Long,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
                            blacklistedAddresses: Set[String],
-                           orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings)
+                           orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
+                           eventsQueue: EventsQueueSettings)
 
 object MatcherSettings {
 
@@ -43,6 +46,15 @@ object MatcherSettings {
 
   implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
   val configPath: String              = "waves.matcher"
+
+  case class EventsQueueSettings(tpe: String, local: LocalMatcherQueue.Settings, kafka: KafkaMatcherQueue.Settings)
+  private implicit val reader: ValueReader[EventsQueueSettings] = { (cfg, path) =>
+    EventsQueueSettings(
+      tpe = cfg.getString(s"$path.type"),
+      local = cfg.as[LocalMatcherQueue.Settings](s"$path.local"),
+      kafka = cfg.as[KafkaMatcherQueue.Settings](s"$path.kafka")
+    )
+  }
 
   def fromConfig(config: Config): MatcherSettings = {
     val enabled               = config.as[Boolean](s"$configPath.enable")
@@ -69,6 +81,7 @@ object MatcherSettings {
     val blacklistedAddresses       = config.as[Set[String]](s"$configPath.blacklisted-addresses")
     val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings](s"$configPath.order-book-snapshot-http-cache")
 
+    val eventsQueue         = config.as[EventsQueueSettings](s"$configPath.events-queue")
     val recoverOrderHistory = !new File(dataDirectory).exists()
 
     MatcherSettings(
@@ -93,7 +106,8 @@ object MatcherSettings {
       defaultOrderTimestamp,
       orderTimestampDrift.toMillis,
       blacklistedAddresses,
-      orderBookSnapshotHttpCache
+      orderBookSnapshotHttpCache,
+      eventsQueue
     )
   }
 }

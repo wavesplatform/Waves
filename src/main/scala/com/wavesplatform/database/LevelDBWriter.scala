@@ -751,7 +751,11 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     (for {
       seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
       addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
-      balance = db.get(Keys.assetBalance(addressId, assetId)(height))
+      actualHeight <- db
+        .get(Keys.assetBalanceHistory(addressId, assetId))
+        .filterNot(_ > height)
+        .headOption
+      balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
   }

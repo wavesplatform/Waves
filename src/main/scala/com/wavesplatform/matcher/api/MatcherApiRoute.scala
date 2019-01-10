@@ -10,12 +10,14 @@ import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.api.http._
 import com.wavesplatform.crypto
 import com.wavesplatform.matcher.AddressDirectory.{Envelope => Env}
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData}
+import com.wavesplatform.matcher.Matcher.StoreEvent
+import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder}
 import com.wavesplatform.metrics.TimerExt
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
@@ -28,45 +30,57 @@ import org.iq80.leveldb.DB
 import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(
-    assetPairBuilder: AssetPairBuilder,
-    matcherPublicKey: PublicKeyAccount,
-    matcher: ActorRef,
-    addressActor: ActorRef,
-    orderBook: AssetPair => Option[Either[Unit, ActorRef]],
-    getMarketStatus: AssetPair => Option[MarketStatus],
-    orderValidator: Order => Either[String, Order],
-    orderBookSnapshot: OrderBookSnapshotHttpCache,
-    wavesSettings: WavesSettings,
-    db: DB,
-    time: Time,
-) extends ApiRoute
+case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
+                           matcherPublicKey: PublicKeyAccount,
+                           matcher: ActorRef,
+                           addressActor: ActorRef,
+                           orderBook: AssetPair => Option[Either[Unit, ActorRef]],
+                           getMarketStatus: AssetPair => Option[MarketStatus],
+                           orderValidator: Order => Either[String, Order],
+                           storeEvent: StoreEvent,
+                           orderBookSnapshot: OrderBookSnapshotHttpCache,
+                           wavesSettings: WavesSettings,
+                           isDuringShutdown: () => Boolean,
+                           db: DB,
+                           time: Time,
+                           currentOffset: () => QueueEventWithMeta.Offset)
+    extends ApiRoute
     with ScorexLogging {
 
   import MatcherApiRoute._
   import PathMatchers._
   import wavesSettings._
 
-  override val settings = restAPISettings
+  override val settings: RestAPISettings = restAPISettings
 
   private val timer           = Kamon.timer("matcher.api-requests")
   private val placeTimer      = timer.refine("action" -> "place")
   private val cancelTimer     = timer.refine("action" -> "cancel")
   private val openVolumeTimer = timer.refine("action" -> "open-volume")
 
-  override lazy val route: Route =
+  private val batchCancelExecutor = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor(new DefaultThreadFactory("batch-cancel", true)))
+
+  override lazy val route: Route = shutdownBarrier {
     pathPrefix("matcher") {
       getMatcherPublicKey ~ getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-        getSettings
+        getSettings ~ getCurrentOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
     }
+  }
+
+  private def shutdownBarrier: Directive0 = if (isDuringShutdown()) complete(DuringShutdown) else pass
+
+  private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
+    case Some(Left(_)) => complete(OrderBookUnavailable)
+    case _             => pass
+  }
 
   private def withAssetPair(p: AssetPair, redirectToInverse: Boolean = false, suffix: String = ""): Directive1[AssetPair] =
     assetPairBuilder.validateAssetPair(p) match {
@@ -164,12 +178,21 @@ case class MatcherApiRoute(
         dataType = "com.wavesplatform.transaction.assets.exchange.Order"
       )
     ))
-  def place: Route = (path("orderbook") & pathEndOrSingleSlash & post) {
-    entity(as[Order]) { order =>
-      complete(orderValidator(order) match {
-        case Right(_)    => placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
-        case Left(error) => OrderRejected(error)
-      })
+  def place: Route = path("orderbook") {
+    (pathEndOrSingleSlash & post) {
+      _json[Order] { order =>
+        unavailableOrderBookBarrier(order.assetPair) {
+          complete {
+            placeTimer.measureFuture {
+              orderValidator(order) match {
+                case Right(_) =>
+                  placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order))) //storeEvent(QueueEvent.Placed(order))
+                case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -455,9 +478,7 @@ case class MatcherApiRoute(
     ))
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
     withAssetPair(p) { pair =>
-      complete((matcher ? DeleteOrderBookRequest(pair)).map { _ =>
-        GetOrderBookResponse(time.correctedTime(), pair, Seq(), Seq()).toHttpResponse
-      })
+      complete(storeEvent(QueueEvent.OrderBookDeleted(pair)))
     }
   }
 
@@ -471,6 +492,51 @@ case class MatcherApiRoute(
     ))
   def getTransactionsByOrder: Route = (path("transactions" / ByteStrPM) & get) { orderId =>
     complete(StatusCodes.OK -> Json.toJson(DBUtils.transactionsForOrder(db, orderId)))
+  }
+
+  @Path("/debug/currentOffset")
+  @ApiOperation(value = "Get a current offset in the queue", notes = "", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
+    ))
+  def getCurrentOffset: Route = (path("debug" / "currentOffset") & get & withAuth) {
+    complete(StatusCodes.OK -> currentOffset())
+  }
+
+  @Path("/debug/oldestSnapshotOffset")
+  @ApiOperation(value = "Get the oldest snapshot's offset in the queue", notes = "", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
+    ))
+  def getOldestSnapshotOffset: Route = (path("debug" / "oldestSnapshotOffset") & get & withAuth) {
+    complete {
+      (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
+        StatusCodes.OK -> x.offsets.valuesIterator.min
+      }
+    }
+  }
+
+  @Path("/debug/allSnapshotOffsets")
+  @ApiOperation(value = "Get all snapshots' offsets in the queue", notes = "", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
+    ))
+  def getAllSnapshotOffsets: Route = (path("debug" / "allSnapshotOffsets") & get & withAuth) {
+    complete {
+      (matcher ? GetSnapshotOffsets).mapTo[SnapshotOffsetsResponse].map { x =>
+        val js = Json.obj(
+          x.offsets.map {
+            case (assetPair, offset) =>
+              assetPair.key -> Json.toJsFieldJsValueWrapper(offset)
+          }.toSeq: _*
+        )
+
+        StatusCodes.OK -> js
+      }
+    }
   }
 }
 

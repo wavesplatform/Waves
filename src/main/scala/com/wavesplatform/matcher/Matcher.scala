@@ -1,22 +1,27 @@
 package com.wavesplatform.matcher
 
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
+import java.lang.{Long => jLong}
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{ConcurrentHashMap, Executors, TimeUnit}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.gracefulStop
+import akka.pattern.{ask, gracefulStop}
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
+import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.db._
-import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
+import com.wavesplatform.matcher.api.{AlreadyProcessed, MatcherApiRoute, MatcherResponse, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor, OrderHistoryActor}
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
+import com.wavesplatform.matcher.queue._
+import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, EitherExt2}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -25,9 +30,10 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 class Matcher(actorSystem: ActorSystem,
               time: Time,
@@ -35,14 +41,18 @@ class Matcher(actorSystem: ActorSystem,
               allChannels: ChannelGroup,
               blockchain: Blockchain,
               settings: WavesSettings,
-              matcherPrivateKey: PrivateKeyAccount)
+              matcherPrivateKey: PrivateKeyAccount,
+              isDuringShutdown: () => Boolean)
     extends ScorexLogging {
 
   import settings._
 
+  private implicit val materializer: ActorMaterializer = ActorMaterializer()(actorSystem)
+
+  private val currentOffset      = new AtomicReference[QueueEventWithMeta.Offset](-1L)
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
-  private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings, time)
+  private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings)
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
@@ -71,11 +81,22 @@ class Matcher(actorSystem: ActorSystem,
     time
   )
 
-  private lazy val matcher       = actorSystem.actorOf(MatcherActor.props(orderBooks, blockchain.assetDescription, orderBookProps), MatcherActor.name)
-  private lazy val addressActors = actorSystem.actorOf(Props(new AddressDirectory(utx.portfolio, matcher, matcherSettings)), "addresses")
+  private val matcherQueue: MatcherQueue = settings.matcherSettings.eventsQueue.tpe match {
+    case "local" =>
+      log.info("Events will be stored locally")
+      new LocalMatcherQueue(settings.matcherSettings.eventsQueue.local, new LocalQueueStore(db), time)(actorSystem.dispatcher)
 
-  private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
-  private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)
+    case "kafka" =>
+      log.info("Events will be stored in Kafka")
+      new KafkaMatcherQueue(settings.matcherSettings.eventsQueue.kafka)(materializer)
+
+    case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
+  }
+
+  private val requests: LoadingCache[jLong, Promise[MatcherResponse]] = CacheBuilder
+    .newBuilder()
+    .expireAfterWrite(6.seconds.toSeconds, TimeUnit.SECONDS)
+    .build[jLong, Promise[MatcherResponse]](CacheLoader.from((_: jLong) => Promise[MatcherResponse]))
 
   private def validateOrder(o: Order) =
     for {
@@ -91,7 +112,12 @@ class Matcher(actorSystem: ActorSystem,
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 
-  private lazy val matcherApiRoutes = Seq(
+  private def storeEvent(event: QueueEvent): Future[MatcherResponse] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    matcherQueue.storeEvent(event).flatMap(offset => requests.get(jLong.valueOf(offset)).future)
+  }
+
+  lazy val matcherApiRoutes: Seq[MatcherApiRoute] = Seq(
     MatcherApiRoute(
       pairBuilder,
       matcherPublicKey,
@@ -100,16 +126,72 @@ class Matcher(actorSystem: ActorSystem,
       p => Option(orderBooks.get()).flatMap(_.get(p)),
       p => Option(marketStatuses.get(p)),
       validateOrder,
+      storeEvent,
       orderBooksSnapshotCache,
       settings,
+      isDuringShutdown,
       db,
-      time
+      time,
+      () => currentOffset.get()
     )
   )
 
   lazy val matcherApiTypes: Set[Class[_]] = Set(
     classOf[MatcherApiRoute]
   )
+
+  private val exchangeTxPool = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
+
+  private val exchangeTxPool = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
+
+  lazy val matcher: ActorRef = actorSystem.actorOf(
+    MatcherActor.props(
+      matcherSettings,
+      (self, oldestSnapshotOffset, newestSnapshotOffset) => {
+        import actorSystem.dispatcher
+        implicit val timeout: Timeout = 5.seconds
+
+        val ok = Success(())
+
+        currentOffset.set(oldestSnapshotOffset)
+        matcherQueue.startConsume(
+          oldestSnapshotOffset + 1,
+          eventWithMeta => {
+            log.debug(s"[offset=${eventWithMeta.offset}, ts=${eventWithMeta.timestamp}] Consumed ${eventWithMeta.event}")
+
+            // Ignoring possible timeouts or other errors
+            // If an order book doesn't process a message, it will re-process all its messages after fix + restart
+            self
+              .ask(eventWithMeta)
+              .mapTo[MatcherResponse]
+              .map { r =>
+                currentOffset.getAndAccumulate(eventWithMeta.offset, math.max(_, _))
+                // We don't need to resolve old requests, those was did before restart, because we lost clients connections
+                if (eventWithMeta.offset > newestSnapshotOffset) r match {
+                  case AlreadyProcessed =>
+                  case _                => requests.get(jLong.valueOf(eventWithMeta.offset)).trySuccess(r)
+                }
+              }
+              .transform {
+                case Failure(e) =>
+                  log.warn(s"An error during processing an event with offset ${eventWithMeta.offset}: ${e.getMessage}", e)
+                  ok
+                case _ => ok
+              }
+          }
+        )
+      },
+      orderBooks,
+      orderBookProps,
+      blockchain.assetDescription
+    ),
+    MatcherActor.name
+  )
+
+  private lazy val addressActors = actorSystem.actorOf(Props(new AddressDirectory(utx.portfolio, matcher, matcherSettings)), "addresses")
+
+  private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
+  private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)
 
   private lazy val db = openDB(matcherSettings.dataDir)
 
@@ -119,8 +201,12 @@ class Matcher(actorSystem: ActorSystem,
 
   def shutdown(): Unit = {
     log.info("Shutting down matcher")
+
     Await.result(matcherServerBinding.unbind(), 10.seconds)
+
     val stopMatcherTimeout = 5.minutes
+    matcherQueue.close(stopMatcherTimeout)
+
     orderBooksSnapshotCache.close()
     Await.result(gracefulStop(matcher, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
     Await.result(gracefulStop(orderHistory, stopMatcherTimeout), stopMatcherTimeout)
@@ -160,20 +246,23 @@ class Matcher(actorSystem: ActorSystem,
 }
 
 object Matcher extends ScorexLogging {
+  type StoreEvent = QueueEvent => Future[MatcherResponse]
+
   def apply(actorSystem: ActorSystem,
             time: Time,
             wallet: Wallet,
             utx: UtxPool,
             allChannels: ChannelGroup,
             blockchain: Blockchain,
-            settings: WavesSettings): Option[Matcher] =
+            settings: WavesSettings,
+            isDuringShutdown: () => Boolean): Option[Matcher] =
     try {
       val privateKey = (for {
         address <- Address.fromString(settings.matcherSettings.account)
         pk      <- wallet.privateKeyAccount(address)
       } yield pk).explicitGet()
 
-      val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, settings, privateKey)
+      val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, settings, privateKey, isDuringShutdown)
       matcher.runMatcher()
       Some(matcher)
     } catch {

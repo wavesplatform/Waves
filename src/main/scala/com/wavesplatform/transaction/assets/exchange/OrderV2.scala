@@ -6,7 +6,7 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
 
@@ -125,7 +125,7 @@ object OrderV2 {
         timestamp,
         expiration,
         matcherFee,
-        maybeProofs.right.get
+        maybeProofs.explicitGet()
       )
     }
     makeOrder.run(0).value._2

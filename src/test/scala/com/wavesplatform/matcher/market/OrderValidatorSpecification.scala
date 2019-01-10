@@ -39,7 +39,7 @@ class OrderValidatorSpecification
   private def tradableBalance(p: Portfolio)(assetId: Option[AssetId]): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
   private def exchangeTransactionCreator(blockchain: Blockchain) =
-    new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings, ntpTime)
+    new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings)
 
   private def asa[A](
       p: Portfolio = defaultPortfolio,
@@ -78,6 +78,7 @@ class OrderValidatorSpecification
         val tc = exchangeTransactionCreator(bc)
 
         val v = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
+
         v(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
       }
 
@@ -236,7 +237,7 @@ class OrderValidatorSpecification
         activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
         (bc.height _).when().returns(0).anyNumberOfTimes()
 
-        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
         val ov = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
         ov(newBuyOrder(account, version = 2)) should produce("Orders of version 1 are only accepted")
       }
@@ -255,7 +256,7 @@ class OrderValidatorSpecification
       val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
       (bc.accountScript _).when(account.toAddress).returns(Some(script)).anyNumberOfTimes()
 
-      val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
+      val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
       val ov = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
       ov(newBuyOrder(account, version = 2)) should produce("height is inaccessible when running script on matcher")
     }

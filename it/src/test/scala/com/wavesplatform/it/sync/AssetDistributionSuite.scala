@@ -67,10 +67,13 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
         waitForTx = true
       )
 
+    nodes.waitForHeightArise()
+
     val distribution = node.assetDistribution(issueTx, None, None, None)
 
     distribution.size shouldBe (recievers.size + 1)
     distribution(issuer.address) shouldBe (issueAmount - 10 * recievers.length)
+
     assert(recievers.forall(rc => distribution(rc.address) == 10), "Distribution correct")
   }
 
