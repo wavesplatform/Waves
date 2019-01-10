@@ -22,7 +22,7 @@ object QueueEvent {
   }
 
   def fromBytes(xs: Array[Byte]): QueueEvent = xs.head match {
-    case 1 => QueueEvent.Placed(Order.fromBytes(xs.tail))
+    case 1 => QueueEvent.Placed(Order.fromBytes(xs(1), xs.slice(2, Int.MaxValue)))
     case 2 =>
       val assetPair = AssetPair.fromBytes(xs.tail)
       QueueEvent.Canceled(assetPair, ByteStr(xs.takeRight(DigestSize)))

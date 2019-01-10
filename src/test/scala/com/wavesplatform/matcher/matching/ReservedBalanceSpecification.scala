@@ -1,18 +1,25 @@
 package com.wavesplatform.matcher.matching
 
+import akka.actor.Props
+import akka.pattern.ask
+import akka.util.Timeout
 import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.WithDB
 import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.matcher.market.MatcherSpecLike
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, PartiallyFilled}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderHistory}
-import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData}
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.matcher.{AddressActor, AddressDirectory, AssetPairDecimals, MatcherTestData}
+import com.wavesplatform.state.{ByteStr, Portfolio}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import org.scalatest.PropSpecLike
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{BeforeAndAfterEach, Matchers, PropSpec}
+
+import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.{Await, Future}
 
 /**
   * Tests for reserved balance
@@ -59,13 +66,11 @@ import org.scalatest.{BeforeAndAfterEach, Matchers, PropSpec}
   * Buy         | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
   * Sell        | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
   */
-class ReservedBalanceSpecification
-    extends PropSpec
-    with BeforeAndAfterEach
-    with WithDB
-    with MatcherTestData
-    with Matchers
-    with TableDrivenPropertyChecks {
+class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike with WithDB with MatcherTestData with TableDrivenPropertyChecks {
+
+  override protected def actorSystemName: String = "ReservedBalanceSpecification" // getClass.getSimpleName
+
+  private implicit val timeout: Timeout = 5.seconds
 
   private def mkAssetId(prefix: String) = {
     val prefixBytes = prefix.getBytes(UTF_8)
@@ -76,13 +81,26 @@ class ReservedBalanceSpecification
   val p    = new AssetPairDecimals(8, 2)
 
   var oh = new OrderHistory(db, matcherSettings)
+  private val addressDir = system.actorOf(
+    Props(
+      new AddressDirectory(_ => Portfolio.empty, _ => Future.failed(new IllegalStateException("Should not be used in the test")), matcherSettings)
+    ))
 
-  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]): Long = ???
+  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]): Long =
+    Await
+      .result(
+        (addressDir ? AddressDirectory.Envelope(senderPublicKey, AddressActor.GetReservedBalance)).mapTo[Map[Option[AssetId], Long]],
+        Duration.Inf
+      )
+      .getOrElse(assetId, 0L)
 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
+    addressDir ! OrderAdded(LimitOrder(submitted))
+    addressDir ! OrderAdded(LimitOrder(counter))
+
     oh.process(OrderAdded(LimitOrder(counter)))
     val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.process(exec)
+    addressDir ! exec
     exec
   }
 

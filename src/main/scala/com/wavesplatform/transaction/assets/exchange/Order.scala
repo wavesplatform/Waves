@@ -273,9 +273,9 @@ object Order {
     assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
   }
 
-  def fromBytes(xs: Array[Byte]): Order = xs.head match {
-    case 1     => OrderV1.parseBytes(xs.tail).get
-    case 2     => OrderV2.parseBytes(xs.tail).get
+  def fromBytes(version: Byte, xs: Array[Byte]): Order = version match {
+    case 1     => OrderV1.parseBytes(xs).get
+    case 2     => OrderV2.parseBytes(xs).get
     case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
   }
 

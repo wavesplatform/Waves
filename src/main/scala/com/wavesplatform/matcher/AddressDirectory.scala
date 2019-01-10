@@ -11,9 +11,7 @@ import scala.concurrent.duration._
 import scala.collection.mutable
 import scala.concurrent.Future
 
-class AddressDirectory(portfolio: Address => Portfolio, matcherRef: ActorRef, storeEvent: StoreEvent, settings: MatcherSettings)
-    extends Actor
-    with ScorexLogging {
+class AddressDirectory(portfolio: Address => Portfolio, storeEvent: StoreEvent, settings: MatcherSettings) extends Actor with ScorexLogging {
   import AddressDirectory._
   import context._
 
@@ -28,7 +26,6 @@ class AddressDirectory(portfolio: Address => Portfolio, matcherRef: ActorRef, st
         Props(
           new AddressActor(address,
                            portfolio(address),
-                           matcherRef,
                            settings.maxTimestampDiff,
                            5.seconds,
                            _ => Future.failed(new Exception),

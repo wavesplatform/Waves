@@ -18,7 +18,12 @@ object MatcherKeys {
 
   val version: Key[Int] = intKey("matcher-version", 0, default = 1)
 
-  def order(orderId: ByteStr): Key[Option[Order]] = Key.opt("matcher-order", bytes(1, orderId.arr), Order.fromBytes, o => o.version +: o.bytes())
+  def order(orderId: ByteStr): Key[Option[Order]] = Key.opt(
+    "matcher-order",
+    bytes(1, orderId.arr),
+    xs => Order.fromBytes(xs.head, xs.tail),
+    o => o.version +: o.bytes()
+  )
 
   val OrderInfoPrefix: Short = 2
 

@@ -14,6 +14,7 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.EmptyBlockchain
 import org.scalamock.scalatest.PathMockFactory
@@ -258,27 +259,21 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       val ord2       = sell(pair, 10 * Order.PriceConstant, 100)
 
       val actor = system.actorOf(
-        Props(
-          new OrderBookActor(
-            TestProbe().ref,
-            TestProbe().ref,
-            pair,
-            update(pair),
-            m => md.put(pair, m),
-            _ => {},
-            matcherSettings,
-            txFactory,
-            ntpTime
-          )))
-
-      /*
-      @TODO
-      (event, ts) => {
-            if (event.submitted.order == invalidOrd || event.counter.order == invalidOrd)
+        Props(new OrderBookActor(
+          TestProbe().ref,
+          TestProbe().ref,
+          pair,
+          update(pair),
+          m => md.put(pair, m),
+          _ => {},
+          matcherSettings,
+          (submitted, counter, ts) => {
+            if (submitted.order == invalidOrd || counter.order == invalidOrd)
               Left(ValidationError.OrderValidationError(invalidOrd, "It's an invalid!"))
-            else Right(txFactory(event, ts).explicitGet())
-          }
-       */
+            else txFactory(submitted, counter, ts)
+          },
+          ntpTime
+        )))
 
       actor ! wrap(ord1)
       expectMsg(OrderAccepted(ord1))

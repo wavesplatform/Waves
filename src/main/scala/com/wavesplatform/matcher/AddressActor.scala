@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.Actor
 import akka.pattern.pipe
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.Matcher.StoreEvent
@@ -21,7 +21,6 @@ import scala.concurrent.duration.FiniteDuration
 class AddressActor(
     owner: Address,
     portfolio: => Portfolio,
-    matcherRef: ActorRef,
     maxTimestampDrift: FiniteDuration,
     cancelTimeout: FiniteDuration,
     loadOrderStatus: ByteStr => Future[OrderStatus],

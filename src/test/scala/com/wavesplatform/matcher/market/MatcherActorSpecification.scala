@@ -223,7 +223,8 @@ class MatcherActorSpecification
           matcherSettings,
           (_, _, _) => (),
           ob,
-          (assetPair, matcher) => OrderBookActor.props(matcher, ???, assetPair, _ => {}, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
+          (assetPair, matcher) =>
+            OrderBookActor.props(matcher, TestProbe().ref, assetPair, _ => {}, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
           blockchain.assetDescription
         )
       ))

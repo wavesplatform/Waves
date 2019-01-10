@@ -32,23 +32,11 @@ class OrderValidatorSpecification
     with PropertyChecks
     with NoShrink {
 
-  private val wbtc             = mkAssetId("WBTC")
-  private val pairWavesBtc     = AssetPair(None, Some(wbtc))
+  private val wbtc         = mkAssetId("WBTC")
+  private val pairWavesBtc = AssetPair(None, Some(wbtc))
+  private val defaultTs    = 1000
+
   private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
-
-  private def tradableBalance(p: Portfolio)(assetId: Option[AssetId]): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
-
-  private def exchangeTransactionCreator(blockchain: Blockchain) =
-    new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings)
-
-  private def asa[A](
-      p: Portfolio = defaultPortfolio,
-      orderStatus: ByteStr => Boolean = _ => false,
-      o: Order = newBuyOrder
-  )(f: Either[String, Order] => A): A =
-    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, 0, orderStatus)(o))
-
-  private def msa(ba: Set[Address], o: Order) = OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty) _
 
   "OrderValidator" should {
     "allow buying WAVES for BTC without balance for order fee" in asa() { v =>
@@ -69,30 +57,23 @@ class OrderValidatorSpecification
       }
 
       "v1 order from a scripted account" in forAll(accountGen) { scripted =>
-        val bc = stub[Blockchain]
-        activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
-        (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
-        (bc.height _).when().returns(50).once()
-        (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8))
+        portfolioTest(defaultPortfolio) { (ov, bc) =>
+          activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
+          (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
+          (bc.height _).when().returns(50).once() // anyNumberOfTimes
 
-        val tc = exchangeTransactionCreator(bc)
-
-        val v = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
-
-        v(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
+          ov(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
+        }
       }
 
       "sender's address has a script returning FALSE" in forAll(accountGen) { scripted =>
-        val bc = stub[Blockchain]
-        activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
-        (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.FALSE).explicitGet()))
-        (bc.height _).when().returns(150).anyNumberOfTimes()
-        (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8))
+        portfolioTest(defaultPortfolio) { (ov, bc) =>
+          activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
+          (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.FALSE).explicitGet()))
+          (bc.height _).when().returns(150).anyNumberOfTimes()
 
-        val tc = exchangeTransactionCreator(bc)
-
-        val v = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
-        v(newBuyOrder(scripted, version = 2)) should produce("Order rejected by script")
+          ov(newBuyOrder(scripted, version = 2)) should produce("Order rejected by script")
+        }
       }
 
       "order expires too soon" in forAll(Gen.choose[Long](1, OrderValidator.MinExpiration), accountGen) { (offset, pk) =>
@@ -113,43 +94,55 @@ class OrderValidatorSpecification
         OrderValidator.timeAware(ntpTime)(signed) should produce("amount should be > 0")
       }
 
-      "order signature is invalid" in {
-        val bc = stub[Blockchain]
+      "order signature is invalid" in portfolioTest(defaultPortfolio) { (ov, bc) =>
         val pk = PrivateKeyAccount(randomBytes())
         (bc.accountScript _).when(pk.toAddress).returns(None)
         val order = newBuyOrder(pk) match {
           case x: OrderV1 => x.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
           case x: OrderV2 => x.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
         }
-        (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8))
-
-        val tc = exchangeTransactionCreator(bc)
-
-        val v = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
-        v(order) should produce("Script doesn't exist and proof doesn't validate as signature")
+        ov(order) should produce("Script doesn't exist and proof doesn't validate as signature")
       }
 
-      "default ts - drift > its for new users" in pending
+      "default ts - drift > its for new users" in {
+        val pk = PrivateKeyAccount(randomBytes())
+        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, 0, 0L, _ => false)(_)
+        ov(newBuyOrder(pk, defaultTs - matcherSettings.orderTimestampDrift - 1)) should produce("Order should have a timestamp")
+      }
 
-      "default ts - drift = its ts for new users" in pending
+      "default ts - drift = its ts for new users" in {
+        val pk = PrivateKeyAccount(randomBytes())
+        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, 0, 0L, _ => false)(_)
+        ov(newBuyOrder(pk, defaultTs - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
+      }
 
-      "ts1 - drift > ts2" in pending
+      "ts1 - drift > ts2" in {
+        val pk = PrivateKeyAccount(randomBytes())
+        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, 0, defaultTs + 1000, _ => false)(_)
+        ov(newBuyOrder(pk, defaultTs + 999 - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
+      }
 
-      "ts1 - drift = ts2" in pending
+      "ts1 - drift = ts2" in {
+        val pk = PrivateKeyAccount(randomBytes())
+        val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, 0, defaultTs + 1000, _ => false)(_)
+        ov(newBuyOrder(pk, defaultTs + 1000 - matcherSettings.orderTimestampDrift)) should produce("Order should have a timestamp")
+      }
 
       "order price has invalid non-zero trailing decimals" in forAll(assetIdGen(1), accountGen, Gen.choose(1, 7)) {
         case (Some(amountAsset), sender, amountDecimals) =>
-          val bc = stub[Blockchain]
-          (bc.hasScript _).when(sender.toAddress).returns(false)
-          (bc.assetDescription _).when(amountAsset).returns(mkAssetDescription(amountDecimals))
+          portfolioTest(Portfolio(11 * Constants.UnitsInWave, LeaseBalance.empty, Map.empty)) { (ov, bc) =>
+            (bc.hasScript _).when(sender.toAddress).returns(false)
+            (bc.assetDescription _).when(amountAsset).returns(mkAssetDescription(amountDecimals))
 
-          val price = BigDecimal(10).pow(-amountDecimals - 1)
-          val tc    = exchangeTransactionCreator(bc)
-
-          val v = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
-          v(buy(AssetPair(Some(amountAsset), None), 10 * Constants.UnitsInWave, price, matcherFee = Some((0.003 * Constants.UnitsInWave).toLong))) should produce(
-            "Invalid price")
-
+            val price = BigDecimal(10).pow(-amountDecimals - 1)
+            ov(
+              buy(
+                AssetPair(Some(amountAsset), None),
+                10 * Constants.UnitsInWave,
+                price,
+                matcherFee = Some((0.003 * Constants.UnitsInWave).toLong)
+              )) should produce("Invalid price")
+          }
       }
     }
 
@@ -157,26 +150,26 @@ class OrderValidatorSpecification
       validateOrderProofsTest((1 to proofsNumber).map(x => ByteStr(Array(x.toByte))))
     }
 
-    "meaningful error for undefined functions in matcher" in {
-      val bc = stub[Blockchain]
+    "meaningful error for undefined functions in matcher" in portfolioTest(defaultPortfolio) { (ov, bc) =>
       activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
 
       val pk     = PrivateKeyAccount(randomBytes())
       val o      = newBuyOrder(pk, version = 2)
       val script = ScriptCompiler("true && (height > 0)", isAssetScript = false).explicitGet()._1
       (bc.accountScript _).when(pk.toAddress).returns(Some(script))
-      (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8))
-
-      val tc = exchangeTransactionCreator(bc)
-
-      val v = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
-      v(o) should produce("height is inaccessible when running script on matcher")
+      ov(o) should produce("height is inaccessible when running script on matcher")
     }
 
     "validate order with smart token" when {
       val asset1 = mkAssetId("asset1")
       val asset2 = mkAssetId("asset2")
       val pair   = AssetPair(Some(asset1), Some(asset2))
+      val portfolio = Portfolio(10 * Constants.UnitsInWave,
+                                LeaseBalance.empty,
+                                Map(
+                                  asset1 -> 10 * Constants.UnitsInWave,
+                                  asset2 -> 10 * Constants.UnitsInWave
+                                ))
 
       val permitScript = ScriptV1(Terms.TRUE).explicitGet()
       val denyScript   = ScriptV1(Terms.FALSE).explicitGet()
@@ -202,13 +195,12 @@ class OrderValidatorSpecification
         ov(o) should produce("Order rejected by script of asset")
       }
 
-      def test(f: (Order => Either[String, Order], Blockchain, Order) => Any): Unit = (1 to 2).foreach { version =>
-        s"v$version" in {
+      def test(f: (Order => OrderValidator.ValidationResult, Blockchain, Order) => Any): Unit = (1 to 2).foreach { version =>
+        s"v$version" in portfolioTest(portfolio) { (ov, bc) =>
           val features = Seq(BlockchainFeatures.SmartAssets -> 0) ++ {
             if (version == 1) Seq.empty
             else Seq(BlockchainFeatures.SmartAccountTrading -> 0)
           }
-          val bc = stub[Blockchain]
           activate(bc, features: _*)
           (bc.assetDescription _).when(asset1).returns(mkAssetDescription(8))
           (bc.assetDescription _).when(asset2).returns(mkAssetDescription(8))
@@ -224,42 +216,45 @@ class OrderValidatorSpecification
             version = version.toByte
           )
           (bc.accountScript _).when(o.sender.toAddress).returns(None)
-
-          val tc = exchangeTransactionCreator(bc)
-
-          val ov = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
           f(ov, bc, o)
         }
       }
+    }
 
-      "deny OrderV2 if SmartAccountTrading hasn't been activated yet" in forAll(accountGen) { account =>
-        val bc = stub[Blockchain]
+    "deny OrderV2 if SmartAccountTrading hasn't been activated yet" in forAll(accountGen) { account =>
+      portfolioTest(defaultPortfolio) { (ov, bc) =>
         activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
         (bc.height _).when().returns(0).anyNumberOfTimes()
 
-        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
-        val ov = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
         ov(newBuyOrder(account, version = 2)) should produce("Orders of version 1 are only accepted")
       }
     }
 
     "deny blockchain functions in account script" in forAll(accountGen) { account =>
-      val bc = stub[Blockchain]
-      activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
-      (bc.height _).when().returns(0).anyNumberOfTimes()
+      portfolioTest(defaultPortfolio) { (ov, bc) =>
+        activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
+        (bc.height _).when().returns(0).anyNumberOfTimes()
 
-      val scriptText =
-        """match tx {
-              |  case o: Order => height >= 0
-              |  case _ => true
-              |}""".stripMargin
-      val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
-      (bc.accountScript _).when(account.toAddress).returns(Some(script)).anyNumberOfTimes()
+        val scriptText =
+          """match tx {
+            |  case o: Order => height >= 0
+            |  case _ => true
+            |}""".stripMargin
+        val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
+        (bc.accountScript _).when(account.toAddress).returns(Some(script)).anyNumberOfTimes()
 
-      val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
-      val ov = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
-      ov(newBuyOrder(account, version = 2)) should produce("height is inaccessible when running script on matcher")
+        ov(newBuyOrder(account, version = 2)) should produce("height is inaccessible when running script on matcher")
+      }
     }
+  }
+
+  private def portfolioTest(p: Portfolio)(f: (Order => OrderValidator.ValidationResult, Blockchain) => Any): Unit = {
+    val bc = stub[Blockchain]
+    (bc.assetScript _).when(wbtc).returns(None)
+    (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8)).anyNumberOfTimes()
+    val tc = exchangeTransactionCreator(bc)
+    val ov = mkOrderValidator(bc, tc)
+    f(ov, bc)
   }
 
   private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = {
@@ -270,8 +265,8 @@ class OrderValidatorSpecification
     activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
     (bc.accountScript _).when(pk.toAddress).returns(Some(accountScript)).anyNumberOfTimes()
     (bc.height _).when().returns(1).anyNumberOfTimes()
-    (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8))
     (bc.assetScript _).when(wbtc).returns(None)
+    (bc.assetDescription _).when(wbtc).returns(mkAssetDescription(8)).anyNumberOfTimes()
 
     val order = OrderV2(
       senderPublicKey = pk,
@@ -287,8 +282,7 @@ class OrderValidatorSpecification
     )
 
     val tc = exchangeTransactionCreator(bc)
-
-    val ov = OrderValidator.blockchainAware(bc, tc.createTransaction, ???, ???, ntpTime) _
+    val ov = mkOrderValidator(bc, tc)
     ov(order) shouldBe 'right
   }
 
@@ -317,4 +311,21 @@ class OrderValidatorSpecification
   private def activate(bc: Blockchain, features: (BlockchainFeature, Int)*): Unit = {
     (bc.activatedFeatures _).when().returns(features.map(x => x._1.id -> x._2).toMap).anyNumberOfTimes()
   }
+
+  private def mkOrderValidator(bc: Blockchain, tc: ExchangeTransactionCreator) =
+    OrderValidator.blockchainAware(bc, tc.createTransaction, (0.003 * Constants.UnitsInWave).toLong, MatcherAccount, ntpTime)(_)
+
+  private def tradableBalance(p: Portfolio)(assetId: Option[AssetId]): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
+
+  private def exchangeTransactionCreator(blockchain: Blockchain) =
+    new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings)
+
+  private def asa[A](
+      p: Portfolio = defaultPortfolio,
+      orderStatus: ByteStr => Boolean = _ => false,
+      o: Order = newBuyOrder
+  )(f: Either[String, Order] => A): A =
+    f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, 0, orderStatus)(o))
+
+  private def msa(ba: Set[Address], o: Order) = OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty) _
 }
