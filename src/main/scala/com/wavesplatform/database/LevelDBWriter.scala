@@ -796,8 +796,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       takeAfter(all, maybeAddressId)
     }
 
-    println(addressIds)
-
     val distribution: Stream[(Address, Long)] =
       for {
         addressId <- addressIds.toStream
