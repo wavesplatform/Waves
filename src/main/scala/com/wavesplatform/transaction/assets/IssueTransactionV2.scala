@@ -45,7 +45,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
   override val typeId: Byte                 = IssueTransaction.typeId
   override val supportedVersions: Set[Byte] = Set(2)
 
-  private def networkByte = AddressScheme.current.chainId
+  private def chainId = AddressScheme.current.chainId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
@@ -82,7 +82,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
              proofs: Proofs): Either[ValidationError, TransactionT] =
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), UnsupportedVersion(version))
-      _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $networkByte"))
+      _ <- Either.cond(chainId == chainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $chainId"))
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
     } yield IssueTransactionV2(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
 

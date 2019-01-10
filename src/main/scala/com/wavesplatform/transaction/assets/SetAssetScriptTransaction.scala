@@ -54,7 +54,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
   val typeId: Byte                          = 15
   override val supportedVersions: Set[Byte] = Set(1)
 
-  private def networkByte = AddressScheme.current.chainId
+  private def chainId = AddressScheme.current.chainId
 
   def create(
       version: Byte,
@@ -68,7 +68,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
   ): Either[ValidationError, TransactionT] = {
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
-      _ <- Either.cond(chainId == networkByte, (), ValidationError.GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $networkByte"))
+      _ <- Either.cond(chainId == chainId, (), ValidationError.GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $chainId"))
     } yield SetAssetScriptTransaction(version, chainId, sender, assetId, script, fee, timestamp, proofs)
 
   }

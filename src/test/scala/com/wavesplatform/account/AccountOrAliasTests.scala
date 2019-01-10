@@ -17,11 +17,11 @@ class AccountOrAliasTests extends PropSpec with PropertyChecks with Matchers {
   property("Alias should get parsed correctly") {
     val alias = AddressOrAlias.fromString("alias:T:sasha").explicitGet().asInstanceOf[Alias]
     alias.name shouldBe "sasha"
-    alias.networkByte shouldBe 'T'
+    alias.chainId shouldBe 'T'
 
     val alias2 = Alias.fromString("alias:T:sasha").explicitGet()
     alias2.name shouldBe "sasha"
-    alias2.networkByte shouldBe 'T'
+    alias2.chainId shouldBe 'T'
 
   }
   property("Alias cannot be from other network") {

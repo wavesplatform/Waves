@@ -17,7 +17,7 @@ import monix.eval.Coeval
 import shapeless.Coproduct
 
 package object predef {
-  val networkByte: Byte = 'u'
+  val chainId: Byte = 'u'
 
   def runScript[T <: EVALUATED](script: String, version: ScriptVersion, t: In, blockchain: Blockchain, networkByte: Byte): Either[String, T] = {
     val Success(expr, _) = Parser(script)
@@ -35,13 +35,13 @@ package object predef {
   }
 
   def runScript[T <: EVALUATED](script: String, t: In = null): Either[String, T] =
-    runScript[T](script, V1, t, EmptyBlockchain, networkByte)
+    runScript[T](script, V1, t, EmptyBlockchain, chainId)
 
   def runScript[T <: EVALUATED](script: String, t: In, networkByte: Byte): Either[String, T] =
     runScript[T](script, V1, t, EmptyBlockchain, networkByte)
 
   def runScript[T <: EVALUATED](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] =
-    runScript[T](script, V1, Coproduct(tx), blockchain, networkByte)
+    runScript[T](script, V1, Coproduct(tx), blockchain, chainId)
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 

@@ -23,7 +23,7 @@ object DocExport {
         version,
         new Environment {
           override def height: Long                                                                                    = ???
-          override def networkByte: Byte                                                                               = 66
+          override def chainId: Byte                                                                                   = 66
           override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
           override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
           override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???

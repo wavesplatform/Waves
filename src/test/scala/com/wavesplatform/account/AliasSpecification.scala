@@ -8,13 +8,13 @@ class AliasSpecification extends PropSpec with PropertyChecks with Matchers with
 
   property("Correct alias should be valid") {
     forAll(validAliasStringGen) { s =>
-      Alias.buildWithCurrentNetworkByte(s) shouldBe 'right
+      Alias.buildWithCurrentChainId(s) shouldBe 'right
     }
   }
 
   property("Incorrect alias should be invalid") {
     forAll(invalidAliasStringGen) { s =>
-      Alias.buildWithCurrentNetworkByte(s) shouldBe 'left
+      Alias.buildWithCurrentChainId(s) shouldBe 'left
     }
   }
 }

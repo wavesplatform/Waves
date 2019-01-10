@@ -25,7 +25,7 @@ case class SignedCreateAliasV2Request(@ApiModelProperty(required = true)
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      _alias      <- Alias.buildWithCurrentNetworkByte(alias)
+      _alias      <- Alias.buildWithCurrentChainId(alias)
       _t          <- CreateAliasTransactionV2.create(version, _sender, _alias, fee, timestamp, _proofs)
     } yield _t
 }

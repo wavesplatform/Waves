@@ -36,7 +36,7 @@ case class ReissueTransactionV2 private (version: Byte,
 object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] with TransactionParser.MultipleVersions {
   override val typeId: Byte                 = ReissueTransaction.typeId
   override def supportedVersions: Set[Byte] = Set(2)
-  private def networkByte                   = AddressScheme.current.chainId
+  private def chainId                 = AddressScheme.current.chainId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
@@ -61,7 +61,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
              proofs: Proofs): Either[ValidationError, TransactionT] =
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), UnsupportedVersion(version))
-      _ <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $networkByte"))
+      _ <- Either.cond(chainId == chainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $chainId"))
       _ <- ReissueTransaction.validateReissueParams(quantity, fee)
     } yield ReissueTransactionV2(version, chainId, sender, assetId, quantity, reissuable, fee, timestamp, proofs)
 

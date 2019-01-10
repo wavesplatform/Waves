@@ -6,11 +6,11 @@ import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 
 sealed trait Alias extends AddressOrAlias {
-  lazy val stringRepr: String = Alias.Prefix + networkByte.toChar + ":" + name
-  lazy val bytes: ByteStr     = ByteStr(Alias.AddressVersion +: networkByte +: Deser.serializeArray(name.getBytes("UTF-8")))
+  lazy val stringRepr: String = Alias.Prefix + chainId.toChar + ":" + name
+  lazy val bytes: ByteStr     = ByteStr(Alias.AddressVersion +: chainId +: Deser.serializeArray(name.getBytes("UTF-8")))
 
   val name: String
-  val networkByte: Byte
+  val chainId: Byte
 }
 
 object Alias {
@@ -25,26 +25,26 @@ object Alias {
 
   private val AliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
 
-  private def schemeByte: Byte = AddressScheme.current.chainId
+  private def chainId: Byte = AddressScheme.current.chainId
 
   private def validAliasChar(c: Char): Boolean =
     ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
   private def buildAlias(networkByte: Byte, name: String): Either[ValidationError, Alias] = {
 
-    case class AliasImpl(networkByte: Byte, name: String) extends Alias
+    case class AliasImpl(chainId: Byte, name: String) extends Alias
 
     if (name.length < MinLength || MaxLength < name.length)
       Left(GenericError(s"Alias '$name' length should be between $MinLength and $MaxLength"))
     else if (!name.forall(validAliasChar))
       Left(GenericError(s"Alias should contain only following characters: $aliasAlphabet"))
-    else if (networkByte != schemeByte)
+    else if (networkByte != chainId)
       Left(GenericError("Alias network char doesn't match current scheme"))
     else
       Right(AliasImpl(networkByte, name))
   }
 
-  def buildWithCurrentNetworkByte(name: String): Either[ValidationError, Alias] = buildAlias(schemeByte, name)
+  def buildWithCurrentChainId(name: String): Either[ValidationError, Alias] = buildAlias(chainId, name)
 
   def fromString(str: String): Either[ValidationError, Alias] =
     if (!str.startsWith(Prefix)) {
@@ -64,7 +64,7 @@ object Alias {
     bytes.headOption match {
       case Some(AddressVersion) =>
         val networkChar = bytes.tail.head
-        if (networkChar != schemeByte) {
+        if (networkChar != chainId) {
           Left(GenericError("Alias network byte doesn't match current scheme"))
         } else
           buildAlias(networkChar, new String(bytes.drop(4), "UTF-8"))

@@ -73,8 +73,8 @@ object Common {
 
   def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Tx :+: Ord :+: CNil] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
     override def height: Long      = h
-    override def networkByte: Byte = nByte
-    override def inputEntity       = in()
+    override def chainId: Byte     = nByte
+    override def inputEntity = in()
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
