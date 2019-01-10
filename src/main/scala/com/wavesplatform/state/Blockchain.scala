@@ -67,6 +67,8 @@ trait Blockchain {
   def accountData(acc: Address): AccountDataInfo
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
 
+  def leaseBalance(address: Address): LeaseBalance
+
   def balance(address: Address, mayBeAssetId: Option[AssetId]): Long
 
   def assetDistribution(assetId: ByteStr): AssetDistribution

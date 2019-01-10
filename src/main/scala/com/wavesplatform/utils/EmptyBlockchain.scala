@@ -3,19 +3,7 @@ package com.wavesplatform.utils
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{
-  AccountDataInfo,
-  AssetDescription,
-  AssetDistribution,
-  AssetDistributionPage,
-  BalanceSnapshot,
-  Blockchain,
-  ByteStr,
-  DataEntry,
-  Diff,
-  Portfolio,
-  VolumeAndFee
-}
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -94,6 +82,8 @@ object EmptyBlockchain extends Blockchain {
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
 
   override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = 0
+
+  override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
   override def assetDistribution(assetId: ByteStr): AssetDistribution = Monoid.empty[AssetDistribution]
 

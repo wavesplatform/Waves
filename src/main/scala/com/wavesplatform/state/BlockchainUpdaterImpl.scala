@@ -542,6 +542,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     case None =>
       blockchain.balance(address, mayBeAssetId)
   }
+
+  override def leaseBalance(address: Address): LeaseBalance = ngState match {
+    case Some(ng) =>
+      cats.Monoid.combine(blockchain.leaseBalance(address), ng.bestLiquidDiff.portfolios.getOrElse(address, Portfolio.empty).lease)
+    case None =>
+      blockchain.leaseBalance(address)
+  }
 }
 
 object BlockchainUpdaterImpl extends ScorexLogging {
