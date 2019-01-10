@@ -36,7 +36,7 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
   override val typeId: Byte = LeaseCancelTransaction.typeId
 
   override def supportedVersions: Set[Byte] = Set(2)
-  private def chainId                 = AddressScheme.current.chainId
+  private def currentChainId                = AddressScheme.current.chainId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
@@ -57,7 +57,7 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
              proofs: Proofs): Either[ValidationError, TransactionT] =
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), UnsupportedVersion(version))
-      _ <- Either.cond(chainId == chainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $chainId"))
+      _ <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
       _ <- LeaseCancelTransaction.validateLeaseCancelParams(leaseId, fee)
     } yield LeaseCancelTransactionV2(version, chainId, sender, leaseId, fee, timestamp, proofs)
 
