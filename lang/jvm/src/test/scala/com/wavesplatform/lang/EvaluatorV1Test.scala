@@ -566,12 +566,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val ctx         = defaultFullContext(environment)
 
     val gen = for {
-      seed        <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
-      networkByte <- Gen.choose[Byte](0, 100)
-      if networkByte != environment.chainId
+      seed    <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
+      chainId <- Gen.choose[Byte](0, 100)
+      if chainId != environment.chainId
     } yield {
       val (_, pk) = Curve25519.createKeyPair(seed)
-      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(networkByte, pk))
+      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(chainId, pk))
     }
 
     forAll(gen) { addrStr =>
