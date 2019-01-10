@@ -5,7 +5,7 @@ import shapeless._
 
 trait Environment {
   def height: Long
-  def networkByte: Byte
+  def chainId: Byte
   def inputEntity: Tx :+: Ord :+: CNil
   def transactionById(id: Array[Byte]): Option[Tx]
   def transactionHeightById(id: Array[Byte]): Option[Long]

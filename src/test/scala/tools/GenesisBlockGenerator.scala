@@ -34,7 +34,7 @@ object GenesisBlockGenerator extends App {
       s"The sum of all balances should be <= $initialBalance, but it is $distributionsSum"
     )
 
-    val networkByte: Byte = networkType.head.toByte
+    val chainId: Byte = networkType.head.toByte
   }
 
   case class FullAddressInfo(seedText: SeedText,
@@ -70,7 +70,7 @@ object GenesisBlockGenerator extends App {
   }
 
   com.wavesplatform.account.AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = settings.networkByte
+    override val chainId: Byte = settings.chainId
   }
 
   val shares: Map[FullAddressInfo, Share] = {

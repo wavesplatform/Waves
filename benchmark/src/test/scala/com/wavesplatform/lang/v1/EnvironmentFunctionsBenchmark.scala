@@ -71,14 +71,14 @@ class EnvironmentFunctionsBenchmark {
 
 object EnvironmentFunctionsBenchmark {
 
-  val NetworkByte: Byte = 'P'
+  val ChainId: Byte     = 'P'
   val Base58BytesLength = Global.MaxBase58Bytes
   val DataBytesLength   = 512
   val SeedBytesLength   = 128
 
   private val defaultEnvironment: Environment = new Environment {
     override def height: Long                                                                                    = 1
-    override def networkByte: Byte                                                                               = NetworkByte
+    override def chainId: Byte                                                                                   = ChainId
     override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
@@ -95,7 +95,7 @@ object EnvironmentFunctionsBenchmark {
     bytes
   }
 
-  def randomAddress: ByteVector = ByteVector(Common.addressFromPublicKey(NetworkByte, randomBytes(Curve25519.KeyLength)))
+  def randomAddress: ByteVector = ByteVector(Common.addressFromPublicKey(ChainId, randomBytes(Curve25519.KeyLength)))
 
   def hashTest[T](f: Array[Byte] => T): T           = f(randomBytes(DataBytesLength))
   def hashTest[T](len: Int, f: Array[Byte] => T): T = f(randomBytes(len))

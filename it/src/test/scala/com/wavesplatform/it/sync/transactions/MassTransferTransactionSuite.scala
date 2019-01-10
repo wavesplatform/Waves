@@ -267,7 +267,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     createAliasTxs.foreach(sender.waitForTransaction(_))
 
     val transfers = aliases.map { alias =>
-      Transfer(Alias.buildWithCurrentNetworkByte(alias).explicitGet().stringRepr, 2.waves)
+      Transfer(Alias.buildWithCurrentChainId(alias).explicitGet().stringRepr, 2.waves)
     }
     val txId = sender.massTransfer(firstAddress, transfers, 300000).id
     nodes.waitForHeightAriseAndTxPresent(txId)
