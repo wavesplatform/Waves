@@ -91,7 +91,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     )
   }
 
-  test("negative: set simple contracts and put exchange transaction in blockchain") {
+  test("negative - set simple contracts and put exchange transaction in blockchain") {
     for ((contr1, contr2, mcontr) <- Seq(
            (sc1, sc2, sc1),
            (sc1, sc1, sc2),
@@ -115,7 +115,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     )
   }
 
-  test("negative: check custom exception") {
+  test("negative - check custom exception") {
     for ((contr1, contr2, mcontr) <- Seq(
            (sc1, sc1, sc3)
          )) {
@@ -136,7 +136,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     )
   }
 
-  test("positive: versioning verification") {
+  test("positive - versioning verification") {
     for ((contr1, contr2, mcontr) <- Seq(
            (None, None, None),
            (sc1, None, None),
@@ -181,14 +181,14 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     )
   }
 
-  test("negative: check orders v2 with exchange tx v1") {
+  test("negative - check orders v2 with exchange tx v1") {
     val tx        = exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, acc1, acc0, acc2)
     val sig       = (Json.parse(tx.toString()) \ "proofs").as[Seq[JsString]].head
     val changedTx = tx + ("version" -> JsNumber(1)) + ("signature" -> sig)
     assertBadRequestAndMessage(sender.signedBroadcast(changedTx), "can only contain orders of version 1", 400)
   }
 
-  test("negative: exchange tx v2 and order v1 from scripted acc") {
+  test("negative - exchange tx v2 and order v1 from scripted acc") {
     setContracts((sc1, acc0))
 
     val matcher   = acc2
