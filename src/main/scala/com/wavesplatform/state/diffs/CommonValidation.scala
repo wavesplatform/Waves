@@ -58,7 +58,7 @@ object CommonValidation {
         }
 
         val spendings       = Monoid.combine(amountDiff, feeDiff)
-        val oldWavesBalance = blockchain.portfolio(sender).balance
+        val oldWavesBalance = blockchain.balance(sender, None)
 
         val newWavesBalance = oldWavesBalance + spendings.balance
         if (newWavesBalance < 0) {
@@ -67,23 +67,31 @@ object CommonValidation {
               "Attempt to transfer unavailable funds: Transaction application leads to " +
                 s"negative waves balance to (at least) temporary negative state, current balance equals $oldWavesBalance, " +
                 s"spends equals ${spendings.balance}, result is $newWavesBalance"))
-        } else if (spendings.assets.nonEmpty) {
-          val oldAssetBalances = blockchain.portfolio(sender).assets
-          val balanceError = spendings.assets.collectFirst {
-            case (aid, delta) if oldAssetBalances.getOrElse(aid, 0L) + delta < 0 =>
-              val availableBalance = oldAssetBalances.getOrElse(aid, 0L)
-              GenericError(
-                "Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
-                  s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
-                  s"spends equals $delta, result is ${availableBalance + delta}")
+        } else {
+          val balanceError = spendings.assets.iterator.flatMap {
+            case (aid, delta) =>
+              if (delta < 0) {
+                val availableBalance = blockchain.balance(sender, Some(aid))
+                if (availableBalance + delta < 0) {
+                  Some(
+                    GenericError(
+                      "Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
+                        s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
+                        s"spends equals $delta, result is ${availableBalance + delta}"))
+                } else {
+                  None
+                }
+              } else {
+                None
+              }
           }
 
-          balanceError.fold[Either[ValidationError, T]](Right(tx))(Left(_))
-        } else Right(tx)
+          balanceError.toSeq.headOption.fold[Either[ValidationError, T]](Right(tx))(Left(_))
+        }
       }
 
       tx match {
-        case ptx: PaymentTransaction if blockchain.portfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
+        case ptx: PaymentTransaction if blockchain.balance(ptx.sender, None) < (ptx.amount + ptx.fee) =>
           Left(
             GenericError(
               "Attempt to pay unavailable funds: balance " +
