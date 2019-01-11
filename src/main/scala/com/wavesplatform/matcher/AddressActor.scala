@@ -12,7 +12,8 @@ import com.wavesplatform.matcher.queue.QueueEvent
 import com.wavesplatform.state.{ByteStr, Portfolio}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -32,21 +33,25 @@ class AddressActor(
   import AddressActor._
   import context.dispatcher
 
+  protected override def log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
+
   private val activeOrders  = mutable.AnyRefMap.empty[ByteStr, LimitOrder]
   private val openVolume    = mutable.AnyRefMap.empty[Option[AssetId], Long].withDefaultValue(0L)
   private var latestOrderTs = 0L
 
   private def reserve(limitOrder: LimitOrder): Unit =
     for ((id, b) <- limitOrder.requiredBalance if b != 0) {
-      val newBalance = openVolume(id) + b
-      log.trace(s"[$owner]${limitOrder.order.id()}: $id -> +$b ($newBalance)")
+      val prevBalance = openVolume(id)
+      val newBalance  = prevBalance + b
+      log.trace(s"${limitOrder.order.id()}: $id -> +$b ($prevBalance -> $newBalance)")
       openVolume += id -> newBalance
     }
 
   private def release(orderId: ByteStr): Unit =
     for (limitOrder <- activeOrders.get(orderId); (id, b) <- limitOrder.requiredBalance if b != 0) {
-      val newBalance = openVolume(id) - b
-      log.trace(s"[$owner]${limitOrder.order.id()}: $id -> -$b ($newBalance)")
+      val prevBalance = openVolume(id)
+      val newBalance  = prevBalance - b
+      log.trace(s"${limitOrder.order.id()}: $id -> -$b ($prevBalance -> $newBalance)")
       openVolume += id -> newBalance
     }
 
@@ -132,8 +137,13 @@ class AddressActor(
         }
       }
       if (counter.order.sender.toAddress == owner) {
-        updateOpenVolume(e.counterRemaining)
-        activeOrders += counter.order.id() -> e.counterRemaining
+        release(counter.order.id())
+        if (e.counterRemaining.isValid) {
+          reserve(e.counterRemaining)
+          activeOrders += counter.order.id() -> e.counterRemaining
+        } else {
+          activeOrders -= counter.order.id()
+        }
       }
     case OrderCanceled(lo, unmatchable) if activeOrders.contains(lo.order.id()) =>
       log.trace(s"OrderCanceled(${lo.order.id()}, system=$unmatchable)")

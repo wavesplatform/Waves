@@ -53,9 +53,7 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
     }
   }
 
-  "Restart the matcher" in {
-    docker.restartContainer(matcherNode.asInstanceOf[DockerNode])
-  }
+  "Restart the matcher" in docker.restartContainer(matcherNode.asInstanceOf[DockerNode])
 
   "Wait all requests are processed - 2" in {
     matcherNode.waitFor[QueueEventWithMeta.Offset]("all requests are processed")(_.getCurrentOffset, _ == stateBefore.offset, 300.millis)
