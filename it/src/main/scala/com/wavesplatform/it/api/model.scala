@@ -31,12 +31,17 @@ object Balance {
   implicit val balanceFormat: Format[Balance] = Json.format
 }
 
+case class BalanceDetails(address: String, regular: Long, generating: Long, available: Long, effective: Long)
+object BalanceDetails {
+  implicit val balanceDetailsFormat: Format[BalanceDetails] = Json.format
+}
+
 case class AssetBalance(address: String, assetId: String, balance: Long)
 object AssetBalance {
   implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
 }
 
-case class CompiledScript(script: String)
+case class CompiledScript(script: String, complexity: Long, extraFee: Long)
 object CompiledScript {
   implicit val compiledScriptFormat: Format[CompiledScript] = Json.format
 }
@@ -56,6 +61,11 @@ object FullAssetsInfo {
   implicit val fullAssetsInfoFormat: Format[FullAssetsInfo] = Json.format
 }
 
+case class ScriptAssetInfo(scriptComplexity: Long, script: String, scriptText: String)
+object ScriptAssetInfo {
+  implicit val scriptAssetInfoFormat: Format[ScriptAssetInfo] = Json.format
+}
+
 case class AssetInfo(assetId: String,
                      issueHeight: Int,
                      issueTimestamp: Long,
@@ -65,7 +75,8 @@ case class AssetInfo(assetId: String,
                      decimals: Int,
                      reissuable: Boolean,
                      quantity: Long,
-                     minSponsoredAssetFee: Option[Long])
+                     minSponsoredAssetFee: Option[Long],
+                     scriptDetails: Option[ScriptAssetInfo])
 object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
@@ -93,8 +104,8 @@ case class OrderInfo(id: String,
                      matcherPublicKey: String,
                      assetPair: AssetPairResponse,
                      orderType: String,
-                     price: Long,
                      amount: Long,
+                     price: Long,
                      timestamp: Long,
                      expiration: Long,
                      matcherFee: Long,
@@ -114,11 +125,11 @@ case class ExchangeTransaction(`type`: Int,
                                senderPublicKey: String,
                                fee: Long,
                                timestamp: Long,
-                               signature: String,
+                               version: Byte,
                                order1: OrderInfo,
                                order2: OrderInfo,
-                               price: Long,
                                amount: Long,
+                               price: Long,
                                buyMatcherFee: Long,
                                sellMatcherFee: Long,
                                height: Option[Int])
@@ -156,6 +167,11 @@ object MatcherMessage {
 case class MatcherResponse(status: String, message: MatcherMessage)
 object MatcherResponse {
   implicit val matcherResponseFormat: Format[MatcherResponse] = Json.format
+}
+
+case class MatcherErrorResponse(status: Option[String], message: Option[String])
+object MatcherErrorResponse {
+  implicit val matcherErrorResponseFormat: Format[MatcherErrorResponse] = Json.format
 }
 
 case class MarketDataInfo(matcherPublicKey: String, markets: Seq[MarketData])
@@ -221,7 +237,7 @@ object PairResponse {
   implicit val pairResponseFormat: Format[PairResponse] = Json.format
 }
 
-case class LevelResponse(price: Long, amount: Long)
+case class LevelResponse(amount: Long, price: Long)
 object LevelResponse {
   implicit val levelResponseFormat: Format[LevelResponse] = Json.format
 }

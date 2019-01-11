@@ -1,13 +1,14 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
-import com.wavesplatform.utils.{Base58, dummyCompilerContext}
+import com.wavesplatform.utils.{Base58, compilerContext}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -49,7 +50,7 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
       .get
 
     val untypedScript  = Parser(scriptWithAllFunctions(dtx, ttx)).get.value
-    val compiledScript = CompilerV1(dummyCompilerContext, untypedScript).explicitGet()._1
+    val compiledScript = CompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
     val bytes = Array[Byte](4, 0, 0, 0, 3, 114, 110, 100, 9, 0, 0, 0, 0, 0, 0, 2, 9, 0, 0, 106, 0, 0, 0, 2, 8, 5, 0, 0, 0, 2, 116, 120, 0, 0, 0, 9,
       116, 105, 109, 101, 115, 116, 97, 109, 112, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 7, 108, 111, 110, 103, 65, 108,
       108, 3, 3, 3, 3, 9, 0, 0, 0, 0, 0, 0, 2, 9, 0, 0, 104, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, -24, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,

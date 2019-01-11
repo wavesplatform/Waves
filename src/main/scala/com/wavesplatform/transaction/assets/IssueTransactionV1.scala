@@ -8,6 +8,7 @@ import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.Script
 import monix.eval.Coeval
+import play.api.libs.json.JsObject
 
 import scala.util.{Failure, Success, Try}
 
@@ -28,7 +29,7 @@ case class IssueTransactionV1 private (sender: PublicKeyAccount,
   override val builder: IssueTransactionV1.type = IssueTransactionV1
   override val bodyBytes: Coeval[Array[Byte]]   = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
   override val bytes: Coeval[Array[Byte]]       = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
-
+  override val json: Coeval[JsObject]           = issueJson
 }
 
 object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with TransactionParser.HardcodedVersion1 {

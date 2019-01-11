@@ -34,9 +34,9 @@ class FeatureActivationTestSuite
                                |    blocks-for-feature-activation = $blocksForActivation
                                |  }
                                |  features.supported = [$featureNum]
-                               |  miner.quorum = 3
+                               |  miner.quorum = 1
                                |}""".stripMargin))
-      .withDefault(4)
+      .withDefault(2)
       .buildNonConflicting()
   }
 

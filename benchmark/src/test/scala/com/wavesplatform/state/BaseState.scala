@@ -3,21 +3,20 @@ package com.wavesplatform.state
 import java.io.File
 import java.nio.file.Files
 
-import com.wavesplatform.TransactionGenBase
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.Block
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
-import org.scalacheck.Gen
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.block.Block
-import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import org.scalacheck.{Arbitrary, Gen}
 
-trait BaseState extends TransactionGenBase {
+trait BaseState {
   import BaseState._
 
   private val fsSettings: FunctionalitySettings = updateFunctionalitySettings(FunctionalitySettings.TESTNET)
@@ -28,13 +27,16 @@ trait BaseState extends TransactionGenBase {
     LevelDBFactory.factory.open(new File(dir), options)
   }
 
-  val state: LevelDBWriter = new LevelDBWriter(db, fsSettings)
+  val state: LevelDBWriter = new LevelDBWriter(db, fsSettings, 100000, 2000, 120 * 60 * 1000)
 
   private var _richAccount: PrivateKeyAccount = _
   def richAccount: PrivateKeyAccount          = _richAccount
 
   private var _lastBlock: Block = _
   def lastBlock: Block          = _lastBlock
+
+  protected def waves(n: Float): Long              = (n * 100000000L).toLong
+  protected val accountGen: Gen[PrivateKeyAccount] = Gen.containerOfN[Array, Byte](32, Arbitrary.arbitrary[Byte]).map(seed => PrivateKeyAccount(seed))
 
   protected def updateFunctionalitySettings(base: FunctionalitySettings): FunctionalitySettings = base
 
@@ -90,8 +92,7 @@ trait BaseState extends TransactionGenBase {
   }
 
   @TearDown
-  override def close(): Unit = {
-    super.close()
+  def close(): Unit = {
     db.close()
   }
 }

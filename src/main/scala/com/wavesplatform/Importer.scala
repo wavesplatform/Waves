@@ -18,6 +18,7 @@ import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
 import monix.execution.Scheduler
 import org.slf4j.bridge.SLF4JBridgeHandler
+
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
@@ -28,48 +29,60 @@ object Importer extends ScorexLogging {
     SLF4JBridgeHandler.removeHandlersForRootLogger()
     SLF4JBridgeHandler.install()
 
-    val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
-    val config         = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
-    val settings       = WavesSettings.fromConfig(config)
+    val argi = args.iterator
+    val (verifyTransactions, configOpt) = {
+      Try(argi.next) match {
+        case Success("-n") | Success("-no-verify") => (false, Try(argi.next))
+        case conf                                  => (true, conf)
+      }
+    }
+    val configFilename     = configOpt.toOption.getOrElse("waves-testnet.conf")
+    val blockchainFilename = Try(argi.next)
+    val importHeight       = Try(argi.next).map(_.toInt).getOrElse(Int.MaxValue)
+
+    val config   = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
+    val settings = WavesSettings.fromConfig(config)
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
     implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
     val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction)                                                     = ???
-      override def removeAll(txs: Traversable[Transaction]): Unit                                = {}
-      override def accountPortfolio(addr: Address)                                               = ???
-      override def portfolio(addr: Address)                                                      = ???
-      override def all                                                                           = ???
-      override def size                                                                          = ???
-      override def transactionById(transactionId: ByteStr)                                       = ???
-      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, sortInBlock: Boolean) = ???
-      override def close(): Unit                                                                 = {}
+      override def putIfNew(tx: Transaction)                               = ???
+      override def removeAll(txs: Traversable[Transaction]): Unit          = {}
+      override def accountPortfolio(addr: Address)                         = ???
+      override def portfolio(addr: Address)                                = ???
+      override def all                                                     = ???
+      override def size                                                    = ???
+      override def transactionById(transactionId: ByteStr)                 = ???
+      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint) = ???
+      override def close(): Unit                                           = {}
     }
 
-    Try(args(1)) match {
+    val time = new NTP(settings.ntpServer)
+    blockchainFilename match {
       case Success(filename) =>
         log.info(s"Loading file '$filename'")
 
         createInputStream(filename) match {
           case Success(inputStream) =>
             val db                = openDB(settings.dataDirectory)
-            val blockchainUpdater = StorageFactory(settings, db, NTP)
+            val blockchainUpdater = StorageFactory(settings, db, time)
             val pos               = new PoSSelector(blockchainUpdater, settings.blockchainSettings)
             val checkpoint        = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-            val extAppender       = BlockAppender(checkpoint, blockchainUpdater, NTP, utxPoolStub, pos, settings, scheduler) _
+            val extAppender       = BlockAppender(checkpoint, blockchainUpdater, time, utxPoolStub, pos, settings, scheduler, verifyTransactions) _
             checkGenesis(settings, blockchainUpdater)
-            val bis          = new BufferedInputStream(inputStream)
-            var quit         = false
-            val lenBytes     = new Array[Byte](Ints.BYTES)
-            val start        = System.currentTimeMillis()
-            var counter      = 0
-            var blocksToSkip = blockchainUpdater.height - 1
+            val bis           = new BufferedInputStream(inputStream)
+            var quit          = false
+            val lenBytes      = new Array[Byte](Ints.BYTES)
+            val start         = System.currentTimeMillis()
+            var counter       = 0
+            var blocksToSkip  = blockchainUpdater.height - 1
+            val blocksToApply = importHeight - blockchainUpdater.height + 1
 
             println(s"Skipping $blocksToSkip blocks(s)")
 
-            while (!quit) {
+            while (!quit && counter < blocksToApply) {
               val s1 = bis.read(lenBytes)
               if (s1 == Ints.BYTES) {
                 val len    = Ints.fromByteArray(lenBytes)
@@ -103,10 +116,12 @@ object Importer extends ScorexLogging {
             inputStream.close()
             val duration = System.currentTimeMillis() - start
             log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
-          case Failure(ex) => log.error(s"Failed to open file '$filename")
+          case Failure(_) => log.error(s"Failed to open file '$filename")
         }
-      case Failure(ex) => log.error(s"Failed to get input filename from second parameter: $ex")
+      case Failure(_) => log.error("Usage: Importer [-n | -no-verify] <config file> <blockchain file> [height]")
     }
+
+    time.close()
   }
 
   def createInputStream(filename: String): Try[FileInputStream] =

@@ -14,15 +14,15 @@ import scala.util.{Failure, Success, Try}
 
 case class ExchangeTransactionV2(buyOrder: Order,
                                  sellOrder: Order,
-                                 price: Long,
                                  amount: Long,
+                                 price: Long,
                                  buyMatcherFee: Long,
                                  sellMatcherFee: Long,
                                  fee: Long,
                                  timestamp: Long,
                                  proofs: Proofs)
     extends ExchangeTransaction {
-
+  import ExchangeTransactionV2._
   override def version: Byte                     = 2
   override val builder                           = ExchangeTransactionV2
   override val assetFee: (Option[AssetId], Long) = (None, fee)
@@ -32,9 +32,9 @@ case class ExchangeTransactionV2(buyOrder: Order,
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Array(0: Byte, builder.typeId, version) ++
-      (Ints.toByteArray(buyOrder.bytes().length) :+ buyOrder.version) ++
-      (Ints.toByteArray(sellOrder.bytes().length) :+ sellOrder.version) ++
-      buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+      Ints.toByteArray(buyOrder.bytes().length) ++ orderMark(buyOrder.version) ++ buyOrder.bytes() ++
+      Ints.toByteArray(sellOrder.bytes().length) ++ orderMark(sellOrder.version) ++ sellOrder.bytes() ++
+      Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
       Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
       Longs.toByteArray(timestamp))
 
@@ -43,27 +43,34 @@ case class ExchangeTransactionV2(buyOrder: Order,
 
 object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2] with TransactionParser.MultipleVersions {
 
+  private def orderMark(version: Byte): Array[Byte] = {
+    if (version == 1) {
+      Array(1: Byte)
+    } else {
+      Array()
+    }
+  }
   override val typeId: Byte                 = ExchangeTransaction.typeId
   override val supportedVersions: Set[Byte] = Set(2)
 
   def create(matcher: PrivateKeyAccount,
              buyOrder: Order,
              sellOrder: Order,
-             price: Long,
              amount: Long,
+             price: Long,
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] = {
-    create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
+    create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
       unverified.copy(proofs = Proofs(Seq(ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))))
     }
   }
 
   def create(buyOrder: Order,
              sellOrder: Order,
-             price: Long,
              amount: Long,
+             price: Long,
              buyMatcherFee: Long,
              sellMatcherFee: Long,
              fee: Long,
@@ -72,28 +79,21 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
     validateExchangeParams(
       buyOrder,
       sellOrder,
-      price,
       amount,
+      price,
       buyMatcherFee,
       sellMatcherFee,
       fee,
       timestamp
     ).map { _ =>
-      ExchangeTransactionV2(
-        buyOrder,
-        sellOrder,
-        price,
-        amount,
-        buyMatcherFee,
-        sellMatcherFee,
-        fee,
-        timestamp,
-        proofs
-      )
+      ExchangeTransactionV2(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs)
     }
   }
 
   override def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = {
+    def back(off: Int): State[Int, Unit] = State { from =>
+      (from - off, ())
+    }
     val readByte: State[Int, Byte] = State { from =>
       (from + 1, bytes(from))
     }
@@ -109,9 +109,11 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
       val makeTransaction = for {
         o1Size         <- read(Ints.fromByteArray _, 4)
         o1Ver          <- readByte
+        _              <- back(if (o1Ver != 1) { 1 } else { 0 })
+        o1             <- read(if (o1Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o1Size).map(_.get)
         o2Size         <- read(Ints.fromByteArray _, 4)
         o2Ver          <- readByte
-        o1             <- read(if (o1Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o1Size).map(_.get)
+        _              <- back(if (o2Ver != 1) { 1 } else { 0 })
         o2             <- read(if (o2Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o2Size).map(_.get)
         price          <- read(Longs.fromByteArray _, 8)
         amount         <- read(Longs.fromByteArray _, 8)
@@ -121,7 +123,7 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
         timestamp      <- read(Longs.fromByteArray _, 8)
         proofs         <- readEnd(Proofs.fromBytes)
       } yield {
-        create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs.right.get)
+        create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs.right.get)
           .fold(left => Failure(new Exception(left.toString)), right => Success(right))
       }
       makeTransaction.run(0).value._2

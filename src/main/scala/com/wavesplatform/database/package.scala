@@ -210,15 +210,16 @@ package object database {
   }
 
   def readAssetInfo(data: Array[Byte]): AssetInfo = {
-    val ndi = newDataInput(data)
-    AssetInfo(ndi.readBoolean(), ndi.readBigInt(), ndi.readScriptOption())
+    val ndi     = newDataInput(data)
+    val reissue = ndi.readBoolean()
+    val volume  = ndi.readBigInt()
+    AssetInfo(reissue, volume)
   }
 
   def writeAssetInfo(ai: AssetInfo): Array[Byte] = {
     val ndo = newDataOutput()
     ndo.writeBoolean(ai.isReissuable)
     ndo.writeBigInt(ai.volume)
-    ndo.writeScriptOption(ai.script)
     ndo.toByteArray
   }
 
@@ -242,9 +243,18 @@ package object database {
       * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
       */
     def readWrite[A](f: RW => A): A = {
-      val rw = new RW(db)
-      try f(rw)
-      finally rw.close()
+      val snapshot    = db.getSnapshot
+      val readOptions = new ReadOptions().snapshot(snapshot)
+      val batch       = db.createWriteBatch()
+      val rw          = new RW(db, readOptions, batch)
+      try {
+        val r = f(rw)
+        db.write(batch)
+        r
+      } finally {
+        batch.close()
+        snapshot.close()
+      }
     }
 
     def get[A](key: Key[A]): A = key.parse(db.get(key.keyBytes))

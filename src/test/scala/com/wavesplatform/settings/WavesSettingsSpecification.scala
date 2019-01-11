@@ -37,12 +37,14 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     val config = loadConfig(ConfigFactory.parseString(s"""waves {
          |  directory = "/xxx"
          |  data-directory = "/xxx/data"
+         |  ntp-server = "example.com"
          |}""".stripMargin))
 
     val settings = WavesSettings.fromConfig(config.resolve())
 
     settings.directory should be("/xxx")
     settings.dataDirectory should be("/xxx/data")
+    settings.ntpServer should be("example.com")
     settings.networkSettings.file should be(Some(new File("/xxx/peers.dat")))
     settings.walletSettings.file should be(Some(new File("/xxx/wallet/wallet.dat")))
     settings.matcherSettings.journalDataDir should be("/xxx/matcher/journal")

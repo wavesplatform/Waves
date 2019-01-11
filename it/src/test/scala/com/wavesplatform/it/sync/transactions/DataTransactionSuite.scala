@@ -6,12 +6,10 @@ import com.wavesplatform.it.sync.{calcDataFee, minFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, DataEntry, EitherExt2, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.utils.Base58
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
-import com.wavesplatform.api.http.SignedDataRequest
-import com.wavesplatform.transaction.DataTransaction
-
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
 
@@ -51,16 +49,6 @@ class DataTransactionSuite extends BaseTransactionSuite {
              version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
       DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).explicitGet()
 
-    def request(tx: DataTransaction): SignedDataRequest =
-      SignedDataRequest(DataTransaction.supportedVersions.head,
-                        Base58.encode(tx.sender.publicKey),
-                        tx.data,
-                        tx.fee,
-                        tx.timestamp,
-                        tx.proofs.base58().toList)
-
-    implicit val w = Json.writes[SignedDataRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(DataTransaction.typeId)))
-
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTxs = Seq(
       (data(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
@@ -68,7 +56,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     )
 
     for ((tx, diag) <- invalidTxs) {
-      assertBadRequestAndResponse(sender.broadcastRequest(request(tx)), diag)
+      assertBadRequestAndResponse(sender.broadcastRequest(tx.json()), diag)
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 

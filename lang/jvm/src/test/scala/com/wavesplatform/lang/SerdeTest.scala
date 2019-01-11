@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -78,6 +79,14 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     }
   }
 
+  "spec input" in {
+    val byteArr   = Array[Byte](1, 113, -1, 63, 0, -1, 127, 0, -1, 39, -1, 87, -41, 50, -111, -38, 12, 1, 0, -19, 101, -128, -1, 54)
+    val (r, time) = measureTime(Serde.deserialize(byteArr))
+
+    r shouldBe an[Either[_, _]]
+    time should be <= 1000L
+  }
+
   "any input" in {
     forAll(Gen.containerOf[Array, Byte](Arbitrary.arbByte.arbitrary)) { byteArr =>
       val (r, time) = measureTime(Serde.deserialize(byteArr))
@@ -94,7 +103,7 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
   }
 
   private def roundTripTest(untypedExpr: Expressions.EXPR): Assertion = {
-    val typedExpr = CompilerV1(PureContext.compilerContext, untypedExpr).map(_._1).explicitGet()
+    val typedExpr = CompilerV1(PureContext.build(V1).compilerContext, untypedExpr).map(_._1).explicitGet()
     roundTripTest(typedExpr)
   }
 

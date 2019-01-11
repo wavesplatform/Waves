@@ -10,7 +10,7 @@ import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ProduceError}
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
-import com.wavesplatform.utils.{Time, TimeImpl}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
@@ -25,7 +25,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   "block delay" - {
     "same on the same height in different forks" in {
       withEnv(chainGen(List(ENOUGH_AMT / 2, ENOUGH_AMT / 3), 110)) {
-        case Env(pos, blockchain, miners) => {
+        case Env(_, blockchain, miners) =>
           val miner1 = miners.head
           val miner2 = miners.tail.head
 
@@ -55,7 +55,6 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
           }
 
           fork1Delay shouldEqual fork2Delay
-        }
       }
     }
   }
@@ -200,14 +199,13 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   }
 
   def withEnv(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: Env => Unit): Unit = {
-    val time          = new TimeImpl
-    val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub)
+    val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, time)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
     val pos           = new PoSSelector(bcu, settings.blockchainSettings)
     try {
-      val (accounts, blocks) = gen(time).sample.get
+      val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
         bcu.processBlock(block).explicitGet()
@@ -216,7 +214,6 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
       f(Env(pos, bcu, accounts))
       bcu.shutdown()
     } finally {
-      time.close()
       bcu.shutdown()
       db.close()
     }

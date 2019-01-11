@@ -39,6 +39,7 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
     require(res.length == TypeLength + BASE_LENGTH)
     res
   }
+  override val bodyBytes: Coeval[Array[Byte]] = bytes
 }
 
 object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with TransactionParser.HardcodedVersion1 {

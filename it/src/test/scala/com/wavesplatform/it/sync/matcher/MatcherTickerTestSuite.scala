@@ -2,18 +2,17 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
-import com.wavesplatform.utils.Base58
 import org.scalatest._
 
 import scala.util.Random
@@ -36,8 +35,8 @@ class MatcherTickerTestSuite
 
   private def bobNode = nodes(2)
 
-  matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
-  nodes.waitForHeightArise()
+  val issueTx = matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
+  matcherNode.waitForTransaction(issueTx.id)
 
   "matcher ticker validation" - {
     "get tickers for unavailable asset should produce error" in {
@@ -45,13 +44,13 @@ class MatcherTickerTestSuite
     }
 
     "status of empty orderbook" in {
-      //    TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
-      //      SyncMatcherHttpApi.assertNotFoundAndMessage(matcherNode.marketStatus(wavesUsdPair), s"")
+//    TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
+//      SyncMatcherHttpApi.assertNotFoundAndMessage(matcherNode.marketStatus(wavesUsdPair), s"")
     }
 
     "error of non-existed order" in {
       //TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
-      //      SyncMatcherHttpApi.assertNotFoundAndMessage(matcherNode.orderStatus(IssueUsdTx.id().toString, wavesUsdPair), s"")
+//      SyncMatcherHttpApi.assertNotFoundAndMessage(matcherNode.orderStatus(IssueUsdTx.id().toString, wavesUsdPair), s"")
     }
 
     "try to work with incorrect pair" in {
@@ -67,12 +66,12 @@ class MatcherTickerTestSuite
           .contains(s"WAVES/${usdWavesPair.amountAssetStr}"))
 
       //TODO: add error message after fix of https://wavesplatform.atlassian.net/browse/NODE-1151
-      //      SyncMatcherHttpApi.assertNotFoundAndMessage(matcherNode.placeOrder(aliceNode, usdWavesPair, OrderType.BUY, 200, 1.waves), "")
+//      SyncMatcherHttpApi.assertNotFoundAndMessage(matcherNode.placeOrder(aliceNode, usdWavesPair, OrderType.BUY, 1.waves, 200), "")
     }
 
     "issue tokens" in {
-      matcherNode.signedIssue(createSignedIssueRequest(IssueEightDigitAssetTx))
-      nodes.waitForHeightArise()
+      val tx = matcherNode.signedIssue(createSignedIssueRequest(IssueEightDigitAssetTx))
+      matcherNode.waitForTransaction(tx.id)
     }
 
     val bidPrice  = 200
@@ -81,8 +80,8 @@ class MatcherTickerTestSuite
     val askAmount = bidAmount / 2
 
     "place bid order for first pair" in {
-      matcherNode.placeOrder(aliceNode, edUsdPair, OrderType.BUY, bidPrice, bidAmount)
-      val aliceOrder = matcherNode.placeOrder(aliceNode, edUsdPair, OrderType.BUY, bidPrice, bidAmount).message.id
+      matcherNode.placeOrder(aliceNode.privateKey, edUsdPair, OrderType.BUY, bidAmount, bidPrice, matcherFee)
+      val aliceOrder = matcherNode.placeOrder(aliceNode.privateKey, edUsdPair, OrderType.BUY, bidAmount, bidPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(edUsdPair, aliceOrder, "Accepted")
 
       val r = matcherNode.marketStatus(edUsdPair)
@@ -95,8 +94,8 @@ class MatcherTickerTestSuite
     }
 
     "place ask order for second pair" in {
-      matcherNode.placeOrder(bobNode, wctWavesPair, OrderType.SELL, askPrice, askAmount)
-      val bobOrder = matcherNode.placeOrder(bobNode, wctWavesPair, OrderType.SELL, askPrice, askAmount).message.id
+      matcherNode.placeOrder(bobNode.privateKey, wctWavesPair, OrderType.SELL, askAmount, askPrice, matcherFee)
+      val bobOrder = matcherNode.placeOrder(bobNode.privateKey, wctWavesPair, OrderType.SELL, askAmount, askPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(wctWavesPair, bobOrder, "Accepted")
       val r = matcherNode.marketStatus(wctWavesPair)
       r.lastPrice shouldBe None
@@ -108,8 +107,8 @@ class MatcherTickerTestSuite
     }
 
     "place ask order for first pair" in {
-      matcherNode.placeOrder(bobNode, edUsdPair, OrderType.SELL, askPrice, askAmount)
-      val bobOrder = matcherNode.placeOrder(bobNode, edUsdPair, OrderType.SELL, askPrice, askAmount).message.id
+      matcherNode.placeOrder(bobNode.privateKey, edUsdPair, OrderType.SELL, askAmount, askPrice, matcherFee)
+      val bobOrder = matcherNode.placeOrder(bobNode.privateKey, edUsdPair, OrderType.SELL, askAmount, askPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(edUsdPair, bobOrder, "Accepted")
       val r = matcherNode.marketStatus(edUsdPair)
       r.lastPrice shouldBe None
@@ -121,7 +120,7 @@ class MatcherTickerTestSuite
     }
 
     "match bid order for first pair" in {
-      val bobOrder = matcherNode.placeOrder(bobNode, edUsdPair, OrderType.SELL, bidPrice, askAmount).message.id
+      val bobOrder = matcherNode.placeOrder(bobNode.privateKey, edUsdPair, OrderType.SELL, askAmount, bidPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(edUsdPair, bobOrder, "Filled")
       val r = matcherNode.marketStatus(edUsdPair)
       r.lastPrice shouldBe Some(bidPrice)
@@ -131,7 +130,7 @@ class MatcherTickerTestSuite
       r.ask shouldBe Some(askPrice)
       r.askAmount shouldBe Some(2 * askAmount)
 
-      val bobOrder1 = matcherNode.placeOrder(bobNode, edUsdPair, OrderType.SELL, bidPrice, 3 * askAmount).message.id
+      val bobOrder1 = matcherNode.placeOrder(bobNode.privateKey, edUsdPair, OrderType.SELL, 3 * askAmount, bidPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(edUsdPair, bobOrder1, "Filled")
       val s = matcherNode.marketStatus(edUsdPair)
       s.lastPrice shouldBe Some(bidPrice)
@@ -143,7 +142,7 @@ class MatcherTickerTestSuite
     }
 
     "match ask order for first pair" in {
-      val aliceOrder = matcherNode.placeOrder(aliceNode, edUsdPair, OrderType.BUY, askPrice, bidAmount).message.id
+      val aliceOrder = matcherNode.placeOrder(aliceNode.privateKey, edUsdPair, OrderType.BUY, bidAmount, askPrice, matcherFee).message.id
       matcherNode.waitOrderStatus(edUsdPair, aliceOrder, "Filled")
       val r = matcherNode.marketStatus(edUsdPair)
       r.lastPrice shouldBe Some(askPrice)
@@ -241,19 +240,4 @@ object MatcherTickerTestSuite {
      """.stripMargin)
 
   private val Configs = _Configs.map(updatedMatcherConfig.withFallback(_))
-
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
-    import tx._
-    SignedIssueV1Request(
-      Base58.encode(tx.sender.publicKey),
-      new String(name),
-      new String(description),
-      quantity,
-      decimals,
-      reissuable,
-      fee,
-      timestamp,
-      signature.base58
-    )
-  }
 }

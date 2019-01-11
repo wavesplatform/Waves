@@ -7,17 +7,15 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.lease.LeaseTransactionV1
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
-import com.wavesplatform.utils.TimeImpl
-import net.ceedubs.ficus.readers.ValueReader
+import com.wavesplatform.utils.Time
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ValueReader
 
 import scala.collection.generic.CanBuildFrom
 
 object Preconditions {
 
   private val FEE = 1000000
-
-  private val Time = new TimeImpl
 
   sealed abstract class PAction(val priority: Int)
   final case class LeaseP(from: PrivateKeyAccount, to: Address, amount: Long)                                                       extends PAction(3)
@@ -30,7 +28,7 @@ object Preconditions {
                                   issuedAssets: List[ByteStr] = Nil,
                                   leases: List[ByteStr] = Nil)
 
-  def mk(settings: PGenSettings): (UniverseHolder, List[Transaction]) = {
+  def mk(settings: PGenSettings, time: Time): (UniverseHolder, List[Transaction]) = {
     settings.actions
       .sortBy(-_.priority)
       .foldLeft((UniverseHolder(), List.empty[Transaction])) {
@@ -38,12 +36,12 @@ object Preconditions {
           action match {
             case LeaseP(from, to, amount) =>
               val tx = LeaseTransactionV1
-                .selfSigned(from, amount, FEE, Time.correctedTime(), to)
+                .selfSigned(from, amount, FEE, time.correctedTime(), to)
                 .explicitGet()
               (uni.copy(leases = tx.id() :: uni.leases), tx :: txs)
             case IssueP(assetName, issuer, assetDescription, amount, decimals, reissueable) =>
               val tx = IssueTransactionV1
-                .selfSigned(issuer, assetName.getBytes(), assetDescription.getBytes, amount, decimals.toByte, reissueable, FEE, Time.correctedTime())
+                .selfSigned(issuer, assetName.getBytes(), assetDescription.getBytes, amount, decimals.toByte, reissueable, FEE, time.correctedTime())
                 .explicitGet()
               (uni.copy(issuedAssets = tx.id() :: uni.issuedAssets), tx :: txs)
             case CreateAccountP(seed, balance) =>
@@ -51,7 +49,7 @@ object Preconditions {
                 .fromSeed(seed)
                 .explicitGet()
               val tx = TransferTransactionV1
-                .selfSigned(None, settings.faucet, acc, balance, Time.correctedTime(), None, FEE, "Generator".getBytes())
+                .selfSigned(None, settings.faucet, acc, balance, time.correctedTime(), None, FEE, "Generator".getBytes())
                 .explicitGet()
               (uni.copy(accountsWithBalances = (acc, balance) :: uni.accountsWithBalances), tx :: txs)
           }

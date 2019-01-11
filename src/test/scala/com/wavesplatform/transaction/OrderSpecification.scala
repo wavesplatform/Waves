@@ -1,17 +1,16 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.OrderOps._
 import com.wavesplatform.matcher.ValidationMatcher
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils.NTP
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, _}
+import com.wavesplatform.transaction.smart.Verifier
+import com.wavesplatform.{NTPTime, TransactionGen}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import com.wavesplatform.OrderOps._
-import com.wavesplatform.transaction.smart.Verifier
 
-class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher {
+class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher with NTPTime {
 
   property("Order transaction serialization roundtrip") {
     forAll(orderV1Gen) { order =>
@@ -48,21 +47,21 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
 
   property("Order generator should generate valid orders") {
     forAll(orderGen) { order =>
-      order.isValid(NTP.correctedTime()) shouldBe valid
+      order.isValid(ntpTime.correctedTime()) shouldBe valid
     }
   }
 
   property("Order timestamp validation") {
     forAll(orderGen) { order =>
-      val time = NTP.correctedTime()
+      val time = ntpTime.correctedTime()
       order.updateTimestamp(-1).isValid(time) shouldBe not(valid)
     }
   }
 
   property("Order expiration validation") {
     forAll(arbitraryOrderGen) { order =>
-      val isValid = order.isValid(NTP.correctedTime())
-      val time    = NTP.correctedTime()
+      val isValid = order.isValid(ntpTime.correctedTime())
+      val time    = ntpTime.correctedTime()
       whenever(order.expiration < time || order.expiration > time + Order.MaxLiveTime) {
         isValid shouldBe not(valid)
       }
@@ -72,7 +71,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   property("Order amount validation") {
     forAll(arbitraryOrderGen) { order =>
       whenever(order.amount <= 0) {
-        order.isValid(NTP.correctedTime()) shouldBe not(valid)
+        order.isValid(ntpTime.correctedTime()) shouldBe not(valid)
       }
     }
   }
@@ -80,7 +79,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   property("Order matcherFee validation") {
     forAll(arbitraryOrderGen) { order =>
       whenever(order.matcherFee <= 0) {
-        order.isValid(NTP.correctedTime()) shouldBe not(valid)
+        order.isValid(ntpTime.correctedTime()) shouldBe not(valid)
       }
     }
   }
@@ -88,7 +87,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   property("Order price validation") {
     forAll(arbitraryOrderGen) { order =>
       whenever(order.price <= 0) {
-        order.isValid(NTP.correctedTime()) shouldBe not(valid)
+        order.isValid(ntpTime.correctedTime()) shouldBe not(valid)
       }
     }
   }
@@ -119,12 +118,12 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
 
   property("Buy and Sell orders") {
     forAll(orderParamGen) {
-      case (sender, matcher, pair, _, price, amount, timestamp, _, _) =>
+      case (sender, matcher, pair, _, amount, price, timestamp, _, _) =>
         val expiration = timestamp + Order.MaxLiveTime - 1000
-        val buy        = Order.buy(sender, matcher, pair, price, amount, timestamp, expiration, price)
+        val buy        = Order.buy(sender, matcher, pair, amount, price, timestamp, expiration, price)
         buy.orderType shouldBe OrderType.BUY
 
-        val sell = Order.sell(sender, matcher, pair, price, amount, timestamp, expiration, price)
+        val sell = Order.sell(sender, matcher, pair, amount, price, timestamp, expiration, price)
         sell.orderType shouldBe OrderType.SELL
     }
   }

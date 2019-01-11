@@ -1,7 +1,6 @@
 package com.wavesplatform.matcher
 
-import java.io.File
-import java.nio.ByteBuffer
+import java.io.{File, PrintWriter}
 import java.util.{HashMap => JHashMap, HashSet => JHashSet}
 
 import akka.actor.ActorSystem
@@ -11,7 +10,6 @@ import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{Address, AddressScheme}
-import com.wavesplatform.crypto.DigestSize
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
 import com.wavesplatform.matcher.api.DBUtils
@@ -25,7 +23,7 @@ import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 import scala.collection.JavaConverters._
-import scala.collection.immutable.Queue
+import scala.collection.immutable.Set
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
@@ -76,7 +74,7 @@ object MatcherTool extends ScorexLogging {
 
     db.iterateOver("matcher:".getBytes(UTF_8))(e => keysToDelete += e.getKey)
 
-    db.readWrite(rw => keysToDelete.result().foreach(rw.delete))
+    db.readWrite(rw => keysToDelete.result().foreach(rw.delete(_, "matcher-legacy-entries")))
   }
 
   private def recalculateReservedBalance(db: DB): Unit = {
@@ -112,18 +110,8 @@ object MatcherTool extends ScorexLogging {
       }
     }
 
-    log.info("Collecting all addresses")
-
-    val addresses = Seq.newBuilder[Address]
-    db.iterateOver(Shorts.toByteArray(5)) { e =>
-      val addressBytes = new Array[Byte](Address.AddressLength)
-      Array.copy(e.getKey, 2, addressBytes, 0, Address.AddressLength)
-      addresses += Address.fromBytes(addressBytes).explicitGet()
-    }
-
     log.info("Loading stored reserved balances")
-
-    val allReservedBalances = addresses.result().map(a => a -> DBUtils.reservedBalance(db, a)).toMap
+    val allReservedBalances = getAddresses(db).asScala.map(a => a -> DBUtils.reservedBalance(db, a)).toMap
 
     if (allReservedBalances.size != calculatedReservedBalances.size()) {
       log.info(s"Calculated balances: ${calculatedReservedBalances.size()}, stored balances: ${allReservedBalances.size}")
@@ -224,7 +212,7 @@ object MatcherTool extends ScorexLogging {
       } else {
         log.info(s"Collected ${orderBookSnapshots.size()} order book snapshots")
 
-        val allOrderBooks   = orderBookSnapshots.asScala.mapValues(_._1)
+        val allOrderBooks   = orderBookSnapshots.asScala.map { case (k, v) => k -> v._1 }
         val allActiveOrders = collectActiveOrders(db)
 
         val snapshotsToUpdate     = new JHashMap[AssetPair, OrderBook]
@@ -282,105 +270,6 @@ object MatcherTool extends ScorexLogging {
     }
   }
 
-  def createPairIndices(db: DB): Unit = {
-    import com.wavesplatform.matcher.util.Codecs.ByteBufferExt
-    val currOrderIds: JHashSet[ByteStr] = {
-      val key = Shorts.toByteArray(11) // MatcherKeys.addressOrdersByPairSeqNr
-      val r   = new JHashSet[ByteStr]
-      db.iterateOver(key) { e =>
-        val seqNr = Ints.fromByteArray(e.getValue)
-        if (seqNr > 0) {
-          val skip    = Address.AddressLength + 2
-          val address = Address.fromBytes(e.getKey.slice(2, skip)).explicitGet()
-          val pair    = ByteBuffer.wrap(e.getKey, skip, e.getKey.length - skip).getAssetPair
-          (1 to seqNr).foreach { idx =>
-            val key = MatcherKeys.addressOrdersByPair(address, pair, idx)
-            key.parse(db.get(key.keyBytes)).foreach { orderId =>
-              r.add(orderId)
-            }
-          }
-        }
-      }
-      r
-    }
-    log.info(s"Records in new indices: ${currOrderIds.size()}")
-
-    val orderRefs: JHashMap[(Address, AssetPair), Queue[Order.Id]] = {
-      log.info("Loading orders")
-      val r   = new JHashMap[(Address, AssetPair), Queue[Order.Id]]()
-      val key = MatcherKeys.orderInfo(ByteStr(Array.emptyByteArray))
-      db.iterateOver(key.keyBytes) { e =>
-        val orderId = ByteStr(new Array[Byte](DigestSize))
-        Array.copy(e.getKey, 2, orderId.arr, 0, DigestSize)
-        db.get(MatcherKeys.order(orderId)).foreach { order =>
-          val key = (order.sender.toAddress, order.assetPair)
-          r.compute(
-            key, { (_, currRefsRaw) =>
-              if (currOrderIds.contains(order.id())) currRefsRaw
-              else
-                Option(currRefsRaw)
-                  .getOrElse(Queue.empty[Order.Id])
-                  .enqueue(order.id())
-            }
-          )
-        }
-      }
-      r
-    }
-
-    var totalRecordsAdded = 0
-    db.readWrite { rw =>
-      orderRefs.forEach { (k, q) =>
-        val (address, pair) = k
-        val seqNrK          = MatcherKeys.addressOrdersByPairSeqNr(address, pair)
-
-        var lastSeqNr = rw.get(seqNrK)
-        var i         = 0
-        q.foreach { orderId =>
-          i += 1
-          lastSeqNr += 1
-          val k = MatcherKeys.addressOrdersByPair(address, pair, lastSeqNr)
-          rw.put(k, Some(orderId))
-        }
-
-        totalRecordsAdded += lastSeqNr
-        rw.put(seqNrK, lastSeqNr)
-      }
-    }
-
-    log.info(s"Total records added: $totalRecordsAdded")
-  }
-
-  def writeLastActive(db: DB): Unit = {
-    val lastActiveOrderIdxs: JHashMap[Address, Int] = {
-      val r   = new JHashMap[Address, Int]()
-      val key = Shorts.toByteArray(3) // MatcherKeys.addressOrdersSeqNr
-      db.iterateOver(key) { e =>
-        val addrOrdersSeqNr = Ints.fromByteArray(e.getValue)
-        if (addrOrdersSeqNr > 0) {
-          val address = Address.fromBytes(e.getKey.drop(2)).explicitGet()
-          val activeIdxs = for {
-            idx             <- (1 to db.get(MatcherKeys.addressOrdersSeqNr(address))).view
-            orderSpendAsset <- db.get(MatcherKeys.addressOrders(address, idx))
-            orderInfo = db.get(MatcherKeys.orderInfo(orderSpendAsset.orderId))
-            if !orderInfo.status.isFinal
-          } yield idx
-
-          activeIdxs.headOption.foreach(r.put(address, _))
-        }
-      }
-      r
-    }
-
-    log.info(s"Total addresses with active orders: ${lastActiveOrderIdxs.size()}")
-
-    db.readWrite { rw =>
-      lastActiveOrderIdxs.forEach { (address, lastIdx) =>
-        rw.put(MatcherKeys.addressOldestActiveOrderSeqNr(address), Some(lastIdx))
-      }
-    }
-  }
-
   def main(args: Array[String]): Unit = {
     log.info(s"OK, engine start")
 
@@ -393,16 +282,55 @@ object MatcherTool extends ScorexLogging {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
+    val start = System.currentTimeMillis()
     args(1) match {
       case "stats" => collectStats(db)
       case "ao" =>
+        val address = Address.fromString(args(2)).explicitGet()
         if (args.length == 5) {
           val pair = AssetPair.createAssetPair(args(3), args(4)).get
-          val o    = DBUtils.ordersByAddressAndPair(db, Address.fromString(args(2)).explicitGet(), pair, Int.MaxValue)
-          println(o.mkString("\n"))
+          val xs   = DBUtils.ordersByAddressAndPair(db, address, pair, activeOnly = false, Int.MaxValue)
+          println(s"""${xs.map { case (o, oi) => s"id: ${o.id()}\n  $o\n  $oi" }.mkString("\n")}""")
         } else {
-          val o = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), activeOnly = false, Int.MaxValue)
-          println(o.mkString("\n"))
+          val xs = DBUtils.ordersByAddress(db, Address.fromString(args(2)).explicitGet(), activeOnly = true, Int.MaxValue)
+          println(s"""${xs.map { case (o, oi) => s"id: ${o.id()}\n  $o\n  $oi" }.mkString("\n")}""")
+          println(s"""Total active orders: ${db.get(MatcherKeys.activeOrdersSize(address))}""".stripMargin)
+        }
+      case "ob" =>
+        val pair   = AssetPair.createAssetPair(args(2), args(3)).get
+        val system = ActorSystem("matcher-tool", actualConfig)
+        val se     = SerializationExtension(system)
+        try {
+          val snapshotDB    = openDB(settings.matcherSettings.snapshotsDataDir)
+          val persistenceId = OrderBookActor.name(pair)
+
+          val historyKey = MatcherSnapshotStore.kSMHistory(persistenceId)
+          val history    = historyKey.parse(snapshotDB.get(historyKey.keyBytes))
+          println(s"Snapshots history for $pair: $history")
+
+          history.headOption.foreach { lastSnapshotNr =>
+            val lastSnapshotKey     = MatcherSnapshotStore.kSnapshot(persistenceId, lastSnapshotNr)
+            val lastSnapshotRawData = lastSnapshotKey.parse(snapshotDB.get(lastSnapshotKey))
+            val lastSnapshot        = se.deserialize(lastSnapshotRawData, classOf[Snapshot]).get.data.asInstanceOf[OrderBookActor.Snapshot].orderBook
+            println(s"Last snapshot: $lastSnapshot")
+            println(s"Asks:\n${lastSnapshot.asks.valuesIterator.flatten.map(x => s"${x.order.id()} -> $x").mkString("\n")}")
+            println(s"Bids:\n${lastSnapshot.bids.valuesIterator.flatten.map(x => s"${x.order.id()} -> $x").mkString("\n")}")
+          }
+        } finally {
+          Await.ready(system.terminate(), Duration.Inf)
+        }
+      case "oi" =>
+        val id = ByteStr.decodeBase58(args(2)).get
+        println(s"Loading order '$id'")
+
+        val orderKey = MatcherKeys.order(id)
+        orderKey.parse(db.get(orderKey.keyBytes)).foreach { o =>
+          println(s"Order (id=${o.id()}): $o")
+        }
+
+        val orderInfoKey = MatcherKeys.orderInfoOpt(id)
+        orderInfoKey.parse(db.get(orderInfoKey.keyBytes)).foreach { oi =>
+          println(s"Order info: $oi")
         }
       case "cb" => recalculateReservedBalance(db)
       case "rb" =>
@@ -412,25 +340,18 @@ object MatcherTool extends ScorexLogging {
       case "ddd" =>
         log.warn("DELETING LEGACY ENTRIES")
         deleteLegacyEntries(db)
-        log.info("Finished deleting legacy entries")
       case "compact" =>
         log.info("Compacting database")
         db.compactRange(null, null)
-        log.info("Compaction complete")
       case "recover-orderbooks" =>
         val dryRun = args.length == 3 && args(2) == "--dry-run"
         recoverOrderBooks(db, settings.matcherSettings.snapshotsDataDir, actualConfig, dryRun)
-      case "create-pair-indices" =>
-        log.info("Creating pair indices")
-        createPairIndices(db)
-        log.info("Completed")
-      case "write-last-active" =>
-        log.info("Writing last active indices")
-        writeLastActive(db)
-        log.info("Completed")
+      case "dump-active" =>
+        dumpActive(db, new File(args(2)))
       case _ =>
     }
 
+    log.info(s"Completed in ${(System.currentTimeMillis() - start) / 1000}s")
     db.close()
   }
 
@@ -473,5 +394,67 @@ object MatcherTool extends ScorexLogging {
   private def releaseFee(lo: LimitOrder, prevRemaining: Long, updatedRemaining: Long): Long = {
     if (lo.rcvAsset == lo.feeAsset) releaseFee(lo.getReceiveAmount, lo.order.matcherFee, prevRemaining, updatedRemaining)
     else prevRemaining - updatedRemaining
+  }
+
+  private def getAddresses(db: DB): JHashSet[Address] = {
+    val start = System.currentTimeMillis()
+    log.info("Collecting all addresses")
+    val addresses = new JHashSet[Address]
+    db.iterateOver(Shorts.toByteArray(5)) { e =>
+      val addressBytes = new Array[Byte](Address.AddressLength)
+      Array.copy(e.getKey, 2, addressBytes, 0, Address.AddressLength)
+      addresses.add(Address.fromBytes(addressBytes).explicitGet())
+    }
+    log.info(s"Total addresses: ${addresses.size} in ${System.currentTimeMillis() - start}ms")
+    addresses
+  }
+
+  private def dumpActive(db: DB, to: File): Unit = {
+    log.info(s"Dumping active order ids to file ${to.getAbsolutePath}")
+    val sb = new PrintWriter(to)
+    try {
+      getAddresses(db).asScala.toVector.sortBy(_.stringRepr).foreach { address =>
+        val activeInCommonIndex = DBUtils.ordersByAddress(db, address, activeOnly = true, maxOrders = Int.MaxValue)
+        if (activeInCommonIndex.nonEmpty) {
+          sb.append("addr=")
+          sb.append(address.toString)
+          sb.append(":\n  common: ")
+          activeInCommonIndex.foreach {
+            case (o, _) =>
+              sb.append(o.id().base58)
+              sb.append(", ")
+          }
+          sb.append("\n")
+
+          implicit val assetPairOrd: Ordering[AssetPair] = Ordering.by[AssetPair, String](_.key)
+          val pairs = activeInCommonIndex
+            .map { case (o, _) => o.assetPair }
+            .toSet
+            .toVector
+            .sorted
+
+          pairs.foreach { pair =>
+            val ordersInPairIndex = DBUtils.ordersByAddressAndPair(db, address, pair, activeOnly = true, maxOrders = Int.MaxValue)
+            if (ordersInPairIndex.nonEmpty) {
+              sb.append("  p=")
+              sb.append(pair.key)
+              sb.append(": ")
+              ordersInPairIndex.foreach {
+                case (o, oi) =>
+                  sb.append(o.id().toString)
+                  sb.append(", ")
+
+                case _ =>
+              }
+              sb.append("\n")
+            } else {
+              sb.append("  WARN: expected to have orders\n")
+            }
+          }
+        }
+      }
+    } finally {
+      sb.close()
+    }
   }
 }

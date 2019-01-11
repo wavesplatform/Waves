@@ -176,10 +176,6 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         _.raw(
           """
           |waves {
-          |  miner {
-          |      quorum = 1
-          |  }
-          |
           |  blockchain {
           |    custom {
           |      functionality {

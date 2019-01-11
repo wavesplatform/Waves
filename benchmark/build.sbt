@@ -12,7 +12,6 @@ inConfig(Jmh)(
 Compile / run / fork := true
 Compile / run / javaOptions ++= Seq(
   "-XX:+IgnoreUnrecognizedVMOptions",
-  "--add-modules",
-  "java.xml.bind",
+  "--add-modules=java.xml.bind",
   s"-Dlogback.configurationFile=${(Compile / resourceDirectory).value / "logback.xml"}"
 )

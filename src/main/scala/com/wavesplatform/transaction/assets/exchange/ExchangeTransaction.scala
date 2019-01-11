@@ -14,8 +14,8 @@ import scala.util.Try
 trait ExchangeTransaction extends FastHashId with ProvenTransaction {
   def buyOrder: Order
   def sellOrder: Order
-  def price: Long
   def amount: Long
+  def price: Long
   def buyMatcherFee: Long
   def sellMatcherFee: Long
   def fee: Long
@@ -36,11 +36,15 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
       "version"        -> version,
       "order1"         -> buyOrder.json(),
       "order2"         -> sellOrder.json(),
-      "price"          -> price,
       "amount"         -> amount,
+      "price"          -> price,
       "buyMatcherFee"  -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
     ))
+  override def checkedAssets(): Seq[AssetId] = {
+    val pair = buyOrder.assetPair
+    (pair.priceAsset ++ pair.amountAsset).toSeq
+  }
 }
 
 object ExchangeTransaction {
@@ -56,8 +60,8 @@ object ExchangeTransaction {
 
   def validateExchangeParams(buyOrder: Order,
                              sellOrder: Order,
-                             price: Long,
                              amount: Long,
+                             price: Long,
                              buyMatcherFee: Long,
                              sellMatcherFee: Long,
                              fee: Long,

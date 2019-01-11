@@ -5,12 +5,28 @@ import com.google.common.base.Charsets
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.functional.syntax._
+import play.api.libs.json.{JsPath, Reads}
 
 object SignedIssueV2Request {
-  implicit val signedExchangeRequestFormat: Format[SignedIssueV2Request] = Json.format
+  implicit val signedExchangeRequestReads: Reads[SignedIssueV2Request] = {
+    (
+      (JsPath \ "version").read[Byte] and
+        (JsPath \ "senderPublicKey").read[String] and
+        (JsPath \ "name").read[String] and
+        (JsPath \ "description").read[String] and
+        (JsPath \ "quantity").read[Long] and
+        (JsPath \ "decimals").read[Byte] and
+        (JsPath \ "reissuable").read[Boolean] and
+        (JsPath \ "fee").read[Long] and
+        (JsPath \ "timestamp").read[Long] and
+        (JsPath \ "proofs").read[List[ProofStr]] and
+        (JsPath \ "script").readNullable[String]
+    )(SignedIssueV2Request.apply _)
+  }
 }
 
 @ApiModel(value = "Signed Smart issue transaction")
@@ -33,13 +49,19 @@ case class SignedIssueV2Request(@ApiModelProperty(required = true)
                                 @ApiModelProperty(required = true)
                                 timestamp: Long,
                                 @ApiModelProperty(required = true)
-                                proofs: List[String])
+                                proofs: List[String],
+                                @ApiModelProperty(value = "Base58 encoded compiled asset script")
+                                script: Option[String])
     extends BroadcastRequest {
   def toTx: Either[ValidationError, IssueTransactionV2] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
+      _script <- script match {
+        case None    => Right(None)
+        case Some(s) => Script.fromBase64String(s).map(Some(_))
+      }
       t <- IssueTransactionV2.create(
         version,
         AddressScheme.current.chainId,
@@ -49,7 +71,7 @@ case class SignedIssueV2Request(@ApiModelProperty(required = true)
         quantity,
         decimals,
         reissuable,
-        None,
+        _script,
         fee,
         timestamp,
         _proofs

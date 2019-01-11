@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.database.{Keys, LevelDBWriter, RW}
+import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.BlockchainUpdater
@@ -12,12 +12,17 @@ object StorageFactory extends ScorexLogging {
 
   def apply(settings: WavesSettings, db: DB, time: Time): BlockchainUpdater with NG = {
     checkVersion(db)
-    val levelDBWriter = new LevelDBWriter(db, settings.blockchainSettings.functionalitySettings, settings.maxCacheSize)
+    val levelDBWriter = new LevelDBWriter(
+      db,
+      settings.blockchainSettings.functionalitySettings,
+      settings.maxCacheSize,
+      settings.maxRollbackDepth,
+      settings.rememberBlocks.toMillis
+    )
     new BlockchainUpdaterImpl(levelDBWriter, settings, time)
   }
 
-  private def checkVersion(db: DB) = {
-    val rw      = new RW(db)
+  private def checkVersion(db: DB): Unit = db.readWrite { rw =>
     val version = rw.get(Keys.version)
     val height  = rw.get(Keys.height)
     if (version != StorageVersion) {
@@ -32,6 +37,5 @@ object StorageFactory extends ScorexLogging {
         forceStopApplication(UnsupportedFeature)
       }
     }
-    rw.close()
   }
 }

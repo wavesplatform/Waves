@@ -1,17 +1,13 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.EitherExt2
-import com.wavesplatform.utils.Base58
-import org.scalatest.CancelAfterFailure
-import play.api.libs.json._
-import com.wavesplatform.account.AddressOrAlias
-import com.wavesplatform.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.transaction.transfer._
-
+import org.scalatest.CancelAfterFailure
 import scala.concurrent.duration._
 
 class TransferTransactionV1Suite extends BaseTransactionSuite with CancelAfterFailure {
@@ -49,27 +45,11 @@ class TransferTransactionV1Suite extends BaseTransactionSuite with CancelAfterFa
   }
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
-    def invalidTx(timestamp: Long = System.currentTimeMillis, fee: Long = 100000) =
+    def invalidTx(timestamp: Long = System.currentTimeMillis, fee: Long = 100000): TransferTransactionV1.TransactionT =
       TransferTransactionV1
         .selfSigned(None, sender.privateKey, AddressOrAlias.fromString(sender.address).explicitGet(), 1, timestamp, None, fee, Array.emptyByteArray)
         .right
         .get
-
-    def request(tx: TransferTransactionV1): SignedTransferV1Request =
-      SignedTransferV1Request(
-        Base58.encode(tx.sender.publicKey),
-        tx.assetId.map(_.base58),
-        tx.recipient.stringRepr,
-        tx.amount,
-        tx.fee,
-        tx.feeAssetId.map(_.base58),
-        tx.timestamp,
-        tx.attachment.headOption.map(_ => Base58.encode(tx.attachment)),
-        tx.signature.base58
-      )
-
-    implicit val w =
-      Json.writes[SignedTransferV1Request].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransferTransactionV1.typeId.toInt)))
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
@@ -79,7 +59,7 @@ class TransferTransactionV1Suite extends BaseTransactionSuite with CancelAfterFa
     )
 
     for ((tx, diag) <- invalidTxs) {
-      assertBadRequestAndResponse(sender.broadcastRequest(request(tx)), diag)
+      assertBadRequestAndResponse(sender.broadcastRequest(tx.json()), diag)
       nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
     }
 

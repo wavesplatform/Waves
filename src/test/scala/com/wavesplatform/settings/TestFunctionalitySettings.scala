@@ -7,7 +7,6 @@ object TestFunctionalitySettings {
     featureCheckBlocksPeriod = 10000,
     blocksForFeatureActivation = 9000,
     allowTemporaryNegativeUntil = 0L,
-    requireSortedTransactionsAfter = 0L,
     generationBalanceDepthFrom50To1000AfterHeight = 0,
     minimalGeneratingBalanceAfter = 0L,
     allowTransactionsFromFutureUntil = Long.MaxValue,

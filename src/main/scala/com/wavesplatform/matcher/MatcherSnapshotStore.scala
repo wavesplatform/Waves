@@ -11,8 +11,9 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.Config
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
+import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.utils.ScorexLogging
-import org.iq80.leveldb.ReadOptions
+import kamon.Kamon
 
 import scala.concurrent.Future
 import scala.util._
@@ -20,23 +21,18 @@ import scala.util._
 class MatcherSnapshotStore(config: Config) extends SnapshotStore {
   import MatcherSnapshotStore._
 
+  private val saveTimer      = Kamon.timer("matcher.snapshot.save")
+  private val serializeTimer = Kamon.timer("matcher.snapshot.serialize")
+
   private val streamDispatcher = context.system.dispatchers.lookup(config.getString("stream-dispatcher"))
 
   private val serializationExtension = SerializationExtension(context.system)
 
   private val writableDB = openDB(config.getString("dir"))
 
-  private def readOnly[A](f: ReadOnlyDB => A): A = {
-    val s = writableDB.getSnapshot
-    try f(new ReadOnlyDB(writableDB, new ReadOptions().snapshot(s)))
-    finally s.close()
-  }
+  private def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
-  private def readWrite[A](f: RW => A): A = {
-    val rw = new RW(writableDB)
-    try f(rw)
-    finally rw.close()
-  }
+  private def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
   private var pendingActions = Map.empty[String, Future[_]]
 
@@ -106,7 +102,7 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
     case _: DeleteSnapshotsFailure ⇒ // ignore
   }
 
-  protected def save(metadata: SnapshotMetadata, snapshot: Any): Unit =
+  protected def save(metadata: SnapshotMetadata, snapshot: Any): Unit = saveTimer.refine("id" -> metadata.persistenceId).measure {
     readWrite { rw =>
       val historyKey      = kSMHistory(metadata.persistenceId)
       val previousHistory = rw.get(historyKey)
@@ -114,8 +110,11 @@ class MatcherSnapshotStore(config: Config) extends SnapshotStore {
       val nextHistory     = nextId +: previousHistory
       rw.put(historyKey, nextHistory)
       rw.put(kSM(metadata.persistenceId, nextId), SM(metadata.sequenceNr, metadata.timestamp))
-      rw.put(kSnapshot(metadata.persistenceId, nextId), serialize(snapshot))
+
+      val serialized = serializeTimer.refine("id" -> metadata.persistenceId).measure(serialize(snapshot))
+      rw.put(kSnapshot(metadata.persistenceId, nextId), serialized)
     }
+  }
 
   protected def deserialize(input: Array[Byte]): Snapshot =
     serializationExtension.deserialize(input, classOf[Snapshot]).get
@@ -141,9 +140,13 @@ object MatcherSnapshotStore extends ScorexLogging {
   private def writeSnapshotMetadata(sm: SM) =
     ByteBuffer.allocate(16).putLong(sm.seqNr).putLong(sm.ts).array()
 
-  private def kSMHistory(persistenceId: String) = Key[Seq[Int]](Bytes.concat(Array(1: Byte), persistenceId.getBytes(UTF_8)), readIntSeq, writeIntSeq)
-  private def kSM(persistenceId: String, seqNr: Int) =
-    Key[SM](Bytes.concat(Array(2: Byte), persistenceId.getBytes(UTF_8), Ints.toByteArray(seqNr)), readSnapshotMetadata, writeSnapshotMetadata)
-  def kSnapshot(persistenceId: String, seqNr: Int) =
-    Key[Array[Byte]](Bytes.concat(Array(3: Byte), persistenceId.getBytes(UTF_8), Ints.toByteArray(seqNr)), identity, identity)
+  def kSMHistory(persistenceId: String): Key[Seq[Int]] =
+    Key[Seq[Int]]("matcher-sm-history", Bytes.concat(Array(1: Byte), persistenceId.getBytes(UTF_8)), readIntSeq, writeIntSeq)
+  def kSM(persistenceId: String, seqNr: Int): Key[SM] =
+    Key[SM]("matcher-sm",
+            Bytes.concat(Array(2: Byte), persistenceId.getBytes(UTF_8), Ints.toByteArray(seqNr)),
+            readSnapshotMetadata,
+            writeSnapshotMetadata)
+  def kSnapshot(persistenceId: String, seqNr: Int): Key[Array[Byte]] =
+    Key[Array[Byte]]("matcher-snapshot", Bytes.concat(Array(3: Byte), persistenceId.getBytes(UTF_8), Ints.toByteArray(seqNr)), identity, identity)
 }

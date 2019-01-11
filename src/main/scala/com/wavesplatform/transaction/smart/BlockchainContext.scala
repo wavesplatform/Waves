@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.kernel.Monoid
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{Global, ScriptVersion}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -13,9 +13,20 @@ import shapeless._
 
 object BlockchainContext {
 
-  private val baseContext = Monoid.combine(PureContext.ctx, CryptoContext.build(Global)).evaluationContext
-
   type In = Transaction :+: Order :+: CNil
-  def build(nByte: Byte, in: Coeval[In], h: Coeval[Int], blockchain: Blockchain): EvaluationContext =
-    Monoid.combine(baseContext, WavesContext.build(new WavesEnvironment(nByte, in, h, blockchain)).evaluationContext)
+  def build(version: ScriptVersion,
+            nByte: Byte,
+            in: Coeval[In],
+            h: Coeval[Int],
+            blockchain: Blockchain,
+            isTokenContext: Boolean): EvaluationContext = {
+    Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(version),
+          CryptoContext.build(Global),
+          WavesContext.build(version, new WavesEnvironment(nByte, in, h, blockchain), isTokenContext)
+        ))
+      .evaluationContext
+  }
 }

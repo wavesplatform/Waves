@@ -11,7 +11,7 @@ import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
-import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.diffs.{CommonValidation, TransactionDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
 import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
@@ -22,8 +22,8 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
 import monix.execution.{CancelableFuture, Scheduler}
+import monix.execution.schedulers.SchedulerService
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong
@@ -60,7 +60,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
   private val putRequestStats     = Kamon.counter("utx-pool-put-if-new")
 
   private def removeExpired(currentTs: Long): Unit = {
-    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
+    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > CommonValidation.MaxTimePrevBlockOverTransactionDiff
 
     transactions.values.asScala
       .collect {
@@ -125,7 +125,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
+  override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val b      = blockchain
@@ -152,7 +152,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
       .reduce((_, s) => s)
 
     invalidTxs.foreach(remove)
-    val txs = if (sortInBlock) reversedValidTxs.sorted(TransactionsOrdering.InBlock) else reversedValidTxs.reverse
+    val txs = reversedValidTxs.reverse
     (txs, finalConstraint)
   }
 
@@ -181,7 +181,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
 
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     putRequestStats.increment()
-    measureSuccessful(
+    val result = measureSuccessful(
       processingTimeStats, {
         for {
           _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
@@ -198,6 +198,11 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
         }
       }
     )
+    result.fold(
+      err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err"),
+      r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}")
+    )
+    result
   }
 }
 

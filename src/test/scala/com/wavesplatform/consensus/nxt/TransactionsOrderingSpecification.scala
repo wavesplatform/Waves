@@ -11,23 +11,7 @@ import scala.util.Random
 class TransactionsOrderingSpecification extends PropSpec with Assertions with Matchers {
 
   property("TransactionsOrdering.InBlock should sort correctly") {
-    val txsDifferentById = (0 to 3)
-      .map(
-        i =>
-          TransferTransactionV1
-            .selfSigned(None,
-                        PrivateKeyAccount(Array.fill(32)(0)),
-                        Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
-                        100000,
-                        5,
-                        None,
-                        125L,
-                        Array(i.toByte))
-            .right
-            .get)
-      .sortBy(t => t.id().base58)
-
-    val correctSeq = txsDifferentById ++ Seq(
+    val correctSeq = Seq(
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),
@@ -95,23 +79,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
   }
 
   property("TransactionsOrdering.InUTXPool should sort correctly") {
-    val txsDifferentById = (0 to 3)
-      .map(
-        i =>
-          TransferTransactionV1
-            .selfSigned(None,
-                        PrivateKeyAccount(Array.fill(32)(0)),
-                        Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
-                        100000,
-                        5,
-                        None,
-                        125L,
-                        Array(i.toByte))
-            .right
-            .get)
-      .sortBy(t => t.id().base58)
-
-    val correctSeq = txsDifferentById ++ Seq(
+    val correctSeq = Seq(
       TransferTransactionV1
         .selfSigned(None,
                     PrivateKeyAccount(Array.fill(32)(0)),

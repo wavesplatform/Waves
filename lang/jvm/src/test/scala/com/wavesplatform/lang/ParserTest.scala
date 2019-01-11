@@ -1238,4 +1238,17 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("truex") shouldBe REF(AnyPos, PART.VALID(AnyPos, "truex"))
     parse("falsex") shouldBe REF(AnyPos, PART.VALID(AnyPos, "falsex"))
   }
+
+  property("parser StackOverflow check") {
+    val depth = 10000
+    val lastStmt = (1 to depth).foldLeft("i0") { (acc, i) =>
+      s"$acc + i$i"
+    }
+    val manyLets = (1 to depth).foldLeft("let i0 = 1") { (acc, i) =>
+      s"$acc\nlet i$i = 1"
+    }
+    val script = s"$manyLets\n$lastStmt"
+
+    Parser(script) shouldBe an[Success[_, _, _]]
+  }
 }

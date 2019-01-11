@@ -4,18 +4,14 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.v1.compiler.CompilerV1
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{Base58, dummyCompilerContext}
+import com.wavesplatform.utils.Base58
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.JsNumber
-
 import scala.concurrent.duration._
 
 /*
@@ -29,8 +25,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
   private val fourthAddress: String = sender.createAddress()
 
   test("airdrop emulation via MassTransfer") {
-    val scriptText = {
-      val untyped = Parser(s"""
+    val scriptText = s"""
         match tx {
           case ttx: MassTransferTransaction =>
             let commonAmount = (ttx.transfers[0].amount + ttx.transfers[1].amount)
@@ -58,18 +53,16 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
             else false
         case _ => false
         }
-        """.stripMargin).get.value
-      CompilerV1(dummyCompilerContext, untyped).explicitGet()._1
-    }
+        """.stripMargin
 
     // set script
-    val script = ScriptV1(scriptText).explicitGet()
+    val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, sender.privateKey, Some(script), minFee, System.currentTimeMillis())
+      .selfSigned(SetScriptTransaction.supportedVersions.head, sender.privateKey, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt)))
+      .signedBroadcast(setScriptTransaction.json())
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
@@ -93,7 +86,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val accountSig = ByteStr(crypto.sign(sender.privateKey, unsigned.bodyBytes()))
     val signed     = unsigned.copy(proofs = Proofs(Seq(accountSig)))
-    val toUsersID  = sender.signedBroadcast(signed.json() + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt))).id
+    val toUsersID  = sender.signedBroadcast(signed.json()).id
 
     nodes.waitForHeightAriseAndTxPresent(toUsersID)
 
@@ -110,11 +103,13 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     val accountSigToGovFail = ByteStr(crypto.sign(sender.privateKey, unsignedToGov.bodyBytes()))
     val signedToGovFail     = unsignedToGov.copy(proofs = Proofs(Seq(accountSigToGovFail)))
 
-    assertBadRequestAndResponse(sender.signedBroadcast(signedToGovFail.json() + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt))),
-                                "Transaction not allowed by account-script")
+    assertBadRequestAndResponse(
+      sender.signedBroadcast(signedToGovFail.json()),
+      "Transaction is not allowed by account-script"
+    )
 
     //make correct transfer to government after some time
-    sender.waitForHeight(heightBefore + 10, 2.minutes)
+    sender.waitForHeight(heightBefore + 10, 5.minutes)
 
     val unsignedToGovSecond =
       MassTransferTransaction
@@ -130,7 +125,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val accountSigToGov = ByteStr(crypto.sign(sender.privateKey, unsignedToGovSecond.bodyBytes()))
     val signedToGovGood = unsignedToGovSecond.copy(proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.decode(toUsersID).get))))
-    val massTransferID  = sender.signedBroadcast(signedToGovGood.json() + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt))).id
+    val massTransferID  = sender.signedBroadcast(signedToGovGood.json()).id
 
     nodes.waitForHeightAriseAndTxPresent(massTransferID)
   }

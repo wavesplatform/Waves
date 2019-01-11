@@ -48,7 +48,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         val contract      = transfer.sender
 
         val contractSpent: Long = ENOUGH_FEE + 1
-        val sponsorSpent: Long  = ENOUGH_FEE * 3 - 1 + ENOUGH_FEE * Sponsorship.FeeUnit
+        val sponsorSpent: Long  = ENOUGH_FEE * 3 - 1 + ENOUGH_FEE * CommonValidation.FeeUnit
 
         val sponsor = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
 
@@ -75,7 +75,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         val contract      = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
         val recipient     = transfer.sender
 
-        val contractSpent: Long  = ENOUGH_FEE * 4 + ENOUGH_FEE * Sponsorship.FeeUnit
+        val contractSpent: Long  = ENOUGH_FEE * 4 + ENOUGH_FEE * CommonValidation.FeeUnit
         val recipientSpent: Long = 1
 
         assertDiffAndState(setupBlocks :+ TestBlock.create(Nil), transferBlock, fs) { (diff, blck) =>
@@ -102,7 +102,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       gen2 = GenesisTransaction
         .create(recipient, ENOUGH_AMT, timestamp)
         .explicitGet()
-      (script, _) = ScriptCompiler(s"false").explicitGet()
+      (script, _) = ScriptCompiler(s"false", isAssetScript = false).explicitGet()
       issueTx = IssueTransactionV1
         .selfSigned(
           sender = contract,
@@ -174,7 +174,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       gen2 = GenesisTransaction
         .create(sponsor, ENOUGH_AMT, timestamp)
         .explicitGet()
-      (script, _) = ScriptCompiler(s"true").explicitGet()
+      (script, _) = ScriptCompiler(s"true", isAssetScript = false).explicitGet()
       issueTx = IssueTransactionV1
         .selfSigned(
           sender = sponsor,

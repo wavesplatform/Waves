@@ -35,6 +35,7 @@ object Tx {
   case class LeaseCancel(p: Proven, leaseId: ByteVector)                                  extends Tx
   case class CreateAlias(p: Proven, alias: String)                                        extends Tx
   case class SetScript(p: Proven, script: Option[ByteVector])                             extends Tx
+  case class SetAssetScript(p: Proven, assetId: ByteVector, script: Option[ByteVector])   extends Tx
   case class MassTransfer(p: Proven,
                           assetId: Option[ByteVector],
                           transferCount: Long,
@@ -43,6 +44,6 @@ object Tx {
                           attachment: ByteVector)
       extends Tx
   case class Sponsorship(p: Proven, assetId: ByteVector, minSponsoredAssetFee: Option[Long])                                          extends Tx
-  case class Exchange(p: Proven, price: Long, amount: Long, buyMatcherFee: Long, sellMatcherFee: Long, buyOrder: Ord, sellOrder: Ord) extends Tx
+  case class Exchange(p: Proven, amount: Long, price: Long, buyMatcherFee: Long, sellMatcherFee: Long, buyOrder: Ord, sellOrder: Ord) extends Tx
   case class Data(p: Proven, data: IndexedSeq[DataItem[_]])                                                                           extends Tx
 }

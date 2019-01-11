@@ -3,13 +3,14 @@ package com.wavesplatform.lang.v1
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.transferTransactionType
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import monix.eval.Coeval
@@ -24,13 +25,14 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
   val FunctionCosts: Map[FunctionHeader, Coeval[Long]] = Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).mapValues(Coeval.now)
 
   private val ctx = {
-    val tx = CaseObj(transferTransactionType.typeRef, Map("amount" -> 100000000L))
+    val transactionType = Types.buildTransferTransactionType(true)
+    val tx              = CaseObj(transactionType.typeRef, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combine(
-        PureContext.ctx,
+        PureContext.build(V1),
         CTX(
-          Seq(transferTransactionType),
-          Map(("tx", ((transferTransactionType.typeRef, "Fake transaction"), LazyVal(EitherT.pure(tx))))),
+          Seq(transactionType),
+          Map(("tx", ((transactionType.typeRef, "Fake transaction"), LazyVal(EitherT.pure(tx))))),
           Array.empty
         )
       )
