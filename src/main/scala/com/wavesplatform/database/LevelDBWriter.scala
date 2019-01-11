@@ -18,12 +18,11 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{Paged, ScorexLogging}
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.parallel.ParSeq
 import scala.collection.{SeqView, immutable, mutable}
 
 object LevelDBWriter {
@@ -757,8 +756,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       .mapValues(_.size)
   }
 
-  override def assetDistribution(assetId: ByteStr): Map[Address, Long] = readOnly { db =>
-    (for {
+  override def assetDistribution(assetId: ByteStr): AssetDistribution = readOnly { db =>
+    val dst = (for {
       seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
       addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
       actualHeight <- db
@@ -768,41 +767,59 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+
+    AssetDistribution(dst)
   }
 
   override def assetDistributionAtHeight(assetId: AssetId,
                                          height: Int,
                                          count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
+                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
     lazy val maybeAddressId = fromAddress.flatMap(addr => db.get(Keys.addressId(addr)))
 
-    def takeAfter(s: ParSeq[BigInt], a: Option[BigInt]): ParSeq[BigInt] = {
+    def takeAfter(s: Seq[BigInt], a: Option[BigInt]): Seq[BigInt] = {
       a match {
         case None    => s
         case Some(v) => s.dropWhile(_ != v).drop(1)
       }
     }
 
-    lazy val addressIds: ParSeq[BigInt] =
-      for {
-        seqNr <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
+    val addressIds: Seq[BigInt] = {
+      val all = for {
+        seqNr <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId)))
         addressId <- db
           .get(Keys.addressesForAsset(assetId, seqNr))
-          .par
       } yield addressId
+
+      takeAfter(all, maybeAddressId)
+    }
+
+    val distribution: Stream[(Address, Long)] =
+      for {
+        addressId <- addressIds.toStream
+        history = db.get(Keys.assetBalanceHistory(addressId, assetId))
+        actualHeight <- history.filterNot(_ > height).headOption
+        balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
+        if balance > 0
+      } yield db.get(Keys.idToAddress(addressId)) -> balance
+
+    lazy val page: AssetDistributionPage = {
+      val items   = distribution.take(count)
+      val hasNext = addressIds.length > count
+      val lastKey = items.lastOption.map(_._1)
+
+      val result: Paged[Address, AssetDistribution] =
+        Paged(hasNext, lastKey, AssetDistribution(items.toMap))
+
+      AssetDistributionPage(result)
+    }
 
     Either
       .cond(
         height > canGetAfterHeight,
-        (for {
-          addressId <- takeAfter(addressIds, maybeAddressId).take(count)
-          history = db.get(Keys.assetBalanceHistory(addressId, assetId))
-          actualHeight <- history.filterNot(_ > height).headOption
-          balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
-          if balance > 0
-        } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq,
+        page,
         GenericError(s"Cannot get asset distribution at height less than ${canGetAfterHeight + 1}")
       )
   }
