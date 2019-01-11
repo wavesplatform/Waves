@@ -98,7 +98,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     }
   }
 
-  override def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] = {
+  override def processBlock(block: Block, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]] = {
     val height                             = blockchain.height
     val notImplementedFeatures: Set[Short] = blockchain.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
 
@@ -120,7 +120,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
                 val miningConstraints = MiningConstraints(blockchain, height)
                 BlockDiffer
-                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
+                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                   .map(r => Some((r, Seq.empty[Transaction])))
             }
           case Some(ng) =>
@@ -130,7 +130,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 val miningConstraints = MiningConstraints(blockchain, height)
 
                 BlockDiffer
-                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
+                  .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                   .map { r =>
                     log.trace(
                       s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
@@ -146,7 +146,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                   val miningConstraints = MiningConstraints(blockchain, height)
 
                   BlockDiffer
-                    .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total)
+                    .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                     .map(r => Some((r, Seq.empty[Transaction])))
                 }
               } else
@@ -175,7 +175,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                         CompositeBlockchain.composite(blockchain, referencedLiquidDiff, carry),
                         Some(referencedForgedBlock),
                         block,
-                        constraint
+                        constraint,
+                        verify
                       )
 
                     diff.map { hardenedDiff =>
@@ -220,7 +221,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     }
   }
 
-  override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = {
+  override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, Unit] = {
     ngState match {
       case None =>
         Left(MicroBlockAppendError("No base block exists", microBlock))
@@ -240,7 +241,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
               r <- {
                 val constraints  = MiningConstraints(blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-                BlockDiffer.fromMicroBlock(functionalitySettings, this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, mdConstraint)
+                BlockDiffer.fromMicroBlock(functionalitySettings,
+                                           this,
+                                           blockchain.lastBlockTimestamp,
+                                           microBlock,
+                                           ng.base.timestamp,
+                                           mdConstraint,
+                                           verify)
               }
             } yield {
               val (diff, carry, updatedMdConstraint) = r
@@ -543,6 +550,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       blockchain.balance(address, mayBeAssetId) + ng.bestLiquidDiff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(mayBeAssetId)
     case None =>
       blockchain.balance(address, mayBeAssetId)
+  }
+
+  override def leaseBalance(address: Address): LeaseBalance = ngState match {
+    case Some(ng) =>
+      cats.Monoid.combine(blockchain.leaseBalance(address), ng.bestLiquidDiff.portfolios.getOrElse(address, Portfolio.empty).lease)
+    case None =>
+      blockchain.leaseBalance(address)
   }
 }
 

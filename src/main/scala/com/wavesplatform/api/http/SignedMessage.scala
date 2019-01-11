@@ -10,7 +10,9 @@ object SignedMessage {
   implicit val messageReads: Reads[SignedMessage] = (
     (JsPath \ "message").read[String] and
       (JsPath \ "signature").read[String] and
-      (JsPath \ "publickey").read[String]
+      (JsPath \ "publickey")
+        .read[String]
+        .orElse((JsPath \ "publicKey").read[String])
   )(SignedMessage.apply _)
 
 }

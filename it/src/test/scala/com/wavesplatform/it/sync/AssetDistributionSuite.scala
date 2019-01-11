@@ -29,6 +29,8 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
       Some(issueTx),
       waitForTx = true
     )
+    
+    nodes.waitForHeightArise()
 
     node.assetDistribution(issueTx, Some(initialHeight), Some(100)) shouldBe Map.empty
 
