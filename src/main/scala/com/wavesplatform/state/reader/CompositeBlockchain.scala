@@ -21,6 +21,10 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   override def balance(address: Address, assetId: Option[AssetId]): Long =
     inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
 
+  override def leaseBalance(address: Address): LeaseBalance = {
+    cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
+  }
+
   override def assetScript(id: ByteStr): Option[Script] = maybeDiff.flatMap(_.assetScripts.get(id)).getOrElse(inner.assetScript(id))
   override def hasAssetScript(id: ByteStr) = maybeDiff.flatMap(_.assetScripts.get(id)) match {
     case Some(s) => s.nonEmpty
