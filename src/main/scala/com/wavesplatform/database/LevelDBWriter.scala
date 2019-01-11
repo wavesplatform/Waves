@@ -818,10 +818,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     Either
       .cond(
-        height > canGetAfterHeight, {
-          println(page)
-          page
-        },
+        height > canGetAfterHeight,
+        page,
         GenericError(s"Cannot get asset distribution at height less than ${canGetAfterHeight + 1}")
       )
   }
