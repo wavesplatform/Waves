@@ -9,7 +9,7 @@ import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Req
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
-import com.wavesplatform.state.DataEntry
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
@@ -127,11 +127,11 @@ object SyncHttpApi extends Assertions {
     def assetsBalance(address: String): FullAssetsInfo =
       sync(async(n).assetsBalance(address))
 
-    def assetDistribution(asset: String,
-                          initialHeight: Option[Int] = None,
-                          limit: Option[Int] = None,
-                          after: Option[String] = None): Map[String, Long] =
-      sync(async(n).assetDistribution(asset, initialHeight, limit, after))
+    def assetDistributionAtHeight(asset: String, height: Int, limit: Int, maybeAfter: Option[String] = None): AssetDistributionPage =
+      sync(async(n).assetDistributionAtHeight(asset, height, limit, maybeAfter))
+
+    def assetDistribution(asset: String): AssetDistribution =
+      sync(async(n).assetDistribution(asset))
 
     def issue(sourceAddress: String,
               name: String,
