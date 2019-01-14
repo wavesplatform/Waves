@@ -9,7 +9,7 @@ import scala.concurrent.duration._
 
 class UTXSettingsSpecification extends FlatSpec with Matchers {
   "UTXSettings" should "read values" in {
-    val config   = ConfigFactory.parseString("""waves {
+    val config = ConfigFactory.parseString("""waves {
         |  utx {
         |    max-size = 100
         |    max-bytes-size = 100k
