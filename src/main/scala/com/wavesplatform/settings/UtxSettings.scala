@@ -10,5 +10,5 @@ case class UtxSettings(maxSize: Int,
                        allowTransactionsFromSmartAccounts: Boolean)
 
 object UtxSettings {
-  val DefaultMaxBytes = 100L * 1024 * 1024 // 100 MB
+  val DefaultMaxBytes = 52428800 // 50 MB
 }
