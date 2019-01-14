@@ -264,6 +264,12 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       all(txs.tail.map(t => utx.putIfNew(t))) should produce("pool size limit")
     }
 
+    "does not add new transactions when full in bytes" in utxTest(
+      UtxSettings(1, 152, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)) { (txs, utx, _) =>
+      utx.putIfNew(txs.head) shouldBe 'right
+      all(txs.tail.map(t => utx.putIfNew(t))) should produce("pool size limit")
+    }
+
     "does not broadcast the same transaction twice" in utxTest() { (txs, utx, _) =>
       utx.putIfNew(txs.head) shouldBe 'right
       utx.putIfNew(txs.head) shouldBe 'right
