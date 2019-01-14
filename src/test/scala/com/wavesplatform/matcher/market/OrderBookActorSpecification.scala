@@ -418,7 +418,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       }
       receiveN(10)
 
-      actor ! SaveSnapshot
+      actor ! SaveSnapshot(10)
       expectMsg(OrderBookSnapshotUpdated(pair, 10))
 
       (11 to 20).foreach { i =>
@@ -426,7 +426,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       }
       receiveN(10)
 
-      actor ! SaveSnapshot
+      actor ! SaveSnapshot(20)
       expectMsg(OrderBookSnapshotUpdated(pair, 20))
     }
 
@@ -436,8 +436,8 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       }
       receiveN(10)
 
-      actor ! SaveSnapshot
-      actor ! SaveSnapshot
+      actor ! SaveSnapshot(10)
+      actor ! SaveSnapshot(10)
       expectMsgType[OrderBookSnapshotUpdated]
       expectNoMessage(200.millis)
     }
@@ -448,7 +448,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       }
       receiveN(10)
 
-      actor ! SaveSnapshot
+      actor ! SaveSnapshot(10)
       expectMsgType[OrderBookSnapshotUpdated]
     }
   }

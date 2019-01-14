@@ -147,7 +147,7 @@ object EventSerializers {
 
   implicit val snapshotFormat: Format[Snapshot] = Format(
     ((JsPath \ "n").readNullable[Long].map(_.getOrElse(-1L)) and (JsPath \ "o").read[OrderBook])(Snapshot),
-    Writes[Snapshot](s => Json.obj("n" -> s.lastProcessedCommandNr, "o" -> s.orderBook))
+    Writes[Snapshot](s => Json.obj("n" -> s.eventNr, "o" -> s.orderBook))
   )
 
   private def encodeOrder(o: LimitOrder) = {

@@ -3,11 +3,12 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, SupervisorStrategy, Terminated}
-import akka.persistence.{PersistentActor, RecoveryCompleted, _}
+import akka.persistence._
 import com.google.common.base.Charsets
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{DuringShutdown, OrderBookUnavailable}
 import com.wavesplatform.matcher.market.OrderBookActor._
+import com.wavesplatform.matcher.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{AssetDescription, ByteStr}
 import com.wavesplatform.transaction.AssetId
@@ -17,7 +18,7 @@ import play.api.libs.json._
 import scorex.utils._
 
 class MatcherActor(matcherSettings: MatcherSettings,
-                   recoveryCompletedWithCommandNr: (ActorRef, Long, Long) => Unit,
+                   recoveryCompletedWithEventNr: (ActorRef, Long, Long) => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
                    assetDescription: ByteStr => Option[AssetDescription])
@@ -31,8 +32,9 @@ class MatcherActor(matcherSettings: MatcherSettings,
   private var tradedPairs: Map[AssetPair, MarketData] = Map.empty
   private var childrenNames: Map[ActorRef, AssetPair] = Map.empty
   private var lastSnapshotSequenceNr: Long            = 0L
+  private var lastProcessedNr: Long                   = 0L
 
-  private var snapshotOffsets: Map[AssetPair, QueueEventWithMeta.Offset] = Map.empty
+  private var snapshotsState = SnapshotsState.empty
 
   private var shutdownStatus: ShutdownStatus = ShutdownStatus(
     initiated = false,
@@ -81,36 +83,25 @@ class MatcherActor(matcherSettings: MatcherSettings,
     orderBook
   }
 
-  private def snapshotOffset(pair: AssetPair): Long = {
-    val half = matcherSettings.snapshotsInterval / 2
-    half + (pair.key.hashCode % half)
-  }
-
-  private var minSnapshotOffset = Long.MinValue
-  private def shouldDoSnapshot(request: QueueEventWithMeta): Boolean = {
-    import request.event.assetPair
-    request.offset > minSnapshotOffset && snapshotOffsets.get(assetPair).fold(false) { oldestSnapshotNr =>
-      val minOffset = oldestSnapshotNr + snapshotOffset(assetPair)
-      val r         = request.offset >= minOffset
-      if (r) log.info(s"$assetPair should do a snapshot at $minOffset, now is ${request.offset}")
-      r
-    }
-  }
-
   /**
     * @param f (sender, orderBook)
     */
   private def runFor(eventWithMeta: QueueEventWithMeta)(f: (ActorRef, ActorRef) => Unit): Unit = {
     import eventWithMeta.event.assetPair
+    import eventWithMeta.offset
+
     val s = sender()
     if (shutdownStatus.initiated) s ! DuringShutdown
     else
       orderBook(assetPair) match {
         case Some(Right(ob)) =>
           f(s, ob)
-          if (shouldDoSnapshot(eventWithMeta)) {
-            snapshotOffsets -= assetPair
-            ob ! SaveSnapshot
+          snapshotsState.requiredSnapshot(offset).foreach {
+            case (assetPair, updatedSnapshotState) =>
+              log.info(
+                s"OrderBook $assetPair should do snapshot, the current offset is $offset. Next snapshot: ${updatedSnapshotState.nearestSnapshotOffset}")
+              orderBooks.get.get(assetPair).flatMap(_.toOption).foreach(_ ! SaveSnapshot(offset))
+              snapshotsState = updatedSnapshotState
           }
         case Some(Left(_)) => s ! OrderBookUnavailable
         case None =>
@@ -123,7 +114,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
   private def forwardToOrderBook: Receive = {
     case GetMarkets => sender() ! tradedPairs.values.toSeq
 
-    case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotOffsets)
+    case GetSnapshotOffsets => sender() ! SnapshotOffsetsResponse(snapshotsState.snapshotOffsets)
 
     case request: QueueEventWithMeta =>
       request.event match {
@@ -141,6 +132,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
 
         case _ => runFor(request)((sender, orderBook) => orderBook.tell(request, sender))
       }
+      lastProcessedNr = math.max(request.offset, lastProcessedNr)
 
     case Shutdown =>
       shutdownStatus = shutdownStatus.copy(
@@ -174,8 +166,8 @@ class MatcherActor(matcherSettings: MatcherSettings,
         childrenNames.get(ref).fold(m)(m.updated(_, Left(())))
       }
 
-    case OrderBookSnapshotUpdated(assetPair, lastProcessedCommandNr) =>
-      snapshotOffsets += assetPair -> lastProcessedCommandNr
+    case OrderBookSnapshotUpdated(assetPair, eventNr) =>
+      snapshotsState = snapshotsState.updated(assetPair, eventNr, lastProcessedNr, matcherSettings.snapshotsInterval)
   }
 
   override def receiveRecover: Receive = {
@@ -189,29 +181,28 @@ class MatcherActor(matcherSettings: MatcherSettings,
     case RecoveryCompleted =>
       if (orderBooks.get().isEmpty) {
         log.info("Recovery completed!")
-        recoveryCompletedWithCommandNr(self, -1, -1)
+        recoveryCompletedWithEventNr(self, -1, -1)
       } else {
         log.info(s"Recovery completed, waiting order books to restore: ${orderBooks.get().keys.mkString(", ")}")
-        context.become(collectOrderBooks(orderBooks.get().size, Long.MaxValue, Long.MinValue))
+        context.become(collectOrderBooks(orderBooks.get().size, Long.MaxValue, Long.MinValue, Map.empty))
       }
   }
 
-  private def collectOrderBooks(restOrderBooksNumber: Long, oldestCommandNr: Long, newestCommandNr: Long): Receive = {
-    case OrderBookSnapshotUpdated(assetPair, lastProcessedCommandNr) =>
-      val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
-      val updatedOldestCommandNr      = math.min(oldestCommandNr, lastProcessedCommandNr)
-      val updatedNewestCommandNr      = math.max(newestCommandNr, lastProcessedCommandNr)
+  private def collectOrderBooks(restOrderBooksNumber: Long,
+                                oldestEventNr: Long,
+                                newestEventNr: Long,
+                                currentOffsets: Map[AssetPair, EventOffset]): Receive = {
+    case OrderBookSnapshotUpdated(assetPair, snapshotEventNr) =>
+      log.info(s"Last snapshot for $assetPair did at $snapshotEventNr")
 
-      snapshotOffsets += assetPair -> lastProcessedCommandNr
+      val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
+      val updatedOldestEventNr        = math.min(oldestEventNr, snapshotEventNr)
+      val updatedNewestEventNr        = math.max(newestEventNr, snapshotEventNr)
+      val updatedCurrentOffsets       = currentOffsets.updated(assetPair, snapshotEventNr)
 
       if (updatedRestOrderBooksNumber > 0)
-        context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestCommandNr, updatedNewestCommandNr))
-      else {
-        context.become(receiveCommand)
-        minSnapshotOffset = updatedNewestCommandNr
-        recoveryCompletedWithCommandNr(self, updatedOldestCommandNr, updatedNewestCommandNr)
-        unstashAll()
-      }
+        context.become(collectOrderBooks(updatedRestOrderBooksNumber, updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets))
+      else becomeWorking(updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets)
 
     case Terminated(ref) =>
       orderBooks.getAndUpdate { m =>
@@ -219,15 +210,27 @@ class MatcherActor(matcherSettings: MatcherSettings,
       }
 
       val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
-      if (updatedRestOrderBooksNumber > 0) context.become(collectOrderBooks(updatedRestOrderBooksNumber, oldestCommandNr, newestCommandNr))
-      else {
-        context.become(receiveCommand)
-        minSnapshotOffset = newestCommandNr
-        recoveryCompletedWithCommandNr(self, oldestCommandNr, newestCommandNr)
-        unstashAll()
-      }
+      if (updatedRestOrderBooksNumber > 0)
+        context.become(collectOrderBooks(updatedRestOrderBooksNumber, oldestEventNr, newestEventNr, currentOffsets))
+      else becomeWorking(oldestEventNr, newestEventNr, currentOffsets)
 
     case _ => stash()
+  }
+
+  private def becomeWorking(oldestEventNr: EventOffset, newestEventNr: EventOffset, currentOffsets: Map[AssetPair, EventOffset]): Unit = {
+    context.become(receiveCommand)
+
+    snapshotsState = SnapshotsState(
+      startOffsetToSnapshot = lastProcessedNr,
+      currentOffsets = currentOffsets,
+      lastProcessedNr = lastProcessedNr,
+      interval = matcherSettings.snapshotsInterval
+    )
+
+    log.trace(s"Expecting snapshots at: ${snapshotsState.nearestSnapshotOffsets}")
+
+    unstashAll()
+    recoveryCompletedWithEventNr(self, oldestEventNr, newestEventNr)
   }
 
   private def snapshotsCommands: Receive = {
@@ -293,14 +296,14 @@ object MatcherActor {
   def name: String = "matcher"
 
   def props(matcherSettings: MatcherSettings,
-            recoveryCompletedWithCommandNr: (ActorRef, Long, Long) => Unit,
+            recoveryCompletedWithEventNr: (ActorRef, Long, Long) => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             orderBookProps: (AssetPair, ActorRef) => Props,
             assetDescription: ByteStr => Option[AssetDescription]): Props =
     Props(
       new MatcherActor(
         matcherSettings,
-        recoveryCompletedWithCommandNr,
+        recoveryCompletedWithEventNr,
         orderBooks,
         orderBookProps,
         assetDescription
@@ -321,7 +324,7 @@ object MatcherActor {
     def tryComplete(): Unit  = if (isCompleted) onComplete()
   }
 
-  case object SaveSnapshot
+  case class SaveSnapshot(globalEventNr: EventOffset)
 
   case class Snapshot(tradedPairsSet: Set[AssetPair])
 
@@ -330,9 +333,9 @@ object MatcherActor {
   case object GetMarkets
 
   case object GetSnapshotOffsets
-  case class SnapshotOffsetsResponse(offsets: Map[AssetPair, QueueEventWithMeta.Offset])
+  case class SnapshotOffsetsResponse(offsets: Map[AssetPair, EventOffset])
 
-  case class MatcherRecovered(oldestCommandNr: Long)
+  case class MatcherRecovered(oldestEventNr: Long)
 
   case object Shutdown
 

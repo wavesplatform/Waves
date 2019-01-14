@@ -87,10 +87,10 @@ class OrderBookActor(owner: ActorRef,
       savingSnapshot = None
       log.error(s"Failed to save snapshot: $metadata", reason)
 
-    case SaveSnapshot =>
+    case SaveSnapshot(globalEventNr) =>
       if (savingSnapshot.isEmpty) {
-        savingSnapshot = Some(lastProcessedOffset)
-        saveSnapshot()
+        saveSnapshotAt(globalEventNr)
+        savingSnapshot = Some(globalEventNr)
       }
   }
 
@@ -244,7 +244,7 @@ class OrderBookActor(owner: ActorRef,
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook
-      lastProcessedOffset = snapshot.lastProcessedCommandNr
+      lastProcessedOffset = snapshot.eventNr
 
       refreshMarketStatus()
       for (level <- orderBook.asks.valuesIterator ++ orderBook.bids.valuesIterator; lo <- level) {
@@ -264,7 +264,8 @@ class OrderBookActor(owner: ActorRef,
     context.system.eventStream.publish(e)
   }
 
-  private def saveSnapshot(): Unit = saveSnapshot(Snapshot(lastProcessedOffset, orderBook))
+  private def saveSnapshotAt(globalEventNr: QueueEventWithMeta.Offset): Unit =
+    saveSnapshot(Snapshot(globalEventNr, orderBook))
 }
 
 object OrderBookActor {
@@ -314,8 +315,8 @@ object OrderBookActor {
 
   case class GetOrdersResponse(orders: Seq[LimitOrder])
 
-  case class Snapshot(lastProcessedCommandNr: Long, orderBook: OrderBook)
+  case class Snapshot(eventNr: Long, orderBook: OrderBook)
 
   // Internal messages
-  case class OrderBookSnapshotUpdated(assetPair: AssetPair, lastProcessedCommandNr: Long)
+  case class OrderBookSnapshotUpdated(assetPair: AssetPair, eventNr: Long)
 }

@@ -54,7 +54,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       |    order-history-file: null
       |    min-order-fee: 100000
       |    order-match-tx-fee: 100000
-      |    snapshots-interval: 1d
+      |    snapshots-interval: 100000
       |    max-open-orders: 1000
       |    price-assets: ["BASE1", "BASE2", "BASE"]
       |    blacklisted-assets: ["BLACKLST"]

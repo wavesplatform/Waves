@@ -92,7 +92,8 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
           .plainSource(consumerSettings, Subscriptions.assignmentWithOffset(topicPartition -> currentOffset))
           .mapMaterializedValue(consumerControl.set)
           .buffer(settings.consumer.bufferSize, OverflowStrategy.backpressure)
-          .mapAsync(1) { msg =>
+          .mapAsync(5) { msg =>
+            // We can do it in parallel, because we're just applying verified events
             val req = QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value())
             process(req).transform { x =>
               currentOffset = msg.offset()
