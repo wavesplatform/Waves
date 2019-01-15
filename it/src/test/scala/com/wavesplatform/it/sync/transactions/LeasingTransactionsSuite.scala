@@ -140,7 +140,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
   test("can not make leasing to yourself") {
     for (v <- supportedVersions) {
       val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-      assertBadRequestAndResponse(sender.lease(firstAddress, firstAddress, balance1 + 1.waves, minFee), "Transaction to yourself")
+      assertBadRequestAndResponse(sender.lease(firstAddress, firstAddress, balance1 + 1.waves, minFee, v), "Transaction to yourself")
       nodes.waitForHeightArise()
 
       notMiner.assertBalances(firstAddress, balance1, eff1)
