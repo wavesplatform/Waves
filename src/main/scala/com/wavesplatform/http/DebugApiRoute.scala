@@ -230,14 +230,21 @@ case class DebugApiRoute(ws: WavesSettings,
       new ApiResponse(code = 200, message = "Json state")
     ))
   def minerInfo: Route = (path("minerInfo") & get & withAuth) {
-    complete(miner.collectNextBlockGenerationTimes.map {
-      case (a, t) =>
-        AccountMiningInfo(
-          a.stringRepr,
-          ng.effectiveBalance(a, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height)),
-          t
-        )
-    })
+    complete(
+      wallet.privateKeyAccounts
+        .filterNot(account => ng.hasScript(account.toAddress))
+        .map { account =>
+          (account.toAddress, miner.getNextBlockGenerationOffset(account))
+        }
+        .collect {
+          case (address, Right(offset)) =>
+            AccountMiningInfo(
+              address.stringRepr,
+              ng.effectiveBalance(address, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height)),
+              System.currentTimeMillis() + offset.toMillis
+            )
+        }
+    )
   }
 
   @Path("/historyInfo")
