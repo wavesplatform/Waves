@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.db.WithState
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
 import com.wavesplatform.state._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -19,12 +19,12 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
       recipient   <- accountGen
       amount      <- positiveLongGen
       fee         <- smallFeeGen
-      transfer1 = createWavesTransfer(master, recipient, amount, fee, prevBlockTs - CommonValidation.MaxTimePrevBlockOverTransactionDiff.toMillis - 1)
+      transfer1 = createWavesTransfer(master, recipient, amount, fee, prevBlockTs - Enabled.maxTransactionTimeBackOffset.toMillis - 1)
         .explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) {
       case (prevBlockTs, blockTs, height, transfer1) =>
-        withStateAndHistory(TestFunctionalitySettings.Enabled) { blockchain: Blockchain =>
-          TransactionDiffer(TestFunctionalitySettings.Enabled, Some(prevBlockTs), blockTs, height)(blockchain, transfer1) should produce("too old")
+        withStateAndHistory(Enabled) { blockchain: Blockchain =>
+          TransactionDiffer(Enabled, Some(prevBlockTs), blockTs, height)(blockchain, transfer1) should produce("too old")
         }
     }
   }
@@ -38,11 +38,11 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
       recipient   <- accountGen
       amount      <- positiveLongGen
       fee         <- smallFeeGen
-      transfer1 = createWavesTransfer(master, recipient, amount, fee, blockTs + CommonValidation.MaxTimeTransactionOverBlockDiff.toMillis + 1)
+      transfer1 = createWavesTransfer(master, recipient, amount, fee, blockTs + Enabled.maxTransactionTimeForwardOffset.toMillis + 1)
         .explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) {
       case (prevBlockTs, blockTs, height, transfer1) =>
-        val functionalitySettings = TestFunctionalitySettings.Enabled.copy(allowTransactionsFromFutureUntil = blockTs - 1)
+        val functionalitySettings = Enabled.copy(allowTransactionsFromFutureUntil = blockTs - 1)
         withStateAndHistory(functionalitySettings) { blockchain: Blockchain =>
           TransactionDiffer(functionalitySettings, Some(prevBlockTs), blockTs, height)(blockchain, transfer1) should produce("far future")
         }

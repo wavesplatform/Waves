@@ -11,7 +11,7 @@ import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
-import com.wavesplatform.state.diffs.{CommonValidation, TransactionDiffer}
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
 import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
@@ -60,7 +60,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
   private val putRequestStats     = Kamon.counter("utx-pool-put-if-new")
 
   private def removeExpired(currentTs: Long): Unit = {
-    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > CommonValidation.MaxTimePrevBlockOverTransactionDiff
+    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > fs.maxTransactionTimeBackOffset
 
     transactions.values.asScala
       .collect {

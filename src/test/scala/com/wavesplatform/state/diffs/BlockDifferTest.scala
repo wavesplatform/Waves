@@ -12,6 +12,7 @@ import com.wavesplatform.state.{Blockchain, Diff, EitherExt2}
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalatest.{FreeSpecLike, Matchers}
 import com.wavesplatform.crypto._
+import scala.concurrent.duration._
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
 
@@ -123,7 +124,9 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       resetEffectiveBalancesAtHeight = 0,
       blockVersion3AfterHeight = 0,
       preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)),
-      doubleFeaturesPeriodsAfterHeight = Int.MaxValue
+      doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
+      maxTransactionTimeBackOffset = 120.minutes,
+      maxTransactionTimeForwardOffset = 90.minutes
     )
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }

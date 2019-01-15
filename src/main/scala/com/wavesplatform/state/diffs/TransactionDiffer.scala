@@ -40,7 +40,7 @@ object TransactionDiffer extends Instrumented with ScorexLogging {
         .measureForType(tx.builder.typeId) {
           for {
             _ <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, tx)
-            _ <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, tx)
+            _ <- CommonValidation.disallowTxFromPast(settings, prevBlockTimestamp, tx)
             _ <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
             _ <- CommonValidation.disallowDuplicateIds(blockchain, settings, currentBlockHeight, tx)
             _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, settings, currentBlockTimestamp, tx)

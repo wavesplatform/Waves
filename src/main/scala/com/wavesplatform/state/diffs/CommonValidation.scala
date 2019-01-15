@@ -14,15 +14,12 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 
-import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
 object CommonValidation {
 
-  val MaxTimeTransactionOverBlockDiff: FiniteDuration     = 90.minutes
-  val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
-  val ScriptExtraFee                                      = 400000L
-  val FeeUnit                                             = 100000
+  val ScriptExtraFee = 400000L
+  val FeeUnit        = 100000
 
   val FeeConstants: Map[Byte, Long] = Map(
     GenesisTransaction.typeId        -> 0,
@@ -153,14 +150,14 @@ object CommonValidation {
 
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
     val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
-    if (!allowTransactionsFromFutureByTimestamp && tx.timestamp - time > MaxTimeTransactionOverBlockDiff.toMillis)
+    if (!allowTransactionsFromFutureByTimestamp && tx.timestamp - time > settings.maxTransactionTimeForwardOffset.toMillis)
       Left(Mistiming(s"Transaction ts ${tx.timestamp} is from far future. BlockTime: $time"))
     else Right(tx)
   }
 
-  def disallowTxFromPast[T <: Transaction](prevBlockTime: Option[Long], tx: T): Either[ValidationError, T] =
+  def disallowTxFromPast[T <: Transaction](settings: FunctionalitySettings, prevBlockTime: Option[Long], tx: T): Either[ValidationError, T] =
     prevBlockTime match {
-      case Some(t) if (t - tx.timestamp) > MaxTimePrevBlockOverTransactionDiff.toMillis =>
+      case Some(t) if (t - tx.timestamp) > settings.maxTransactionTimeBackOffset.toMillis =>
         Left(Mistiming(s"Transaction ts ${tx.timestamp} is too old. Previous block time: $prevBlockTime"))
       case _ => Right(tx)
     }
