@@ -228,6 +228,10 @@ checkPRRaw in Global := {
   }
 }
 
+lazy val common = project.settings(
+  libraryDependencies ++= Dependencies.serialization
+)
+
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
@@ -278,7 +282,7 @@ lazy val lang =
     )
 
 lazy val langJS  = lang.js
-lazy val langJVM = lang.jvm
+lazy val langJVM = lang.jvm.dependsOn(common)
 
 lazy val node = project
   .in(file("."))
@@ -302,7 +306,7 @@ lazy val node = project
         Dependencies.commons_net ++
         Dependencies.monix.value
   )
-  .dependsOn(langJVM)
+  .dependsOn(langJVM, common)
 
 lazy val discovery = project
 
