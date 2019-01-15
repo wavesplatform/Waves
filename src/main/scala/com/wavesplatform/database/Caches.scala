@@ -221,27 +221,28 @@ trait Caches extends Blockchain with ScorexLogging {
     val assetBalances        = Map.newBuilder[BigInt, Map[ByteStr, Long]]
     val leaseBalances        = Map.newBuilder[BigInt, LeaseBalance]
     val updatedLeaseBalances = Map.newBuilder[Address, LeaseBalance]
-    val newPortfolios        = Map.newBuilder[Address, Portfolio]
+    val newPortfolios        = Seq.newBuilder[Address]
 
     for ((address, portfolioDiff) <- diff.portfolios) {
-      val newPortfolio = portfolioCache.get(address).combine(portfolioDiff)
+      val aid = addressId(address)
       if (portfolioDiff.balance != 0) {
-        wavesBalances += addressId(address) -> newPortfolio.balance
+        wavesBalances += aid -> (portfolioDiff.balance + balance(address, None))
       }
 
       if (portfolioDiff.lease != LeaseBalance.empty) {
-        leaseBalances += addressId(address) -> newPortfolio.lease
-        updatedLeaseBalances += address     -> newPortfolio.lease
+        val lease = leaseBalance(address).combine(portfolioDiff.lease)
+        leaseBalances += aid            -> lease
+        updatedLeaseBalances += address -> lease
       }
 
       if (portfolioDiff.assets.nonEmpty) {
-        val newAssetBalances = for { (k, v) <- portfolioDiff.assets if v != 0 } yield k -> newPortfolio.assets(k) // XXX rewrite for assetBalance
+        val newAssetBalances = for { (k, v) <- portfolioDiff.assets if v != 0 } yield k -> (v + balance(address, Some(k)))
         if (newAssetBalances.nonEmpty) {
-          assetBalances += addressId(address) -> newAssetBalances
+          assetBalances += aid -> newAssetBalances
         }
       }
 
-      newPortfolios += address -> newPortfolio
+      newPortfolios += address
     }
 
     val newFills = for {
@@ -277,7 +278,7 @@ trait Caches extends Blockchain with ScorexLogging {
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
-    for ((address, portfolio)    <- newPortfolios.result()) portfolioCache.put(address, portfolio)
+    for (address                 <- newPortfolios.result()) portfolioCache.invalidate(address)
     for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     leaseBalanceCache.putAll(updatedLeaseBalances.result().asJava)
     scriptCache.putAll(diff.scripts.asJava)
