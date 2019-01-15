@@ -786,7 +786,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       }
     }
 
-    val addressIds: Seq[BigInt] = {
+    lazy val addressIds: Seq[BigInt] = {
       val all = for {
         seqNr <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId)))
         addressId <- db
@@ -796,7 +796,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       takeAfter(all, maybeAddressId)
     }
 
-    val distribution: Stream[(Address, Long)] =
+    lazy val distribution: Stream[(Address, Long)] =
       for {
         addressId <- addressIds.toStream
         history = db.get(Keys.assetBalanceHistory(addressId, assetId))
@@ -806,9 +806,11 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       } yield db.get(Keys.idToAddress(addressId)) -> balance
 
     lazy val page: AssetDistributionPage = {
-      val items   = distribution.take(count)
-      val hasNext = addressIds.length > count
-      val lastKey = items.lastOption.map(_._1)
+      val dst = distribution.take(count + 1)
+
+      val hasNext = dst.length > count
+      val items   = if (hasNext) dst.init else dst
+      val lastKey = if (hasNext) items.lastOption.map(_._1) else None
 
       val result: Paged[Address, AssetDistribution] =
         Paged(hasNext, lastKey, AssetDistribution(items.toMap))
