@@ -235,7 +235,7 @@ trait Caches extends Blockchain with ScorexLogging {
       }
 
       if (portfolioDiff.assets.nonEmpty) {
-        val newAssetBalances = for { (k, v) <- portfolioDiff.assets if v != 0 } yield k -> newPortfolio.assets(k)
+        val newAssetBalances = for { (k, v) <- portfolioDiff.assets if v != 0 } yield k -> newPortfolio.assets(k) // XXX rewrite for assetBalance
         if (newAssetBalances.nonEmpty) {
           assetBalances += addressId(address) -> newAssetBalances
         }

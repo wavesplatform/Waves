@@ -1,7 +1,7 @@
 package com.wavesplatform.database
 
 import cats.kernel.Monoid
-import com.google.common.cache.CacheBuilder
+import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.database.patch.DisableHijackedAliases
@@ -123,14 +123,33 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
   }
 
-  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = readOnly { db =>
+  private val balancesCache = CacheBuilder
+    .newBuilder()
+    .maximumSize(100000)
+    .recordStats()
+    .build[(Address, Option[AssetId]), java.lang.Long](new CacheLoader[(Address, Option[AssetId]), java.lang.Long] {
+      override def load(key: (Address, Option[AssetId])) = loadBalance(key)
+    })
+
+  private def loadBalance(req: (Address, Option[AssetId])): Long = readOnly { db =>
+    addressId(req._1).fold(0L) { addressId =>
+      req._2 match {
+        case Some(assetId) => db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId)).getOrElse(0L)
+        case None          => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
+      }
+    }
+  }
+
+  private def discardBalance(key: (Address, Option[AssetId])) = balancesCache.invalidate(key)
+
+  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = balancesCache.get(address -> mayBeAssetId) /*readOnly { db =>
     addressId(address).fold(0L) { addressId =>
       mayBeAssetId match {
         case Some(assetId) => db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId)).getOrElse(0L)
         case None          => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
       }
     }
-  }
+  }*/
 
   private def loadLeaseBalance(db: ReadOnlyDB, addressId: BigInt): LeaseBalance = {
     val lease = db.fromHistory(Keys.leaseBalanceHistory(addressId), Keys.leaseBalance(addressId)).getOrElse(LeaseBalance.empty)
@@ -217,12 +236,15 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     rw.put(Keys.lastAddressId, Some(lastAddressId))
     rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
 
+    val newAddressIdsBuilder = Map.newBuilder[BigInt, Address]
     for ((address, id) <- newAddresses) {
       rw.put(Keys.addressId(address), Some(id))
       log.trace(s"WRITE ${address.address} -> $id")
       rw.put(Keys.idToAddress(id), address)
+      newAddressIdsBuilder += (id -> address)
     }
     log.trace(s"WRITE lastAddressId = $lastAddressId")
+    val newAddressIds = newAddressIdsBuilder.result()
 
     val threshold        = height - maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
@@ -235,6 +257,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         newAddressesForWaves += addressId
       }
       rw.put(Keys.wavesBalance(addressId)(height), balance)
+      val address = newAddressIds.get(addressId).getOrElse(rw.get(Keys.idToAddress(addressId)))
+      balancesCache.put(address -> None, balance)
       expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshold, Keys.wavesBalance(addressId))
       addressId
     }
@@ -263,6 +287,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       for ((assetId, balance) <- assets) {
         rw.put(Keys.assetBalance(addressId, assetId)(height), balance)
         expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, assetId), threshold, Keys.assetBalance(addressId, assetId))
+        val address = newAddressIds.get(addressId).getOrElse(rw.get(Keys.idToAddress(addressId)))
+        balancesCache.put(address -> Some(assetId), balance)
       }
     }
 
@@ -379,6 +405,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
       val discardedBlocks: Seq[Block] = for (currentHeight <- height until targetHeight by -1) yield {
+        val balancesToInvalidate   = Seq.newBuilder[(Address, Option[AssetId])]
         val portfoliosToInvalidate = Seq.newBuilder[Address]
         val assetInfoToInvalidate  = Seq.newBuilder[ByteStr]
         val ordersToInvalidate     = Seq.newBuilder[ByteStr]
@@ -391,8 +418,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
           for (addressId <- rw.get(Keys.changedAddresses(currentHeight))) {
             val address = rw.get(Keys.idToAddress(addressId))
+            balancesToInvalidate += (address -> None)
 
             for (assetId <- rw.get(Keys.assetList(addressId))) {
+              balancesToInvalidate += (address -> Some(assetId))
               rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
               rw.filterHistory(Keys.assetBalanceHistory(addressId, assetId), currentHeight)
             }
@@ -495,6 +524,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
           discardedBlock
         }
 
+        balancesToInvalidate.result().foreach(discardBalance)
         portfoliosToInvalidate.result().foreach(discardPortfolio)
         assetInfoToInvalidate.result().foreach(discardAssetDescription)
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
