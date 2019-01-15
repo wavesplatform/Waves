@@ -807,8 +807,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     lazy val page: AssetDistributionPage = {
       val items   = distribution.take(count)
-      val hasNext = addressIds.length > count
-      val lastKey = items.lastOption.map(_._1)
+      val hasNext = addressIds.length > count && items.nonEmpty
+      val lastKey = if (hasNext) items.lastOption.map(_._1) else None
 
       val result: Paged[Address, AssetDistribution] =
         Paged(hasNext, lastKey, AssetDistribution(items.toMap))
