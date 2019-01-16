@@ -134,7 +134,7 @@ trait Caches extends Blockchain with ScorexLogging {
     portfolioCache.get(a)
   }
 
-  private val balancesCache: LoadingCache[(Address, Option[AssetId]), java.lang.Long] = cache(maxCacheSize, loadBalance)
+  private val balancesCache: LoadingCache[(Address, Option[AssetId]), java.lang.Long] = cache(maxCacheSize * 16, loadBalance)
   protected def discardBalance(key: (Address, Option[AssetId]))                       = balancesCache.invalidate(key)
   override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long         = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Option[AssetId])): Long

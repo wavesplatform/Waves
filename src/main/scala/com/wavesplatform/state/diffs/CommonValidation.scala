@@ -68,25 +68,15 @@ object CommonValidation {
                 s"negative waves balance to (at least) temporary negative state, current balance equals $oldWavesBalance, " +
                 s"spends equals ${spendings.balance}, result is $newWavesBalance"))
         } else {
-          val balanceError = spendings.assets.iterator.flatMap {
-            case (aid, delta) =>
-              if (delta < 0) {
-                val availableBalance = blockchain.balance(sender, Some(aid))
-                if (availableBalance + delta < 0) {
-                  Some(
-                    GenericError(
-                      "Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
-                        s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
-                        s"spends equals $delta, result is ${availableBalance + delta}"))
-                } else {
-                  None
-                }
-              } else {
-                None
-              }
+          val balanceError = spendings.assets.collectFirst {
+            case (aid, delta) if delta < 0 && blockchain.balance(sender, Some(aid)) + delta < 0 =>
+              val availableBalance = blockchain.balance(sender, Some(aid))
+              GenericError(
+                "Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
+                  s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
+                  s"spends equals $delta, result is ${availableBalance + delta}")
           }
-
-          balanceError.toSeq.headOption.fold[Either[ValidationError, T]](Right(tx))(Left(_))
+          balanceError.fold[Either[ValidationError, T]](Right(tx))(Left(_))
         }
       }
 
@@ -95,7 +85,7 @@ object CommonValidation {
           Left(
             GenericError(
               "Attempt to pay unavailable funds: balance " +
-                s"${blockchain.portfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
+                s"${blockchain.balance(ptx.sender, None)} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, None, mtx.fee)
         case _                            => Right(tx)
