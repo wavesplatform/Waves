@@ -89,7 +89,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
             .get
 
         val iTx = invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis)
-        assertBadRequestAndResponse(sponsor.broadcastRequest(iTx.json()), "Transaction .* is from far future")
+        assertBadRequestAndResponse(sponsor.broadcastRequest(iTx.json()), "Transaction timestamp .* is more than .*ms in the future")
       }
     }
 
