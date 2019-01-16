@@ -75,7 +75,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
 
   val aliasGen: Gen[Alias] = for {
     str <- validAliasStringGen
-  } yield Alias.buildWithCurrentNetworkByte(str.mkString).explicitGet()
+  } yield Alias.buildWithCurrentChainId(str.mkString).explicitGet()
 
   val invalidAliasStringGen: Gen[String] = for {
     length     <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)

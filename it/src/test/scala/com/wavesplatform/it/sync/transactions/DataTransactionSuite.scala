@@ -51,7 +51,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTxs = Seq(
-      (data(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
+      (data(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
       (data(fee = 99999), "Fee .* does not exceed minimal value")
     )
 
@@ -259,7 +259,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("try to make address with 1000 DataEntries") {
-    val dataSet = 0 to 200 flatMap (i =>
+    val dataSet = 0 until 200 flatMap (i =>
       List(
         IntegerDataEntry(s"int$i", 1000 + i),
         BooleanDataEntry(s"bool$i", false),
@@ -268,14 +268,8 @@ class DataTransactionSuite extends BaseTransactionSuite {
         IntegerDataEntry(s"integer$i", 1000 - i)
       ))
 
-    val dataAllTypes = dataSet.toList
-
-    for (i <- 0 to 900 by 100) {
-      val dataTx = dataAllTypes.slice(i, i + 100)
-      val fee    = calcDataFee(dataTx)
-      val txId   = sender.putData(thirdAddress, dataTx, fee).id
-      nodes.waitForHeightAriseAndTxPresent(txId)
-    }
+    val txIds = dataSet.grouped(100).map(_.toList).map(data => sender.putData(thirdAddress, data, calcDataFee(data)).id)
+    txIds foreach nodes.waitForTransaction
 
     val r = scala.util.Random.nextInt(199)
     sender.getData(thirdAddress, s"int$r") shouldBe IntegerDataEntry(s"int$r", 1000 + r)

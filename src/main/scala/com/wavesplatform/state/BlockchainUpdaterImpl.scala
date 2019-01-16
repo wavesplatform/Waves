@@ -207,6 +207,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = {
+    log.info(s"Removing blocks after ${blockId.trim} from blockchain")
+
     val ng = ngState
     if (ng.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
@@ -480,27 +482,18 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         } yield address -> f(address)
       }
 
-  override def assetDistribution(assetId: AssetId): Map[Address, Long] = {
+  override def assetDistribution(assetId: AssetId): AssetDistribution = {
     val fromInner = blockchain.assetDistribution(assetId)
-    val fromNg    = changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L))
+    val fromNg    = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L)))
 
-    fromInner ++ fromNg
+    fromInner |+| fromNg
   }
 
   override def assetDistributionAtHeight(assetId: AssetId,
                                          height: Int,
                                          count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] = {
-    val innerDistribution = blockchain.assetDistributionAtHeight(assetId, height, count, fromAddress)
-    ngState.fold(innerDistribution) { ng =>
-      if (height < this.height) {
-        innerDistribution
-      } else {
-        val distributionFromNG =
-          changedBalances(_.assets.getOrElse(assetId, 0) != 0, portfolio(_).assets.getOrElse(assetId, 0))
-        innerDistribution.map(_ ++ distributionFromNG)
-      }
-    }
+                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = {
+    blockchain.assetDistributionAtHeight(assetId, height, count, fromAddress)
   }
 
   override def wavesDistribution(height: Int): Map[Address, Long] = ngState.fold(blockchain.wavesDistribution(height)) { ng =>
@@ -550,6 +543,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       blockchain.balance(address, mayBeAssetId) + ng.bestLiquidDiff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(mayBeAssetId)
     case None =>
       blockchain.balance(address, mayBeAssetId)
+  }
+
+  override def leaseBalance(address: Address): LeaseBalance = ngState match {
+    case Some(ng) =>
+      cats.Monoid.combine(blockchain.leaseBalance(address), ng.bestLiquidDiff.portfolios.getOrElse(address, Portfolio.empty).lease)
+    case None =>
+      blockchain.leaseBalance(address)
   }
 }
 

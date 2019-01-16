@@ -485,7 +485,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
 
       val actual = ev[CaseObj](ctx.evaluationContext, expr).map(_.fields("bytes"))
-      actual shouldBe evaluated(ByteVector(addressFromPublicKey(environment.networkByte, pkBytes)))
+      actual shouldBe evaluated(ByteVector(addressFromPublicKey(environment.chainId, pkBytes)))
     }
   }
 
@@ -495,14 +495,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
-      Base58.encode(addressFromPublicKey(environment.networkByte, pk))
+      Base58.encode(addressFromPublicKey(environment.chainId, pk))
     }
 
     forAll(gen) { addrStr =>
       val expr                                   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
       val actual                                 = ev[CaseObj](ctx.evaluationContext, expr)
       val a: Either[ExecutionError, EVALUATED]   = actual.map(_.fields("bytes"))
-      val e: Either[String, Option[Array[Byte]]] = addressFromString(environment.networkByte, addrStr)
+      val e: Either[String, Option[Array[Byte]]] = addressFromString(environment.chainId, addrStr)
       a.explicitGet() shouldBe CONST_BYTEVECTOR(ByteVector(e.explicitGet().get))
     }
   }
@@ -513,13 +513,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
-      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(environment.networkByte, pk))
+      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(environment.chainId, pk))
     }
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr)))
       val actual = ev[CaseObj](ctx.evaluationContext, expr)
-      val e      = addressFromString(environment.networkByte, addrStr).explicitGet().get
+      val e      = addressFromString(environment.chainId, addrStr).explicitGet().get
       actual.map(_.fields("bytes")).explicitGet() shouldBe CONST_BYTEVECTOR(ByteVector(e))
     }
   }
@@ -530,7 +530,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
-      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(environment.networkByte, pk) :+ (1: Byte))
+      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(environment.chainId, pk) :+ (1: Byte))
     }
 
     forAll(gen) { addrStr =>
@@ -550,7 +550,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       if addressVersion != EnvironmentFunctions.AddressVersion
     } yield {
       val (_, pk) = Curve25519.createKeyPair(seed)
-      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(environment.networkByte, pk, addressVersion))
+      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(environment.chainId, pk, addressVersion))
     }
 
     forAll(gen) { addrStr =>
@@ -565,12 +565,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val ctx         = defaultFullContext(environment)
 
     val gen = for {
-      seed        <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
-      networkByte <- Gen.choose[Byte](0, 100)
-      if networkByte != environment.networkByte
+      seed    <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
+      chainId <- Gen.choose[Byte](0, 100)
+      if chainId != environment.chainId
     } yield {
       val (_, pk) = Curve25519.createKeyPair(seed)
-      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(networkByte, pk))
+      EnvironmentFunctions.AddressPrefix + Base58.encode(addressFromPublicKey(chainId, pk))
     }
 
     forAll(gen) { addrStr =>
@@ -588,7 +588,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
       bytes = {
         val (_, pk) = Curve25519.createKeyPair(seed)
-        addressFromPublicKey(environment.networkByte, pk)
+        addressFromPublicKey(environment.chainId, pk)
       }
       checkSum = bytes.takeRight(EnvironmentFunctions.ChecksumLength)
       wrongCheckSum <- Gen.containerOfN[Array, Byte](EnvironmentFunctions.ChecksumLength, Arbitrary.arbByte.arbitrary)

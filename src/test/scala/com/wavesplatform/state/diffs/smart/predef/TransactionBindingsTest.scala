@@ -541,7 +541,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(V2, new WavesEnvironment(networkByte, Coeval(null), null, EmptyBlockchain), isTokenContext = true)
+          .build(V2, new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain), isTokenContext = true)
 
     for {
       compileResult <- compiler.ExpressionCompilerV1(ctx.compilerContext, expr)
@@ -550,7 +550,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     } yield r
   }
 
-  def runWithSmartTradingActivated(script: String, t: In = null, networkByte: Byte = networkByte): Either[String, EVALUATED] = {
+  def runWithSmartTradingActivated(script: String, t: In = null, chainId: Byte = chainId): Either[String, EVALUATED] = {
     import cats.syntax.monoid._
     import com.wavesplatform.lang.v1.CTX._
 
@@ -560,7 +560,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(V2, new WavesEnvironment(networkByte, Coeval(t), null, EmptyBlockchain), isTokenContext = false)
+          .build(V2, new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain), isTokenContext = false)
 
     for {
       compileResult <- ExpressionCompilerV1(ctx.compilerContext, expr)

@@ -60,7 +60,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
   private val putRequestStats     = Kamon.counter("utx-pool-put-if-new")
 
   private def removeExpired(currentTs: Long): Unit = {
-    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
+    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > fs.maxTransactionTimeBackOffset
 
     transactions.values.asScala
       .collect {
@@ -184,7 +184,15 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
     val result = measureSuccessful(
       processingTimeStats, {
         for {
-          _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+          _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+
+          transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
+            .map(_.bytes().size)
+            .sum
+          _ <- Either.cond((transactionsBytes + tx.bytes().size) <= utxSettings.maxBytesSize,
+                           (),
+                           GenericError("Transaction pool bytes size limit is reached"))
+
           _    <- checkNotBlacklisted(tx)
           _    <- checkScripted(b, tx)
           _    <- checkAlias(b, tx)

@@ -126,7 +126,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTransfers = Seq(
-      (request(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
+      (request(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
       (request(transfers = List.fill(MaxTransferCount + 1)(Transfer(secondAddress, 1)), fee = calcMassTransferFee(MaxTransferCount + 1)),
        s"Number of transfers ${MaxTransferCount + 1} is greater than 100"),
       (request(transfers = List(Transfer(secondAddress, -1))), "One of the transfers has negative amount"),
@@ -267,7 +267,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     createAliasTxs.foreach(sender.waitForTransaction(_))
 
     val transfers = aliases.map { alias =>
-      Transfer(Alias.buildWithCurrentNetworkByte(alias).explicitGet().stringRepr, 2.waves)
+      Transfer(Alias.buildWithCurrentChainId(alias).explicitGet().stringRepr, 2.waves)
     }
     val txId = sender.massTransfer(firstAddress, transfers, 300000).id
     nodes.waitForHeightAriseAndTxPresent(txId)

@@ -2,6 +2,10 @@ package com.wavesplatform.mining
 
 import cats.data.EitherT
 import cats.implicits._
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.block.Block._
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -10,23 +14,17 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
+import com.wavesplatform.transaction._
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
-import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.block.Block._
-import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.transaction._
-import com.wavesplatform.wallet.Wallet
 
-import scala.collection.mutable.{Map => MMap}
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 trait Miner {
@@ -36,7 +34,7 @@ trait Miner {
 trait MinerDebugInfo {
   def state: MinerDebugInfo.State
 
-  def collectNextBlockGenerationTimes: List[(Address, Long)]
+  def getNextBlockGenerationOffset(account: PrivateKeyAccount): Either[String, FiniteDuration]
 }
 
 object MinerDebugInfo {
@@ -82,11 +80,9 @@ class MinerImpl(allChannels: ChannelGroup,
   private val blockBuildTimeStats      = Kamon.histogram("pack-and-forge-block-time", MeasurementUnit.time.milliseconds)
   private val microBlockBuildTimeStats = Kamon.histogram("forge-microblock-time", MeasurementUnit.time.milliseconds)
 
-  private val nextBlockGenerationTimes: MMap[Address, Long] = MMap.empty
-
   @volatile private var debugState: MinerDebugInfo.State = MinerDebugInfo.Disabled
 
-  def collectNextBlockGenerationTimes: List[(Address, Long)] = Await.result(Task.now(nextBlockGenerationTimes.toList).runAsyncLogErr, Duration.Inf)
+  def getNextBlockGenerationOffset(account: PrivateKeyAccount): Either[String, FiniteDuration] = nextBlockGenOffsetWithConditions(account)
 
   private def checkAge(parentHeight: Int, parentTimestamp: Long): Either[String, Unit] =
     Either
@@ -290,17 +286,24 @@ class MinerImpl(allChannels: ChannelGroup,
     } else Left(s"Balance $balance of ${account.address} is lower than required for generation")
   }
 
+  private def nextBlockGenOffsetWithConditions(account: PrivateKeyAccount): Either[String, FiniteDuration] = {
+    val height    = blockchainUpdater.height
+    val lastBlock = blockchainUpdater.lastBlock.get
+    for {
+      _  <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
+      _  <- checkScript(account)
+      ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
+      calculatedOffset = ts - timeService.correctedTime()
+      offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
+
+    } yield offset
+  }
+
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     {
-      val height    = blockchainUpdater.height
-      val lastBlock = blockchainUpdater.lastBlock.get
       for {
-        _  <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
-        _  <- checkScript(account)
-        ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
-        calculatedOffset = ts - timeService.correctedTime()
-        offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
-        quorumAvailable  = checkQuorumAvailable().isRight
+        offset <- nextBlockGenOffsetWithConditions(account)
+        quorumAvailable = checkQuorumAvailable().isRight
       } yield {
         if (quorumAvailable) offset
         else offset.max(settings.minerSettings.noQuorumMiningDelay)
@@ -308,7 +311,6 @@ class MinerImpl(allChannels: ChannelGroup,
     } match {
       case Right(offset) =>
         log.debug(s"Next attempt for acc=$account in $offset")
-        nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
             BlockAppender(checkpoint, blockchainUpdater, timeService, utx, pos, settings, appenderScheduler)(block)
@@ -366,7 +368,7 @@ object Miner {
   val Disabled = new Miner with MinerDebugInfo {
     override def scheduleMining(): Unit = ()
 
-    override def collectNextBlockGenerationTimes: List[(Address, Long)] = List.empty
+    override def getNextBlockGenerationOffset(account: PrivateKeyAccount): Either[String, FiniteDuration] = Left("Disabled")
 
     override val state = MinerDebugInfo.Disabled
   }

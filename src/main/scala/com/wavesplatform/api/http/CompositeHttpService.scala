@@ -27,6 +27,7 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Set[Class[_]], ro
                                                                                                "Content-Type",
                                                                                                "X-Requested-With",
                                                                                                "Timestamp",
+                                                                                               "x-api-key",
                                                                                                "Signature") ++
     (if (settings.apiKeyDifferentHost) Seq("api_key", "X-API-Key") else Seq.empty[String])
 

@@ -47,7 +47,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
   override val typeId: Byte                 = 13
   override val supportedVersions: Set[Byte] = Set(1)
 
-  private def networkByte = AddressScheme.current.chainId
+  private def chainId = AddressScheme.current.chainId
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
@@ -65,7 +65,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
       lazy val timestamp = Longs.fromByteArray(bytes.slice(scriptEnd + 8, scriptEnd + 16))
       (for {
         scriptOpt <- scriptEiOpt
-        _         <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
+        _         <- Either.cond(chainId == chainId, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
         proofs    <- Proofs.fromBytes(bytes.drop(scriptEnd + 16))
         tx        <- create(version, sender, scriptOpt, fee, timestamp, proofs)
       } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
@@ -80,7 +80,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
     for {
       _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
-    } yield new SetScriptTransaction(version, networkByte, sender, script, fee, timestamp, proofs)
+    } yield new SetScriptTransaction(version, chainId, sender, script, fee, timestamp, proofs)
 
   def signed(version: Byte,
              sender: PublicKeyAccount,

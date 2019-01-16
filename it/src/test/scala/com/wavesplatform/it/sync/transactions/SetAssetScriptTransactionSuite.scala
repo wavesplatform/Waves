@@ -170,7 +170,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val (balance, eff) = notMiner.accountBalances(firstAddress)
 
     val invalidTxs = Seq(
-      (sastx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
+      (sastx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
       (sastx(fee = 9999999), "Fee .* does not exceed minimal value"),
       (sastx(assetId = ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz9ekQuYn92natMnMq8").get), "invalid.assetId"),
       (sastx(assetId = ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get), "Referenced assetId not found")

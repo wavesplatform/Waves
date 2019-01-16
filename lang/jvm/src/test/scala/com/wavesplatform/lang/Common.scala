@@ -79,9 +79,9 @@ object Common {
     EvaluationContext.build(Map.empty, Map("p" -> LazyVal(EitherT.pure(instance))), Seq.empty)
 
   def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Tx :+: Ord :+: CNil] = Coeval(???), nByte: Byte = 'T'): Environment = new Environment {
-    override def height: Long      = h
-    override def networkByte: Byte = nByte
-    override def inputEntity       = in()
+    override def height: Long  = h
+    override def chainId: Byte = nByte
+    override def inputEntity   = in()
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
@@ -90,13 +90,13 @@ object Common {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
   }
 
-  def addressFromPublicKey(networkByte: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {
+  def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {
     val publicKeyHash   = Global.secureHash(pk).take(EnvironmentFunctions.HashLength)
-    val withoutChecksum = addressVersion +: networkByte +: publicKeyHash
+    val withoutChecksum = addressVersion +: chainId +: publicKeyHash
     withoutChecksum ++ Global.secureHash(withoutChecksum).take(EnvironmentFunctions.ChecksumLength)
   }
 
-  def addressFromString(networkByte: Byte, str: String): Either[String, Option[Array[Byte]]] = {
+  def addressFromString(chainId: Byte, str: String): Either[String, Option[Array[Byte]]] = {
     val base58String = if (str.startsWith(EnvironmentFunctions.AddressPrefix)) str.drop(EnvironmentFunctions.AddressPrefix.length) else str
     Global.base58Decode(base58String, Global.MaxAddressLength) match {
       case Left(e) => Left(e)
@@ -110,7 +110,7 @@ object Common {
           checkSum sameElements checkSumGenerated
         }
 
-        if (version == EnvironmentFunctions.AddressVersion && network == networkByte && addressBytes.length == EnvironmentFunctions.AddressLength && checksumCorrect)
+        if (version == EnvironmentFunctions.AddressVersion && network == chainId && addressBytes.length == EnvironmentFunctions.AddressLength && checksumCorrect)
           Right(Some(addressBytes))
         else Right(None)
     }

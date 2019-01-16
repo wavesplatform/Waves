@@ -32,6 +32,7 @@ import monix.eval.{Coeval, Task}
 import play.api.libs.json._
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -132,11 +133,11 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
   def portfolios: Route = path("portfolios" / Segment) { rawAddress =>
-    (get & withAuth & parameter('considerUnspent.as[Boolean])) { considerUnspent =>
+    (get & withAuth & parameter('considerUnspent.as[Boolean].?)) { considerUnspent =>
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
-          val portfolio = if (considerUnspent) utxStorage.portfolio(address) else ng.portfolio(address)
+          val portfolio = if (considerUnspent.getOrElse(true)) utxStorage.portfolio(address) else ng.portfolio(address)
           complete(Json.toJson(portfolio))
       }
     }
@@ -193,7 +194,7 @@ case class DebugApiRoute(ws: WavesSettings,
     Array(
       new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
     ))
-  def rollback: Route = (path("rollback") & post & withAuth) {
+  def rollback: Route = (path("rollback") & post & withAuth & withRequestTimeout(15.minutes)) {
     json[RollbackParams] { params =>
       ng.blockAt(params.rollbackTo) match {
         case Some(block) =>
@@ -229,14 +230,21 @@ case class DebugApiRoute(ws: WavesSettings,
       new ApiResponse(code = 200, message = "Json state")
     ))
   def minerInfo: Route = (path("minerInfo") & get & withAuth) {
-    complete(miner.collectNextBlockGenerationTimes.map {
-      case (a, t) =>
-        AccountMiningInfo(
-          a.stringRepr,
-          ng.effectiveBalance(a, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height)),
-          t
-        )
-    })
+    complete(
+      wallet.privateKeyAccounts
+        .filterNot(account => ng.hasScript(account.toAddress))
+        .map { account =>
+          (account.toAddress, miner.getNextBlockGenerationOffset(account))
+        }
+        .collect {
+          case (address, Right(offset)) =>
+            AccountMiningInfo(
+              address.stringRepr,
+              ng.effectiveBalance(address, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height)),
+              System.currentTimeMillis() + offset.toMillis
+            )
+        }
+    )
   }
 
   @Path("/historyInfo")
