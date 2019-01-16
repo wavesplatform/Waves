@@ -29,11 +29,8 @@ import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-
 class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink with WithDB {
-  object UtxTestSettings {
-    val DefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
-  }
+  val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import CommonValidation.{MaxTimePrevBlockOverTransactionDiff => maxAge, ScriptExtraFee => extraFee}
 
@@ -107,7 +104,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         time,
         bcu,
         FunctionalitySettings.TESTNET,
-        UtxSettings(10, UtxTestSettings.DefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
+        UtxSettings(10, PoolDefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
       )
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs        = for (_ <- 1 to n) yield createWavesTransfer(sender, recipient, amountPart, fee, time.getTimestamp()).explicitGet()
@@ -123,7 +120,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
             time,
             bcu,
             FunctionalitySettings.TESTNET,
-            UtxSettings(10, UtxTestSettings.DefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
+            UtxSettings(10, PoolDefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
           )
         (sender, bcu, utxPool)
     }
@@ -135,7 +132,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
   } yield {
-    val settings = UtxSettings(10, UtxTestSettings.DefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
+    val settings = UtxSettings(10, PoolDefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
     val utxPool  = new UtxPoolImpl(time, bcu, FunctionalitySettings.TESTNET, settings)
     txs.foreach(utxPool.putIfNew)
     (sender, bcu, utxPool, time, settings)
@@ -147,8 +144,9 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
-    val settings = UtxSettings(10, UtxTestSettings.DefaultMaxBytes, Set(sender.address), Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
-    val utxPool  = new UtxPoolImpl(time, bcu, FunctionalitySettings.TESTNET, settings)
+    val settings =
+      UtxSettings(10, PoolDefaultMaxBytes, Set(sender.address), Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
+    val utxPool = new UtxPoolImpl(time, bcu, FunctionalitySettings.TESTNET, settings)
     (sender, utxPool, txs)
   }).label("withBlacklisted")
 
@@ -160,7 +158,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
   } yield {
     val settings =
       UtxSettings(txs.length,
-                  UtxTestSettings.DefaultMaxBytes,
+                  PoolDefaultMaxBytes,
                   Set(sender.address),
                   Set(recipient.address),
                   5.minutes,
@@ -179,13 +177,13 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     } yield {
       val whitelist: Set[String] = if (allowRecipients) recipients.map(_.address).toSet else Set.empty
       val settings =
-        UtxSettings(txs.length, UtxTestSettings.DefaultMaxBytes, Set(sender.address), whitelist, 5.minutes, allowTransactionsFromSmartAccounts = true)
+        UtxSettings(txs.length, PoolDefaultMaxBytes, Set(sender.address), whitelist, 5.minutes, allowTransactionsFromSmartAccounts = true)
       val utxPool = new UtxPoolImpl(time, bcu, FunctionalitySettings.TESTNET, settings)
       (sender, utxPool, txs)
     }).label("massTransferWithBlacklisted")
 
   private def utxTest(utxSettings: UtxSettings =
-                        UtxSettings(20, UtxTestSettings.DefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true),
+                        UtxSettings(20, PoolDefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true),
                       txCount: Int = 10)(f: (Seq[TransferTransactionV1], UtxPool, TestTime) => Unit): Unit =
     forAll(stateGen, chooseNum(2, txCount).label("txCount")) {
       case ((sender, senderBalance, bcu), count) =>
@@ -210,7 +208,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         time,
         bcu,
         FunctionalitySettings.TESTNET,
-        UtxSettings(10, UtxTestSettings.DefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
+        UtxSettings(10, PoolDefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
       )
       (utx, time, tx1, tx2)
     }
@@ -247,7 +245,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         new TestTime(),
         bcu,
         smartAccountsFs,
-        UtxSettings(10, UtxTestSettings.DefaultMaxBytes, Set.empty, Set.empty, 1.day, allowTransactionsFromSmartAccounts = scEnabled)
+        UtxSettings(10, PoolDefaultMaxBytes, Set.empty, Set.empty, 1.day, allowTransactionsFromSmartAccounts = scEnabled)
       )
 
       (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.timestamp))
@@ -263,7 +261,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
 
   "UTX Pool" - {
     "does not add new transactions when full" in utxTest(
-      UtxSettings(1, UtxTestSettings.DefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)) { (txs, utx, _) =>
+      UtxSettings(1, PoolDefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)) { (txs, utx, _) =>
       utx.putIfNew(txs.head) shouldBe 'right
       all(txs.tail.map(t => utx.putIfNew(t))) should produce("pool size limit")
     }
