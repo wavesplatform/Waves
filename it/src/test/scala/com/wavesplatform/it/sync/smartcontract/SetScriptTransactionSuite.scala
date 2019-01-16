@@ -138,11 +138,28 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
     val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
-    val clearScriptId = sender
-      .signedBroadcast(signed.json())
-      .id
 
-    nodes.waitForHeightAriseAndTxPresent(clearScriptId)
+    nodes.waitForHeightArise()
+
+    sender
+      .signedBroadcast(signed.json(), waitForTx = true)
+
+    val tx =
+      TransferTransactionV2
+        .selfSigned(
+          version = 2,
+          assetId = None,
+          sender = acc0,
+          recipient = acc3,
+          amount = transferAmount,
+          timestamp = System.currentTimeMillis(),
+          feeAssetId = None,
+          feeAmount = minFee,
+          attachment = Array.emptyByteArray
+        )
+        .explicitGet()
+    sender.signedBroadcast(tx.json(), waitForTx = true)
+
   }
 
   test("can send using old pk of acc0") {
