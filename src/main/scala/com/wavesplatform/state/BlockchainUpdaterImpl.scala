@@ -207,6 +207,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = {
+    log.info(s"Removing blocks after ${blockId.trim} from blockchain")
+
     val ng = ngState
     if (ng.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
