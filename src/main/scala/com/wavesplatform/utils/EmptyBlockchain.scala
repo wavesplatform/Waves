@@ -9,6 +9,7 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
+import cats.kernel.Monoid
 
 object EmptyBlockchain extends Blockchain {
   override def height: Int = 0
@@ -84,7 +85,7 @@ object EmptyBlockchain extends Blockchain {
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
-  override def assetDistribution(assetId: ByteStr): Map[Address, Long] = Map.empty
+  override def assetDistribution(assetId: ByteStr): AssetDistribution = Monoid.empty[AssetDistribution]
 
   override def wavesDistribution(height: Int): Map[Address, Long] = Map.empty
 
@@ -93,7 +94,8 @@ object EmptyBlockchain extends Blockchain {
   override def assetDistributionAtHeight(assetId: AssetId,
                                          height: Int,
                                          count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
+                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] =
+    Right(AssetDistributionPage(Paged[Address, AssetDistribution](false, None, Monoid.empty[AssetDistribution])))
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *

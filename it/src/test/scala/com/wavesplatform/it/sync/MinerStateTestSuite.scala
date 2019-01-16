@@ -54,8 +54,8 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
     assert(last.balanceDetails(newAddress).generating == balance2)
 
     all(miner.debugMinerInfo()) shouldNot matchPattern { case State(`newAddress`, _, ts) if ts > 0 => }
-    // uncomment after https://wavesplatform.atlassian.net/browse/NODE-1287 fix
-    //all(last.debugMinerInfo()) shouldNot matchPattern { case State(`newAddress`, _, ts) if ts > 0  => }
+
+    all(last.debugMinerInfo()) shouldNot matchPattern { case State(`newAddress`, _, ts) if ts > 0  => }
 
   }
 }

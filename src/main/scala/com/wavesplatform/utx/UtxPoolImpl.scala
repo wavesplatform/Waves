@@ -184,7 +184,15 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
     val result = measureSuccessful(
       processingTimeStats, {
         for {
-          _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+          _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+
+          transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
+            .map(_.bytes().size)
+            .sum
+          _ <- Either.cond((transactionsBytes + tx.bytes().size) <= utxSettings.maxBytesSize,
+                           (),
+                           GenericError("Transaction pool bytes size limit is reached"))
+
           _    <- checkNotBlacklisted(tx)
           _    <- checkScripted(b, tx)
           _    <- checkAlias(b, tx)
