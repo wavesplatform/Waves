@@ -27,17 +27,19 @@ object ScriptReader {
           ver,
           ScriptParseError(s"Invalid version: $version")
         )
-      s <- if (sv == V1 || sv == V2)
-        for {
-          _     <- ScriptV1.validateBytes(scriptBytes)
-          bytes <- Serde.deserialize(scriptBytes).map(_._1)
-          s     <- ScriptV1(sv, bytes, checkSize = false)
-        } yield s
-      else
-        for {
-          bytes <- ContractSerDe.deserialize(scriptBytes)
-          s = ScriptV2(sv, bytes)
-        } yield s
+      s <- sv match {
+        case V1 | V2 =>
+          for {
+            _     <- ScriptV1.validateBytes(scriptBytes)
+            bytes <- Serde.deserialize(scriptBytes).map(_._1)
+            s     <- ScriptV1(sv, bytes, checkSize = false)
+          } yield s
+        case V3 =>
+          for {
+            bytes <- ContractSerDe.deserialize(scriptBytes)
+            s = ScriptV2(sv, bytes)
+          } yield s
+      }
     } yield s).left
       .map(m => ScriptParseError(m.toString))
   }

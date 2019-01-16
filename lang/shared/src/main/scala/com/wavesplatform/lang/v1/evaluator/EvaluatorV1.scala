@@ -29,7 +29,7 @@ object EvaluatorV1 {
     val function   = UserFunction(func.name, null, s"user defined function '${func.name}'", func.args.map(n => (n, null, n)): _*)(func.body)
     for {
       ctx <- get[LoggedEvaluationContext, ExecutionError]
-      result <- id {
+      result <- local {
         modify[LoggedEvaluationContext, ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
           .flatMap(_ => evalExpr(inner))
       }

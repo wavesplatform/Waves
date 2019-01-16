@@ -382,7 +382,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       Expressions.PART.VALID(AnyPos, dropRightFunctionName),
       List(Expressions.TRUE(AnyPos), Expressions.CONST_LONG(AnyPos, 1))
     ),
-    expectedResult = Left("Compilation failed: Can't find a function 'dropRight'(Boolean, Int) in -1--1")
+    expectedResult = Left("Compilation failed: Can't find a function overload 'dropRight'(Boolean, Int) in -1--1")
   )
 
   treeTypeTest("user function definition and usage")(
