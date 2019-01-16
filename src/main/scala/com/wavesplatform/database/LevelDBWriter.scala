@@ -123,9 +123,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
   }
 
-  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = readOnly { db =>
-    addressId(address).fold(0L) { addressId =>
-      mayBeAssetId match {
+  protected override def loadBalance(req: (Address, Option[AssetId])): Long = readOnly { db =>
+    addressId(req._1).fold(0L) { addressId =>
+      req._2 match {
         case Some(assetId) => db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId)).getOrElse(0L)
         case None          => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
       }
@@ -379,6 +379,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
       val discardedBlocks: Seq[Block] = for (currentHeight <- height until targetHeight by -1) yield {
+        val balancesToInvalidate   = Seq.newBuilder[(Address, Option[AssetId])]
         val portfoliosToInvalidate = Seq.newBuilder[Address]
         val assetInfoToInvalidate  = Seq.newBuilder[ByteStr]
         val ordersToInvalidate     = Seq.newBuilder[ByteStr]
@@ -391,8 +392,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
           for (addressId <- rw.get(Keys.changedAddresses(currentHeight))) {
             val address = rw.get(Keys.idToAddress(addressId))
+            balancesToInvalidate += (address -> None)
 
             for (assetId <- rw.get(Keys.assetList(addressId))) {
+              balancesToInvalidate += (address -> Some(assetId))
               rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
               rw.filterHistory(Keys.assetBalanceHistory(addressId, assetId), currentHeight)
             }
@@ -495,6 +498,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
           discardedBlock
         }
 
+        balancesToInvalidate.result().foreach(discardBalance)
         portfoliosToInvalidate.result().foreach(discardPortfolio)
         assetInfoToInvalidate.result().foreach(discardAssetDescription)
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
