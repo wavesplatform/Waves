@@ -6,7 +6,6 @@ import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
-import com.wavesplatform.matcher.api.DBUtils.indexes.active.MaxElements
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
@@ -26,7 +25,8 @@ object OrderValidator {
 
   private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
 
-  val MinExpiration: Long = 60 * 1000L
+  val MinExpiration: Long   = 60 * 1000L
+  val MaxActiveOrders: Long = 200
 
   private def verifySignature(order: Order): ValidationResult =
     Verifier
@@ -164,7 +164,7 @@ object OrderValidator {
     for {
       _ <- (Right(order): ValidationResult)
         .ensure(s"Order sender ${order.sender.toAddress} does not match expected $sender")(_.sender.toAddress == sender)
-        .ensure(s"Limit of $MaxElements active orders has been reached")(_ => activeOrderCount < MaxElements)
+        .ensure(s"Limit of $MaxActiveOrders active orders has been reached")(_ => activeOrderCount < MaxActiveOrders)
         .ensure(s"Order should have a timestamp after $lowestOrderTimestamp, but it is ${order.timestamp}")(_.timestamp > lowestOrderTimestamp)
         .ensure("Order has already been placed")(o => !orderExists(o.id()))
       _ <- validateBalance(order, tradableBalance)

@@ -14,7 +14,6 @@ import scala.math.BigDecimal.RoundingMode
 object MatcherModel {
   type Price     = Long
   type Level[+A] = Vector[A]
-  type OrderId   = String
 }
 
 case class LevelAgg(amount: Long, price: Long)
@@ -128,6 +127,10 @@ object LimitOrder {
     // Should not round! It could lead to forks. See ExchangeTransactionDiff
     (BigInt(matcherFee) * partialAmount / totalAmount).toLong
   }
+
+  def finalStatus(remaining: LimitOrder, unmatchable: Boolean): OrderStatus =
+    if (remaining.amount == 0 || unmatchable) LimitOrder.Filled(remaining.amount)
+    else LimitOrder.Cancelled(remaining.order.amount - remaining.amount)
 }
 
 object Events {
@@ -140,13 +143,11 @@ object Events {
     def counterRemainingAmount: Long = math.max(counter.amount - executedAmount, 0)
     def counterExecutedFee: Long     = LimitOrder.getPartialFee(counter.order.matcherFee, counter.order.amount, executedAmount)
     def counterRemainingFee: Long    = math.max(counter.fee - counterExecutedFee, 0)
-    def counterExecuted: LimitOrder  = counter.partial(amount = executedAmount, fee = counterExecutedFee)
     def counterRemaining: LimitOrder = counter.partial(amount = counterRemainingAmount, fee = counterRemainingFee)
 
     def submittedRemainingAmount: Long = math.max(submitted.amount - executedAmount, 0)
     def submittedExecutedFee: Long     = LimitOrder.getPartialFee(submitted.order.matcherFee, submitted.order.amount, executedAmount)
     def submittedRemainingFee: Long    = math.max(submitted.fee - submittedExecutedFee, 0)
-    def submittedExecuted: LimitOrder  = submitted.partial(amount = executedAmount, fee = submittedExecutedFee)
     def submittedRemaining: LimitOrder = submitted.partial(amount = submittedRemainingAmount, fee = submittedRemainingFee)
   }
 
