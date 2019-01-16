@@ -8,7 +8,3 @@ case class UtxSettings(maxSize: Int,
                        allowBlacklistedTransferTo: Set[String],
                        cleanupInterval: FiniteDuration,
                        allowTransactionsFromSmartAccounts: Boolean)
-
-object UtxSettings {
-  val DefaultMaxBytes = 52428800 // 50 MB
-}

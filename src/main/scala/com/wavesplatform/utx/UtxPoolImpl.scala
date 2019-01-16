@@ -180,21 +180,19 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
     }
 
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
-    // Bytes size of all transactions in pool
-    def transactionsBytes: Long = {
-      transactions.values.asScala
-        .map(_.bytes().size)
-        .sum
-    }
-
     putRequestStats.increment()
     val result = measureSuccessful(
       processingTimeStats, {
         for {
           _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+
+          transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
+            .map(_.bytes().size)
+            .sum
           _ <- Either.cond((transactionsBytes + tx.bytes().size) <= utxSettings.maxBytesSize,
                            (),
                            GenericError("Transaction pool bytes size limit is reached"))
+
           _    <- checkNotBlacklisted(tx)
           _    <- checkScripted(b, tx)
           _    <- checkAlias(b, tx)
