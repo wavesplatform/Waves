@@ -3,11 +3,11 @@ package com.wavesplatform.matcher.model
 import com.google.common.base.Charsets
 import com.wavesplatform.WithDB
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.OrderHistorySpecification._
 import com.wavesplatform.matcher.{MatcherKeys, MatcherTestData}
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._

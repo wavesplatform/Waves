@@ -1,10 +1,15 @@
 package com.wavesplatform.http
 
+import com.wavesplatform.account.Address
+import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.state.{Blockchain, EitherExt2}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
@@ -12,10 +17,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
-import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 
 class AddressRouteSpec
     extends RouteSpec("/addresses")

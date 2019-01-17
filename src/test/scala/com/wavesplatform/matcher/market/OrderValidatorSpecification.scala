@@ -3,6 +3,8 @@ package com.wavesplatform.matcher.market
 import com.google.common.base.Charsets
 import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -11,7 +13,7 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

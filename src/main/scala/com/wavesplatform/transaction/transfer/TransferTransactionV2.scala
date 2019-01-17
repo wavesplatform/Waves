@@ -2,8 +2,9 @@ package com.wavesplatform.transaction.transfer
 
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.state._
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
 

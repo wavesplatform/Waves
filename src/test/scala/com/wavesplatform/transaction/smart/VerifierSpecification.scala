@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

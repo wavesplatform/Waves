@@ -5,6 +5,7 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
 import com.wavesplatform.lang.v1.traits.Environment
@@ -13,7 +14,6 @@ import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.WavesEnvironmentBenchmark._
 import com.wavesplatform.state.bench.DataTestData
 import com.wavesplatform.transaction.smart.WavesEnvironment
-import com.wavesplatform.utils.Base58
 import monix.eval.Coeval
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._

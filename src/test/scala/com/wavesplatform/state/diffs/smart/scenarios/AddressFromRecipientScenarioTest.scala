@@ -1,9 +1,9 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTEVECTOR, CaseObj}
-import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.predef._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
 import com.wavesplatform.transaction.transfer._

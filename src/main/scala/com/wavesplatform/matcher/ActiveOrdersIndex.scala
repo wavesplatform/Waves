@@ -4,10 +4,10 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.database.{Key, RW, ReadOnlyDB}
 import com.wavesplatform.matcher.ActiveOrdersIndex._
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.Order.Id

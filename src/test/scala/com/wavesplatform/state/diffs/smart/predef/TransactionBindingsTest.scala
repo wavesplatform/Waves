@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.ScriptVersion.Versions.V2
 import com.wavesplatform.lang.Testing.evaluated

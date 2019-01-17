@@ -2,9 +2,10 @@ package com.wavesplatform.matcher.api
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.common.utils.Base58
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json._

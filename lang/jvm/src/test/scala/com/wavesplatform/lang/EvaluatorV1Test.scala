@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import cats.data.EitherT
 import cats.kernel.Monoid
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.ExprEvaluator.Log
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
@@ -21,7 +22,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentF
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import com.wavesplatform.utils.{Base58, Base64}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}

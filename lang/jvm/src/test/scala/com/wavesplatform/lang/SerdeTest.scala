@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1

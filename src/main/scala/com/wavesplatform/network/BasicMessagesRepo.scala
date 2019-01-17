@@ -5,13 +5,14 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.message.Message._
 import com.wavesplatform.network.message._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.crypto._
+
 import scala.util.Try
 
 object GetPeersSpec extends MessageSpec[GetPeers.type] {

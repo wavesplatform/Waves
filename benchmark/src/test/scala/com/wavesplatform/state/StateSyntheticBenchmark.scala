@@ -2,19 +2,20 @@ package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
 
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.StateSyntheticBenchmark._
-import com.wavesplatform.utils.compilerContext
-import org.openjdk.jmh.annotations._
-import org.scalacheck.Gen
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.compilerContext
+import org.openjdk.jmh.annotations._
+import org.scalacheck.Gen
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))

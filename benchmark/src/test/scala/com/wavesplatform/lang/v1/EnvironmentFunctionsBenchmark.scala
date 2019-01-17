@@ -2,17 +2,16 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
-import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
-import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.lang.{Common, Global}
 import org.openjdk.jmh.annotations._
-import shapeless.:+:
-import shapeless.CNil
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
+import shapeless.{:+:, CNil}
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))

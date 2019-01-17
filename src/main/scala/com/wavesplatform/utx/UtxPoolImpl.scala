@@ -7,13 +7,14 @@ import java.util.concurrent.ConcurrentHashMap
 import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.{CommonValidation, TransactionDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction

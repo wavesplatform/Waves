@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.smart.SetScriptTransaction

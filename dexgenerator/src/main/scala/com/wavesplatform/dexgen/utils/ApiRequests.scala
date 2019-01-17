@@ -6,6 +6,7 @@ import java.util.concurrent.TimeoutException
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest, SignedTransferV1Request}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.{
   AssetBalance,
@@ -21,7 +22,6 @@ import com.wavesplatform.it.api.{
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}

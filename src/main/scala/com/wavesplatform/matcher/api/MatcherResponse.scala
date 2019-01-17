@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.api
 
 import akka.http.scaladsl.marshalling.ToResponseMarshaller
 import akka.http.scaladsl.model.{StatusCodes => C, _}
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.Order
 import play.api.libs.json.{JsNull, JsValue, Json}
 

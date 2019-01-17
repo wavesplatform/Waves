@@ -1,7 +1,7 @@
-package com.wavesplatform.state
+package com.wavesplatform.common.state
 
+import com.wavesplatform.common.utils.{Base58, Base64}
 import play.api.libs.json._
-import com.wavesplatform.utils.{Base58, Base64}
 
 import scala.util.Try
 

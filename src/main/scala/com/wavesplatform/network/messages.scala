@@ -3,10 +3,10 @@ package com.wavesplatform.network
 import java.net.InetSocketAddress
 
 import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{Signed, Transaction}
 
 sealed trait Message

@@ -4,10 +4,11 @@ import java.security.SecureRandom
 
 import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.utils.{Base58, Time}
+import com.wavesplatform.utils.Time
 import io.swagger.annotations._
 import play.api.libs.json._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}

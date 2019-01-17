@@ -6,12 +6,12 @@ import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils._

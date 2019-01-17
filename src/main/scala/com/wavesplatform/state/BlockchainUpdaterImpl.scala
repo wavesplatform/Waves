@@ -4,6 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}

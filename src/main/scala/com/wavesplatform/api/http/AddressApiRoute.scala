@@ -10,12 +10,13 @@ import com.wavesplatform.crypto
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.utils.{Base58, Time}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
 import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

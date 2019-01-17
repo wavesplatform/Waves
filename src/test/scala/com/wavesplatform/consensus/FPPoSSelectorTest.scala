@@ -3,6 +3,8 @@ package com.wavesplatform.consensus
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.lagonaki.mocks.TestBlock

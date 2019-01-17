@@ -281,7 +281,7 @@ lazy val lang =
       ) ++ Dependencies.logging.map(_       % "test") // scrypto logs an error if a signature verification was failed
     )
 
-lazy val langJS  = lang.js
+lazy val langJS  = lang.js.dependsOn(common)
 lazy val langJVM = lang.jvm.dependsOn(common)
 
 lazy val node = project

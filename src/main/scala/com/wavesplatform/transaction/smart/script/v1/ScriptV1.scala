@@ -1,11 +1,11 @@
 package com.wavesplatform.transaction.smart.script.v1
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator, Serde}
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.crypto
 import com.wavesplatform.utils.{functionCosts, varNames}

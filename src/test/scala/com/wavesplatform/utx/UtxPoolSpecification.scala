@@ -4,6 +4,8 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform._
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -11,15 +13,15 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
+import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.{ByteStr, EitherExt2, _}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.Time
 import org.scalacheck.Gen
 import org.scalacheck.Gen._

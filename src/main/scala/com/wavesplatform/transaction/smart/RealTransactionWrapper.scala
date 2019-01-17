@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._

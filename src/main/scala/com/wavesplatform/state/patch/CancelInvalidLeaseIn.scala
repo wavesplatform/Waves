@@ -1,5 +1,6 @@
 package com.wavesplatform.state.patch
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.{Diff, _}
 import com.wavesplatform.utils.ScorexLogging
 

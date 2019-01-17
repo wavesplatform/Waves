@@ -2,15 +2,16 @@ package com.wavesplatform.transaction.smart
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import monix.eval.Coeval
 import play.api.libs.json.Json
-import com.wavesplatform.crypto.KeyLength
 
 import scala.util.{Failure, Success, Try}
 

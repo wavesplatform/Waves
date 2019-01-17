@@ -8,8 +8,9 @@ import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request, _}
 import com.wavesplatform.api.http.{DataRequest, SignedDataRequest, versionReads}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
@@ -17,7 +18,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCance
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{Base58, Time}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.JsValue
 

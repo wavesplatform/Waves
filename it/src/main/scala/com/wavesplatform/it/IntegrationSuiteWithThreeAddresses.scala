@@ -1,14 +1,15 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
-import org.scalatest._
-import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.ScorexLogging
+import org.scalatest._
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 trait IntegrationSuiteWithThreeAddresses
     extends BeforeAndAfterAll

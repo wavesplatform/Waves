@@ -4,9 +4,9 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange._
 

@@ -9,10 +9,11 @@ import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Requ
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._

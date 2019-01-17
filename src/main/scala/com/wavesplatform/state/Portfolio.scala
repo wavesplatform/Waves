@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import cats._
 import cats.kernel.instances.map._
 import com.wavesplatform.block.Block.Fraction
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 
 case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[ByteStr, Long]) {

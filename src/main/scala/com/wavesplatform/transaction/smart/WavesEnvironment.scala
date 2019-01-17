@@ -1,6 +1,8 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}

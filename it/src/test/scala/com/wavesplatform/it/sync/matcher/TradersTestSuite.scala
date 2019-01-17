@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
@@ -9,7 +10,6 @@ import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.util.Random

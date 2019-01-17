@@ -1,4 +1,5 @@
 package com.wavesplatform.lang
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.compiler.Terms._
 import scodec.bits.ByteVector
 

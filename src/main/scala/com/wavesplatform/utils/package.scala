@@ -5,6 +5,7 @@ import java.security.SecureRandom
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -12,7 +13,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
 import com.wavesplatform.lang.{Global, ScriptVersion}
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter

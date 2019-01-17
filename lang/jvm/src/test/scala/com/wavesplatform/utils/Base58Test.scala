@@ -1,5 +1,6 @@
 package com.wavesplatform.utils
 
+import com.wavesplatform.common.utils.Base58
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks

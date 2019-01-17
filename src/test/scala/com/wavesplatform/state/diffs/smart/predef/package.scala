@@ -1,12 +1,13 @@
 package com.wavesplatform.state.diffs.smart
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.compiler.CompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.transfer.TransferTransaction

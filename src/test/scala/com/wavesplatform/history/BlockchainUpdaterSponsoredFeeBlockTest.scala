@@ -1,18 +1,19 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
-import org.scalacheck.Gen
-import org.scalatest._
-import org.scalatest.prop.PropertyChecks
-import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.crypto._
+import org.scalacheck.Gen
+import org.scalatest._
+import org.scalatest.prop.PropertyChecks
 
 class BlockchainUpdaterSponsoredFeeBlockTest
     extends PropSpec

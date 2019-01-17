@@ -3,6 +3,8 @@ package com.wavesplatform
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
@@ -59,13 +61,6 @@ package object state {
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
     def liftValidationError[T <: Transaction](t: T): Either[ValidationError, R] = {
       ei.left.map(e => GenericError(e.toString))
-    }
-  }
-
-  implicit class EitherExt2[A, B](ei: Either[A, B]) {
-    def explicitGet(): B = ei match {
-      case Left(value)  => throw new Exception(value.toString)
-      case Right(value) => value
     }
   }
 

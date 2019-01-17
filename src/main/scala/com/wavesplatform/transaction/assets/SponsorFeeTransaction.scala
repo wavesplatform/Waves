@@ -1,13 +1,15 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.state._
+import com.wavesplatform.crypto._
+import com.wavesplatform.transaction._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.transaction._
-import com.wavesplatform.crypto._
+
 import scala.util.{Failure, Success, Try}
 
 case class SponsorFeeTransaction private (version: Byte,
