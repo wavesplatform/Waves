@@ -4,7 +4,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTEVECTOR
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
@@ -29,7 +29,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
           Coproduct(transfer)
         )
         transfer.assetId match {
-          case Some(v) => result.explicitGet().asInstanceOf[CONST_BYTEVECTOR].bs.toArray sameElements v.arr
+          case Some(v) => result.explicitGet().asInstanceOf[CONST_BYTESTR].bs.toArray sameElements v.arr
           case None    => result should produce("extract() called on unit")
         }
     }

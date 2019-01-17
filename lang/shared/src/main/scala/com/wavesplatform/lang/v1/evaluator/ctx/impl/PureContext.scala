@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import java.nio.charset.StandardCharsets
 
 import cats.data.EitherT
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -11,7 +12,6 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import scodec.bits.ByteVector
 
 import scala.util.Try
 
@@ -39,12 +39,12 @@ object PureContext {
         Either.cond(al + bl <= MaxStringResult, CONST_STRING(a + b), "String is too large")
       case _ => ???
     }
-  lazy val sumByteVector: BaseFunction =
-    createRawOp(SUM_OP, BYTEVECTOR, BYTEVECTOR, SUM_BYTES, "Limited bytes vectors concatination", "prefix", "suffix", 10) {
-      case (CONST_BYTEVECTOR(a), CONST_BYTEVECTOR(b)) =>
-        lazy val al = a.length
-        lazy val bl = b.length
-        Either.cond(al + bl <= MaxBytesResult, CONST_BYTEVECTOR(ByteVector.concat(Seq(a, b))), "ByteVector is too large")
+  lazy val sumByteStr: BaseFunction =
+    createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, "Limited bytes vectors concatination", "prefix", "suffix", 10) {
+      case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
+        lazy val al = a.arr.length
+        lazy val bl = b.arr.length
+        Either.cond(al + bl <= MaxBytesResult, CONST_BYTESTR(a ++ b), "ByteStr is too large")
       case _ => ???
     }
   lazy val ge: BaseFunction = createOp(GE_OP, LONG, BOOLEAN, GE_LONG, "Integer grater or equal comparation", "term", "term")(_ >= _)
@@ -114,34 +114,34 @@ object PureContext {
                                                         "Internal function to check value type",
                                                         ("obj", TYPEPARAM('T'), "value"),
                                                         ("of", STRING, "type name")) {
-    case CONST_BOOLEAN(_) :: CONST_STRING("Boolean") :: Nil       => Right(TRUE)
-    case CONST_BYTEVECTOR(_) :: CONST_STRING("ByteVector") :: Nil => Right(TRUE)
-    case CONST_STRING(_) :: CONST_STRING("String") :: Nil         => Right(TRUE)
-    case CONST_LONG(_) :: CONST_STRING("Int") :: Nil              => Right(TRUE)
-    case (p: CaseObj) :: CONST_STRING(s) :: Nil                   => Right(CONST_BOOLEAN(p.caseType.name == s))
-    case _                                                        => Right(FALSE)
+    case CONST_BOOLEAN(_) :: CONST_STRING("Boolean") :: Nil => Right(TRUE)
+    case CONST_BYTESTR(_) :: CONST_STRING("ByteStr") :: Nil => Right(TRUE)
+    case CONST_STRING(_) :: CONST_STRING("String") :: Nil   => Right(TRUE)
+    case CONST_LONG(_) :: CONST_STRING("Int") :: Nil        => Right(TRUE)
+    case (p: CaseObj) :: CONST_STRING(s) :: Nil             => Right(CONST_BOOLEAN(p.caseType.name == s))
+    case _                                                  => Right(FALSE)
   }
 
-  lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes vector", ("byteVector", BYTEVECTOR, "vector")) {
-    case CONST_BYTEVECTOR(bv) :: Nil => Right(CONST_LONG(bv.size))
-    case xs                          => notImplemented("size(byte[])", xs)
+  lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes str", ("byteStr", BYTESTR, "vector")) {
+    case CONST_BYTESTR(bv) :: Nil => Right(CONST_LONG(bv.arr.length))
+    case xs                       => notImplemented("size(byte[])", xs)
   }
 
   lazy val toBytesBoolean: BaseFunction =
-    NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("b", BOOLEAN, "value")) {
-      case TRUE :: Nil  => Right(CONST_BYTEVECTOR(ByteVector(1)))
-      case FALSE :: Nil => Right(CONST_BYTEVECTOR(ByteVector(0)))
-      case _                           => ???
+    NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTESTR, "Bytes array representation", ("b", BOOLEAN, "value")) {
+      case TRUE :: Nil  => Right(CONST_BYTESTR(ByteStr(1)))
+      case FALSE :: Nil => Right(CONST_BYTESTR(ByteStr(0)))
+      case _            => ???
     }
 
-  lazy val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("n", LONG, "value")) {
-    case CONST_LONG(n) :: Nil => Right(CONST_BYTEVECTOR(ByteVector.fromLong(n)))
+  lazy val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTESTR, "Bytes array representation", ("n", LONG, "value")) {
+    case CONST_LONG(n) :: Nil => Right(CONST_BYTESTR(ByteStr(n)))
     case _                    => ???
   }
 
   lazy val toBytesString: BaseFunction =
-    NativeFunction("toBytes", 1, STRING_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("s", STRING, "value")) {
-      case CONST_STRING(s) :: Nil => Right(CONST_BYTEVECTOR(ByteVector(s.getBytes(StandardCharsets.UTF_8))))
+    NativeFunction("toBytes", 1, STRING_TO_BYTES, BYTESTR, "Bytes array representation", ("s", STRING, "value")) {
+      case CONST_STRING(s) :: Nil => Right(CONST_BYTESTR(ByteStr(s)))
       case _                      => ???
     }
 
@@ -154,7 +154,7 @@ object PureContext {
     NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, "String representation", ("b", BOOLEAN, "value")) {
       case TRUE :: Nil  => Right(CONST_STRING("true"))
       case FALSE :: Nil => Right(CONST_STRING("false"))
-      case _                           => ???
+      case _            => ???
     }
 
   lazy val toStringLong: BaseFunction = NativeFunction("toString", 1, LONG_TO_STRING, STRING, "String representation", ("n", LONG, "value")) {
@@ -163,19 +163,19 @@ object PureContext {
   }
 
   lazy val takeBytes: BaseFunction =
-    NativeFunction("take", 1, TAKE_BYTES, BYTEVECTOR, "Take firsts bytes subvector", ("xs", BYTEVECTOR, "vector"), ("number", LONG, "Bytes number")) {
-      case CONST_BYTEVECTOR(xs) :: CONST_LONG(number) :: Nil => Right(CONST_BYTEVECTOR(xs.take(number)))
-      case xs                                                => notImplemented("take(xs: byte[], number: Long)", xs)
+    NativeFunction("take", 1, TAKE_BYTES, BYTESTR, "Take firsts bytes subvector", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => Right(CONST_BYTESTR(xs.take(number)))
+      case xs                                             => notImplemented("take(xs: byte[], number: Long)", xs)
     }
 
   lazy val dropBytes: BaseFunction =
-    NativeFunction("drop", 1, DROP_BYTES, BYTEVECTOR, "Skip firsts bytes", ("xs", BYTEVECTOR, "vector"), ("number", LONG, "Bytes number")) {
-      case CONST_BYTEVECTOR(xs) :: CONST_LONG(number) :: Nil => Right(CONST_BYTEVECTOR(xs.drop(number)))
-      case xs                                                => notImplemented("drop(xs: byte[], number: Long)", xs)
+    NativeFunction("drop", 1, DROP_BYTES, BYTESTR, "Skip firsts bytes", ("xs", BYTESTR, "vector"), ("number", LONG, "Bytes number")) {
+      case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => Right(CONST_BYTESTR(xs.drop(number)))
+      case xs                                             => notImplemented("drop(xs: byte[], number: Long)", xs)
     }
 
   lazy val dropRightBytes: BaseFunction =
-    UserFunction("dropRight", "dropRightBytes", BYTEVECTOR, "Cut vectors tail", ("@xs", BYTEVECTOR, "vector"), ("@number", LONG, "cuting size")) {
+    UserFunction("dropRight", "dropRightBytes", BYTESTR, "Cut vectors tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "cuting size")) {
       FUNCTION_CALL(
         takeBytes,
         List(
@@ -192,7 +192,7 @@ object PureContext {
     }
 
   lazy val takeRightBytes: BaseFunction =
-    UserFunction("takeRight", "takeRightBytes", BYTEVECTOR, "Take vector tail", ("@xs", BYTEVECTOR, "vector"), ("@number", LONG, "taking size")) {
+    UserFunction("takeRight", "takeRightBytes", BYTESTR, "Take vector tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "taking size")) {
       FUNCTION_CALL(
         dropBytes,
         List(
@@ -317,7 +317,7 @@ object PureContext {
     sumLong,
     subLong,
     sumString,
-    sumByteVector,
+    sumByteStr,
     eq,
     ne,
     ge,
@@ -355,11 +355,11 @@ object PureContext {
 
   private lazy val ctx = CTX(
     Seq(
-      new DefinedType { lazy val name = "Unit"; lazy val typeRef       = UNIT       },
-      new DefinedType { lazy val name = "Int"; lazy val typeRef        = LONG       },
-      new DefinedType { lazy val name = "Boolean"; lazy val typeRef    = BOOLEAN    },
-      new DefinedType { lazy val name = "ByteVector"; lazy val typeRef = BYTEVECTOR },
-      new DefinedType { lazy val name = "String"; lazy val typeRef     = STRING     }
+      new DefinedType { lazy val name = "Unit"; lazy val typeRef    = UNIT    },
+      new DefinedType { lazy val name = "Int"; lazy val typeRef     = LONG    },
+      new DefinedType { lazy val name = "Boolean"; lazy val typeRef = BOOLEAN },
+      new DefinedType { lazy val name = "ByteStr"; lazy val typeRef = BYTESTR },
+      new DefinedType { lazy val name = "String"; lazy val typeRef  = STRING  }
     ),
     vars,
     functions

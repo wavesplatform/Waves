@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.v1.parser
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.UnaryOperation._
 import fastparse.{WhitespaceApi, core}
-import scodec.bits.ByteVector
 
 object Parser {
 
@@ -238,7 +238,7 @@ object Parser {
           }
           decoded match {
             case Left(err) => CONST_BYTEVECTOR(Pos(start, end), PART.INVALID(Pos(innerStart, innerEnd), err))
-            case Right(r)  => CONST_BYTEVECTOR(Pos(start, end), PART.VALID(Pos(innerStart, innerEnd), ByteVector(r)))
+            case Right(r)  => CONST_BYTEVECTOR(Pos(start, end), PART.VALID(Pos(innerStart, innerEnd), ByteStr(r)))
           }
       }
 

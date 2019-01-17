@@ -1,11 +1,14 @@
 package com.wavesplatform.common.state
 
+import java.nio.charset.StandardCharsets
+
 import com.wavesplatform.common.utils.{Base58, Base64}
 import play.api.libs.json._
 
 import scala.util.Try
 
 case class ByteStr(arr: Array[Byte]) {
+
   override def equals(a: Any): Boolean = a match {
     case other: ByteStr => arr.sameElements(other.arr)
     case _              => false
@@ -20,12 +23,27 @@ case class ByteStr(arr: Array[Byte]) {
   lazy val trim: String = base58.toString.take(7) + "..."
 
   override lazy val toString: String = base58
+
+  def isEmpty: Boolean = arr.length == 0
+
+  def ++(other: ByteStr): ByteStr = if (this.isEmpty) other else ByteStr(this.arr ++ other.arr)
+
+  def take(n: Long): ByteStr = ByteStr(arr.take(n.toInt))
+
+  def drop(n: Long): ByteStr = ByteStr(arr.drop(n.toInt))
+
 }
 
 object ByteStr {
+
+  val empty: ByteStr = ByteStr(Array.emptyByteArray)
+
+  def apply(bytes: Int*): ByteStr   = ByteStr(bytes.toArray.map(_.toByte))
+  def apply(bytes: Long*): ByteStr  = ByteStr(bytes.toArray.map(_.toByte))
+  def apply(bytes: String): ByteStr = ByteStr(bytes.getBytes(StandardCharsets.UTF_8))
+
   def decodeBase58(s: String): Try[ByteStr] = Base58.decode(s).map(ByteStr(_))
   def decodeBase64(s: String): Try[ByteStr] = Base64.decode(s).map(ByteStr(_))
-  val empty: ByteStr                        = ByteStr(Array.emptyByteArray)
 
   implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
     override def writes(o: ByteStr): JsValue = JsString(o.base58)

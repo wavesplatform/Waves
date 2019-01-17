@@ -4,9 +4,9 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
-import scodec.bits.ByteVector
 
 import scala.util.Try
 
@@ -34,7 +34,7 @@ object Serde {
     def aux(acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] = acc.flatMap { _ =>
       bb.get() match {
         case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
-        case E_BYTES  => Coeval.now(CONST_BYTEVECTOR(bb.getByteVector))
+        case E_BYTES  => Coeval.now(CONST_BYTESTR(bb.getByteStr))
         case E_STRING => Coeval.now(CONST_STRING(bb.getString))
         case E_IF     => (aux(), aux(), aux()).mapN(IF)
         case E_BLOCK =>
@@ -81,7 +81,7 @@ object Serde {
       bytes
     }
 
-    def getByteVector: ByteVector = ByteVector(getBytes)
+    def getByteStr: ByteStr = ByteStr(getBytes)
 
     def getString: String = new String(getBytes, StandardCharsets.UTF_8)
 
@@ -130,10 +130,10 @@ object Serde {
             out.write(E_LONG)
             out.writeLong(n)
           }
-        case CONST_BYTEVECTOR(bs) =>
+        case CONST_BYTESTR(bs) =>
           Coeval.now {
             out.write(E_BYTES)
-            out.writeInt(Math.toIntExact(bs.size)).write(bs.toArray)
+            out.writeInt(Math.toIntExact(bs.arr.length)).write(bs.arr)
           }
         case CONST_STRING(s) =>
           Coeval.now {

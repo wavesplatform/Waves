@@ -607,9 +607,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val txType = CaseType(
       "Transaction",
       List(
-        "bodyBytes" -> BYTEVECTOR,
-        "senderPk"  -> BYTEVECTOR,
-        "proof0"    -> BYTEVECTOR
+        "bodyBytes" -> BYTESTR,
+        "senderPk"  -> BYTESTR,
+        "proof0"    -> BYTESTR
       )
     )
 
@@ -658,10 +658,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val txType = CaseType(
       "Transaction",
       List(
-        "bodyBytes" -> BYTEVECTOR,
-        "senderPk"  -> BYTEVECTOR,
-        "proof0"    -> BYTEVECTOR,
-        "proof1"    -> BYTEVECTOR
+        "bodyBytes" -> BYTESTR,
+        "senderPk"  -> BYTESTR,
+        "proof0"    -> BYTESTR,
+        "proof1"    -> BYTESTR
       )
     )
 
@@ -677,8 +677,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
       ("tx", ((txType.typeRef, "Test transaction"), LazyVal(EitherT.pure(txObj)))),
-      ("alicePubKey", ((BYTEVECTOR, "Alices test publik key"), LazyVal(EitherT.pure(ByteVector(alicePK))))),
-      ("bobPubKey", ((BYTEVECTOR, "Bob test public key"), LazyVal(EitherT.pure(ByteVector(bobPK)))))
+      ("alicePubKey", ((BYTESTR, "Alices test publik key"), LazyVal(EitherT.pure(ByteVector(alicePK))))),
+      ("bobPubKey", ((BYTESTR, "Bob test public key"), LazyVal(EitherT.pure(ByteVector(bobPK)))))
     )
 
     val context = Monoid.combineAll(
@@ -718,7 +718,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   private def hashFuncTest(bodyBytes: Array[Byte], funcName: Short): Either[ExecutionError, ByteVector] = {
     val context = Monoid.combineAll(Seq(pureEvalContext, defaultCryptoContext.evaluationContext))
 
-    ev[CONST_BYTEVECTOR](
+    ev[CONST_BYTESTR](
       context = context,
       expr = FUNCTION_CALL(
         function = FunctionHeader.Native(funcName),

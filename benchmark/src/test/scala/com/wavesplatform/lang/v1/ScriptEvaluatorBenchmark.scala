@@ -148,5 +148,5 @@ class Concat {
   val strings: EXPR = expr(CONST_STRING("a" * (Short.MaxValue - Steps)), PureContext.sumString, CONST_STRING("a"), Steps)
 
   val bytes: EXPR =
-    expr(CONST_BYTEVECTOR(ByteVector.fill(Short.MaxValue - Steps)(0)), PureContext.sumByteVector, CONST_BYTEVECTOR(ByteVector(0)), Steps)
+    expr(CONST_BYTEVECTOR(ByteVector.fill(Short.MaxValue - Steps)(0)), PureContext.sumByteStr, CONST_BYTEVECTOR(ByteVector(0)), Steps)
 }

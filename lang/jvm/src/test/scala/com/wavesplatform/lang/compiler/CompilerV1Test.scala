@@ -362,7 +362,7 @@ class CompilerV1Test extends PropSpec with PropertyChecks with Matchers with Scr
       Expressions.PART.VALID(AnyPos, dropRightFunctionName),
       List(Expressions.CONST_BYTEVECTOR(AnyPos, Expressions.PART.VALID(AnyPos, ByteVector.empty)), Expressions.CONST_LONG(AnyPos, 1))
     ),
-    expectedResult = Right((FUNCTION_CALL(dropRightBytes.header, List(CONST_BYTEVECTOR(ByteVector.empty), CONST_LONG(1))), BYTEVECTOR))
+    expectedResult = Right((FUNCTION_CALL(dropRightBytes.header, List(CONST_BYTEVECTOR(ByteVector.empty), CONST_LONG(1))), BYTESTR))
   )
 
   treeTypeTest("user function overloading 2")(

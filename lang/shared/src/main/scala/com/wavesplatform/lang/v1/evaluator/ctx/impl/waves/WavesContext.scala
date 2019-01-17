@@ -2,9 +2,10 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
 import cats.implicits._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LONG, STRING, _}
+import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
@@ -40,10 +41,10 @@ object WavesContext {
             case None => unit
             case Some(a) =>
               a match {
-                case b: ByteVector => CONST_BYTEVECTOR(b)
-                case b: Long       => CONST_LONG(b)
-                case b: String     => CONST_STRING(b)
-                case b: Boolean    => CONST_BOOLEAN(b)
+                case b: ByteStr => CONST_BYTESTR(b)
+                case b: Long    => CONST_LONG(b)
+                case b: String  => CONST_STRING(b)
+                case b: Boolean => CONST_BOOLEAN(b)
               }
           }
         case _ => ???
@@ -66,11 +67,11 @@ object WavesContext {
       ) {
         case ARR(data: IndexedSeq[CaseObj] @unchecked) :: CONST_STRING(key: String) :: Nil =>
           data.find(_.fields("key") == CONST_STRING(key)).map(_.fields("value")) match {
-            case Some(n: CONST_LONG) if dataType == DataType.Long            => Right(n)
-            case Some(b: CONST_BOOLEAN) if dataType == DataType.Boolean      => Right(b)
-            case Some(b: CONST_BYTEVECTOR) if dataType == DataType.ByteArray => Right(b)
-            case Some(s: CONST_STRING) if dataType == DataType.String        => Right(s)
-            case _                                                           => Right(unit)
+            case Some(n: CONST_LONG) if dataType == DataType.Long         => Right(n)
+            case Some(b: CONST_BOOLEAN) if dataType == DataType.Boolean   => Right(b)
+            case Some(b: CONST_BYTESTR) if dataType == DataType.ByteArray => Right(b)
+            case Some(s: CONST_STRING) if dataType == DataType.String     => Right(s)
+            case _                                                        => Right(unit)
           }
         case _ => ???
       }
@@ -110,7 +111,7 @@ object WavesContext {
     )
 
     val addressFromPublicKeyF: BaseFunction =
-      UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to account address", ("@publicKey", BYTEVECTOR, "public key")) {
+      UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to account address", ("@publicKey", BYTESTR, "public key")) {
 
         FUNCTION_CALL(
           FunctionHeader.User("Address"),
@@ -119,9 +120,9 @@ object WavesContext {
               LET(
                 "@afpk_withoutChecksum",
                 FUNCTION_CALL(
-                  PureContext.sumByteVector,
+                  PureContext.sumByteStr,
                   List(
-                    CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.chainId)),
+                    CONST_BYTESTR(ByteStr(EnvironmentFunctions.AddressVersion, env.chainId)),
                     // publicKeyHash
                     FUNCTION_CALL(
                       PureContext.takeBytes,
@@ -135,7 +136,7 @@ object WavesContext {
               ),
               // bytes
               FUNCTION_CALL(
-                PureContext.sumByteVector,
+                PureContext.sumByteStr,
                 List(
                   REF("@afpk_withoutChecksum"),
                   FUNCTION_CALL(
@@ -245,7 +246,7 @@ object WavesContext {
         case CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
             .addressFromAlias(fields("alias").asInstanceOf[CONST_STRING].s)
-            .map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> CONST_BYTEVECTOR(resolved.bytes))))
+            .map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> CONST_BYTESTR(resolved.bytes))))
         case _ => ???
       }
 
@@ -270,8 +271,8 @@ object WavesContext {
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
-      NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTEVECTOR, "transaction Id")) {
-        case CONST_BYTEVECTOR(id: ByteVector) :: Nil =>
+      NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTESTR, "transaction Id")) {
+        case CONST_BYTESTR(id: ByteVector) :: Nil =>
           val maybeDomainTx: Option[CaseObj] = env.transactionById(id.toArray).map(transactionObject(_, proofsEnabled))
           Right(fromOptionCO(maybeDomainTx))
         case _ => ???
@@ -279,7 +280,7 @@ object WavesContext {
     }
 
     def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
-      case addressType.typeRef.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTEVECTOR].bs)
+      case addressType.typeRef.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTESTR].bs)
       case aliasType.typeRef.name   => Recipient.Alias(c.fields("alias").asInstanceOf[CONST_STRING].s)
       case _                        => ???
     }
@@ -292,10 +293,10 @@ object WavesContext {
         LONG,
         "get asset balance for account",
         ("addressOrAlias", addressOrAliasType, "account"),
-        ("assetId", UNION(UNIT, BYTEVECTOR), "assetId (WAVES if none)")
+        ("assetId", UNION(UNIT, BYTESTR), "assetId (WAVES if none)")
       ) {
         case (c: CaseObj) :: u :: Nil if u == unit => env.accountBalanceOf(caseObjToRecipient(c), None).map(CONST_LONG)
-        case (c: CaseObj) :: CONST_BYTEVECTOR(assetId: ByteVector) :: Nil =>
+        case (c: CaseObj) :: CONST_BYTESTR(assetId: ByteVector) :: Nil =>
           env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray)).map(CONST_LONG)
 
         case _ => ???
@@ -313,10 +314,10 @@ object WavesContext {
       TRANSACTIONHEIGHTBYID,
       optionLong,
       "get height when transaction was stored to blockchain",
-      ("id", BYTEVECTOR, "transaction Id")
+      ("id", BYTESTR, "transaction Id")
     ) {
-      case CONST_BYTEVECTOR(id: ByteVector) :: Nil => Right(fromOptionL(env.transactionHeightById(id.toArray).map(_.toLong)))
-      case _                                       => ???
+      case CONST_BYTESTR(id: ByteVector) :: Nil => Right(fromOptionL(env.transactionHeightById(id.toArray).map(_.toLong)))
+      case _                                    => ???
     }
 
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))

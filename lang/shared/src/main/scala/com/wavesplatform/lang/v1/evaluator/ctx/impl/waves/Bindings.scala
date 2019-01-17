@@ -22,7 +22,7 @@ object Bindings {
   )
 
   private def proofsPart(existingProofs: IndexedSeq[ByteVector]) =
-    "proofs" -> ARR((existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)).map(CONST_BYTEVECTOR).toIndexedSeq)
+    "proofs" -> ARR((existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)).map(CONST_BYTESTR).toIndexedSeq)
 
   private def provenTxPart(tx: Proven, proofsEnabled: Boolean): Map[String, EVALUATED] = {
     val commonPart = combine(Map(

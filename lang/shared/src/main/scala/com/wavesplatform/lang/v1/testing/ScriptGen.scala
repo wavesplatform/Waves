@@ -1,11 +1,11 @@
 package com.wavesplatform.lang.v1.testing
 
-import com.wavesplatform.lang.v1.parser.Parser.keywords
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
+import com.wavesplatform.lang.v1.parser.Parser.keywords
 import org.scalacheck._
-import scodec.bits.ByteVector
 import scorex.crypto.encode.Base58
 
 import scala.reflect.ClassTag
@@ -129,7 +129,7 @@ trait ScriptGen {
 
   private def toString[T](part: PART[T])(implicit ct: ClassTag[T]): String = part match {
     case PART.VALID(_, x: String)      => x
-    case PART.VALID(_, xs: ByteVector) => Base58.encode(xs.toArray)
+    case PART.VALID(_, xs: ByteStr) => Base58.encode(xs.arr)
     case _                                => throw new RuntimeException(s"Can't stringify $part")
   }
 
