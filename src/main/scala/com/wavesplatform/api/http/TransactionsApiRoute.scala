@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.DataRequest._
 import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
@@ -26,7 +26,8 @@ import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
-
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.util.Success
 
 @Path("/transactions")
@@ -62,34 +63,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       new ApiImplicitParam(name = "after", value = "Id of transaction to paginate after", required = false, dataType = "string", paramType = "query")
     ))
   def addressLimit: Route = {
-    def getResponse(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] =
-      blockchain
-        .addressTransactions(address, Set.empty, limit, fromId)
-        .map(_.map { case (h, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(h)) })
-        .map(txs => Json.arr(JsArray(txs)))
-
-    (get & pathPrefix("address" / Segment)) { address =>
-      Address.fromString(address) match {
-        case Left(e) => complete(ApiError.fromValidationError(e))
-        case Right(a) =>
-          (path("limit" / IntNumber) & parameter('after.?)) { (limit, after) =>
-            if (limit > settings.transactionByAddressLimit) complete(TooBigArrayAllocation)
-            else
-              after match {
-                case Some(t) =>
-                  ByteStr.decodeBase58(t) match {
-                    case Success(id) =>
-                      getResponse(a, limit, Some(id)).fold(
-                        _ => complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain")),
-                        complete(_))
-                    case _ => complete(CustomValidationError(s"Unable to decode transaction id $t"))
-                  }
-                case None =>
-                  getResponse(a, limit, None)
-                    .fold(_ => complete(StatusCodes.NotFound), complete(_))
-              }
-          } ~ complete(CustomValidationError("invalid.limit"))
-      }
+    (get & pathPrefix("address" / Segment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
+      complete(transactionsByAddress(address, limit, maybeAfter))
     }
   }
 
@@ -302,13 +277,56 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     * Produces compact representation for large transactions by stripping unnecessary data.
     * Currently implemented for MassTransfer transaction only.
     */
-  private def txToCompactJson(address: Address, tx: Transaction): JsObject = {
+  private def txToCompactJson(address: Address, addresses: Set[AddressOrAlias], tx: Transaction): JsObject = {
     import com.wavesplatform.transaction.transfer._
     tx match {
       case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
-        val addresses = blockchain.aliasesOfAddress(address) :+ address
-        mtt.compactJson(addresses.toSet)
+        mtt.compactJson(addresses)
       case _ => txToExtendedJson(tx)
     }
   }
+
+  def getResponse(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] = {
+    lazy val aoa = blockchain.aliasesOfAddress(address) :+ address
+
+    val txs =
+      blockchain
+        .addressTransactions(address, Set.empty, limit, fromId)
+
+    val json =
+      txs.map { txSeq =>
+        txSeq.map { htx =>
+          txToCompactJson(address, aoa.toSet, htx._2) + ("height" -> JsNumber(htx._1))
+        }
+      }
+
+    json.map(txs => JsArray(txs))
+  }
+
+  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Future[ToResponseMarshallable] =
+    Future {
+      val result = for {
+        address <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
+        limit   <- Either.cond(limitParam < settings.transactionByAddressLimit, limitParam, TooBigArrayAllocation)
+        maybeAfter <- maybeAfterParam match {
+          case Some(v) =>
+            ByteStr
+              .decodeBase58(v)
+              .fold(
+                _ => Left(CustomValidationError(s"Unable to decode transaction id $v")),
+                id => Right(Some(id))
+              )
+          case None => Right(None)
+        }
+        result <- getResponse(address, limit, maybeAfter).fold(
+          err => Left(CustomValidationError(err)),
+          arr => Right(arr)
+        )
+      } yield result
+
+      result match {
+        case Right(arr) => arr: ToResponseMarshallable
+        case Left(err)  => err: ToResponseMarshallable
+      }
+    }
 }
