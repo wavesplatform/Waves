@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, TransferSending}
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
+import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.mining.MiningConstraints.MaxScriptRunsInBlock
 import com.wavesplatform.transaction.smart.SetScriptTransaction

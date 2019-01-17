@@ -1,0 +1,32 @@
+@Callable(i)
+func deposit() = {
+   let pmt = extract(i.payment)
+   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
+   else {
+	  	let currentKey = toBase58String(i.caller.bytes)
+	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+	  		case a:Int => a
+	  		case _ => 0
+	  	}
+	  	let newAmount = currentAmount + pmt.amount
+	  	WriteSet(List(DataEntry(currentKey, newAmount)))
+   }
+}
+
+@Callable(i)
+func withdraw(amount: Int) = {
+	  	let currentKey = toBase58String(i.caller.bytes)
+	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+	  		case a:Int => a
+	  		case _ => 0
+	  	}
+		let newAmount = currentAmount - amount
+	 if (amount < 0)
+			then throw("Can't withdraw negative amount")
+    else if (newAmount < 0)
+			then throw("Not enough balance")
+			else ContractResult(
+					WriteSet(List(DataEntry(currentKey, newAmount))),
+					TransferSet(List(ContractTransfer(i.caller, amount, unit)))
+				)
+	}

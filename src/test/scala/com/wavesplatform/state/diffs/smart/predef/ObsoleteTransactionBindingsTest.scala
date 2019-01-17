@@ -3,8 +3,8 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
@@ -75,8 +75,8 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
     fee       <- smallFeeGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT * 3, ts).explicitGet()
     payment                     = PaymentTransaction.create(master, recipient, ENOUGH_AMT * 2, fee, ts).explicitGet()
-    untypedScript               = Parser(script(genesis, payment)).get.value
-    typedScript                 = ScriptV1(CompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
+    untypedScript               = Parser.parseScript(script(genesis, payment)).get.value
+    typedScript                 = ScriptV1(ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction
       .selfSigned(1, recipient, Some(typedScript), 100000000L, ts)
       .explicitGet()

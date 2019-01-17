@@ -6,7 +6,7 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.lang.ScriptVersion
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled}
 import com.wavesplatform.matcher.model._
@@ -302,7 +302,7 @@ class OrderValidatorSpecification
 
   private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = portfolioTest(defaultPortfolio) { (ov, bc) =>
     val pk            = PrivateKeyAccount(randomBytes())
-    val accountScript = ScriptV1(ScriptVersion.Versions.V2, Terms.TRUE, checkSize = false).explicitGet()
+    val accountScript = ScriptV1(V2, Terms.TRUE, checkSize = false).explicitGet()
 
     activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
     (bc.accountScript _).when(pk.toAddress).returns(Some(accountScript)).anyNumberOfTimes()

@@ -42,15 +42,27 @@ object Expressions {
     case class INVALID(position: Pos, message: String) extends PART[Nothing]
   }
 
-  case class LET(position: Pos, name: PART[String], value: EXPR, types: Seq[PART[String]], allowShadowing: Boolean = false) extends Positioned
+  sealed trait Declaration extends Positioned {
+    def name: PART[String]
+    def allowShadowing: Boolean
+  }
 
+  case class LET(position: Pos, name: PART[String], value: EXPR, types: Seq[PART[String]], allowShadowing: Boolean = false) extends Declaration
+  case class FUNC(position: Pos, name: PART[String], args: Seq[(PART[String], Seq[PART[String]])], expr: EXPR) extends Declaration {
+    val allowShadowing = false
+  }
+
+  case class ANNOTATION(position: Pos, name: PART[String], args: Seq[PART[String]]) extends Positioned
+  case class ANNOTATEDFUNC(position: Pos, anns: Seq[ANNOTATION], f: FUNC) extends Positioned {
+    def name = f.name
+  }
   sealed trait EXPR                                                             extends Positioned
   case class CONST_LONG(position: Pos, value: Long)                             extends EXPR
   case class GETTER(position: Pos, ref: EXPR, field: PART[String])              extends EXPR
   case class CONST_BYTEVECTOR(position: Pos, value: PART[ByteStr])           extends EXPR
   case class CONST_STRING(position: Pos, value: PART[String])                   extends EXPR
   case class BINARY_OP(position: Pos, a: EXPR, kind: BinaryOperation, b: EXPR)  extends EXPR
-  case class BLOCK(position: Pos, let: LET, body: EXPR)                         extends EXPR
+  case class BLOCK(position: Pos, let: Declaration, body: EXPR)                 extends EXPR
   case class IF(position: Pos, cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)         extends EXPR
   case class REF(position: Pos, key: PART[String])                              extends EXPR
   case class TRUE(position: Pos)                                                extends EXPR
@@ -60,6 +72,9 @@ object Expressions {
   case class MATCH(position: Pos, expr: EXPR, cases: Seq[MATCH_CASE]) extends EXPR
 
   case class INVALID(position: Pos, message: String) extends EXPR
+
+  case class CONTRACT(position: Pos, decs: List[Declaration], fs: List[ANNOTATEDFUNC])
+
   implicit class PartOps[T](val self: PART[T]) extends AnyVal {
     def toEither: Either[String, T] = self match {
       case Expressions.PART.VALID(_, x)         => Right(x)

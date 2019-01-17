@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 object Terms {
   sealed abstract class EXPR
   sealed abstract class DECLARATION
-  sealed trait EVALUATED
+  sealed trait EVALUATED extends EXPR
 
   case class LET(name: String, value: EXPR)                     extends DECLARATION
   case class FUNC(name: String, args: List[String], body: EXPR) extends DECLARATION
@@ -15,7 +15,8 @@ object Terms {
   case class GETTER(expr: EXPR, field: String)                  extends EXPR
   case class CONST_BYTESTR(bs: ByteStr)                         extends EXPR with EVALUATED
   case class CONST_STRING(s: String)                            extends EXPR with EVALUATED
-  case class BLOCK(let: LET, body: EXPR)                        extends EXPR
+  case class BLOCKV1(let: LET, body: EXPR)                      extends EXPR
+  case class BLOCKV2(dec: DECLARATION, body: EXPR)              extends EXPR
   case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)        extends EXPR
   case class REF(key: String)                                   extends EXPR
 

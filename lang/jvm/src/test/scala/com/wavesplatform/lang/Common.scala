@@ -1,8 +1,10 @@
 package com.wavesplatform.lang
 
 import cats.data.EitherT
+import cats.kernel.Monoid
 import com.wavesplatform.common.state.diffs.ProduceError
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
+import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -19,7 +21,12 @@ import scala.util.{Left, Right, Try}
 object Common {
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  def ev[T <: EVALUATED](context: EvaluationContext = PureContext.build(V1).evaluationContext, expr: EXPR): Either[ExecutionError, T] =
+  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTEVECTOR, STRING)
+  val dataEntryType              = CaseType("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
+  val addCtx: CTX                = CTX.apply(Seq(dataEntryType), Map.empty, Array.empty)
+
+  def ev[T <: EVALUATED](context: EvaluationContext = Monoid.combine(PureContext.build(V1).evaluationContext, addCtx.evaluationContext),
+                         expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)
 
   trait NoShrink {

@@ -19,9 +19,10 @@ object LeaseTransactionsDiff {
       if (recipient == sender)
         Left(GenericError("Cannot lease to self"))
       else {
-        val ap = blockchain.portfolio(tx.sender)
-        if (ap.balance - ap.lease.out < tx.amount) {
-          Left(GenericError(s"Cannot lease more than own: Balance:${ap.balance}, already leased: ${ap.lease.out}"))
+        val lease   = blockchain.leaseBalance(tx.sender)
+        val balance = blockchain.balance(tx.sender, None)
+        if (balance - lease.out < tx.amount) {
+          Left(GenericError(s"Cannot lease more than own: Balance:${balance}, already leased: ${lease.out}"))
         } else {
           val portfolioDiff: Map[Address, Portfolio] = Map(
             sender    -> Portfolio(-tx.fee, LeaseBalance(0, tx.amount), Map.empty),

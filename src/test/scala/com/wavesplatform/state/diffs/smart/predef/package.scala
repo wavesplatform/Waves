@@ -1,9 +1,8 @@
 package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ScriptVersion
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
@@ -20,10 +19,10 @@ import shapeless.Coproduct
 package object predef {
   val chainId: Byte = 'u'
 
-  def runScript[T <: EVALUATED](script: String, version: ScriptVersion, t: In, blockchain: Blockchain, chainId: Byte): Either[String, T] = {
-    val Success(expr, _) = Parser(script)
+  def runScript[T <: EVALUATED](script: String, version: Version, t: In, blockchain: Blockchain, chainId: Byte): Either[String, T] = {
+    val Success(expr, _) = Parser.parseScript(script)
     for {
-      compileResult <- CompilerV1(compilerContext(version, isAssetScript = false), expr)
+      compileResult <- ExpressionCompilerV1(compilerContext(version, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
       evalContext = BlockchainContext.build(version,
                                             chainId,

@@ -56,6 +56,22 @@ object Bindings {
       case OrdType.Sell => sellType
     }).typeRef, Map.empty)
 
+  def buildPayment(mpmt: Option[Tx.Pmt]): CaseObj = mpmt match {
+    case None => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
+    case Some(pmt) =>
+      CaseObj(
+        paymentType.typeRef,
+        Map(
+          "amount" -> CONST_LONG(pmt.amount),
+          "asset" -> (pmt.asset match {
+            case None        => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
+            case Some(asset) => CONST_BYTEVECTOR(asset)
+          })
+        )
+      )
+
+  }
+
   def orderObject(ord: Ord, proofsEnabled: Boolean): CaseObj =
     CaseObj(
       buildOrderType(proofsEnabled).typeRef,
@@ -73,6 +89,16 @@ object Bindings {
         "matcherFee"       -> ord.matcherFee,
         "bodyBytes"        -> ord.bodyBytes,
         proofsPart(ord.proofs)
+      )
+    )
+
+  def buildInvocation(caller: Recipient.Address, payment: Option[Pmt], contractAddress:Recipient.Address) =
+    CaseObj(
+      invocationType.typeRef,
+      Map(
+        "caller"          -> mapRecipient(caller)._2,
+        "contractAddress" -> mapRecipient(contractAddress)._2,
+        "payment"         -> buildPayment(payment)
       )
     )
 
@@ -132,6 +158,16 @@ object Bindings {
                   ),
                   provenTxPart(p, proofsEnabled))
         )
+      case CI(p, address, maybePayment) =>
+        CaseObj(
+          buildContractInvokationTransactionType(proofsEnabled).typeRef,
+          combine(Map(
+                    "contractAddress" -> mapRecipient(address)._2,
+                    "paymentInfo"     -> buildPayment(maybePayment)
+                  ),
+                  provenTxPart(p, proofsEnabled))
+        )
+
       case Lease(p, amount, recipient) =>
         CaseObj(
           buildLeaseTransactionType(proofsEnabled).typeRef,

@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ScriptVersion
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -21,7 +21,7 @@ object WavesContext {
   import Types._
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  def build(version: ScriptVersion, env: Environment, isTokenContext: Boolean): CTX = {
+  def build(version: Version, env: Environment, isTokenContext: Boolean): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     val proofsEnabled = !isTokenContext
@@ -89,7 +89,7 @@ object WavesContext {
         ("@data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"),
         ("@index", LONG, "index")
       ) {
-        BLOCK(
+        BLOCKV1(
           LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(REF("@data"), REF("@index"))), "value")),
           IF(FUNCTION_CALL(PureContext._isInstanceOf, List(REF("@val"), CONST_STRING(dataType.innerType.name))), REF("@val"), REF("unit"))
         )
@@ -110,13 +110,13 @@ object WavesContext {
       )
     )
 
-    val addressFromPublicKeyF: BaseFunction =
+    lazy val addressFromPublicKeyF: BaseFunction =
       UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to account address", ("@publicKey", BYTESTR, "public key")) {
 
         FUNCTION_CALL(
           FunctionHeader.User("Address"),
           List(
-            BLOCK(
+            BLOCKV1(
               LET(
                 "@afpk_withoutChecksum",
                 FUNCTION_CALL(
@@ -181,10 +181,10 @@ object WavesContext {
       )
     )
 
-    val addressFromStringF: BaseFunction =
+    lazy val addressFromStringF: BaseFunction =
       UserFunction("addressFromString", optionAddress, "Decode account address", ("@string", STRING, "string address represntation")) {
 
-        BLOCK(
+        BLOCKV1(
           LET("@afs_addrBytes",
               FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(REF("@string"), EnvironmentFunctions.AddressPrefix)))),
           IF(
@@ -267,7 +267,7 @@ object WavesContext {
     val anyTransactionType =
       UNION(
         (buildObsoleteTransactionTypes(proofsEnabled) ++
-          buildActiveTransactionTypes(proofsEnabled)).map(_.typeRef))
+          buildActiveTransactionTypes(proofsEnabled, version)).map(_.typeRef))
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
@@ -327,22 +327,26 @@ object WavesContext {
       if (isTokenContext)
         UNION(buildAssetSupportedTransactions(proofsEnabled).map(_.typeRef))
       else
-        UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled)).map(_.typeRef))
+        UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version)).map(_.typeRef))
 
     val commonVars = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
-      ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
     )
 
     val vars = Map(
-      1 -> Map(),
+      1 -> Map(("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))),
       2 -> Map(
+        ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
+        ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval)))),
+        ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
+      ),
+      3 -> Map(
         ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
         ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
       )
     )
 
-    val functions = Array(
+    lazy val functions = Array(
       txByIdF,
       txHeightByIdF,
       getIntegerFromStateF,
@@ -364,25 +368,21 @@ object WavesContext {
       wavesBalanceF
     )
 
-    val activeTxTypes   = buildActiveTransactionTypes(proofsEnabled)
-    val obsoleteTxTypes = buildObsoleteTransactionTypes(proofsEnabled)
+    lazy val writeSetType            = CaseType(FieldNames.WriteSet, List(FieldNames.Data         -> LIST(dataEntryType.typeRef)))
+    val contractTransfer             = CaseType(FieldNames.ContractTransfer, List("recipient"    -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+    lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
+    lazy val contractResultType      = CaseType(FieldNames.ContractResult, List(FieldNames.Data   -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
 
-    val transactionsCommonType = UnionType("Transaction", activeTxTypes.map(_.typeRef))
+    val types = buildWavesTypes(proofsEnabled, version)
 
-    val transactionTypes: List[CaseType] = obsoleteTxTypes ++ activeTxTypes
-
-    Seq(
-      addressType,
-      aliasType,
-      transfer,
-      assetPairType,
-      dataEntryType,
-      buildOrderType(proofsEnabled),
-      transactionsCommonType
-    ) ++ transactionTypes
-
-    val types = buildWavesTypes(proofsEnabled)
-
-    CTX(types, commonVars ++ vars(version.value), functions)
+    CTX(
+      types ++ (if (version == V3) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType) else List.empty),
+      commonVars ++ vars(version),
+      functions
+    )
   }
+
+  val verifierInput =
+    UnionType("VerifierInput", (buildOrderType(true) :: buildActiveTransactionTypes(true, V3)).map(_.typeRef))
+
 }

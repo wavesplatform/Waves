@@ -45,6 +45,11 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
       assertSignBadJson(js + ("type" -> Json.toJson(-100)), "Bad transaction type")
       assertSignBadJson(js - "alias", "failed to parse json message")
     }
+
+    val obsoleteTx = Json.obj("type" -> 1, "sender" -> firstAddress, "recipient" -> firstAddress, "amount" -> 1, "fee" -> 100000)
+    assertSignBadJson(obsoleteTx, "UnsupportedTransactionType")
+    assertSignBadJson(obsoleteTx + ("type" -> Json.toJson(2)), "UnsupportedTransactionType")
+
   }
 
   test("/transactions/sign should respect timestamp if specified") {

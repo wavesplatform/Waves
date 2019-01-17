@@ -5,6 +5,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 
 package object sync {

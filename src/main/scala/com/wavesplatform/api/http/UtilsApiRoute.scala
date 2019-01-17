@@ -26,7 +26,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   }
 
   override val route: Route = pathPrefix("utils") {
-    compile ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    compile ~ compileContract ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
   }
 
   @Path("/script/compile")
@@ -64,7 +64,41 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
       }
     }
   }
-
+  @Path("/script/compileContract")
+  @ApiOperation(value = "Compile Contract", notes = "Compiles string code to base64 contract representation", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "code",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        value = "Contract code",
+        example = "true"
+      )
+    ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "base64 or error")
+    ))
+  def compileContract: Route = path("script" / "compileContract") {
+    (post & entity(as[String])) { code =>
+      complete(
+        ScriptCompiler
+          .contract(code)
+          .fold(
+            e => ScriptCompilerError(e), {
+              case (contract) =>
+                Json.obj(
+                  "script"     -> contract.bytes().base64,
+                  "complexity" -> 0,
+                  "extraFee"   -> CommonValidation.ScriptExtraFee
+                )
+            }
+          )
+      )
+    }
+  }
   @Path("/script/estimate")
   @ApiOperation(value = "Estimate", notes = "Estimates compiled code in Base64 representation", httpMethod = "POST")
   @ApiImplicitParams(

@@ -18,4 +18,10 @@ package object evaluator {
   def liftTER[A](ter: Coeval[Either[ExecutionError, A]]): EvalM[A] = {
     TaskM(_ => ter)
   }
+
+  type LetExecResult  = Either[ExecutionError, Any]
+  type LogItem        = (String, LetExecResult)
+  type Log            = List[LogItem]
+  type LogCallback    = LetExecResult => Unit
+  type LetLogCallback = String => LogCallback
 }

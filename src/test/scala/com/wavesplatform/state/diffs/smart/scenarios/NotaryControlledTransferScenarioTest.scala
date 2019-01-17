@@ -5,8 +5,8 @@ import java.nio.charset.StandardCharsets
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
@@ -61,9 +61,9 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
                     | }
         """.stripMargin
 
-      untypedScript = Parser(assetScript).get.value
+      untypedScript = Parser.parseScript(assetScript).get.value
 
-      typedScript = ScriptV1(CompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
+      typedScript = ScriptV1(ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -112,8 +112,8 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
        transferFromAToB)
 
   private def eval(code: String) = {
-    val untyped = Parser(code).get.value
-    val typed   = CompilerV1(compilerContext(V1, isAssetScript = false), untyped).map(_._1)
+    val untyped = Parser.parseScript(code).get.value
+    val typed   = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untyped).map(_._1)
     typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(V1), _))
   }
 

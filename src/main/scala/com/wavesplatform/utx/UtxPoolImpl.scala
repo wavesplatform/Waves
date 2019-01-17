@@ -12,7 +12,7 @@ import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
-import com.wavesplatform.state.diffs.{CommonValidation, TransactionDiffer}
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
@@ -51,17 +51,30 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
 
   private val cleanup: CancelableFuture[Unit] = removeInvalidTask.runAsyncLogErr
 
+  private[this] object PoolMetrics {
+    private[this] val sizeStats = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
+    private[this] val bytesStats = Kamon.rangeSampler("utx-pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
+    val processingTimeStats = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
+    val putRequestStats     = Kamon.counter("utx-pool-put-if-new")
+
+    def addTransaction(tx: Transaction): Unit = {
+      sizeStats.increment()
+      bytesStats.increment(tx.bytes().size)
+    }
+
+    def removeTransaction(tx: Transaction): Unit = {
+      sizeStats.decrement()
+      bytesStats.decrement(tx.bytes().size)
+    }
+  }
+
   override def close(): Unit = {
     cleanup.cancel()
     scheduler.shutdown()
   }
 
-  private val utxPoolSizeStats    = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
-  private val processingTimeStats = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
-  private val putRequestStats     = Kamon.counter("utx-pool-put-if-new")
-
   private def removeExpired(currentTs: Long): Unit = {
-    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > CommonValidation.MaxTimePrevBlockOverTransactionDiff
+    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > fs.maxTransactionTimeBackOffset
 
     transactions.values.asScala
       .collect {
@@ -103,7 +116,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
   }
 
   private def remove(txId: ByteStr): Unit = {
-    Option(transactions.remove(txId)).foreach(_ => utxPoolSizeStats.decrement())
+    Option(transactions.remove(txId)).foreach(PoolMetrics.removeTransaction)
     pessimisticPortfolios.remove(txId)
   }
 
@@ -181,11 +194,19 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
     }
 
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
-    putRequestStats.increment()
+    PoolMetrics.putRequestStats.increment()
     val result = measureSuccessful(
-      processingTimeStats, {
+      PoolMetrics.processingTimeStats, {
         for {
-          _    <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+          _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+
+          transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
+            .map(_.bytes().size)
+            .sum
+          _ <- Either.cond((transactionsBytes + tx.bytes().size) <= utxSettings.maxBytesSize,
+                           (),
+                           GenericError("Transaction pool bytes size limit is reached"))
+
           _    <- checkNotBlacklisted(tx)
           _    <- checkScripted(b, tx)
           _    <- checkAlias(b, tx)
@@ -194,7 +215,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
         } yield {
           pessimisticPortfolios.add(tx.id(), diff)
           val isNew = Option(transactions.put(tx.id(), tx)).isEmpty
-          if (isNew) utxPoolSizeStats.increment()
+          if (isNew) PoolMetrics.addTransaction(tx)
           (isNew, diff)
         }
       }

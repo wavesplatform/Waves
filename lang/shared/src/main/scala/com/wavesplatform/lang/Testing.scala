@@ -14,7 +14,7 @@ object Testing {
     case s: ByteStr       => Right(CONST_BYTESTR(s))
     case s: CaseObj       => Right(s)
     case s: Boolean       => Right(CONST_BOOLEAN(s))
-    case a: IndexedSeq[_] => Right(ARR(a.map(x => evaluated(x).explicitGet())))
+    case a: Seq[_] => Right(ARR(a.map(x => evaluated(x).explicitGet()).toIndexedSeq))
     case _                => Left("Bad Assert: unexprected type")
   }
 }
