@@ -22,7 +22,6 @@ import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Assertion, Matchers}
 import play.api.libs.json._
 
 class TransactionsRouteSpec

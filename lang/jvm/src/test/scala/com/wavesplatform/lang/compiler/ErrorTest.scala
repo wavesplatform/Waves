@@ -30,7 +30,10 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
       LET(AnyPos, PART.VALID(AnyPos, "drop"), CONST_LONG(AnyPos, 2), Seq.empty),
       TRUE(AnyPos)
     ),
-    "BINARY_OP with wrong types"                   -> "Compilation failed: Can't find a function overload '+'" -> BINARY_OP(AnyPos, TRUE(AnyPos), SUM_OP, CONST_LONG(AnyPos, 1)),
+    "BINARY_OP with wrong types" -> "Compilation failed: Can't find a function overload '+'" -> BINARY_OP(AnyPos,
+                                                                                                          TRUE(AnyPos),
+                                                                                                          SUM_OP,
+                                                                                                          CONST_LONG(AnyPos, 1)),
     "IF clause must be boolean"                    -> "Unexpected type, required: Boolean" -> IF(AnyPos, CONST_LONG(AnyPos, 0), TRUE(AnyPos), FALSE(AnyPos)),
     "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(
       AnyPos,
