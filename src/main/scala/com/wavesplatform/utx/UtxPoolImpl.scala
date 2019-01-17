@@ -51,10 +51,10 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
   private val cleanup: CancelableFuture[Unit] = removeInvalidTask.runAsyncLogErr
 
   private[this] object PoolMetrics {
-    private[this] val sizeStats = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
+    private[this] val sizeStats  = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
     private[this] val bytesStats = Kamon.rangeSampler("utx-pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
-    val processingTimeStats = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
-    val putRequestStats     = Kamon.counter("utx-pool-put-if-new")
+    val processingTimeStats      = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
+    val putRequestStats          = Kamon.counter("utx-pool-put-if-new")
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()

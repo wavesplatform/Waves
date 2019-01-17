@@ -30,7 +30,7 @@ object ScriptV1 {
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s
 
-  case class ScriptV1Impl(override val version: Version, override val expr: EXPR) extends Script {
+  case class ScriptV1Impl(version: Version, expr: EXPR, complexity: Long) extends Script {
     override type Expr = EXPR
     override val text: String = expr.toString
     override val bytes: Coeval[ByteStr] =
@@ -41,7 +41,8 @@ object ScriptV1 {
   }
 }
 
-case class ScriptV2(override val version: Version, override val expr: Contract) extends Script {
+case class ScriptV2(version: Version, expr: Contract) extends Script {
+  override val complexity: Long = -1
   override type Expr = Contract
   override val text: String = expr.toString
   override val bytes: Coeval[ByteStr] =
