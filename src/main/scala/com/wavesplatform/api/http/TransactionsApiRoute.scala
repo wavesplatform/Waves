@@ -63,7 +63,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       new ApiImplicitParam(name = "after", value = "Id of transaction to paginate after", required = false, dataType = "string", paramType = "query")
     ))
   def addressLimit: Route = {
-    (get & pathPrefix("address" / Segment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
+    (get & path("address" / Segment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
       complete(transactionsByAddress(address, limit, maybeAfter))
     }
   }
@@ -300,7 +300,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
         }
       }
 
-    json.map(txs => JsArray(txs))
+    json.map(txs => Json.arr(JsArray(txs)))
   }
 
   def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Future[ToResponseMarshallable] =
