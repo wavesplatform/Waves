@@ -113,7 +113,7 @@ class AddressRouteSpec
         val messageBytes = message.getBytes()
         val signature    = crypto.sign(account, messageBytes)
         val validBody = Json.obj(
-          "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else Base64.encode(messageBytes) else message),
+          "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else ("base64:" ++ Base64.encode(messageBytes)) else message),
           "publickey" -> JsString(Base58.encode(account.publicKey)),
           "signature" -> JsString(Base58.encode(signature))
         )
