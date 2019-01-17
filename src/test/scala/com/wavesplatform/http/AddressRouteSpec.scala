@@ -4,7 +4,7 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.state.{Blockchain, EitherExt2}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.utils.{Base58, Base64}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
@@ -107,13 +107,13 @@ class AddressRouteSpec
 
   private def testVerify(path: String, encode: Boolean): Unit = {
 
-    forAll(generatedMessages) {
-      case (account, message) =>
+    forAll(generatedMessages.flatMap(m => Gen.oneOf(true, false).map(b => (m, b)))) {
+      case ((account, message), b58) =>
         val uri          = routePath(s"/$path/${account.address}")
         val messageBytes = message.getBytes()
         val signature    = crypto.sign(account, messageBytes)
         val validBody = Json.obj(
-          "message"   -> JsString(if (encode) Base58.encode(messageBytes) else message),
+          "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else Base64.encode(messageBytes) else message),
           "publickey" -> JsString(Base58.encode(account.publicKey)),
           "signature" -> JsString(Base58.encode(signature))
         )
