@@ -4,7 +4,7 @@ import com.wavesplatform.utils.base58Length
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.crypto._
 
@@ -45,7 +45,8 @@ object TransactionParsers {
     LeaseTransactionV2,
     LeaseCancelTransactionV2,
     SponsorFeeTransaction,
-    SetAssetScriptTransaction
+    SetAssetScriptTransaction,
+    ContractInvocationTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)

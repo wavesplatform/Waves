@@ -2,21 +2,16 @@ package com.wavesplatform.lang.v1.evaluator
 
 import cats.Monad
 import cats.implicits._
-import com.wavesplatform.lang.ExprEvaluator.{LetExecResult, LetLogCallback, Log, LogItem}
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.task.imports._
-import com.wavesplatform.lang.{ExecutionError, ExprEvaluator, TrampolinedExecResult}
+import com.wavesplatform.lang.{ExecutionError, TrampolinedExecResult}
 
 import scala.collection.mutable.ListBuffer
 
-object EvaluatorV1 extends ExprEvaluator {
-
-  override type Ver = V1.type
-  override val version: Ver = V1
+object EvaluatorV1 {
 
   private def evalLetBlock(let: LET, inner: EXPR): EvalM[EVALUATED] =
     for {
@@ -29,6 +24,18 @@ object EvaluatorV1 extends ExprEvaluator {
       }
     } yield result
 
+  private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[EVALUATED] = {
+    val funcHeader = FunctionHeader.User(func.name)
+    val function   = UserFunction(func.name, null, s"user defined function '${func.name}'", func.args.map(n => (n, null, n)): _*)(func.body)
+    for {
+      ctx <- get[LoggedEvaluationContext, ExecutionError]
+      result <- local {
+        modify[LoggedEvaluationContext, ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
+          .flatMap(_ => evalExpr(inner))
+      }
+    } yield result
+  }
+
   private def evalRef(key: String): EvalM[EVALUATED] =
     get[LoggedEvaluationContext, ExecutionError] flatMap { ctx =>
       lets.get(ctx).get(key) match {
@@ -39,9 +46,9 @@ object EvaluatorV1 extends ExprEvaluator {
 
   private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[EVALUATED] =
     evalExpr(cond) flatMap {
-      case TRUE => evalExpr(ifTrue)
+      case TRUE  => evalExpr(ifTrue)
       case FALSE => evalExpr(ifFalse)
-      case _ => ???
+      case _     => ???
     }
 
   private def evalGetter(expr: EXPR, field: String): EvalM[EVALUATED] =
@@ -91,8 +98,13 @@ object EvaluatorV1 extends ExprEvaluator {
         .getOrElse(raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"function '$header' not found"))
     } yield result
 
-  private def evalExpr(t: EXPR): EvalM[EVALUATED] = t match {
-    case BLOCK(let, inner)           => evalLetBlock(let, inner)
+  def evalExpr(t: EXPR): EvalM[EVALUATED] = t match {
+    case BLOCKV1(let, inner) => evalLetBlock(let, inner)
+    case BLOCKV2(dec, inner) =>
+      dec match {
+        case l: LET  => evalLetBlock(l, inner)
+        case f: FUNC => evalFuncBlock(f, inner)
+      }
     case REF(str)                    => evalRef(str)
     case c: EVALUATED                => implicitly[Monad[EvalM]].pure(c)
     case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
@@ -108,6 +120,13 @@ object EvaluatorV1 extends ExprEvaluator {
 
   def apply[A <: EVALUATED](c: EvaluationContext, expr: EXPR): Either[ExecutionError, A] = ap(c, expr, _ => _ => ())
 
+  def evalWithLogging(c: EvaluationContext, evalC: EvalM[EVALUATED]): (Log, Either[ExecutionError, EVALUATED]) = {
+    val log = ListBuffer[LogItem]()
+    val llc = (str: String) => (v: LetExecResult) => log.append((str, v))
+    val lec = LoggedEvaluationContext(llc, c)
+    val res = evalC.run(lec).value._2
+    (log.toList, res)
+  }
   private def ap[A <: EVALUATED](c: EvaluationContext, expr: EXPR, llc: LetLogCallback): Either[ExecutionError, A] = {
     val lec = LoggedEvaluationContext(llc, c)
     evalExpr(expr)

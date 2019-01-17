@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import java.nio.charset.StandardCharsets
 
 import cats.data.EitherT
-import com.wavesplatform.lang.ScriptVersion
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -131,7 +131,7 @@ object PureContext {
     NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("b", BOOLEAN, "value")) {
       case TRUE :: Nil  => Right(CONST_BYTEVECTOR(ByteVector(1)))
       case FALSE :: Nil => Right(CONST_BYTEVECTOR(ByteVector(0)))
-      case _                           => ???
+      case _            => ???
     }
 
   lazy val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTEVECTOR, "Bytes array representation", ("n", LONG, "value")) {
@@ -154,7 +154,7 @@ object PureContext {
     NativeFunction("toString", 1, BOOLEAN_TO_STRING, STRING, "String representation", ("b", BOOLEAN, "value")) {
       case TRUE :: Nil  => Right(CONST_STRING("true"))
       case FALSE :: Nil => Right(CONST_STRING("false"))
-      case _                           => ???
+      case _            => ???
     }
 
   lazy val toStringLong: BaseFunction = NativeFunction("toString", 1, LONG_TO_STRING, STRING, "String representation", ("n", LONG, "value")) {
@@ -215,6 +215,15 @@ object PureContext {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => Right(CONST_STRING(xs.take(trimLongToInt(number))))
       case xs                                            => notImplemented("take(xs: String, number: Long)", xs)
     }
+
+  lazy val listConstructor1 = NativeFunction("List", 1, CREATE_LIST1, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]",
+    ("arg1", TYPEPARAM('T'), "arg1"))(xs => Right(ARR(xs.toIndexedSeq)))
+
+  lazy val listConstructor2 = NativeFunction("List", 1, CREATE_LIST2, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]",
+    ("arg1", TYPEPARAM('T'), "arg1"), ("arg2", TYPEPARAM('T'), "arg2"))(xs => Right(ARR(xs.toIndexedSeq)))
+
+  lazy val listConstructor3 = NativeFunction("List", 1, CREATE_LIST3, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]",
+    ("arg1", TYPEPARAM('T'), "arg1"), ("arg2", TYPEPARAM('T'), "arg2"),  ("arg3", TYPEPARAM('T'), "arg3"))(xs => Right(ARR(xs.toIndexedSeq)))
 
   lazy val dropString: BaseFunction =
     NativeFunction("drop", 1, DROP_STRING, STRING, "Remmove sring prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
@@ -350,7 +359,10 @@ object PureContext {
     isDefined,
     extract,
     throwWithMessage,
-    throwNoMessage
+    throwNoMessage,
+    listConstructor1, // TODO for context v3
+    listConstructor2,
+    listConstructor3
   ) ++ operators
 
   private lazy val ctx = CTX(
@@ -365,6 +377,6 @@ object PureContext {
     functions
   )
 
-  def build(version: ScriptVersion): CTX = ctx
+  def build(version: Version): CTX = ctx
 
 }

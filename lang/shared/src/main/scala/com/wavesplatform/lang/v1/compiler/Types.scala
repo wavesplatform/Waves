@@ -55,6 +55,11 @@ object Types {
     }
     def apply(l: REAL*): UNION = create(l.toList)
 
+    def reduce(u: UNION): FINAL = u.l match {
+      case Nil      => throw new Exception("Empty union")
+      case x :: Nil => x
+      case _        => u
+    }
   }
 
   implicit class TypeExt(l1: FINAL) {

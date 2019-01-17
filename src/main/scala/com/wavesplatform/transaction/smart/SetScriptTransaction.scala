@@ -61,8 +61,8 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
         case Some(Left(err)) => Left(err)
       }
 
-      val fee       = Longs.fromByteArray(bytes.slice(scriptEnd, scriptEnd + 8))
-      val timestamp = Longs.fromByteArray(bytes.slice(scriptEnd + 8, scriptEnd + 16))
+      lazy val fee       = Longs.fromByteArray(bytes.slice(scriptEnd, scriptEnd + 8))
+      lazy val timestamp = Longs.fromByteArray(bytes.slice(scriptEnd + 8, scriptEnd + 16))
       (for {
         scriptOpt <- scriptEiOpt
         _         <- Either.cond(chainId == chainId, (), GenericError(s"Wrong chainId ${chainId.toInt}"))

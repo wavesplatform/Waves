@@ -3,12 +3,12 @@ package com.wavesplatform.lang
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LONG}
-import com.wavesplatform.lang.v1.compiler.{CompilerV1, Terms}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompilerV1, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
@@ -120,12 +120,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   private def eval[T <: EVALUATED](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
-    val untyped                                                = Parser(code).get.value
+    val untyped                                                = Parser.parseScript(code).get.value
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
-      Monoid.combine(PureContext.build(V1), CTX(sampleTypes, stringToTuple, Array.empty))
-    val typed = CompilerV1(ctx.compilerContext, untyped)
+      Monoid.combineAll(Seq(PureContext.build(V1), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
+    val typed = ExpressionCompilerV1(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
 
@@ -185,7 +185,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   def compile(script: String): Either[String, Terms.EXPR] = {
-    val compiler = new CompilerV1(CTX.empty.compilerContext)
+    val compiler = new ExpressionCompilerV1(CTX.empty.compilerContext)
     compiler.compile(script, List.empty)
   }
 
@@ -275,6 +275,28 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, Some(pointCInstance)) shouldBe Left("arrgh")
   }
 
+  property("func") {
+    val script =
+      """
+        |func inc(z:Int) = {z + 1}
+        |inc(0)
+      """.stripMargin
+    eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(1)
+  }
+
+  property("func in func") {
+    val script =
+      """
+        |func maxx(x:Int, y: Int) = {
+        |  let z = 11
+        |  func max(i: Int, j:Int) = { if(i>j) then i else j }
+        |  max(x,max(y,z))
+        |}
+        |maxx(0,10)
+      """.stripMargin
+    eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(11)
+  }
+
   property("context won't change after inner let") {
     val script = "{ let x = 3; x } + { let x = 5; x}"
     eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(8)
@@ -285,7 +307,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(5)
   }
 
-  ignore("context won't change after execution of a user function") {
+  property("context won't change after execution of a user function") {
     val doubleFst = UserFunction("ID", LONG, "D", ("x", LONG, "X")) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
     }
@@ -303,7 +325,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     ev[CONST_LONG](context, expr) shouldBe evaluated(2003l)
   }
 
-  ignore("context won't change after execution of an inner block") {
+  property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
       PureContext.build(V1).evaluationContext,
       EvaluationContext(
@@ -316,14 +338,38 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val expr = FUNCTION_CALL(
       function = PureContext.sumLong.header,
       args = List(
-        BLOCK(
-          let = LET("x", CONST_LONG(5l)),
+        BLOCKV2(
+          dec = LET("x", CONST_LONG(5l)),
           body = REF("x")
         ),
         REF("x")
       )
     )
     ev[CONST_LONG](context, expr) shouldBe evaluated(8)
+  }
+
+  property("list constructor primitive") {
+    val src =
+      """
+        |List(1,2)
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2))
+  }
+
+  property("list constructor for different data entries") {
+    val src =
+      """
+        |let x = DataEntry("foo",1)
+        |let y = DataEntry("bar","2")
+        |let z = DataEntry("baz","2")
+        |List(x,y,z)
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(
+      ARR(Vector(
+        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("foo"), "value" -> CONST_LONG(1))),
+        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("bar"), "value" -> CONST_STRING("2"))),
+        CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("baz"), "value" -> CONST_STRING("2")))
+      )))
   }
 
 }
