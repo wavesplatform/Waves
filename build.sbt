@@ -229,7 +229,9 @@ checkPRRaw in Global := {
 }
 
 lazy val common = project.settings(
-  libraryDependencies ++= Dependencies.serialization
+  libraryDependencies ++=
+    Dependencies.serialization ++
+      Dependencies.scalatest
 )
 
 lazy val lang =
