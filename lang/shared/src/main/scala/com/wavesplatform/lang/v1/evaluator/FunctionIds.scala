@@ -25,12 +25,12 @@ object FunctionIds {
   val DROP_STRING: Short = 304
   val SIZE_STRING: Short = 305
 
-  val SIZE_LIST: Short = 400
-  val GET_LIST: Short  = 401
-  val LONG_TO_BYTES: Short = 410
-  val STRING_TO_BYTES: Short = 411
-  val BOOLEAN_TO_BYTES: Short = 412
-  val LONG_TO_STRING: Short = 420
+  val SIZE_LIST: Short         = 400
+  val GET_LIST: Short          = 401
+  val LONG_TO_BYTES: Short     = 410
+  val STRING_TO_BYTES: Short   = 411
+  val BOOLEAN_TO_BYTES: Short  = 412
+  val LONG_TO_STRING: Short    = 420
   val BOOLEAN_TO_STRING: Short = 421
 
   // Crypto
@@ -49,16 +49,23 @@ object FunctionIds {
   val TRANSACTIONHEIGHTBYID: Short = 1001
   val ACCOUNTASSETBALANCE: Short   = 1003
 
-  val DATA_LONG_FROM_ARRAY: Short = 1040
+  val DATA_LONG_FROM_ARRAY: Short    = 1040
   val DATA_BOOLEAN_FROM_ARRAY: Short = 1041
-  val DATA_BYTES_FROM_ARRAY: Short = 1042
-  val DATA_STRING_FROM_ARRAY: Short = 1043
+  val DATA_BYTES_FROM_ARRAY: Short   = 1042
+  val DATA_STRING_FROM_ARRAY: Short  = 1043
 
-  val DATA_LONG_FROM_STATE: Short             = 1050
-  val DATA_BOOLEAN_FROM_STATE: Short          = 1051
-  val DATA_BYTES_FROM_STATE: Short            = 1052
-  val DATA_STRING_FROM_STATE: Short           = 1053
+  val DATA_LONG_FROM_STATE: Short    = 1050
+  val DATA_BOOLEAN_FROM_STATE: Short = 1051
+  val DATA_BYTES_FROM_STATE: Short   = 1052
+  val DATA_STRING_FROM_STATE: Short  = 1053
 
-  val ADDRESSFROMRECIPIENT: Short  = 1060
+  val ADDRESSFROMRECIPIENT: Short = 1060
+
+
+  val CREATE_LIST0: Short       = 1100
+  val CREATE_LIST1: Short       = 1101
+  val CREATE_LIST2: Short       = 1102
+  val CREATE_LIST3: Short       = 1103
+
 
 }

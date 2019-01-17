@@ -5,10 +5,10 @@ import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
+import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.directives.DirectiveParser
 import com.wavesplatform.lang.v1.ScriptEstimator
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompilerV1}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -486,7 +486,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   }
 
   def compile(scriptText: String, ctx: CompilerContext): Either[String, (Script, Long)] = {
-    val compiler = new CompilerV1(ctx)
+    val compiler = new ExpressionCompilerV1(ctx)
 
     val directives = DirectiveParser(scriptText)
 

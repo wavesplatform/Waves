@@ -4,8 +4,9 @@ import java.util.concurrent.TimeUnit
 
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
+import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark.pureEvalContext
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
@@ -18,7 +19,6 @@ import scodec.bits.ByteVector
 import scorex.crypto.signatures.Curve25519
 
 import scala.util.Random
-import ScriptEvaluatorBenchmark.pureEvalContext
 
 object ScriptEvaluatorBenchmark {
   val pureEvalContext = PureContext.build(V1).evaluationContext
@@ -61,9 +61,9 @@ class NestedBlocks {
     val blockCount = 300
     val cond       = FUNCTION_CALL(PureContext.eq, List(REF(s"v$blockCount"), CONST_LONG(0)))
     val blocks = (1 to blockCount).foldRight[EXPR](cond) { (i, e) =>
-      BLOCK(LET(s"v$i", REF(s"v${i - 1}")), e)
+      BLOCKV2(LET(s"v$i", REF(s"v${i - 1}")), e)
     }
-    BLOCK(LET("v0", CONST_LONG(0)), blocks)
+    BLOCKV2(LET("v0", CONST_LONG(0)), blocks)
   }
 }
 
@@ -82,7 +82,7 @@ class Base58Perf {
         Random.nextBytes(b)
         LET("v" + i, FUNCTION_CALL(PureContext.sizeString, List(FUNCTION_CALL(Native(TOBASE58), List(CONST_BYTEVECTOR(ByteVector(b)))))))
       }
-      .foldRight[EXPR](sum) { case (let, e) => BLOCK(let, e) }
+      .foldRight[EXPR](sum) { case (let, e) => BLOCKV2(let, e) }
   }
 
   val decode: EXPR = {
@@ -96,7 +96,7 @@ class Base58Perf {
         Random.nextBytes(b)
         LET("v" + i, FUNCTION_CALL(PureContext.sizeBytes, List(FUNCTION_CALL(Native(FROMBASE58), List(CONST_STRING(Base58.encode(b)))))))
       }
-      .foldRight[EXPR](sum) { case (let, e) => BLOCK(let, e) }
+      .foldRight[EXPR](sum) { case (let, e) => BLOCKV2(let, e) }
   }
 }
 
@@ -129,7 +129,7 @@ class Signatures {
         )
       }
       .foldRight[EXPR](FUNCTION_CALL(PureContext.eq, List(sum, CONST_LONG(sigCount)))) {
-        case (let, e) => BLOCK(let, e)
+        case (let, e) => BLOCKV2(let, e)
       }
   }
 }

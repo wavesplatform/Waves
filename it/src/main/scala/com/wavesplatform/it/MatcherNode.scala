@@ -3,6 +3,7 @@ package com.wavesplatform.it
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.ScorexLogging

@@ -1,6 +1,7 @@
 package com.wavesplatform.settings
 
 import com.wavesplatform.features.BlockchainFeatures
+import scala.concurrent.duration._
 
 object TestFunctionalitySettings {
   val Enabled = FunctionalitySettings(
@@ -16,7 +17,9 @@ object TestFunctionalitySettings {
     resetEffectiveBalancesAtHeight = 0,
     blockVersion3AfterHeight = 0,
     preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.SmartAssets.id -> 0, BlockchainFeatures.FairPoS.id -> 0),
-    doubleFeaturesPeriodsAfterHeight = Int.MaxValue
+    doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
+    maxTransactionTimeBackOffset = 120.minutes,
+    maxTransactionTimeForwardOffset = 90.minutes
   )
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)

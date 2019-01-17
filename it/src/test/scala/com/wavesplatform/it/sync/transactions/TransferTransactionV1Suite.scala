@@ -54,7 +54,7 @@ class TransferTransactionV1Suite extends BaseTransactionSuite with CancelAfterFa
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
 
     val invalidTxs = Seq(
-      (invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction .* is from far future"),
+      (invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
       (invalidTx(fee = 99999), "Fee .* does not exceed minimal value")
     )
 

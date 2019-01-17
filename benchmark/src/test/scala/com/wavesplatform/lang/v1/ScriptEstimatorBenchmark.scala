@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
+import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.v1.ScriptEstimatorBenchmark.St
 import com.wavesplatform.utils
 import monix.eval.Coeval
