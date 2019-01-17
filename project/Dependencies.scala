@@ -104,5 +104,6 @@ object Dependencies {
     "org.scalacheck"      %% "scalacheck"      % "1.14.0",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
-  lazy val kindProjector = "org.spire-math" %% "kind-projector" % "0.9.6"
+  lazy val kindProjector = "org.spire-math" %% "kind-projector"     % "0.9.6"
+  lazy val betterFor     = "com.olegpy"     %% "better-monadic-for" % "0.3.0-M4"
 }

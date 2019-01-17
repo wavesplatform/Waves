@@ -8,7 +8,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompilerV1}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
@@ -32,7 +32,8 @@ import scala.concurrent.duration._
 class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink with WithDB {
   val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
-  import CommonValidation.{MaxTimePrevBlockOverTransactionDiff => maxAge, ScriptExtraFee => extraFee}
+  import CommonValidation.{ScriptExtraFee => extraFee}
+  import FunctionalitySettings.TESTNET.{maxTransactionTimeBackOffset => maxAge}
 
   private def mkBlockchain(senderAccount: Address, senderBalance: Long) = {
     val config          = ConfigFactory.load()
@@ -219,7 +220,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         |let y = 2
         |true""".stripMargin
 
-    val compiler = new CompilerV1(CompilerContext.empty)
+    val compiler = new ExpressionCompilerV1(CompilerContext.empty)
     compiler.compile(code, List.empty).explicitGet()
   }
 
@@ -359,7 +360,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
           val utxPortfolioBefore = utxPool.portfolio(sender)
           val poolSizeBefore     = utxPool.size
 
-          time.advance(CommonValidation.MaxTimePrevBlockOverTransactionDiff * 2)
+          time.advance(maxAge * 2)
           utxPool.packUnconfirmed(limitByNumber(100))
 
           poolSizeBefore should be > utxPool.size

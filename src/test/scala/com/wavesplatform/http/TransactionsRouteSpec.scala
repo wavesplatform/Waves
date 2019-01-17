@@ -6,10 +6,10 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
+import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
-import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
+import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr, _}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.utils.Base58
@@ -22,6 +22,7 @@ import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Assertion, Matchers}
 import play.api.libs.json._
 
 class TransactionsRouteSpec

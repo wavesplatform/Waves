@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-import com.wavesplatform.lang.v1.compiler.Terms.{CaseObj, EVALUATED}
+import com.wavesplatform.lang.v1.compiler.Terms.CaseObj
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 
 package object impl {
@@ -9,5 +9,5 @@ package object impl {
   )
 
   lazy val UNIT: CASETYPEREF = CASETYPEREF("Unit", List.empty)
-  lazy val unit: EVALUATED   = CaseObj(UNIT, Map.empty)
+  lazy val unit: CaseObj   = CaseObj(UNIT, Map.empty)
 }

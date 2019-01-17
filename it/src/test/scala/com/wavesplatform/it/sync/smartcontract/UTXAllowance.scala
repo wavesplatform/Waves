@@ -11,6 +11,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
+import com.wavesplatform.state._
 
 class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with CancelAfterFailure with ReportingTestName with NodesFromDocker {
   import UTXAllowance._
