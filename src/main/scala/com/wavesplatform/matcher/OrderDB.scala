@@ -1,4 +1,5 @@
 package com.wavesplatform.matcher
+
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
@@ -57,7 +58,9 @@ object OrderDB {
         offset <- 0 until (settings.maxOrdersPerRequest - activeOrders.length)
         id     <- db.get(key(seqNr - offset))
         oi     <- db.get(MatcherKeys.orderInfo(id))
-      } yield id -> oi).sortBy { case (_, oi) => -oi.timestamp }
+      } yield id -> oi).sorted
     }
   }
+
+  implicit val orderInfoOrdering: Ordering[(ByteStr, OrderInfo)] = Ordering.by { case (id, oi) => (-oi.timestamp, id) }
 }

@@ -4,6 +4,7 @@ import akka.actor.Actor
 import akka.pattern.pipe
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.Matcher.StoreEvent
+import com.wavesplatform.matcher.OrderDB.orderInfoOrdering
 import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
@@ -117,8 +118,7 @@ class AddressActor(
         if maybePair.forall(_ == lo.order.assetPair)
       } yield
         lo.order
-          .id() -> OrderInfo(lo.order.orderType, lo.order.amount, lo.order.price, lo.order.timestamp, activeStatus(lo), lo.order.assetPair)).toSeq
-        .sortBy { case (_, oi) => -oi.timestamp }
+          .id() -> OrderInfo(lo.order.orderType, lo.order.amount, lo.order.price, lo.order.timestamp, activeStatus(lo), lo.order.assetPair)).toSeq.sorted
 
       sender() ! (if (onlyActive) matchingActiveOrders else orderDB.loadRemainingOrders(owner, maybePair, matchingActiveOrders))
     case GetTradableBalance(pair) =>
