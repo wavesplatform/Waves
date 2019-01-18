@@ -3,23 +3,23 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.RequestGen
+import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.assets._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.utx.{UtxBatchOps, UtxPool}
+import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{Proofs, Transaction}
+import com.wavesplatform.utils.Base58
+import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
-import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.assets._
-import com.wavesplatform.utils.Base58
-import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Proofs, Transaction, ValidationError}
-import com.wavesplatform.wallet.Wallet
 import shapeless.Coproduct
 
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
@@ -156,10 +156,6 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   "compatibility" - {
     val alwaysApproveUtx = stub[UtxPool]
-    val utxOps = new UtxBatchOps {
-      override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = alwaysApproveUtx.putIfNew(tx)
-    }
-    (alwaysApproveUtx.batched[Any] _).when(*).onCall((f: UtxBatchOps => Any) => f(utxOps)).anyNumberOfTimes()
     (alwaysApproveUtx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
 
     val alwaysSendAllChannels = stub[ChannelGroup]

@@ -54,5 +54,5 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
 object AssetPairBuilder {
   private def errorMsg(assetId: String) = s"Invalid Asset ID: $assetId"
 
-  val assetIdOrdering: Ordering[Option[ByteStr]] = Ordering[Option[ByteStr]]
+  val assetIdOrdering: Ordering[Option[ByteStr]] = Ordering.Option[ByteStr]
 }

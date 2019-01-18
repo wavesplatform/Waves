@@ -19,13 +19,11 @@ class TradersTestSuite extends MatcherSuiteBase {
   private def orderVersion                        = (Random.nextInt(2) + 1).toByte
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  "Verifications of tricky ordering cases" ignore {
+  "Verifications of tricky ordering cases" - {
     // Alice issues new asset
     val aliceAsset =
       aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, issueFee, 2).id
     matcherNode.waitForTransaction(aliceAsset)
-
-    // val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
 
     // Wait for balance on Alice's account
     matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
@@ -34,7 +32,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
     // Bob issues a new asset
     val bobAssetQuantity = 10000
-    val bobNewAsset      = bobNode.issue(bobAcc.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, false, issueFee, 2).id
+    val bobNewAsset      = bobNode.issue(bobAcc.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, reissuable = false, issueFee, 2).id
     matcherNode.waitForTransaction(bobNewAsset)
 
     val bobAssetId   = ByteStr.decodeBase58(bobNewAsset).get
@@ -59,29 +57,28 @@ class TradersTestSuite extends MatcherSuiteBase {
 
     matcherNode.assertAssetBalance(bobAcc.address, bobNewAsset, bobAssetQuantity)
 
-    "owner moves assets/waves to another account and order become an invalid" ignore {
-      // todo: reactivate after balance watcher is reimplemented
+    "owner moves assets/waves to another account and order become an invalid" - {
       // Could not work sometimes because of NODE-546
       "order with assets" - {
         "moved assets, insufficient assets" in {
-          val oldestOrderId = bobPlacesAssetOrder(8000, twoAssetsPair, bobNewAsset)
-          val newestOrderId = bobPlacesAssetOrder(1000, twoAssetsPair, bobNewAsset)
+          val oldestOrderId = bobPlacesAssetOrder(4000, twoAssetsPair, bobNewAsset)
+          val newestOrderId = bobPlacesAssetOrder(4000, twoAssetsPair, bobNewAsset)
 
-          val transferId = bobNode.transfer(bobAcc.address, aliceAcc.address, 3050, exTxFee, Some(bobNewAsset), None, 2).id
-          matcherNode.waitForTransaction(transferId)
+          val transferId = bobNode.transfer(bobAcc.address, aliceAcc.address, 5000, exTxFee, Some(bobNewAsset), None, 2).id
+          matcherNode.waitForTransaction(transferId) // 5000 waves are rest
 
-          withClue(s"The oldest order '$oldestOrderId' was cancelled") {
-            matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
+          withClue(s"The newest order '$newestOrderId' was cancelled") {
+            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
           }
-          withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Accepted")
+          withClue(s"The oldest order '$oldestOrderId' is still active") {
+            matcherNode.orderStatus(oldestOrderId, bobWavesPair).status shouldBe "Accepted"
           }
 
           // Cleanup
-          matcherNode.cancelOrder(bobAcc, twoAssetsPair, newestOrderId)
-          matcherNode.waitOrderStatus(twoAssetsPair, newestOrderId, "Cancelled")
+          matcherNode.cancelOrder(bobAcc, twoAssetsPair, oldestOrderId)
+          matcherNode.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
 
-          val transferBackId = aliceNode.transfer(aliceAcc.address, bobAcc.address, 3050, exTxFee, Some(bobNewAsset), None, 2).id
+          val transferBackId = aliceNode.transfer(aliceAcc.address, bobAcc.address, 5000, exTxFee, Some(bobNewAsset), None, 2).id
           matcherNode.waitForTransaction(transferBackId)
         }
 
@@ -95,16 +92,16 @@ class TradersTestSuite extends MatcherSuiteBase {
           val leaseId     = bobNode.lease(bobAcc.address, aliceAcc.address, leaseAmount, exTxFee, 2).id
           matcherNode.waitForTransaction(leaseId)
 
-          withClue(s"The oldest order '$oldestOrderId' was cancelled") {
-            matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
+          withClue(s"The newest order '$newestOrderId' was cancelled") {
+            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
           }
-          withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Accepted")
+          withClue(s"The oldest order '$oldestOrderId' is still active") {
+            matcherNode.orderStatus(oldestOrderId, bobWavesPair).status shouldBe "Accepted"
           }
 
           // Cleanup
-          matcherNode.cancelOrder(bobAcc, twoAssetsPair, newestOrderId)
-          matcherNode.waitOrderStatus(twoAssetsPair, newestOrderId, "Cancelled")
+          matcherNode.cancelOrder(bobAcc, twoAssetsPair, oldestOrderId)
+          matcherNode.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
 
           val cancelLeaseId = bobNode.cancelLease(bobAcc.address, leaseId, exTxFee, 2).id
           matcherNode.waitForTransaction(cancelLeaseId)
@@ -120,16 +117,16 @@ class TradersTestSuite extends MatcherSuiteBase {
           val transferId     = bobNode.transfer(bobAcc.address, aliceAcc.address, transferAmount, exTxFee, None, None, 2).id
           matcherNode.waitForTransaction(transferId)
 
-          withClue(s"The oldest order '$oldestOrderId' was cancelled") {
-            matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
+          withClue(s"The newest order '$newestOrderId' was cancelled") {
+            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
           }
-          withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Accepted")
+          withClue(s"The oldest order '$oldestOrderId' is still active") {
+            matcherNode.orderStatus(oldestOrderId, bobWavesPair).status shouldBe "Accepted"
           }
 
           // Cleanup
-          matcherNode.cancelOrder(bobAcc, twoAssetsPair, newestOrderId)
-          matcherNode.waitOrderStatus(twoAssetsPair, newestOrderId, "Cancelled")
+          matcherNode.cancelOrder(bobAcc, twoAssetsPair, oldestOrderId)
+          matcherNode.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
 
           val transferBackId = aliceNode.transfer(aliceAcc.address, bobAcc.address, transferAmount, exTxFee, None, None, 2).id
           matcherNode.waitForTransaction(transferBackId)
@@ -149,18 +146,18 @@ class TradersTestSuite extends MatcherSuiteBase {
           val leaseId     = bobNode.lease(bobAcc.address, aliceAcc.address, leaseAmount, exTxFee, 2).id
           matcherNode.waitForTransaction(leaseId)
 
-          withClue(s"The newest order '$oldestOrderId' is Cancelled") {
-            matcherNode.waitOrderStatus(bobWavesPair, oldestOrderId, "Cancelled")
+          withClue(s"The newest order '$newestOrderId' is Cancelled") {
+            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Cancelled")
           }
-          withClue(s"The newest order '$newestOrderId' is still active") {
-            matcherNode.waitOrderStatus(bobWavesPair, newestOrderId, "Accepted")
+          withClue(s"The oldest order '$oldestOrderId' is still active") {
+            matcherNode.orderStatus(oldestOrderId, bobWavesPair).status shouldBe "Accepted"
           }
 
           // Cleanup
-          matcherNode.cancelOrder(bobAcc, bobWavesPair, newestOrderId)
-          matcherNode.waitOrderStatus(twoAssetsPair, newestOrderId, "Cancelled")
+          matcherNode.cancelOrder(bobAcc, bobWavesPair, oldestOrderId)
+          matcherNode.waitOrderStatus(twoAssetsPair, oldestOrderId, "Cancelled")
 
-          val cancelLeaseId = bobNode.cancelLease(bobNode.address, leaseId, exTxFee, 2).id
+          val cancelLeaseId = bobNode.cancelLease(bobAcc.address, leaseId, exTxFee, 2).id
           matcherNode.waitForTransaction(cancelLeaseId)
         }
 
@@ -215,9 +212,9 @@ class TradersTestSuite extends MatcherSuiteBase {
   def bobPlacesAssetOrder(bobCoinAmount: Int, twoAssetsPair: AssetPair, assetId: String): String = {
     val decodedAsset = ByteStr.decodeBase58(assetId).get
     val bobOrder = if (twoAssetsPair.amountAsset.contains(decodedAsset)) {
-      matcherNode.prepareOrder(bobAcc, twoAssetsPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant, orderVersion)
+      matcherNode.prepareOrder(bobAcc, twoAssetsPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant, exTxFee, orderVersion)
     } else {
-      matcherNode.prepareOrder(bobAcc, twoAssetsPair, OrderType.BUY, 1, bobCoinAmount * Order.PriceConstant, orderVersion)
+      matcherNode.prepareOrder(bobAcc, twoAssetsPair, OrderType.BUY, 1, bobCoinAmount * Order.PriceConstant, exTxFee, orderVersion)
     }
     val order = matcherNode.placeOrder(bobOrder)
     matcherNode.waitOrderStatus(twoAssetsPair, order.message.id, "Accepted")

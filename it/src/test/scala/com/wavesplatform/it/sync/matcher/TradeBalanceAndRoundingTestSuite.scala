@@ -112,12 +112,14 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     }
 
     "check waves-usd tradable balance" in {
+      val orderHistory = matcherNode.fullOrderHistory(bobAcc)
+      orderHistory.size should be(1)
+
       val expectedBobTradableBalance = bobWavesBalanceBefore - (correctedSellAmount + matcherFee)
       matcherNode.tradableBalance(bobAcc, wavesUsdPair)("WAVES") shouldBe expectedBobTradableBalance
       matcherNode.tradableBalance(aliceAcc, wavesUsdPair)("WAVES") shouldBe aliceNode.accountBalances(aliceAcc.address)._1
 
-      val orderId = matcherNode.fullOrderHistory(bobAcc).head.id
-      matcherNode.fullOrderHistory(bobAcc).size should be(1)
+      val orderId = orderHistory.head.id
       matcherNode.cancelOrder(bobAcc, wavesUsdPair, orderId)
       matcherNode.waitOrderStatus(wavesUsdPair, orderId, "Cancelled", 1.minute)
       matcherNode.tradableBalance(bobAcc, wavesUsdPair)("WAVES") shouldBe bobNode.accountBalances(bobAcc.address)._1

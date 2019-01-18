@@ -74,13 +74,14 @@ object AsyncMatcherHttpApi extends Assertions {
     def matcherGetStatusCode(path: String, statusCode: Int): Future[MessageMatcherResponse] =
       matcherGet(path, statusCode = statusCode).as[MessageMatcherResponse]
 
-    def matcherPost[A: Writes](path: String, body: A): Future[Response] =
+    def matcherPost[A: Writes](path: String, body: A, waitForStatus: Boolean = false): Future[Response] =
       post(
         s"${matcherNode.matcherApiEndpoint}$path",
         (rb: RequestBuilder) =>
           rb.setHeader("Content-type", "application/json")
             .setHeader("Accept", "application/json")
-            .setBody(stringify(toJson(body)))
+            .setBody(stringify(toJson(body))),
+        waitForStatus
       )
 
     def postWithAPiKey(path: String): Future[Response] =

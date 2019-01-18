@@ -11,11 +11,12 @@ import com.wavesplatform.transaction.{AssetId, Transaction}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.metrics.LevelDBStats
+import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
-trait Caches extends Blockchain with ScorexLogging {
+abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain with ScorexLogging {
   import Caches._
 
   protected def maxCacheSize: Int
@@ -247,7 +248,7 @@ trait Caches extends Blockchain with ScorexLogging {
       newTransactions += id -> ((tx, addresses.map(addressId)))
     }
 
-    current = (newHeight, (current._2 + block.blockScore()), Some(block))
+    current = (newHeight, current._2 + block.blockScore(), Some(block))
 
     doAppend(
       block,
@@ -270,8 +271,11 @@ trait Caches extends Blockchain with ScorexLogging {
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
-    for ((address, portfolio)    <- newPortfolios.result()) portfolioCache.put(address, portfolio)
-    for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
+    for ((address, portfolio)    <- newPortfolios.result()) {
+      portfolioCache.put(address, portfolio)
+      portfolioChanged.onNext(address)
+    }
+    for (id <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
     blocksTs.put(newHeight, block.timestamp)

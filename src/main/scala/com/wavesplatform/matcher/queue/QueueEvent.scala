@@ -4,7 +4,7 @@ import com.wavesplatform.crypto.DigestSize
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
-sealed trait QueueEvent {
+sealed trait QueueEvent extends Product with Serializable {
   def assetPair: AssetPair
 }
 

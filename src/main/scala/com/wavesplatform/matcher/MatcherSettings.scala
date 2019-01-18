@@ -38,6 +38,7 @@ case class MatcherSettings(enable: Boolean,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
                            blacklistedAddresses: Set[String],
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
+                           balanceWatchingBufferInterval: FiniteDuration,
                            eventsQueue: EventsQueueSettings)
 
 object MatcherSettings {
@@ -81,6 +82,8 @@ object MatcherSettings {
     val blacklistedAddresses       = config.as[Set[String]](s"$configPath.blacklisted-addresses")
     val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings](s"$configPath.order-book-snapshot-http-cache")
 
+    val balanceWatchingBufferInterval = config.as[FiniteDuration](s"$configPath.balance-watching-buffer-interval")
+
     val eventsQueue         = config.as[EventsQueueSettings](s"$configPath.events-queue")
     val recoverOrderHistory = !new File(dataDirectory).exists()
 
@@ -107,6 +110,7 @@ object MatcherSettings {
       orderTimestampDrift.toMillis,
       blacklistedAddresses,
       orderBookSnapshotHttpCache,
+      balanceWatchingBufferInterval,
       eventsQueue
     )
   }

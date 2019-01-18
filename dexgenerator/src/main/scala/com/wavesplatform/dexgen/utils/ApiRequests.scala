@@ -57,7 +57,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
                 response
               } else {
                 log.info(s"[$tag] Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
-                throw UnexpectedStatusCodeException(r.getUrl, response.getStatusCode, response.getResponseBody)
+                throw UnexpectedStatusCodeException(r.getMethod, r.getUrl, response.getStatusCode, response.getResponseBody)
               }
             }
           }

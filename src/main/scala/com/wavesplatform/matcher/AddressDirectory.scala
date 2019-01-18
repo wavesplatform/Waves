@@ -6,17 +6,29 @@ import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.model.Events
 import com.wavesplatform.state.{EitherExt2, Portfolio}
 import com.wavesplatform.utils.ScorexLogging
+import monix.execution.Scheduler
+import monix.reactive.Observable
 
 import scala.collection.mutable
 import scala.concurrent.duration._
 
-class AddressDirectory(portfolio: Address => Portfolio, storeEvent: StoreEvent, settings: MatcherSettings, orderDB: OrderDB)
+class AddressDirectory(portfolioChanged: Observable[Address],
+                       portfolio: Address => Portfolio,
+                       storeEvent: StoreEvent,
+                       settings: MatcherSettings,
+                       orderDB: OrderDB)
     extends Actor
     with ScorexLogging {
   import AddressDirectory._
   import context._
 
   private[this] val children = mutable.AnyRefMap.empty[Address, ActorRef]
+
+  portfolioChanged
+    .filter(children.contains)
+    .bufferTimed(settings.balanceWatchingBufferInterval)
+    .filter(_.nonEmpty)
+    .foreach(_.toSet.foreach((address: Address) => children.get(address).foreach(_ ! AddressActor.BalanceUpdated)))(Scheduler(context.dispatcher))
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 

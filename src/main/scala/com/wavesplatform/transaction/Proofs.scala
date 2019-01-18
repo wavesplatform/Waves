@@ -12,6 +12,7 @@ import scala.util.Try
 case class Proofs(proofs: List[ByteStr]) {
   val bytes: Coeval[Array[Byte]]  = Coeval.evalOnce(Proofs.Version +: Deser.serializeArrays(proofs.map(_.arr)))
   val base58: Coeval[Seq[String]] = Coeval.evalOnce(proofs.map(p => Base58.encode(p.arr)))
+  override def toString: String   = s"Proofs(${proofs.mkString(", ")})"
 }
 
 object Proofs {

@@ -117,6 +117,7 @@ inConfig(Test)(
   Seq(
     logBuffered := false,
     parallelExecution := false,
+    testListeners := Seq.empty, // Fix for doubled test reports
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true")
   ))
