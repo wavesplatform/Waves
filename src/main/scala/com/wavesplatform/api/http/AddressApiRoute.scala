@@ -12,7 +12,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.TransactionFactory
-import com.wavesplatform.utils.{Base58, Time}
+import com.wavesplatform.utils.{Base58, Base64, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
@@ -421,7 +421,9 @@ case class AddressApiRoute(settings: RestAPISettings,
         InvalidAddress
       } else {
         //DECODE SIGNATURE
-        val msg: Try[Array[Byte]] = if (decode) Base58.decode(m.message) else Success(m.message.getBytes)
+        val msg: Try[Array[Byte]] =
+          if (decode) if (m.message.startsWith("base64:")) Base64.decode(m.message) else Base58.decode(m.message, 2048)
+          else Success(m.message.getBytes)
         verifySigned(msg, m.signature, m.publickey, address)
       }
     }

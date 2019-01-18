@@ -39,8 +39,9 @@ object Base58 {
     new String(output, out, output.length - out, US_ASCII)
   }
 
-  def decode(string: String): Try[Array[Byte]] = Try {
+  def decode(string: String, limit: Int = 192 /* 140*log(256)/log(58) */ ): Try[Array[Byte]] = Try {
     val input: Array[Byte] = new Array[Byte](string.length)
+    string.length.ensuring(_ <= limit, s"base58Decode input exceeds $limit")
     for (i <- 0 until string.length)
       input(i) = toBase58(string(i)).ensuring(_ != -1, s"Wrong char '${string(i)}' in Base58 string '$string'")
 
