@@ -29,11 +29,11 @@ object GenesisBlockGenerator extends App {
                       averageBlockDelay: FiniteDuration,
                       timestamp: Option[Long],
                       distributions: Map[SeedText, Share]) {
-    private val distributionsSum = distributions.values.sum
 
+    private[this] val distributionsSum = distributions.values.sum
     require(
-      distributionsSum <= initialBalance,
-      s"The sum of all balances should be <= $initialBalance, but it is $distributionsSum"
+      distributionsSum == initialBalance,
+      s"The sum of all balances should be == $initialBalance, but it is $distributionsSum"
     )
 
     val chainId: Byte = networkType.head.toByte

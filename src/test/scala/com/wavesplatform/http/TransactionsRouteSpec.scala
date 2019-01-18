@@ -21,8 +21,8 @@ import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Assertion, Matchers}
 import play.api.libs.json._
 
 class TransactionsRouteSpec
@@ -232,36 +232,11 @@ class TransactionsRouteSpec
     "handles parameter errors with corresponding responses" - {
       "invalid address" in {
         forAll(bytes32StrGen) { badAddress =>
-          Get(routePath(s"/address/$badAddress")) ~> route should produce(InvalidAddress)
+          Get(routePath(s"/address/$badAddress/limit/1")) ~> route should produce(InvalidAddress)
         }
       }
 
       "invalid limit" - {
-        def assertInvalidLimit(p: String): Assertion = forAll(accountGen) { a =>
-          Get(routePath(p)) ~> route ~> check {
-            status shouldEqual StatusCodes.BadRequest
-            (responseAs[JsObject] \ "message").as[String] shouldEqual "invalid.limit"
-          }
-        }
-
-        "limit missing" in {
-          forAll(addressGen) { a =>
-            assertInvalidLimit(s"/address/$a")
-          }
-        }
-
-        "only trailing slash after address" in {
-          forAll(addressGen) { a =>
-            assertInvalidLimit(s"/address/$a/")
-          }
-        }
-
-        "limit could not be parsed as int" in {
-          forAll(addressGen) { a =>
-            assertInvalidLimit(s"/address/$a/qwe")
-          }
-        }
-
         "limit is too big" in {
           forAll(addressGen, choose(MaxTransactionsPerRequest + 1, Int.MaxValue).label("limitExceeded")) {
             case (address, limit) =>
