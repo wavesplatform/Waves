@@ -788,7 +788,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     lazy val addressIds: Seq[BigInt] = {
       val all = for {
-        seqNr <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId)))
+        seqNr <- 1 to db.get(Keys.addressesForAssetSeqNr(assetId))
         addressId <- db
           .get(Keys.addressesForAsset(assetId, seqNr))
       } yield addressId
@@ -810,7 +810,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
       val hasNext = dst.length > count
       val items   = if (hasNext) dst.init else dst
-      val lastKey = if (hasNext) items.lastOption.map(_._1) else None
+      val lastKey = items.lastOption.map(_._1)
 
       val result: Paged[Address, AssetDistribution] =
         Paged(hasNext, lastKey, AssetDistribution(items.toMap))
