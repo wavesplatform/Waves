@@ -311,7 +311,7 @@ object Block extends ScorexLogging {
       _ <- Either.cond(crypto.verify(signature, toSign, genesisSigner.publicKey), (), GenericError("Passed genesis signature is not valid"))
 
       // Verify initial balance
-      genesisTransactionsSum = transactionGenesisData.map(_.amount).reduce(Math.addExact)
+      genesisTransactionsSum = transactionGenesisData.map(_.amount).reduce(Math.addExact(_: Long, _: Long))
       _ <- Either.cond(genesisTransactionsSum == genesisSettings.initialBalance, (), GenericError(s"Initial balance ${genesisSettings.initialBalance} did not match the distributions sum $genesisTransactionsSum"))
     } yield Block(
       timestamp = timestamp,
