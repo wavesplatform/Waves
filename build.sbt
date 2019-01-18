@@ -253,7 +253,7 @@ lazy val lang =
           Dependencies.scalatest ++
           Dependencies.scalactic ++
           Dependencies.monix.value ++
-          Dependencies.scodec.value ++
+          Dependencies.meta ++
           Dependencies.fastparse.value,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
       resolvers += Resolver.sbtPluginRepo("releases")
@@ -262,7 +262,7 @@ lazy val lang =
       scalaJSLinkerConfig ~= {
         _.withModuleKind(ModuleKind.CommonJSModule)
       },
-      libraryDependencies += "org.rudogma" %% "supertagged" % "1.4"
+      libraryDependencies += "org.rudogma" %%% "supertagged" % "1.4"
     )
     .jvmSettings(
       coverageExcludedPackages := "",
