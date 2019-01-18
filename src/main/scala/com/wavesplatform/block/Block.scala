@@ -312,16 +312,21 @@ object Block extends ScorexLogging {
 
       // Verify initial balance
       genesisTransactionsSum = transactionGenesisData.map(_.amount).reduce(Math.addExact(_: Long, _: Long))
-      _ <- Either.cond(genesisTransactionsSum == genesisSettings.initialBalance, (), GenericError(s"Initial balance ${genesisSettings.initialBalance} did not match the distributions sum $genesisTransactionsSum"))
-    } yield Block(
-      timestamp = timestamp,
-      version = GenesisBlockVersion,
-      reference = ByteStr(reference),
-      signerData = SignerData(genesisSigner, ByteStr(signature)),
-      consensusData = consensusGenesisData,
-      transactionData = transactionGenesisData,
-      featureVotes = Set.empty
-    )
+      _ <- Either.cond(
+        genesisTransactionsSum == genesisSettings.initialBalance,
+        (),
+        GenericError(s"Initial balance ${genesisSettings.initialBalance} did not match the distributions sum $genesisTransactionsSum")
+      )
+    } yield
+      Block(
+        timestamp = timestamp,
+        version = GenesisBlockVersion,
+        reference = ByteStr(reference),
+        signerData = SignerData(genesisSigner, ByteStr(signature)),
+        consensusData = consensusGenesisData,
+        transactionData = transactionGenesisData,
+        featureVotes = Set.empty
+      )
   }
 
   val GenesisBlockVersion: Byte = 1
