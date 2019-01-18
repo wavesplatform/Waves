@@ -17,8 +17,7 @@ import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.db._
 import com.wavesplatform.matcher.api.{AlreadyProcessed, MatcherApiRoute, MatcherResponse, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
-import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor, OrderHistoryActor}
-import com.wavesplatform.matcher.model.Events.Event
+import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
@@ -185,14 +184,12 @@ class Matcher(actorSystem: ActorSystem,
     MatcherActor.name
   )
 
-  private lazy val addressActors = actorSystem.actorOf(Props(new AddressDirectory(utx.portfolio, storeEvent, matcherSettings)), "addresses")
+  private lazy val addressActors = actorSystem.actorOf(Props(new AddressDirectory(utx.portfolio, storeEvent, matcherSettings, db)), "addresses")
 
   private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
   private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)
 
   private lazy val db = openDB(matcherSettings.dataDir)
-
-  private val orderHistory = actorSystem.actorOf(OrderHistoryActor.props(db, matcherSettings), OrderHistoryActor.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
 
@@ -206,7 +203,6 @@ class Matcher(actorSystem: ActorSystem,
 
     orderBooksSnapshotCache.close()
     Await.result(gracefulStop(matcher, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
-    Await.result(gracefulStop(orderHistory, stopMatcherTimeout), stopMatcherTimeout)
     log.debug("Matcher's actor system has been shut down")
     db.close()
     log.debug("Matcher's database closed")
@@ -238,7 +234,6 @@ class Matcher(actorSystem: ActorSystem,
     log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
 
     actorSystem.actorOf(MatcherTransactionWriter.props(db, matcherSettings), MatcherTransactionWriter.name)
-    actorSystem.eventStream.subscribe(orderHistory, classOf[Event])
   }
 }
 

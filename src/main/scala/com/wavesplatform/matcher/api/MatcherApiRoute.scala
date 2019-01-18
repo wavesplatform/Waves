@@ -9,10 +9,12 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.api.http._
 import com.wavesplatform.crypto
+import com.wavesplatform.matcher.AddressActor.GetOrderStatus
 import com.wavesplatform.matcher.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
+import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder}
@@ -300,6 +302,27 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     }
   }
 
+  private def loadOrders(address: Address, pair: Option[AssetPair], activeOnly: Boolean): Route = complete {
+    askAddressActor[Seq[(ByteStr, OrderInfo)]](address, AddressActor.GetOrders(pair, activeOnly))
+      .map(orders =>
+        StatusCodes.OK -> orders.map {
+          case (id, oi) =>
+            Json.obj(
+              "id"        -> id.base58,
+              "type"      -> oi.side.toString,
+              "amount"    -> oi.amount,
+              "price"     -> oi.price,
+              "timestamp" -> oi.timestamp,
+              "filled" -> (oi.status match {
+                case LimitOrder.Filled(f) => f
+                case _                    => 0L
+              }),
+              "status"    -> oi.status.name,
+              "assetPair" -> oi.assetPair.json
+            )
+      })
+  }
+
   @Path("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}")
   @ApiOperation(value = "Order History by Asset Pair and Public Key",
                 notes = "Get Order History for a given Asset Pair and Public Key",
@@ -328,14 +351,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     withAssetPair(p, redirectToInverse = true, s"/publicKey/$publicKey") { pair =>
       parameters('activeOnly.as[Boolean].?) { activeOnly =>
         signedGet(publicKey) {
-          complete(
-            StatusCodes.OK -> DBUtils
-              .ordersByAddressAndPair(db, publicKey.toAddress, pair, activeOnly.getOrElse(false), matcherSettings.maxOrdersPerRequest)
-              .map {
-                case (order, orderInfo) =>
-                  orderJson(order, orderInfo)
-              })
-
+          loadOrders(publicKey, Some(pair), activeOnly.getOrElse(false))
         }
       }
     }
@@ -364,13 +380,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def getPublicKeyOrderHistory: Route = (path("orderbook" / PublicKeyPM) & get) { publicKey =>
     parameters('activeOnly.as[Boolean].?) { activeOnly =>
       signedGet(publicKey) {
-        complete(
-          StatusCodes.OK -> DBUtils
-            .ordersByAddress(db, publicKey, activeOnly.getOrElse(false), matcherSettings.maxOrdersPerRequest)
-            .map {
-              case (order, orderInfo) =>
-                orderJson(order, orderInfo)
-            })
+        loadOrders(publicKey, None, activeOnly.getOrElse(false))
       }
     }
   }
@@ -404,10 +414,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def getAllOrderHistory: Route = (path("orders" / AddressPM) & get & withAuth) { address =>
     parameters('activeOnly.as[Boolean].?) { activeOnly =>
-      complete(StatusCodes.OK -> DBUtils.ordersByAddress(db, address, activeOnly.getOrElse(true), matcherSettings.maxOrdersPerRequest).map {
-        case (order, orderInfo) =>
-          orderJson(order, orderInfo)
-      })
+      loadOrders(address, None, activeOnly.getOrElse(true))
     }
   }
 
@@ -459,7 +466,13 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def orderStatus: Route = (path("orderbook" / AssetPairPM / ByteStrPM) & get) { (p, orderId) =>
     withAssetPair(p, redirectToInverse = true, s"/$orderId") { _ =>
-      complete(StatusCodes.OK -> DBUtils.orderInfo(db, orderId).status.json)
+      complete(
+        DBUtils
+          .order(db, orderId)
+          .fold[Future[OrderStatus]](Future.successful(LimitOrder.NotFound)) { order =>
+            askAddressActor[OrderStatus](order.sender, GetOrderStatus(orderId))
+          }
+          .map(_.json))
     }
   }
 
@@ -539,16 +552,4 @@ object MatcherApiRoute {
 
   private def stringifyAssetIds(balances: Map[Option[AssetId], Long]): Map[String, Long] =
     balances.map { case (aid, v) => AssetPair.assetIdStr(aid) -> v }
-
-  private def orderJson(order: Order, orderInfo: OrderInfo): JsObject =
-    Json.obj(
-      "id"        -> order.idStr(),
-      "type"      -> order.orderType.toString,
-      "amount"    -> order.amount,
-      "price"     -> order.price,
-      "timestamp" -> order.timestamp,
-      "filled"    -> orderInfo.filled,
-      "status"    -> orderInfo.status.name,
-      "assetPair" -> order.assetPair.json
-    )
 }

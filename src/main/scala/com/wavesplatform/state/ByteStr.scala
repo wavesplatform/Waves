@@ -1,7 +1,8 @@
 package com.wavesplatform.state
 
-import play.api.libs.json._
 import com.wavesplatform.utils.{Base58, Base64}
+import play.api.libs.json._
+import scorex.utils.ByteArray
 
 import scala.util.Try
 
@@ -35,4 +36,5 @@ object ByteStr {
     }
   }
 
+  implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => ByteArray.compare(x.arr, y.arr)
 }
