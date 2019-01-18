@@ -2,25 +2,23 @@ package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
 
-import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
+import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.utils.{Base58, Base64, Time}
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json._
-import com.wavesplatform.account.{Address, PublicKeyAccount}
-import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{TransactionFactory, ValidationError}
-import com.wavesplatform.wallet.Wallet
 
 import scala.util.{Failure, Success, Try}
 
@@ -56,7 +54,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     complete(
       Address
         .fromString(address)
-        .flatMap(addressScriptInfoJson)
+        .map(addressScriptInfoJson)
         .map(ToResponseMarshallable(_))
     )
   }
@@ -365,19 +363,18 @@ case class AddressApiRoute(settings: RestAPISettings,
     )
   }
 
-  private def addressScriptInfoJson(account: Address): Either[ValidationError, AddressScriptInfo] =
-    for {
-      script <- Right(blockchain.accountScript(account))
-      complexity <- script.fold[Either[ValidationError, Long]](Right(0))(script =>
-        ScriptCompiler.estimate(script, script.version).left.map(GenericError(_)))
-    } yield
-      AddressScriptInfo(
-        address = account.address,
-        script = script.map(_.bytes().base64),
-        scriptText = script.map(_.text),
-        complexity = complexity,
-        extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
-      )
+  private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
+    val script = blockchain
+      .accountScript(account)
+
+    AddressScriptInfo(
+      address = account.address,
+      script = script.map(_.bytes().base64),
+      scriptText = script.map(_.text),
+      complexity = script.map(_.complexity).getOrElse(0),
+      extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
+    )
+  }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Address

@@ -14,6 +14,7 @@ trait Script {
   val expr: Expr
   val text: String
   val bytes: Coeval[ByteStr]
+  val complexity: Long
 
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: Script => version == that.version && expr == that.expr

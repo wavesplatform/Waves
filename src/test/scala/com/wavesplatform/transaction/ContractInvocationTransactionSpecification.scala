@@ -20,7 +20,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
     forAll(contractInvokationGen) { transaction: ContractInvocationTransaction =>
       val bytes = transaction.bytes()
       val deser = ContractInvocationTransaction.parseBytes(bytes).get
-      deser.sender shouldEqual  transaction.sender
+      deser.sender shouldEqual transaction.sender
       deser.contractAddress shouldEqual transaction.contractAddress
       deser.fc shouldEqual transaction.fc
       deser.payment shouldEqual transaction.payment
@@ -29,7 +29,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
       deser.proofs shouldEqual transaction.proofs
       bytes shouldEqual deser.bytes()
       Verifier.verifyAsEllipticCurveSignature(transaction) shouldBe 'right
-      Verifier.verifyAsEllipticCurveSignature(deser) shouldBe 'right  // !!!!!!!!!!!!!!!
+      Verifier.verifyAsEllipticCurveSignature(deser) shouldBe 'right // !!!!!!!!!!!!!!!
     }
   }
 
