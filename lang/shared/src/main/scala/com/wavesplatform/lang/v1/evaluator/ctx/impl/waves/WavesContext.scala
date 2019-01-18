@@ -13,7 +13,6 @@ import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.{OrdType, Recipient}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import monix.eval.Coeval
-import scodec.bits.ByteVector
 
 object WavesContext {
 
@@ -122,7 +121,7 @@ object WavesContext {
                 FUNCTION_CALL(
                   PureContext.sumByteStr,
                   List(
-                    CONST_BYTESTR(ByteStr(EnvironmentFunctions.AddressVersion, env.chainId)),
+                    CONST_BYTESTR(ByteStr.fromBytes(EnvironmentFunctions.AddressVersion, env.chainId)),
                     // publicKeyHash
                     FUNCTION_CALL(
                       PureContext.takeBytes,
@@ -201,7 +200,7 @@ object WavesContext {
                 PureContext.eq,
                 List(
                   FUNCTION_CALL(PureContext.takeBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
-                  CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion))
+                  CONST_BYTESTR(ByteStr.fromBytes(EnvironmentFunctions.AddressVersion))
                 )
               ),
               IF(
@@ -216,7 +215,7 @@ object WavesContext {
                         CONST_LONG(1)
                       )
                     ),
-                    CONST_BYTEVECTOR(ByteVector(env.chainId))
+                    CONST_BYTESTR(ByteStr.fromBytes(env.chainId))
                   )
                 ),
                 IF(
@@ -272,8 +271,8 @@ object WavesContext {
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
       NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTESTR, "transaction Id")) {
-        case CONST_BYTESTR(id: ByteVector) :: Nil =>
-          val maybeDomainTx: Option[CaseObj] = env.transactionById(id.toArray).map(transactionObject(_, proofsEnabled))
+        case CONST_BYTESTR(id: ByteStr) :: Nil =>
+          val maybeDomainTx: Option[CaseObj] = env.transactionById(id.arr).map(transactionObject(_, proofsEnabled))
           Right(fromOptionCO(maybeDomainTx))
         case _ => ???
       }
@@ -296,8 +295,8 @@ object WavesContext {
         ("assetId", UNION(UNIT, BYTESTR), "assetId (WAVES if none)")
       ) {
         case (c: CaseObj) :: u :: Nil if u == unit => env.accountBalanceOf(caseObjToRecipient(c), None).map(CONST_LONG)
-        case (c: CaseObj) :: CONST_BYTESTR(assetId: ByteVector) :: Nil =>
-          env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray)).map(CONST_LONG)
+        case (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil =>
+          env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.arr)).map(CONST_LONG)
 
         case _ => ???
       }
@@ -316,8 +315,8 @@ object WavesContext {
       "get height when transaction was stored to blockchain",
       ("id", BYTESTR, "transaction Id")
     ) {
-      case CONST_BYTESTR(id: ByteVector) :: Nil => Right(fromOptionL(env.transactionHeightById(id.toArray).map(_.toLong)))
-      case _                                    => ???
+      case CONST_BYTESTR(id: ByteStr) :: Nil => Right(fromOptionL(env.transactionHeightById(id.arr).map(_.toLong)))
+      case _                                 => ???
     }
 
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
@@ -368,15 +367,18 @@ object WavesContext {
       wavesBalanceF
     )
 
-    lazy val writeSetType            = CaseType(FieldNames.WriteSet, List(FieldNames.Data         -> LIST(dataEntryType.typeRef)))
-    val contractTransfer             = CaseType(FieldNames.ContractTransfer, List("recipient"    -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+    lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
+    val contractTransfer =
+      CaseType(FieldNames.ContractTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
     lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
-    lazy val contractResultType      = CaseType(FieldNames.ContractResult, List(FieldNames.Data   -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
+    lazy val contractResultType =
+      CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
 
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
-      types ++ (if (version == V3) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType) else List.empty),
+      types ++ (if (version == V3) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
+                else List.empty),
       commonVars ++ vars(version),
       functions
     )

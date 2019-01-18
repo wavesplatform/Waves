@@ -40,7 +40,7 @@ object Serde {
     def aux(acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] = acc.flatMap { _ =>
       bb.get() match {
         case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
-        case E_BYTES  => Coeval.now(CONST_BYTESTR(bb.getByteStr))
+        case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(bb.getBytes)))
         case E_STRING => Coeval.now(CONST_STRING(bb.getString))
         case E_IF     => (aux(), aux(), aux()).mapN(IF)
         case E_BLOCK =>

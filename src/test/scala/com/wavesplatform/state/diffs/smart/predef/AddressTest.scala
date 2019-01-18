@@ -7,7 +7,6 @@ import com.wavesplatform.lang.Testing._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
 
 class AddressTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   property("should calculate address from public key") {
@@ -18,7 +17,7 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
            | let address = addressFromPublicKey(pk)
            | address.bytes
         """.stripMargin
-      runScript(script) shouldBe evaluated(ByteVector(Address.fromPublicKey(acc.publicKey, chainId).bytes.arr))
+      runScript(script) shouldBe evaluated(Address.fromPublicKey(acc.publicKey, chainId).bytes)
     }
   }
 
@@ -32,7 +31,7 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
            | let address = extract(maybeAddress)
            | address.bytes
         """.stripMargin
-      runScript(script) shouldBe evaluated(ByteVector(Address.fromBytes(addressBytes.arr, chainId).explicitGet().bytes.arr))
+      runScript(script) shouldBe evaluated(Address.fromBytes(addressBytes.arr, chainId).explicitGet().bytes)
     }
   }
 
@@ -45,7 +44,7 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
            | let maybeAddress = addressFromString(addressString)
            | extract(maybeAddress).bytes
         """.stripMargin
-      runScript(script) shouldBe evaluated(ByteVector(Address.fromBytes(addressBytes.arr, chainId).explicitGet().bytes.arr))
+      runScript(script) shouldBe evaluated(Address.fromBytes(addressBytes.arr, chainId).explicitGet().bytes)
     }
   }
 }

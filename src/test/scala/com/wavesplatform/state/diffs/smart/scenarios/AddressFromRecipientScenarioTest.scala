@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
 import com.wavesplatform.state.diffs.smart.predef._
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, produce}
+import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -41,11 +41,11 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(aliasTx))) {
           case (_, state) =>
             val addressBytes = runScript[CaseObj](script, transferViaAddress, state).explicitGet().fields("bytes").asInstanceOf[CONST_BYTESTR]
-            addressBytes.bs.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
+            addressBytes.bs.arr.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
             val resolvedAddressBytes =
               runScript[CaseObj](script, transferViaAlias, state).explicitGet().fields("bytes").asInstanceOf[CONST_BYTESTR]
 
-            resolvedAddressBytes.bs.toArray.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
+            resolvedAddressBytes.bs.arr.sameElements(transferViaAddress.recipient.bytes.arr) shouldBe true
         }
     }
   }

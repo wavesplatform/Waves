@@ -59,7 +59,7 @@ object Expressions {
   sealed trait EXPR                                                             extends Positioned
   case class CONST_LONG(position: Pos, value: Long)                             extends EXPR
   case class GETTER(position: Pos, ref: EXPR, field: PART[String])              extends EXPR
-  case class CONST_BYTEVECTOR(position: Pos, value: PART[ByteStr])           extends EXPR
+  case class CONST_BYTESTR(position: Pos, value: PART[ByteStr])                 extends EXPR
   case class CONST_STRING(position: Pos, value: PART[String])                   extends EXPR
   case class BINARY_OP(position: Pos, a: EXPR, kind: BinaryOperation, b: EXPR)  extends EXPR
   case class BLOCK(position: Pos, let: Declaration, body: EXPR)                 extends EXPR

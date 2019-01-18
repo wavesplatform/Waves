@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1
 import java.util.concurrent.TimeUnit
 
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Version.V1
@@ -15,7 +16,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
-import scodec.bits.ByteVector
 import scorex.crypto.signatures.Curve25519
 
 import scala.util.Random
@@ -80,7 +80,7 @@ class Base58Perf {
       .map { i =>
         val b = new Array[Byte](64)
         Random.nextBytes(b)
-        LET("v" + i, FUNCTION_CALL(PureContext.sizeString, List(FUNCTION_CALL(Native(TOBASE58), List(CONST_BYTEVECTOR(ByteVector(b)))))))
+        LET("v" + i, FUNCTION_CALL(PureContext.sizeString, List(FUNCTION_CALL(Native(TOBASE58), List(CONST_BYTESTR(ByteStr(b)))))))
       }
       .foldRight[EXPR](sum) { case (let, e) => BLOCKV2(let, e) }
   }
@@ -122,7 +122,7 @@ class Signatures {
           "v" + i,
           IF(
             FUNCTION_CALL(Native(SIGVERIFY),
-                          List(CONST_BYTEVECTOR(ByteVector(msg)), CONST_BYTEVECTOR(ByteVector(sig)), CONST_BYTEVECTOR(ByteVector(pk)))),
+                          List(CONST_BYTESTR(ByteStr(msg)), CONST_BYTESTR(ByteStr(sig)), CONST_BYTESTR(ByteStr(pk)))),
             CONST_LONG(1),
             CONST_LONG(0)
           )
@@ -148,5 +148,5 @@ class Concat {
   val strings: EXPR = expr(CONST_STRING("a" * (Short.MaxValue - Steps)), PureContext.sumString, CONST_STRING("a"), Steps)
 
   val bytes: EXPR =
-    expr(CONST_BYTEVECTOR(ByteVector.fill(Short.MaxValue - Steps)(0)), PureContext.sumByteStr, CONST_BYTEVECTOR(ByteVector(0)), Steps)
+    expr(CONST_BYTESTR(ByteStr.fill(Short.MaxValue - Steps)(0)), PureContext.sumByteStr, CONST_BYTESTR(ByteStr.fromBytes(0)), Steps)
 }

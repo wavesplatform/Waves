@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
@@ -9,7 +10,6 @@ import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.lang.{Common, Global}
 import org.openjdk.jmh.annotations._
-import scodec.bits.ByteVector
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
 import shapeless.{:+:, CNil}
 
@@ -64,7 +64,7 @@ class EnvironmentFunctionsBenchmark {
   }
 
   @Benchmark
-  def addressFromPublicKey_test(): ByteVector = randomAddress
+  def addressFromPublicKey_test(): ByteStr = randomAddress
 
 }
 
@@ -94,7 +94,7 @@ object EnvironmentFunctionsBenchmark {
     bytes
   }
 
-  def randomAddress: ByteVector = ByteVector(Common.addressFromPublicKey(ChainId, randomBytes(Curve25519.KeyLength)))
+  def randomAddress: ByteStr = ByteStr(Common.addressFromPublicKey(ChainId, randomBytes(Curve25519.KeyLength)))
 
   def hashTest[T](f: Array[Byte] => T): T           = f(randomBytes(DataBytesLength))
   def hashTest[T](len: Int, f: Array[Byte] => T): T = f(randomBytes(len))

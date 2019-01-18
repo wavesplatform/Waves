@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets
 
 import cats.data.EitherT
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ScriptVersion
 import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -130,19 +129,19 @@ object PureContext {
 
   lazy val toBytesBoolean: BaseFunction =
     NativeFunction("toBytes", 1, BOOLEAN_TO_BYTES, BYTESTR, "Bytes array representation", ("b", BOOLEAN, "value")) {
-      case TRUE :: Nil  => Right(CONST_BYTESTR(ByteStr(1)))
-      case FALSE :: Nil => Right(CONST_BYTESTR(ByteStr(0)))
+      case TRUE :: Nil  => Right(CONST_BYTESTR(ByteStr.fromBytes(1)))
+      case FALSE :: Nil => Right(CONST_BYTESTR(ByteStr.fromBytes(0)))
       case _            => ???
     }
 
   lazy val toBytesLong: BaseFunction = NativeFunction("toBytes", 1, LONG_TO_BYTES, BYTESTR, "Bytes array representation", ("n", LONG, "value")) {
-    case CONST_LONG(n) :: Nil => Right(CONST_BYTESTR(ByteStr(n)))
+    case CONST_LONG(n) :: Nil => Right(CONST_BYTESTR(ByteStr.fromLong(n)))
     case _                    => ???
   }
 
   lazy val toBytesString: BaseFunction =
     NativeFunction("toBytes", 1, STRING_TO_BYTES, BYTESTR, "Bytes array representation", ("s", STRING, "value")) {
-      case CONST_STRING(s) :: Nil => Right(CONST_BYTESTR(ByteStr(s)))
+      case CONST_STRING(s) :: Nil => Right(CONST_BYTESTR(ByteStr(s.getBytes(StandardCharsets.UTF_8))))
       case _                      => ???
     }
 

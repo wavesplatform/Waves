@@ -21,7 +21,7 @@ import scala.util.{Left, Right, Try}
 object Common {
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTEVECTOR, STRING)
+  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
   val dataEntryType              = CaseType("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
   val addCtx: CTX                = CTX.apply(Seq(dataEntryType), Map.empty, Array.empty)
 

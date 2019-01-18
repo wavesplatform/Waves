@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.compiler
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common.{NoShrink, multiplierFunction, produce}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
@@ -8,7 +9,6 @@ import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
 
 class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -30,7 +30,10 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
       LET(AnyPos, PART.VALID(AnyPos, "drop"), CONST_LONG(AnyPos, 2), Seq.empty),
       TRUE(AnyPos)
     ),
-    "BINARY_OP with wrong types"                   -> "Compilation failed: Can't find a function overload '+'" -> BINARY_OP(AnyPos, TRUE(AnyPos), SUM_OP, CONST_LONG(AnyPos, 1)),
+    "BINARY_OP with wrong types" -> "Compilation failed: Can't find a function overload '+'" -> BINARY_OP(AnyPos,
+                                                                                                          TRUE(AnyPos),
+                                                                                                          SUM_OP,
+                                                                                                          CONST_LONG(AnyPos, 1)),
     "IF clause must be boolean"                    -> "Unexpected type, required: Boolean" -> IF(AnyPos, CONST_LONG(AnyPos, 0), TRUE(AnyPos), FALSE(AnyPos)),
     "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(
       AnyPos,
@@ -45,7 +48,7 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
     "FUNCTION_CALL with uncommon types for parameter T" -> "Can't match inferred types" -> FUNCTION_CALL(
       AnyPos,
       PART.VALID(AnyPos, functionWithTwoPrarmsOfTheSameType.name),
-      List(CONST_LONG(AnyPos, 1), CONST_BYTEVECTOR(AnyPos, PART.VALID(AnyPos, ByteVector.empty)))
+      List(CONST_LONG(AnyPos, 1), CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr.empty)))
     ),
     "User functions: wrong arg type" -> "Non-matching types" ->
       Expressions.BLOCK(

@@ -254,8 +254,8 @@ object Parser {
             case "64" => Global.base64Decode(xs)
           }
           decoded match {
-            case Left(err) => CONST_BYTEVECTOR(Pos(start, end), PART.INVALID(Pos(innerStart, innerEnd), err))
-            case Right(r)  => CONST_BYTEVECTOR(Pos(start, end), PART.VALID(Pos(innerStart, innerEnd), ByteStr(r)))
+            case Left(err) => CONST_BYTESTR(Pos(start, end), PART.INVALID(Pos(innerStart, innerEnd), err))
+            case Right(r)  => CONST_BYTESTR(Pos(start, end), PART.VALID(Pos(innerStart, innerEnd), ByteStr(r)))
           }
       }
 

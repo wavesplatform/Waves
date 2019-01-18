@@ -2,13 +2,14 @@ package com.wavesplatform.transaction.smart
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL, REF}
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.state.{ByteStr, _}
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
@@ -42,8 +43,8 @@ case class ContractInvocationTransaction private (version: Byte,
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     ))
-  import play.api.libs.json.Json
   import ContractInvocationTransaction.paymentPartFormat
+  import play.api.libs.json.Json
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase()
@@ -65,11 +66,11 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
   def functionCallToJson(fc: Terms.FUNCTION_CALL) = Json.obj(
     "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].name),
     "args" -> JsArray(fc.args.map {
-      case Terms.CONST_LONG(l)       => Json.obj("key" -> "", "type" -> "integer", "value" -> l)
-      case Terms.CONST_BOOLEAN(l)    => Json.obj("key" -> "", "type" -> "boolean", "value" -> l)
-      case Terms.CONST_BYTEVECTOR(l) => Json.obj("key" -> "", "type" -> "binary", "value" -> ByteStr(l.toArray).base64)
-      case Terms.CONST_STRING(l)     => Json.obj("key" -> "", "type" -> "string", "value" -> l)
-      case _                         => ???
+      case Terms.CONST_LONG(l)    => Json.obj("key" -> "", "type" -> "integer", "value" -> l)
+      case Terms.CONST_BOOLEAN(l) => Json.obj("key" -> "", "type" -> "boolean", "value" -> l)
+      case Terms.CONST_BYTESTR(l) => Json.obj("key" -> "", "type" -> "binary", "value" -> l.base64)
+      case Terms.CONST_STRING(l)  => Json.obj("key" -> "", "type" -> "string", "value" -> l)
+      case _                      => ???
     })
   )
 

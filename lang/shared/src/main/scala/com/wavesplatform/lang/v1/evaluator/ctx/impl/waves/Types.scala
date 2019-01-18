@@ -12,11 +12,8 @@ object Types {
   val aliasType          = CaseType("Alias", List("alias" -> STRING))
   val addressOrAliasType = UNION(addressType.typeRef, aliasType.typeRef)
 
-  val transfer = CaseType("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
-
-  val optionByteVector     = UNION(BYTESTR, UNIT)
   val transfer         = CaseType("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
-  val optionByteVector = UNION(BYTEVECTOR, UNIT)
+  val optionByteVector = UNION(BYTESTR, UNIT)
 
   val optionAddress        = UNION(addressType.typeRef, UNIT)
   val optionLong           = UNION(LONG, UNIT)

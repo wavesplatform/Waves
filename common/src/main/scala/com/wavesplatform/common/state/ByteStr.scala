@@ -1,7 +1,5 @@
 package com.wavesplatform.common.state
 
-import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.common.utils.{Base58, Base64}
 import play.api.libs.json._
 
@@ -28,9 +26,32 @@ case class ByteStr(arr: Array[Byte]) {
 
   def ++(other: ByteStr): ByteStr = if (this.isEmpty) other else ByteStr(this.arr ++ other.arr)
 
-  def take(n: Long): ByteStr = ByteStr(arr.take(n.toInt))
+  def take(n: Long): ByteStr = {
 
-  def drop(n: Long): ByteStr = ByteStr(arr.drop(n.toInt))
+    val n1 = n min arr.length max 0
+
+    if (n1 == arr.length) this
+    else if (n1 == 0) ByteStr.empty
+    else {
+      ByteStr(arr.take(n1.toInt))
+    }
+
+  }
+
+  def drop(n: Long): ByteStr = {
+
+    val n1 = n min arr.length max 0
+
+    if (n1 == arr.length) ByteStr.empty
+    else if (n1 == 0) this
+    else {
+      ByteStr(arr.drop(n1.toInt))
+    }
+  }
+
+  def takeRight(n: Long): ByteStr = drop(arr.length.toLong - n)
+
+  def dropRight(n: Long): ByteStr = take(arr.length.toLong - n.max(0))
 
 }
 
@@ -38,15 +59,42 @@ object ByteStr {
 
   val empty: ByteStr = ByteStr(Array.emptyByteArray)
 
-  def apply(bytes: Int*): ByteStr   = ByteStr(bytes.toArray.map(_.toByte))
-  def apply(bytes: Long*): ByteStr  = ByteStr(bytes.toArray.map(_.toByte))
-  def apply(bytes: String): ByteStr = ByteStr(bytes.getBytes(StandardCharsets.UTF_8))
+  def fromBytes(bytes: Byte*): ByteStr = {
+
+    val buf = new Array[Byte](bytes.size)
+    var i   = 0
+
+    bytes.foreach { b =>
+      buf(i) = b
+      i += 1
+    }
+
+    ByteStr(buf)
+  }
+
+  def fromLong(l: Long): ByteStr = {
+
+    val buf = new Array[Byte](8)
+    var b   = l
+
+    for (i <- (buf.length - 1) to 0 by -1) {
+      buf(i) = b.toByte
+      b = b >> 8
+    }
+
+    ByteStr(buf)
+  }
+
+  def fill(size: Int)(b: Int): ByteStr = ByteStr(Array.fill(size)(b.toByte))
 
   def decodeBase58(s: String): Try[ByteStr] = Base58.decode(s).map(ByteStr(_))
+
   def decodeBase64(s: String): Try[ByteStr] = Base64.decode(s).map(ByteStr(_))
 
   implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
+
     override def writes(o: ByteStr): JsValue = JsString(o.base58)
+
     override def reads(json: JsValue): JsResult[ByteStr] = json match {
       case JsString(v) => decodeBase58(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))
       case _           => JsError("Expected JsString")

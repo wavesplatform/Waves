@@ -11,7 +11,7 @@ object Tx {
   case class Header(id: ByteStr, fee: Long, timestamp: Long, version: Long)
   case class Proven(h: Header, sender: Recipient.Address, bodyBytes: ByteStr, senderPk: ByteStr, proofs: IndexedSeq[ByteStr])
   case class TransferItem(recipient: Recipient, amount: Long)
-  case class Pmt(asset: Option[ByteVector], amount: Long)
+  case class Pmt(asset: Option[ByteStr], amount: Long)
 
   case class Genesis(header: Header, amount: Long, recipient: Recipient) extends Tx
   case class Payment(p: Proven, amount: Long, recipient: Recipient)      extends Tx
