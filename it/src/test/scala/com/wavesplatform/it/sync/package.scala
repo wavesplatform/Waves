@@ -4,6 +4,7 @@ import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Req
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.utils.Base58
 

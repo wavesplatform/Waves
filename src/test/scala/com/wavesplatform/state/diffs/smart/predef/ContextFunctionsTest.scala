@@ -2,9 +2,9 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.ScriptVersion.Versions.V1
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.v1.compiler.CompilerV1
+import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
@@ -14,12 +14,9 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.utils.{Base58, compilerContext}
 import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.transaction.GenesisTransaction
-import org.scalacheck.Gen
 import shapeless.Coproduct
 
 class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -49,10 +46,10 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         case 2 => scriptWithWavesFunctions(dataTransaction, transfer)
         case 3 => scriptWithCryptoFunctions
       }
-      .map(x => Parser(x).get.value)
+      .map(x => Parser.parseScript(x).get.value)
 
     typedScript = {
-      val compilerScript = CompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
+      val compilerScript = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
       ScriptV1(compilerScript).explicitGet()
     }
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(1, recipient, Some(typedScript), 100000000L, ts).explicitGet()

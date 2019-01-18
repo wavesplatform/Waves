@@ -151,7 +151,7 @@ trait ScriptGen {
         t <- toString(x)
         f <- toString(y)
       } yield s"(if ($c) then $t else $f)"
-    case BLOCK(_, let, body) =>
+    case BLOCK(_, let:LET, body) =>
       for {
         v         <- toString(let.value)
         b         <- toString(body)

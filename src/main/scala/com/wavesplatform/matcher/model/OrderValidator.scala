@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
+import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.api.DBUtils.indexes.active.MaxElements
@@ -55,7 +55,7 @@ class OrderValidator(db: DB,
         Left("Trading on scripted account isn't allowed yet")
       else if (order.version <= 1) Left("Can't process order with signature from scripted account")
       else
-        try MatcherScriptRunner[EVALUATED](script, order, isTokenScript = false) match {
+        try MatcherScriptRunner(script, order, isTokenScript = false) match {
           case (_, Left(execError)) => Left(s"Error executing script for $address: $execError")
           case (_, Right(FALSE))    => Left(s"Order rejected by script for $address")
           case (_, Right(TRUE))     => Right(order)
@@ -70,7 +70,7 @@ class OrderValidator(db: DB,
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
         Left("Trading of scripted asset isn't allowed yet")
       else {
-        try ScriptRunner[EVALUATED](blockchain.height, Coproduct(tx), blockchain, script, isTokenScript = true) match {
+        try ScriptRunner(blockchain.height, Coproduct(tx), blockchain, script, isTokenScript = true) match {
           case (_, Left(execError)) => Left(s"Error executing script of asset $assetId: $execError")
           case (_, Right(FALSE))    => Left(s"Order rejected by script of asset $assetId")
           case (_, Right(TRUE))     => Right(())

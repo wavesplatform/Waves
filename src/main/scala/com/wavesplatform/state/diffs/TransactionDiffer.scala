@@ -8,7 +8,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{SetScriptTransaction, Verifier}
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 
@@ -40,7 +40,7 @@ object TransactionDiffer extends Instrumented with ScorexLogging {
         .measureForType(tx.builder.typeId) {
           for {
             _ <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, tx)
-            _ <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, tx)
+            _ <- CommonValidation.disallowTxFromPast(settings, prevBlockTimestamp, tx)
             _ <- CommonValidation.disallowBeforeActivationTime(blockchain, currentBlockHeight, tx)
             _ <- CommonValidation.disallowDuplicateIds(blockchain, settings, currentBlockHeight, tx)
             _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, settings, currentBlockTimestamp, tx)
@@ -75,8 +75,9 @@ object TransactionDiffer extends Instrumented with ScorexLogging {
         case sstx: SetScriptTransaction   => SetScriptTransactionDiff(blockchain, currentBlockHeight)(sstx)
         case sstx: SetAssetScriptTransaction =>
           AssetTransactionsDiff.setAssetScript(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(sstx)
-        case stx: SponsorFeeTransaction => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
-        case _                          => Left(UnsupportedTransactionType)
+        case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
+        case ci: ContractInvocationTransaction => ContractInvocationTransactionDiff.apply(blockchain, currentBlockHeight)(ci)
+        case _                                 => Left(UnsupportedTransactionType)
       }
     }
   }

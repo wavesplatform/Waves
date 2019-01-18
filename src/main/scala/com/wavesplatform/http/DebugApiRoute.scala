@@ -236,13 +236,12 @@ case class DebugApiRoute(ws: WavesSettings,
         .map { account =>
           (account.toAddress, miner.getNextBlockGenerationOffset(account))
         }
-        .filter(_._2.isRight)
-        .map {
-          case (address, offsetEth) =>
+        .collect {
+          case (address, Right(offset)) =>
             AccountMiningInfo(
               address.stringRepr,
               ng.effectiveBalance(address, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height)),
-              System.currentTimeMillis() + offsetEth.right.get.toMillis
+              System.currentTimeMillis() + offset.toMillis
             )
         }
     )
