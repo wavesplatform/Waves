@@ -1,7 +1,6 @@
 package com.wavesplatform.common.state
 
 import com.wavesplatform.common.utils.{Base58, Base64}
-import play.api.libs.json._
 
 import scala.util.Try
 
@@ -90,15 +89,5 @@ object ByteStr {
   def decodeBase58(s: String): Try[ByteStr] = Base58.decode(s).map(ByteStr(_))
 
   def decodeBase64(s: String): Try[ByteStr] = Base64.decode(s).map(ByteStr(_))
-
-  implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
-
-    override def writes(o: ByteStr): JsValue = JsString(o.base58)
-
-    override def reads(json: JsValue): JsResult[ByteStr] = json match {
-      case JsString(v) => decodeBase58(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))
-      case _           => JsError("Expected JsString")
-    }
-  }
 
 }

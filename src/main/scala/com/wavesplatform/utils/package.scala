@@ -5,6 +5,8 @@ import java.security.SecureRandom
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.state.ByteStr._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.Global
@@ -19,6 +21,7 @@ import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
 import org.joda.time.Duration
 import org.joda.time.format.PeriodFormat
+import play.api.libs.json._
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -175,5 +178,15 @@ package object utils extends ScorexLogging {
     val module        = runtimeMirror.staticModule(fullClassName)
     val obj           = runtimeMirror.reflectModule(module)
     obj.instance.asInstanceOf[T]
+  }
+
+  implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
+
+    override def writes(o: ByteStr): JsValue = JsString(o.base58)
+
+    override def reads(json: JsValue): JsResult[ByteStr] = json match {
+      case JsString(v) => decodeBase58(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))
+      case _           => JsError("Expected JsString")
+    }
   }
 }

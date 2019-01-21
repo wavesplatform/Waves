@@ -232,7 +232,7 @@ checkPRRaw in Global := {
 lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .settings(
-    libraryDependencies ++=
+    libraryDependencies ++= Dependencies.scalatest
   )
 
 lazy val commonJS  = common.js
