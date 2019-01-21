@@ -52,6 +52,19 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
 
   }
 
+  test("/transaction/calculateFee should handle coding size limit") {
+    {
+      val json =
+        Json.obj("type"            -> 4,
+                 "senderPublicKey" -> sender.publicKey.toString,
+                 "recipient"       -> secondAddress,
+                 "fee"             -> 100000,
+                 "amount"          -> 1,
+                 "assetId"         -> "W" * 524291)
+      assertBadRequestAndMessage(sender.calculateFee(json).feeAmount, "base58Decode input exceeds")
+    }
+  }
+
   test("/transactions/sign should respect timestamp if specified") {
     val timestamp = 1500000000000L
     for (v <- supportedVersions) {
