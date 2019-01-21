@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import cats.data.EitherT
 import com.google.common.base.Charsets
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.DataRequest._
