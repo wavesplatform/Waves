@@ -13,6 +13,7 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
+import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject}
 

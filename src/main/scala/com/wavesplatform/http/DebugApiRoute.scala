@@ -32,6 +32,7 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.eval.{Coeval, Task}
 import play.api.libs.json._
+import com.wavesplatform.utils.byteStrWrites
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
