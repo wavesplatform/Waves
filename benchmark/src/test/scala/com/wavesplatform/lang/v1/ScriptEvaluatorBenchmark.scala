@@ -121,8 +121,7 @@ class Signatures {
         LET(
           "v" + i,
           IF(
-            FUNCTION_CALL(Native(SIGVERIFY),
-                          List(CONST_BYTESTR(ByteStr(msg)), CONST_BYTESTR(ByteStr(sig)), CONST_BYTESTR(ByteStr(pk)))),
+            FUNCTION_CALL(Native(SIGVERIFY), List(CONST_BYTESTR(ByteStr(msg)), CONST_BYTESTR(ByteStr(sig)), CONST_BYTESTR(ByteStr(pk)))),
             CONST_LONG(1),
             CONST_LONG(0)
           )
