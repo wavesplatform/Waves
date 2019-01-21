@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import play.api.libs.json._
 
 import scala.util.{Success, Try}
@@ -69,6 +70,8 @@ package object http extends ApiMarshallers {
                   case SetScriptTransaction          => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
                   case SetAssetScriptTransaction     => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
                   case SponsorFeeTransaction         => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
+                  case ExchangeTransactionV1         => TransactionFactory.exchangeV1(txJson.as[SignedExchangeRequest], senderPk)
+                  case ExchangeTransactionV2         => TransactionFactory.exchangeV2(txJson.as[SignedExchangeRequestV2], senderPk)
                 }
             }
           }
