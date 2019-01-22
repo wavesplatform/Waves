@@ -24,7 +24,7 @@ object BaseTargetChecker {
     val db           = openDB("/tmp/tmp-db")
     val time         = new NTP("ntp.pool.org")
     val bu           = StorageFactory(settings, db, time)
-    val pos          = new PoSSelector(bu, settings.blockchainSettings)
+    val pos          = new PoSSelector(bu, settings.blockchainSettings, settings.synchronizationSettings)
     bu.processBlock(genesisBlock)
 
     try {
