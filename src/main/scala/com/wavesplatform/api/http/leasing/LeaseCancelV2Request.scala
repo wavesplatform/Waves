@@ -17,7 +17,8 @@ object LeaseCancelV2Request {
     import play.api.libs.json._
     import play.api.libs.functional.syntax._
 
-    ((JsPath \ 'sender).read[String] ~
+    ((JsPath \ 'version).read[Byte] ~
+      (JsPath \ 'sender).read[String] ~
       ((JsPath \ 'txId).read[String] | (JsPath \ 'leaseId).read[String]) ~
       (JsPath \ 'fee).read[Long] ~
       (JsPath \ 'timestamp).readNullable[Long])(LeaseCancelV2Request.apply _)
