@@ -630,30 +630,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
 
     /**
-      * Compatibility implementation where
-      *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5)]}}}
-      *
-      * @todo remove this method once SmartAccountTrading is activated
-      */
-    @tailrec
-    def recMergeCompat(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
-      buf += wh -> lh
-      if (wt.isEmpty && lt.isEmpty) {
-        buf
-      } else if (wt.isEmpty) {
-        recMergeCompat(wh, wt, lt.head, lt.tail, buf)
-      } else if (lt.isEmpty) {
-        recMergeCompat(wt.head, wt.tail, lh, lt, buf)
-      } else {
-        if (wh >= lh) {
-          recMergeCompat(wt.head, wt.tail, lh, lt, buf)
-        } else {
-          recMergeCompat(wh, wt, lt.head, lt.tail, buf)
-        }
-      }
-    }
-
-    /**
       * Fixed implementation where
       *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 5)]}}}
       */
@@ -677,12 +653,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       }
     }
 
-    val recMerge = activatedFeatures
-      .get(BlockchainFeatures.SmartAccountTrading.id)
-      .filter(_ <= height)
-      .fold(recMergeCompat _)(_ => recMergeFixed _)
-
-    recMerge(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
+    recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
   override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>
