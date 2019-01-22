@@ -271,7 +271,7 @@ case class TransactionNotAllowedByAccountScript(tx: Transaction, log: Log, scrip
 case class TransactionNotAllowedByAssetScript(tx: Transaction, log: Log, scriptSrc: String) extends ApiError {
   override val id: Int             = 308
   override val code: StatusCode    = StatusCodes.BadRequest
-  override val message: String     = s"Transaction is not allowed by asset-script"
+  override val message: String     = s"Transaction is not allowed by token-script"
   override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
 }
 
