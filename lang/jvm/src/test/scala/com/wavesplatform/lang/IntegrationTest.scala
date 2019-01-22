@@ -224,7 +224,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |let a = if (true) then 1 else ""
         |
         |match a {
-        | case x: Int => x 
+        | case x: Int => x
         | case y: String => 2
         |}""".stripMargin) shouldBe evaluated(1)
   }
