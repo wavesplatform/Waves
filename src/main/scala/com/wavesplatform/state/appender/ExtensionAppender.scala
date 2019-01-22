@@ -79,7 +79,11 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
                 _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight),
                                  (),
                                  GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
-                droppedBlocks <- blockchainUpdater.removeAfter(lastCommonBlockId)
+                droppedBlocks <- {
+                  if (commonBlockHeight < initialHeight)
+                    blockchainUpdater.removeAfter(lastCommonBlockId)
+                  else Right(Seq.empty)
+                }
               } yield (commonBlockHeight, droppedBlocks)
 
               droppedBlocksEi.flatMap {
