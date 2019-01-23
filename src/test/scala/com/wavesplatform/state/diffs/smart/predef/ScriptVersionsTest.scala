@@ -45,6 +45,35 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
 
   val orderTypeBindings = "let t = Buy; t == Buy"
 
+  "ScriptV1" - {
+    "forbids duplicate names" in {
+      import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
+
+      val Success(expr, _)      = Parser.parseScript(duplicateNames)
+      val Right((typedExpr, _)) = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), expr)
+      val settings = TestFunctionalitySettings.Enabled.copy(
+        preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.SmartAccountTrading.id -> 3))
+      val setup = for {
+        master <- accountGen
+        ts     <- positiveLongGen
+        genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+        script  = ScriptV1(V1, typedExpr, checkSize = false).explicitGet()
+        tx      = SetScriptTransaction.selfSigned(1, master, Some(script), 100000, ts + 1).explicitGet()
+      } yield (genesis, tx)
+
+      forAll(setup) {
+        case (genesis, tx) =>
+          assertDiffEi(Seq(block(Seq(genesis)), block(Seq())), block(Seq(tx)), settings) { blockDiffEi =>
+            blockDiffEi shouldBe 'right
+          }
+      }
+    }
+
+    "does not have bindings defined in V2" in {
+      eval[EVALUATED](orderTypeBindings, V1) should produce("definition of 'Buy' is not found")
+    }
+  }
+
   "ScriptV2" - {
     "allows duplicate names" in {
       forAll(transferV2Gen) { tx =>
