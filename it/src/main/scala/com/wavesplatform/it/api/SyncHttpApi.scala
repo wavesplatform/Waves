@@ -259,6 +259,8 @@ object SyncHttpApi extends Assertions {
     def debugMinerInfo(): Seq[State] =
       sync(async(n).debugMinerInfo())
 
+    def transactionSerializer(body: JsObject): TransactionSerialize = sync(async(n).transactionSerializer(body))
+
     def debugStateAt(height: Long): Map[String, Long] = sync(async(n).debugStateAt(height))
 
     def height: Int =

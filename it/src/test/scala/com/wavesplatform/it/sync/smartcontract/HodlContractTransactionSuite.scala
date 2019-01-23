@@ -134,7 +134,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty),
-          p = Some(ContractInvocationTransaction.Payment(1.5.waves,None)),
+          p = Some(ContractInvocationTransaction.Payment(1.5.waves, None)),
           timestamp = System.currentTimeMillis(),
           fee = 1.waves
         )
@@ -153,7 +153,6 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("caller can't withdraw more than owns") {
-    val balanceBefore = sender.accountBalances(contract.address)._1
     val tx =
       ContractInvocationTransaction
         .selfSigned(
@@ -167,12 +166,10 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-
     assertBadRequestAndMessage(sender
                                  .signedBroadcast(tx.json() + ("type" -> JsNumber(ContractInvocationTransaction.typeId.toInt))),
                                "Not enough balance")
   }
-
 
   test("caller can withdraw less than he owns") {
     val balanceBefore = sender.accountBalances(contract.address)._1
