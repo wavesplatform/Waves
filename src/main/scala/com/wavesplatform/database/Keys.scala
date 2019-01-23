@@ -5,8 +5,8 @@ import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
+import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 
 object Keys {
   import KeyHelpers._
@@ -120,5 +120,42 @@ object Keys {
 
   def changedDataKeys(height: Int, addressId: BigInt): Key[Seq[String]] =
     Key("changed-data-keys", hAddr(49, height, addressId), readStrings, writeStrings)
+
+  // New Keys
+
+  val BlockHeaderPrefix: Short = 101
+  def blockHeaderAt(height: Height): Key[Option[BlockHeader]] =
+    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeader, writeBlockHeader)
+
+  val TransactionInfoPrefix: Short = 102
+  def nthTransactionInfoAt(height: Height, n: TxNum): Key[Option[Transaction]] =
+    Key.opt[Transaction](
+      "nth-transaction-info-at-height",
+      hNum(TransactionInfoPrefix, height, n),
+      data => TransactionParsers.parseBytes(data).get,
+      _.bytes()
+    )
+
+  val AddressTransactionSeqNrPrefix: Short = 103
+  def addressTransactionSeqNr2(addressId: AddressId): Key[Int] =
+    bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, addressId.toByteArray)
+
+  val AddressTransactionHNPrefix: Short = 104
+  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[(Height, Seq[TxNum])] =
+    Key(
+      "address-transaction-ids",
+      hBytes(AddressTransactionHNPrefix, seqNr, addressId.toByteArray),
+      readTransactionHNSeq,
+      writeTransactionHNSeq
+    )
+
+  val TransactionHeightByIdPrefix: Short = 105
+  def transactionHNById(txId: TransactionId): Key[Option[(Height, TxNum)]] =
+    Key.opt(
+      "transaction-height-by-id",
+      bytes(TransactionInfoPrefix, txId.arr),
+      readTransactionHN,
+      writeTransactionHN
+    )
 
 }

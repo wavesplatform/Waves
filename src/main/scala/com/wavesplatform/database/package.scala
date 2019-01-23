@@ -11,6 +11,9 @@ import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import org.iq80.leveldb.{DB, ReadOptions}
 import java.util.{Map => JMap}
+import supertagged._
+
+import com.wavesplatform.block.BlockHeader
 
 package object database {
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
@@ -223,6 +226,15 @@ package object database {
     ndo.toByteArray
   }
 
+  def writeBlockHeader(bh: BlockHeader): Array[Byte] = ???
+  def readBlockHeader(bs: Array[Byte]): BlockHeader  = ???
+
+  def readTransactionHNSeq(bs: Array[Byte]): (Height, Seq[TxNum]) = ???
+  def writeTransactionHNSeq(v: (Height, Seq[TxNum])): Array[Byte] = ???
+
+  def readTransactionHN(bs: Array[Byte]): (Height, TxNum) = ???
+  def writeTransactionHN(v: (Height, TxNum)): Array[Byte] = ???
+
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestSize
     def extractId(offset: Int = 2, length: Int = DigestSize): ByteStr = {
@@ -270,4 +282,16 @@ package object database {
       } finally iterator.close()
     }
   }
+
+  object Height extends TaggedType[Int]
+  type Height = Height.Type
+
+  object TxNum extends TaggedType[Int]
+  type TxNum = TxNum.Type
+
+  object AddressId extends TaggedType[BigInt]
+  type AddressId = AddressId.Type
+
+  object TransactionId extends TaggedType[ByteStr]
+  type TransactionId = TransactionId.Type
 }

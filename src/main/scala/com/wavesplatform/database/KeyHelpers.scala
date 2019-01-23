@@ -21,6 +21,8 @@ object KeyHelpers {
 
   def hAddr(prefix: Short, height: Int, addressId: BigInt): Array[Byte] = hBytes(prefix, height, addressId.toByteArray)
 
+  def hNum(prefix: Short, height: Int, num: Int): Array[Byte] = hBytes(prefix, height, Ints.toByteArray(num))
+
   def historyKey(name: String, prefix: Short, b: Array[Byte]) = Key(name, bytes(prefix, b), readIntSeq, writeIntSeq)
 
   def intKey(name: String, prefix: Short, default: Int = 0): Key[Int] =
