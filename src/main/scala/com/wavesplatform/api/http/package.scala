@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.serialization.BytesSerializable
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import play.api.libs.json._
 
