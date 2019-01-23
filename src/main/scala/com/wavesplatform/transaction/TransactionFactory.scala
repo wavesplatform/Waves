@@ -261,7 +261,7 @@ object TransactionFactory {
         reissuable = request.reissuable,
         script = s,
         fee = request.fee,
-        timestamp = 0,
+        timestamp = request.timestamp.getOrElse(0),
         proofs = Proofs.empty
       )
     } yield tx
@@ -294,7 +294,7 @@ object TransactionFactory {
     request.decimals,
     request.reissuable,
     request.fee,
-    0,
+    request.timestamp.getOrElse(0),
     EmptySignature
   )
 
@@ -323,7 +323,7 @@ object TransactionFactory {
         sender,
         request.amount,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         recipientAcc,
         EmptySignature
       )
@@ -356,7 +356,7 @@ object TransactionFactory {
         sender,
         request.amount,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         recipientAcc,
         Proofs.empty
       )
@@ -386,7 +386,7 @@ object TransactionFactory {
       sender,
       ByteStr.decodeBase58(request.txId).get,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       EmptySignature
     )
 
@@ -418,7 +418,7 @@ object TransactionFactory {
       sender,
       ByteStr.decodeBase58(request.txId).get,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       Proofs.empty
     )
 
@@ -446,7 +446,7 @@ object TransactionFactory {
         sender,
         alias,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         EmptySignature
       )
     } yield tx
@@ -477,7 +477,7 @@ object TransactionFactory {
         sender,
         alias,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         Proofs.empty
       )
     } yield tx
@@ -507,7 +507,7 @@ object TransactionFactory {
       request.quantity,
       request.reissuable,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       EmptySignature
     )
 
@@ -540,7 +540,7 @@ object TransactionFactory {
       request.quantity,
       request.reissuable,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       Proofs.empty
     )
 
@@ -566,7 +566,7 @@ object TransactionFactory {
     ByteStr.decodeBase58(request.assetId).get,
     request.quantity,
     request.fee,
-    0,
+    request.timestamp.getOrElse(0),
     EmptySignature
   )
 
@@ -596,7 +596,7 @@ object TransactionFactory {
     ByteStr.decodeBase58(request.assetId).get,
     request.quantity,
     request.fee,
-    0,
+    request.timestamp.getOrElse(0),
     Proofs.empty
   )
 
@@ -623,7 +623,7 @@ object TransactionFactory {
       sender,
       request.data,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       Proofs.empty
     )
 
@@ -662,7 +662,7 @@ object TransactionFactory {
         fc,
         ???,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         Proofs.empty
       )
 
@@ -696,7 +696,7 @@ object TransactionFactory {
         assetId,
         request.minSponsoredAssetFee,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         Proofs.empty
       )
     } yield tx
