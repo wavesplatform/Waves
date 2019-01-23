@@ -6,12 +6,13 @@ import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.model.Events
 import com.wavesplatform.state.{EitherExt2, Portfolio}
 import com.wavesplatform.utils.ScorexLogging
-import org.iq80.leveldb.DB
 
 import scala.collection.mutable
 import scala.concurrent.duration._
 
-class AddressDirectory(portfolio: Address => Portfolio, storeEvent: StoreEvent, settings: MatcherSettings, db: DB) extends Actor with ScorexLogging {
+class AddressDirectory(portfolio: Address => Portfolio, storeEvent: StoreEvent, settings: MatcherSettings, orderDB: OrderDB)
+    extends Actor
+    with ScorexLogging {
   import AddressDirectory._
   import context._
 
@@ -23,7 +24,7 @@ class AddressDirectory(portfolio: Address => Portfolio, storeEvent: StoreEvent, 
     log.debug(s"Creating address actor for $address")
     watch(
       actorOf(
-        Props(new AddressActor(address, portfolio(address), settings.maxTimestampDiff, 5.seconds, OrderDB(settings, db), storeEvent)),
+        Props(new AddressActor(address, portfolio(address), settings.maxTimestampDiff, 5.seconds, orderDB, storeEvent)),
         address.toString
       ))
   }

@@ -6,11 +6,10 @@ import akka.util.Timeout
 import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.WithDB
 import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.market.MatcherSpecLike
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
-import com.wavesplatform.matcher.model.LimitOrder.{Filled, PartiallyFilled}
-import com.wavesplatform.matcher.model.{LimitOrder, OrderHistory}
-import com.wavesplatform.matcher.{AddressActor, AddressDirectory, AssetPairDecimals, MatcherTestData}
+import com.wavesplatform.matcher.model.{LimitOrder, OrderHistoryStub}
 import com.wavesplatform.state.{ByteStr, Portfolio}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
@@ -80,10 +79,13 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
   val pair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
   val p    = new AssetPairDecimals(8, 2)
 
-  var oh = new OrderHistory(db, matcherSettings)
+  var oh = new OrderHistoryStub(system)
   private val addressDir = system.actorOf(
     Props(
-      new AddressDirectory(_ => Portfolio.empty, _ => Future.failed(new IllegalStateException("Should not be used in the test")), matcherSettings)
+      new AddressDirectory(_ => Portfolio.empty,
+                           _ => Future.failed(new IllegalStateException("Should not be used in the test")),
+                           matcherSettings,
+                           new TestOrderDB(100))
     ))
 
   private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]): Long =
@@ -106,7 +108,7 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    oh = new OrderHistory(db, matcherSettings)
+    oh = new OrderHistoryStub(system)
   }
 
   forAll(
@@ -124,8 +126,6 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
 
       withClue("Both orders should be filled") {
         exec.executedAmount shouldBe counter.amount
-        oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-        oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
       }
 
       withClue("All remains should be 0") {
@@ -161,8 +161,6 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
 
       withClue("Both orders should be filled") {
         exec.executedAmount shouldBe submittedAmount
-        oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-        oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
       }
 
       withClue("Counter remain should be (minAmount - 1):") {
@@ -198,8 +196,6 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
 
       withClue("Both orders should be filled") {
         exec.executedAmount shouldBe counterAmount
-        oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-        oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
       }
 
       withClue("Submitted remain should be (minAmount - 1):") {
@@ -235,8 +231,6 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
 
       withClue("Counter should be partially filled:") {
         exec.executedAmount shouldBe submittedAmount
-        oh.orderInfo(counter.id()).status shouldBe PartiallyFilled(exec.executedAmount)
-        oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
       }
 
       withClue("Counter remain should be minAmount:") {
@@ -273,8 +267,6 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
 
       withClue("Submitted should be partially filled:") {
         exec.executedAmount shouldBe counterAmount
-        oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-        oh.orderInfo(submitted.id()).status shouldBe PartiallyFilled(exec.executedAmount)
       }
 
       withClue("Submitted remain should be minAmount:") {
@@ -308,8 +300,6 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
       val exec      = execute(counter, submitted)
 
       exec.executedAmount shouldBe p.amount(2)
-      oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-      oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
 
       exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice) - 1
       exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice) - 1
@@ -339,8 +329,6 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
       val exec      = execute(counter, submitted)
 
       exec.executedAmount shouldBe p.amount(2)
-      oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-      oh.orderInfo(submitted.id()).status shouldBe PartiallyFilled(exec.executedAmount)
 
       exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice) - 1
       exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice)
@@ -371,8 +359,6 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
       val exec      = execute(counter, submitted)
 
       exec.executedAmount shouldBe p.amount(2)
-      oh.orderInfo(counter.id()).status shouldBe PartiallyFilled(exec.executedAmount)
-      oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
 
       exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice)
       exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice) - 1

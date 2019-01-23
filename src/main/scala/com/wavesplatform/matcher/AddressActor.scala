@@ -113,12 +113,15 @@ class AddressActor(
     case GetOrderStatus(orderId) =>
       sender() ! activeOrders.get(orderId).fold(orderDB.status(orderId))(activeStatus)
     case GetOrders(maybePair, onlyActive) =>
+      log.trace(s"Loading ${if (onlyActive) "active" else "all"} ${maybePair.fold("")(_.toString + " ")}orders")
       val matchingActiveOrders = (for {
         lo <- activeOrders.values
         if maybePair.forall(_ == lo.order.assetPair)
       } yield
         lo.order
           .id() -> OrderInfo(lo.order.orderType, lo.order.amount, lo.order.price, lo.order.timestamp, activeStatus(lo), lo.order.assetPair)).toSeq.sorted
+
+      log.trace(s"Collected ${matchingActiveOrders.length} active orders")
 
       sender() ! (if (onlyActive) matchingActiveOrders else orderDB.loadRemainingOrders(owner, maybePair, matchingActiveOrders))
     case GetTradableBalance(pair) =>
@@ -142,7 +145,7 @@ class AddressActor(
       log.trace(s"OrderCanceled(${lo.order.id()}, system=$unmatchable)")
       release(lo.order.id())
       val l = lo.order.amount - lo.amount
-      handleOrderTerminated(lo.order.id(), if (unmatchable) LimitOrder.Filled(l) else LimitOrder.Cancelled(l))
+      handleOrderTerminated(lo, if (unmatchable) LimitOrder.Filled(l) else LimitOrder.Cancelled(l))
   }
 
   private def handleOrderExecuted(remaining: LimitOrder): Unit = if (remaining.order.sender.toAddress == owner) {
@@ -153,17 +156,19 @@ class AddressActor(
       activeOrders += remaining.order.id() -> remaining
     } else {
       val actualFilledAmount = remaining.order.amount - remaining.amount
-      handleOrderTerminated(remaining.order.id(), LimitOrder.Filled(actualFilledAmount))
+      handleOrderTerminated(remaining, LimitOrder.Filled(actualFilledAmount))
     }
   }
 
-  private def handleOrderTerminated(orderId: ByteStr, status: OrderStatus): Unit =
-    for (lo <- activeOrders.remove(orderId)) {
-      log.trace(s"Order ${lo.order.id()} terminated: $status")
-      orderDB.saveOrderInfo(orderId,
-                            owner,
-                            OrderInfo(lo.order.orderType, lo.order.amount, lo.order.price, lo.order.timestamp, status, lo.order.assetPair))
-    }
+  private def handleOrderTerminated(lo: LimitOrder, status: OrderStatus): Unit = {
+    log.trace(s"Order ${lo.order.id()} terminated: $status")
+    activeOrders.remove(lo.order.id())
+    orderDB.saveOrderInfo(
+      lo.order.id(),
+      owner,
+      OrderInfo(lo.order.orderType, lo.order.amount, lo.order.price, lo.order.timestamp, status, lo.order.assetPair)
+    )
+  }
 
   def receive: Receive = handleCommands orElse handleExecutionEvents orElse handleStatusRequests
 }
