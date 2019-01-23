@@ -724,19 +724,14 @@ object TransactionFactory {
   }
 
   def exchangeV2(request: SignedExchangeRequestV2, sender: PublicKeyAccount): Either[ValidationError, ExchangeTransactionV2] = {
-    def orderV2(ord: Order) = {
-      import ord._
-      OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
-    }
-
     val decodedProofs = request.proofs.map(ByteStr.decodeBase58(_))
     for {
       proofs <- Either.cond(decodedProofs.forall(_.isSuccess),
                             Proofs(decodedProofs.map(_.get)),
                             GenericError(s"Invalid proof: ${decodedProofs.find(_.isFailure).get}"))
       tx <- ExchangeTransactionV2.create(
-        orderV2(request.order1),
-        orderV2(request.order2),
+        request.order1,
+        request.order2,
         request.amount,
         request.price,
         request.buyMatcherFee,
