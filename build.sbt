@@ -49,7 +49,7 @@ inThisBuild(
     scalaVersion := "2.12.8",
     organization := "com.wavesplatform",
     crossPaths := false,
-    scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
+    scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint", "-Ypartial-unification")
   ))
 
 resolvers ++= Seq(
@@ -326,7 +326,7 @@ lazy val node = project
   )
   .dependsOn(langJVM, commonJVM)
 
-lazy val discovery = project
+//lazy val discovery = project
 
 lazy val it = project
   .dependsOn(node)
