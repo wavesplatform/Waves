@@ -1,12 +1,12 @@
 package com.wavesplatform.transaction.api.http.assets
 
-import com.wavesplatform.state.{ByteStr, EitherExt2}
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.api.http.assets._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.smart.script.Script
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import com.wavesplatform.api.http.assets._
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.Proofs
 
 class SignedRequestsTest extends FunSuite with Matchers {
 

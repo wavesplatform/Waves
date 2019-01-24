@@ -1,6 +1,6 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import play.api.libs.json._
 

@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang._
 import com.wavesplatform.lang.v1.evaluator.ctx.DefinedType
 
 object TypeInferrer {

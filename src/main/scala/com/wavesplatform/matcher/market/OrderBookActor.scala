@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Props, Status}
 import akka.http.scaladsl.model._
 import akka.persistence._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -11,7 +12,6 @@ import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.network._
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, HasScriptType, NegativeAmount, OrderValidationError}

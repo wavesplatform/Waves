@@ -1,14 +1,14 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.transfer._
 
 class BlockchainUpdaterGeneratorFeeSameBlockTest
     extends PropSpec

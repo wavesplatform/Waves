@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import java.nio.charset.StandardCharsets
 
 import cats._
+import com.wavesplatform.common.state.ByteStr
 import org.scalatest.{FunSuite, Matchers}
 
 class PortfolioTest extends FunSuite with Matchers {

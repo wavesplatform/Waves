@@ -1,10 +1,11 @@
 package com.wavesplatform.network
 
 import com.google.common.cache.{CacheBuilder, CacheLoader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.HistoryReplier._
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroBlockSignature
 import com.wavesplatform.settings.SynchronizationSettings
-import com.wavesplatform.state.{ByteStr, NG}
+import com.wavesplatform.state.NG
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}

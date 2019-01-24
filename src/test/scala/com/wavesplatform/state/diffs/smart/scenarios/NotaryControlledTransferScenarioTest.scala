@@ -3,6 +3,8 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED

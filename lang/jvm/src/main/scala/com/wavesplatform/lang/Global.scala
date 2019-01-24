@@ -1,7 +1,8 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
-import com.wavesplatform.utils.{Base58, Base64}
+import com.wavesplatform.common.utils.Base58
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 

@@ -18,7 +18,7 @@ object DenyDuplicateVarNames {
 
     def aux(t: DenyDuplicates[EXPR], declared: Set[String]): DenyDuplicates[Set[String]] = {
       t flatMap {
-        case _: CONST_LONG | _: CONST_BYTEVECTOR | _: CONST_STRING | _: CONST_BOOLEAN | REF(_) => EitherT.pure(declared)
+        case _: CONST_LONG | _: CONST_BYTESTR | _: CONST_STRING | _: CONST_BOOLEAN | REF(_) => EitherT.pure(declared)
         case BLOCKV1(LET(name, expr), body) =>
           EitherT
             .fromEither[Coeval](isVarValid(declared, name))

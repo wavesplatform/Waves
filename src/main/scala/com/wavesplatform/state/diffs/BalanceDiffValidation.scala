@@ -2,9 +2,10 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits._
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{Blockchain, ByteStr, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
 import com.wavesplatform.utils.ScorexLogging
 

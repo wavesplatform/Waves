@@ -3,6 +3,8 @@ package com.wavesplatform.state.diffs
 import cats.{Order => _, _}
 import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Version.V1

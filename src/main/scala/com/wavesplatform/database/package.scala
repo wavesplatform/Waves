@@ -1,16 +1,18 @@
 package com.wavesplatform
 
 import java.nio.ByteBuffer
+import java.util.{Map => JMap}
 
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import org.iq80.leveldb.{DB, ReadOptions}
-import java.util.{Map => JMap}
 
 package object database {
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {

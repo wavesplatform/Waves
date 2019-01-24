@@ -1,14 +1,14 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state.{ByteStr, EitherExt2}
+import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.transfer._
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
-import com.wavesplatform.account.{Address, PublicKeyAccount}
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.state.diffs._
-import com.wavesplatform.utils.Base58
 
 class TransferTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 

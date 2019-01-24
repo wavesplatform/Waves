@@ -1,10 +1,10 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters
 import com.wavesplatform.lang.v1.traits.domain.Tx._
 import com.wavesplatform.lang.v1.traits.domain._
-import scodec.bits.ByteVector
 
 object Bindings {
 
@@ -21,8 +21,8 @@ object Bindings {
     "version"   -> tx.version,
   )
 
-  private def proofsPart(existingProofs: IndexedSeq[ByteVector]) =
-    "proofs" -> ARR((existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteVector.empty)).map(CONST_BYTEVECTOR).toIndexedSeq)
+  private def proofsPart(existingProofs: IndexedSeq[ByteStr]) =
+    "proofs" -> ARR((existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteStr.empty)).map(CONST_BYTESTR).toIndexedSeq)
 
   private def provenTxPart(tx: Proven, proofsEnabled: Boolean): Map[String, EVALUATED] = {
     val commonPart = combine(Map(
@@ -64,8 +64,8 @@ object Bindings {
         Map(
           "amount" -> CONST_LONG(pmt.amount),
           "asset" -> (pmt.asset match {
-            case None        => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-            case Some(asset) => CONST_BYTEVECTOR(asset)
+            case None                 => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
+            case Some(asset: ByteStr) => CONST_BYTESTR(asset)
           })
         )
       )
@@ -92,7 +92,7 @@ object Bindings {
       )
     )
 
-  def buildInvocation(caller: Recipient.Address, payment: Option[Pmt], contractAddress:Recipient.Address) =
+  def buildInvocation(caller: Recipient.Address, payment: Option[Pmt], contractAddress: Recipient.Address) =
     CaseObj(
       invocationType.typeRef,
       Map(
@@ -216,11 +216,11 @@ object Bindings {
         )
       case Data(p, data) =>
         def mapValue(e: Any): EVALUATED = e match {
-          case s: String     => c(s)
-          case s: Boolean    => c(s)
-          case s: Long       => c(s)
-          case s: ByteVector => c(s)
-          case _             => ???
+          case s: String  => c(s)
+          case s: Boolean => c(s)
+          case s: Long    => c(s)
+          case s: ByteStr => c(s)
+          case _          => ???
         }
 
         CaseObj(

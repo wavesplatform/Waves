@@ -5,7 +5,6 @@ import java.util.concurrent.TimeUnit
 import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
-import com.wavesplatform.state.ByteStr
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
@@ -13,6 +12,7 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
+import com.wavesplatform.common.state.ByteStr
 
 import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration

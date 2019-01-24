@@ -3,6 +3,7 @@ package com.wavesplatform.db
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}

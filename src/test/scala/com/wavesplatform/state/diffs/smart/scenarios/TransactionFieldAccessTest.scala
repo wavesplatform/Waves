@@ -1,10 +1,10 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.state.diffs.{assertDiffAndState, assertDiffEi, produce}
 import com.wavesplatform.transaction.GenesisTransaction
