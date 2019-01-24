@@ -23,9 +23,9 @@ case class ByteStr(arr: Array[Byte]) {
 }
 
 object ByteStr {
-  def decodeBase58(s: String): Try[ByteStr] = Base58.decode(s).map(ByteStr(_))
-  def decodeBase64(s: String): Try[ByteStr] = Base64.decode(s).map(ByteStr(_))
-  val empty: ByteStr                        = ByteStr(Array.emptyByteArray)
+  def decodeBase58(s: String, limit: Int = 192 /* 140*log(256)/log(58) */ ): Try[ByteStr] = Base58.decode(s, limit).map(ByteStr(_))
+  def decodeBase64(s: String): Try[ByteStr]                                               = Base64.decode(s).map(ByteStr(_))
+  val empty: ByteStr                                                                      = ByteStr(Array.emptyByteArray)
 
   implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
     override def writes(o: ByteStr): JsValue = JsString(o.base58)

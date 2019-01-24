@@ -1,0 +1,45 @@
+@Callable(i)
+func fearmissing() = {
+	let lpKey = "lastPayment"
+	let liKey = "bestFomoer"
+	let lhKey = "height"
+
+   let payment = match i.payment {
+	   case p:AttachedPayment =>
+	   		match p.asset {
+				   case asset: ByteVector => throw("fomo waves only")
+				   case _ => p.amount
+			   }
+
+	   case _ => throw("payment must be attached")
+   }
+	let lastPayment = match getInteger(i.contractAddress, "lastPayment") {
+		case p:Int => p
+		case _ => 0
+	}
+
+	if(payment <= lastPayment)
+		then throw("min payment is " +toString(payment))
+		else # storing best payment, caller and height
+			WriteSet(List(
+				DataEntry(lpKey, payment),
+				DataEntry(liKey, i.caller.bytes),
+				DataEntry(lhKey, height)
+			))
+}
+
+@Callable(i)
+func withdraw(amount: Int) = {
+
+	let day = 1440
+	let liKey = "bestFomoer"
+	let lhKey = "height"
+
+	let callerCorrect = i.caller.bytes == extract(getBinary(i.contractAddress, liKey))
+	let heightCorrect = extract(getInteger(i.contractAddress, lhKey)) - height >= day
+	let canWithdraw = heightCorrect && callerCorrect
+
+	if (canWithdraw)
+		then TransferSet(List(ContractTransfer(i.caller, wavesBalance(i.contractAddress), unit)))
+		else throw("behold")
+}

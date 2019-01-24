@@ -8,7 +8,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, CompilerV1}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompilerV1}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs._
@@ -158,12 +158,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
     val settings =
-      UtxSettings(txs.length,
-                  PoolDefaultMaxBytes,
-                  Set(sender.address),
-                  Set(recipient.address),
-                  5.minutes,
-                  allowTransactionsFromSmartAccounts = true)
+      UtxSettings(txs.length, PoolDefaultMaxBytes, Set(sender.address), Set(recipient.address), 5.minutes, allowTransactionsFromSmartAccounts = true)
     val utxPool = new UtxPoolImpl(time, bcu, FunctionalitySettings.TESTNET, settings)
     (sender, utxPool, txs)
   }).label("withBlacklistedAndAllowedByRule")
@@ -220,7 +215,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         |let y = 2
         |true""".stripMargin
 
-    val compiler = new CompilerV1(CompilerContext.empty)
+    val compiler = new ExpressionCompilerV1(CompilerContext.empty)
     compiler.compile(code, List.empty).explicitGet()
   }
 

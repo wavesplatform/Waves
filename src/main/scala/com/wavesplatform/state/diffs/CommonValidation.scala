@@ -4,14 +4,15 @@ import cats._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.lang.Version._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError._
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.{smart, _}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
 import scala.util.{Left, Right}
@@ -22,21 +23,22 @@ object CommonValidation {
   val FeeUnit        = 100000
 
   val FeeConstants: Map[Byte, Long] = Map(
-    GenesisTransaction.typeId        -> 0,
-    PaymentTransaction.typeId        -> 1,
-    IssueTransaction.typeId          -> 1000,
-    ReissueTransaction.typeId        -> 1000,
-    BurnTransaction.typeId           -> 1,
-    TransferTransaction.typeId       -> 1,
-    MassTransferTransaction.typeId   -> 1,
-    LeaseTransaction.typeId          -> 1,
-    LeaseCancelTransaction.typeId    -> 1,
-    ExchangeTransaction.typeId       -> 3,
-    CreateAliasTransaction.typeId    -> 1,
-    DataTransaction.typeId           -> 1,
-    SetScriptTransaction.typeId      -> 10,
-    SponsorFeeTransaction.typeId     -> 1000,
-    SetAssetScriptTransaction.typeId -> (1000 - 4)
+    GenesisTransaction.typeId                  -> 0,
+    PaymentTransaction.typeId                  -> 1,
+    IssueTransaction.typeId                    -> 1000,
+    ReissueTransaction.typeId                  -> 1000,
+    BurnTransaction.typeId                     -> 1,
+    TransferTransaction.typeId                 -> 1,
+    MassTransferTransaction.typeId             -> 1,
+    LeaseTransaction.typeId                    -> 1,
+    LeaseCancelTransaction.typeId              -> 1,
+    ExchangeTransaction.typeId                 -> 3,
+    CreateAliasTransaction.typeId              -> 1,
+    DataTransaction.typeId                     -> 1,
+    SetScriptTransaction.typeId                -> 10,
+    SponsorFeeTransaction.typeId               -> 1000,
+    SetAssetScriptTransaction.typeId           -> (1000 - 4),
+    smart.ContractInvocationTransaction.typeId -> 5
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
@@ -55,7 +57,7 @@ object CommonValidation {
         }
 
         val spendings       = Monoid.combine(amountDiff, feeDiff)
-        val oldWavesBalance = blockchain.portfolio(sender).balance
+        val oldWavesBalance = blockchain.balance(sender, None)
 
         val newWavesBalance = oldWavesBalance + spendings.balance
         if (newWavesBalance < 0) {
@@ -64,27 +66,25 @@ object CommonValidation {
               "Attempt to transfer unavailable funds: Transaction application leads to " +
                 s"negative waves balance to (at least) temporary negative state, current balance equals $oldWavesBalance, " +
                 s"spends equals ${spendings.balance}, result is $newWavesBalance"))
-        } else if (spendings.assets.nonEmpty) {
-          val oldAssetBalances = blockchain.portfolio(sender).assets
+        } else {
           val balanceError = spendings.assets.collectFirst {
-            case (aid, delta) if oldAssetBalances.getOrElse(aid, 0L) + delta < 0 =>
-              val availableBalance = oldAssetBalances.getOrElse(aid, 0L)
+            case (aid, delta) if delta < 0 && blockchain.balance(sender, Some(aid)) + delta < 0 =>
+              val availableBalance = blockchain.balance(sender, Some(aid))
               GenericError(
                 "Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
                   s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
                   s"spends equals $delta, result is ${availableBalance + delta}")
           }
-
           balanceError.fold[Either[ValidationError, T]](Right(tx))(Left(_))
-        } else Right(tx)
+        }
       }
 
       tx match {
-        case ptx: PaymentTransaction if blockchain.portfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
+        case ptx: PaymentTransaction if blockchain.balance(ptx.sender, None) < (ptx.amount + ptx.fee) =>
           Left(
             GenericError(
               "Attempt to pay unavailable funds: balance " +
-                s"${blockchain.portfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
+                s"${blockchain.balance(ptx.sender, None)} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, None, mtx.fee)
         case _                            => Right(tx)
@@ -125,10 +125,11 @@ object CommonValidation {
       case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
       case sst: SetScriptTransaction =>
-        sst.script.map(_.version.value) match {
-          case Some(1) | None => activationBarrier(BlockchainFeatures.SmartAccounts)
-          case Some(2)        => activationBarrier(BlockchainFeatures.SmartAccountTrading, Some("Script version 2"))
-          case Some(v)        => Left(GenericError(s"Bad script version $v"))
+        sst.script.map(_.version) match {
+          case Some(V1) | None => activationBarrier(BlockchainFeatures.SmartAccounts)
+          case Some(V2)        => activationBarrier(BlockchainFeatures.SmartAccountTrading, Some("Script version 2"))
+          case Some(V3)        => activationBarrier(BlockchainFeatures.Ride4DApps)
+          case Some(v)         => Left(GenericError(s"Bad script version $v"))
         }
       case _: TransferTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
@@ -138,13 +139,14 @@ object CommonValidation {
         } else {
           activationBarrier(BlockchainFeatures.SmartAssets)
         }
-      case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: LeaseCancelTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: CreateAliasTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _                           => Left(GenericError("Unknown transaction must be explicitly activated"))
+      case _: ReissueTransactionV2          => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: BurnTransactionV2             => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: LeaseTransactionV2            => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: LeaseCancelTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: CreateAliasTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: SponsorFeeTransaction         => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _: ContractInvocationTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
+      case _                                => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
 

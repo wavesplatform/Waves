@@ -7,14 +7,14 @@ import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Requ
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request, _}
-import com.wavesplatform.api.http.{DataRequest, SignedDataRequest, versionReads}
+import com.wavesplatform.api.http.{ContractInvocationRequest, DataRequest, SignedContractInvocationRequest, SignedDataRequest, versionReads}
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{Base58, Time}
@@ -261,7 +261,7 @@ object TransactionFactory {
         reissuable = request.reissuable,
         script = s,
         fee = request.fee,
-        timestamp = 0,
+        timestamp = request.timestamp.getOrElse(0),
         proofs = Proofs.empty
       )
     } yield tx
@@ -294,7 +294,7 @@ object TransactionFactory {
     request.decimals,
     request.reissuable,
     request.fee,
-    0,
+    request.timestamp.getOrElse(0),
     EmptySignature
   )
 
@@ -323,7 +323,7 @@ object TransactionFactory {
         sender,
         request.amount,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         recipientAcc,
         EmptySignature
       )
@@ -356,7 +356,7 @@ object TransactionFactory {
         sender,
         request.amount,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         recipientAcc,
         Proofs.empty
       )
@@ -386,7 +386,7 @@ object TransactionFactory {
       sender,
       ByteStr.decodeBase58(request.txId).get,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       EmptySignature
     )
 
@@ -418,7 +418,7 @@ object TransactionFactory {
       sender,
       ByteStr.decodeBase58(request.txId).get,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       Proofs.empty
     )
 
@@ -446,7 +446,7 @@ object TransactionFactory {
         sender,
         alias,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         EmptySignature
       )
     } yield tx
@@ -477,7 +477,7 @@ object TransactionFactory {
         sender,
         alias,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         Proofs.empty
       )
     } yield tx
@@ -507,7 +507,7 @@ object TransactionFactory {
       request.quantity,
       request.reissuable,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       EmptySignature
     )
 
@@ -540,7 +540,7 @@ object TransactionFactory {
       request.quantity,
       request.reissuable,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       Proofs.empty
     )
 
@@ -566,7 +566,7 @@ object TransactionFactory {
     ByteStr.decodeBase58(request.assetId).get,
     request.quantity,
     request.fee,
-    0,
+    request.timestamp.getOrElse(0),
     EmptySignature
   )
 
@@ -596,7 +596,7 @@ object TransactionFactory {
     ByteStr.decodeBase58(request.assetId).get,
     request.quantity,
     request.fee,
-    0,
+    request.timestamp.getOrElse(0),
     Proofs.empty
   )
 
@@ -623,9 +623,50 @@ object TransactionFactory {
       sender,
       request.data,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       Proofs.empty
     )
+
+  def contractInvocation(request: ContractInvocationRequest, wallet: Wallet, time: Time): Either[ValidationError, ContractInvocationTransaction] =
+    contractInvocation(request, wallet, request.sender, time)
+
+  def contractInvocation(request: ContractInvocationRequest,
+                         wallet: Wallet,
+                         signerAddress: String,
+                         time: Time): Either[ValidationError, ContractInvocationTransaction] =
+    for {
+      sender   <- wallet.findPrivateKey(request.sender)
+      signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+      contract <- Address.fromString(request.contractAddress)
+
+      tx <- ContractInvocationTransaction.signed(
+        request.version,
+        sender,
+        contract,
+        ContractInvocationRequest.buildFunctionCall(request.call),
+        ???,
+        request.fee,
+        request.timestamp.getOrElse(time.getTimestamp()),
+        signer
+      )
+    } yield tx
+
+  def contractInvocation(request: ContractInvocationRequest, sender: PublicKeyAccount): Either[ValidationError, ContractInvocationTransaction] =
+    for {
+      contract <- Address.fromString(request.contractAddress)
+      fc = ContractInvocationRequest.buildFunctionCall(request.call)
+      tx <- ContractInvocationTransaction.create(
+        request.version,
+        sender,
+        contract,
+        fc,
+        ???,
+        request.fee,
+        request.timestamp.getOrElse(0),
+        Proofs.empty
+      )
+
+    } yield tx
 
   def sponsor(request: SponsorFeeRequest, wallet: Wallet, time: Time): Either[ValidationError, SponsorFeeTransaction] =
     sponsor(request, wallet, request.sender, time)
@@ -655,39 +696,88 @@ object TransactionFactory {
         assetId,
         request.minSponsoredAssetFee,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         Proofs.empty
       )
     } yield tx
 
+  def exchangeV1(request: SignedExchangeRequest, sender: PublicKeyAccount): Either[ValidationError, ExchangeTransactionV1] = {
+    def orderV1(ord: Order) = {
+      import ord._
+      OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
+    }
+
+    for {
+      signature <- ByteStr.decodeBase58(request.signature).toEither.left.map(_ => GenericError(s"Wrong Base58 string: ${request.signature}"))
+      tx <- ExchangeTransactionV1.create(
+        orderV1(request.order1),
+        orderV1(request.order2),
+        request.amount,
+        request.price,
+        request.buyMatcherFee,
+        request.sellMatcherFee,
+        request.fee,
+        request.timestamp,
+        signature
+      )
+    } yield tx
+  }
+
+  def exchangeV2(request: SignedExchangeRequestV2, sender: PublicKeyAccount): Either[ValidationError, ExchangeTransactionV2] = {
+    def orderV2(ord: Order) = {
+      import ord._
+      OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
+    }
+
+    val decodedProofs = request.proofs.map(ByteStr.decodeBase58(_))
+    for {
+      proofs <- Either.cond(decodedProofs.forall(_.isSuccess),
+                            Proofs(decodedProofs.map(_.get)),
+                            GenericError(s"Invalid proof: ${decodedProofs.find(_.isFailure).get}"))
+      tx <- ExchangeTransactionV2.create(
+        orderV2(request.order1),
+        orderV2(request.order2),
+        request.amount,
+        request.price,
+        request.buyMatcherFee,
+        request.sellMatcherFee,
+        request.fee,
+        request.timestamp,
+        proofs
+      )
+    } yield tx
+  }
+
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
+    import ContractInvocationRequest._
     val typeId  = (jsv \ "type").as[Byte]
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
     TransactionParsers.by(typeId, version) match {
       case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
       case Some(x) =>
         x match {
-          case IssueTransactionV1        => jsv.as[SignedIssueV1Request].toTx
-          case IssueTransactionV2        => jsv.as[SignedIssueV2Request].toTx
-          case TransferTransactionV1     => jsv.as[SignedTransferV1Request].toTx
-          case TransferTransactionV2     => jsv.as[SignedTransferV2Request].toTx
-          case MassTransferTransaction   => jsv.as[SignedMassTransferRequest].toTx
-          case ReissueTransactionV1      => jsv.as[SignedReissueV1Request].toTx
-          case ReissueTransactionV2      => jsv.as[SignedReissueV2Request].toTx
-          case BurnTransactionV1         => jsv.as[SignedBurnV1Request].toTx
-          case BurnTransactionV2         => jsv.as[SignedBurnV2Request].toTx
-          case LeaseTransactionV1        => jsv.as[SignedLeaseV1Request].toTx
-          case LeaseTransactionV2        => jsv.as[SignedLeaseV2Request].toTx
-          case LeaseCancelTransactionV1  => jsv.as[SignedLeaseCancelV1Request].toTx
-          case LeaseCancelTransactionV2  => jsv.as[SignedLeaseCancelV2Request].toTx
-          case CreateAliasTransactionV1  => jsv.as[SignedCreateAliasV1Request].toTx
-          case CreateAliasTransactionV2  => jsv.as[SignedCreateAliasV2Request].toTx
-          case DataTransaction           => jsv.as[SignedDataRequest].toTx
-          case SetScriptTransaction      => jsv.as[SignedSetScriptRequest].toTx
-          case SetAssetScriptTransaction => jsv.as[SignedSetAssetScriptRequest].toTx
-          case SponsorFeeTransaction     => jsv.as[SignedSponsorFeeRequest].toTx
-          case ExchangeTransactionV1     => jsv.as[SignedExchangeRequest].toTx
-          case ExchangeTransactionV2     => jsv.as[SignedExchangeRequestV2].toTx
+          case IssueTransactionV1            => jsv.as[SignedIssueV1Request].toTx
+          case IssueTransactionV2            => jsv.as[SignedIssueV2Request].toTx
+          case TransferTransactionV1         => jsv.as[SignedTransferV1Request].toTx
+          case TransferTransactionV2         => jsv.as[SignedTransferV2Request].toTx
+          case MassTransferTransaction       => jsv.as[SignedMassTransferRequest].toTx
+          case ReissueTransactionV1          => jsv.as[SignedReissueV1Request].toTx
+          case ReissueTransactionV2          => jsv.as[SignedReissueV2Request].toTx
+          case BurnTransactionV1             => jsv.as[SignedBurnV1Request].toTx
+          case BurnTransactionV2             => jsv.as[SignedBurnV2Request].toTx
+          case LeaseTransactionV1            => jsv.as[SignedLeaseV1Request].toTx
+          case LeaseTransactionV2            => jsv.as[SignedLeaseV2Request].toTx
+          case LeaseCancelTransactionV1      => jsv.as[SignedLeaseCancelV1Request].toTx
+          case LeaseCancelTransactionV2      => jsv.as[SignedLeaseCancelV2Request].toTx
+          case CreateAliasTransactionV1      => jsv.as[SignedCreateAliasV1Request].toTx
+          case CreateAliasTransactionV2      => jsv.as[SignedCreateAliasV2Request].toTx
+          case DataTransaction               => jsv.as[SignedDataRequest].toTx
+          case ContractInvocationTransaction => jsv.as[SignedContractInvocationRequest].toTx
+          case SetScriptTransaction          => jsv.as[SignedSetScriptRequest].toTx
+          case SetAssetScriptTransaction     => jsv.as[SignedSetAssetScriptRequest].toTx
+          case SponsorFeeTransaction         => jsv.as[SignedSponsorFeeRequest].toTx
+          case ExchangeTransactionV1         => jsv.as[SignedExchangeRequest].toTx
+          case ExchangeTransactionV2         => jsv.as[SignedExchangeRequestV2].toTx
         }
     }
   }

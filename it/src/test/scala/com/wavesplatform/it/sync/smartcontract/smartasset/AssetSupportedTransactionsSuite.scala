@@ -7,6 +7,7 @@ import com.wavesplatform.state.{ByteStr, IntegerDataEntry}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.state._
 import scala.concurrent.duration._
 
 class AssetSupportedTransactionsSuite extends BaseTransactionSuite {

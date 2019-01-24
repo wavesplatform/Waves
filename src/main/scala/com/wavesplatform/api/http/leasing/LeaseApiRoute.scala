@@ -3,8 +3,6 @@ package com.wavesplatform.api.http.leasing
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.leasing.LeaseCancelV1Request.leaseCancelRequestFormat
-import com.wavesplatform.api.http.leasing.LeaseV1Request.leaseCancelRequestFormat
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, EitherExt2}
