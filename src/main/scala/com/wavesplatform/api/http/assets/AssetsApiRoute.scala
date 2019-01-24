@@ -325,7 +325,9 @@ object AssetsApiRoute {
       _ <- Either
         .cond(height > 0, (), GenericError(s"Height should be greater than zero"))
       _ <- Either
-        .cond(height < blockchain.height, (), GenericError(s"Using 'assetDistributionAtHeight' on current height can lead to inconsistent result"))
+        .cond(height != blockchain.height, (), GenericError(s"Using 'assetDistributionAtHeight' on current height can lead to inconsistent result"))
+      _ <- Either
+        .cond(height < blockchain.height, (), GenericError(s"Asset distribution available only at height not greater than ${blockchain.height - 1}"))
     } yield height
 
   }
