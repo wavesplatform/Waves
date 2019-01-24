@@ -4,7 +4,6 @@ import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import cats.Eq
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import io.netty.channel.local.LocalAddress
@@ -16,6 +15,7 @@ import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Transaction
 
 import scala.concurrent.duration._

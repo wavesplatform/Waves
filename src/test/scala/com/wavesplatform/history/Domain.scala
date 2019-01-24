@@ -1,8 +1,10 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.state._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.BlockchainUpdater
 
 case class Domain(blockchainUpdater: BlockchainUpdater with NG) {

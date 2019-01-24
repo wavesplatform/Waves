@@ -1,19 +1,20 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTEVECTOR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, Json}
-import scodec.bits.ByteVector
 
 class ContractInvocationTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -69,7 +70,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
       """
         |
         | @Callable(inv)
-        | func foo(a:ByteVector) = {
+        | func foo(a:ByteStr) = {
         |  WriteSet(List(DataEntry("a", a), DataEntry("sender", inv.caller.bytes)))
         | }
         | 
@@ -104,7 +105,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
 
   test("contract caller invokes a function on a contract") {
     val arg               = ByteStr(Array(42: Byte))
-    val fc: FUNCTION_CALL = FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_BYTEVECTOR(ByteVector(arg.arr))))
+    val fc: FUNCTION_CALL = FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_BYTESTR(arg)))
 
     val tx =
       ContractInvocationTransaction

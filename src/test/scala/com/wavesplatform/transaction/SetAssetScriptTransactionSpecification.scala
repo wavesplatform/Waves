@@ -1,11 +1,12 @@
 package com.wavesplatform.transaction
 
-import play.api.libs.json._
-import org.scalacheck.Gen
-import com.wavesplatform.state._
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
+import org.scalacheck.Gen
+import play.api.libs.json._
 
 class SetAssetScriptTransactionSpecification extends GenericTransactionSpecification[SetAssetScriptTransaction] {
   def transactionParser: com.wavesplatform.transaction.TransactionParserFor[SetAssetScriptTransaction] = SetAssetScriptTransaction

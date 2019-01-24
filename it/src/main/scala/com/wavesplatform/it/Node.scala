@@ -4,11 +4,11 @@ import java.net.{InetSocketAddress, URL}
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.utils.{Base58, LoggerFacade}
+import com.wavesplatform.utils.LoggerFacade
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
 import org.slf4j.LoggerFactory

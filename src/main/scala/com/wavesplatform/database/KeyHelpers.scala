@@ -3,7 +3,7 @@ package com.wavesplatform.database
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Ints, Shorts}
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 
 object KeyHelpers {
   def h(prefix: Short, height: Int): Array[Byte] =

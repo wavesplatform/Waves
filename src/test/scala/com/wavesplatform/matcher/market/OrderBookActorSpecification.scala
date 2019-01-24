@@ -6,6 +6,7 @@ import akka.actor.{ActorRef, Props}
 import akka.testkit.{ImplicitSender, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.OrderOps._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.{OrderAccepted, OrderCanceled}
 import com.wavesplatform.matcher.fixtures.RestartableActor
@@ -13,7 +14,7 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state.{ByteStr, Diff}
+import com.wavesplatform.state.Diff
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.utils.EmptyBlockchain

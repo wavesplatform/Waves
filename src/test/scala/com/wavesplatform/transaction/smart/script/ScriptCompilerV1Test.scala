@@ -1,14 +1,14 @@
 package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.state.EitherExt2
-import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 
 class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 

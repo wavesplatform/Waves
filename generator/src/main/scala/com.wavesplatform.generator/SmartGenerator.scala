@@ -4,14 +4,16 @@ import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.it.util._
-import com.wavesplatform.state._
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, OrderV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, OrderV2}
+
 import scala.concurrent.duration._
 
 class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {

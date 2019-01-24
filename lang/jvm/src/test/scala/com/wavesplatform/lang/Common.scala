@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.data.EitherT
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -13,7 +14,6 @@ import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
 import org.scalacheck.Shrink
-import org.scalatest.matchers.{MatchResult, Matcher}
 import shapeless.{:+:, CNil}
 
 import scala.util.{Left, Right, Try}
@@ -21,7 +21,7 @@ import scala.util.{Left, Right, Try}
 object Common {
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTEVECTOR, STRING)
+  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
   val dataEntryType              = CaseType("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
   val addCtx: CTX                = CTX.apply(Seq(dataEntryType), Map.empty, Array.empty)
 
@@ -31,19 +31,6 @@ object Common {
 
   trait NoShrink {
     implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-  }
-
-  class ProduceError(errorMessage: String) extends Matcher[Either[_, _]] {
-    override def apply(ei: Either[_, _]): MatchResult = {
-      ei match {
-        case r @ Right(_) => MatchResult(matches = false, "expecting Left(...{0}...) but got {1}", "got expected error", IndexedSeq(errorMessage, r))
-        case l @ Left(_) =>
-          MatchResult(matches = l.toString contains errorMessage,
-                      "expecting Left(...{0}...) but got {1}",
-                      "got expected error",
-                      IndexedSeq(errorMessage, l))
-      }
-    }
   }
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)

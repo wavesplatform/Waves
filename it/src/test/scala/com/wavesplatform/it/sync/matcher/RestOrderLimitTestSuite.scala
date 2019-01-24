@@ -9,7 +9,7 @@ import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{Node, ReportingTestName}
-import com.wavesplatform.state.ByteStr.decodeBase58
+import com.wavesplatform.common.state.ByteStr.decodeBase58
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}

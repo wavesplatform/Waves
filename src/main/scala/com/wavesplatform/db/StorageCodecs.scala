@@ -2,7 +2,7 @@ package com.wavesplatform.db
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2
 
 import scala.collection.generic.CanBuildFrom
 import scala.util.Try

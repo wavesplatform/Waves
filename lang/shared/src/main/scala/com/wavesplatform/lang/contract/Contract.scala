@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.contract
+
 import com.wavesplatform.lang.contract.Contract.{ContractFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION

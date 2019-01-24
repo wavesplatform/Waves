@@ -12,16 +12,18 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{Blockchain, ByteStr, LeaseBalance, NG, Portfolio}
+import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio}
 import com.wavesplatform.transaction.ValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.Verifier
-import com.wavesplatform.utils.{Base58, ScorexLogging, Time}
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -30,6 +32,7 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.eval.{Coeval, Task}
 import play.api.libs.json._
+import com.wavesplatform.utils.byteStrWrites
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

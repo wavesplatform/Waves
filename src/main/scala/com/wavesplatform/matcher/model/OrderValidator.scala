@@ -2,6 +2,7 @@ package com.wavesplatform.matcher.model
 
 import cats.implicits._
 import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}

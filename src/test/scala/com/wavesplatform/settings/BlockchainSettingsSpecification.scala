@@ -1,7 +1,7 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._

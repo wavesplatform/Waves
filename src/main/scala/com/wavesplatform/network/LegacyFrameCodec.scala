@@ -3,8 +3,9 @@ package com.wavesplatform.network
 import java.util
 
 import com.google.common.cache.CacheBuilder
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.crypto
-import com.wavesplatform.utils.{Base64, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled._
 import io.netty.channel.ChannelHandlerContext
