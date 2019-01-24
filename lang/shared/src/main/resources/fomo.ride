@@ -7,7 +7,7 @@ func fearmissing() = {
    let payment = match i.payment {
 	   case p:AttachedPayment =>
 	   		match p.asset {
-				   case asset: ByteStr => throw("fomo waves only")
+				   case asset: ByteVector => throw("fomo waves only")
 				   case _ => p.amount
 			   }
 
