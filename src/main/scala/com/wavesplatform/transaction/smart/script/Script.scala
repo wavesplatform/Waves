@@ -16,6 +16,8 @@ trait Script {
   val bytes: Coeval[ByteStr]
   val complexity: Long
 
+  val maxBlockVersion: Coeval[Int]
+
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: Script => version == that.version && expr == that.expr
     case _            => false

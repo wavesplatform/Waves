@@ -38,6 +38,26 @@ object ScriptV1 {
         val s = Array(version.toByte) ++ Serde.serialize(expr)
         ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
       }
+    override val maxBlockVersion: Coeval[Int] = Coeval.evalOnce(calcMaxBlockVersion(expr))
+  }
+
+  def calcMaxBlockVersion(e: EXPR): Int = {
+    def horTraversal(queue: Iterable[EXPR]): Int = {
+      queue.headOption match {
+        case Some(expr) => {
+          expr match {
+            case BLOCKV2(_, _)              => 2
+            case GETTER(expr1, _)           => horTraversal(queue.tail ++ Iterable[EXPR](expr1))
+            case BLOCKV1(let, body)         => horTraversal(queue.tail ++ Iterable[EXPR](let.value, body))
+            case IF(expr1, expr2, expr3)    => horTraversal(queue.tail ++ Iterable[EXPR](expr1, expr2, expr3))
+            case FUNCTION_CALL(_, exprList) => horTraversal(queue.tail ++ exprList)
+            case _                          => 1
+          }
+        }
+        case None => 1
+      }
+    }
+    horTraversal(List(e))
   }
 }
 
@@ -50,4 +70,5 @@ case class ScriptV2(version: Version, expr: Contract) extends Script {
       val s = Array(version.toByte) ++ ContractSerDe.serialize(expr)
       ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
     }
+  override val maxBlockVersion: Coeval[Int] = Coeval.evalOnce(2)
 }
