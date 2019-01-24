@@ -138,17 +138,22 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 
+  def orderGenerator(sender: PrivateKeyAccount, pair: AssetPair): Gen[Order] =
+    for {
+      orderType          <- orderTypeGenerator
+      amount: Long       <- maxWavesAmountGen
+      price: Long        <- maxWavesAmountGen
+      timestamp: Long    <- createdTimeGen
+      expiration: Long   <- maxTimeGen
+      matcherFee: Long   <- maxWavesAmountGen
+      orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
+    } yield Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, orderVersion)
+
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     pair                      <- assetPairGen
-    orderType                 <- orderTypeGenerator
-    amount: Long              <- maxWavesAmountGen
-    price: Long               <- maxWavesAmountGen
-    timestamp: Long           <- createdTimeGen
-    expiration: Long          <- maxTimeGen
-    matcherFee: Long          <- maxWavesAmountGen
-    orderVersion: Byte        <- Gen.oneOf(1: Byte, 2: Byte)
-  } yield (Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, orderVersion), sender)
+    order                     <- orderGenerator(sender, pair)
+  } yield order -> sender
 
   val buyLimitOrderGenerator: Gen[BuyLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen
