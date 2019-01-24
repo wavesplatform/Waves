@@ -272,6 +272,11 @@ object State {
   implicit val StateFormat: Format[State] = Json.format
 }
 
+case class TransactionSerialize(bytes: Array[Int])
+object TransactionSerialize {
+  implicit val TransactionSerializeFormat: Format[TransactionSerialize] = Json.format
+}
+
 case class FeeInfo(feeAssetId: Option[String], feeAmount: Long)
 object FeeInfo {
   implicit val format: Format[FeeInfo] = Json.format
