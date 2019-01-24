@@ -266,14 +266,18 @@ trait Caches extends Blockchain with ScorexLogging {
     val addressTransactions: Map[AddressId, List[TransactionId]] =
       diff.transactions.toList
         .flatMap {
-          case (txId, (_, _, addrs)) =>
+          case (_, (h, tx, addrs)) =>
             addrs.map { addr =>
               val addrId = AddressId(addressId(addr))
-              addrId -> TransactionId(txId)
+              val htx    = (h, tx)
+              addrId -> htx
             }
         }
         .groupBy(_._1)
-        .mapValues(_.map(_._2))
+        .mapValues { txs =>
+          val sorted = txs.sortBy { case (_, (h, tx)) => (-h, -tx.timestamp) }
+          sorted.map { case (_, (_, tx)) => TransactionId(tx.id()) }
+        }
 
     current = (newHeight, (current._2 + block.blockScore()), Some(block))
 

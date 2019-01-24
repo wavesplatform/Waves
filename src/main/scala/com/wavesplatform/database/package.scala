@@ -258,44 +258,22 @@ package object database {
     ndo.writeInt(bh.featureVotes.size)
     bh.featureVotes.foreach(s => ndo.writeShort(s))
 
-//    val arr = ndo.toByteArray
-
-//    println("************* OUT *************")
-//    println(arr.length)
-//    println(bh)
-//    println("*******************************")
-
     ndo.toByteArray
   }
 
   def readBlockHeader(bs: Array[Byte]): BlockHeader = {
-
-//    println("************* IN *************")
-//    println(bs.length)
-//    println("******************************")
-
     val ndi = newDataInput(bs)
 
-    val timestamp = ndi.readLong()
-//    println(s"ts: $timestamp")
-    val version = ndi.readByte()
-//    println(s"version: $version")
-    val reference = ndi.readSignature
-//    println(s"ref: ${Base58.encode(reference.arr)}")
-    val generator = ndi.readPublicKey
-//    println(s"gen: ${Base58.encode(generator.publicKey)}")
-    val signature = ndi.readSignature
-//    println(s"sig: ${Base58.encode(signature.arr)}")
-    val baseTarget = ndi.readLong()
-//    println(s"bt: $baseTarget")
-    val genSig = ndi.readByteStr(Block.GeneratorSignatureLength)
-//    println(s"gs: ${Base58.encode(genSig.arr)}")
-    val transactionCount = ndi.readInt()
-//    println(s"tc: $transactionCount")
+    val timestamp         = ndi.readLong()
+    val version           = ndi.readByte()
+    val reference         = ndi.readSignature
+    val generator         = ndi.readPublicKey
+    val signature         = ndi.readSignature
+    val baseTarget        = ndi.readLong()
+    val genSig            = ndi.readByteStr(Block.GeneratorSignatureLength)
+    val transactionCount  = ndi.readInt()
     val featureVotesCount = ndi.readInt()
-//    println(s"fvc: $featureVotesCount")
-    val featureVotes = List.fill(featureVotesCount)(ndi.readShort()).toSet
-//    println(s"fv: $featureVotes")
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
     new BlockHeader(timestamp,
                     version,
                     reference,
@@ -305,24 +283,32 @@ package object database {
                     featureVotes)
   }
 
-  def readTransactionHNSeq(bs: Array[Byte]): (Height, Seq[TxNum]) = {
+  def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
     val ndi          = newDataInput(bs)
     val height       = Height(ndi.readInt())
     val numSeqLength = ndi.readInt()
 
-    (height, List.fill(numSeqLength)(TxNum(ndi.readInt())))
+    (height, List.fill(numSeqLength) {
+      val tp  = ndi.readByte()
+      val num = TxNum(ndi.readInt())
+      (tp, num)
+    })
   }
 
-  def writeTransactionHNSeq(v: (Height, Seq[TxNum])): Array[Byte] = {
+  def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
     val (height, numSeq) = v
     val numSeqLength     = numSeq.length
 
-    val outputLength = 4 + 4 + numSeqLength * 4
+    val outputLength = 4 + 4 + numSeqLength * (4 + 1)
     val ndo          = newDataOutput(outputLength)
 
     ndo.writeInt(height)
     ndo.writeInt(numSeqLength)
-    numSeq.foreach(ndo.writeInt)
+    numSeq.foreach {
+      case (tp, num) =>
+        ndo.writeByte(tp)
+        ndo.writeInt(num)
+    }
 
     ndo.toByteArray
   }

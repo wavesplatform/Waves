@@ -138,12 +138,12 @@ object Keys {
     bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, addressId.toByteArray)
 
   val AddressTransactionHNPrefix: Short = 104
-  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[TxNum])]] =
+  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
     Key.opt(
       "address-transaction-ids",
       hBytes(AddressTransactionHNPrefix, seqNr, addressId.toByteArray),
-      readTransactionHNSeq,
-      writeTransactionHNSeq
+      readTransactionHNSeqAndType,
+      writeTransactionHNSeqAndType
     )
 
   val TransactionHeightNumByIdPrefix: Short = 105

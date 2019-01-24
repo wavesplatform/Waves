@@ -109,26 +109,6 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val stransactions2 = d.addressTransactions(sender).explicitGet().sortBy(_._2.timestamp)
           val rtransactions2 = d.addressTransactions(recipient).explicitGet().sortBy(_._2.timestamp)
 
-          println("******************")
-
-          println(txCount)
-
-          println("******************")
-
-          stransactions1
-            .foreach { case (h, tx) =>
-                println(s"H: $h - TP: ${tx.builder.typeId} - ID: ${tx.id()}")
-          }
-
-          println("******************")
-
-          stransactions2
-            .foreach { case (h, tx) =>
-                println(s"H: $h - TP: ${tx.builder.typeId} - ID: ${tx.id()}")
-          }
-
-          println("******************")
-
           stransactions1 shouldBe stransactions2
           rtransactions1 shouldBe rtransactions2
         }

@@ -123,20 +123,7 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 scripts: Map[Address, Option[Script]],
                 assetScripts: Map[AssetId, Option[Script]],
                 accountData: Map[Address, AccountDataInfo],
-                sponsorship: Map[AssetId, Sponsorship]) {
-
-  lazy val accountTransactionIds: Map[Address, List[(Int, ByteStr)]] = {
-    val map: List[(Address, Set[(Int, Byte, Long, ByteStr)])] = transactions.toList
-      .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> Set((h, tx.builder.typeId, tx.timestamp, id))) }
-    val groupedByAcc = map.foldLeft(Map.empty[Address, Set[(Int, Byte, Long, ByteStr)]]) {
-      case (m, (acc, set)) =>
-        m.combine(Map(acc -> set))
-    }
-    groupedByAcc
-      .mapValues(l => l.toList.sortBy { case (h, _, t, _) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
-      .mapValues(_.map({ case (_, typ, _, id) => (typ.toInt, id) }))
-  }
-}
+                sponsorship: Map[AssetId, Sponsorship])
 
 object Diff {
 

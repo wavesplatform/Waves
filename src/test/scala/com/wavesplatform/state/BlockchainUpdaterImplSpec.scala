@@ -7,10 +7,10 @@ import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{WithDB, RequestGen, NTPTime}
+import com.wavesplatform.{NTPTime, RequestGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -36,11 +36,9 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
   }
 
   def createTransfer(master: PrivateKeyAccount, recipient: Address, ts: Long): TransferTransaction = {
-    val tx = TransferTransactionV1
+    TransferTransactionV1
       .selfSigned(None, master, recipient, ENOUGH_AMT / 5, ts, None, 1000000, Array.emptyByteArray)
       .explicitGet()
-    println(s"TR_ID: ${tx.id()}")
-    tx
   }
 
   "addressTransactions" - {
@@ -102,20 +100,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 10, None)
           .explicitGet()
 
-        txs.foreach {
-          case (h, t) =>
-            println(s"H: $h - TS: ${t.timestamp} - ID: ${t.id()}")
-        }
-
-        println("****************")
-
         val ordering = Ordering
           .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
-
-        txs.sorted(ordering).foreach {
-          case (h, t) =>
-            println(s"H: $h - TS: ${t.timestamp} - ID: ${t.id()}")
-        }
 
         txs.length shouldBe 9
         txs.sorted(ordering) shouldEqual txs
