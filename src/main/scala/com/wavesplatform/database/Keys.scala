@@ -3,7 +3,7 @@ package com.wavesplatform.database
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
@@ -14,17 +14,6 @@ object Keys {
   val version: Key[Int]               = intKey("version", 0, default = 1)
   val height: Key[Int]                = intKey("height", 1)
   def score(height: Int): Key[BigInt] = Key("score", h(2, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
-
-  private def blockAtHeight(height: Int) = h(3, height)
-
-  def blockAt(height: Int): Key[Option[Block]]                  = Key.opt[Block]("block-at", blockAtHeight(height), Block.parseBytes(_).get, _.bytes())
-  def blockBytes(height: Int): Key[Option[Array[Byte]]]         = Key.opt[Array[Byte]]("block-bytes", blockAtHeight(height), identity, identity)
-  def blockHeader(height: Int): Key[Option[(BlockHeader, Int)]] =
-    // this dummy encoder is never used: we only store blocks, not block headers
-    Key.opt[(BlockHeader, Int)]("block-header",
-                                blockAtHeight(height),
-                                b => (BlockHeader.parseBytes(b).get._1, b.length),
-                                unsupported("Can't write block headers"))
 
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int]("height-of", hash(4, blockId), Ints.fromByteArray, Ints.toByteArray)
 
@@ -54,16 +43,9 @@ object Keys {
   def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =
     Key("filled-volume-and-fee", hBytes(17, height, orderId.arr), readVolumeAndFee, writeVolumeAndFee)
 
-  def transactionInfo(txId: ByteStr): Key[Option[(Int, Transaction)]] =
-    Key.opt("transaction-info", hash(18, txId), readTransactionInfo, writeTransactionInfo)
-  def transactionHeight(txId: ByteStr): Key[Option[Int]] =
-    Key.opt("transaction-height", hash(18, txId), readTransactionHeight, unsupported("Can't write transaction height only"))
-
   // 19, 20 were never used
 
   def changedAddresses(height: Int): Key[Seq[BigInt]] = Key("changed-addresses", h(21, height), readBigIntSeq, writeBigIntSeq)
-
-  def transactionIdsAtHeight(height: Int): Key[Seq[ByteStr]] = Key("transaction-ids-at-height", h(22, height), readTxIds, writeTxIds)
 
   def addressIdOfAlias(alias: Alias): Key[Option[BigInt]] = Key.opt("address-id-of-alias", bytes(23, alias.bytes.arr), BigInt(_), _.toByteArray)
 
@@ -99,10 +81,6 @@ object Keys {
   def addressesForAsset(assetId: ByteStr, seqNr: Int): Key[Seq[BigInt]] =
     Key("addresses-for-asset", hBytes(40, seqNr, assetId.arr), readBigIntSeq, writeBigIntSeq)
 
-  def addressTransactionSeqNr(addressId: BigInt): Key[Int] = bytesSeqNr("address-transaction-seq-nr", 41, addressId.toByteArray)
-  def addressTransactionIds(addressId: BigInt, seqNr: Int): Key[Seq[(Int, ByteStr)]] =
-    Key("address-transaction-ids", hBytes(42, seqNr, addressId.toByteArray), readTransactionIds, writeTransactionIds)
-
   val AliasIsDisabledPrefix: Short = 43
   def aliasIsDisabled(alias: Alias): Key[Boolean] =
     Key("alias-is-disabled", bytes(AliasIsDisabledPrefix, alias.bytes.arr), Option(_).exists(_(0) == 1), if (_) Array[Byte](1) else Array[Byte](0))
@@ -127,8 +105,19 @@ object Keys {
   def blockHeaderAt(height: Height): Key[Option[BlockHeader]] =
     Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeader, writeBlockHeader)
 
+  def blockHeaderAndSizeAt(height: Height): Key[Option[(BlockHeader, Int)]] =
+    Key.opt(
+      "block-header-at-height",
+      h(BlockHeaderPrefix, height),
+      bytes => (readBlockHeader(bytes), bytes.length),
+      data => {
+        val (header, _) = data
+        writeBlockHeader(header) // don't really store sizes
+      }
+    )
+
   val TransactionInfoPrefix: Short = 102
-  def nthTransactionInfoAt(height: Height, n: TxNum): Key[Option[Transaction]] =
+  def transactionAt(height: Height, n: TxNum): Key[Option[Transaction]] =
     Key.opt[Transaction](
       "nth-transaction-info-at-height",
       hNum(TransactionInfoPrefix, height, n),
@@ -136,20 +125,28 @@ object Keys {
       _.bytes()
     )
 
+  def transactionBytesAt(height: Height, n: TxNum): Key[Option[Array[Byte]]] =
+    Key.opt(
+      "nth-transaction-info-at-height",
+      hNum(TransactionInfoPrefix, height, n),
+      identity,
+      identity
+    )
+
   val AddressTransactionSeqNrPrefix: Short = 103
-  def addressTransactionSeqNr2(addressId: AddressId): Key[Int] =
+  def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
     bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, addressId.toByteArray)
 
   val AddressTransactionHNPrefix: Short = 104
-  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[(Height, Seq[TxNum])] =
-    Key(
+  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[TxNum])]] =
+    Key.opt(
       "address-transaction-ids",
       hBytes(AddressTransactionHNPrefix, seqNr, addressId.toByteArray),
       readTransactionHNSeq,
       writeTransactionHNSeq
     )
 
-  val TransactionHeightByIdPrefix: Short = 105
+  val TransactionHeightNumByIdPrefix: Short = 105
   def transactionHNById(txId: TransactionId): Key[Option[(Height, TxNum)]] =
     Key.opt(
       "transaction-height-by-id",

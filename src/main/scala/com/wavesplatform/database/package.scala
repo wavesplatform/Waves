@@ -1,22 +1,27 @@
 package com.wavesplatform
 
 import java.nio.ByteBuffer
+import java.util.{Map => JMap}
 
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.block.{Block, BlockHeader, SignerData}
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.crypto._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import org.iq80.leveldb.{DB, ReadOptions}
-import java.util.{Map => JMap}
-import supertagged._
-
-import com.wavesplatform.block.BlockHeader
 
 package object database {
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
+    def writeByteStr(s: ByteStr) = {
+      output.write(s.arr)
+    }
+
     def writeBigInt(v: BigInt): Unit = {
       val b = v.toByteArray
       require(b.length <= Byte.MaxValue)
@@ -50,6 +55,19 @@ package object database {
         Some(ScriptReader.fromBytes(b).explicitGet())
       } else None
     }
+
+    def readBytes(len: Int): Array[Byte] = {
+      val arr = new Array[Byte](len)
+      input.readFully(arr)
+      arr
+    }
+
+    def readByteStr(len: Int): ByteStr = {
+      ByteStr(readBytes(len))
+    }
+
+    def readSignature: ByteStr          = readByteStr(SignatureLength)
+    def readPublicKey: PublicKeyAccount = PublicKeyAccount(readBytes(KeyLength))
   }
 
   def writeIntSeq(values: Seq[Int]): Array[Byte] = {
@@ -226,14 +244,107 @@ package object database {
     ndo.toByteArray
   }
 
-  def writeBlockHeader(bh: BlockHeader): Array[Byte] = ???
-  def readBlockHeader(bs: Array[Byte]): BlockHeader  = ???
+  def writeBlockHeader(bh: BlockHeader): Array[Byte] = {
+    val ndo = newDataOutput()
 
-  def readTransactionHNSeq(bs: Array[Byte]): (Height, Seq[TxNum]) = ???
-  def writeTransactionHNSeq(v: (Height, Seq[TxNum])): Array[Byte] = ???
+    ndo.writeLong(bh.timestamp)
+    ndo.writeByte(bh.version)
+    ndo.writeByteStr(bh.reference)
+    ndo.write(bh.signerData.generator.publicKey)
+    ndo.writeByteStr(bh.signerData.signature)
+    ndo.writeLong(bh.consensusData.baseTarget)
+    ndo.writeByteStr(bh.consensusData.generationSignature)
+    ndo.writeInt(bh.transactionCount)
+    ndo.writeInt(bh.featureVotes.size)
+    bh.featureVotes.foreach(s => ndo.writeShort(s))
 
-  def readTransactionHN(bs: Array[Byte]): (Height, TxNum) = ???
-  def writeTransactionHN(v: (Height, TxNum)): Array[Byte] = ???
+//    val arr = ndo.toByteArray
+
+//    println("************* OUT *************")
+//    println(arr.length)
+//    println(bh)
+//    println("*******************************")
+
+    ndo.toByteArray
+  }
+
+  def readBlockHeader(bs: Array[Byte]): BlockHeader = {
+
+//    println("************* IN *************")
+//    println(bs.length)
+//    println("******************************")
+
+    val ndi = newDataInput(bs)
+
+    val timestamp = ndi.readLong()
+//    println(s"ts: $timestamp")
+    val version = ndi.readByte()
+//    println(s"version: $version")
+    val reference = ndi.readSignature
+//    println(s"ref: ${Base58.encode(reference.arr)}")
+    val generator = ndi.readPublicKey
+//    println(s"gen: ${Base58.encode(generator.publicKey)}")
+    val signature = ndi.readSignature
+//    println(s"sig: ${Base58.encode(signature.arr)}")
+    val baseTarget = ndi.readLong()
+//    println(s"bt: $baseTarget")
+    val genSig = ndi.readByteStr(Block.GeneratorSignatureLength)
+//    println(s"gs: ${Base58.encode(genSig.arr)}")
+    val transactionCount = ndi.readInt()
+//    println(s"tc: $transactionCount")
+    val featureVotesCount = ndi.readInt()
+//    println(s"fvc: $featureVotesCount")
+    val featureVotes = List.fill(featureVotesCount)(ndi.readShort()).toSet
+//    println(s"fv: $featureVotes")
+    new BlockHeader(timestamp,
+                    version,
+                    reference,
+                    SignerData(generator, signature),
+                    NxtLikeConsensusBlockData(baseTarget, genSig),
+                    transactionCount,
+                    featureVotes)
+  }
+
+  def readTransactionHNSeq(bs: Array[Byte]): (Height, Seq[TxNum]) = {
+    val ndi          = newDataInput(bs)
+    val height       = Height(ndi.readInt())
+    val numSeqLength = ndi.readInt()
+
+    (height, List.fill(numSeqLength)(TxNum(ndi.readInt())))
+  }
+
+  def writeTransactionHNSeq(v: (Height, Seq[TxNum])): Array[Byte] = {
+    val (height, numSeq) = v
+    val numSeqLength     = numSeq.length
+
+    val outputLength = 4 + 4 + numSeqLength * 4
+    val ndo          = newDataOutput(outputLength)
+
+    ndo.writeInt(height)
+    ndo.writeInt(numSeqLength)
+    numSeq.foreach(ndo.writeInt)
+
+    ndo.toByteArray
+  }
+
+  def readTransactionHN(bs: Array[Byte]): (Height, TxNum) = {
+    val ndi = newDataInput(bs)
+    val h   = Height(ndi.readInt())
+    val num = TxNum(ndi.readInt())
+
+    (h, num)
+  }
+
+  def writeTransactionHN(v: (Height, TxNum)): Array[Byte] = {
+    val ndo = newDataOutput(8)
+
+    val (h, num) = v
+
+    ndo.writeInt(h)
+    ndo.writeInt(num)
+
+    ndo.toByteArray
+  }
 
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestSize
@@ -282,16 +393,4 @@ package object database {
       } finally iterator.close()
     }
   }
-
-  object Height extends TaggedType[Int]
-  type Height = Height.Type
-
-  object TxNum extends TaggedType[Int]
-  type TxNum = TxNum.Type
-
-  object AddressId extends TaggedType[BigInt]
-  type AddressId = AddressId.Type
-
-  object TransactionId extends TaggedType[ByteStr]
-  type TransactionId = TransactionId.Type
 }

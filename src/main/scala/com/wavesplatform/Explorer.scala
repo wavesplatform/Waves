@@ -10,7 +10,7 @@ import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{ByteStr, EitherExt2}
-import com.wavesplatform.utils.{Base58, Base64, ScorexLogging}
+import com.wavesplatform.utils.{Base58, ScorexLogging}
 import org.slf4j.bridge.SLF4JBridgeHandler
 
 import scala.collection.JavaConverters._
@@ -106,9 +106,9 @@ object Explorer extends ScorexLogging {
             val blockHeightBytes = db.get(kBlockHeight.keyBytes)
             val maybeBlockHeight = kBlockHeight.parse(blockHeightBytes)
             maybeBlockHeight.foreach { h =>
-              val kBlock     = Keys.blockBytes(h)
-              val blockBytes = db.get(kBlock.keyBytes)
-              log.info(s"BlockId=${maybeBlockId.get} at h=$h: ${Base64.encode(blockBytes)}")
+//              val kBlock     = Keys.blockBytes(h)
+//              val blockBytes = db.get(kBlock.keyBytes)
+//              log.info(s"BlockId=${maybeBlockId.get} at h=$h: ${Base64.encode(blockBytes)}")
             }
           } else log.error("No block ID was provided")
 

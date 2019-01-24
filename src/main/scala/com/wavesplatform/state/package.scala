@@ -168,4 +168,15 @@ package object state {
     )
   }
 
+  object Height extends TaggedType[Int]
+  type Height = Height.Type
+
+  object TxNum extends TaggedType[Int]
+  type TxNum = TxNum.Type
+
+  object AddressId extends TaggedType[BigInt]
+  type AddressId = AddressId.Type
+
+  object TransactionId extends TaggedType[ByteStr]
+  type TransactionId = TransactionId.Type
 }

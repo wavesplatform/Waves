@@ -248,6 +248,18 @@ object Block extends ScorexLogging {
     (blockVersion == 3 && txsCount <= MaxTransactionsPerBlockVer3) || (blockVersion <= 2 || txsCount <= MaxTransactionsPerBlockVer1Ver2)
   }
 
+  def fromHeaderAndTransactions(h: BlockHeader, txs: Seq[Transaction]): Either[GenericError, Block] = {
+    build(
+      h.version,
+      h.timestamp,
+      h.reference,
+      h.consensusData,
+      txs,
+      h.signerData,
+      h.featureVotes
+    )
+  }
+
   def build(version: Byte,
             timestamp: Long,
             reference: ByteStr,

@@ -131,25 +131,101 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
     }
   }
 
-  "addressTransactions" - {
-    def preconditions(ts: Long): Gen[(PrivateKeyAccount, List[Block])] = {
-      for {
-        master    <- accountGen
-        recipient <- accountGen
-        genesisBlock = TestBlock
-          .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
-        block1 = TestBlock
-          .create(
-            ts + 3,
-            genesisBlock.uniqueId,
-            Seq(
-              createTransfer(master, recipient.toAddress, ts + 1),
-              createTransfer(master, recipient.toAddress, ts + 2)
-            )
-          )
-        emptyBlock = TestBlock.create(ts + 5, block1.uniqueId, Seq())
-      } yield (master, List(genesisBlock, block1, emptyBlock))
+  def testWithBlocks(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (LevelDBWriter, Seq[Block], PrivateKeyAccount) => Unit): Unit = {
+    val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+    val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
+    try {
+      val (account, blocks) = gen(ntpTime).sample.get
+
+      blocks.foreach { block =>
+        bcu.processBlock(block).explicitGet()
+      }
+
+      bcu.shutdown()
+      f(defaultWriter, blocks, account)
+    } finally {
+      bcu.shutdown()
+      db.close()
     }
+  }
+
+  def createTransfer(master: PrivateKeyAccount, recipient: Address, ts: Long): TransferTransaction = {
+    TransferTransactionV1
+      .selfSigned(None, master, recipient, ENOUGH_AMT / 5, ts, None, 1000000, Array.emptyByteArray)
+      .explicitGet()
+  }
+
+  def preconditions(ts: Long): Gen[(PrivateKeyAccount, List[Block])] = {
+    for {
+      master    <- accountGen
+      recipient <- accountGen
+      genesisBlock = TestBlock
+        .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+      block1 = TestBlock
+        .create(
+          ts + 3,
+          genesisBlock.uniqueId,
+          Seq(
+            createTransfer(master, recipient.toAddress, ts + 1),
+            createTransfer(master, recipient.toAddress, ts + 2)
+          )
+        )
+      emptyBlock = TestBlock.create(ts + 5, block1.uniqueId, Seq())
+    } yield (master, List(genesisBlock, block1, emptyBlock))
+  }
+
+  "correct reassemble block from header and transactions" in {
+    val rw        = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+    val settings0 = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+    val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val bcu       = new BlockchainUpdaterImpl(rw, settings, ntpTime)
+    try {
+      val master    = PrivateKeyAccount("master".getBytes())
+      val recipient = PrivateKeyAccount("recipient".getBytes())
+
+      val ts = System.currentTimeMillis()
+
+      val genesisBlock = TestBlock
+        .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+      val block1 = TestBlock
+        .create(
+          ts + 3,
+          genesisBlock.uniqueId,
+          Seq(
+            createTransfer(master, recipient.toAddress, ts + 1),
+            createTransfer(master, recipient.toAddress, ts + 2)
+          )
+        )
+      val block2 = TestBlock.create(ts + 5, block1.uniqueId, Seq())
+      val block3 = TestBlock
+        .create(
+          ts + 10,
+          block2.uniqueId,
+          Seq(
+            createTransfer(master, recipient.toAddress, ts + 6),
+            createTransfer(master, recipient.toAddress, ts + 7)
+          )
+        )
+
+      bcu.processBlock(genesisBlock) shouldBe 'right
+      bcu.processBlock(block1) shouldBe 'right
+      bcu.processBlock(block2) shouldBe 'right
+      bcu.processBlock(block3) shouldBe 'right
+
+      bcu.blockAt(1).get shouldBe genesisBlock
+      bcu.blockAt(2).get shouldBe block1
+      bcu.blockAt(3).get shouldBe block2
+      bcu.blockAt(4).get shouldBe block3
+
+    } finally {
+      bcu.shutdown()
+      db.close()
+    }
+  }
+
+  "addressTransactions" - {
 
     "return txs in correct ordering without fromId" in {
       baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
@@ -224,10 +300,5 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       }
     }
 
-    def createTransfer(master: PrivateKeyAccount, recipient: Address, ts: Long): TransferTransaction = {
-      TransferTransactionV1
-        .selfSigned(None, master, recipient, ENOUGH_AMT / 5, ts, None, 1000000, Array.emptyByteArray)
-        .explicitGet()
-    }
   }
 }

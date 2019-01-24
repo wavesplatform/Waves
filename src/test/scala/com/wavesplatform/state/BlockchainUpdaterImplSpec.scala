@@ -36,9 +36,11 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
   }
 
   def createTransfer(master: PrivateKeyAccount, recipient: Address, ts: Long): TransferTransaction = {
-    TransferTransactionV1
+    val tx = TransferTransactionV1
       .selfSigned(None, master, recipient, ENOUGH_AMT / 5, ts, None, 1000000, Array.emptyByteArray)
       .explicitGet()
+    println(s"TR_ID: ${tx.id()}")
+    tx
   }
 
   "addressTransactions" - {
@@ -100,11 +102,23 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 10, None)
           .explicitGet()
 
+        txs.foreach {
+          case (h, t) =>
+            println(s"H: $h - TS: ${t.timestamp} - ID: ${t.id()}")
+        }
+
+        println("****************")
+
         val ordering = Ordering
           .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
 
+        txs.sorted(ordering).foreach {
+          case (h, t) =>
+            println(s"H: $h - TS: ${t.timestamp} - ID: ${t.id()}")
+        }
+
         txs.length shouldBe 9
-        txs.sorted(ordering) shouldBe txs
+        txs.sorted(ordering) shouldEqual txs
       }
     }
 
