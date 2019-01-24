@@ -21,12 +21,14 @@ object Gen {
   }
 
   def transfers(senderGen: Iterator[PrivateKeyAccount], recipientGen: Iterator[Address], feeGen: Iterator[Long]): Iterator[Transaction] = {
+    val now = System.currentTimeMillis()
     senderGen
       .zip(recipientGen)
       .zip(feeGen)
+      .zipWithIndex
       .map {
-        case ((src, dst), fee) =>
-          TransferTransactionV1.selfSigned(None, src, dst, fee, System.currentTimeMillis(), None, fee, Array.emptyByteArray)
+        case (((src, dst), fee), i) =>
+          TransferTransactionV1.selfSigned(None, src, dst, fee, now + i, None, fee, Array.emptyByteArray)
       }
       .collect { case Right(x) => x }
   }
