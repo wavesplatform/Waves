@@ -114,12 +114,12 @@ object PureContext {
                                                         "Internal function to check value type",
                                                         ("obj", TYPEPARAM('T'), "value"),
                                                         ("of", STRING, "type name")) {
-    case CONST_BOOLEAN(_) :: CONST_STRING("Boolean") :: Nil => Right(TRUE)
-    case CONST_BYTESTR(_) :: CONST_STRING("ByteStr") :: Nil => Right(TRUE)
-    case CONST_STRING(_) :: CONST_STRING("String") :: Nil   => Right(TRUE)
-    case CONST_LONG(_) :: CONST_STRING("Int") :: Nil        => Right(TRUE)
-    case (p: CaseObj) :: CONST_STRING(s) :: Nil             => Right(CONST_BOOLEAN(p.caseType.name == s))
-    case _                                                  => Right(FALSE)
+    case CONST_BOOLEAN(_) :: CONST_STRING("Boolean") :: Nil    => Right(TRUE)
+    case CONST_BYTESTR(_) :: CONST_STRING("ByteVector") :: Nil => Right(TRUE)
+    case CONST_STRING(_) :: CONST_STRING("String") :: Nil      => Right(TRUE)
+    case CONST_LONG(_) :: CONST_STRING("Int") :: Nil           => Right(TRUE)
+    case (p: CaseObj) :: CONST_STRING(s) :: Nil                => Right(CONST_BOOLEAN(p.caseType.name == s))
+    case _                                                     => Right(FALSE)
   }
 
   lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes str", ("byteStr", BYTESTR, "vector")) {
