@@ -6,6 +6,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.utils.{Base58, Time}
 import io.swagger.annotations._
@@ -14,7 +15,7 @@ import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute {
+case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, blockchain: Blockchain) extends ApiRoute {
 
   import UtilsApiRoute._
 
