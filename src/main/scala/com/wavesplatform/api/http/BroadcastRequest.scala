@@ -1,6 +1,5 @@
 package com.wavesplatform.api.http
-
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.Validation
 

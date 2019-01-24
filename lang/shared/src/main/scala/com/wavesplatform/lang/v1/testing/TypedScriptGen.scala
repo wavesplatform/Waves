@@ -1,11 +1,11 @@
 package com.wavesplatform.lang.v1.testing
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import org.scalacheck._
-import scodec.bits.ByteVector
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import org.scalacheck._
 
 trait TypedScriptGen {
 
@@ -48,7 +48,7 @@ trait TypedScriptGen {
 
   def STRINGgen: Gen[EXPR] = Gen.identifier.map(CONST_STRING)
 
-  def BYTESTRgen: Gen[EXPR] = Gen.identifier.map(x => CONST_BYTEVECTOR(ByteVector(x.getBytes)))
+  def BYTESTRgen: Gen[EXPR] = Gen.identifier.map(x => CONST_BYTESTR(ByteStr(x.getBytes)))
 
   def REFgen(tpe: TYPE): Gen[EXPR] = Gen.identifier.map(REF)
 

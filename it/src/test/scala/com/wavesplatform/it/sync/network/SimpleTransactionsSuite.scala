@@ -10,7 +10,7 @@ import com.wavesplatform.it.api.AsyncNetworkApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
-import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.transfer._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}

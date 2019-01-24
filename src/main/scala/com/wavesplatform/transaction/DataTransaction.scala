@@ -1,12 +1,15 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto._
 import com.wavesplatform.state._
 import monix.eval.Coeval
 import play.api.libs.json._
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.crypto._
+
 import scala.util.{Failure, Success, Try}
 
 case class DataTransaction private (version: Byte, sender: PublicKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)

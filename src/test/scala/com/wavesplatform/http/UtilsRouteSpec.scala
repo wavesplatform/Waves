@@ -5,13 +5,14 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.utils.{Base58, Time}
+import com.wavesplatform.utils.Time
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
 import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 

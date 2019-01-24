@@ -1,9 +1,9 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

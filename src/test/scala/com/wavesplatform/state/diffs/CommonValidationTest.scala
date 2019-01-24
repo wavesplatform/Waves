@@ -1,22 +1,22 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.state.EitherExt2
-import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Assertion, Matchers, PropSpec}
-import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, ValidationError}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
+import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Assertion, Matchers, PropSpec}
 
 class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithState with NoShrink {
 

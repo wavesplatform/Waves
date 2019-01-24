@@ -1,10 +1,10 @@
 package com.wavesplatform.matcher.api
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, RW, ReadOnlyDB}
 import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.model.OrderInfo
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import org.iq80.leveldb.DB

@@ -3,17 +3,17 @@ package com.wavesplatform.transaction.transfer
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
+import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, toJson}
-import com.wavesplatform.utils.Base58
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
-import com.wavesplatform.crypto._
 
 import scala.annotation.meta.field
 import scala.util.{Either, Failure, Success, Try}

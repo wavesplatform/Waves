@@ -5,7 +5,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
 import scala.concurrent.duration._

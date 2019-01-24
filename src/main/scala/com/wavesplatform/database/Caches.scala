@@ -6,6 +6,7 @@ import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{AssetId, Transaction}
 import com.wavesplatform.transaction.smart.script.Script

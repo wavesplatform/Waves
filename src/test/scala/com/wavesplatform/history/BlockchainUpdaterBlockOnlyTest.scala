@@ -2,7 +2,7 @@ package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.EitherExt2
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.diffs._
 import org.scalacheck.Gen
 import org.scalatest._

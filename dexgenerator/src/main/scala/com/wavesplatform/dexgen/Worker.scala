@@ -5,6 +5,7 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Show
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.assets.SignedTransferV1Request
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.dexgen.Worker._
 import com.wavesplatform.dexgen.utils.{ApiRequests, GenOrderType}
@@ -12,7 +13,6 @@ import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, Orderbo
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.AssetPairBuilder
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.transfer.TransferTransactionV1

@@ -1,8 +1,9 @@
 package com.wavesplatform.api.http
 
 import akka.http.scaladsl.server.Directive1
-import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.TransactionParsers
 
 trait CommonApiFunctions { this: ApiRoute =>

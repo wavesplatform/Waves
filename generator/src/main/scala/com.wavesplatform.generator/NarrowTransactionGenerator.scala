@@ -3,18 +3,20 @@ package com.wavesplatform.generator
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
+import com.wavesplatform.account.{Alias, PrivateKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
 import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, EitherExt2, IntegerDataEntry, StringDataEntry}
-import org.slf4j.LoggerFactory
-import com.wavesplatform.account.{Alias, PrivateKeyAccount}
-import com.wavesplatform.utils.LoggerFacade
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.LoggerFacade
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.util.Random
