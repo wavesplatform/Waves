@@ -46,7 +46,7 @@ logBuffered := false
 
 inThisBuild(
   Seq(
-    scalaVersion := "2.12.7",
+    scalaVersion := "2.12.8",
     organization := "com.wavesplatform",
     crossPaths := false,
     scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
