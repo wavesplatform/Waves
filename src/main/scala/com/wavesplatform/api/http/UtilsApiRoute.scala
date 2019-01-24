@@ -263,7 +263,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   def transactionSerialize: Route = (pathPrefix("transactionSerialize") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
-        createTransaction((jsv \ "senderPublicKey").as[String], jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
+        parseOrCreateTransaction(jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
       }
     }
   }
