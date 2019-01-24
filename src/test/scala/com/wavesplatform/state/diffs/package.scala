@@ -6,6 +6,7 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings => TFS}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{Transaction, ValidationError}
 import org.scalatest.Matchers
 
@@ -29,14 +30,31 @@ package object diffs extends WithState with Matchers {
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block) =
       BlockDiffer.fromBlock(fs, blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited)
 
-    preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-      val (diff, fees, _) = differ(state, prevBlock, curBlock).explicitGet()
-      state.append(diff, fees, curBlock)
-      Some(curBlock)
+    // CompositeBlockchain test
+    {
+      val (preBlockChain, _) = preconditions.foldLeft((state, Option.empty[Block])) {
+        case ((state, prevBlock), curBlock) =>
+          val (diff, fees, _) = differ(state, prevBlock, curBlock).explicitGet()
+          val newState        = new CompositeBlockchain(state, Some(diff))
+          (newState, Some(curBlock))
+      }
+      val (diff, fees, _) = differ(preBlockChain, preconditions.lastOption, block).explicitGet()
+      val blockchain      = new CompositeBlockchain(preBlockChain, Some(diff))
+      assertion(diff, blockchain)
     }
-    val (diff, fees, _) = differ(state, preconditions.lastOption, block).explicitGet()
-    state.append(diff, fees, block)
-    assertion(diff, state)
+
+    // LevelDB test
+    {
+      preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
+        val (diff, fees, _) = differ(state, prevBlock, curBlock).explicitGet()
+        state.append(diff, fees, curBlock)
+        Some(curBlock)
+      }
+
+      val (diff, fees, _) = differ(state, preconditions.lastOption, block).explicitGet()
+      state.append(diff, fees, block)
+      assertion(diff, state)
+    }
   }
 
   def assertNgDiffState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
