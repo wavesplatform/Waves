@@ -1,7 +1,7 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import org.scalatest.{FlatSpec, Matchers}

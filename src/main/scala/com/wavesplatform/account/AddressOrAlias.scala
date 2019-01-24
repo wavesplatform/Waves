@@ -1,6 +1,5 @@
 package com.wavesplatform.account
-
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError
 

@@ -3,8 +3,8 @@ package com.wavesplatform.network
 import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.CacheBuilder
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSettings
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher}

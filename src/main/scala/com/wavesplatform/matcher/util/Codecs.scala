@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.util
 
 import java.nio.ByteBuffer
 
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 
 object Codecs {

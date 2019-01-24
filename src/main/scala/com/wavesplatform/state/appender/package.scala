@@ -12,6 +12,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
 import cats.implicits._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.utils.{ScorexLogging, Time}
 
 import scala.util.{Left, Right}

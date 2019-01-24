@@ -4,20 +4,26 @@ import java.util.concurrent._
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import cats.instances.either.catsStdInstancesForEither
+import cats.instances.option.catsStdInstancesForOption
+import cats.syntax.either._
+import cats.syntax.traverse._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{AssetId, AssetIdStringLength, TransactionFactory, ValidationError}
-import com.wavesplatform.utils.{Base58, Time, _}
+import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
@@ -26,10 +32,7 @@ import javax.ws.rs.Path
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json._
-import cats.syntax.either._
-import cats.syntax.traverse._
-import cats.instances.option.catsStdInstancesForOption
-import cats.instances.either.catsStdInstancesForEither
+
 import scala.concurrent.Future
 import scala.util.Success
 
@@ -322,7 +325,9 @@ object AssetsApiRoute {
       _ <- Either
         .cond(height > 0, (), GenericError(s"Height should be greater than zero"))
       _ <- Either
-        .cond(height < blockchain.height, (), GenericError(s"Using 'assetDistributionAtHeight' on current height can lead to inconsistent result"))
+        .cond(height != blockchain.height, (), GenericError(s"Using 'assetDistributionAtHeight' on current height can lead to inconsistent result"))
+      _ <- Either
+        .cond(height < blockchain.height, (), GenericError(s"Asset distribution available only at height not greater than ${blockchain.height - 1}"))
     } yield height
 
   }

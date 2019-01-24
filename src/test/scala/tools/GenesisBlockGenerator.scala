@@ -3,17 +3,19 @@ package tools
 import java.io.{File, FileNotFoundException}
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.crypto
-import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.state._
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import com.wavesplatform.account.{Address, AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.crypto
+import com.wavesplatform.crypto._
+import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.crypto._
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+
 import scala.concurrent.duration._
 
 object GenesisBlockGenerator extends App {

@@ -2,6 +2,8 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.assets.SignedTransferV1Request
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -11,7 +13,6 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, _}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.utils.Base58
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
 

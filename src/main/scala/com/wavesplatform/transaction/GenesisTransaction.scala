@@ -1,12 +1,13 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.state.{ByteStr, _}
+import com.wavesplatform.transaction.TransactionParsers._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import com.wavesplatform.account.Address
-import com.wavesplatform.transaction.TransactionParsers._
 
 import scala.util.{Failure, Success, Try}
 

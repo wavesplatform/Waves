@@ -5,10 +5,12 @@ import java.util.concurrent.ThreadLocalRandom
 import com.wavesplatform.BlockGen
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto._
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{Blockchain, Diff, EitherExt2}
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalatest.{FreeSpecLike, Matchers}
 import com.wavesplatform.crypto._

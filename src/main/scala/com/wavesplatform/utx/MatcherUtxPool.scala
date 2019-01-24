@@ -5,8 +5,9 @@ import cats.kernel.Monoid
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.BalanceChanged
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
-import com.wavesplatform.state.{ByteStr, Diff, Portfolio}
+import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.transaction.{AssetId, Authorized, Transaction, ValidationError}
 

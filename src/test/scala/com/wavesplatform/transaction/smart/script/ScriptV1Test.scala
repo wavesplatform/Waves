@@ -1,15 +1,15 @@
 package com.wavesplatform.transaction.smart.script
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.testing.TypedScriptGen
-import com.wavesplatform.state.diffs.produce
-import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.testing.TypedScriptGen
+import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 
 class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
@@ -20,12 +20,12 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
   }
 
   property("ScriptV1.apply should deny too complex scripts") {
-    val byteVector = CONST_BYTEVECTOR(ByteVector(1))
+    val byteStr = CONST_BYTESTR(ByteStr.fromBytes(1))
     val expr = (1 to 21)
       .map { _ =>
         FUNCTION_CALL(
           function = FunctionHeader.Native(SIGVERIFY),
-          args = List(byteVector, byteVector, byteVector)
+          args = List(byteStr, byteStr, byteStr)
         )
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))
@@ -51,12 +51,12 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
   }
 
   property("19 sigVerify should fit in maxSizeInBytes") {
-    val byteVector = CONST_BYTEVECTOR(ByteVector(1))
+    val byteStr = CONST_BYTESTR(ByteStr.fromBytes(1))
     val expr = (1 to 19)
       .map { _ =>
         FUNCTION_CALL(
           function = FunctionHeader.Native(SIGVERIFY),
-          args = List(byteVector, byteVector, byteVector)
+          args = List(byteStr, byteStr, byteStr)
         )
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))

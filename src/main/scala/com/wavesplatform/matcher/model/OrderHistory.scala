@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.model
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, RW}
 import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.api.DBUtils

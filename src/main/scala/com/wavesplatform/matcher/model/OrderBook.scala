@@ -1,7 +1,7 @@
 package com.wavesplatform.matcher.model
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.immutable.TreeMap

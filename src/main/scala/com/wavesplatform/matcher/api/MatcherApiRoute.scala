@@ -11,6 +11,8 @@ import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.matcher.AssetPairBuilder
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData}
@@ -19,11 +21,10 @@ import com.wavesplatform.matcher.market.OrderHistoryActor
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetAcc
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.{Base58, ScorexLogging, Time}
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import io.netty.util.concurrent.DefaultThreadFactory
 import io.swagger.annotations._
 import javax.ws.rs.Path

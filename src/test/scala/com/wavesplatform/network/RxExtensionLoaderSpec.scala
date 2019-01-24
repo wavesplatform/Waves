@@ -1,8 +1,11 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.RxExtensionLoader.ExtensionBlocks
 import com.wavesplatform.network.RxScoreObserver.{BestChannel, ChannelClosedAndSyncWith}
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.{BlockGen, RxScheduler, TransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
@@ -11,9 +14,6 @@ import monix.eval.{Coeval, Task}
 import monix.reactive.Observable
 import monix.reactive.subjects.{PublishSubject => PS}
 import org.scalatest.{FreeSpec, Matchers}
-import com.wavesplatform.block.Block
-import com.wavesplatform.transaction.ValidationError
-import com.wavesplatform.transaction.ValidationError.GenericError
 
 import scala.concurrent.duration._
 

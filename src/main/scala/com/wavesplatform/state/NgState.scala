@@ -8,6 +8,7 @@ import com.google.common.cache.CacheBuilder
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
 class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val approvedFeatures: Set[Short]) extends ScorexLogging {

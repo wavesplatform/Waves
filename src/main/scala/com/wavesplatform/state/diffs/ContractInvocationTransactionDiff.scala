@@ -2,10 +2,12 @@ package com.wavesplatform.state.diffs
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
 import com.wavesplatform.lang.{Global, Version}
 import com.wavesplatform.state._
@@ -15,7 +17,6 @@ import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.v1.ScriptV2
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, WavesEnvironment}
 import monix.eval.Coeval
-import scodec.bits.ByteVector
 
 object ContractInvocationTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: ContractInvocationTransaction): Either[ValidationError, Diff] = {
@@ -37,13 +38,12 @@ object ContractInvocationTransactionDiff {
                 ))
               .evaluationContext
 
-            val invoker                                          = ByteVector(tx.sender.toAddress.bytes.arr)
-            val maybePayment: Option[(Long, Option[ByteVector])] = tx.payment.map(p => (p.amount, p.assetId.map(a => ByteVector(a.arr))))
+            val invoker                                       = tx.sender.toAddress.bytes
+            val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.map(p => (p.amount, p.assetId))
             val res =
-              ContractEvaluator.apply(
-                ctx,
-                contract,
-                ContractEvaluator.Invokation(functionName, tx.fc, invoker, maybePayment, ByteVector(tx.contractAddress.bytes.arr)))
+              ContractEvaluator.apply(ctx,
+                                      contract,
+                                      ContractEvaluator.Invokation(functionName, tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
             res.left
               .map(a => GenericError(a.toString): ValidationError)
               .flatMap {
@@ -52,11 +52,11 @@ object ContractInvocationTransactionDiff {
                     case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
                     case DataItem.Str(k, b)  => StringDataEntry(k, b)
                     case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
-                    case DataItem.Bin(k, b)  => BinaryDataEntry(k, ByteStr(b.toArray))
+                    case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
                   }
                   val pmts: List[Map[Address, Map[Option[ByteStr], Long]]] = ps.map {
                     case (Recipient.Address(addrBytes), amt, maybeAsset) =>
-                      Map(Address.fromBytes(addrBytes.toArray).explicitGet() -> Map(maybeAsset.map(a => ByteStr(a.toArray)) -> amt))
+                      Map(Address.fromBytes(addrBytes.arr).explicitGet() -> Map(maybeAsset -> amt))
                   }
                   for {
                     _ <- Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, ""))

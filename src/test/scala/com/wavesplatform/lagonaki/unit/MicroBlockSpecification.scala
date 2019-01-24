@@ -1,15 +1,16 @@
 package com.wavesplatform.lagonaki.unit
 
+import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.transfer._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FunSuite, Matchers}
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.transfer._
 
 import scala.util.Random
 

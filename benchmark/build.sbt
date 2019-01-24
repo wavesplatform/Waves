@@ -15,3 +15,5 @@ Compile / run / javaOptions ++= Seq(
   "--add-modules=java.xml.bind",
   s"-Dlogback.configurationFile=${(Compile / resourceDirectory).value / "logback.xml"}"
 )
+
+libraryDependencies ++= Dependencies.scodec.value

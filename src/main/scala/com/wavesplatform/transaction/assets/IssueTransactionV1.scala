@@ -2,9 +2,9 @@ package com.wavesplatform.transaction.assets
 
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.Script
 import monix.eval.Coeval

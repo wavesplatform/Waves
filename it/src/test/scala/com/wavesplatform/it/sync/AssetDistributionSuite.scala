@@ -92,7 +92,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
     assert(receivers.forall(rc => distribution(rc) == 10), "Distribution correct")
   }
 
-  test("Correct entry count") {
+  test("Correct last page and entry count") {
     val receivers = for (i <- 0 until 50) yield PrivateKeyAccount(s"receiver#$i".getBytes)
 
     val issueTx = node.issue(issuer.address, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
@@ -114,6 +114,8 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val pages = distributionPages(issueTx, height, 10)
 
+    assert(pages.last.hasNext == false)
+    assert(pages.last.lastItem.nonEmpty)
     assert(pages.length == 6)
     assert(pages.map(_.items.size).sum == 51)
   }
@@ -125,6 +127,6 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
       else page :: acc
     }
 
-    _load(Nil, None)
+    _load(Nil, None).reverse
   }
 }

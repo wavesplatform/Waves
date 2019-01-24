@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.Config
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -8,7 +9,6 @@ import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV2}
 

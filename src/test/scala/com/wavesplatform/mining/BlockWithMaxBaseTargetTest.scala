@@ -6,6 +6,8 @@ import java.util.concurrent.{Semaphore, TimeUnit}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.features.BlockchainFeatures

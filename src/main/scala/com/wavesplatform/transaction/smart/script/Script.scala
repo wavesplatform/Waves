@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.state.ByteStr
-import monix.eval.Coeval
-import com.wavesplatform.utils.Base64
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.Version._
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
+import monix.eval.Coeval
 
 trait Script {
   type Expr

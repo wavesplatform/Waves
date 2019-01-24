@@ -3,13 +3,12 @@ package com.wavesplatform.api.http.leasing
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.leasing.LeaseCancelV1Request.leaseCancelRequestFormat
-import com.wavesplatform.api.http.leasing.LeaseV1Request.leaseCancelRequestFormat
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, EitherExt2}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet

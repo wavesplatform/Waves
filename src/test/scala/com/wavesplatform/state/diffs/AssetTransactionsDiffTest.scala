@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Version.V1

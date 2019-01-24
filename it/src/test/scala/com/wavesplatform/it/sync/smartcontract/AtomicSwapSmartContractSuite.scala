@@ -2,12 +2,13 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

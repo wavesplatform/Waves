@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import java.nio.charset.StandardCharsets
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state._
 import com.wavesplatform.utils.Paged
 import org.asynchttpclient.Response

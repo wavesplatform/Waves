@@ -5,12 +5,13 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{Actor, ActorRef, PoisonPill, Props, Terminated}
 import akka.persistence.{PersistentActor, RecoveryCompleted, _}
 import com.google.common.base.Charsets
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{DuringShutdown, OrderBookUnavailable}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.OrderExecuted
 import com.wavesplatform.matcher.model.OrderBook
-import com.wavesplatform.state.{AssetDescription, ByteStr}
+import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.{AssetId, ValidationError}
 import com.wavesplatform.utils.{ScorexLogging, Time}

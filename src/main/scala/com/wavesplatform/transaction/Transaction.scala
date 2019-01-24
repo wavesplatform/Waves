@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
 import monix.eval.Coeval
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}

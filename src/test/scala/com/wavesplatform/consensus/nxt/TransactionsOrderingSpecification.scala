@@ -1,10 +1,11 @@
 package com.wavesplatform.consensus.nxt
 
-import com.wavesplatform.state.{ByteStr, EitherExt2}
-import org.scalatest.{Assertions, Matchers, PropSpec}
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.common.utils.EitherExt2
+import org.scalatest.{Assertions, Matchers, PropSpec}
 
 import scala.util.Random
 

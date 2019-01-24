@@ -5,10 +5,10 @@ import java.io.File
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.utils.{JsonFileStorage, _}
 import play.api.libs.json._
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.MissingSenderPrivateKey
 import com.wavesplatform.utils.randomBytes

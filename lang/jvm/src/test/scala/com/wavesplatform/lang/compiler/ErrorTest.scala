@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.compiler
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common.{NoShrink, multiplierFunction, produce}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
@@ -8,7 +9,6 @@ import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
 
 class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -48,7 +48,7 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
     "FUNCTION_CALL with uncommon types for parameter T" -> "Can't match inferred types" -> FUNCTION_CALL(
       AnyPos,
       PART.VALID(AnyPos, functionWithTwoPrarmsOfTheSameType.name),
-      List(CONST_LONG(AnyPos, 1), CONST_BYTEVECTOR(AnyPos, PART.VALID(AnyPos, ByteVector.empty)))
+      List(CONST_LONG(AnyPos, 1), CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr.empty)))
     ),
     "User functions: wrong arg type" -> "Non-matching types" ->
       Expressions.BLOCK(

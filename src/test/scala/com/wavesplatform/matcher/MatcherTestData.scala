@@ -3,10 +3,10 @@ package com.wavesplatform.matcher
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.loadConfig
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.{Arbitrary, Gen}
