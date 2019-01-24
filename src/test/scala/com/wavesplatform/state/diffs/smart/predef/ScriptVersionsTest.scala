@@ -52,7 +52,9 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
       val Success(expr, _)      = Parser.parseScript(duplicateNames)
       val Right((typedExpr, _)) = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), expr)
       val settings = TestFunctionalitySettings.Enabled.copy(
-        preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.SmartAccountTrading.id -> 3))
+        preActivatedFeatures =
+          Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0, BlockchainFeatures.SmartAccountTrading.id -> 3)
+      )
       val setup = for {
         master <- accountGen
         ts     <- positiveLongGen

@@ -34,7 +34,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id       -> 0,
       BlockchainFeatures.SmartAssets.id         -> 0,
-      BlockchainFeatures.SmartAccountTrading.id -> 0
+      BlockchainFeatures.SmartAccountTrading.id -> 0,
+      BlockchainFeatures.Ride4DApps.id          -> 0
     )
   )
 
@@ -223,6 +224,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     BlockchainFeatures.SmartAccounts       -> 0,
     BlockchainFeatures.SmartAccountTrading -> 0,
     BlockchainFeatures.SmartAssets         -> 0,
+    BlockchainFeatures.Ride4DApps          -> 0,
     BlockchainFeatures.FeeSponsorship      -> 0,
     BlockchainFeatures.FairPoS             -> 0
   )
