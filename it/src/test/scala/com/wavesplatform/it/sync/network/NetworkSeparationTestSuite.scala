@@ -44,9 +44,6 @@ class NetworkSeparationTestSuite
   }
 
   "after fork node should apply correct subchain" in {
-    nodeA.accountBalances(nodeA.address)
-    nodeB.accountBalances(nodeB.address)
-
     val issuedAssetId = nodeA.issue(nodeA.address, "TestAsset", "description", issueAmount, 8, reissuable = true, issueFee).id
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
