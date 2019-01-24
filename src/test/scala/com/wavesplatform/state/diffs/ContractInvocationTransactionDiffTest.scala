@@ -32,7 +32,6 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     List(
       ContractFunction(
         CallableAnnotation(senderBinding),
-        None,
         Terms.FUNC(
           funcName,
           List(argName),
@@ -56,7 +55,6 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     List(
       ContractFunction(
         CallableAnnotation(senderBinding),
-        None,
         Terms.FUNC(
           funcName,
           List(argName),
