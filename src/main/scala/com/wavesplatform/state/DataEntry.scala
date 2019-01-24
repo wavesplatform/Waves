@@ -3,9 +3,10 @@ package com.wavesplatform.state
 import java.nio.charset.StandardCharsets.UTF_8
 
 import io.swagger.annotations.ApiModelProperty
-import scala.annotation.meta.field
 
+import scala.annotation.meta.field
 import com.google.common.primitives.{Longs, Shorts}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.DataEntry._
 import play.api.libs.json._
 import com.wavesplatform.serialization.Deser

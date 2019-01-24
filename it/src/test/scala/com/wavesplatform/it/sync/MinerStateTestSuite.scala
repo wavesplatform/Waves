@@ -55,7 +55,7 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
 
     all(miner.debugMinerInfo()) shouldNot matchPattern { case State(`newAddress`, _, ts) if ts > 0 => }
 
-    all(last.debugMinerInfo()) shouldNot matchPattern { case State(`newAddress`, _, ts) if ts > 0  => }
+    all(last.debugMinerInfo()) shouldNot matchPattern { case State(`newAddress`, _, ts) if ts > 0 => }
 
   }
 }

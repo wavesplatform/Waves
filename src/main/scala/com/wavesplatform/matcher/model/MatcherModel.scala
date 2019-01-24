@@ -1,8 +1,9 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.state.{ByteStr, Portfolio}
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.{AssetAcc, AssetId}
 import play.api.libs.json.{JsObject, JsValue, Json}

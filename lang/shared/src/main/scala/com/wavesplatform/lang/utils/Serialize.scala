@@ -6,7 +6,6 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.Serde.{FH_NATIVE, FH_USER}
-import scodec.bits.ByteVector
 
 object Serialize {
   implicit class ByteBufferOps(val self: ByteBuffer) extends AnyVal {
@@ -19,8 +18,6 @@ object Serialize {
       self.get(bytes)
       bytes
     }
-
-    def getByteVector: ByteVector = ByteVector(getBytes)
 
     def getString: String = new String(getBytes, StandardCharsets.UTF_8)
 

@@ -6,12 +6,13 @@ import akka.actor.{Actor, ActorRef, Kill, Props, Terminated}
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.OrderAccepted
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData}
 import com.wavesplatform.matcher.market.MatcherActorSpecification.FailAtStartActor
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator
-import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
+import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.{EmptyBlockchain, randomBytes}

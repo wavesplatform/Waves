@@ -3,16 +3,16 @@ package com.wavesplatform.transaction
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{AddressScheme, DefaultAddressScheme, PrivateKeyAccount}
 import com.wavesplatform.api.http.{ContractInvocationRequest, SignedContractInvocationRequest}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
-import com.wavesplatform.utils.Base64
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, Json}
-import scodec.bits.ByteVector
 
 class ContractInvocationTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -66,7 +66,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
         1,
         PrivateKeyAccount("test3".getBytes()),
         PrivateKeyAccount("test4".getBytes()),
-        Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTEVECTOR(ByteVector(Base64.decode("YWxpY2U=").get)))),
+        Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr(Base64.decode("YWxpY2U=").get)))),
         Some(ContractInvocationTransaction.Payment(7, Some(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
         100000,
         1526910778245L,
@@ -75,9 +75,6 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
       .get
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
-
-    println("Bytes to sign")
-    println(tx.bodyBytes().map(_.toInt).toList)
 
     TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
     AddressScheme.current = DefaultAddressScheme

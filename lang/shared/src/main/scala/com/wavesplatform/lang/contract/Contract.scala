@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.contract
+
 import com.wavesplatform.lang.contract.Contract.{ContractFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
@@ -49,7 +50,7 @@ object Contract {
     lazy val dic = Map(invocationArgName -> com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.invocationType.typeRef)
   }
   case class PayableAnnotation(amountArgName: String, tokenArgName: String) extends Annotation {
-    lazy val dic = Map(amountArgName -> LONG, tokenArgName -> BYTEVECTOR)
+    lazy val dic = Map(amountArgName -> LONG, tokenArgName -> BYTESTR)
   }
   case class VerifierAnnotation(txArgName: String) extends Annotation { lazy val dic = Map(txArgName -> WavesContext.verifierInput.typeRef) }
 

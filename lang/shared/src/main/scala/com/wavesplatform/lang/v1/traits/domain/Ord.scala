@@ -1,11 +1,11 @@
 package com.wavesplatform.lang.v1.traits.domain
 
-import scodec.bits.ByteVector
+import com.wavesplatform.common.state.ByteStr
 
-case class Ord(id: ByteVector,
+case class Ord(id: ByteStr,
                sender: Recipient.Address,
-               senderPublicKey: ByteVector,
-               matcherPublicKey: ByteVector,
+               senderPublicKey: ByteStr,
+               matcherPublicKey: ByteStr,
                assetPair: APair,
                orderType: OrdType,
                price: Long,
@@ -13,5 +13,5 @@ case class Ord(id: ByteVector,
                timestamp: Long,
                expiration: Long,
                matcherFee: Long,
-               bodyBytes: ByteVector,
-               proofs: IndexedSeq[ByteVector])
+               bodyBytes: ByteStr,
+               proofs: IndexedSeq[ByteStr])

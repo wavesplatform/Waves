@@ -1,10 +1,11 @@
 package com.wavesplatform.transaction
 
-import org.scalacheck.Gen
-import com.wavesplatform.state.{ByteStr, EitherExt2}
-import play.api.libs.json._
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV2}
+import org.scalacheck.Gen
+import play.api.libs.json._
 
 class ReissueTransactionV2Specification extends GenericTransactionSpecification[ReissueTransactionV2] {
 

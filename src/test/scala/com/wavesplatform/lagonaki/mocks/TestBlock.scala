@@ -1,11 +1,13 @@
 package com.wavesplatform.lagonaki.mocks
 
-import com.wavesplatform.state._
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.block._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.Transaction
+
 import scala.util.{Random, Try}
 
 object TestBlock {

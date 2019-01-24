@@ -1,10 +1,10 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, RW}
 import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.matcher.{MatcherKeys, MatcherSettings}
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB

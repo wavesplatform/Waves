@@ -1,10 +1,11 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.state._
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalacheck.Gen
 import play.api.libs.json._
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 class SetScriptTransactionSpecification extends GenericTransactionSpecification[SetScriptTransaction] {
 

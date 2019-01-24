@@ -3,8 +3,8 @@ package com.wavesplatform.transaction
 import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.evaluator.Log
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.Order
 
 import scala.util.Either

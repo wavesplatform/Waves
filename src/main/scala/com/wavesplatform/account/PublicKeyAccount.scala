@@ -1,7 +1,7 @@
 package com.wavesplatform.account
 
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.utils.base58Length
-import com.wavesplatform.utils.Base58
 import com.wavesplatform.transaction.ValidationError.InvalidAddress
 import com.wavesplatform.crypto._
 

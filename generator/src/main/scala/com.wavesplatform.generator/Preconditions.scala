@@ -2,7 +2,8 @@ package com.wavesplatform.generator
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
-import com.wavesplatform.state._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.lease.LeaseTransactionV1

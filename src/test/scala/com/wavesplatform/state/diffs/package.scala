@@ -2,6 +2,8 @@ package com.wavesplatform.state
 
 import cats.Monoid
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.diffs.ProduceError
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint

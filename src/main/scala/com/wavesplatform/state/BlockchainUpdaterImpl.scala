@@ -4,6 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
@@ -440,13 +441,14 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     }
   }
 
-  override def hasScript(address: Address): Boolean = {
-    ngState.fold(blockchain.hasScript(address)) { ng =>
-      ng.bestLiquidDiff.scripts.exists {
-        case (addr, maybeScript) => addr == address && maybeScript.nonEmpty
-      } || blockchain.hasScript(address)
-    }
-  }
+  override def hasScript(address: Address): Boolean =
+    ngState
+      .flatMap(
+        _.bestLiquidDiff.scripts
+          .get(address)
+          .map(_.nonEmpty)
+      )
+      .getOrElse(blockchain.hasScript(address))
 
   override def assetScript(asset: AssetId): Option[Script] = ngState.fold(blockchain.assetScript(asset)) { ng =>
     ng.bestLiquidDiff.assetScripts.get(asset) match {

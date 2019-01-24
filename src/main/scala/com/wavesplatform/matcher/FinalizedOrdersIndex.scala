@@ -1,8 +1,8 @@
 package com.wavesplatform.matcher
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{Key, RW, ReadOnlyDB}
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.Order.Id
 

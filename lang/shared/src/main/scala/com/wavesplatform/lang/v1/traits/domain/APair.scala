@@ -1,5 +1,5 @@
 package com.wavesplatform.lang.v1.traits.domain
 
-import scodec.bits.ByteVector
+import com.wavesplatform.common.state.ByteStr
 
-case class APair(amountAsset: Option[ByteVector], priceAsset: Option[ByteVector])
+case class APair(amountAsset: Option[ByteStr], priceAsset: Option[ByteStr])

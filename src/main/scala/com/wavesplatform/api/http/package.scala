@@ -34,7 +34,7 @@ package object http extends ApiMarshallers {
       stringToByteReads
   }
 
-  def createTransaction(senderPk: String, jsv: JsObject)(f: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
+  def createTransaction(senderPk: String, jsv: JsObject)(txToResponse: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
     val typeId = (jsv \ "type").as[Byte]
 
     (jsv \ "version").validateOpt[Byte](versionReads) match {
@@ -75,7 +75,16 @@ package object http extends ApiMarshallers {
                 }
             }
           }
-          .fold(ApiError.fromValidationError, tx => f(tx))
+          .fold(ApiError.fromValidationError, txToResponse)
+    }
+  }
+
+  def parseOrCreateTransaction(jsv: JsObject)(txToResponse: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
+    val result = TransactionFactory.fromSignedRequest(jsv)
+    if (result.isRight) {
+      result.fold(ApiError.fromValidationError, txToResponse)
+    } else {
+      createTransaction((jsv \ "senderPk").as[String], jsv)(txToResponse)
     }
   }
 }
