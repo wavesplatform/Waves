@@ -4,7 +4,6 @@ import akka.actor.Props
 import akka.pattern.ask
 import akka.util.Timeout
 import com.google.common.base.Charsets.UTF_8
-import com.wavesplatform.WithDB
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.market.MatcherSpecLike
@@ -14,6 +13,7 @@ import com.wavesplatform.state.{ByteStr, Portfolio}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.{NTPTime, WithDB}
 import org.scalatest.PropSpecLike
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -65,7 +65,13 @@ import scala.concurrent.{Await, Future}
   * Buy         | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
   * Sell        | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
   */
-class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike with WithDB with MatcherTestData with TableDrivenPropertyChecks {
+class ReservedBalanceSpecification
+    extends PropSpecLike
+    with MatcherSpecLike
+    with WithDB
+    with MatcherTestData
+    with TableDrivenPropertyChecks
+    with NTPTime {
 
   override protected def actorSystemName: String = "ReservedBalanceSpecification" // getClass.getSimpleName
 
@@ -79,7 +85,7 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
   val pair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
   val p    = new AssetPairDecimals(8, 2)
 
-  var oh = new OrderHistoryStub(system)
+  var oh = new OrderHistoryStub(system, ntpTime)
   private val addressDir = system.actorOf(
     Props(
       new AddressDirectory(
@@ -87,6 +93,7 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
         _ => Portfolio.empty,
         _ => Future.failed(new IllegalStateException("Should not be used in the test")),
         matcherSettings,
+        ntpTime,
         new TestOrderDB(100)
       )
     ))
@@ -111,7 +118,7 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    oh = new OrderHistoryStub(system)
+    oh = new OrderHistoryStub(system, ntpTime)
   }
 
   forAll(

@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.model.Events
 import com.wavesplatform.state.{EitherExt2, Portfolio}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
@@ -16,6 +16,7 @@ class AddressDirectory(portfolioChanged: Observable[Address],
                        portfolio: Address => Portfolio,
                        storeEvent: StoreEvent,
                        settings: MatcherSettings,
+                       time: Time,
                        orderDB: OrderDB)
     extends Actor
     with ScorexLogging {
@@ -36,7 +37,7 @@ class AddressDirectory(portfolioChanged: Observable[Address],
     log.debug(s"Creating address actor for $address")
     watch(
       actorOf(
-        Props(new AddressActor(address, portfolio(address), settings.maxTimestampDiff, 5.seconds, orderDB, storeEvent)),
+        Props(new AddressActor(address, portfolio(address), settings.maxTimestampDiff, 5.seconds, time, orderDB, storeEvent)),
         address.toString
       ))
   }

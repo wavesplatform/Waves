@@ -32,8 +32,8 @@ import monix.reactive.Observable
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
-import scala.util.control.NonFatal
 import scala.util.Failure
+import scala.util.control.NonFatal
 
 class Matcher(actorSystem: ActorSystem,
               time: Time,
@@ -188,8 +188,9 @@ class Matcher(actorSystem: ActorSystem,
   )
 
   private lazy val addressActors =
-    actorSystem.actorOf(Props(new AddressDirectory(portfoliosChanged, utx.portfolio, storeEvent, matcherSettings, OrderDB(matcherSettings, db))),
-                        "addresses")
+    actorSystem.actorOf(
+      Props(new AddressDirectory(portfoliosChanged, utx.portfolio, storeEvent, matcherSettings, time, OrderDB(matcherSettings, db))),
+      "addresses")
 
   private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
   private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)

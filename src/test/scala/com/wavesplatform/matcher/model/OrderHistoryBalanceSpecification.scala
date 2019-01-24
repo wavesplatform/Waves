@@ -5,6 +5,7 @@ import akka.pattern.ask
 import akka.testkit.TestKit
 import akka.util.Timeout
 import com.google.common.base.Charsets
+import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
@@ -18,7 +19,13 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
-class OrderHistoryBalanceSpecification extends TestKit(ActorSystem()) with PropSpecLike with Matchers with MatcherTestData with BeforeAndAfterEach {
+class OrderHistoryBalanceSpecification
+    extends TestKit(ActorSystem())
+    with PropSpecLike
+    with Matchers
+    with MatcherTestData
+    with BeforeAndAfterEach
+    with NTPTime {
 
   import OrderHistoryBalanceSpecification._
 
@@ -30,10 +37,10 @@ class OrderHistoryBalanceSpecification extends TestKit(ActorSystem()) with PropS
   private val WctBtc   = AssetPair(mkAssetId("WCT"), mkAssetId("BTC"))
   private val WavesBtc = AssetPair(None, mkAssetId("BTC"))
 
-  private var oh = new OrderHistoryStub(system)
+  private var oh = new OrderHistoryStub(system, ntpTime)
   override def beforeEach(): Unit = {
     super.beforeEach()
-    oh = new OrderHistoryStub(system)
+    oh = new OrderHistoryStub(system, ntpTime)
   }
 
   def openVolume(address: Address, asset: Option[AssetId]): Long = oh.ref(address).openVolume(asset)

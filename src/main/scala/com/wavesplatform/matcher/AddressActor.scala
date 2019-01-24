@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher
 
-import akka.actor.Actor
+import akka.actor.{Actor, Cancellable}
 import akka.pattern.pipe
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.Matcher.StoreEvent
@@ -13,19 +13,22 @@ import com.wavesplatform.matcher.queue.QueueEvent
 import com.wavesplatform.state.{ByteStr, Portfolio}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import org.slf4j.LoggerFactory
+import java.time.{Instant, Duration => JDuration}
 
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 class AddressActor(
     owner: Address,
     portfolio: => Portfolio,
     maxTimestampDrift: FiniteDuration,
     cancelTimeout: FiniteDuration,
+    time: Time,
     orderDB: OrderDB,
     storeEvent: StoreEvent,
 ) extends Actor
@@ -38,6 +41,7 @@ class AddressActor(
 
   private val activeOrders   = mutable.AnyRefMap.empty[Order.Id, LimitOrder]
   private val openVolume     = mutable.AnyRefMap.empty[Option[AssetId], Long].withDefaultValue(0L)
+  private val expiration    = mutable.AnyRefMap.empty[ByteStr, Cancellable]
   private var latestOrderTs  = 0L
   private var markedToCancel = Set.empty[Order.Id]
 
@@ -56,11 +60,6 @@ class AddressActor(
       log.trace(s"${limitOrder.order.id()}: $id -> -$b ($prevBalance -> $newBalance)")
       openVolume += id -> newBalance
     }
-
-  private def updateOpenVolume(limitOrder: LimitOrder): Unit = {
-    release(limitOrder.order.id())
-    reserve(limitOrder)
-  }
 
   private def updateTimestamp(newTimestamp: Long): Unit = if (newTimestamp > latestOrderTs) {
     latestOrderTs = newTimestamp
@@ -125,6 +124,19 @@ class AddressActor(
       } else {
         sender() ! OrderCancelRejected("Invalid timestamp")
       }
+    case CancelExpiredOrder(id) =>
+      expiration.remove(id)
+      for (lo <- activeOrders.get(id)) {
+        if ((lo.order.expiration - time.correctedTime()).max(0L).millis <= ExpirationThreshold) {
+          log.trace(s"Order $id expired, storing cancel event")
+          storeEvent(QueueEvent.Canceled(lo.order.assetPair, id)).andThen {
+            case Success(_) => log.trace(s"Successfully stored cancel event for expired order $id")
+            case Failure(e) => log.warn(s"Error cancelling expired order $id", e)
+          }
+        } else {
+          scheduleExpiration(lo.order)
+        }
+      }
   }
 
   private def handleStatusRequests: Receive = {
@@ -152,8 +164,8 @@ class AddressActor(
     case OrderAdded(submitted) if submitted.order.sender.toAddress == owner =>
       log.trace(s"OrderAdded(${submitted.order.id()})")
       updateTimestamp(submitted.order.timestamp)
-      updateOpenVolume(submitted)
-      activeOrders += submitted.order.id() -> submitted
+      release(submitted.order.id())
+      handleOrderAdded(submitted)
     case e @ OrderExecuted(submitted, counter) =>
       log.trace(s"OrderExecuted(${submitted.order.id()}, ${counter.order.id()}), amount = ${e.executedAmount}")
       handleOrderExecuted(e.submittedRemaining)
@@ -162,17 +174,29 @@ class AddressActor(
     case OrderCanceled(lo, unmatchable) if activeOrders.contains(lo.order.id()) =>
       log.trace(s"OrderCanceled(${lo.order.id()}, system=$unmatchable)")
       release(lo.order.id())
-      val l = lo.order.amount - lo.amount
-      handleOrderTerminated(lo, if (unmatchable) LimitOrder.Filled(l) else LimitOrder.Cancelled(l))
+      val filledAmount = lo.order.amount - lo.amount
+      handleOrderTerminated(lo, if (unmatchable) LimitOrder.Filled(filledAmount) else LimitOrder.Cancelled(filledAmount))
       markedToCancel -= lo.order.id()
+  }
+
+  private def scheduleExpiration(order: Order): Unit = {
+    val timeToExpiration = (order.expiration - time.correctedTime()).max(0L)
+    log.trace(s"Order ${order.id()} will expire in ${JDuration.ofMillis(timeToExpiration)}, at ${Instant.ofEpochMilli(order.expiration)}")
+    expiration +=
+      order.id() -> context.system.scheduler.scheduleOnce(timeToExpiration.millis, self, CancelExpiredOrder(order.id()))
+  }
+
+  private def handleOrderAdded(lo: LimitOrder): Unit = {
+    reserve(lo)
+    activeOrders += lo.order.id() -> lo
+    scheduleExpiration(lo.order)
   }
 
   private def handleOrderExecuted(remaining: LimitOrder): Unit = if (remaining.order.sender.toAddress == owner) {
     updateTimestamp(remaining.order.timestamp)
     release(remaining.order.id())
     if (remaining.isValid) {
-      reserve(remaining)
-      activeOrders += remaining.order.id() -> remaining
+      handleOrderAdded(remaining)
     } else {
       val actualFilledAmount = remaining.order.amount - remaining.amount
       handleOrderTerminated(remaining, LimitOrder.Filled(actualFilledAmount))
@@ -181,6 +205,7 @@ class AddressActor(
 
   private def handleOrderTerminated(lo: LimitOrder, status: OrderStatus): Unit = {
     log.trace(s"Order ${lo.order.id()} terminated: $status")
+    expiration.remove(lo.order.id()).foreach(_.cancel())
     activeOrders.remove(lo.order.id())
     orderDB.saveOrderInfo(
       lo.order.id(),
@@ -234,6 +259,8 @@ class AddressActor(
 }
 
 object AddressActor {
+  private val ExpirationThreshold = 50.millis
+
   private def activeStatus(lo: LimitOrder): OrderStatus =
     if (lo.amount == lo.order.amount) LimitOrder.Accepted else LimitOrder.PartiallyFilled(lo.order.amount - lo.amount)
 
@@ -248,5 +275,5 @@ object AddressActor {
   case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long)    extends Command
   case object BalanceUpdated                                              extends Command
 
-  private case class CancelTimedOut(orderId: ByteStr)
+  private case class CancelExpiredOrder(orderId: ByteStr)
 }
