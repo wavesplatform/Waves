@@ -12,7 +12,7 @@ import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.Script
@@ -261,7 +261,7 @@ object TransactionFactory {
         reissuable = request.reissuable,
         script = s,
         fee = request.fee,
-        timestamp = 0,
+        timestamp = request.timestamp.getOrElse(0),
         proofs = Proofs.empty
       )
     } yield tx
@@ -294,7 +294,7 @@ object TransactionFactory {
     request.decimals,
     request.reissuable,
     request.fee,
-    0,
+    request.timestamp.getOrElse(0),
     EmptySignature
   )
 
@@ -323,7 +323,7 @@ object TransactionFactory {
         sender,
         request.amount,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         recipientAcc,
         EmptySignature
       )
@@ -356,7 +356,7 @@ object TransactionFactory {
         sender,
         request.amount,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         recipientAcc,
         Proofs.empty
       )
@@ -386,7 +386,7 @@ object TransactionFactory {
       sender,
       ByteStr.decodeBase58(request.txId).get,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       EmptySignature
     )
 
@@ -418,7 +418,7 @@ object TransactionFactory {
       sender,
       ByteStr.decodeBase58(request.txId).get,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       Proofs.empty
     )
 
@@ -446,7 +446,7 @@ object TransactionFactory {
         sender,
         alias,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         EmptySignature
       )
     } yield tx
@@ -477,7 +477,7 @@ object TransactionFactory {
         sender,
         alias,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         Proofs.empty
       )
     } yield tx
@@ -507,7 +507,7 @@ object TransactionFactory {
       request.quantity,
       request.reissuable,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       EmptySignature
     )
 
@@ -540,7 +540,7 @@ object TransactionFactory {
       request.quantity,
       request.reissuable,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       Proofs.empty
     )
 
@@ -566,7 +566,7 @@ object TransactionFactory {
     ByteStr.decodeBase58(request.assetId).get,
     request.quantity,
     request.fee,
-    0,
+    request.timestamp.getOrElse(0),
     EmptySignature
   )
 
@@ -596,7 +596,7 @@ object TransactionFactory {
     ByteStr.decodeBase58(request.assetId).get,
     request.quantity,
     request.fee,
-    0,
+    request.timestamp.getOrElse(0),
     Proofs.empty
   )
 
@@ -623,7 +623,7 @@ object TransactionFactory {
       sender,
       request.data,
       request.fee,
-      0,
+      request.timestamp.getOrElse(0),
       Proofs.empty
     )
 
@@ -662,7 +662,7 @@ object TransactionFactory {
         fc,
         ???,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         Proofs.empty
       )
 
@@ -696,10 +696,57 @@ object TransactionFactory {
         assetId,
         request.minSponsoredAssetFee,
         request.fee,
-        0,
+        request.timestamp.getOrElse(0),
         Proofs.empty
       )
     } yield tx
+
+  def exchangeV1(request: SignedExchangeRequest, sender: PublicKeyAccount): Either[ValidationError, ExchangeTransactionV1] = {
+    def orderV1(ord: Order) = {
+      import ord._
+      OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
+    }
+
+    for {
+      signature <- ByteStr.decodeBase58(request.signature).toEither.left.map(_ => GenericError(s"Wrong Base58 string: ${request.signature}"))
+      tx <- ExchangeTransactionV1.create(
+        orderV1(request.order1),
+        orderV1(request.order2),
+        request.amount,
+        request.price,
+        request.buyMatcherFee,
+        request.sellMatcherFee,
+        request.fee,
+        request.timestamp,
+        signature
+      )
+    } yield tx
+  }
+
+  def exchangeV2(request: SignedExchangeRequestV2, sender: PublicKeyAccount): Either[ValidationError, ExchangeTransactionV2] = {
+    def orderV2(ord: Order) = {
+      import ord._
+      OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
+    }
+
+    val decodedProofs = request.proofs.map(ByteStr.decodeBase58(_))
+    for {
+      proofs <- Either.cond(decodedProofs.forall(_.isSuccess),
+                            Proofs(decodedProofs.map(_.get)),
+                            GenericError(s"Invalid proof: ${decodedProofs.find(_.isFailure).get}"))
+      tx <- ExchangeTransactionV2.create(
+        orderV2(request.order1),
+        orderV2(request.order2),
+        request.amount,
+        request.price,
+        request.buyMatcherFee,
+        request.sellMatcherFee,
+        request.fee,
+        request.timestamp,
+        proofs
+      )
+    } yield tx
+  }
 
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
     import ContractInvocationRequest._
