@@ -9,7 +9,6 @@ import com.wavesplatform.transaction.smart.ContractInvocationTransaction
 import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
-import scodec.bits.ByteVector
 
 import scala.annotation.meta.field
 
@@ -28,7 +27,7 @@ object ContractInvocationRequest {
         case BooleanDataEntry(_, b) => CONST_BOOLEAN(b)
         case StringDataEntry(_, b)  => CONST_STRING(b)
         case IntegerDataEntry(_, b) => CONST_LONG(b)
-        case BinaryDataEntry(_, b)  => CONST_BYTEVECTOR(ByteVector(b.arr))
+        case BinaryDataEntry(_, b)  => CONST_BYTESTR(b)
       }
     )
 }

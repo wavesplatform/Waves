@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.v1.traits.domain
 
-import scodec.bits.ByteVector
+import com.wavesplatform.common.state.ByteStr
 
 trait Recipient
 object Recipient {
-  case class Address(bytes: ByteVector) extends Recipient
-  case class Alias(name: String)        extends Recipient
+  case class Address(bytes: ByteStr) extends Recipient
+  case class Alias(name: String)     extends Recipient
 }

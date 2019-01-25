@@ -18,7 +18,7 @@ class TypeInferrerTest extends FreeSpec with Matchers {
                    Map("User" -> CaseType("User", List.empty))) shouldBe Right(Map.empty)
     }
     "fails if no simple common type" in {
-      TypeInferrer(Seq((LONG, BYTEVECTOR))) should produce("Non-matching types")
+      TypeInferrer(Seq((LONG, BYTESTR))) should produce("Non-matching types")
     }
 
     "fails if no obj common type" in {
@@ -36,8 +36,8 @@ class TypeInferrerTest extends FreeSpec with Matchers {
       TypeInferrer(
         Seq(
           (LONG, typeparamT),
-          (BYTEVECTOR, typeparamG)
-        )) shouldBe Right(Map(typeparamT -> LONG, typeparamG -> BYTEVECTOR))
+          (BYTESTR, typeparamG)
+        )) shouldBe Right(Map(typeparamT -> LONG, typeparamG -> BYTESTR))
     }
 
     "one simple same type" in {
@@ -67,9 +67,9 @@ class TypeInferrerTest extends FreeSpec with Matchers {
       }
 
       "fails if no common type" in {
-        TypeInferrer(Seq((BYTEVECTOR, typeparamT), (BYTEVECTOR, PARAMETERIZEDLIST(typeparamT)))) should produce("Non-matching types")
+        TypeInferrer(Seq((BYTESTR, typeparamT), (BYTESTR, PARAMETERIZEDLIST(typeparamT)))) should produce("Non-matching types")
         TypeInferrer(Seq((LONG, typeparamT), (LIST(LIST(NOTHING)), PARAMETERIZEDLIST(typeparamT)))) should produce("Can't match inferred types")
-        TypeInferrer(Seq((BYTEVECTOR, typeparamT), (LIST(LONG), PARAMETERIZEDLIST(typeparamT)))) should produce("Can't match inferred types")
+        TypeInferrer(Seq((BYTESTR, typeparamT), (LIST(LONG), PARAMETERIZEDLIST(typeparamT)))) should produce("Can't match inferred types")
       }
     }
 

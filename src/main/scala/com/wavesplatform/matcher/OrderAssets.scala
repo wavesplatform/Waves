@@ -2,7 +2,7 @@ package com.wavesplatform.matcher
 
 import java.nio.ByteBuffer
 
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 
 case class OrderAssets(orderId: ByteStr, spendAsset: Option[AssetId])

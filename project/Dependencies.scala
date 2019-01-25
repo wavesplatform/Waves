@@ -41,6 +41,7 @@ object Dependencies {
     "com.google.guava"  % "guava"      % "21.0",
     "com.typesafe.play" %% "play-json" % "2.6.10"
   )
+
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
   lazy val db = Seq(

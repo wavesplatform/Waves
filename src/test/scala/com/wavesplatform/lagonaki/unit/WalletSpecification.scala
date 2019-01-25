@@ -4,10 +4,10 @@ import java.io.File
 import java.nio.file.Files
 
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.wallet.Wallet
 import org.scalatest.{FunSuite, Matchers}
 import cats.syntax.option._
+import com.wavesplatform.common.state.ByteStr
 
 class WalletSpecification extends FunSuite with Matchers {
 

@@ -1,11 +1,11 @@
 package com.wavesplatform.lang.v1.testing
 
-import com.wavesplatform.lang.v1.parser.Parser.keywords
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
+import com.wavesplatform.lang.v1.parser.Parser.keywords
 import org.scalacheck._
-import scodec.bits.ByteVector
 import scorex.crypto.encode.Base58
 
 import scala.reflect.ClassTag
@@ -128,18 +128,18 @@ trait ScriptGen {
     } yield pred + expr + post
 
   private def toString[T](part: PART[T])(implicit ct: ClassTag[T]): String = part match {
-    case PART.VALID(_, x: String)      => x
-    case PART.VALID(_, xs: ByteVector) => Base58.encode(xs.toArray)
-    case _                                => throw new RuntimeException(s"Can't stringify $part")
+    case PART.VALID(_, x: String)   => x
+    case PART.VALID(_, xs: ByteStr) => Base58.encode(xs.arr)
+    case _                          => throw new RuntimeException(s"Can't stringify $part")
   }
 
   def toString(expr: EXPR): Gen[String] = expr match {
-    case CONST_LONG(_, x)       => withWhitespaces(s"$x")
-    case REF(_, x)              => withWhitespaces(toString(x))
-    case CONST_STRING(_, x)     => withWhitespaces(s"""\"${toString(x)}\"""")
-    case CONST_BYTEVECTOR(_, x) => withWhitespaces(s"""base58'${toString(x)}'""")
-    case _: TRUE                   => withWhitespaces("true")
-    case _: FALSE                  => withWhitespaces("false")
+    case CONST_LONG(_, x)    => withWhitespaces(s"$x")
+    case REF(_, x)           => withWhitespaces(toString(x))
+    case CONST_STRING(_, x)  => withWhitespaces(s"""\"${toString(x)}\"""")
+    case CONST_BYTESTR(_, x) => withWhitespaces(s"""base58'${toString(x)}'""")
+    case _: TRUE             => withWhitespaces("true")
+    case _: FALSE            => withWhitespaces("false")
     case BINARY_OP(_, x, op: BinaryOperation, y) =>
       for {
         arg1 <- toString(x)
@@ -151,7 +151,7 @@ trait ScriptGen {
         t <- toString(x)
         f <- toString(y)
       } yield s"(if ($c) then $t else $f)"
-    case BLOCK(_, let:LET, body) =>
+    case BLOCK(_, let: LET, body) =>
       for {
         v         <- toString(let.value)
         b         <- toString(body)

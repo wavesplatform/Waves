@@ -10,6 +10,7 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
 
 object EmptyBlockchain extends Blockchain {
   override def height: Int = 0

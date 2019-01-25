@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser

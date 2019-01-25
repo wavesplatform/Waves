@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.utils.Base58
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}

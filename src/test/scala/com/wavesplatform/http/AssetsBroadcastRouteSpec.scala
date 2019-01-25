@@ -15,7 +15,7 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Proofs, Transaction, ValidationError}

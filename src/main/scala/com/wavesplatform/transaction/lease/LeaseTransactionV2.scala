@@ -2,9 +2,9 @@ package com.wavesplatform.transaction.lease
 
 import com.google.common.primitives.Bytes
 import com.wavesplatform.crypto
-import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.UnsupportedVersion
 import com.wavesplatform.transaction._

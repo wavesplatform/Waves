@@ -3,12 +3,13 @@ package com.wavesplatform.database
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.state.BlockchainUpdaterImpl
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdaterImpl, EitherExt2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}

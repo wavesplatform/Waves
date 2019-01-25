@@ -3,8 +3,9 @@ package com.wavesplatform.api.http
 import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.api.http.assets.AssetsApiRoute
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
-import com.wavesplatform.state.{AssetDescription, Blockchain, ByteStr}
+import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
 import io.netty.channel.group.ChannelGroup

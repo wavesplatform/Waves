@@ -1,11 +1,12 @@
 package com.wavesplatform.block
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.state.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
 import com.wavesplatform.transaction.Transaction
 

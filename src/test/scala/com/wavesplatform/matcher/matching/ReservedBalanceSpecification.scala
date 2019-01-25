@@ -3,12 +3,12 @@ package com.wavesplatform.matcher.matching
 import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.WithDB
 import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.api.DBUtils
-import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, PartiallyFilled}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderHistory}
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}

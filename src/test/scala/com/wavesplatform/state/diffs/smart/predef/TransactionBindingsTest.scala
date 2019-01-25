@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Version.V2
 import com.wavesplatform.lang.Testing.evaluated
@@ -12,7 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.ProduceError._
+import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.WavesEnvironment

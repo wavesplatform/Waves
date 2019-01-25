@@ -1,6 +1,8 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Version
@@ -14,13 +16,12 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.v1.ScriptV2
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
 
 class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -67,9 +68,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
               List(
                 FUNCTION_CALL(
                   User(FieldNames.ContractTransfer),
-                  List(FUNCTION_CALL(User("Address"), List(CONST_BYTEVECTOR(ByteVector(recipientAddress.bytes.arr)))),
-                       CONST_LONG(recipientAmount),
-                       REF("unit"))
+                  List(FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes))), CONST_LONG(recipientAmount), REF("unit"))
                 )
               )
             ))
@@ -107,7 +106,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       contract    <- senderBindingToContract(funcBinding)
       script      = ScriptV2(Version.V3, contract)
       setContract = SetScriptTransaction.selfSigned(setScriptVersion, master, Some(script), fee, ts).explicitGet()
-      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTEVECTOR(ByteVector(arg))))
+      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
       ci          = ContractInvocationTransaction.selfSigned(ciVersion, invoker, master, fc, None, fee, ts).explicitGet()
     } yield (List(genesis, genesis2), setContract, ci)
 
@@ -121,7 +120,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
             newState.accountData(genesis(0).recipient) shouldBe AccountDataInfo(
               Map(
                 "sender"   -> BinaryDataEntry("sender", ci.sender.toAddress.bytes),
-                "argument" -> BinaryDataEntry("argument", ByteStr(ci.fc.args(0).asInstanceOf[CONST_BYTEVECTOR].bs.toArray))
+                "argument" -> BinaryDataEntry("argument", ci.fc.args(0).asInstanceOf[CONST_BYTESTR].bs)
               ))
         }
     }

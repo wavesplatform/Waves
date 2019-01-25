@@ -2,13 +2,13 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import com.wavesplatform.it.util._
-import com.wavesplatform.state._
+import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 with CancelAfterFailure with ReportingTestName with NodesFromDocker {
   import NodeRestartTestSuite._

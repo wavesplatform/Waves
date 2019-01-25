@@ -8,16 +8,17 @@ import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request, _}
 import com.wavesplatform.api.http.{ContractInvocationRequest, DataRequest, SignedContractInvocationRequest, SignedDataRequest, versionReads}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{Base58, Time}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.JsValue
 
@@ -724,19 +725,14 @@ object TransactionFactory {
   }
 
   def exchangeV2(request: SignedExchangeRequestV2, sender: PublicKeyAccount): Either[ValidationError, ExchangeTransactionV2] = {
-    def orderV2(ord: Order) = {
-      import ord._
-      OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
-    }
-
     val decodedProofs = request.proofs.map(ByteStr.decodeBase58(_))
     for {
       proofs <- Either.cond(decodedProofs.forall(_.isSuccess),
                             Proofs(decodedProofs.map(_.get)),
                             GenericError(s"Invalid proof: ${decodedProofs.find(_.isFailure).get}"))
       tx <- ExchangeTransactionV2.create(
-        orderV2(request.order1),
-        orderV2(request.order2),
+        request.order1,
+        request.order2,
         request.amount,
         request.price,
         request.buyMatcherFee,

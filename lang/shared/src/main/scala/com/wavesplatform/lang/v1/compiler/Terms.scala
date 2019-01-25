@@ -1,9 +1,8 @@
 package com.wavesplatform.lang.v1.compiler
 
-import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
-import scodec.bits.ByteVector
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 
 object Terms {
   sealed abstract class EXPR
@@ -14,7 +13,7 @@ object Terms {
   case class FUNC(name: String, args: List[String], body: EXPR) extends DECLARATION
   case class CONST_LONG(t: Long)                                extends EXPR with EVALUATED
   case class GETTER(expr: EXPR, field: String)                  extends EXPR
-  case class CONST_BYTEVECTOR(bs: ByteVector)                   extends EXPR with EVALUATED
+  case class CONST_BYTESTR(bs: ByteStr)                         extends EXPR with EVALUATED
   case class CONST_STRING(s: String)                            extends EXPR with EVALUATED
   case class BLOCKV1(let: LET, body: EXPR)                      extends EXPR
   case class BLOCKV2(dec: DECLARATION, body: EXPR)              extends EXPR

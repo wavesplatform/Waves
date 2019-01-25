@@ -82,5 +82,5 @@ object JsonFileStorage {
   }
 
   def load[T](path: String)(implicit r: Reads[T]): T =
-    load(path, None)
+    load(path, Option.empty[SecretKeySpec])(r)
 }

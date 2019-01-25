@@ -1,7 +1,7 @@
 package com.wavesplatform.generator.utils
 
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 
 object Universe {
   var AccountsWithBalances: List[(PrivateKeyAccount, Long)] = Nil

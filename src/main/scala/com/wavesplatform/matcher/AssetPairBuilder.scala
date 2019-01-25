@@ -1,8 +1,9 @@
 package com.wavesplatform.matcher
 
 import com.google.common.base.Charsets.UTF_8
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics._
-import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import kamon.Kamon
