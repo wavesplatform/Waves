@@ -2,15 +2,16 @@ package com.wavesplatform.it.sync.utils
 
 import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKeyAccount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, ByteStr, IntegerDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
 import com.wavesplatform.transaction.{CreateAliasTransactionV1, CreateAliasTransactionV2, DataTransaction, Proofs}
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.common.state.ByteStr
 import org.scalatest.prop.TableDrivenPropertyChecks
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import scorex.crypto.encode.Base64
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
