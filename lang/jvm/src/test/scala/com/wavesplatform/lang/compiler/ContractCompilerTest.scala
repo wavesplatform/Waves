@@ -45,7 +45,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         List.empty,
         List(ContractFunction(
           CallableAnnotation("invocation"),
-          None,
           Terms.FUNC(
             "foo",
             List("a"),

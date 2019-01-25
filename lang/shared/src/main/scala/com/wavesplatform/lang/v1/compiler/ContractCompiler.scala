@@ -52,7 +52,7 @@ object ContractCompiler {
               Generic(0, 0, s"ContractFunction must return WriteSet/PaymentSet/ContractResult, but got '$tpe'")
             )
             .toCompileM
-        } yield ContractFunction(c, None, func)
+        } yield ContractFunction(c, func)
       case (List(c: VerifierAnnotation), (func, tpe, _)) =>
         for {
           _ <- Either

@@ -23,7 +23,7 @@ object ContractEvaluator {
       case Some(f) =>
         val zeroExpr = Right(
           BLOCKV2(
-            LET(f.c.invocationArgName,
+            LET(f.annotation.invocationArgName,
                 Bindings
                   .buildInvocation(Recipient.Address(i.invoker), i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.contractAddress))),
             BLOCKV2(f.u, i.fc)
@@ -40,7 +40,7 @@ object ContractEvaluator {
   def verify(v: VerifierFunction, tx: Tx): EvalM[EVALUATED] = {
     val t = Bindings.transactionObject(tx, proofsEnabled = true)
     val expr =
-      BLOCKV2(LET(v.v.txArgName, t), BLOCKV2(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+      BLOCKV2(LET(v.annotation.txArgName, t), BLOCKV2(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 
