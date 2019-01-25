@@ -10,10 +10,6 @@ import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.state.EitherExt2
 
 class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
@@ -68,7 +64,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     ScriptV1(expr) shouldBe 'right
   }
 
-  property("successful on very deep expressions(stack overflow check)") {
+  property("Expression block version check - successful on very deep expressions(stack overflow check)") {
     val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
       FUNCTION_CALL(FunctionHeader.Native(SUM_LONG), List(CONST_LONG(1), acc))
     }
