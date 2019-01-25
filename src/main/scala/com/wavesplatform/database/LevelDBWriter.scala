@@ -832,7 +832,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
           val byte = headerBytes(txCountOffset)
           (byte.toInt, Array[Byte](byte))
         } else {
-          val bytes = headerBytes.slice(txCountOffset + 1, txCountOffset + 1 + 4)
+          val bytes = headerBytes.slice(txCountOffset, txCountOffset + 4)
           (Ints.fromByteArray(bytes), bytes)
         }
 
