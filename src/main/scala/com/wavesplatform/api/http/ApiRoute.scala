@@ -32,17 +32,14 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     }
   }
 
-  val jsonExceptionHandler = ExceptionHandler {
+  val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
     case JsResultException(err)    => complete(WrongJson(errors = err))
     case e: NoSuchElementException => complete(WrongJson(Some(e)))
-  }
-
-  val genericExceptionHandler: ExceptionHandler = jsonExceptionHandler.orElse(ExceptionHandler {
     case e: ValidationError                          => complete(ApiError.fromValidationError(e))
     case e: IllegalArgumentException                 => complete(ApiError.fromValidationError(GenericError(e)))
     case e: AssertionError                           => complete(ApiError.fromValidationError(GenericError(e)))
-    case e: ExecutionException if e.getCause != null => genericExceptionHandler(e.getCause)
-  })
+    case e: ExecutionException if e.getCause != null && e.getCause != e => jsonExceptionHandler(e.getCause)
+  }
 
   def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>
     optionalHeaderValueByType[api_key](()).flatMap {

@@ -140,7 +140,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     ))
   def calculateFee: Route = (pathPrefix("calculateFee") & post) {
     pathEndOrSingleSlash {
-      handleExceptions(genericExceptionHandler) {
+      handleExceptions(jsonExceptionHandler) {
         json[JsObject] { jsv =>
           val senderPk = (jsv \ "senderPublicKey").as[String]
           // Just for converting the request to the transaction
