@@ -47,7 +47,8 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
 
   val orderTypeBindings = "let t = Buy; t == Buy"
 
-  "allows duplicate names" in {
+
+  "ScriptV1 allows duplicate names" in {
     forAll(transferV2Gen.flatMap(tx => Gen.oneOf(V1, V2).map(v => (tx, v)))) {
       case (tx, v) =>
         eval[EVALUATED](duplicateNames, v, tx) shouldBe Testing.evaluated(true)

@@ -12,6 +12,9 @@ import com.wavesplatform.transaction.smart.script.v1.ScriptV1.checksumLength
 import com.wavesplatform.utils.{functionCosts, varNames}
 import monix.eval.Coeval
 
+import scala.annotation.tailrec
+import scala.collection.mutable._
+
 object ScriptV1 {
   val checksumLength         = 4
   private val maxComplexity  = 20 * functionCosts(V1)(FunctionHeader.Native(SIGVERIFY))()
@@ -38,6 +41,27 @@ object ScriptV1 {
         val s = Array(version.toByte) ++ Serde.serialize(expr)
         ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
       }
+    override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(isExprContainsBlockV2(expr))
+  }
+
+  def isExprContainsBlockV2(e: EXPR): Boolean = {
+    @tailrec
+    def horTraversal(queue: MutableList[EXPR]): Boolean = {
+      queue.headOption match {
+        case Some(expr) => {
+          expr match {
+            case BLOCKV2(_, _)              => true
+            case GETTER(expr1, _)           => horTraversal(queue.tail += expr1)
+            case BLOCKV1(let, body)         => horTraversal(queue.tail ++ MutableList(let.value, body))
+            case IF(expr1, expr2, expr3)    => horTraversal(queue.tail ++ MutableList(expr1, expr2, expr3))
+            case FUNCTION_CALL(_, exprList) => horTraversal(queue.tail ++ exprList)
+            case _                          => false
+          }
+        }
+        case None => false
+      }
+    }
+    horTraversal(Queue(e))
   }
 }
 
@@ -50,4 +74,5 @@ case class ScriptV2(version: Version, expr: Contract) extends Script {
       val s = Array(version.toByte) ++ ContractSerDe.serialize(expr)
       ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
     }
+  override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
 }
