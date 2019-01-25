@@ -14,7 +14,6 @@ import scala.util.Try
 object ContractSerDe {
 
   val CALL_ANNO: Int = 1
-  val PAY_ANNO: Int  = 2
   val VER_ANNO: Int  = 3
 
   val DEC_LET: Int  = 1
@@ -56,9 +55,6 @@ object ContractSerDe {
       case c: CallableAnnotation =>
         out.writeInt(CALL_ANNO)
         serializeCallAnnotation(out, c)
-      case p: PayableAnnotation =>
-        out.writeInt(PAY_ANNO)
-        serializePayableAnnotation(out, p)
       case v: VerifierAnnotation =>
         out.writeInt(VER_ANNO)
         serializeVerifiableAnnotation(out, v)
@@ -70,7 +66,6 @@ object ContractSerDe {
       annType <- tryEi(bb.getInt)
       ann <- annType match {
         case CALL_ANNO => deserializeCallAnnotation(bb)
-        case PAY_ANNO  => deserializePayableAnnotation(bb)
         case VER_ANNO  => deserializeVerifiableAnnotation(bb)
         case t         => Left(s"Unknown annotation type: $t")
       }
@@ -80,19 +75,11 @@ object ContractSerDe {
   private[lang] def deserializeCallAnnotation(bb: ByteBuffer): Either[String, CallableAnnotation] =
     tryEi(CallableAnnotation(bb.getString))
 
-  private[lang] def deserializePayableAnnotation(bb: ByteBuffer): Either[String, PayableAnnotation] =
-    tryEi(PayableAnnotation(bb.getString, bb.getString))
-
   private[lang] def deserializeVerifiableAnnotation(bb: ByteBuffer): Either[String, VerifierAnnotation] =
     tryEi(VerifierAnnotation(bb.getString))
 
   private[lang] def serializeCallAnnotation(out: ByteArrayOutputStream, a: CallableAnnotation): Unit =
     out.writeString(a.invocationArgName)
-
-  private[lang] def serializePayableAnnotation(out: ByteArrayOutputStream, p: PayableAnnotation): Unit = {
-    out.writeString(p.amountArgName)
-    out.writeString(p.tokenArgName)
-  }
 
   private[lang] def serializeVerifiableAnnotation(out: ByteArrayOutputStream, v: VerifierAnnotation): Unit = {
     out.writeString(v.txArgName)
@@ -155,32 +142,19 @@ object ContractSerDe {
   }
 
   private[lang] def serializeContractFunction(out: ByteArrayOutputStream, cf: ContractFunction): Unit = {
-    serializeCallAnnotation(out, cf.c)
-    cf.p match {
-      case None => out.writeInt(0)
-      case Some(pa) =>
-        out.writeInt(1)
-        serializePayableAnnotation(out, pa)
-    }
+    serializeCallAnnotation(out, cf.annotation)
     serializeFUNC(out, cf.u)
   }
 
   private[lang] def deserializeContractFunction(bb: ByteBuffer): Either[String, ContractFunction] = {
     for {
       ca        <- deserializeCallAnnotation(bb)
-      isPresent <- tryEi(bb.getInt)
-      pa <- {
-        if (isPresent > 0)
-          deserializePayableAnnotation(bb).map(_.some)
-        else
-          none.asRight[String]
-      }
       cf <- deserializeFUNC(bb)
-    } yield ContractFunction(ca, pa, cf)
+    } yield ContractFunction(ca, cf)
   }
 
   def serializeVerifierFunction(out: ByteArrayOutputStream, vf: VerifierFunction): Unit = {
-    serializeVerifiableAnnotation(out, vf.v)
+    serializeVerifiableAnnotation(out, vf.annotation)
     serializeFUNC(out, vf.u)
   }
 
