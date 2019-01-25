@@ -792,21 +792,68 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
-    val h = Height(height)
-    readOnly(_.get(Keys.blockHeaderAndSizeAt(h)))
+    loadBlock(Height(height)).map { block =>
+      (block, block.bytes().length)
+    }
   }
 
   override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = readOnly { db =>
-    for {
-      h <- db.get(Keys.heightOf(blockId))
-      height = Height(h)
-      r <- db.get(Keys.blockHeaderAndSizeAt(height))
-    } yield r
+    db.get(Keys.heightOf(blockId))
+      .flatMap(loadBlockHeaderAndSize)
   }
 
-  //FIXME: do not parse block bytes, just read em
-  override def loadBlockBytes(height: Int): Option[Array[Byte]] = {
-    loadBlock(Height(height)).map(_.bytes())
+  override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
+    import com.wavesplatform.crypto._
+
+    val height = Height(h)
+
+    val cDataOffset = 1 + 8 + SignatureLength
+
+    // version + timestamp + reference + baseTarget + genSig
+    val txCountOffset = cDataOffset + 8 + Block.GeneratorSignatureLength
+
+    val headerKey = Keys.blockHeaderBytesAt(height)
+
+    def readTransactionBytes(count: Int) = {
+      (0 until count).toArray.flatMap { n =>
+        db.get(Keys.transactionBytesAt(height, TxNum(n)))
+          .map { txBytes =>
+            Ints.toByteArray(txBytes.length) ++ txBytes
+          }
+      }.flatten
+    }
+
+    db.get(headerKey)
+      .map { headerBytes =>
+        val bytesBeforeCData = headerBytes.take(cDataOffset)
+        val cDataBytes       = headerBytes.slice(cDataOffset, cDataOffset + 40)
+        val version          = headerBytes.head
+        val (txCount, txCountBytes) = if (version == 1 || version == 2) {
+          val byte = headerBytes(txCountOffset)
+          (byte.toInt, Array[Byte](byte))
+        } else {
+          val bytes = headerBytes.slice(txCountOffset + 1, txCountOffset + 1 + 4)
+          (Ints.fromByteArray(bytes), bytes)
+        }
+
+        val bytesAfterTxs =
+          if (version > 2) {
+            headerBytes.drop(txCountOffset + txCountBytes.length)
+          } else {
+            headerBytes.takeRight(SignatureLength + KeyLength)
+          }
+
+        val txBytes = txCountBytes ++ readTransactionBytes(txCount)
+
+        val bytes = bytesBeforeCData ++
+          Ints.toByteArray(cDataBytes.length) ++
+          cDataBytes ++
+          Ints.toByteArray(txBytes.length) ++
+          txBytes ++
+          bytesAfterTxs
+
+        bytes
+      }
   }
 
   override def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]] = {

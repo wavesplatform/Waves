@@ -107,15 +107,12 @@ object Keys {
   def blockHeaderAt(height: Height): Key[Option[BlockHeader]] =
     Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeader, writeBlockHeader)
 
-  def blockHeaderAndSizeAt(height: Height): Key[Option[(BlockHeader, Int)]] =
+  def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(
-      "block-header-at-height",
+      "block-header-bytes-at-height",
       h(BlockHeaderPrefix, height),
-      bytes => (readBlockHeader(bytes), bytes.length),
-      data => {
-        val (header, _) = data
-        writeBlockHeader(header) // don't really store sizes
-      }
+      identity,
+      identity
     )
 
   val TransactionInfoPrefix: Short = 102
@@ -129,7 +126,7 @@ object Keys {
 
   def transactionBytesAt(height: Height, n: TxNum): Key[Option[Array[Byte]]] =
     Key.opt(
-      "nth-transaction-info-at-height",
+      "nth-transaction-info-bytes-at-height",
       hNum(TransactionInfoPrefix, height, n),
       identity,
       identity
@@ -142,7 +139,7 @@ object Keys {
   val AddressTransactionHNPrefix: Short = 104
   def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
     Key.opt(
-      "address-transaction-ids",
+      "address-transaction-height-type-and-nums",
       hBytes(AddressTransactionHNPrefix, seqNr, addressId.toByteArray),
       readTransactionHNSeqAndType,
       writeTransactionHNSeqAndType
@@ -151,7 +148,7 @@ object Keys {
   val TransactionHeightNumByIdPrefix: Short = 105
   def transactionHNById(txId: TransactionId): Key[Option[(Height, TxNum)]] =
     Key.opt(
-      "transaction-height-by-id",
+      "transaction-height-and-nums-by-id",
       bytes(TransactionInfoPrefix, txId.arr),
       readTransactionHN,
       writeTransactionHN

@@ -249,16 +249,21 @@ package object database {
   def writeBlockHeader(bh: BlockHeader): Array[Byte] = {
     val ndo = newDataOutput()
 
-    ndo.writeLong(bh.timestamp)
     ndo.writeByte(bh.version)
+    ndo.writeLong(bh.timestamp)
     ndo.writeByteStr(bh.reference)
-    ndo.write(bh.signerData.generator.publicKey)
-    ndo.writeByteStr(bh.signerData.signature)
     ndo.writeLong(bh.consensusData.baseTarget)
     ndo.writeByteStr(bh.consensusData.generationSignature)
-    ndo.writeInt(bh.transactionCount)
+
+    if (bh.version == 1 | bh.version == 2)
+      ndo.writeByte(bh.transactionCount)
+    else
+      ndo.writeInt(bh.transactionCount)
+
     ndo.writeInt(bh.featureVotes.size)
     bh.featureVotes.foreach(s => ndo.writeShort(s))
+    ndo.write(bh.signerData.generator.publicKey)
+    ndo.writeByteStr(bh.signerData.signature)
 
     ndo.toByteArray
   }
@@ -266,16 +271,20 @@ package object database {
   def readBlockHeader(bs: Array[Byte]): BlockHeader = {
     val ndi = newDataInput(bs)
 
-    val timestamp         = ndi.readLong()
-    val version           = ndi.readByte()
-    val reference         = ndi.readSignature
-    val generator         = ndi.readPublicKey
-    val signature         = ndi.readSignature
-    val baseTarget        = ndi.readLong()
-    val genSig            = ndi.readByteStr(Block.GeneratorSignatureLength)
-    val transactionCount  = ndi.readInt()
+    val version    = ndi.readByte()
+    val timestamp  = ndi.readLong()
+    val reference  = ndi.readSignature
+    val baseTarget = ndi.readLong()
+    val genSig     = ndi.readByteStr(Block.GeneratorSignatureLength)
+    val transactionCount = {
+      if (version == 1 || version == 2) ndi.readByte()
+      else ndi.readInt()
+    }
     val featureVotesCount = ndi.readInt()
     val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+    val generator         = ndi.readPublicKey
+    val signature         = ndi.readSignature
+
     new BlockHeader(timestamp,
                     version,
                     reference,

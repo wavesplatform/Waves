@@ -177,7 +177,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
     } yield (master, List(genesisBlock, block1, emptyBlock))
   }
 
-  "correct reassemble block from header and transactions" in {
+  "correctly reassemble block from header and transactions" in {
     val rw        = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
     val settings0 = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
@@ -219,6 +219,11 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       bcu.blockAt(2).get shouldBe block1
       bcu.blockAt(3).get shouldBe block2
       bcu.blockAt(4).get shouldBe block3
+
+      bcu.blockBytes(1).get shouldBe genesisBlock.bytes()
+      bcu.blockBytes(2).get shouldBe block1.bytes()
+      bcu.blockBytes(3).get shouldBe block2.bytes()
+      bcu.blockBytes(4).get shouldBe block3.bytes()
 
     } finally {
       bcu.shutdown()
