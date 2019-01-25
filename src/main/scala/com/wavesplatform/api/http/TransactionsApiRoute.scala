@@ -30,7 +30,7 @@ import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.{Success, Try}
+import scala.util.Success
 
 @Path("/transactions")
 @Api(value = "/transactions")
