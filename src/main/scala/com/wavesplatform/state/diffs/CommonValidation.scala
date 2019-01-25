@@ -126,7 +126,7 @@ object CommonValidation {
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
       case sst: SetScriptTransaction =>
         sst.script.map(_.version) match {
-          case Some(v) if ((v == V1 || v == V2) && sst.script.exists(_.maxBlockVersion.value == 2)) =>
+          case Some(v) if ((v == V1 || v == V2) && sst.script.exists(_.containsBlockV2.value)) =>
             activationBarrier(BlockchainFeatures.Ride4DApps)
           case Some(V1) | None => activationBarrier(BlockchainFeatures.SmartAccounts)
           case Some(V2)        => activationBarrier(BlockchainFeatures.SmartAccountTrading, Some("Script version 2"))
