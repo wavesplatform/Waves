@@ -12,11 +12,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   property("simple if") {
     val expr = IF(TRUE, CONST_LONG(1), CONST_STRING("XXX"))
     Decompiler(expr, 0) shouldBe
-      """if (true) then
+      """{ if (
+        |    true
+        |    )
+        |then
         |    1
         |else
         |    "XXX"
-        |""".stripMargin
+        |}""".stripMargin
   }
 
   property("if with complicated else branch") {
@@ -24,15 +27,21 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       IF(TRUE, CONST_LONG(1),
         CONST_STRING("XXX")))
     Decompiler(expr, 0) shouldBe
-      """if (true) then
+      """{ if (
+        |    true
+        |    )
+        |then
         |    1
         |else
-        |    if (true) then
+        |    { if (
+        |        true
+        |        )
+        |    then
         |        1
         |    else
         |        "XXX"
-        |
-        |""".stripMargin
+        |    }
+        |}""".stripMargin
   }
 
   property("if with complicated then branch") {
@@ -41,15 +50,21 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         CONST_STRING("XXX")),
       CONST_LONG(1))
     Decompiler(expr, 0) shouldBe
-      """if (true) then
-        |    if (true) then
+      """{ if (
+        |    true
+        |    )
+        |then
+        |    { if (
+        |        true
+        |        )
+        |    then
         |        1
         |    else
         |        "XXX"
-        |
+        |    }
         |else
         |    1
-        |""".stripMargin
+        |}""".stripMargin
   }
 
   property("simple let") {
@@ -93,7 +108,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     )
     Decompiler(expr, 0) shouldBe
     """{
-      |    let vari = p;
+      |    let vari =
+      |        p;
       |    true
       |}""".stripMargin
   }
@@ -107,7 +123,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       ))
     Decompiler(expr, 0) shouldBe
       """{
-        |    let v = p;
+        |    let v =
+        |        p;
         |    Native_1(v,"a")
         |}""".stripMargin
   }
@@ -126,14 +143,15 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       ))
     Decompiler(expr, 0) shouldBe
       """{
-        |    let v = {
-        |        let v = p;
-        |        Native_1(v,"a")
-        |    };
+        |    let v =
+        |        {
+        |            let v =
+        |                p;
+        |            Native_1(v,"a")
+        |        };
         |    Native_1(v,"a")
         |}""".stripMargin
   }
-
 
   property("old match") {
     val expr = Terms.BLOCKV2(
@@ -154,7 +172,30 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         FALSE
       )
     )
-    Decompiler(expr, 0) shouldBe """let v = p; if (if (Native_1(v,"a")) then true else Native_1(v,"b")) then let p = v; true else false"""
+    Decompiler(expr, 0) shouldBe
+      """{
+        |    let v =
+        |        p;
+        |    { if (
+        |        { if (
+        |            Native_1(v,"a")
+        |            )
+        |        then
+        |            true
+        |        else
+        |            Native_1(v,"b")
+        |        }
+        |        )
+        |    then
+        |        {
+        |            let p =
+        |                v;
+        |            true
+        |        }
+        |    else
+        |        false
+        |    }
+        |}""".stripMargin
   }
 
   property("new match") {
@@ -172,27 +213,36 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
               List(REF("v"), Terms.CONST_STRING("b"))
             )
          ),
-          Terms.BLOCKV2(Terms.LET("p", Terms.REF("v")), TRUE),
+          Terms.BLOCKV2(
+            Terms.LET("z", Terms.REF("x")
+            ), TRUE),
           FALSE
         )
       )
     Decompiler(expr, 0) shouldBe
-    """{a
-      |    let v = p;
-      |    if (if (Native_1(v,"a")) then
+    """{
+      |    let v =
+      |        p;
+      |    { if (
+      |        { if (
+      |            Native_1(v,"a")
+      |            )
+      |        then
       |            true
       |        else
-      |            Native_1(v,"b")) then
-      |            {
-      |                let p = v;
-      |                true
-      |            }
-      |        else
-      |            false
+      |            Native_1(v,"b")
+      |        }
+      |        )
+      |    then
+      |        {
+      |            let z =
+      |                x;
+      |            true
+      |        }
+      |    else
+      |        false
+      |    }
       |}""".stripMargin
-
-
-    //"""{ let v = p; if (if (Native_1(v,"a")) then true else Native_1(v,"b")) then { let p = v; true } else false }"""
   }
 
 }
