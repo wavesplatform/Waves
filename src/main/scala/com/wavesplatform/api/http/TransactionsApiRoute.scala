@@ -148,7 +148,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
             "fee"    -> 1234567,
             "sender" -> senderPk
           )
-          val tra = Try(createTransaction(senderPk, enrichedJsv) { tx =>
+
+          createTransaction(senderPk, enrichedJsv) { tx =>
             CommonValidation.getMinFee(blockchain, functionalitySettings, blockchain.height, tx).map {
               case (assetId, assetAmount, wavesAmount) =>
                 Json.obj(
@@ -156,10 +157,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                   "feeAmount"  -> assetAmount
                 )
             }
-          })
-
-          if (tra.isFailure) tra.failed.get.printStackTrace()
-          tra.get
+          }
         }
       }
     }

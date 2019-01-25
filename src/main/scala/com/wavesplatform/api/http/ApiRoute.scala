@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
 import java.util.NoSuchElementException
+import java.util.concurrent.ExecutionException
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server._
@@ -9,6 +10,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, api_key, deprecated_api_key}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.ValidationError.GenericError
 import play.api.libs.json.{JsResultException, Reads}
 
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
@@ -35,10 +37,11 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     case e: NoSuchElementException => complete(WrongJson(Some(e)))
   }
 
-  val genericExceptionHandler = jsonExceptionHandler.orElse(ExceptionHandler {
-    case e: ValidationError          => complete(ApiError.fromValidationError(e))
-    case e: IllegalArgumentException => complete(WrongJson(Some(e)))
-    case e: AssertionError           => complete(WrongJson(Some(e)))
+  val genericExceptionHandler: ExceptionHandler = jsonExceptionHandler.orElse(ExceptionHandler {
+    case e: ValidationError                                                                  => complete(ApiError.fromValidationError(e))
+    case e: IllegalArgumentException                                                         => complete(ApiError.fromValidationError(GenericError(e)))
+    case e: AssertionError                                                                   => complete(ApiError.fromValidationError(GenericError(e)))
+    case e: ExecutionException if e.getMessage.contains("Boxed error") && e.getCause != null => genericExceptionHandler(e.getCause)
   })
 
   def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>
