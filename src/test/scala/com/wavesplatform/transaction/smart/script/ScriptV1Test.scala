@@ -10,6 +10,7 @@ import scodec.bits.ByteVector
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.state.EitherExt2
 
 class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
@@ -62,6 +63,14 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       .reduceLeft[EXPR](IF(_, _, FALSE))
 
     ScriptV1(expr) shouldBe 'right
+  }
+
+  property("successful on very deep expressions(stack overflow check)") {
+    val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
+      FUNCTION_CALL(FunctionHeader.Native(SUM_LONG), List(CONST_LONG(1), acc))
+    }
+
+    ScriptV1.isExprContainsBlockV2(expr) shouldBe false
   }
 
 }
