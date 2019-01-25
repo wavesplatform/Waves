@@ -18,7 +18,7 @@ object DisableHijackedAliases extends ScorexLogging {
     val height  = Height(rw.get(Keys.height))
 
     for (h <- 1 to height) {
-      val header = rw.get(Keys.blockHeaderAt(Height(h))).get
+      val (header, _) = rw.get(Keys.blockHeaderAndSizeAt(Height(h))).get
 
       for (n <- 0 to header.transactionCount) {
         val txNum            = TxNum(n)

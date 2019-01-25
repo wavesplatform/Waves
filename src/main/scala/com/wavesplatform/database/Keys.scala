@@ -104,15 +104,16 @@ object Keys {
   // New Keys
 
   val BlockHeaderPrefix: Short = 101
-  def blockHeaderAt(height: Height): Key[Option[BlockHeader]] =
-    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeader, writeBlockHeader)
+
+  def blockHeaderAndSizeAt(height: Height): Key[Option[(BlockHeader, Int)]] =
+    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeaderAndSize, writeBlockHeaderAndSize)
 
   def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(
       "block-header-bytes-at-height",
       h(BlockHeaderPrefix, height),
-      identity,
-      identity
+      _.drop(4),
+      _ => throw new Exception("Key \"block-header-bytes-at-height\" - is read only!")
     )
 
   val TransactionInfoPrefix: Short = 102

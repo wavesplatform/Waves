@@ -230,9 +230,11 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         k -> v
       }.toMap
 
-    rw.put(Keys.blockHeaderAt(h), Some(block))
+    rw.put(Keys.blockHeaderAndSizeAt(h), Some((block, block.bytes().size)))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
+
     val lastAddressId = loadMaxAddressId() + newAddresses.size
+
     rw.put(Keys.lastAddressId, Some(lastAddressId))
     rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
 
@@ -417,8 +419,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
           log.trace(s"Rolling back to ${currentHeight - 1}")
           rw.put(Keys.height, currentHeight - 1)
 
-          val discardedHeader = rw
-            .get(Keys.blockHeaderAt(h))
+          val (discardedHeader, _) = rw
+            .get(Keys.blockHeaderAndSizeAt(h))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
 //          val discardedBlock =
@@ -518,7 +520,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
               }
           }
 
-          rw.delete(Keys.blockHeaderAt(h))
+          rw.delete(Keys.blockHeaderAndSizeAt(h))
           rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.filterHistory(Keys.carryFeeHistory, currentHeight)
@@ -791,10 +793,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
   }
 
-  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
-    loadBlock(Height(height)).map { block =>
-      (block, block.bytes().length)
-    }
+  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readOnly { db =>
+    db.get(Keys.blockHeaderAndSizeAt(Height(height)))
   }
 
   override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = readOnly { db =>
@@ -872,10 +872,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     (currentHeight until (currentHeight - howMany).max(0) by -1)
       .map { h =>
         val height = Height(h)
-        db.get(Keys.blockHeaderAt(height))
+        db.get(Keys.blockHeaderAndSizeAt(height))
       }
       .collect {
-        case Some(header) => header.signerData.signature
+        case Some((header, _)) => header.signerData.signature
       }
   }
 
@@ -884,10 +884,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       (parentHeight until (parentHeight + howMany))
         .map { h =>
           val height = Height(h)
-          db.get(Keys.blockHeaderAt(height))
+          db.get(Keys.blockHeaderAndSizeAt(height))
         }
         .collect {
-          case Some(header) => header.signerData.signature
+          case Some((header, _)) => header.signerData.signature
         }
     }
   }
@@ -904,8 +904,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     fs.activationWindow(height)
       .flatMap { h =>
         val height = Height(h)
-        db.get(Keys.blockHeaderAt(height))
-          .map(_.featureVotes.toSeq)
+        db.get(Keys.blockHeaderAndSizeAt(height))
+          .map(_._1.featureVotes.toSeq)
           .getOrElse(Seq.empty)
       }
       .groupBy(identity)
@@ -998,10 +998,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   private[database] def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
-    val headerKey = Keys.blockHeaderAt(height)
+    val headerKey = Keys.blockHeaderAndSizeAt(height)
 
     for {
-      header <- db.get(headerKey)
+      (header, _) <- db.get(headerKey)
       txs = (0 until header.transactionCount).toList.flatMap { n =>
         db.get(Keys.transactionAt(height, TxNum(n)))
       }

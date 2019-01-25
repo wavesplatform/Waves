@@ -246,8 +246,12 @@ package object database {
     ndo.toByteArray
   }
 
-  def writeBlockHeader(bh: BlockHeader): Array[Byte] = {
+  def writeBlockHeaderAndSize(data: (BlockHeader, Int)): Array[Byte] = {
+    val (bh, size) = data
+
     val ndo = newDataOutput()
+
+    ndo.writeInt(size)
 
     ndo.writeByte(bh.version)
     ndo.writeLong(bh.timestamp)
@@ -268,8 +272,10 @@ package object database {
     ndo.toByteArray
   }
 
-  def readBlockHeader(bs: Array[Byte]): BlockHeader = {
+  def readBlockHeaderAndSize(bs: Array[Byte]): (BlockHeader, Int) = {
     val ndi = newDataInput(bs)
+
+    val size = ndi.readInt()
 
     val version    = ndi.readByte()
     val timestamp  = ndi.readLong()
@@ -285,13 +291,15 @@ package object database {
     val generator         = ndi.readPublicKey
     val signature         = ndi.readSignature
 
-    new BlockHeader(timestamp,
-                    version,
-                    reference,
-                    SignerData(generator, signature),
-                    NxtLikeConsensusBlockData(baseTarget, genSig),
-                    transactionCount,
-                    featureVotes)
+    val header = new BlockHeader(timestamp,
+                                 version,
+                                 reference,
+                                 SignerData(generator, signature),
+                                 NxtLikeConsensusBlockData(baseTarget, genSig),
+                                 transactionCount,
+                                 featureVotes)
+
+    (header, size)
   }
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
