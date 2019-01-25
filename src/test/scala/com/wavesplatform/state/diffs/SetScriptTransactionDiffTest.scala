@@ -95,7 +95,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     forAll(setup) {
       case (genesis, tx) =>
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsUnactivated) { blockDiffEi =>
-          blockDiffEi should produce("SetScriptTransaction has not been activated yet")
+          blockDiffEi should produce("Ride4DApps has not been activated yet")
         }
 
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsActivated) { blockDiffEi =>
