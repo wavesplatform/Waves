@@ -19,6 +19,7 @@ import com.wavesplatform.utils.{EmptyBlockchain, compilerContext}
 import fastparse.core.Parsed.Success
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalacheck.Gen
 import shapeless.Coproduct
 
 class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with TransactionGen {
@@ -46,48 +47,19 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
 
   val orderTypeBindings = "let t = Buy; t == Buy"
 
-  "ScriptV1" - {
-    "forbids duplicate names" in {
-      import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 
-      val Success(expr, _)      = Parser.parseScript(duplicateNames)
-      val Right((typedExpr, _)) = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), expr)
-      val settings = TestFunctionalitySettings.Enabled.copy(
-        preActivatedFeatures =
-          Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0, BlockchainFeatures.SmartAccountTrading.id -> 3)
-      )
-      val setup = for {
-        master <- accountGen
-        ts     <- positiveLongGen
-        genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-        script  = ScriptV1(V1, typedExpr, checkSize = false).explicitGet()
-        tx      = SetScriptTransaction.selfSigned(1, master, Some(script), 100000, ts + 1).explicitGet()
-      } yield (genesis, tx)
-
-      forAll(setup) {
-        case (genesis, tx) =>
-          assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settings) { blockDiffEi =>
-            blockDiffEi should produce("duplicate variable names")
-          }
-
-          assertDiffEi(Seq(block(Seq(genesis)), block(Seq())), block(Seq(tx)), settings) { blockDiffEi =>
-            blockDiffEi shouldBe 'right
-          }
-      }
-    }
-
-    "does not have bindings defined in V2" in {
-      eval[EVALUATED](orderTypeBindings, V1) should produce("definition of 'Buy' is not found")
+  "ScriptV1 allows duplicate names" in {
+    forAll(transferV2Gen.flatMap(tx => Gen.oneOf(V1, V2).map(v => (tx, v)))) {
+      case (tx, v) =>
+        eval[EVALUATED](duplicateNames, v, tx) shouldBe Testing.evaluated(true)
     }
   }
 
-  "ScriptV2" - {
-    "allows duplicate names" in {
-      forAll(transferV2Gen) { tx =>
-        eval[EVALUATED](duplicateNames, V2, tx) shouldBe Testing.evaluated(true)
-      }
-    }
+  "ScriptV1 - does not have bindings defined in V2" in {
+    eval[EVALUATED](orderTypeBindings, V1) should produce("definition of 'Buy' is not found")
+  }
 
+  "ScriptV2" - {
     "has bindings defined in V2" in {
       eval[EVALUATED](orderTypeBindings, V2) shouldBe Testing.evaluated(true)
     }

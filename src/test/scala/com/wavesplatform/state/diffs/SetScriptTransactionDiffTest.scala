@@ -53,10 +53,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
       Version.V3,
       Contract(
         List.empty,
-        List(
-          ContractFunction(CallableAnnotation("sender"),
-                           None,
-                           Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
+        List(ContractFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
         None
       )
     )
