@@ -54,6 +54,10 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
     }
   }
 
+  "ScriptV1 - does not have bindings defined in V2" in {
+    eval[EVALUATED](orderTypeBindings, V1) should produce("definition of 'Buy' is not found")
+  }
+
   "ScriptV2" - {
     "has bindings defined in V2" in {
       eval[EVALUATED](orderTypeBindings, V2) shouldBe Testing.evaluated(true)
