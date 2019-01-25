@@ -166,7 +166,7 @@ package object state {
   object Height extends TaggedType[Int]
   type Height = Height.Type
 
-  object TxNum extends TaggedType[Int]
+  object TxNum extends TaggedType[Short]
   type TxNum = TxNum.Type
 
   object AddressId extends TaggedType[BigInt]

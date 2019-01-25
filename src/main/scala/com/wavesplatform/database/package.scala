@@ -309,7 +309,7 @@ package object database {
 
     (height, List.fill(numSeqLength) {
       val tp  = ndi.readByte()
-      val num = TxNum(ndi.readInt())
+      val num = TxNum(ndi.readShort())
       (tp, num)
     })
   }
@@ -326,7 +326,7 @@ package object database {
     numSeq.foreach {
       case (tp, num) =>
         ndo.writeByte(tp)
-        ndo.writeInt(num)
+        ndo.writeShort(num)
     }
 
     ndo.toByteArray
@@ -335,7 +335,7 @@ package object database {
   def readTransactionHN(bs: Array[Byte]): (Height, TxNum) = {
     val ndi = newDataInput(bs)
     val h   = Height(ndi.readInt())
-    val num = TxNum(ndi.readInt())
+    val num = TxNum(ndi.readShort())
 
     (h, num)
   }
@@ -346,7 +346,7 @@ package object database {
     val (h, num) = v
 
     ndo.writeInt(h)
-    ndo.writeInt(num)
+    ndo.writeShort(num)
 
     ndo.toByteArray
   }

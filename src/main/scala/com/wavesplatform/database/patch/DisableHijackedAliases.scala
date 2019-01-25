@@ -21,7 +21,7 @@ object DisableHijackedAliases extends ScorexLogging {
       val (header, _) = rw.get(Keys.blockHeaderAndSizeAt(Height(h))).get
 
       for (n <- 0 to header.transactionCount) {
-        val txNum            = TxNum(n)
+        val txNum            = TxNum(n.toShort)
         val transactionBytes = rw.get(Keys.transactionBytesAt(height, txNum)).get
 
         val isCreateAlias = transactionBytes(0) == CreateAliasTransaction.typeId ||

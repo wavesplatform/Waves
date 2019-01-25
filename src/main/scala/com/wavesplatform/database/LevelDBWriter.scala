@@ -226,7 +226,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       block.transactionData.zipWithIndex.map { in =>
         val (tx, idx) = in
         val k         = TransactionId(tx.id())
-        val v         = (tx, TxNum(idx))
+        val v         = (tx, TxNum(idx.toShort))
         k -> v
       }.toMap
 
@@ -816,11 +816,12 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     def readTransactionBytes(count: Int) = {
       (0 until count).toArray.flatMap { n =>
-        db.get(Keys.transactionBytesAt(height, TxNum(n)))
+        db.get(Keys.transactionBytesAt(height, TxNum(n.toShort)))
           .map { txBytes =>
             Ints.toByteArray(txBytes.length) ++ txBytes
           }
-      }.flatten
+          .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
+      }
     }
 
     db.get(headerKey)
@@ -1003,7 +1004,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     for {
       (header, _) <- db.get(headerKey)
       txs = (0 until header.transactionCount).toList.flatMap { n =>
-        db.get(Keys.transactionAt(height, TxNum(n)))
+        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
       }
       block <- Block.fromHeaderAndTransactions(header, txs).toOption
     } yield block
@@ -1029,7 +1030,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         val v = entry.getValue
 
         for {
-          idx <- Try(Ints.fromByteArray(k.slice(6, 10)))
+          idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
           tx  <- TransactionParsers.parseBytes(v)
         } txs.append((TxNum(idx), tx))
       }
