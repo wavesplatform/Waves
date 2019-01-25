@@ -157,7 +157,7 @@ trait Caches extends Blockchain with ScorexLogging {
 
   override def accountScript(address: Address): Option[Script] = scriptCache.get(address)
   override def hasScript(address: Address): Boolean =
-    Option(scriptCache.getIfPresent(address)).flatten.isDefined || hasScriptBytes(address)
+    Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
   private val assetScriptCache: LoadingCache[AssetId, Option[Script]] = cache(maxCacheSize, loadAssetScript)
   protected def loadAssetScript(asset: AssetId): Option[Script]

@@ -7,12 +7,13 @@ import com.wavesplatform.lang.Version
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, REF}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ContractScript
+import com.wavesplatform.transaction.smart.script.v1.{ContractScript, ExprScript}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -52,10 +53,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
       Version.ContractV,
       Contract(
         List.empty,
-        List(
-          ContractFunction(CallableAnnotation("sender"),
-                           None,
-                           Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
+        List(ContractFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
         None
       )
     )
@@ -67,6 +65,38 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
           case (blockDiff, newState) =>
             newState.accountScript(setScript.sender) shouldBe setScript.script
+        }
+    }
+  }
+
+  property("Script with BlockV2 only works after Ride4DApps feature activation") {
+    import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
+
+    val settingsUnactivated = TestFunctionalitySettings.Enabled.copy(
+      preActivatedFeatures = Map(
+        BlockchainFeatures.Ride4DApps.id -> 3
+      ))
+    val settingsActivated = TestFunctionalitySettings.Enabled.copy(
+      preActivatedFeatures = Map(
+        BlockchainFeatures.Ride4DApps.id -> 0
+      ))
+    val setup = for {
+      master <- accountGen
+      ts     <- positiveLongGen
+      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      expr    = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
+      script  = ExprScript(ExprV1, expr, checkSize = false).explicitGet()
+      tx      = SetScriptTransaction.selfSigned(1, master, Some(script), 100000, ts + 1).explicitGet()
+    } yield (genesis, tx)
+
+    forAll(setup) {
+      case (genesis, tx) =>
+        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsUnactivated) { blockDiffEi =>
+          blockDiffEi should produce("Ride4DApps has not been activated yet")
+        }
+
+        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsActivated) { blockDiffEi =>
+          blockDiffEi shouldBe 'right
         }
     }
   }

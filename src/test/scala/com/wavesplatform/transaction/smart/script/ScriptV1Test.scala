@@ -64,4 +64,12 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
     ExprScript(expr) shouldBe 'right
   }
 
+  property("Expression block version check - successful on very deep expressions(stack overflow check)") {
+    val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
+      FUNCTION_CALL(FunctionHeader.Native(SUM_LONG), List(CONST_LONG(1), acc))
+    }
+
+    ScriptV1.isExprContainsBlockV2(expr) shouldBe false
+  }
+
 }

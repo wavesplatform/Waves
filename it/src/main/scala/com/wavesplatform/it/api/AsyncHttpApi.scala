@@ -554,6 +554,9 @@ object AsyncHttpApi extends Assertions {
 
     def debugMinerInfo(): Future[Seq[State]] = getWithApiKey(s"/debug/minerInfo").as[Seq[State]]
 
+    def transactionSerializer(body: JsObject): Future[TransactionSerialize] =
+      postJsObjectWithApiKey(s"/utils/transactionSerialize", body).as[TransactionSerialize]
+
     def accountEffectiveBalance(acc: String): Future[Long] = n.effectiveBalance(acc).map(_.balance)
 
     def accountBalance(acc: String): Future[Long] = n.balance(acc).map(_.balance)
