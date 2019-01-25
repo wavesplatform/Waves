@@ -30,7 +30,7 @@ import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.Success
+import scala.util.{Success, Try}
 
 @Path("/transactions")
 @Api(value = "/transactions")
@@ -140,7 +140,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     ))
   def calculateFee: Route = (pathPrefix("calculateFee") & post) {
     pathEndOrSingleSlash {
-      handleExceptions(jsonExceptionHandler) {
+      handleExceptions(genericExceptionHandler) {
         json[JsObject] { jsv =>
           val senderPk = (jsv \ "senderPublicKey").as[String]
           // Just for converting the request to the transaction
@@ -148,7 +148,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
             "fee"    -> 1234567,
             "sender" -> senderPk
           )
-          createTransaction(senderPk, enrichedJsv) { tx =>
+          val tra = Try(createTransaction(senderPk, enrichedJsv) { tx =>
             CommonValidation.getMinFee(blockchain, functionalitySettings, blockchain.height, tx).map {
               case (assetId, assetAmount, wavesAmount) =>
                 Json.obj(
@@ -156,7 +156,10 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                   "feeAmount"  -> assetAmount
                 )
             }
-          }
+          })
+
+          if (tra.isFailure) tra.failed.get.printStackTrace()
+          tra.get
         }
       }
     }

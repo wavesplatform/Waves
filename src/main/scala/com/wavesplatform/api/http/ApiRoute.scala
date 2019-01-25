@@ -8,6 +8,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException, api_key, deprecated_api_key}
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.transaction.ValidationError
 import play.api.libs.json.{JsResultException, Reads}
 
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
@@ -33,6 +34,12 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     case JsResultException(err)    => complete(WrongJson(errors = err))
     case e: NoSuchElementException => complete(WrongJson(Some(e)))
   }
+
+  val genericExceptionHandler = jsonExceptionHandler.orElse(ExceptionHandler {
+    case e: ValidationError          => complete(ApiError.fromValidationError(e))
+    case e: IllegalArgumentException => complete(WrongJson(Some(e)))
+    case e: AssertionError           => complete(WrongJson(Some(e)))
+  })
 
   def withAuth: Directive0 = apiKeyHash.fold[Directive0](complete(ApiKeyNotValid)) { hashFromSettings =>
     optionalHeaderValueByType[api_key](()).flatMap {
