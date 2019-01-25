@@ -28,16 +28,16 @@ object ScriptReader {
           ScriptParseError(s"Invalid version: $version")
         )
       s <- sv match {
-        case V1 | V2 =>
+        case ExprV1 | ExprV2 =>
           for {
-            _     <- ScriptV1.validateBytes(scriptBytes)
+            _     <- ExprScript.validateBytes(scriptBytes)
             bytes <- Serde.deserialize(scriptBytes).map(_._1)
-            s     <- ScriptV1(sv, bytes, checkSize = false)
+            s     <- ExprScript(sv, bytes, checkSize = false)
           } yield s
-        case V3 =>
+        case ContractV =>
           for {
             bytes <- ContractSerDe.deserialize(scriptBytes)
-            s = ScriptV2(sv, bytes)
+            s = ContractScript(sv, bytes)
           } yield s
       }
     } yield s).left

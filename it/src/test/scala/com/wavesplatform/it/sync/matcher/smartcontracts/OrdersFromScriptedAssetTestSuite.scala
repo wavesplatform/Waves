@@ -13,7 +13,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 
 import scala.concurrent.duration._
@@ -219,7 +219,7 @@ object OrdersFromScriptedAssetTestSuite {
         quantity = Int.MaxValue / 3,
         decimals = 0,
         reissuable = false,
-        script = Some(ScriptV1(Terms.TRUE).explicitGet()),
+        script = Some(ExprScript(Terms.TRUE).explicitGet()),
         fee = 1.waves,
         timestamp = System.currentTimeMillis()
       )
@@ -243,7 +243,7 @@ object OrdersFromScriptedAssetTestSuite {
       quantity = Int.MaxValue / 3,
       decimals = 0,
       reissuable = false,
-      script = Some(ScriptV1(Terms.FALSE).explicitGet()),
+      script = Some(ExprScript(Terms.FALSE).explicitGet()),
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
     )

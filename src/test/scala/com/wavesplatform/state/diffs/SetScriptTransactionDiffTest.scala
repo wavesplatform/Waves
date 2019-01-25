@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, REF}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV2
+import com.wavesplatform.transaction.smart.script.v1.ContractScript
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -48,8 +48,8 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     ts      <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     fee <- smallFeeGen
-    script = ScriptV2(
-      Version.V3,
+    script = ContractScript(
+      Version.ContractV,
       Contract(
         List.empty,
         List(

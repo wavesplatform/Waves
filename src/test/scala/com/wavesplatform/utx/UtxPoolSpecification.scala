@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
@@ -221,7 +221,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     compiler.compile(code, List.empty).explicitGet()
   }
 
-  private val script: Script = ScriptV1(expr).explicitGet()
+  private val script: Script = ExprScript(expr).explicitGet()
 
   private def preconditionsGen(lastBlockId: ByteStr, master: PrivateKeyAccount): Gen[Seq[Block]] =
     for {

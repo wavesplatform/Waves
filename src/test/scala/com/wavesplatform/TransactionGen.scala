@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.script.v1.{ScriptV1, ScriptV2}
+import com.wavesplatform.transaction.smart.script.v1.{ExprScript, ContractScript}
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
 import com.wavesplatform.transaction.transfer._
@@ -113,12 +113,12 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
   val scriptGen = BOOLgen(100).map {
     case (expr, _) =>
       val typed =
-        ExpressionCompilerV1(PureContext.build(V1).compilerContext |+| CryptoContext.compilerContext(Global), expr).explicitGet()
-      ScriptV1(typed._1).explicitGet()
+        ExpressionCompilerV1(PureContext.build(ExprV1).compilerContext |+| CryptoContext.compilerContext(Global), expr).explicitGet()
+      ExprScript(typed._1).explicitGet()
   }
 
   val contractGen = Gen.const(
-    ScriptV2(V3,
+    ContractScript(ContractV,
              Contract(List.empty, List(ContractFunction(CallableAnnotation("sender"), None, Terms.FUNC("foo", List("a"), Terms.REF("a")))), None)))
 
   val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = for {
@@ -769,7 +769,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
       recipient <- accountGen
       ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(typed).explicitGet())
+      setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(typed).explicitGet())
       transfer  <- transferGeneratorPV2(ts, master, recipient.toAddress, ENOUGH_AMT / 2)
       fee       <- smallFeeGen
       lease = LeaseTransactionV2.selfSigned(LeaseTransactionV2.supportedVersions.head, master, ENOUGH_AMT / 2, fee, ts, recipient).explicitGet()

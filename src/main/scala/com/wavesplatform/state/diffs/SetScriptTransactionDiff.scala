@@ -22,7 +22,7 @@ object SetScriptTransactionDiff {
           Right(())
         } else {
           val version = script.version
-          if (version == Version.V1 || version == Version.V2)
+          if (version == Version.ExprV1 || version == Version.ExprV2)
             DenyDuplicateVarNames(version, varNames(version), script.expr.asInstanceOf[EXPR]).left.map(GenericError.apply)
           else Right(())
         }

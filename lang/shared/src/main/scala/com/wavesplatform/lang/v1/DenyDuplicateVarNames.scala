@@ -19,7 +19,7 @@ object DenyDuplicateVarNames {
     def aux(t: DenyDuplicates[EXPR], declared: Set[String]): DenyDuplicates[Set[String]] = {
       t flatMap {
         case _: CONST_LONG | _: CONST_BYTESTR | _: CONST_STRING | _: CONST_BOOLEAN | REF(_) => EitherT.pure(declared)
-        case BLOCKV1(LET(name, expr), body) =>
+        case LET_BLOCK(LET(name, expr), body) =>
           EitherT
             .fromEither[Coeval](isVarValid(declared, name))
             .flatMap(aux(EitherT.pure(expr), _))
@@ -33,7 +33,7 @@ object DenyDuplicateVarNames {
           args.foldLeft(EitherT.pure[Coeval, String](declared)) {
             case (declEi, arg) => declEi.flatMap(aux(EitherT.pure[Coeval, String](arg), _))
           }
-        case BLOCKV2(LET(name, expr), body) =>
+        case BLOCK(LET(name, expr), body) =>
           EitherT
             .fromEither[Coeval](isVarValid(declared, name))
             .flatMap(aux(EitherT.pure(expr), _))
@@ -43,8 +43,8 @@ object DenyDuplicateVarNames {
     }
 
     version match {
-      case V1 => aux(EitherT.pure(t), initial).value().map(_ => ())
-      case V2 => Right(())
+      case ExprV1 => aux(EitherT.pure(t), initial).value().map(_ => ())
+      case ExprV2 => Right(())
     }
   }
 }

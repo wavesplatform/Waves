@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV2
+import com.wavesplatform.transaction.smart.script.v1.ContractScript
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
@@ -104,7 +104,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       arg         <- genBoundedString(1, 32)
       funcBinding <- validAliasStringGen
       contract    <- senderBindingToContract(funcBinding)
-      script      = ScriptV2(Version.V3, contract)
+      script      = ContractScript(Version.ContractV, contract)
       setContract = SetScriptTransaction.selfSigned(setScriptVersion, master, Some(script), fee, ts).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
       ci          = ContractInvocationTransaction.selfSigned(ciVersion, invoker, master, fc, None, fee, ts).explicitGet()

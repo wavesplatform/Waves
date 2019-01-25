@@ -49,7 +49,7 @@ object Serde {
             letValue <- aux()
             body     <- aux()
           } yield
-            BLOCKV1(
+            LET_BLOCK(
               let = LET(name, letValue),
               body = body
             )
@@ -58,7 +58,7 @@ object Serde {
             decType <- Coeval.now(bb.get())
             dec     <- deserializeDeclaration(bb, aux(), decType)
             body    <- aux()
-          } yield BLOCKV2(dec, body)
+          } yield BLOCK(dec, body)
         case E_REF    => Coeval.now(REF(bb.getString))
         case E_TRUE   => Coeval.now(TRUE)
         case E_FALSE  => Coeval.now(FALSE)
@@ -138,13 +138,13 @@ object Serde {
           }
         case IF(cond, ifTrue, ifFalse) =>
           List(cond, ifTrue, ifFalse).foldLeft(Coeval.now(out.write(E_IF)))(aux)
-        case BLOCKV1(LET(name, value), body) =>
+        case LET_BLOCK(LET(name, value), body) =>
           val n = Coeval.now[Unit] {
             out.write(E_BLOCK)
             out.writeString(name)
           }
           List(value, body).foldLeft(n)(aux)
-        case BLOCKV2(dec, body) =>
+        case BLOCK(dec, body) =>
           val n = Coeval.now[Unit] {
             out.write(E_BLOCK_V2)
           }

@@ -17,7 +17,7 @@ import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Port
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.{NoShrink, TestTime, WithDB}
 import org.scalacheck.Gen
@@ -82,7 +82,7 @@ class OrderValidatorSpecification
       "v1 order from a scripted account" in forAll(accountGen) { scripted =>
         portfolioTest(defaultPortfolio) { (ov, bc) =>
           activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
-          (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
+          (bc.accountScript _).when(scripted.toAddress).returns(Some(ExprScript(Terms.TRUE).explicitGet()))
           (bc.height _).when().returns(50).anyNumberOfTimes()
 
           ov.validateNewOrder(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
@@ -92,7 +92,7 @@ class OrderValidatorSpecification
       "sender's address has a script, but trading from smart accounts hasn't been activated" in forAll(accountGen) { scripted =>
         portfolioTest(defaultPortfolio) { (ov, bc) =>
           activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
-          (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.TRUE).explicitGet()))
+          (bc.accountScript _).when(scripted.toAddress).returns(Some(ExprScript(Terms.TRUE).explicitGet()))
           (bc.height _).when().returns(50).anyNumberOfTimes()
 
           ov.validateNewOrder(newBuyOrder(scripted)) should produce("Trading on scripted account isn't allowed yet")
@@ -102,7 +102,7 @@ class OrderValidatorSpecification
       "sender's address has a script returning FALSE" in forAll(accountGen) { scripted =>
         portfolioTest(defaultPortfolio) { (_, bc) =>
           activate(bc, BlockchainFeatures.SmartAccountTrading -> 100)
-          (bc.accountScript _).when(scripted.toAddress).returns(Some(ScriptV1(Terms.FALSE).explicitGet()))
+          (bc.accountScript _).when(scripted.toAddress).returns(Some(ExprScript(Terms.FALSE).explicitGet()))
           (bc.height _).when().returns(150).anyNumberOfTimes()
 
           val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings, ntpTime)
@@ -204,8 +204,8 @@ class OrderValidatorSpecification
                                   asset2 -> 10 * Constants.UnitsInWave
                                 ))
 
-      val permitScript = ScriptV1(Terms.TRUE).explicitGet()
-      val denyScript   = ScriptV1(Terms.FALSE).explicitGet()
+      val permitScript = ExprScript(Terms.TRUE).explicitGet()
+      val denyScript   = ExprScript(Terms.FALSE).explicitGet()
 
       "two assets are smart and they permit an order" when test { (ov, bc, o) =>
         (bc.assetScript _).when(asset1).returns(Some(permitScript))
@@ -302,7 +302,7 @@ class OrderValidatorSpecification
 
   private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = portfolioTest(defaultPortfolio) { (ov, bc) =>
     val pk            = PrivateKeyAccount(randomBytes())
-    val accountScript = ScriptV1(V2, Terms.TRUE, checkSize = false).explicitGet()
+    val accountScript = ExprScript(ExprV2, Terms.TRUE, checkSize = false).explicitGet()
 
     activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
     (bc.accountScript _).when(pk.toAddress).returns(Some(accountScript)).anyNumberOfTimes()
