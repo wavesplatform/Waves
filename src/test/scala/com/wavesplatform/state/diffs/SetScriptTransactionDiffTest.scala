@@ -4,16 +4,16 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Version
-import com.wavesplatform.lang.Version.V1
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.{ScriptV1, ScriptV2}
+import com.wavesplatform.transaction.smart.script.v1.{ContractScript, ExprScript}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -49,8 +49,8 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     ts      <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     fee <- smallFeeGen
-    script = ScriptV2(
-      Version.V3,
+    script = ContractScript(
+      Version.ContractV,
       Contract(
         List.empty,
         List(ContractFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
@@ -84,8 +84,8 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
       master <- accountGen
       ts     <- positiveLongGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      expr    = BLOCKV2(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
-      script  = ScriptV1(V1, expr, checkSize = false).explicitGet()
+      expr    = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
+      script  = ExprScript(ExprV1, expr, checkSize = false).explicitGet()
       tx      = SetScriptTransaction.selfSigned(1, master, Some(script), 100000, ts + 1).explicitGet()
     } yield (genesis, tx)
 

@@ -27,7 +27,7 @@ object JsAPI {
         case GETTER(ref, field) => jObj.applyDynamic("apply")("type" -> "GETTER", "ref"    -> r(ref), "field" -> field)
         case CONST_BYTESTR(bs)  => jObj.applyDynamic("apply")("type" -> "BYTESTR", "value" -> bs.arr.toJSArray)
         case CONST_STRING(s)    => jObj.applyDynamic("apply")("type" -> "STRING", "value"  -> s)
-        case BLOCKV1(let, body) =>
+        case LET_BLOCK(let, body) =>
           jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
         case IF(cond, ifTrue, ifFalse) =>
           jObj.applyDynamic("apply")("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
@@ -64,8 +64,8 @@ object JsAPI {
     isTokenContext = false
   )
 
-  val v1                   = com.wavesplatform.lang.Version.V1
-  val v3                   = com.wavesplatform.lang.Version.V3
+  val v1                   = com.wavesplatform.lang.Version.ExprV1
+  val v3                   = com.wavesplatform.lang.Version.ContractV
   val exprWavesContext     = wavesContext(v1)
   val contractWavesContext = wavesContext(v3)
 

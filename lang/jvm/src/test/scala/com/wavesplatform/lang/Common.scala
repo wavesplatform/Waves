@@ -3,7 +3,7 @@ package com.wavesplatform.lang
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.diffs.ProduceError
-import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -25,7 +25,7 @@ object Common {
   val dataEntryType              = CaseType("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
   val addCtx: CTX                = CTX.apply(Seq(dataEntryType), Map.empty, Array.empty)
 
-  def ev[T <: EVALUATED](context: EvaluationContext = Monoid.combine(PureContext.build(V1).evaluationContext, addCtx.evaluationContext),
+  def ev[T <: EVALUATED](context: EvaluationContext = Monoid.combine(PureContext.build(ExprV1).evaluationContext, addCtx.evaluationContext),
                          expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)
 

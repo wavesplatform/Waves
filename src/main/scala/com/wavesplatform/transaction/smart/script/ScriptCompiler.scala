@@ -2,14 +2,14 @@ package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
 import com.wavesplatform.lang.Version
-import com.wavesplatform.lang.Version.{V1, _}
+import com.wavesplatform.lang.Version.{ExprV1, _}
 import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompilerV1}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1.ScriptV1Impl
-import com.wavesplatform.transaction.smart.script.v1.{ScriptV1, ScriptV2}
+import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
+import com.wavesplatform.transaction.smart.script.v1.{ExprScript, ContractScript}
 import com.wavesplatform.utils._
 
 import scala.util.{Failure, Success, Try}
@@ -17,9 +17,9 @@ import scala.util.{Failure, Success, Try}
 object ScriptCompiler extends ScorexLogging {
 
   def contract(scriptText: String): Either[String, Script] = {
-    val ctx = compilerContext(V3, isAssetScript = false)
+    val ctx = compilerContext(ContractV, isAssetScript = false)
     ContractCompiler(ctx, Parser.parseContract(scriptText).get.value)
-      .map(s => ScriptV2(V3, s))
+      .map(s => ContractScript(ContractV, s))
   }
 
   def apply(scriptText: String, isAssetScript: Boolean): Either[String, (Script, Long)] = {
@@ -33,7 +33,7 @@ object ScriptCompiler extends ScorexLogging {
     for {
       ver        <- extractVersion(directives)
       expr       <- tryCompile(scriptWithoutDirectives, ver, isAssetScript, directives)
-      script     <- ScriptV1.apply(ver, expr)
+      script     <- ExprScript.apply(ver, expr)
       complexity <- ScriptEstimator(varNames(ver), functionCosts(ver), expr)
     } yield (script, complexity)
   }
@@ -52,8 +52,8 @@ object ScriptCompiler extends ScorexLogging {
   }
 
   def estimate(script: Script, version: Version): Either[String, Long] = script match {
-    case s: ScriptV1Impl => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
-    case s: ScriptV2     => Right(1)
+    case s: ExprScriprImpl => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
+    case s: ContractScript     => Right(1)
     case _               => ???
   }
 
@@ -73,7 +73,7 @@ object ScriptCompiler extends ScorexLogging {
           case Failure(ex) =>
             Left("Can't parse language version")
       })
-      .getOrElse(V1.asRight)
+      .getOrElse(ExprV1.asRight)
   }
 
 }

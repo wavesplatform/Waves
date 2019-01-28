@@ -13,7 +13,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptRunner
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.{EmptyBlockchain, compilerContext}
 import fastparse.core.Parsed.Success
@@ -31,7 +31,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
     for {
       compileResult <- ExpressionCompilerV1(compilerContext(version, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
-      s <- ScriptV1(version, typedExpr, checkSize = false)
+      s <- ExprScript(version, typedExpr, checkSize = false)
       r <- ScriptRunner(blockchain.height, Coproduct(tx), blockchain, s, isTokenScript = false)._2
     } yield r
 
@@ -47,21 +47,26 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
 
   val orderTypeBindings = "let t = Buy; t == Buy"
 
-
   "ScriptV1 allows duplicate names" in {
-    forAll(transferV2Gen.flatMap(tx => Gen.oneOf(V1, V2).map(v => (tx, v)))) {
+    forAll(transferV2Gen.flatMap(tx => Gen.oneOf(ExprV1, ExprV2).map(v => (tx, v)))) {
       case (tx, v) =>
         eval[EVALUATED](duplicateNames, v, tx) shouldBe Testing.evaluated(true)
     }
   }
 
   "ScriptV1 - does not have bindings defined in V2" in {
-    eval[EVALUATED](orderTypeBindings, V1) should produce("definition of 'Buy' is not found")
+    eval[EVALUATED](orderTypeBindings, ExprV1) should produce("definition of 'Buy' is not found")
   }
 
   "ScriptV2" - {
+    "allows duplicate names" in {
+      forAll(transferV2Gen) { tx =>
+        eval[EVALUATED](duplicateNames, ExprV2, tx) shouldBe Testing.evaluated(true)
+      }
+    }
+
     "has bindings defined in V2" in {
-      eval[EVALUATED](orderTypeBindings, V2) shouldBe Testing.evaluated(true)
+      eval[EVALUATED](orderTypeBindings, ExprV2) shouldBe Testing.evaluated(true)
     }
 
     "only works after SmartAccountTrading feature activation" in {
@@ -72,7 +77,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
         master <- accountGen
         ts     <- positiveLongGen
         genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-        script  = ScriptV1(V2, TRUE, checkSize = false).explicitGet()
+        script  = ExprScript(ExprV2, TRUE, checkSize = false).explicitGet()
         tx      = SetScriptTransaction.selfSigned(1, master, Some(script), 100000, ts + 1).explicitGet()
       } yield (genesis, tx)
 
