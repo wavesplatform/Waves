@@ -150,7 +150,7 @@ object Keys {
   def transactionHNById(txId: TransactionId): Key[Option[(Height, TxNum)]] =
     Key.opt(
       "transaction-height-and-nums-by-id",
-      bytes(TransactionInfoPrefix, txId.arr),
+      bytes(TransactionHeightNumByIdPrefix, txId.arr),
       readTransactionHN,
       writeTransactionHN
     )

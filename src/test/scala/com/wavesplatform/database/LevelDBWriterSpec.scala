@@ -10,16 +10,17 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.BlockchainUpdaterImpl
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{RequestGen, WithDB}
+import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 
-class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestGen {
+class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with RequestGen {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
@@ -228,6 +229,74 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
     } finally {
       bcu.shutdown()
       db.close()
+    }
+  }
+
+  "allActiveLeases" - {
+    "should return correct set of leases" in {
+      def precs: Gen[(Seq[LeaseTransaction], Seq[Block])] = {
+
+        val ts = ntpTime.correctedTime()
+
+        for {
+          leaser <- accountGen
+          genesisBlock = TestBlock
+            .create(ts, Seq(GenesisTransaction.create(leaser, ENOUGH_AMT, ts).explicitGet()))
+          leases <- Gen.listOfN(
+            100,
+            for {
+              rec   <- accountGen
+              lease <- createLease(leaser, ENOUGH_AMT / 1000, 1 * 10 ^ 8, ts, rec.toAddress)
+            } yield lease
+          )
+          zero = (Seq.empty[LeaseTransaction], Seq[Block](genesisBlock))
+          (leaseTxs, blocks) = leases.distinct
+            .sliding(10, 10)
+            .foldLeft(zero) {
+              case ((ls, b :: bs), txs) =>
+                val nextBlock = TestBlock
+                  .create(
+                    ts + 10 + (b :: bs).length,
+                    b.uniqueId,
+                    txs
+                  )
+
+                (ls ++ txs, nextBlock :: b :: bs)
+            }
+        } yield (leaseTxs, blocks.reverse)
+      }
+
+      val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+      val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+      val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+      val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
+      try {
+
+        val (leases, blocks) = precs.sample.get
+
+        blocks.foreach { block =>
+          bcu.processBlock(block).explicitGet()
+        }
+
+        bcu.allActiveLeases shouldBe leases.toSet
+
+        val emptyBlock = TestBlock
+          .create(
+            blocks.last.timestamp + 2,
+            blocks.last.uniqueId,
+            Seq.empty
+          )
+
+        // some leases in liquid state, we should add one block over to store them in db
+        bcu.processBlock(emptyBlock)
+
+        defaultWriter.allActiveLeases shouldBe leases.toSet
+
+        bcu.shutdown()
+      } finally {
+        bcu.shutdown()
+        db.close()
+      }
     }
   }
 

@@ -761,7 +761,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     try {
       iterator.seek(prefix)
       while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) {
-        val txId = iterator.next().getKey.drop(4)
+        val txId = iterator.next().getKey.drop(2)
         txIds.append(TransactionId(ByteStr(txId)))
       }
     } finally iterator.close()
