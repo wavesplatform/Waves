@@ -1,19 +1,16 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{Route, StandardRoute}
-import com.wavesplatform.network._
+import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction._
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import play.api.libs.json._
-import com.wavesplatform.block.BlockHeader
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction._
 
 import scala.concurrent._
 
@@ -21,8 +18,7 @@ import scala.concurrent._
 @Api(value = "/blocks")
 case class BlocksApiRoute(settings: RestAPISettings,
                           blockchain: Blockchain,
-                          allChannels: ChannelGroup,
-                          checkpointProc: Checkpoint => Task[Either[ValidationError, Option[BigInt]]])
+                          allChannels: ChannelGroup)
     extends ApiRoute {
 
   // todo: make this configurable and fix integration tests
@@ -233,34 +229,9 @@ case class BlocksApiRoute(settings: RestAPISettings,
         .toOption
         .toRight(InvalidSignature)
         .flatMap(s => blockchain.blockById(s).toRight(BlockDoesNotExist)) match {
-        case Right(block) => complete(block.json() + ("height" -> blockchain.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
-        case Left(e)      => complete(e)
-      }
-    }
-  }
-
-  @Path("/checkpoint")
-  @ApiOperation(value = "Create checkpoint", notes = "Broadcast a checkpoint", httpMethod = "POST")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "message",
-                           value = "Checkpoint message",
-                           required = true,
-                           paramType = "body",
-                           dataType = "com.wavesplatform.network.Checkpoint")
-    ))
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Json with response or error")
-    ))
-  def checkpoint: Route = (path("checkpoint") & post) {
-    json[Checkpoint] { checkpoint =>
-      checkpointProc(checkpoint)
-        .runAsync(rollbackExecutor)
-        .map {
-          _.map(score => allChannels.broadcast(LocalScoreChanged(score.getOrElse(blockchain.score))))
+          case Right(block) => complete(block.json() + ("height" -> blockchain.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
+          case Left(e)      => complete(e)
         }
-        .map(_.fold(ApiError.fromValidationError, _ => Json.obj("" -> "")): ToResponseMarshallable)
     }
   }
 }

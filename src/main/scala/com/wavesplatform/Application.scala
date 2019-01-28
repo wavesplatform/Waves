@@ -212,7 +212,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
+        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, allChannels),
         TransactionsApiRoute(settings.restAPISettings,
                              settings.blockchainSettings.functionalitySettings,
                              wallet,
