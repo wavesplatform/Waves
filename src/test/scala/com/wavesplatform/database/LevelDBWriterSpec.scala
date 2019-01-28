@@ -11,7 +11,7 @@ import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loa
 import com.wavesplatform.state.BlockchainUpdaterImpl
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
@@ -92,7 +92,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
     def baseGen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = accountGen.map { master =>
       val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       val setScriptTx = SetScriptTransaction
-        .selfSigned(1, master, Some(ScriptV1(Terms.TRUE).explicitGet()), 5000000, ts)
+        .selfSigned(1, master, Some(ExprScript(Terms.TRUE).explicitGet()), 5000000, ts)
         .explicitGet()
 
       val block = TestBlock.create(ts, Seq(genesisTx, setScriptTx))
