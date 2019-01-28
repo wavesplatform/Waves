@@ -55,7 +55,8 @@ case class ContractInvocationTransaction private (version: Byte,
         "call"            -> ContractInvocationTransaction.functionCallToJson(fc),
         "payment"         -> payment
       ))
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+  override val bytes: Coeval[Array[Byte]]    = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+  override def checkedAssets(): Seq[AssetId] = payment.toSeq.flatMap(_.assetId)
 }
 
 object ContractInvocationTransaction extends TransactionParserFor[ContractInvocationTransaction] with TransactionParser.MultipleVersions {
