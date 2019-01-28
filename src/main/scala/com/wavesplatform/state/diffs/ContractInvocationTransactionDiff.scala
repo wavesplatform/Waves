@@ -48,11 +48,34 @@ object ContractInvocationTransactionDiff {
               .map(a => GenericError(a.toString): ValidationError)
               .flatMap {
                 case ContractResult(ds, ps) => {
+                  import cats.implicits._
                   val r: Seq[DataEntry[_]] = ds.map {
                     case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
                     case DataItem.Str(k, b)  => StringDataEntry(k, b)
                     case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
                     case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
+                  }
+                  val dataDiff = {
+                    val payablePart: Map[Address, Portfolio] = tx.payment match {
+                      case None => Map.empty
+                      case Some(ContractInvocationTransaction.Payment(amt, assetOpt)) =>
+                        assetOpt match {
+                          case Some(asset) =>
+                            Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
+                              Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                            )
+                          case None =>
+                            Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
+                              .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
+                        }
+                    }
+                    val feePart = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
+                    Diff(
+                      height = height,
+                      tx = tx,
+                      portfolios = feePart.combine(payablePart),
+                      accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
+                    )
                   }
                   val pmts: List[Map[Address, Map[Option[ByteStr], Long]]] = ps.map {
                     case (Recipient.Address(addrBytes), amt, maybeAsset) =>
@@ -72,36 +95,18 @@ object ContractInvocationTransactionDiff {
                     _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - sum doesn't overflow
                     _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - whatever else tranfser/massTransfer ensures
                   } yield {
-                    import cats.implicits._
                     val paymentReceiversMap: Map[Address, Portfolio] = Monoid
                       .combineAll(pmts)
                       .mapValues(mp => mp.toList.map(x => Portfolio.build(x._1, x._2)))
                       .mapValues(l => Monoid.combineAll(l))
-                    val feePart = Map(
-                      tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)
-                    )
                     val paymentFromContractMap = Map(tx.contractAddress -> Monoid.combineAll(paymentReceiversMap.values).negate)
 
-                    val payablePart: Map[Address, Portfolio] = tx.payment match {
-                      case None => Map.empty
-                      case Some(ContractInvocationTransaction.Payment(amt, assetOpt)) =>
-                        assetOpt match {
-                          case Some(asset) =>
-                            Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
-                              Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
-                            )
-                          case None =>
-                            Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
-                              .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
-                        }
-                    }
-                    val transfers = Monoid.combineAll(Seq(payablePart, feePart, paymentReceiversMap, paymentFromContractMap))
-                    Diff(
-                      height = height,
-                      tx = tx,
-                      portfolios = transfers,
-                      accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
-                    )
+                    val transfers = Monoid.combineAll(Seq(paymentReceiversMap, paymentFromContractMap))
+                    dataDiff.combine(
+                      Diff.stateOps(
+                        portfolios = transfers,
+                        accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
+                      ))
                   }
                 }
               }

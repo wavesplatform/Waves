@@ -141,6 +141,28 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
 
 object Diff {
 
+  def stateOps(portfolios: Map[Address, Portfolio] = Map.empty,
+               assetInfos: Map[AssetId, AssetInfo] = Map.empty,
+               aliases: Map[Alias, Address] = Map.empty,
+               orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
+               leaseState: Map[ByteStr, Boolean] = Map.empty,
+               scripts: Map[Address, Option[Script]] = Map.empty,
+               assetScripts: Map[AssetId, Option[Script]] = Map.empty,
+               accountData: Map[Address, AccountDataInfo] = Map.empty,
+               sponsorship: Map[AssetId, Sponsorship] = Map.empty): Diff =
+    Diff(
+      transactions = Map(),
+      portfolios = portfolios,
+      issuedAssets = assetInfos,
+      aliases = aliases,
+      orderFills = orderFills,
+      leaseState = leaseState,
+      scripts = scripts,
+      assetScripts = assetScripts,
+      accountData = accountData,
+      sponsorship = sponsorship
+    )
+
   def apply(height: Int,
             tx: Transaction,
             portfolios: Map[Address, Portfolio] = Map.empty,
