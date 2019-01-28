@@ -35,13 +35,13 @@ package object predef {
   }
 
   def runScript[T <: EVALUATED](script: String, t: In = null): Either[String, T] =
-    runScript[T](script, V1, t, EmptyBlockchain, chainId)
+    runScript[T](script, ExprV1, t, EmptyBlockchain, chainId)
 
   def runScript[T <: EVALUATED](script: String, t: In, chainId: Byte): Either[String, T] =
-    runScript[T](script, V1, t, EmptyBlockchain, chainId)
+    runScript[T](script, ExprV1, t, EmptyBlockchain, chainId)
 
   def runScript[T <: EVALUATED](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] =
-    runScript[T](script, V1, Coproduct(tx), blockchain, chainId)
+    runScript[T](script, ExprV1, Coproduct(tx), blockchain, chainId)
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 

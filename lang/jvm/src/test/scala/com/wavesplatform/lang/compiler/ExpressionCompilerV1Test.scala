@@ -140,7 +140,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Right(
-      (BLOCKV2(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))), BOOLEAN))
+      (BLOCK(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))), BOOLEAN))
   )
 
   treeTypeTest("idOptionLong(())")(
@@ -174,7 +174,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Right(
-      (BLOCKV2(
+      (BLOCK(
          LET("$match0", REF("p")),
          IF(
            IF(
@@ -188,7 +188,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
                List(REF("$match0"), CONST_STRING("PointA"))
              )
            ),
-           BLOCKV2(LET("p", REF("$match0")), TRUE),
+           BLOCK(LET("p", REF("$match0")), TRUE),
            FALSE
          )
        ),
@@ -215,9 +215,9 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     },
     expectedResult = {
       Right(
-        (BLOCKV2(
-           LET("a", BLOCKV2(LET("$match0", REF("p")), BLOCKV2(LET("$match1", REF("p")), CONST_LONG(1)))),
-           BLOCKV2(LET("b", BLOCKV2(LET("$match0", REF("p")), CONST_LONG(2))), FUNCTION_CALL(FunctionHeader.Native(100), List(REF("a"), REF("b"))))
+        (BLOCK(
+           LET("a", BLOCK(LET("$match0", REF("p")), BLOCK(LET("$match1", REF("p")), CONST_LONG(1)))),
+           BLOCK(LET("b", BLOCK(LET("$match0", REF("p")), CONST_LONG(2))), FUNCTION_CALL(FunctionHeader.Native(100), List(REF("a"), REF("b"))))
          ),
          LONG))
 
@@ -398,7 +398,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.CONST_LONG(AnyPos, 1L)))
     ),
     expectedResult = Right(
-      (BLOCKV2(
+      (BLOCK(
          FUNC("id", List("x"), REF("x")),
          FUNCTION_CALL(FunctionHeader.User("id"), List(CONST_LONG(1L)))
        ),

@@ -12,13 +12,13 @@ object ScriptEstimator {
       case _: CONST_LONG | _: CONST_BYTESTR | _: CONST_STRING | _: CONST_BOOLEAN => EitherT.pure((1, syms))
       case t: GETTER                                                                => aux(EitherT.pure(t.expr), syms).map { case (comp, out) => (comp + 2, out) }
 
-      case BLOCKV1(let: LET, body) =>
+      case LET_BLOCK(let: LET, body) =>
         aux(EitherT.pure(body), syms + ((let.name, (let.value, false))))
           .map { case (comp, out) => (comp + 5, out) }
-      case BLOCKV2(let: LET, body) =>
+      case BLOCK(let: LET, body) =>
         aux(EitherT.pure(body), syms + ((let.name, (let.value, false))))
           .map { case (comp, out) => (comp + 5, out) }
-      case BLOCKV2(f: FUNC, body) => ???
+      case BLOCK(f: FUNC, body) => ???
       case REF(key) =>
         val ei: EitherT[Coeval, String, (Long, Map[String, (EXPR, Boolean)])] = syms.get(key) match {
           case None                => EitherT.fromEither(Left(s"ScriptValidator: Undeclared variable '$key'"))

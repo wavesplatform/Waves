@@ -22,16 +22,16 @@ object ContractEvaluator {
       case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '${i.name} doesn't exist in the contract")
       case Some(f) =>
         val zeroExpr = Right(
-          BLOCKV2(
+          BLOCK(
             LET(f.annotation.invocationArgName,
                 Bindings
                   .buildInvocation(Recipient.Address(i.invoker), i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.contractAddress))),
-            BLOCKV2(f.u, i.fc)
+            BLOCK(f.u, i.fc)
           ))
 
         for {
           ze <- liftEither(zeroExpr)
-          expr = c.dec.foldRight(ze)((d, e) => BLOCKV2(d, e))
+          expr = c.dec.foldRight(ze)((d, e) => BLOCK(d, e))
           r <- EvaluatorV1.evalExpr(expr)
         } yield r
     }
@@ -40,7 +40,7 @@ object ContractEvaluator {
   def verify(v: VerifierFunction, tx: Tx): EvalM[EVALUATED] = {
     val t = Bindings.transactionObject(tx, proofsEnabled = true)
     val expr =
-      BLOCKV2(LET(v.annotation.txArgName, t), BLOCKV2(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+      BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 

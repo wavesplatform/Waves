@@ -277,7 +277,7 @@ object Types {
         buildSetScriptTransactionType(proofsEnabled),
         buildSponsorFeeTransactionType(proofsEnabled),
         buildDataTransactionType(proofsEnabled)
-      ) ++ (if (v == Version.V3) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
+      ) ++ (if (v == Version.ContractV) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
   }
 
   def buildWavesTypes(proofsEnabled: Boolean, v: Version): Seq[DefinedType] = {

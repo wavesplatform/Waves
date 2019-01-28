@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -15,7 +15,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.transaction.assets.IssueTransactionV2
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 import com.wavesplatform.utils._
@@ -63,7 +63,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
       untypedScript = Parser.parseScript(assetScript).get.value
 
-      typedScript = ScriptV1(ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
+      typedScript = ExprScript(ExpressionCompilerV1(compilerContext(ExprV1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -113,8 +113,8 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
   private def eval(code: String) = {
     val untyped = Parser.parseScript(code).get.value
-    val typed   = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untyped).map(_._1)
-    typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(V1), _))
+    val typed   = ExpressionCompilerV1(compilerContext(ExprV1, isAssetScript = false), untyped).map(_._1)
+    typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(ExprV1), _))
   }
 
   property("Script toBase58String") {

@@ -93,7 +93,7 @@ package object utils extends ScorexLogging {
   private val lazyAssetContexts: Map[Version, Coeval[CTX]] =
     Seq
       .tabulate(2) { v =>
-        val version = com.wavesplatform.lang.Version.fromInt(v + 1)
+        val version = com.wavesplatform.lang.Version.parseVersion(v + 1)
         version -> Coeval.evalOnce(
           Monoid
             .combineAll(Seq(

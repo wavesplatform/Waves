@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
@@ -15,7 +15,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
 
   property("ScriptV1.apply should permit BOOLEAN scripts") {
     forAll(BOOLEANgen(10)) { expr =>
-      ScriptV1(expr) shouldBe 'right
+      ExprScript(expr) shouldBe 'right
     }
   }
 
@@ -30,7 +30,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))
 
-    ScriptV1(expr) should produce("Script is too complex")
+    ExprScript(expr) should produce("Script is too complex")
   }
 
   property("ScriptV1.apply should deny too big scripts") {
@@ -47,7 +47,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       )
     }
 
-    ScriptV1(expr) should produce("Script is too large")
+    ExprScript(expr) should produce("Script is too large")
   }
 
   property("19 sigVerify should fit in maxSizeInBytes") {
@@ -61,7 +61,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))
 
-    ScriptV1(expr) shouldBe 'right
+    ExprScript(expr) shouldBe 'right
   }
 
   property("Expression block version check - successful on very deep expressions(stack overflow check)") {
@@ -69,7 +69,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       FUNCTION_CALL(FunctionHeader.Native(SUM_LONG), List(CONST_LONG(1), acc))
     }
 
-    ScriptV1.isExprContainsBlockV2(expr) shouldBe false
+    ExprScript.isExprContainsBlockV2(expr) shouldBe false
   }
 
 }
