@@ -3,48 +3,60 @@ package com.wavesplatform.lang.v1
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
+import com.wavesplatform.common.utils.EitherExt2
 
 object ScriptEstimator {
   def apply(declaredVals: Set[String], functionCosts: collection.Map[FunctionHeader, Coeval[Long]], t: EXPR): Either[String, Long] = {
     type Result[T] = EitherT[Coeval, String, T]
 
-    def aux(t: Result[EXPR], syms: Map[String, (EXPR, Boolean)]): Result[(Long, Map[String, (EXPR, Boolean)])] = t.flatMap {
+    def aux(t: Result[EXPR],
+            syms: Map[String, (EXPR, Boolean)],
+            funcs: Map[FunctionHeader, Coeval[Long]]): Result[(Long, Map[String, (EXPR, Boolean)])] = t.flatMap {
+
       case _: CONST_LONG | _: CONST_BYTESTR | _: CONST_STRING | _: CONST_BOOLEAN => EitherT.pure((1, syms))
-      case t: GETTER                                                                => aux(EitherT.pure(t.expr), syms).map { case (comp, out) => (comp + 2, out) }
+      case t: GETTER                                                             => aux(EitherT.pure(t.expr), syms, funcs).map { case (comp, out) => (comp + 2, out) }
 
       case BLOCKV1(let: LET, body) =>
-        aux(EitherT.pure(body), syms + ((let.name, (let.value, false))))
+        aux(EitherT.pure(body), syms + ((let.name, (let.value, false))), funcs)
           .map { case (comp, out) => (comp + 5, out) }
+
       case BLOCKV2(let: LET, body) =>
-        aux(EitherT.pure(body), syms + ((let.name, (let.value, false))))
+        aux(EitherT.pure(body), syms + ((let.name, (let.value, false))), funcs)
           .map { case (comp, out) => (comp + 5, out) }
-      case BLOCKV2(f: FUNC, body) => ???
+
+      case BLOCKV2(f: FUNC, body) =>
+        aux(
+          EitherT.pure(body),
+          syms,
+          funcs + (FunctionHeader.User(f.name) -> Coeval.evalOnce(aux(EitherT.pure(f.body), syms, funcs).value().map(_._1).explicitGet()))
+        ).map { case (comp, out) => (comp + 5, out) }
+
       case REF(key) =>
         val ei: EitherT[Coeval, String, (Long, Map[String, (EXPR, Boolean)])] = syms.get(key) match {
           case None                => EitherT.fromEither(Left(s"ScriptValidator: Undeclared variable '$key'"))
           case Some((_, true))     => EitherT.pure[Coeval, String]((0L, syms))
-          case Some((expr, false)) => aux(EitherT.pure(expr), syms + ((key, (expr, true))))
+          case Some((expr, false)) => aux(EitherT.pure(expr), syms + ((key, (expr, true))), funcs)
         }
         ei.map { case (comp: Long, out: Map[String, (EXPR, Boolean)]) => (comp + 2, out) }
 
       case t: IF =>
         for {
-          cond <- aux(EitherT.pure(t.cond), syms)
+          cond <- aux(EitherT.pure(t.cond), syms, funcs)
           (condComp, condSyms) = cond
-          right <- aux(EitherT.pure(t.ifTrue), condSyms)
-          left  <- aux(EitherT.pure(t.ifFalse), condSyms)
+          right <- aux(EitherT.pure(t.ifTrue), condSyms, funcs)
+          left  <- aux(EitherT.pure(t.ifFalse), condSyms, funcs)
           (bodyComp, bodySyms) = if (right._1 > left._1) right else left
         } yield (condComp + bodyComp + 1, bodySyms)
 
       case t: FUNCTION_CALL =>
         for {
-          callCost <- EitherT.fromOption[Coeval](functionCosts.get(t.function), s"ScriptValidator: Unknown function '${t.function}'")
+          callCost <- EitherT.fromOption[Coeval]((functionCosts ++ funcs).get(t.function), s"ScriptValidator: Unknown function '${t.function}'")
           args <- t.args.foldLeft(EitherT.pure[Coeval, String]((0L, syms))) {
             case (accEi, arg) =>
               for {
                 acc <- accEi
                 (accComp, accSyms) = acc
-                v <- aux(EitherT.pure[Coeval, String](arg), accSyms)
+                v <- aux(EitherT.pure[Coeval, String](arg), accSyms, funcs)
                 (comp, out) = v
               } yield (accComp + comp, out)
           }
@@ -54,6 +66,6 @@ object ScriptEstimator {
       case _ => ??? //TODO: FIx exhaustivness
     }
 
-    aux(EitherT.pure(t), declaredVals.map(_ -> ((TRUE, true))).toMap).value().map(_._1)
+    aux(EitherT.pure(t), declaredVals.map(_ -> ((TRUE, true))).toMap, Map.empty).value().map(_._1)
   }
 }
