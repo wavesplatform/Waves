@@ -86,10 +86,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("successful on x = y") {
     ev[EVALUATED](
       expr = BLOCK(LET("x", CONST_LONG(3)),
-                     BLOCK(
-                       LET("y", REF("x")),
-                       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("y")))
-                     ))) shouldBe evaluated(6)
+                   BLOCK(
+                     LET("y", REF("x")),
+                     FUNCTION_CALL(sumLong.header, List(REF("x"), REF("y")))
+                   ))) shouldBe evaluated(6)
   }
 
   property("successful on simple get") {

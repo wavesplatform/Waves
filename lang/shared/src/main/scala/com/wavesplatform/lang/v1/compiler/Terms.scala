@@ -15,7 +15,7 @@ object Terms {
   case class GETTER(expr: EXPR, field: String)                  extends EXPR
   case class CONST_BYTESTR(bs: ByteStr)                         extends EXPR with EVALUATED
   case class CONST_STRING(s: String)                            extends EXPR with EVALUATED
-  @Deprecated("Use BLOCK(_,_) instead")
+  @Deprecated
   case class LET_BLOCK(let: LET, body: EXPR)             extends EXPR
   case class BLOCK(dec: DECLARATION, body: EXPR)         extends EXPR
   case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR) extends EXPR
