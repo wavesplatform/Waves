@@ -27,7 +27,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
 
   override lazy val route =
     pathPrefix("blocks") {
-      signature ~ first ~ last ~ lastHeaderOnly ~ at ~ atHeaderOnly ~ seq ~ seqHeaderOnly ~ height ~ heightEncoded ~ child ~ address ~ delay ~ checkpoint
+      signature ~ first ~ last ~ lastHeaderOnly ~ at ~ atHeaderOnly ~ seq ~ seqHeaderOnly ~ height ~ heightEncoded ~ child ~ address ~ delay
     }
 
   @Path("/address/{address}/{from}/{to}")
