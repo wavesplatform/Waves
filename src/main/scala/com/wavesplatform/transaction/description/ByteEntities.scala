@@ -1,8 +1,9 @@
-package com.wavesplatform.transaction.serialization
+package com.wavesplatform.transaction.description
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.transaction.{AssetId, Proofs, ValidationError}
 import com.wavesplatform.transaction.ValidationError.Validation
@@ -11,21 +12,23 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTra
 
 import scala.util.Try
 
+case class ByteEntityDescription(index: String, name: String, tpe: String, length: String, additionalInfo: String = "")
+
 sealed trait ByteEntity[T] { self =>
 
-  def generateDoc(): String
+  //def generateDoc(): String
+  def generateDoc(): Seq[ByteEntityDescription]
 
   def deserialize(buf: Array[Byte], offset: Int): Option[(T, Int)]
 
-  def deserializeFromByteArray(buf: Array[Byte], offset: Int): Option[T] = {
-    if (offset >= 0 && offset <= buf.length) deserialize(buf, offset).map(_._1) else Option.empty[T]
-  }
+  def deserializeFromByteArray(buf: Array[Byte]): Option[T] = deserialize(buf, 0) map { case (value, _) ⇒ value }
 
   def ~[U](other: ByteEntity[U]): ByteEntity[(T, U)] = Composition(this, other)
 
   def |(other: ByteEntity[T]): ByteEntity[T] = new ByteEntity[T] {
 
-    def generateDoc(): String = s"${self.generateDoc()} | ${other.generateDoc()}"
+    //def generateDoc(): String = s"${self.generateDoc()} | ${other.generateDoc()}"
+    def generateDoc(): Seq[ByteEntityDescription] = self.generateDoc() ++ other.generateDoc()
 
     def deserialize(buf: Array[Byte], offset: Int): Option[(T, Int)] =
       self.deserialize(buf, offset).orElse(other.deserialize(buf, offset))
@@ -33,7 +36,7 @@ sealed trait ByteEntity[T] { self =>
 
   def map[U](f: T => U): ByteEntity[U] = new ByteEntity[U] {
 
-    def generateDoc(): String = self.generateDoc()
+    def generateDoc(): Seq[ByteEntityDescription] = self.generateDoc()
 
     def deserialize(buf: Array[Byte], offset: Int): Option[(U, Int)] = self.deserialize(buf, offset).map { case (t, o) => f(t) -> o }
   }
@@ -280,7 +283,14 @@ object ByteEntity extends App {
 //  println(byteDesc.deserializeFromByteArray(byteArray, 0))
 //  println(byteDesc.getDoc())
 
-  case class TestMassTransaction(version: Byte, assetId: Option[AssetId], sender: PublicKeyAccount, transfers: List[ParsedTransfer], proofs: Proofs) {
+  case class TestMassTransaction(version: Byte,
+                                 assetId: Option[AssetId],
+                                 sender: PublicKeyAccount,
+                                 transfers: List[ParsedTransfer],
+                                 timestamp: Long,
+                                 fee: Long,
+                                 attachments: Array[Byte],
+                                 proofs: Proofs) {
 
     val typeId = 11: Byte
 
@@ -297,6 +307,10 @@ object ByteEntity extends App {
         assetIdBytes,
         Shorts.toByteArray(transfers.size.toShort),
         transferBytes,
+        Longs.toByteArray(timestamp),
+        Longs.toByteArray(fee),
+        Shorts.toByteArray(attachments.length.toShort),
+        attachments,
         proofs.bytes.value
       )
 
@@ -306,6 +320,9 @@ object ByteEntity extends App {
         s"assetId = ${assetId.fold("Waves")(_.arr.mkString(", "))}, " +
         s"sender = $sender, " +
         s"transfers = ${transfers.mkString(", ")}, " +
+        s"timestamp = $timestamp, " +
+        s"fee = $fee, " +
+        s"attachments = $attachments, " +
         s"proofs = ${proofs.proofs.mkString(", ")}"
     s")"
   }
@@ -322,6 +339,9 @@ object ByteEntity extends App {
       None,
       PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
       transfers,
+      1518091313964L,
+      200000,
+      Base58.decode("59QuUcqP6p").get,
       Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
     ).bytes
 
@@ -332,10 +352,25 @@ object ByteEntity extends App {
         PublicKeyAccountBytes("Sender's public key") ~
         OptionAssetIdBytes("Asset") ~
         TransfersBytes ~
+        LongBytes("Timestamp") ~
+        LongBytes("Fee") ~
+        BytesArrayUndefinedLength("Attachments") ~
         ProofsBytes
-    ).map { case (((((_, version), sender), assetId), transfer), proofs) => TestMassTransaction(version, assetId, sender, transfer, proofs) }
+    ).map {
+      case ((((((((_, version), sender), assetId), transfer), timestamp), fee), attachments), proofs) =>
+        TestMassTransaction(
+          version = version,
+          assetId = assetId,
+          sender = sender,
+          transfers = transfer,
+          timestamp = timestamp,
+          fee = fee,
+          attachments = attachments,
+          proofs = proofs
+        )
+    }
 
-  println(tmttByteDesc.deserializeFromByteArray(tmttBytes, 0))
+  println(tmttByteDesc.deserializeFromByteArray(tmttBytes))
   println(tmttByteDesc.getDoc())
 
 }

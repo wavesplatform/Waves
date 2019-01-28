@@ -10,6 +10,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, toJson}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
@@ -89,6 +90,18 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
+
+      /*
+      Array(builder.typeId, version),
+      sender.publicKey,
+      assetIdBytes,
+      Shorts.toByteArray(transfers.size.toShort),
+      transferBytes,
+      Longs.toByteArray(timestamp),
+      Longs.toByteArray(fee),
+      Deser.serializeArray(attachment)
+       */
+
       val sender           = PublicKeyAccount(bytes.slice(0, KeyLength))
       val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, KeyLength, AssetIdLength)
       val transferCount    = Shorts.fromByteArray(bytes.slice(s0, s0 + 2))
@@ -114,6 +127,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
         proofs <- Proofs.fromBytes(bytes.drop(attachEnd))
         mtt    <- MassTransferTransaction.create(version, assetIdOpt.map(ByteStr(_)), sender, transfers, timestamp, feeAmount, attachment, proofs)
       } yield mtt
+
       tx.fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
@@ -178,4 +192,33 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
   private def toJson(transfers: List[ParsedTransfer]): JsValue =
     Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) })
+
+  val byteDescription: ByteEntity[MassTransferTransaction] =
+    (
+      OneByte("Transaction type") ~
+        OneByte("Version") ~
+        PublicKeyAccountBytes("Sender's public key") ~
+        OptionAssetIdBytes("Asset") ~
+        TransfersBytes ~
+        LongBytes("Timestamp") ~
+        LongBytes("Fee") ~
+        BytesArrayUndefinedLength("Attachments") ~
+        ProofsBytes
+    ).map {
+      case ((((((((_, txVersion), sender), assetId), transfer), timestamp), fee), attachment), proofs) =>
+        MassTransferTransaction(
+          version = txVersion,
+          assetId = assetId,
+          sender = sender,
+          transfers = transfer,
+          timestamp = timestamp,
+          fee = fee,
+          attachment = attachment,
+          proofs = proofs
+        )
+    }
+}
+
+object GenDoc extends App {
+  println(MassTransferTransaction.byteDescription.getDoc())
 }

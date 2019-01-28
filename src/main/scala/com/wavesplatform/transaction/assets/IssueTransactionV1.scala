@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.smart.script.Script
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import com.wavesplatform.transaction.serialization._
+import com.wavesplatform.transaction.description._
 
 import scala.util.{Failure, Success, Try}
 
@@ -89,7 +89,7 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
   /*override */
   val byteDesc =
     (OneByte("Transaction type (3)") ~
-      com.wavesplatform.transaction.serialization.BytesArrayDefinedLength("Signature", SignatureLength) ~
+      com.wavesplatform.transaction.description.BytesArrayDefinedLength("Signature", SignatureLength) ~
       OneByte("Transaction type 2 (3)") ~
       PublicKeyAccountBytes("Sender's public key") ~
       BytesArrayUndefinedLength("Asset name") ~
@@ -142,7 +142,7 @@ object Test extends App {
     .right
     .get
 
-  val itv1d = IssueTransactionV1.byteDesc.deserializeFromByteArray(itv1.bytes.value, 0)
+  val itv1d = IssueTransactionV1.byteDesc.deserializeFromByteArray(itv1.bytes.value)
 
   println(doc)
   println(itv1d)

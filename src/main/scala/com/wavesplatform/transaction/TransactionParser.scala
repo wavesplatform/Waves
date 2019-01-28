@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction
 
+import com.wavesplatform.transaction.description.ByteEntity
+
 import scala.reflect.ClassTag
 import scala.util.Try
 
@@ -20,6 +22,22 @@ trait TransactionParser {
     */
   protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)]
   protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT]
+
+  /**
+    * Byte description of the transaction. Can be used for deserialization and generation of documentation.
+    *
+    * Implementation example:
+    * {{{
+    *   val bytesDescription =
+    *   (OneByte("Transaction type") ~ OneByte("Version") ~ LongBytes("Fee"))
+    *     .map { case ((txType, version), fee) =>
+    *       Transaction(txType, version, fee)
+    *     }
+    * }}}
+    *
+    *
+    */
+  //val byteDescription: ByteEntity[TransactionT]
 }
 
 object TransactionParser {
