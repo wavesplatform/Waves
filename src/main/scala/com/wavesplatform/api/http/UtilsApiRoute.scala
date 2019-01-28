@@ -68,38 +68,35 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, blockchai
     }
   }
 
-
-  @Path("/script/compile")
-  @ApiOperation(value = "Compile", notes = "Compiles string code to base64 script representation", httpMethod = "POST")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "code",
-        required = true,
-        dataType = "string",
-        paramType = "body",
-        value = "Script code",
-        example = "true"
-      )
-    ))
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "base64 or error")
-    ))
-  def deCompile: Route = path("script" / "decompile") { // {json with base64-encoded script bytes}
-    (post & entity(as[String])) { code =>
-      parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
-        complete(
-          val opcodes = com.wavesplatform.utils.compilerContext(Version.V3,false).functionDefs
-          Script.fromBase64String("")
-            .map( s => s.expr.asInstanceOf[ScriptV1Impl].expr)
-              .map( expr => Decompiler(expr, opcodes))
-          )
-        )
-      }
-    }
-  }
-
+//  @Path("/script/compile")
+//  @ApiOperation(value = "Compile", notes = "Compiles string code to base64 script representation", httpMethod = "POST")
+//  @ApiImplicitParams(
+//    Array(
+//      new ApiImplicitParam(
+//        name = "code",
+//        required = true,
+//        dataType = "string",
+//        paramType = "body",
+//        value = "Script code",
+//        example = "true"
+//      )
+//    ))
+//  @ApiResponses(
+//    Array(
+//      new ApiResponse(code = 200, message = "base64 or error")
+//    ))
+//  def deCompile: Route = path("script" / "decompile") { // {json with base64-encoded script bytes}
+//    (post & entity(as[String])) { code =>
+//      parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
+//        complete(
+//          val OpCodes = com.wavesplatform.utils.compilerContext(Version.V3,false).functionDefs
+//          Script.fromBase64String("")
+//            .map( s => s.expr.asInstanceOf[ScriptV1Impl].expr)
+//              .map( expr => Decompiler(expr, OpCodes))
+//        )
+//      }
+//    }
+//  }
 
   @Path("/script/compileContract")
   @ApiOperation(value = "Compile Contract", notes = "Compiles string code to base64 contract representation", httpMethod = "POST")
@@ -168,7 +165,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings, blockchai
               case (script, complexity) =>
                 Json.obj(
                   "script"     -> code,
-                  "scriptText" -> script.text,
+                  "scriptText" -> script.text, // ddd!!!
                   "complexity" -> complexity,
                   "extraFee"   -> CommonValidation.ScriptExtraFee
                 )

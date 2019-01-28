@@ -363,6 +363,8 @@ case class AddressApiRoute(settings: RestAPISettings,
     )
   }
 
+  // lazy val of CTX
+
   private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
     val script = blockchain
       .accountScript(account)
@@ -370,7 +372,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     AddressScriptInfo(
       address = account.address,
       script = script.map(_.bytes().base64),
-      scriptText = script.map(_.text),
+      scriptText = script.map(_.text), // TODO : fff!!!
       complexity = script.map(_.complexity).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
     )
