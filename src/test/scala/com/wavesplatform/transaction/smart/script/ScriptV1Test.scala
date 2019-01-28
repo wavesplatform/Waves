@@ -69,7 +69,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       FUNCTION_CALL(FunctionHeader.Native(SUM_LONG), List(CONST_LONG(1), acc))
     }
 
-    ScriptV1.isExprContainsBlockV2(expr) shouldBe false
+    ExprScript.isExprContainsBlockV2(expr) shouldBe false
   }
 
 }
