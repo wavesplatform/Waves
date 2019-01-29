@@ -240,7 +240,7 @@ class OrderBookActor(owner: ActorRef,
     case RecoveryCompleted =>
       updateSnapshot(orderBook)
       owner ! OrderBookSnapshotUpdated(assetPair, lastProcessedOffset)
-      log.debug(s"Recovery completed: $orderBook")
+      log.debug(s"Recovery completed for ${assetPair.key}: $orderBook")
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook

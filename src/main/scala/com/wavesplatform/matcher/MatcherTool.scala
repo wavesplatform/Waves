@@ -12,7 +12,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
-import com.wavesplatform.matcher.market.OrderBookActor
+import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -130,6 +130,53 @@ object MatcherTool extends ScorexLogging {
       case "compact" =>
         log.info("Compacting database")
         db.compactRange(null, null)
+      case "mar" =>
+        val system = ActorSystem("matcher-tool", actualConfig)
+        try {
+          val snapshotDB    = openDB(settings.matcherSettings.snapshotsDataDir)
+          val persistenceId = MatcherActor.name
+
+          val historyKey = MatcherSnapshotStore.kSMHistory(persistenceId)
+          val history    = historyKey.parse(snapshotDB.get(historyKey.keyBytes))
+          if (history.isEmpty) log.warn("History is empty")
+          else {
+            log.info(s"Snapshots history for ${MatcherActor.name}: $history")
+            val xs = history.map { seqNr =>
+              val smKey = MatcherSnapshotStore.kSM(persistenceId, seqNr)
+              val smRaw = snapshotDB.get(smKey.keyBytes)
+              val sm    = smKey.parse(smRaw)
+
+              val snapshotKey = MatcherSnapshotStore.kSnapshot(persistenceId, seqNr)
+              val snapshotRaw = snapshotDB.get(snapshotKey.keyBytes)
+
+              (seqNr, sm, snapshotRaw)
+            }
+            log.info(s"Records:\n${xs.map { case (seqNr, sm, _) => s"$seqNr: $sm" }.mkString("\n")}")
+
+            log.info(s"Deleting old data")
+            xs.foreach {
+              case (seqNr, _, _) =>
+                val smKey       = MatcherSnapshotStore.kSM(persistenceId, seqNr)
+                val snapshotKey = MatcherSnapshotStore.kSnapshot(persistenceId, seqNr)
+
+                snapshotDB.delete(smKey.keyBytes)
+                snapshotDB.delete(snapshotKey.keyBytes)
+            }
+
+            val (firstSeqNr, firstSm, firstSnapshotRaw) = xs.head
+            val updatedSm                               = firstSm.copy(seqNr = 1L)
+            log.info(s"Writing the record with seqNr=$firstSeqNr at seqNr=1, sm was $firstSm, will be $updatedSm")
+
+            val smKey       = MatcherSnapshotStore.kSM(persistenceId, 1)
+            val snapshotKey = MatcherSnapshotStore.kSnapshot(persistenceId, 1)
+
+            snapshotDB.put(smKey.keyBytes, smKey.encode(updatedSm))
+            snapshotDB.put(snapshotKey.keyBytes, firstSnapshotRaw)
+            snapshotDB.put(historyKey.keyBytes, historyKey.encode(Seq(1)))
+          }
+        } finally {
+          Await.ready(system.terminate(), Duration.Inf)
+        }
       case _ =>
     }
 
