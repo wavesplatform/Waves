@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
+import com.wavesplatform.common.state.ByteStr
 import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.utils.Serialize._
@@ -39,7 +40,7 @@ object Serde {
     def aux(acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] = acc.flatMap { _ =>
       bb.get() match {
         case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
-        case E_BYTES  => Coeval.now(CONST_BYTEVECTOR(bb.getByteVector))
+        case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(bb.getBytes)))
         case E_STRING => Coeval.now(CONST_STRING(bb.getString))
         case E_IF     => (aux(), aux(), aux()).mapN(IF)
         case E_BLOCK =>
@@ -48,7 +49,7 @@ object Serde {
             letValue <- aux()
             body     <- aux()
           } yield
-            BLOCKV1(
+            LET_BLOCK(
               let = LET(name, letValue),
               body = body
             )
@@ -57,7 +58,7 @@ object Serde {
             decType <- Coeval.now(bb.get())
             dec     <- deserializeDeclaration(bb, aux(), decType)
             body    <- aux()
-          } yield BLOCKV2(dec, body)
+          } yield BLOCK(dec, body)
         case E_REF    => Coeval.now(REF(bb.getString))
         case E_TRUE   => Coeval.now(TRUE)
         case E_FALSE  => Coeval.now(FALSE)
@@ -125,10 +126,10 @@ object Serde {
             out.write(E_LONG)
             out.writeLong(n)
           }
-        case CONST_BYTEVECTOR(bs) =>
+        case CONST_BYTESTR(bs) =>
           Coeval.now {
             out.write(E_BYTES)
-            out.writeInt(Math.toIntExact(bs.size)).write(bs.toArray)
+            out.writeInt(Math.toIntExact(bs.arr.length)).write(bs.arr)
           }
         case CONST_STRING(s) =>
           Coeval.now {
@@ -137,13 +138,13 @@ object Serde {
           }
         case IF(cond, ifTrue, ifFalse) =>
           List(cond, ifTrue, ifFalse).foldLeft(Coeval.now(out.write(E_IF)))(aux)
-        case BLOCKV1(LET(name, value), body) =>
+        case LET_BLOCK(LET(name, value), body) =>
           val n = Coeval.now[Unit] {
             out.write(E_BLOCK)
             out.writeString(name)
           }
           List(value, body).foldLeft(n)(aux)
-        case BLOCKV2(dec, body) =>
+        case BLOCK(dec, body) =>
           val n = Coeval.now[Unit] {
             out.write(E_BLOCK_V2)
           }

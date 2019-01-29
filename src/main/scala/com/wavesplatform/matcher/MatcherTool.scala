@@ -10,13 +10,14 @@ import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
 import com.wavesplatform.matcher.api.DBUtils
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderBook}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.{ByteStr, EitherExt2}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.ScorexLogging

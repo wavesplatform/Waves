@@ -19,10 +19,10 @@ import com.typesafe.config.ConfigFactory._
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.settings._
-import com.wavesplatform.state.EitherExt2
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
@@ -470,7 +470,10 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
   def disconnectFromNetwork(node: DockerNode): Unit = disconnectFromNetwork(node.containerId)
 
-  private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
+  private def disconnectFromNetwork(containerId: String): Unit = {
+    log.info(s"Trying to disconnect container ${containerId} from network ...")
+    client.disconnectFromNetwork(containerId, wavesNetwork.id())
+  }
 
   def restartContainer(node: DockerNode): DockerNode = {
     val id            = node.containerId
@@ -493,6 +496,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
   }
 
   private def connectToNetwork(node: DockerNode): Unit = {
+    log.info(s"Trying to connect node ${node} to network ...")
     client.connectToNetwork(
       wavesNetwork.id(),
       NetworkConnection

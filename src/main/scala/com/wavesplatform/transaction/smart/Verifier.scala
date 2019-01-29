@@ -60,28 +60,28 @@ object Verifier extends Instrumented with ScorexLogging {
         s"transaction ${transaction.id()}",
         ScriptRunner(height, Coproduct[TxOrd](transaction), blockchain, script, isTokenScript)
       ) match {
-        case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript))
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isTokenScript))
         case (log, Right(FALSE)) =>
-          Left(TransactionNotAllowedByScript(log, script.text, isTokenScript))
+          Left(TransactionNotAllowedByScript(log, isTokenScript))
         case (_, Right(TRUE)) => Right(transaction)
         case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
     } match {
       case Failure(e) =>
-        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", script.text, List.empty, isTokenScript))
+        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isTokenScript))
       case Success(s) => s
     }
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
     Try {
       logged(s"order ${order.idStr()}", ScriptRunner(height, Coproduct[TxOrd](order), blockchain, script, isTokenScript = false)) match {
-        case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, isTokenScript = false))
-        case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, script.text, isTokenScript = false))
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isTokenScript = false))
+        case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isTokenScript = false))
         case (_, Right(TRUE))       => Right(order)
         case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
     } match {
-      case Failure(e) => Left(ScriptExecutionError(s"Uncaught execution error: $e", script.text, List.empty, isTokenScript = false))
+      case Failure(e) => Left(ScriptExecutionError(s"Uncaught execution error: $e", List.empty, isTokenScript = false))
       case Success(s) => s
     }
 
@@ -132,8 +132,8 @@ object Verifier extends Instrumented with ScorexLogging {
         blockchain.assetScript(assetId).fold[ValidationResult[Transaction]](Right(tx)) { script =>
           verifyTx(blockchain, script, height, tx, isTokenScript = true).left.map {
             case x: HasScriptType => x
-            case GenericError(x)  => ScriptExecutionError(x, script.text, List.empty, isTokenScript = true)
-            case x                => ScriptExecutionError(x.toString, script.text, List.empty, isTokenScript = true)
+            case GenericError(x)  => ScriptExecutionError(x, List.empty, isTokenScript = true)
+            case x                => ScriptExecutionError(x.toString, List.empty, isTokenScript = true)
           }
         }
       }

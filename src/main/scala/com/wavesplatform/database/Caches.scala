@@ -6,6 +6,7 @@ import cats.syntax.monoid._
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{AssetId, Transaction}
 import com.wavesplatform.transaction.smart.script.Script
@@ -156,7 +157,7 @@ trait Caches extends Blockchain with ScorexLogging {
 
   override def accountScript(address: Address): Option[Script] = scriptCache.get(address)
   override def hasScript(address: Address): Boolean =
-    Option(scriptCache.getIfPresent(address)).flatten.isDefined || hasScriptBytes(address)
+    Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
   private val assetScriptCache: LoadingCache[AssetId, Option[Script]] = cache(maxCacheSize, loadAssetScript)
   protected def loadAssetScript(asset: AssetId): Option[Script]

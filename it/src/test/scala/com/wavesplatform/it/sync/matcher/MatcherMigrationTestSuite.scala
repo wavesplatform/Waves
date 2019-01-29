@@ -1,12 +1,12 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 import scala.concurrent.duration._

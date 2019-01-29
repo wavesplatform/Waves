@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.state.ByteStr
-import monix.eval.Coeval
-import com.wavesplatform.utils.Base64
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.Version._
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
+import monix.eval.Coeval
 
 trait Script {
   type Expr
@@ -12,9 +12,11 @@ trait Script {
   val version: Version
 
   val expr: Expr
-  val text: String
+
   val bytes: Coeval[ByteStr]
   val complexity: Long
+
+  val containsBlockV2: Coeval[Boolean]
 
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: Script => version == that.version && expr == that.expr

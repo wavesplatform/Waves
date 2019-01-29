@@ -3,8 +3,10 @@ package com.wavesplatform.lang.v1
 import java.util.concurrent.TimeUnit
 
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark.pureEvalContext
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -12,16 +14,14 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.utils.Base58
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
-import scodec.bits.ByteVector
 import scorex.crypto.signatures.Curve25519
 
 import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
-  val pureEvalContext = PureContext.build(V1).evaluationContext
+  val pureEvalContext = PureContext.build(ExprV1).evaluationContext
 }
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -61,9 +61,9 @@ class NestedBlocks {
     val blockCount = 300
     val cond       = FUNCTION_CALL(PureContext.eq, List(REF(s"v$blockCount"), CONST_LONG(0)))
     val blocks = (1 to blockCount).foldRight[EXPR](cond) { (i, e) =>
-      BLOCKV2(LET(s"v$i", REF(s"v${i - 1}")), e)
+      BLOCK(LET(s"v$i", REF(s"v${i - 1}")), e)
     }
-    BLOCKV2(LET("v0", CONST_LONG(0)), blocks)
+    BLOCK(LET("v0", CONST_LONG(0)), blocks)
   }
 }
 
@@ -80,9 +80,9 @@ class Base58Perf {
       .map { i =>
         val b = new Array[Byte](64)
         Random.nextBytes(b)
-        LET("v" + i, FUNCTION_CALL(PureContext.sizeString, List(FUNCTION_CALL(Native(TOBASE58), List(CONST_BYTEVECTOR(ByteVector(b)))))))
+        LET("v" + i, FUNCTION_CALL(PureContext.sizeString, List(FUNCTION_CALL(Native(TOBASE58), List(CONST_BYTESTR(ByteStr(b)))))))
       }
-      .foldRight[EXPR](sum) { case (let, e) => BLOCKV2(let, e) }
+      .foldRight[EXPR](sum) { case (let, e) => BLOCK(let, e) }
   }
 
   val decode: EXPR = {
@@ -96,7 +96,7 @@ class Base58Perf {
         Random.nextBytes(b)
         LET("v" + i, FUNCTION_CALL(PureContext.sizeBytes, List(FUNCTION_CALL(Native(FROMBASE58), List(CONST_STRING(Base58.encode(b)))))))
       }
-      .foldRight[EXPR](sum) { case (let, e) => BLOCKV2(let, e) }
+      .foldRight[EXPR](sum) { case (let, e) => BLOCK(let, e) }
   }
 }
 
@@ -121,15 +121,14 @@ class Signatures {
         LET(
           "v" + i,
           IF(
-            FUNCTION_CALL(Native(SIGVERIFY),
-                          List(CONST_BYTEVECTOR(ByteVector(msg)), CONST_BYTEVECTOR(ByteVector(sig)), CONST_BYTEVECTOR(ByteVector(pk)))),
+            FUNCTION_CALL(Native(SIGVERIFY), List(CONST_BYTESTR(ByteStr(msg)), CONST_BYTESTR(ByteStr(sig)), CONST_BYTESTR(ByteStr(pk)))),
             CONST_LONG(1),
             CONST_LONG(0)
           )
         )
       }
       .foldRight[EXPR](FUNCTION_CALL(PureContext.eq, List(sum, CONST_LONG(sigCount)))) {
-        case (let, e) => BLOCKV2(let, e)
+        case (let, e) => BLOCK(let, e)
       }
   }
 }
@@ -148,5 +147,5 @@ class Concat {
   val strings: EXPR = expr(CONST_STRING("a" * (Short.MaxValue - Steps)), PureContext.sumString, CONST_STRING("a"), Steps)
 
   val bytes: EXPR =
-    expr(CONST_BYTEVECTOR(ByteVector.fill(Short.MaxValue - Steps)(0)), PureContext.sumByteVector, CONST_BYTEVECTOR(ByteVector(0)), Steps)
+    expr(CONST_BYTESTR(ByteStr.fill(Short.MaxValue - Steps)(0)), PureContext.sumByteStr, CONST_BYTESTR(ByteStr.fromBytes(0)), Steps)
 }

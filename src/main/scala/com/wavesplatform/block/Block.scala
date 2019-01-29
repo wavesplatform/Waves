@@ -4,18 +4,21 @@ import java.nio.ByteBuffer
 
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.crypto
-import com.wavesplatform.settings.GenesisSettings
-import com.wavesplatform.state._
-import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.fields.FeaturesBlockField
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.crypto
+import com.wavesplatform.crypto._
+import com.wavesplatform.settings.GenesisSettings
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
-import com.wavesplatform.crypto._
+import com.wavesplatform.utils.ScorexLogging
+import monix.eval.Coeval
+import play.api.libs.json.{JsObject, Json}
+
 import scala.util.{Failure, Try}
 
 class BlockHeader(val timestamp: Long,
@@ -306,18 +309,27 @@ object Block extends ScorexLogging {
 
     val signature = genesisSettings.signature.fold(crypto.sign(genesisSigner, toSign))(_.arr)
 
-    if (crypto.verify(signature, toSign, genesisSigner.publicKey))
-      Right(
-        Block(
-          timestamp = timestamp,
-          version = GenesisBlockVersion,
-          reference = ByteStr(reference),
-          signerData = SignerData(genesisSigner, ByteStr(signature)),
-          consensusData = consensusGenesisData,
-          transactionData = transactionGenesisData,
-          featureVotes = Set.empty
-        ))
-    else Left(GenericError("Passed genesis signature is not valid"))
+    for {
+      // Verify signature
+      _ <- Either.cond(crypto.verify(signature, toSign, genesisSigner.publicKey), (), GenericError("Passed genesis signature is not valid"))
+
+      // Verify initial balance
+      genesisTransactionsSum = transactionGenesisData.map(_.amount).reduce(Math.addExact(_: Long, _: Long))
+      _ <- Either.cond(
+        genesisTransactionsSum == genesisSettings.initialBalance,
+        (),
+        GenericError(s"Initial balance ${genesisSettings.initialBalance} did not match the distributions sum $genesisTransactionsSum")
+      )
+    } yield
+      Block(
+        timestamp = timestamp,
+        version = GenesisBlockVersion,
+        reference = ByteStr(reference),
+        signerData = SignerData(genesisSigner, ByteStr(signature)),
+        consensusData = consensusGenesisData,
+        transactionData = transactionGenesisData,
+        featureVotes = Set.empty
+      )
   }
 
   val GenesisBlockVersion: Byte = 1

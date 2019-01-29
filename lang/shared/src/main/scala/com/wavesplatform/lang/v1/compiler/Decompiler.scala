@@ -5,6 +5,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 
 // TODO: сделать ручку
 // TODO: переполнение стека
+// TODO: декомпилить контракт, который может быть списком функций
 
 object Decompiler {
 
@@ -34,14 +35,14 @@ object Decompiler {
           out("}", ident)
       case Terms.CONST_LONG(t) => out(t.toLong.toString, ident)
       case Terms.CONST_STRING(s) => out('"' + s + '"', ident)
-      case Terms.BLOCKV1(let, exprPar) => out("{ let " + let.name + " = " +
+      case Terms.LET_BLOCK(let, exprPar) => out("{ let " + let.name + " = " +
         expr(let.value, 0, OpCodes) + "; " + expr(exprPar, 0, OpCodes) + " }", ident)
-      case Terms.BLOCKV2(declPar, body) =>
+      case Terms.BLOCK(declPar, body) =>
         out("{\n", ident) +
         decl(declPar, 1 + ident, OpCodes) + ";\n" +
         expr(body, 1 + ident, OpCodes) + "\n" +
         out("}", ident)
-      case Terms.CONST_BYTEVECTOR(bs) => out("'" + bs + "'", ident) // TODO: need test for bytevector
+      case Terms.CONST_BYTESTR(bs) => out("'" + bs + "'", ident) // TODO: need test for bytestr
       case Terms.FUNCTION_CALL(func, args) => func match {
         case FunctionHeader.Native(name) => out(
           OpCodes.getOrElse(name, "<Native_" + name + ">") +

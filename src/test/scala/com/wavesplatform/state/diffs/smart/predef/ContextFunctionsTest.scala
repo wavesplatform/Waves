@@ -1,9 +1,10 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
@@ -11,8 +12,8 @@ import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.utils.{Base58, compilerContext}
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.utils.compilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -49,8 +50,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
       .map(x => Parser.parseScript(x).get.value)
 
     typedScript = {
-      val compilerScript = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
-      ScriptV1(compilerScript).explicitGet()
+      val compilerScript = ExpressionCompilerV1(compilerContext(ExprV1, isAssetScript = false), untypedScript).explicitGet()._1
+      ExprScript(compilerScript).explicitGet()
     }
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(1, recipient, Some(typedScript), 100000000L, ts).explicitGet()
 

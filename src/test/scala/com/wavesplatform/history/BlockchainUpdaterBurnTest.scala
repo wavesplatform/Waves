@@ -1,16 +1,16 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
-import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
-import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.{BurnTransactionV1, IssueTransactionV1, ReissueTransactionV1}
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import org.scalacheck.Gen
+import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 
 class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 

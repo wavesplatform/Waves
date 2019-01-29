@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
 import com.wavesplatform.state._

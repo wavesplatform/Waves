@@ -47,7 +47,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
     case x: CONST_LONG                       => x.copy(position = Pos(0, 0))
     case x: REF                              => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
     case x: CONST_STRING                     => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: CONST_BYTEVECTOR                 => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: CONST_BYTESTR                    => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
     case x: TRUE                             => x.copy(position = Pos(0, 0))
     case x: FALSE                            => x.copy(position = Pos(0, 0))
     case x: BINARY_OP                        => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))

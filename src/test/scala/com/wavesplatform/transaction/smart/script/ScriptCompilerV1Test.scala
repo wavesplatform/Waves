@@ -1,14 +1,14 @@
 package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.state.EitherExt2
-import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 
 class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
@@ -32,7 +32,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
     ScriptCompiler(script, isAssetScript = false) shouldBe Left("Can't parse language version")
   }
 
-  private val expectedExpr = BLOCKV2(
+  private val expectedExpr = BLOCK(
     LET("x", CONST_LONG(10)),
     FUNCTION_CALL(
       PureContext.eq.header,
@@ -46,7 +46,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
     )
   )
 
-  private val expectedScript = ScriptV1(expectedExpr).explicitGet()
+  private val expectedScript = ExprScript(expectedExpr).explicitGet()
 
   private def scriptWithVersion(versionStr: Option[String]): String = {
     val directive =

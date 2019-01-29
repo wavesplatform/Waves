@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.compiler
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -15,7 +16,6 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
 
 class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -140,7 +140,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Right(
-      (BLOCKV2(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))), BOOLEAN))
+      (BLOCK(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))), BOOLEAN))
   )
 
   treeTypeTest("idOptionLong(())")(
@@ -174,7 +174,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Right(
-      (BLOCKV2(
+      (BLOCK(
          LET("$match0", REF("p")),
          IF(
            IF(
@@ -188,7 +188,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
                List(REF("$match0"), CONST_STRING("PointA"))
              )
            ),
-           BLOCKV2(LET("p", REF("$match0")), TRUE),
+           BLOCK(LET("p", REF("$match0")), TRUE),
            FALSE
          )
        ),
@@ -215,9 +215,9 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     },
     expectedResult = {
       Right(
-        (BLOCKV2(
-           LET("a", BLOCKV2(LET("$match0", REF("p")), BLOCKV2(LET("$match1", REF("p")), CONST_LONG(1)))),
-           BLOCKV2(LET("b", BLOCKV2(LET("$match0", REF("p")), CONST_LONG(2))), FUNCTION_CALL(FunctionHeader.Native(100), List(REF("a"), REF("b"))))
+        (BLOCK(
+           LET("a", BLOCK(LET("$match0", REF("p")), BLOCK(LET("$match1", REF("p")), CONST_LONG(1)))),
+           BLOCK(LET("b", BLOCK(LET("$match0", REF("p")), CONST_LONG(2))), FUNCTION_CALL(FunctionHeader.Native(100), List(REF("a"), REF("b"))))
          ),
          LONG))
 
@@ -303,7 +303,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Left(
-      "Compilation failed: Value 'p1' declared as non-existing type, while all possible types are List(Point, PointB, Boolean, Int, PointA, ByteVector, Unit, String) in -1--1")
+      "Compilation failed: Value 'p1' declared as non-existing type, while all possible types are List(Point, PointB, Boolean, Int, PointA, ByteStr, Unit, String) in -1--1")
   )
 
   treeTypeTest("Invalid LET")(
@@ -323,9 +323,9 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     expectedResult = Left("Compilation failed: can't parse in 2-3")
   )
 
-  treeTypeTest("Invalid BYTEVECTOR")(
+  treeTypeTest("Invalid BYTESTR")(
     ctx = compilerContext,
-    expr = Expressions.CONST_BYTEVECTOR(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
+    expr = Expressions.CONST_BYTESTR(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
     expectedResult = Left("Compilation failed: can't parse in -1--1")
   )
 
@@ -360,9 +360,9 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     expr = Expressions.FUNCTION_CALL(
       AnyPos,
       Expressions.PART.VALID(AnyPos, dropRightFunctionName),
-      List(Expressions.CONST_BYTEVECTOR(AnyPos, Expressions.PART.VALID(AnyPos, ByteVector.empty)), Expressions.CONST_LONG(AnyPos, 1))
+      List(Expressions.CONST_BYTESTR(AnyPos, Expressions.PART.VALID(AnyPos, ByteStr.empty)), Expressions.CONST_LONG(AnyPos, 1))
     ),
-    expectedResult = Right((FUNCTION_CALL(dropRightBytes.header, List(CONST_BYTEVECTOR(ByteVector.empty), CONST_LONG(1))), BYTEVECTOR))
+    expectedResult = Right((FUNCTION_CALL(dropRightBytes.header, List(CONST_BYTESTR(ByteStr.empty), CONST_LONG(1))), BYTESTR))
   )
 
   treeTypeTest("user function overloading 2")(
@@ -398,7 +398,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.CONST_LONG(AnyPos, 1L)))
     ),
     expectedResult = Right(
-      (BLOCKV2(
+      (BLOCK(
          FUNC("id", List("x"), REF("x")),
          FUNCTION_CALL(FunctionHeader.User("id"), List(CONST_LONG(1L)))
        ),

@@ -4,6 +4,8 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform._
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -11,15 +13,15 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompilerV1}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
+import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.{ByteStr, EitherExt2, _}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.Time
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
@@ -45,7 +47,8 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         FunctionalitySettings.TESTNET.copy(
           preActivatedFeatures = Map(
             BlockchainFeatures.MassTransfer.id  -> 0,
-            BlockchainFeatures.SmartAccounts.id -> 0
+            BlockchainFeatures.SmartAccounts.id -> 0,
+            BlockchainFeatures.Ride4DApps.id    -> 0
           )),
         genesisSettings
       ),
@@ -219,7 +222,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     compiler.compile(code, List.empty).explicitGet()
   }
 
-  private val script: Script = ScriptV1(expr).explicitGet()
+  private val script: Script = ExprScript(expr).explicitGet()
 
   private def preconditionsGen(lastBlockId: ByteStr, master: PrivateKeyAccount): Gen[Seq[Block]] =
     for {

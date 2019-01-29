@@ -2,6 +2,8 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.assets.SignedTransferV1Request
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -11,7 +13,6 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, _}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.utils.Base58
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json._
 
@@ -48,7 +49,22 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     val obsoleteTx = Json.obj("type" -> 1, "sender" -> firstAddress, "recipient" -> firstAddress, "amount" -> 1, "fee" -> 100000)
     assertSignBadJson(obsoleteTx, "UnsupportedTransactionType")
     assertSignBadJson(obsoleteTx + ("type" -> Json.toJson(2)), "UnsupportedTransactionType")
+    
+    val bigBaseTx = Json.obj("type" -> 4, "sender" -> firstAddress, "recipient" -> firstAddress, "amount" -> 1, "fee" -> 100000, "attachment" -> "W" * 524291)
+    assertSignBadJson(bigBaseTx, "base58Decode input exceeds")
+  }
 
+  test("/transaction/calculateFee should handle coding size limit") {
+    {
+      val json =
+        Json.obj("type"            -> 4,
+                 "senderPublicKey" -> sender.publicKey.toString,
+                 "recipient"       -> secondAddress,
+                 "fee"             -> 100000,
+                 "amount"          -> 1,
+                 "assetId"         -> "W" * 524291)
+      assertBadRequestAndMessage(sender.calculateFee(json).feeAmount, "base58Decode input exceeds")
+    }
   }
 
   test("/transactions/sign should respect timestamp if specified") {

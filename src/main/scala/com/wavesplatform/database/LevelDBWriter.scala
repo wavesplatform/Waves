@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
@@ -630,30 +631,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
 
     /**
-      * Compatibility implementation where
-      *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 12), (3, 5)]}}}
-      *
-      * @todo remove this method once SmartAccountTrading is activated
-      */
-    @tailrec
-    def recMergeCompat(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
-      buf += wh -> lh
-      if (wt.isEmpty && lt.isEmpty) {
-        buf
-      } else if (wt.isEmpty) {
-        recMergeCompat(wh, wt, lt.head, lt.tail, buf)
-      } else if (lt.isEmpty) {
-        recMergeCompat(wt.head, wt.tail, lh, lt, buf)
-      } else {
-        if (wh >= lh) {
-          recMergeCompat(wt.head, wt.tail, lh, lt, buf)
-        } else {
-          recMergeCompat(wh, wt, lt.head, lt.tail, buf)
-        }
-      }
-    }
-
-    /**
       * Fixed implementation where
       *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 5)]}}}
       */
@@ -677,12 +654,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       }
     }
 
-    val recMerge = activatedFeatures
-      .get(BlockchainFeatures.SmartAccountTrading.id)
-      .filter(_ <= height)
-      .fold(recMergeCompat _)(_ => recMergeFixed _)
-
-    recMerge(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
+    recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
   override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>
@@ -790,9 +762,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       }
     }
 
-    val addressIds: Seq[BigInt] = {
+    lazy val addressIds: Seq[BigInt] = {
       val all = for {
-        seqNr <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId)))
+        seqNr <- 1 to db.get(Keys.addressesForAssetSeqNr(assetId))
         addressId <- db
           .get(Keys.addressesForAsset(assetId, seqNr))
       } yield addressId
@@ -800,7 +772,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       takeAfter(all, maybeAddressId)
     }
 
-    val distribution: Stream[(Address, Long)] =
+    lazy val distribution: Stream[(Address, Long)] =
       for {
         addressId <- addressIds.toStream
         history = db.get(Keys.assetBalanceHistory(addressId, assetId))
@@ -810,8 +782,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       } yield db.get(Keys.idToAddress(addressId)) -> balance
 
     lazy val page: AssetDistributionPage = {
-      val items   = distribution.take(count)
-      val hasNext = addressIds.length > count
+      val dst = distribution.take(count + 1)
+
+      val hasNext = dst.length > count
+      val items   = if (hasNext) dst.init else dst
       val lastKey = items.lastOption.map(_._1)
 
       val result: Paged[Address, AssetDistribution] =

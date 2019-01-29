@@ -2,11 +2,13 @@ package com.wavesplatform.matcher.model
 
 import com.google.common.base.Charsets
 import com.wavesplatform.NoShrink
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.OrderExecuted
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{Blockchain, ByteStr, EitherExt2}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV1, ExchangeTransactionV2}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._

@@ -1,6 +1,8 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
@@ -13,7 +15,7 @@ import com.wavesplatform.transaction.ValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
@@ -307,7 +309,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       case (sender, initialBalance) =>
         withDomain(createSettings(SmartAccounts -> 0)) { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
-          val script = ScriptV1(TRUE).explicitGet()
+          val script = ExprScript(TRUE).explicitGet()
 
           val genesisBlockId = d.lastBlockId
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty

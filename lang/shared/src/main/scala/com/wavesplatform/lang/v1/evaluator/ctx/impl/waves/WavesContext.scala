@@ -2,9 +2,10 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.data.EitherT
 import cats.implicits._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{BYTEVECTOR, LONG, STRING, _}
+import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
@@ -12,7 +13,6 @@ import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.{OrdType, Recipient}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import monix.eval.Coeval
-import scodec.bits.ByteVector
 
 object WavesContext {
 
@@ -40,10 +40,10 @@ object WavesContext {
             case None => unit
             case Some(a) =>
               a match {
-                case b: ByteVector => CONST_BYTEVECTOR(b)
-                case b: Long       => CONST_LONG(b)
-                case b: String     => CONST_STRING(b)
-                case b: Boolean    => CONST_BOOLEAN(b)
+                case b: ByteStr => CONST_BYTESTR(b)
+                case b: Long    => CONST_LONG(b)
+                case b: String  => CONST_STRING(b)
+                case b: Boolean => CONST_BOOLEAN(b)
               }
           }
         case _ => ???
@@ -66,11 +66,11 @@ object WavesContext {
       ) {
         case ARR(data: IndexedSeq[CaseObj] @unchecked) :: CONST_STRING(key: String) :: Nil =>
           data.find(_.fields("key") == CONST_STRING(key)).map(_.fields("value")) match {
-            case Some(n: CONST_LONG) if dataType == DataType.Long            => Right(n)
-            case Some(b: CONST_BOOLEAN) if dataType == DataType.Boolean      => Right(b)
-            case Some(b: CONST_BYTEVECTOR) if dataType == DataType.ByteArray => Right(b)
-            case Some(s: CONST_STRING) if dataType == DataType.String        => Right(s)
-            case _                                                           => Right(unit)
+            case Some(n: CONST_LONG) if dataType == DataType.Long         => Right(n)
+            case Some(b: CONST_BOOLEAN) if dataType == DataType.Boolean   => Right(b)
+            case Some(b: CONST_BYTESTR) if dataType == DataType.ByteArray => Right(b)
+            case Some(s: CONST_STRING) if dataType == DataType.String     => Right(s)
+            case _                                                        => Right(unit)
           }
         case _ => ???
       }
@@ -88,7 +88,7 @@ object WavesContext {
         ("@data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"),
         ("@index", LONG, "index")
       ) {
-        BLOCKV1(
+        LET_BLOCK(
           LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(REF("@data"), REF("@index"))), "value")),
           IF(FUNCTION_CALL(PureContext._isInstanceOf, List(REF("@val"), CONST_STRING(dataType.innerType.name))), REF("@val"), REF("unit"))
         )
@@ -110,18 +110,18 @@ object WavesContext {
     )
 
     lazy val addressFromPublicKeyF: BaseFunction =
-      UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to account address", ("@publicKey", BYTEVECTOR, "public key")) {
+      UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to account address", ("@publicKey", BYTESTR, "public key")) {
 
         FUNCTION_CALL(
           FunctionHeader.User("Address"),
           List(
-            BLOCKV1(
+            LET_BLOCK(
               LET(
                 "@afpk_withoutChecksum",
                 FUNCTION_CALL(
-                  PureContext.sumByteVector,
+                  PureContext.sumByteStr,
                   List(
-                    CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion, env.chainId)),
+                    CONST_BYTESTR(ByteStr.fromBytes(EnvironmentFunctions.AddressVersion, env.chainId)),
                     // publicKeyHash
                     FUNCTION_CALL(
                       PureContext.takeBytes,
@@ -135,7 +135,7 @@ object WavesContext {
               ),
               // bytes
               FUNCTION_CALL(
-                PureContext.sumByteVector,
+                PureContext.sumByteStr,
                 List(
                   REF("@afpk_withoutChecksum"),
                   FUNCTION_CALL(
@@ -183,7 +183,7 @@ object WavesContext {
     lazy val addressFromStringF: BaseFunction =
       UserFunction("addressFromString", optionAddress, "Decode account address", ("@string", STRING, "string address represntation")) {
 
-        BLOCKV1(
+        LET_BLOCK(
           LET("@afs_addrBytes",
               FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(REF("@string"), EnvironmentFunctions.AddressPrefix)))),
           IF(
@@ -200,7 +200,7 @@ object WavesContext {
                 PureContext.eq,
                 List(
                   FUNCTION_CALL(PureContext.takeBytes, List(REF("@afs_addrBytes"), CONST_LONG(1))),
-                  CONST_BYTEVECTOR(ByteVector(EnvironmentFunctions.AddressVersion))
+                  CONST_BYTESTR(ByteStr.fromBytes(EnvironmentFunctions.AddressVersion))
                 )
               ),
               IF(
@@ -215,7 +215,7 @@ object WavesContext {
                         CONST_LONG(1)
                       )
                     ),
-                    CONST_BYTEVECTOR(ByteVector(env.chainId))
+                    CONST_BYTESTR(ByteStr.fromBytes(env.chainId))
                   )
                 ),
                 IF(
@@ -245,7 +245,7 @@ object WavesContext {
         case CaseObj(aliasType.typeRef, fields) :: Nil =>
           environmentFunctions
             .addressFromAlias(fields("alias").asInstanceOf[CONST_STRING].s)
-            .map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> CONST_BYTEVECTOR(resolved.bytes))))
+            .map(resolved => CaseObj(addressType.typeRef, Map("bytes" -> CONST_BYTESTR(resolved.bytes))))
         case _ => ???
       }
 
@@ -270,16 +270,16 @@ object WavesContext {
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
-      NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTEVECTOR, "transaction Id")) {
-        case CONST_BYTEVECTOR(id: ByteVector) :: Nil =>
-          val maybeDomainTx: Option[CaseObj] = env.transactionById(id.toArray).map(transactionObject(_, proofsEnabled))
+      NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTESTR, "transaction Id")) {
+        case CONST_BYTESTR(id: ByteStr) :: Nil =>
+          val maybeDomainTx: Option[CaseObj] = env.transactionById(id.arr).map(transactionObject(_, proofsEnabled))
           Right(fromOptionCO(maybeDomainTx))
         case _ => ???
       }
     }
 
     def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
-      case addressType.typeRef.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTEVECTOR].bs)
+      case addressType.typeRef.name => Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTESTR].bs)
       case aliasType.typeRef.name   => Recipient.Alias(c.fields("alias").asInstanceOf[CONST_STRING].s)
       case _                        => ???
     }
@@ -292,11 +292,11 @@ object WavesContext {
         LONG,
         "get asset balance for account",
         ("addressOrAlias", addressOrAliasType, "account"),
-        ("assetId", UNION(UNIT, BYTEVECTOR), "assetId (WAVES if none)")
+        ("assetId", UNION(UNIT, BYTESTR), "assetId (WAVES if none)")
       ) {
         case (c: CaseObj) :: u :: Nil if u == unit => env.accountBalanceOf(caseObjToRecipient(c), None).map(CONST_LONG)
-        case (c: CaseObj) :: CONST_BYTEVECTOR(assetId: ByteVector) :: Nil =>
-          env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.toArray)).map(CONST_LONG)
+        case (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil =>
+          env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.arr)).map(CONST_LONG)
 
         case _ => ???
       }
@@ -313,10 +313,10 @@ object WavesContext {
       TRANSACTIONHEIGHTBYID,
       optionLong,
       "get height when transaction was stored to blockchain",
-      ("id", BYTEVECTOR, "transaction Id")
+      ("id", BYTESTR, "transaction Id")
     ) {
-      case CONST_BYTEVECTOR(id: ByteVector) :: Nil => Right(fromOptionL(env.transactionHeightById(id.toArray).map(_.toLong)))
-      case _                                       => ???
+      case CONST_BYTESTR(id: ByteStr) :: Nil => Right(fromOptionL(env.transactionHeightById(id.arr).map(_.toLong)))
+      case _                                 => ???
     }
 
     val sellOrdTypeCoeval: Coeval[Either[String, CaseObj]] = Coeval(Right(ordType(OrdType.Sell)))
@@ -367,21 +367,24 @@ object WavesContext {
       wavesBalanceF
     )
 
-    lazy val writeSetType            = CaseType(FieldNames.WriteSet, List(FieldNames.Data         -> LIST(dataEntryType.typeRef)))
-    val contractTransfer             = CaseType(FieldNames.ContractTransfer, List("recipient"    -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+    lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
+    val contractTransfer =
+      CaseType(FieldNames.ContractTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
     lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
-    lazy val contractResultType      = CaseType(FieldNames.ContractResult, List(FieldNames.Data   -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
+    lazy val contractResultType =
+      CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
 
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
-      types ++ (if (version == V3) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType) else List.empty),
+      types ++ (if (version == ContractV) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
+                else List.empty),
       commonVars ++ vars(version),
       functions
     )
   }
 
   val verifierInput =
-    UnionType("VerifierInput", (buildOrderType(true) :: buildActiveTransactionTypes(true, V3)).map(_.typeRef))
+    UnionType("VerifierInput", (buildOrderType(true) :: buildActiveTransactionTypes(true, ContractV)).map(_.typeRef))
 
 }

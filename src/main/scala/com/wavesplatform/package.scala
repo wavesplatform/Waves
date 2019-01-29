@@ -1,8 +1,9 @@
 package com
 
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{ByteStr, NG}
+import com.wavesplatform.state.NG
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, ValidationError}
 import com.wavesplatform.utils.ScorexLogging

@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import play.api.libs.json._
 
 import scala.util.{Success, Try}
@@ -33,7 +34,7 @@ package object http extends ApiMarshallers {
       stringToByteReads
   }
 
-  def createTransaction(senderPk: String, jsv: JsObject)(f: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
+  def createTransaction(senderPk: String, jsv: JsObject)(txToResponse: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
     val typeId = (jsv \ "type").as[Byte]
 
     (jsv \ "version").validateOpt[Byte](versionReads) match {
@@ -69,10 +70,21 @@ package object http extends ApiMarshallers {
                   case SetScriptTransaction          => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
                   case SetAssetScriptTransaction     => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
                   case SponsorFeeTransaction         => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
+                  case ExchangeTransactionV1         => TransactionFactory.exchangeV1(txJson.as[SignedExchangeRequest], senderPk)
+                  case ExchangeTransactionV2         => TransactionFactory.exchangeV2(txJson.as[SignedExchangeRequestV2], senderPk)
                 }
             }
           }
-          .fold(ApiError.fromValidationError, tx => f(tx))
+          .fold(ApiError.fromValidationError, txToResponse)
+    }
+  }
+
+  def parseOrCreateTransaction(jsv: JsObject)(txToResponse: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
+    val result = TransactionFactory.fromSignedRequest(jsv)
+    if (result.isRight) {
+      result.fold(ApiError.fromValidationError, txToResponse)
+    } else {
+      createTransaction((jsv \ "senderPk").as[String], jsv)(txToResponse)
     }
   }
 }

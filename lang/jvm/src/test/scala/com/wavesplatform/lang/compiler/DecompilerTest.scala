@@ -70,7 +70,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("simple let") {
-    val expr = Terms.BLOCKV1(LET("a", CONST_LONG(1)), TRUE)
+    val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), TRUE)
     Decompiler(expr, opcodes) shouldBe "{ let a = 1; true }"
   }
 
@@ -114,7 +114,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("v2 with LET in BLOCK") {
-    val expr = Terms.BLOCKV2(
+    val expr = Terms.BLOCK(
       LET("vari", REF("p")),
       TRUE
     )
@@ -127,7 +127,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("let and function call in block") {
-    val expr = Terms.BLOCKV2(
+    val expr = Terms.BLOCK(
       Terms.LET("v", REF("p")),
       Terms.FUNCTION_CALL(
         PureContext._isInstanceOf.header,
@@ -142,8 +142,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("complicated let in let and function call in block") {
-    val expr = Terms.BLOCKV2(
-      Terms.LET("v", Terms.BLOCKV2(
+    val expr = Terms.BLOCK(
+      Terms.LET("v", Terms.BLOCK(
         Terms.LET("v", REF("p")),
         Terms.FUNCTION_CALL(
           PureContext._isInstanceOf.header,
@@ -166,7 +166,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("old match") {
-    val expr = Terms.BLOCKV2(
+    val expr = Terms.BLOCK(
       LET("v", REF("p")),
       IF(
         IF(
@@ -180,7 +180,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
             List(REF("v"), CONST_STRING("b"))
           )
         ),
-        BLOCKV2(LET("p", REF("v")), TRUE),
+        BLOCK(LET("p", REF("v")), TRUE),
         FALSE
       )
     )
@@ -211,7 +211,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("new match") {
-    val expr = Terms.BLOCKV2(
+    val expr = Terms.BLOCK(
       Terms.LET("v", REF("p")),
         Terms.IF(
           Terms.IF(
@@ -225,7 +225,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
               List(REF("v"), Terms.CONST_STRING("b"))
             )
          ),
-          Terms.BLOCKV2(
+          Terms.BLOCK(
             Terms.LET("z", Terms.REF("x")
             ), TRUE),
           FALSE

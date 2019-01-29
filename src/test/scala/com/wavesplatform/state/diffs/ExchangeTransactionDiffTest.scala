@@ -3,9 +3,11 @@ package com.wavesplatform.state.diffs
 import cats.{Order => _, _}
 import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.directives.DirectiveParser
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompilerV1}
@@ -17,7 +19,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.functionCosts
@@ -34,7 +36,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id       -> 0,
       BlockchainFeatures.SmartAssets.id         -> 0,
-      BlockchainFeatures.SmartAccountTrading.id -> 0
+      BlockchainFeatures.SmartAccountTrading.id -> 0,
+      BlockchainFeatures.Ride4DApps.id          -> 0
     )
   )
 
@@ -223,6 +226,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     BlockchainFeatures.SmartAccounts       -> 0,
     BlockchainFeatures.SmartAccountTrading -> 0,
     BlockchainFeatures.SmartAssets         -> 0,
+    BlockchainFeatures.Ride4DApps          -> 0,
     BlockchainFeatures.FeeSponsorship      -> 0,
     BlockchainFeatures.FairPoS             -> 0
   )
@@ -497,8 +501,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     for {
       expr       <- compiler.compile(scriptWithoutDirectives, directives)
-      script     <- ScriptV1(expr)
-      complexity <- ScriptEstimator(ctx.varDefs.keySet, functionCosts(V1), expr)
+      script     <- ExprScript(expr)
+      complexity <- ScriptEstimator(ctx.varDefs.keySet, functionCosts(ExprV1), expr)
     } yield (script, complexity)
   }
 

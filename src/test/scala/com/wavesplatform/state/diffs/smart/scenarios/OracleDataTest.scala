@@ -1,16 +1,17 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.api.http.ScriptExecutionError
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global.MaxBase58Bytes
-import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Proofs}
 import com.wavesplatform.utils.compilerContext
@@ -57,8 +58,8 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       setScript <- {
         val untypedAllFieldsRequiredScript = Parser.parseScript(allFieldsRequiredScript).get.value
         val typedAllFieldsRequiredScript =
-          ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untypedAllFieldsRequiredScript).explicitGet()._1
-        selfSignedSetScriptTransactionGenP(master, ScriptV1(typedAllFieldsRequiredScript).explicitGet())
+          ExpressionCompilerV1(compilerContext(ExprV1, isAssetScript = false), untypedAllFieldsRequiredScript).explicitGet()._1
+        selfSignedSetScriptTransactionGenP(master, ExprScript(typedAllFieldsRequiredScript).explicitGet())
       }
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
 

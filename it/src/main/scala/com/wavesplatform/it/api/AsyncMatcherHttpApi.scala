@@ -2,15 +2,15 @@ package com.wavesplatform.it.api
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.http.api_key
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.utils.Base58
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}

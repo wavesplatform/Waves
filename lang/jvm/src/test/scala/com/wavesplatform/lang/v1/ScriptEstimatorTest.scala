@@ -2,9 +2,9 @@ package com.wavesplatform.lang.v1
 
 import cats.data.EitherT
 import cats.kernel.Monoid
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.Version.V1
-import com.wavesplatform.lang._
+import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -29,7 +29,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
     val tx              = CaseObj(transactionType.typeRef, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combine(
-        PureContext.build(V1),
+        PureContext.build(ExprV1),
         CTX(
           Seq(transactionType),
           Map(("tx", ((transactionType.typeRef, "Fake transaction"), LazyVal(EitherT.pure(tx))))),
@@ -79,7 +79,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
 
   property("recursive let statement") {
     // let v = v; v
-    val expr = BLOCKV2(LET("v", REF("v")), REF("v"))
+    val expr = BLOCK(LET("v", REF("v")), REF("v"))
     estimate(Map.empty, expr) shouldBe 'right
   }
 

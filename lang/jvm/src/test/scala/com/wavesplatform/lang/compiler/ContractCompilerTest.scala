@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction, VerifierAnnotation, VerifierFunction}
@@ -15,18 +16,17 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.{Common, Version}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
 
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   property("contract compiles when uses annotation bindings and correct return type") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
     val expr = {
       val script =
         """
           |
           | @Callable(invocation)
-          | func foo(a:ByteVector) = {
+          | func foo(a:ByteStr) = {
           |  let sender0 = invocation.caller.bytes
           |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender0)))
           | }
@@ -45,11 +45,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         List.empty,
         List(ContractFunction(
           CallableAnnotation("invocation"),
-          None,
           Terms.FUNC(
             "foo",
             List("a"),
-            BLOCKV2(
+            BLOCK(
               LET("sender0", GETTER(GETTER(REF("invocation"), "caller"), "bytes")),
               FUNCTION_CALL(
                 User(FieldNames.WriteSet),
@@ -62,10 +61,11 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
             )
           )
         )),
-        Some(VerifierFunction(
-          VerifierAnnotation("t"),
-          FUNC("verify", List.empty, FUNCTION_CALL(Native(FunctionIds.EQ), List(GETTER(REF("t"), "id"), CONST_BYTEVECTOR(ByteVector.empty))))
-        ))
+        Some(
+          VerifierFunction(
+            VerifierAnnotation("t"),
+            FUNC("verify", List.empty, FUNCTION_CALL(Native(FunctionIds.EQ), List(GETTER(REF("t"), "id"), CONST_BYTESTR(ByteStr.empty))))
+          ))
       ))
     compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
   }
@@ -77,7 +77,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """
           |
           | @Callable(invocation)
-          | func foo(a:ByteVector) = {
+          | func foo(a:ByteStr) = {
           |  a + invocation.caller.bytes
           | }
           |
@@ -92,9 +92,9 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(Version.V3),
+          PureContext.build(Version.ContractV),
           CryptoContext.build(com.wavesplatform.lang.Global),
-          WavesContext.build(Version.V3, Common.emptyBlockchainEnvironment(), false)
+          WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false)
         ))
       .compilerContext
     val expr = {

@@ -8,16 +8,16 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, DefinedType, UnionType
 
 object Types {
 
-  val addressType        = CaseType("Address", List("bytes" -> BYTEVECTOR))
+  val addressType        = CaseType("Address", List("bytes" -> BYTESTR))
   val aliasType          = CaseType("Alias", List("alias" -> STRING))
   val addressOrAliasType = UNION(addressType.typeRef, aliasType.typeRef)
 
   val transfer         = CaseType("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
-  val optionByteVector = UNION(BYTEVECTOR, UNIT)
+  val optionByteVector = UNION(BYTESTR, UNIT)
 
   val optionAddress        = UNION(addressType.typeRef, UNIT)
   val optionLong           = UNION(LONG, UNIT)
-  val listByteVector: LIST = LIST(BYTEVECTOR)
+  val listByteVector: LIST = LIST(BYTESTR)
   val listTransfers        = LIST(transfer.typeRef)
   val paymentType          = CaseType("AttachedPayment", List("asset" -> optionByteVector, "amount" -> LONG))
 
@@ -26,15 +26,15 @@ object Types {
   val invocationType = CaseType("Invocation", List("caller" -> addressType.typeRef, "contractAddress" -> addressType.typeRef, "payment" -> optionPayment))
 
   private val header = List(
-    "id"        -> BYTEVECTOR,
+    "id"        -> BYTESTR,
     "fee"       -> LONG,
     "timestamp" -> LONG,
     "version"   -> LONG,
   )
   private val proven = List(
     "sender"          -> addressType.typeRef,
-    "senderPublicKey" -> BYTEVECTOR,
-    "bodyBytes"       -> BYTEVECTOR
+    "senderPublicKey" -> BYTESTR,
+    "bodyBytes"       -> BYTESTR
   )
 
   private val proofs = "proofs" -> listByteVector
@@ -53,7 +53,7 @@ object Types {
           "amount"     -> LONG,
           "assetId"    -> optionByteVector,
           "recipient"  -> addressOrAliasType,
-          "attachment" -> BYTEVECTOR
+          "attachment" -> BYTESTR
         ) ++ header ++ proven,
         proofsEnabled
       )
@@ -70,8 +70,8 @@ object Types {
     addProofsIfNeeded(
       List(
         "quantity"    -> LONG,
-        "name"        -> BYTEVECTOR,
-        "description" -> BYTEVECTOR,
+        "name"        -> BYTESTR,
+        "description" -> BYTESTR,
         "reissuable"  -> BOOLEAN,
         "decimals"    -> LONG,
         "script"      -> optionByteVector
@@ -96,7 +96,7 @@ object Types {
     addProofsIfNeeded(
       List(
         "quantity"   -> LONG,
-        "assetId"    -> BYTEVECTOR,
+        "assetId"    -> BYTESTR,
         "reissuable" -> BOOLEAN,
       ) ++ header ++ proven,
       proofsEnabled
@@ -108,7 +108,7 @@ object Types {
     addProofsIfNeeded(
       List(
         "quantity" -> LONG,
-        "assetId"  -> BYTEVECTOR
+        "assetId"  -> BYTESTR
       ) ++ header ++ proven,
       proofsEnabled
     )
@@ -119,7 +119,7 @@ object Types {
     addProofsIfNeeded(
       List(
         "script"  -> optionByteVector,
-        "assetId" -> BYTEVECTOR
+        "assetId" -> BYTESTR
       ) ++ header ++ proven,
       proofsEnabled
     )
@@ -140,7 +140,7 @@ object Types {
     "LeaseCancelTransaction",
     addProofsIfNeeded(
       List(
-        "leaseId" -> BYTEVECTOR,
+        "leaseId" -> BYTESTR,
       ) ++ header ++ proven,
       proofsEnabled
     )
@@ -173,7 +173,7 @@ object Types {
     "SponsorFeeTransaction",
     addProofsIfNeeded(
       List(
-        "assetId"              -> BYTEVECTOR,
+        "assetId"              -> BYTESTR,
         "minSponsoredAssetFee" -> optionLong
       ) ++ header ++ proven,
       proofsEnabled
@@ -192,8 +192,8 @@ object Types {
       "Order",
       addProofsIfNeeded(
         List(
-          "id"               -> BYTEVECTOR,
-          "matcherPublicKey" -> BYTEVECTOR,
+          "id"               -> BYTESTR,
+          "matcherPublicKey" -> BYTESTR,
           "assetPair"        -> assetPairType.typeRef,
           "orderType"        -> ordTypeType,
           "price"            -> LONG,
@@ -221,7 +221,7 @@ object Types {
     )
   )
 
-  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTEVECTOR, STRING)
+  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
   val dataEntryType              = CaseType("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
 
   def buildDataTransactionType(proofsEnabled: Boolean) = CaseType(
@@ -238,7 +238,7 @@ object Types {
         "totalAmount"   -> LONG,
         "transfers"     -> listTransfers,
         "transferCount" -> LONG,
-        "attachment"    -> BYTEVECTOR
+        "attachment"    -> BYTESTR
       ) ++ header ++ proven,
       proofsEnabled
     )
@@ -277,7 +277,7 @@ object Types {
         buildSetScriptTransactionType(proofsEnabled),
         buildSponsorFeeTransactionType(proofsEnabled),
         buildDataTransactionType(proofsEnabled)
-      ) ++ (if (v == Version.V3) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
+      ) ++ (if (v == Version.ContractV) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
   }
 
   def buildWavesTypes(proofsEnabled: Boolean, v: Version): Seq[DefinedType] = {

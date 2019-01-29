@@ -3,14 +3,15 @@ package com.wavesplatform.database
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.state.BlockchainUpdaterImpl
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdaterImpl, EitherExt2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
@@ -38,13 +39,6 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       writer.merge(Seq(15, 12, 3), Seq(12, 5)) shouldEqual Seq((15, 12), (12, 12), (3, 5))
       writer.merge(Seq(12, 5), Seq(15, 12, 3)) shouldEqual Seq((12, 15), (12, 12), (5, 3))
       writer.merge(Seq(8, 4), Seq(8, 4)) shouldEqual Seq((8, 8), (4, 4))
-    }
-
-    "preserves compatibility until SmartAccountTrading feature is activated" in {
-      val writer = new LevelDBWriter(db, Enabled, 100000, 2000, 120 * 60 * 1000)
-      writer.merge(Seq(15, 12, 3), Seq(12, 5)) shouldEqual Seq((15, 12), (12, 12), (3, 12), (3, 5))
-      writer.merge(Seq(12, 5), Seq(15, 12, 3)) shouldEqual Seq((12, 15), (12, 12), (5, 12), (5, 3))
-      writer.merge(Seq(8, 4), Seq(8, 4)) shouldEqual Seq((8, 8), (4, 8), (4, 4))
     }
   }
   "hasScript" - {
@@ -98,7 +92,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
     def baseGen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = accountGen.map { master =>
       val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       val setScriptTx = SetScriptTransaction
-        .selfSigned(1, master, Some(ScriptV1(Terms.TRUE).explicitGet()), 5000000, ts)
+        .selfSigned(1, master, Some(ExprScript(Terms.TRUE).explicitGet()), 5000000, ts)
         .explicitGet()
 
       val block = TestBlock.create(ts, Seq(genesisTx, setScriptTx))

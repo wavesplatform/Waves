@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 

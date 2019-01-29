@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.VerifierFunction
@@ -6,37 +7,31 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, FieldNames, Types}
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
-import com.wavesplatform.lang.v1.task.imports.raiseError
+import com.wavesplatform.lang.v1.task.imports.{raiseError, _}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
-import scodec.bits.ByteVector
-import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.traits.domain.Tx.Pmt
+import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
 
 import scala.collection.mutable.ListBuffer
 
 object ContractEvaluator {
-  case class Invokation(name: String,
-                        fc: FUNCTION_CALL,
-                        invoker: ByteVector,
-                        payment: Option[(Long, Option[ByteVector])],
-                        contractAddress: ByteVector)
+  case class Invokation(name: String, fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
 
   def eval(c: Contract, i: Invokation): EvalM[EVALUATED] = {
     c.cfs.find(_.u.name == i.name) match {
       case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '${i.name} doesn't exist in the contract")
       case Some(f) =>
         val zeroExpr = Right(
-          BLOCKV2(
-            LET(f.c.invocationArgName,
+          BLOCK(
+            LET(f.annotation.invocationArgName,
                 Bindings
                   .buildInvocation(Recipient.Address(i.invoker), i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.contractAddress))),
-            BLOCKV2(f.u, i.fc)
+            BLOCK(f.u, i.fc)
           ))
 
         for {
           ze <- liftEither(zeroExpr)
-          expr = c.dec.foldRight(ze)((d, e) => BLOCKV2(d, e))
+          expr = c.dec.foldRight(ze)((d, e) => BLOCK(d, e))
           r <- EvaluatorV1.evalExpr(expr)
         } yield r
     }
@@ -45,7 +40,7 @@ object ContractEvaluator {
   def verify(v: VerifierFunction, tx: Tx): EvalM[EVALUATED] = {
     val t = Bindings.transactionObject(tx, proofsEnabled = true)
     val expr =
-      BLOCKV2(LET(v.v.txArgName, t), BLOCKV2(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+      BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 
@@ -59,7 +54,7 @@ object ContractEvaluator {
   }
 }
 
-case class ContractResult(ds: List[DataItem[_]], ts: List[(Address, Long, Option[ByteVector])])
+case class ContractResult(ds: List[DataItem[_]], ts: List[(Address, Long, Option[ByteStr])])
 object ContractResult {
   private def processWriteSet(c: CaseObj) = c match {
     case CaseObj(_, fields) =>
@@ -67,11 +62,11 @@ object ContractResult {
       xs.map {
         case CaseObj(tpe, fields) if tpe.name == "DataEntry" =>
           (fields("key"), fields("value")) match {
-            case (CONST_STRING(k), CONST_BOOLEAN(b))    => DataItem.Bool(k, b)
-            case (CONST_STRING(k), CONST_STRING(b))     => DataItem.Str(k, b)
-            case (CONST_STRING(k), CONST_LONG(b))       => DataItem.Lng(k, b)
-            case (CONST_STRING(k), CONST_BYTEVECTOR(b)) => DataItem.Bin(k, b)
-            case _                                      => ???
+            case (CONST_STRING(k), CONST_BOOLEAN(b)) => DataItem.Bool(k, b)
+            case (CONST_STRING(k), CONST_STRING(b))  => DataItem.Str(k, b)
+            case (CONST_STRING(k), CONST_LONG(b))    => DataItem.Lng(k, b)
+            case (CONST_STRING(k), CONST_BYTESTR(b)) => DataItem.Bin(k, b)
+            case _                                   => ???
           }
         case _ => ???
       }
@@ -85,14 +80,14 @@ object ContractResult {
           (fields("recipient"), fields("amount"), fields("asset")) match {
             case (CaseObj(Types.addressType.typeRef, fields2), CONST_LONG(b), t) =>
               val token = t match {
-                case CONST_BYTEVECTOR(tokenId)  => Some(tokenId)
+                case CONST_BYTESTR(tokenId)     => Some(tokenId)
                 case CaseObj(_, m) if m.isEmpty => None
                 case _                          => ???
               }
 
               fields2("bytes") match {
-                case CONST_BYTEVECTOR(addBytes) => (Address(addBytes), b, token)
-                case v                          => ???
+                case CONST_BYTESTR(addBytes) => (Address(addBytes), b, token)
+                case v                       => ???
               }
             case v => ???
           }
@@ -104,11 +99,11 @@ object ContractResult {
     case CaseObj(_, fields) =>
       val writes = fields(FieldNames.Data) match {
         case c @ CaseObj(tpe, _) if tpe.name == FieldNames.WriteSet => processWriteSet(c)
-        case _                                             => ???
+        case _                                                      => ???
       }
       val payments = fields(FieldNames.Transfers) match {
         case c @ CaseObj(tpe, _) if tpe.name == FieldNames.TransferSet => processTransferSet(c)
-        case _                                             => ???
+        case _                                                         => ???
       }
       ContractResult(writes.toList, payments.toList)
   }
@@ -120,7 +115,7 @@ object ContractResult {
           case FieldNames.WriteSet       => ContractResult(processWriteSet(c).toList, List.empty)
           case FieldNames.TransferSet    => ContractResult(List.empty, processTransferSet(c).toList)
           case FieldNames.ContractResult => processContractSet(c)
-          case _                => ???
+          case _                         => ???
         }
       case _ => ???
     }

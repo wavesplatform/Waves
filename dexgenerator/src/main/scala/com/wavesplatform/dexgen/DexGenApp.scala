@@ -6,13 +6,13 @@ import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dexgen.cli.ScoptImplicits
 import com.wavesplatform.dexgen.config.FicusImplicits
 import com.wavesplatform.dexgen.utils.{ApiRequests, GenOrderType}
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.network.client.NetworkSender
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.transfer.MassTransferTransaction

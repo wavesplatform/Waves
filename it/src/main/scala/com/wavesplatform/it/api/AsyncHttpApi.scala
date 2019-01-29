@@ -8,6 +8,7 @@ import com.wavesplatform.api.http.alias.CreateAliasV1Request
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq, DataRequest}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugApiRoute._
 import com.wavesplatform.http.DebugMessage._
@@ -15,7 +16,7 @@ import com.wavesplatform.http.{DebugMessage, RollbackParams, api_key}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EitherExt2, Portfolio}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
@@ -552,6 +553,9 @@ object AsyncHttpApi extends Assertions {
     }.as[Portfolio]
 
     def debugMinerInfo(): Future[Seq[State]] = getWithApiKey(s"/debug/minerInfo").as[Seq[State]]
+
+    def transactionSerializer(body: JsObject): Future[TransactionSerialize] =
+      postJsObjectWithApiKey(s"/utils/transactionSerialize", body).as[TransactionSerialize]
 
     def accountEffectiveBalance(acc: String): Future[Long] = n.effectiveBalance(acc).map(_.balance)
 

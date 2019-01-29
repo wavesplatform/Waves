@@ -1,6 +1,6 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.state.ByteStr
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import play.api.libs.json._
 
@@ -270,6 +270,11 @@ object BlacklistedPeer {
 case class State(address: String, miningBalance: Long, timestamp: Long)
 object State {
   implicit val StateFormat: Format[State] = Json.format
+}
+
+case class TransactionSerialize(bytes: Array[Int])
+object TransactionSerialize {
+  implicit val TransactionSerializeFormat: Format[TransactionSerialize] = Json.format
 }
 
 case class FeeInfo(feeAssetId: Option[String], feeAmount: Long)

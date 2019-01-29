@@ -3,10 +3,10 @@ package com.wavesplatform.transaction.assets.exchange
 import cats.data.State
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval

@@ -1,17 +1,18 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffEi, produce}
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{GenesisTransaction, Proofs}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{GenesisTransaction, Proofs}
 
 class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -24,7 +25,7 @@ class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks wit
       fee       <- smallFeeGen
       ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      setScript <- selfSignedSetScriptTransactionGenP(master, ScriptV1(TRUE).explicitGet())
+      setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(TRUE).explicitGet())
       transfer = TransferTransactionV2.selfSigned(version, None, master, recepient, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
     } yield (genesis, setScript, transfer)
 

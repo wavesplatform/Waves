@@ -1,16 +1,16 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.{AddressScheme, Alias}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.CreateAliasTransactionV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.scalatest.CancelAfterFailure
 
@@ -45,7 +45,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
   }
 
   test("wrong type of script return value") {
-    val script = ScriptV1(
+    val script = ExprScript(
       Terms.FUNCTION_CALL(
         FunctionHeader.Native(100),
         List(Terms.CONST_LONG(3), Terms.CONST_LONG(2))

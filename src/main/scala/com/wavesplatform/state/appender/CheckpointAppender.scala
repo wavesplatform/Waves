@@ -1,8 +1,9 @@
 package com.wavesplatform.state.appender
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint, PeerDatabase, id}
-import com.wavesplatform.state.{Blockchain, ByteStr}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
