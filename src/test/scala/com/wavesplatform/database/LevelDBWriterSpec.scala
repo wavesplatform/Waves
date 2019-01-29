@@ -8,9 +8,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
-import com.wavesplatform.state.BlockchainUpdaterImpl
+import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
@@ -19,6 +19,8 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
+
+import scala.util.Random
 
 class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with RequestGen {
   "Slice" - {
@@ -221,6 +223,10 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
       bcu.blockAt(3).get shouldBe block2
       bcu.blockAt(4).get shouldBe block3
 
+      for (i <- 1 to db.get(Keys.height)) {
+        db.get(Keys.blockHeaderAndSizeAt(Height(i))).isDefined shouldBe true
+      }
+
       bcu.blockBytes(1).get shouldBe genesisBlock.bytes()
       bcu.blockBytes(2).get shouldBe block1.bytes()
       bcu.blockBytes(3).get shouldBe block2.bytes()
@@ -234,7 +240,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
 
   "allActiveLeases" - {
     "should return correct set of leases" in {
-      def precs: Gen[(Seq[LeaseTransaction], Seq[Block])] = {
+      def precs: Gen[(PrivateKeyAccount, Seq[LeaseTransaction], Seq[Block])] = {
 
         val ts = ntpTime.correctedTime()
 
@@ -263,7 +269,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
 
                 (ls ++ txs, nextBlock :: b :: bs)
             }
-        } yield (leaseTxs, blocks.reverse)
+        } yield (leaser, leaseTxs, blocks.reverse)
       }
 
       val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
@@ -272,7 +278,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
       val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
       try {
 
-        val (leases, blocks) = precs.sample.get
+        val (leaser, leases, blocks) = precs.sample.get
 
         blocks.foreach { block =>
           bcu.processBlock(block).explicitGet()
@@ -291,6 +297,40 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
         bcu.processBlock(emptyBlock)
 
         defaultWriter.allActiveLeases shouldBe leases.toSet
+
+        val l = leases(Random.nextInt(leases.length - 1))
+
+        val lc = LeaseCancelTransactionV1
+            .selfSigned(
+              leaser,
+              l.id(),
+              1 * 10 ^ 8,
+              ntpTime.correctedTime() + 1000
+            ).explicitGet()
+
+        val b = TestBlock
+            .create(
+              emptyBlock.timestamp + 2,
+              emptyBlock.uniqueId,
+              Seq(lc)
+            )
+
+        val b2 = TestBlock
+          .create(
+            b.timestamp + 3,
+            b.uniqueId,
+            Seq.empty
+          )
+
+        bcu.processBlock(b)
+        bcu.processBlock(b2)
+
+        bcu.allActiveLeases shouldBe (leases.toSet - l)
+        defaultWriter.allActiveLeases shouldBe (leases.toSet - l)
+
+        leases.foreach { ls =>
+          println(defaultWriter.transactionInfo(ls.id()).get)
+        }
 
         bcu.shutdown()
       } finally {

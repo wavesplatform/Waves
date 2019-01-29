@@ -212,8 +212,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
                                   sponsorship: Map[AssetId, Sponsorship]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
-    val h = Height(height)
-
     rw.put(Keys.height, height)
 
     val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
@@ -230,7 +228,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         k -> v
       }.toMap
 
-    rw.put(Keys.blockHeaderAndSizeAt(h), Some((block, block.bytes().size)))
+    rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block, block.bytes().length)))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -355,7 +353,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
         (tx.builder.typeId, num)
       }
-      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((h, txTypeNumSeq)))
+      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq)))
       rw.put(kk, nextSeqNr)
     }
 
@@ -364,8 +362,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     }
 
     for ((id, (tx, num)) <- transactions) {
-      rw.put(Keys.transactionAt(h, num), Some(tx))
-      rw.put(Keys.transactionHNById(id), Some((h, num)))
+      rw.put(Keys.transactionAt(Height(height), num), Some(tx))
+      rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
     }
 
     val activationWindowSize = fs.activationWindowSize(height)
@@ -422,10 +420,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
           val (discardedHeader, _) = rw
             .get(Keys.blockHeaderAndSizeAt(h))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
-
-//          val discardedBlock =
-//            loadBlock(h, rw)
-//              .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
           for (aId <- rw.get(Keys.changedAddresses(currentHeight))) {
             val addressId = AddressId(aId)
@@ -768,11 +762,16 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     txIds.toList
       .filter(loadLeaseStatus(db, _))
-      .flatMap { txId =>
-        for {
-          (h, n) <- db.get(Keys.transactionHNById(txId))
-          tx     <- db.get(Keys.transactionAt(h, n))
-        } yield tx
+      .map { txId =>
+        val (h, n) = db
+          .get(Keys.transactionHNById(txId))
+          .getOrElse(throw new Exception(s"Corrupted state! No (H, n) found in db, for transaction with id - ${txId.base58}"))
+
+        val tx = db
+          .get(Keys.transactionAt(h, n))
+          .getOrElse(throw new Exception(s"Corrupted state! No transaction found in db, for id - ${txId.base58}"))
+
+        tx
       }
       .collect {
         case t: LeaseTransaction => t

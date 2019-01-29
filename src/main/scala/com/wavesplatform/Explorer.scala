@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util
 
+import com.google.common.primitives.Shorts
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
@@ -11,11 +12,13 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.Height
+import com.wavesplatform.state.{Height, TxNum}
+import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 import org.slf4j.bridge.SLF4JBridgeHandler
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
 object Explorer extends ScorexLogging {
@@ -212,6 +215,39 @@ object Explorer extends ScorexLogging {
           for ((prefix, stats) <- result.asScala) {
             log.info(s"${keys(prefix)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
           }
+
+        case "TXBH" =>
+          val h = args(2).toInt
+
+          val txs = new ListBuffer[(TxNum, Transaction)]()
+
+          val prefix = ByteBuffer
+            .allocate(6)
+            .putShort(Keys.TransactionInfoPrefix)
+            .putInt(h)
+            .array()
+
+          val iterator = db.iterator
+
+          try {
+            iterator.seek(prefix)
+            while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) {
+              val entry = iterator.next()
+
+              val k = entry.getKey
+              println(k.toList.map(_.toInt & 0xff))
+              val v = entry.getValue
+
+              for {
+                idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
+                tx  <- TransactionParsers.parseBytes(v)
+              } txs.append((TxNum(idx), tx))
+            }
+          } finally iterator.close()
+
+          println(txs.length)
+          txs.foreach(println)
+
       }
     } finally db.close()
   }
