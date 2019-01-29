@@ -4,7 +4,6 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
 import akka.testkit.TestKit
 import akka.util.Timeout
-import com.google.common.base.Charsets
 import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
@@ -28,11 +27,6 @@ class OrderHistoryBalanceSpecification
     with NTPTime {
 
   import OrderHistoryBalanceSpecification._
-
-  private def mkAssetId(prefix: String) = {
-    val prefixBytes = prefix.getBytes(Charsets.UTF_8)
-    Some(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
-  }
 
   private val WctBtc   = AssetPair(mkAssetId("WCT"), mkAssetId("BTC"))
   private val WavesBtc = AssetPair(None, mkAssetId("BTC"))

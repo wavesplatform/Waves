@@ -3,13 +3,12 @@ package com.wavesplatform.matcher.matching
 import akka.actor.Props
 import akka.pattern.ask
 import akka.util.Timeout
-import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.market.MatcherSpecLike
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderHistoryStub}
-import com.wavesplatform.state.{ByteStr, Portfolio}
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -76,11 +75,6 @@ class ReservedBalanceSpecification
   override protected def actorSystemName: String = "ReservedBalanceSpecification" // getClass.getSimpleName
 
   private implicit val timeout: Timeout = 5.seconds
-
-  private def mkAssetId(prefix: String) = {
-    val prefixBytes = prefix.getBytes(UTF_8)
-    Some(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
-  }
 
   val pair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
   val p    = new AssetPairDecimals(8, 2)

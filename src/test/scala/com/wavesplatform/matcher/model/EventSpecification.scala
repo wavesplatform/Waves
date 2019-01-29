@@ -1,19 +1,12 @@
 package com.wavesplatform.matcher.model
 
-import com.google.common.base.Charsets
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.OrderExecuted
-import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import org.scalatest.{FreeSpec, Matchers}
 
 class EventSpecification extends FreeSpec with Matchers with MatcherTestData {
-  private def mkAssetId(prefix: String) = {
-    val prefixBytes = prefix.getBytes(Charsets.UTF_8)
-    Some(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
-  }
-
   "Proper rounding scenario 1" in {
     val pair      = AssetPair(None, mkAssetId("BTC"))
     val counter   = sell(pair, 840340L, 0.00000238, matcherFee = Some(300000L))

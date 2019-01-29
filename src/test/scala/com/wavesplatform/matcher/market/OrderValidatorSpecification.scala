@@ -32,7 +32,7 @@ class OrderValidatorSpecification
     with PropertyChecks
     with NoShrink {
 
-  private val wbtc         = mkAssetId("WBTC")
+  private val wbtc         = mkAssetId("WBTC").get
   private val pairWavesBtc = AssetPair(None, Some(wbtc))
   private val defaultTs    = 1000
 
@@ -161,8 +161,8 @@ class OrderValidatorSpecification
     }
 
     "validate order with smart token" when {
-      val asset1 = mkAssetId("asset1")
-      val asset2 = mkAssetId("asset2")
+      val asset1 = mkAssetId("asset1").get
+      val asset2 = mkAssetId("asset2").get
       val pair   = AssetPair(Some(asset1), Some(asset2))
       val portfolio = Portfolio(10 * Constants.UnitsInWave,
                                 LeaseBalance.empty,
@@ -302,11 +302,6 @@ class OrderValidatorSpecification
       ts = Some(ts),
       version = version
     )
-
-  private def mkAssetId(prefix: String): ByteStr = {
-    val prefixBytes = prefix.getBytes(Charsets.UTF_8)
-    ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32))
-  }
 
   private def activate(bc: Blockchain, features: (BlockchainFeature, Int)*): Unit = {
     (bc.activatedFeatures _).when().returns(features.map(x => x._1.id -> x._2).toMap).anyNumberOfTimes()

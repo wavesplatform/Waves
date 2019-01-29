@@ -12,13 +12,12 @@ import play.api.libs.json.{JsObject, JsValue, Json}
 import scala.math.BigDecimal.RoundingMode
 
 object MatcherModel {
-  type Price     = Long
-  type Level[+A] = Vector[A]
+  type Price = Long
 }
 
 case class LevelAgg(amount: Long, price: Long)
 
-sealed trait LimitOrder extends Product with Serializable {
+sealed trait LimitOrder {
   def amount: Long // could be remaining or executed, see OrderExecuted
   def price: Price
   def fee: Long // same

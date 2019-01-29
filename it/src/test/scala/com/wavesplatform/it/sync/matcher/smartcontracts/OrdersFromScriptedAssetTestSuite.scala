@@ -256,14 +256,10 @@ object OrdersFromScriptedAssetTestSuite {
     ScriptCompiler(scriptText, isAssetScript = true).explicitGet()._1
   }
 
-  private val commonConfig = ConfigFactory.parseString(s"""
-                                                           |waves {
-                                                           |  blockchain.custom.functionality.pre-activated-features = { 9 = 0 }
-                                                           |  matcher.price-assets = ["$AllowAssetId", "$DenyAssetId", "$UnscriptedAssetId"]
-                                                           |}
-                                                           |waves.matcher {
-                                                           |  order-cleanup-interval = 5m
-                                                           |}""".stripMargin)
+  private val commonConfig = ConfigFactory.parseString(s"""waves {
+                                                          |  blockchain.custom.functionality.pre-activated-features = { 9 = 0 }
+                                                          |  matcher.price-assets = ["$AllowAssetId", "$DenyAssetId", "$UnscriptedAssetId"]
+                                                          |}""".stripMargin)
 
   private val Configs = MatcherDefaultConfig.Configs.map(commonConfig.withFallback(_))
 

@@ -52,7 +52,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private val currentOffset      = new AtomicReference[QueueEventWithMeta.Offset](-1L)
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
-  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
+  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.Snapshot](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings)
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
@@ -64,7 +64,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private val marketStatuses = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
 
-  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook): Unit = {
+  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook.Snapshot): Unit = {
     orderBookCache.put(assetPair, newSnapshot)
     orderBooksSnapshotCache.invalidate(assetPair)
   }

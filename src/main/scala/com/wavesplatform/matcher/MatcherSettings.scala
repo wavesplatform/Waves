@@ -27,13 +27,11 @@ case class MatcherSettings(enable: Boolean,
                            snapshotsDataDir: String,
                            snapshotsInterval: Int,
                            makeSnapshotsAtStart: Boolean,
-                           orderCleanupInterval: FiniteDuration,
                            priceAssets: Seq[String],
                            maxTimestampDiff: FiniteDuration,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
                            maxOrdersPerRequest: Int,
-                           defaultOrderTimestamp: Long,
                            orderTimestampDrift: Long,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
                            blacklistedAddresses: Set[String],
@@ -58,23 +56,21 @@ object MatcherSettings {
   }
 
   def fromConfig(config: Config): MatcherSettings = {
-    val enabled               = config.as[Boolean](s"$configPath.enable")
-    val account               = config.as[String](s"$configPath.account")
-    val bindAddress           = config.as[String](s"$configPath.bind-address")
-    val port                  = config.as[Int](s"$configPath.port")
-    val minOrderFee           = config.as[Long](s"$configPath.min-order-fee")
-    val orderMatchTxFee       = config.as[Long](s"$configPath.order-match-tx-fee")
-    val dataDirectory         = config.as[String](s"$configPath.data-directory")
-    val journalDirectory      = config.as[String](s"$configPath.journal-directory")
-    val snapshotsDirectory    = config.as[String](s"$configPath.snapshots-directory")
-    val snapshotsInterval     = config.as[Int](s"$configPath.snapshots-interval")
-    val makeSnapshotsAtStart  = config.as[Boolean](s"$configPath.make-snapshots-at-start")
-    val orderCleanupInterval  = config.as[FiniteDuration](s"$configPath.order-cleanup-interval")
-    val maxOrdersPerRequest   = config.as[Int](s"$configPath.rest-order-limit")
-    val defaultOrderTimestamp = config.as[Long](s"$configPath.default-order-timestamp")
-    val orderTimestampDrift   = config.as[FiniteDuration](s"$configPath.order-timestamp-drift")
-    val baseAssets            = config.as[List[String]](s"$configPath.price-assets")
-    val maxTimestampDiff      = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
+    val enabled              = config.as[Boolean](s"$configPath.enable")
+    val account              = config.as[String](s"$configPath.account")
+    val bindAddress          = config.as[String](s"$configPath.bind-address")
+    val port                 = config.as[Int](s"$configPath.port")
+    val minOrderFee          = config.as[Long](s"$configPath.min-order-fee")
+    val orderMatchTxFee      = config.as[Long](s"$configPath.order-match-tx-fee")
+    val dataDirectory        = config.as[String](s"$configPath.data-directory")
+    val journalDirectory     = config.as[String](s"$configPath.journal-directory")
+    val snapshotsDirectory   = config.as[String](s"$configPath.snapshots-directory")
+    val snapshotsInterval    = config.as[Int](s"$configPath.snapshots-interval")
+    val makeSnapshotsAtStart = config.as[Boolean](s"$configPath.make-snapshots-at-start")
+    val maxOrdersPerRequest  = config.as[Int](s"$configPath.rest-order-limit")
+    val orderTimestampDrift  = config.as[FiniteDuration](s"$configPath.order-timestamp-drift")
+    val baseAssets           = config.as[List[String]](s"$configPath.price-assets")
+    val maxTimestampDiff     = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
 
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
     val blacklistedNames  = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
@@ -100,13 +96,11 @@ object MatcherSettings {
       snapshotsDirectory,
       snapshotsInterval,
       makeSnapshotsAtStart,
-      orderCleanupInterval,
       baseAssets,
       maxTimestampDiff,
       blacklistedAssets.toSet,
       blacklistedNames,
       maxOrdersPerRequest,
-      defaultOrderTimestamp,
       orderTimestampDrift.toMillis,
       blacklistedAddresses,
       orderBookSnapshotHttpCache,

@@ -1,111 +1,161 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
+import com.wavesplatform.matcher.model.Events._
+import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state.ByteStr
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import play.api.libs.json._
+import play.api.libs.functional.syntax._
 
-import scala.collection.immutable.TreeMap
+import scala.annotation.tailrec
+import scala.collection.mutable
 
-case class OrderBook(bids: TreeMap[Price, Level[BuyLimitOrder]], asks: TreeMap[Price, Level[SellLimitOrder]]) {
-  def bestBid: Option[BuyLimitOrder]  = bids.headOption.flatMap(_._2.headOption)
-  def bestAsk: Option[SellLimitOrder] = asks.headOption.flatMap(_._2.headOption)
+class OrderBook private (private[OrderBook] val bids: OrderBook.Side, private[OrderBook] val asks: OrderBook.Side) {
+  import OrderBook._
 
-  lazy val allOrderIds = bids.values.flatMap(_.map(_.order.id())).toSet ++ asks.values.flatMap(_.map(_.order.id())).toSet
+  def bestBid: Option[LevelAgg] = bids.aggregated.headOption
+  def bestAsk: Option[LevelAgg] = asks.aggregated.headOption
+
+  def allOrders: Iterable[LimitOrder] =
+    for {
+      (_, level) <- bids ++ asks
+      lo         <- level
+    } yield lo
+
+  def cancel(orderId: ByteStr): Option[OrderCanceled] = ???
+
+  def cancelAll(): Seq[OrderCanceled] = {
+    val canceledOrders = allOrders.map(lo => OrderCanceled(lo, unmatchable = false)).toSeq
+    bids.clear()
+    asks.clear()
+    canceledOrders
+  }
+
+  def add(o: Order, ts: Long): Seq[Event] =
+    (o.orderType match {
+      case OrderType.BUY  => doMatch(ts, _ >= _, LimitOrder(o), Seq.empty, bids, asks)
+      case OrderType.SELL => doMatch(ts, _ <= _, LimitOrder(o), Seq.empty, asks, bids)
+    }).reverse
+
+  def snapshot: Snapshot = Snapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
 }
 
-object OrderBook extends ScorexLogging {
+object OrderBook {
+  type Level = Vector[LimitOrder]
+  type Side  = mutable.TreeMap[Price, Level]
+
+  case class Snapshot(bids: Seq[LevelAgg] = Seq.empty, asks: Seq[LevelAgg] = Seq.empty)
+
+  implicit class SideExt(val side: Side) extends AnyVal {
+    def best: Option[LimitOrder] = side.headOption.flatMap(_._2.headOption)
+
+    final def removeBest(): LimitOrder = side.headOption match {
+      case l if l.forall(_._2.isEmpty) =>
+        throw new IllegalArgumentException("Cannot remove the best element from an empty level")
+      case Some((price, level)) =>
+        if (level.length == 1) side -= price
+        else side += price -> level.tail
+        level.head
+    }
+
+    def replaceBest(newBestAsk: LimitOrder): Side = {
+      require(side.nonEmpty, "Cannot replace the best level of an empty side")
+      val (price, level) = side.head
+      require(level.nonEmpty, "Cannot replace the best element of an empty level")
+      side += (price -> (newBestAsk +: level.tail))
+    }
+
+    def aggregated: Iterable[LevelAgg] =
+      for {
+        (p, l) <- side.view
+        if l.nonEmpty
+      } yield LevelAgg(l.map(_.amount).sum, p)
+  }
+
+  /** @param canMatch (submittedPrice, counterPrice) => Boolean */
+  @tailrec
+  private def doMatch(
+      eventTs: Long,
+      canMatch: (Long, Long) => Boolean,
+      submitted: LimitOrder,
+      prevEvents: Seq[Event],
+      submittedSide: Side,
+      counterSide: Side,
+  ): Seq[Event] = counterSide.best match {
+    case counter if counter.forall(c => !canMatch(submitted.price, c.price)) =>
+      submittedSide += submitted.price -> (submittedSide.getOrElse(submitted.price, Vector.empty) :+ submitted)
+      Seq(OrderAdded(submitted))
+    case Some(counter) =>
+      if (!counter.order.isValid(eventTs)) {
+        counterSide.removeBest()
+        doMatch(eventTs, canMatch, submitted, prevEvents :+ OrderCanceled(counter, false), submittedSide, counterSide)
+      } else {
+        val x = OrderExecuted(submitted, counter)
+
+        require(
+          !(x.counterRemaining.isValid && x.submittedRemaining.isValid),
+          s"Either submitted ${submitted.order.id()} or counter ${counter.order.id()} must match completely"
+        )
+
+        val newEvents = x +: prevEvents
+
+        if (x.submittedRemaining.isValid) {
+          counterSide.removeBest()
+          doMatch(eventTs, canMatch, x.submittedRemaining, newEvents, submittedSide, counterSide)
+        } else {
+          if (x.counterRemaining.isValid) {
+            counterSide.replaceBest(x.counterRemaining)
+          } else {
+            counterSide.removeBest()
+          }
+
+          newEvents
+        }
+      }
+  }
+
   val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
   val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
 
-  val empty: OrderBook =
-    OrderBook(TreeMap.empty[Price, Level[BuyLimitOrder]](bidsOrdering), TreeMap.empty[Price, Level[SellLimitOrder]](asksOrdering))
+  import com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
 
-  import Events._
+  private implicit val limitOrderFormat: Format[LimitOrder] = (
+    (JsPath \ "amount").format[Long] and
+      (JsPath \ "fee").format[Long] and
+      (JsPath \ "order").format[Order]
+  )(LimitOrder.limitOrder, lo => (lo.amount, lo.fee, lo.order))
 
-  def matchOrder(ob: OrderBook, o: LimitOrder): Event = o match {
-    case oo: BuyLimitOrder =>
-      if (ob.bestAsk.exists(oo.price >= _.price)) {
-        OrderExecuted(o, ob.bestAsk.get)
-      } else {
-        OrderAdded(oo)
+  private type SideJson = Map[Price, Seq[LimitOrder]]
+
+  implicit val priceMapFormat: Format[SideJson] =
+    implicitly[Format[Map[String, Seq[LimitOrder]]]].inmap(
+      _.map { case (k, v) => k.toLong   -> v },
+      _.map { case (k, v) => k.toString -> v }
+    )
+
+  implicit val orderBookFormat: Format[OrderBook] = (
+    (JsPath \ "bids").format[SideJson] and
+      (JsPath \ "asks").format[SideJson]
+  )(apply, unapply)
+
+  def empty: OrderBook = new OrderBook(mutable.TreeMap.empty(bidsOrdering), mutable.TreeMap.empty(asksOrdering))
+
+  private def unapply(ob: OrderBook): (Map[Price, Level], Map[Price, Level]) = (ob.asks.toMap, ob.asks.toMap)
+
+  private def transformSide(side: SideJson, expectedSide: OrderType): Side = {
+    val bidMap = mutable.TreeMap.empty[Price, Level](bidsOrdering)
+    for ((p, level) <- side) {
+      val v = Vector.newBuilder[LimitOrder]
+      for (lo <- level) {
+        require(lo.order.orderType == expectedSide,
+                s"Expecting $expectedSide only orders in bid list, but ${lo.order.id()} is a ${lo.order.orderType} order")
+        v += lo
       }
-    case oo: SellLimitOrder =>
-      if (ob.bestBid.exists(oo.price <= _.price)) {
-        OrderExecuted(o, ob.bestBid.get)
-      } else {
-        OrderAdded(oo)
-      }
+      bidMap += p -> v.result()
+    }
+    bidMap
   }
 
-  def cancelOrder(ob: OrderBook, orderId: ByteStr): Option[OrderCanceled] = {
-    ob.bids
-      .find { case (_, v) => v.exists(_.order.id() == orderId) }
-      .orElse(ob.asks.find { case (_, v) => v.exists(_.order.id() == orderId) })
-      .fold(Option.empty[OrderCanceled]) {
-        case (_, v) =>
-          Some(OrderCanceled(v.find(_.order.id() == orderId).get, unmatchable = false))
-      }
-  }
-
-  private def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): OrderBook = {
-    (limitOrder match {
-      case oo @ BuyLimitOrder(_, _, order) =>
-        ob.bids.get(order.price).map { lvl =>
-          val updatedQ = lvl.filter(_ != oo)
-          ob.copy(bids = if (updatedQ.nonEmpty) {
-            ob.bids + (order.price -> updatedQ)
-          } else {
-            ob.bids - order.price
-          })
-        }
-      case oo @ SellLimitOrder(_, _, order) =>
-        ob.asks.get(order.price).map { lvl =>
-          val updatedQ = lvl.filter(_ != oo)
-          ob.copy(asks = if (updatedQ.nonEmpty) {
-            ob.asks + (order.price -> updatedQ)
-          } else {
-            ob.asks - order.price
-          })
-        }
-    }).getOrElse(ob)
-  }
-
-  private def updateExecutedBuy(ob: OrderBook, o: BuyLimitOrder, remainingAmount: Long, remainingFee: Long) = ob.bids.get(o.price) match {
-    case Some(l) =>
-      val (l1, l2) = l.span(_ != o)
-      if (l2.isEmpty) {
-        // Impossible situation if all works properly
-        log.warn(s"Can't find '${o.order.id()}' order in '${o.order.assetPair}': $o")
-        ob
-      } else {
-        val ll = if (remainingAmount > 0) (l1 :+ o.copy(amount = remainingAmount, fee = remainingFee)) ++ l2.tail else l1 ++ l2.tail
-        ob.copy(bids = if (ll.isEmpty) ob.bids - o.price else ob.bids + (o.price -> ll))
-      }
-    case None => ob
-  }
-
-  private def updateExecutedSell(ob: OrderBook, o: SellLimitOrder, remainingAmount: Long, remainingFee: Long) = ob.asks.get(o.price) match {
-    case Some(l) =>
-      val (l1, l2) = l.span(_ != o)
-      if (l2.isEmpty) {
-        log.warn(s"Can't find '${o.order.id()}' order in '${o.order.assetPair}': $o")
-        ob
-      } else {
-        val ll = if (remainingAmount > 0) (l1 :+ o.copy(amount = remainingAmount, fee = remainingFee)) ++ l2.tail else l1 ++ l2.tail
-        ob.copy(asks = if (ll.isEmpty) ob.asks - o.price else ob.asks + (o.price -> ll))
-      }
-    case None => ob
-  }
-
-  def updateState(ob: OrderBook, event: Event): OrderBook = event match {
-    case OrderAdded(o: BuyLimitOrder) =>
-      val orders = ob.bids.getOrElse(o.price, Vector.empty)
-      ob.copy(bids = ob.bids + (o.price -> (orders :+ o)))
-    case OrderAdded(o: SellLimitOrder) =>
-      val orders = ob.asks.getOrElse(o.price, Vector.empty)
-      ob.copy(asks = ob.asks + (o.price -> (orders :+ o)))
-    case e @ OrderExecuted(_, c: BuyLimitOrder)  => updateExecutedBuy(ob, c, e.counterRemainingAmount, e.counterRemainingFee)
-    case e @ OrderExecuted(_, c: SellLimitOrder) => updateExecutedSell(ob, c, e.counterRemainingAmount, e.counterRemainingFee)
-    case OrderCanceled(limitOrder, _)            => updateCancelOrder(ob, limitOrder)
-  }
+  private def apply(bids: SideJson, asks: SideJson): OrderBook =
+    new OrderBook(transformSide(bids, OrderType.BUY), transformSide(asks, OrderType.BUY))
 }
