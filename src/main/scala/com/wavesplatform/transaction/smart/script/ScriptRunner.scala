@@ -18,12 +18,9 @@ import monix.eval.Coeval
 import shapeless._
 
 object ScriptRunner {
+  type TxOrd = Transaction :+: Order :+: CNil
 
-  def apply(height: Int,
-            in: Transaction :+: Order :+: CNil,
-            blockchain: Blockchain,
-            script: Script,
-            isTokenScript: Boolean): (Log, Either[ExecutionError, EVALUATED]) = {
+  def apply(height: Int, in: TxOrd, blockchain: Blockchain, script: Script, isTokenScript: Boolean): (Log, Either[ExecutionError, EVALUATED]) = {
     script match {
       case s: ExprScriprImpl =>
         val ctx = BlockchainContext.build(
