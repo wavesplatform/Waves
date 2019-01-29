@@ -33,11 +33,11 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
   }
 
   val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
-    case JsResultException(err)    => complete(WrongJson(errors = err))
-    case e: NoSuchElementException => complete(WrongJson(Some(e)))
-    case e: ValidationError                          => complete(ApiError.fromValidationError(e))
-    case e: IllegalArgumentException                 => complete(ApiError.fromValidationError(GenericError(e)))
-    case e: AssertionError                           => complete(ApiError.fromValidationError(GenericError(e)))
+    case JsResultException(err)                                         => complete(WrongJson(errors = err))
+    case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
+    case e: ValidationError                                             => complete(ApiError.fromValidationError(e))
+    case e: IllegalArgumentException                                    => complete(ApiError.fromValidationError(GenericError(e)))
+    case e: AssertionError                                              => complete(ApiError.fromValidationError(GenericError(e)))
     case e: ExecutionException if e.getCause != null && e.getCause != e => jsonExceptionHandler(e.getCause)
   }
 

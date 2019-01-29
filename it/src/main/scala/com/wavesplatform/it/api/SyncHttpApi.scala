@@ -176,8 +176,8 @@ object SyncHttpApi extends Assertions {
     def sign(jsObject: JsObject): JsObject =
       sync(async(n).sign(jsObject))
 
-    def createAlias(targetAddress: String, alias: String, fee: Long): Transaction =
-      sync(async(n).createAlias(targetAddress, alias, fee))
+    def createAlias(targetAddress: String, alias: String, fee: Long, version: Byte = 2): Transaction =
+      sync(async(n).createAlias(targetAddress, alias, fee, version))
 
     def aliasByAddress(targetAddress: String): Seq[String] =
       sync(async(n).aliasByAddress(targetAddress))
