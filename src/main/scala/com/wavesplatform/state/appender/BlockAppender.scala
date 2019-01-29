@@ -22,7 +22,13 @@ import scala.util.Right
 
 object BlockAppender extends ScorexLogging with Instrumented {
 
-  def apply(blockchainUpdater: BlockchainUpdater with Blockchain, time: Time, utxStorage: UtxPool, pos: PoSSelector, settings: WavesSettings, scheduler: Scheduler, verify: Boolean = true)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
+  def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
+            time: Time,
+            utxStorage: UtxPool,
+            pos: PoSSelector,
+            settings: WavesSettings,
+            scheduler: Scheduler,
+            verify: Boolean = true)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       measureSuccessful(
         blockProcessingTimeStats, {
@@ -37,7 +43,15 @@ object BlockAppender extends ScorexLogging with Instrumented {
       )
     }.executeOn(scheduler)
 
-  def apply(blockchainUpdater: BlockchainUpdater with Blockchain, time: Time, utxStorage: UtxPool, pos: PoSSelector, settings: WavesSettings, allChannels: ChannelGroup, peerDatabase: PeerDatabase, miner: Miner, scheduler: Scheduler)(ch: Channel, newBlock: Block): Task[Unit] = {
+  def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
+            time: Time,
+            utxStorage: UtxPool,
+            pos: PoSSelector,
+            settings: WavesSettings,
+            allChannels: ChannelGroup,
+            peerDatabase: PeerDatabase,
+            miner: Miner,
+            scheduler: Scheduler)(ch: Channel, newBlock: Block): Task[Unit] = {
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
     blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
     (for {

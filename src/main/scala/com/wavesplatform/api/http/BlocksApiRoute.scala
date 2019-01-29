@@ -16,10 +16,7 @@ import scala.concurrent._
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings,
-                          blockchain: Blockchain,
-                          allChannels: ChannelGroup)
-    extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, allChannels: ChannelGroup) extends ApiRoute {
 
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
@@ -229,9 +226,9 @@ case class BlocksApiRoute(settings: RestAPISettings,
         .toOption
         .toRight(InvalidSignature)
         .flatMap(s => blockchain.blockById(s).toRight(BlockDoesNotExist)) match {
-          case Right(block) => complete(block.json() + ("height" -> blockchain.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
-          case Left(e)      => complete(e)
-        }
+        case Right(block) => complete(block.json() + ("height" -> blockchain.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
+        case Left(e)      => complete(e)
+      }
     }
   }
 }

@@ -8,7 +8,22 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 import scala.concurrent.duration._
 
-case class WavesSettings(directory: String, dataDirectory: String, maxCacheSize: Int, maxRollbackDepth: Int, rememberBlocks: FiniteDuration, ntpServer: String, networkSettings: NetworkSettings, walletSettings: WalletSettings, blockchainSettings: BlockchainSettings, matcherSettings: MatcherSettings, minerSettings: MinerSettings, restAPISettings: RestAPISettings, synchronizationSettings: SynchronizationSettings, utxSettings: UtxSettings, featuresSettings: FeaturesSettings, metrics: Metrics.Settings)
+case class WavesSettings(directory: String,
+                         dataDirectory: String,
+                         maxCacheSize: Int,
+                         maxRollbackDepth: Int,
+                         rememberBlocks: FiniteDuration,
+                         ntpServer: String,
+                         networkSettings: NetworkSettings,
+                         walletSettings: WalletSettings,
+                         blockchainSettings: BlockchainSettings,
+                         matcherSettings: MatcherSettings,
+                         minerSettings: MinerSettings,
+                         restAPISettings: RestAPISettings,
+                         synchronizationSettings: SynchronizationSettings,
+                         utxSettings: UtxSettings,
+                         featuresSettings: FeaturesSettings,
+                         metrics: Metrics.Settings)
 
 object WavesSettings {
 
@@ -34,6 +49,23 @@ object WavesSettings {
     val featuresSettings        = config.as[FeaturesSettings]("waves.features")
     val metrics                 = config.as[Metrics.Settings]("metrics")
 
-    WavesSettings(directory, dataDirectory, maxCacheSize, maxRollbackDepth, rememberBlocks, ntpServer, networkSettings, walletSettings, blockchainSettings, matcherSettings, minerSettings, restAPISettings, synchronizationSettings, utxSettings, featuresSettings, metrics)
+    WavesSettings(
+      directory,
+      dataDirectory,
+      maxCacheSize,
+      maxRollbackDepth,
+      rememberBlocks,
+      ntpServer,
+      networkSettings,
+      walletSettings,
+      blockchainSettings,
+      matcherSettings,
+      minerSettings,
+      restAPISettings,
+      synchronizationSettings,
+      utxSettings,
+      featuresSettings,
+      metrics
+    )
   }
 }

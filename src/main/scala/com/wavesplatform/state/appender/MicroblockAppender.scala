@@ -20,7 +20,8 @@ import scala.util.{Left, Right}
 
 object MicroblockAppender extends ScorexLogging with Instrumented {
 
-  def apply(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(microBlock: MicroBlock): Task[Either[ValidationError, Unit]] =
+  def apply(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
+      microBlock: MicroBlock): Task[Either[ValidationError, Unit]] =
     Task(
       measureSuccessful(
         microblockProcessingTimeStats,
@@ -29,7 +30,11 @@ object MicroblockAppender extends ScorexLogging with Instrumented {
         } yield utxStorage.removeAll(microBlock.transactionData)
       )).executeOn(scheduler)
 
-  def apply(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, allChannels: ChannelGroup, peerDatabase: PeerDatabase, scheduler: Scheduler)(ch: Channel, md: MicroblockData): Task[Unit] = {
+  def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
+            utxStorage: UtxPool,
+            allChannels: ChannelGroup,
+            peerDatabase: PeerDatabase,
+            scheduler: Scheduler)(ch: Channel, md: MicroblockData): Task[Unit] = {
     import md.microBlock
     val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {

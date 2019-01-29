@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompilerV1}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
-import com.wavesplatform.transaction.smart.script.v1.{ExprScript, ContractScript}
+import com.wavesplatform.transaction.smart.script.v1.{ContractScript, ExprScript}
 import com.wavesplatform.utils._
 
 import scala.util.{Failure, Success, Try}
@@ -53,8 +53,8 @@ object ScriptCompiler extends ScorexLogging {
 
   def estimate(script: Script, version: Version): Either[String, Long] = script match {
     case s: ExprScriprImpl => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
-    case s: ContractScript     => Right(1)
-    case _               => ???
+    case s: ContractScript => Right(1)
+    case _                 => ???
   }
 
   private def extractVersion(directives: List[Directive]): Either[String, Version] = {

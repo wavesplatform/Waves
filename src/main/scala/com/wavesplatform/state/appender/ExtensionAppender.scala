@@ -22,7 +22,16 @@ import scala.util.{Left, Right}
 
 object ExtensionAppender extends ScorexLogging with Instrumented {
 
-  def apply(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, pos: PoSSelector, time: Time, settings: WavesSettings, invalidBlocks: InvalidBlockStorage, peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup, scheduler: Scheduler)(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
+  def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
+            utxStorage: UtxPool,
+            pos: PoSSelector,
+            time: Time,
+            settings: WavesSettings,
+            invalidBlocks: InvalidBlockStorage,
+            peerDatabase: PeerDatabase,
+            miner: Miner,
+            allChannels: ChannelGroup,
+            scheduler: Scheduler)(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] =
       Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
         {

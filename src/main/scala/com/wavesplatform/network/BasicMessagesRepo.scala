@@ -157,8 +157,6 @@ object ScoreSpec extends MessageSpec[BigInt] {
   }
 }
 
-
-
 object TransactionSpec extends MessageSpec[Transaction] {
   override val messageCode: MessageCode = 25: Byte
 
