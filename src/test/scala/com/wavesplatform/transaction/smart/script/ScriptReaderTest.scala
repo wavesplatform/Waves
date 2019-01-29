@@ -22,7 +22,8 @@ class ScriptReaderTest extends FreeSpec with Matchers {
 
   "should parse all bytes for V3" in {
     val sc =
-      ContractScript(ContractV, Contract(List.empty, List(ContractFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), Terms.REF("a")))), None))
+      ContractScript(ContractV,
+                     Contract(List.empty, List(ContractFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), Terms.REF("a")))), None))
 
     val allBytes = sc.bytes().arr
     ScriptReader.fromBytes(allBytes) shouldBe Right(sc)
