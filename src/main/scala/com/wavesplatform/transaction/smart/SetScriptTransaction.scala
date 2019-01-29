@@ -9,6 +9,7 @@ import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import monix.eval.Coeval
 import play.api.libs.json.Json
@@ -99,4 +100,29 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
     signed(version, sender, script, fee, timestamp, sender)
+
+  val byteDescription: ByteEntity[SetScriptTransaction] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 1, name = "Version") ~
+        OneByte(4, "Chain ID") ~
+        PublicKeyAccountBytes(5, "Sender's public key") ~
+        OptionScriptBytes(6, "Script") ~
+        LongBytes(7, "Fee") ~
+        LongBytes(8, "Timestamp") ~
+        ProofsBytes(9)
+    ).map {
+      case ((((((((_, _), version), chainId), senderPublicKey), script), fee), timestamp), proofs) =>
+        SetScriptTransaction(
+          version = version,
+          chainId = chainId,
+          sender = senderPublicKey,
+          script = script,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
+  }
 }

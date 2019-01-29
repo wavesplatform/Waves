@@ -86,65 +86,31 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
                  timestamp: Long): Either[ValidationError, TransactionT] =
     signed(sender, name, description, quantity, decimals, reissuable, fee, timestamp, sender)
 
-  /*override */
-  val byteDesc =
-    (OneByte("Transaction type (3)") ~
-      com.wavesplatform.transaction.description.BytesArrayDefinedLength("Signature", SignatureLength) ~
-      OneByte("Transaction type 2 (3)") ~
-      PublicKeyAccountBytes("Sender's public key") ~
-      BytesArrayUndefinedLength("Asset name") ~
-      BytesArrayUndefinedLength("Description") ~
-      LongBytes("Quantity") ~
-      OneByte("Decimals") ~
-      BooleanByte("Reissuable") ~
-      LongBytes("Fee") ~
-      LongBytes("Timestamp"))
+  val byteDescription: ByteEntity[IssueTransactionV1] = {
+    (ConstantByte(1, value = typeId, name = "Transaction type") ~
+      SignatureBytes(2, "Signature") ~
+      ConstantByte(3, value = typeId, name = "Transaction type 2") ~
+      PublicKeyAccountBytes(4, "Sender's public key") ~
+      BytesArrayUndefinedLength(5, "Asset name") ~
+      BytesArrayUndefinedLength(6, "Description") ~
+      LongBytes(7, "Quantity") ~
+      OneByte(8, "Decimals") ~
+      BooleanByte(9, "Reissuable") ~
+      LongBytes(10, "Fee") ~
+      LongBytes(11, "Timestamp"))
       .map {
-        case ((((((((((txType1, signature), txType2), senderPublicKey), name), desc), quantity), decimals), reissuable), fee), timestamp) =>
-          IssueTransactionV1
-            .create(
-              sender = senderPublicKey,
-              name = name,
-              description = desc,
-              quantity = quantity,
-              decimals = decimals,
-              reissuable = reissuable,
-              fee = fee,
-              timestamp = timestamp,
-              signature = ByteStr(signature)
-            )
-            .right
-            .get
+        case ((((((((((_, signature), _), senderPublicKey), name), desc), quantity), decimals), reissuable), fee), timestamp) =>
+          IssueTransactionV1(
+            sender = senderPublicKey,
+            name = name,
+            description = desc,
+            quantity = quantity,
+            decimals = decimals,
+            reissuable = reissuable,
+            fee = fee,
+            timestamp = timestamp,
+            signature = signature
+          )
       }
-
-  def getDocs() = byteDesc.generateDoc()
-
-}
-
-object Test extends App {
-
-  import com.wavesplatform.common.utils.EitherExt2
-
-  val doc = IssueTransactionV1.byteDesc.generateDoc()
-
-  val itv1 = IssueTransactionV1
-    .create(
-      PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-      "Gigacoin".getBytes,
-      "Gigacoin".getBytes,
-      10000000000L,
-      8,
-      true,
-      100000000,
-      1526287561757L,
-      ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get
-    )
-    .right
-    .get
-
-  val itv1d = IssueTransactionV1.byteDesc.deserializeFromByteArray(itv1.bytes.value)
-
-  println(doc)
-  println(itv1d)
-
+  }
 }

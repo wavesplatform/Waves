@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 import play.api.libs.json._
 
@@ -111,5 +112,28 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
                  feeAmount: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(version, sender, data, feeAmount, timestamp, sender)
+  }
+
+  val byteDescription: ByteEntity[DataTransaction] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 1, name = "Version") ~
+        PublicKeyAccountBytes(4, "Sender's public key") ~
+        ListDataEntryBytes(5) ~
+        LongBytes(6, "Timestamp") ~
+        LongBytes(7, "Fee") ~
+        ProofsBytes(8)
+    ).map {
+        case (((((((_, _), version), senderPublicKey), data), timestamp), fee), proofs) =>
+          DataTransaction(
+            version = version,
+            sender = senderPublicKey,
+            data = data,
+            fee = fee,
+            timestamp = timestamp,
+            proofs = proofs
+          )
+      }
   }
 }

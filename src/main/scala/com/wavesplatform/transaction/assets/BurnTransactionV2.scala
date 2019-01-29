@@ -7,6 +7,7 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction._
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.description._
 
 import scala.util.{Failure, Success, Try}
 
@@ -84,4 +85,31 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
     signed(version, chainId, sender, assetId, quantity, fee, timestamp, sender)
+
+  val byteDescription: ByteEntity[BurnTransactionV2] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, 2, "Version") ~
+        OneByte(4, "Chain ID") ~
+        PublicKeyAccountBytes(5, "Sender's public key") ~
+        ByteStrDefinedLength(6, "Asset ID", AssetIdLength) ~
+        LongBytes(7, "Quantity") ~
+        LongBytes(8, "Fee") ~
+        LongBytes(9, "Timestamp") ~
+        ProofsBytes(10)
+    ).map {
+      case (((((((((_, _), version), chainId), sender), assetId), quantity), fee), timestamp), proofs) =>
+        BurnTransactionV2(
+          version,
+          chainId,
+          sender,
+          assetId,
+          quantity,
+          fee,
+          timestamp,
+          proofs
+        )
+    }
+  }
 }

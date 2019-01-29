@@ -8,6 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.UnsupportedVersion
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 
 import scala.util.{Either, Failure, Success, Try}
 
@@ -78,5 +79,31 @@ object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with 
                  timestamp: Long,
                  recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
     signed(version, sender, amount, fee, timestamp, recipient, sender)
+  }
+
+  val byteDescription: ByteEntity[LeaseTransactionV2] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 2, name = "Version") ~
+        OptionAssetIdBytes(4, "Leasing asset (Only Waves are currently supported)") ~
+        PublicKeyAccountBytes(5, "Sender's public key") ~
+        AddressOrAliasBytes(6, "Recipient") ~
+        LongBytes(7, "Amount") ~
+        LongBytes(8, "Fee") ~
+        LongBytes(9, "Timestamp") ~
+        ProofsBytes(10)
+    ).map {
+      case (((((((((_, _), version), _), senderPublicKey), recipient), amount), fee), timestamp), proofs) =>
+        LeaseTransactionV2(
+          version = version,
+          sender = senderPublicKey,
+          amount = amount,
+          fee = fee,
+          timestamp = timestamp,
+          recipient = recipient,
+          proofs = proofs
+        )
+    }
   }
 }

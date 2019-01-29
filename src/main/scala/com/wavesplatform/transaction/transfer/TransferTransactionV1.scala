@@ -7,6 +7,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.description._
 
 import scala.util.{Failure, Success, Try}
 
@@ -91,5 +92,34 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
     signed(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, sender)
+  }
+
+  val byteDescription: ByteEntity[TransferTransactionV1] = {
+    (
+      ConstantByte(1, value = typeId, name = "Transaction type") ~
+        SignatureBytes(2, "Signature") ~
+        ConstantByte(3, value = typeId, name = "Transaction type") ~
+        PublicKeyAccountBytes(4, "Sender's public key") ~
+        OptionAssetIdBytes(5, "Asset ID") ~
+        OptionAssetIdBytes(6, "Fee's asset ID") ~
+        LongBytes(7, "Timestamp") ~
+        LongBytes(8, "Amount") ~
+        LongBytes(9, "Fee") ~
+        AddressOrAliasBytes(10, "Recipient") ~
+        BytesArrayUndefinedLength(11, "Attachment")
+    ).map {
+      case ((((((((((_, signature), _), senderPublicKey), assetId), feeAssetId), timestamp), amount), fee), recipient), attachments) =>
+        TransferTransactionV1(
+          assetId = assetId,
+          sender = senderPublicKey,
+          recipient = recipient,
+          amount = amount,
+          timestamp = timestamp,
+          feeAssetId = feeAssetId,
+          fee = fee,
+          attachment = attachments,
+          signature = signature
+        )
+    }
   }
 }

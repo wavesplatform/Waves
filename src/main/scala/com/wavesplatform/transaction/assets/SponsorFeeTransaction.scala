@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -112,4 +113,31 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
     signed(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, sender)
+
+  val byteDescription: ByteEntity[SponsorFeeTransaction] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 1, name = "Version") ~
+        ConstantByte(4, value = typeId, name = "Transaction type") ~
+        ConstantByte(5, value = 1, name = "Version") ~
+        PublicKeyAccountBytes(6, "Sender's public key") ~
+        ByteStrDefinedLength(7, "Asset ID", AssetIdLength) ~
+        OptionLongBytes(8, "Minimal fee in assets*", " * Zero value assume canceling sponsorship") ~
+        LongBytes(9, "Fee") ~
+        LongBytes(10, "Timestamp") ~
+        ProofsBytes(11)
+    ).map {
+      case ((((((((((_, _), _), _), version), sender), assetId), minSponsoredAssetFee), fee), timestamp), proofs) =>
+        SponsorFeeTransaction(
+          version,
+          sender,
+          assetId,
+          minSponsoredAssetFee,
+          fee,
+          timestamp,
+          proofs
+        )
+    }
+  }
 }

@@ -7,6 +7,7 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.description._
 
 import scala.util.{Failure, Success, Try}
 
@@ -55,5 +56,25 @@ object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransact
 
   def selfSigned(sender: PrivateKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, leaseId, fee, timestamp, sender)
+  }
+
+  val byteDescription: ByteEntity[LeaseCancelTransactionV1] = {
+    (
+      ConstantByte(1, value = typeId, name = "Transaction type") ~
+        PublicKeyAccountBytes(2, "Sender's public key") ~
+        LongBytes(3, "Fee") ~
+        LongBytes(4, "Timestamp") ~
+        ByteStrDefinedLength(5, "Lease ID", crypto.DigestSize) ~
+        SignatureBytes(6, "Signature")
+    ).map {
+      case (((((_, sender), fee), timestamp), leaseId), signature) =>
+        LeaseCancelTransactionV1(
+          sender = sender,
+          leaseId = leaseId,
+          fee = fee,
+          timestamp = timestamp,
+          signature = signature
+        )
+    }
   }
 }

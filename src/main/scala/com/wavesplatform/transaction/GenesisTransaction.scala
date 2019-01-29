@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction.TransactionParsers._
+import com.wavesplatform.transaction.description.{AddressBytes, ByteEntity, ConstantByte, LongBytes}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -88,6 +89,23 @@ object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with 
     } else {
       val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
       Right(GenesisTransaction(recipient, amount, timestamp, signature))
+    }
+  }
+
+  val byteDescription: ByteEntity[GenesisTransaction] = {
+    (
+      ConstantByte(1, value = typeId, name = "Transaction type") ~
+        LongBytes(2, "Timestamp") ~
+        AddressBytes(3, "Recipient's address") ~
+        LongBytes(4, "Amount")
+    ).map {
+      case (((_, timestamp), recipient), amount) =>
+        GenesisTransaction(
+          recipient,
+          amount,
+          timestamp,
+          ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
+        )
     }
   }
 }

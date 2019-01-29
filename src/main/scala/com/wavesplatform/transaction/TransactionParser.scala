@@ -24,20 +24,24 @@ trait TransactionParser {
   protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT]
 
   /**
-    * Byte description of the transaction. Can be used for deserialization and generation of documentation.
+    * Byte description of the transaction. Can be used for deserialization and generation of the documentation.
     *
     * Implementation example:
     * {{{
     *   val bytesDescription =
-    *   (OneByte("Transaction type") ~ OneByte("Version") ~ LongBytes("Fee"))
+    *   (OneByte(1, "Transaction type") ~ OneByte(2, "Version") ~ LongBytes(3, "Fee"))
     *     .map { case ((txType, version), fee) =>
     *       Transaction(txType, version, fee)
     *     }
+    *
+    *   // deserialization from buf: Array[Byte]
+    *   val tx = byteDescription.deserializeFromByteArray(buf)
+    *
+    *   // generation of the documentation
+    *   val txDocumentation: String = byteDescription.getStringDoc()
     * }}}
-    *
-    *
     */
-  //val byteDescription: ByteEntity[TransactionT]
+  val byteDescription: ByteEntity[TransactionT]
 }
 
 object TransactionParser {

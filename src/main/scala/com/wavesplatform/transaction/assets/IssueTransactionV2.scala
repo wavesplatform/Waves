@@ -1,14 +1,15 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.common.primitives.Bytes
-import com.wavesplatform.crypto
-import monix.eval.Coeval
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.{GenericError, UnsupportedVersion}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -115,4 +116,40 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
     signed(version, chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
+
+  val byteDescription: ByteEntity[IssueTransactionV2] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 2, name = "Version") ~
+        OneByte(4, "Chain ID") ~
+        PublicKeyAccountBytes(5, "Sender's public key") ~
+        BytesArrayUndefinedLength(6, "Name") ~
+        BytesArrayUndefinedLength(7, "Description") ~
+        LongBytes(8, "Quantity") ~
+        OneByte(9, "Decimals") ~
+        BooleanByte(10, "Reissuable") ~
+        LongBytes(11, "Fee") ~
+        LongBytes(12, "Timestamp") ~
+        OptionScriptBytes(13, "Script") ~
+        ProofsBytes(14)
+    ).map {
+      case (((((((((((((_, _), version), chainId), senderPublicKey), name), desc), quantity), decimals), reissuable), fee), timestamp), script),
+            proofs) =>
+        IssueTransactionV2(
+          version = version,
+          chainId = chainId,
+          sender = senderPublicKey,
+          name = name,
+          description = desc,
+          quantity = quantity,
+          decimals = decimals,
+          reissuable = reissuable,
+          script = script,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
+  }
 }

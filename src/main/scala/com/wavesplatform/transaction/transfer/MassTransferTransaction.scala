@@ -91,17 +91,6 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
 
-      /*
-      Array(builder.typeId, version),
-      sender.publicKey,
-      assetIdBytes,
-      Shorts.toByteArray(transfers.size.toShort),
-      transferBytes,
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee),
-      Deser.serializeArray(attachment)
-       */
-
       val sender           = PublicKeyAccount(bytes.slice(0, KeyLength))
       val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, KeyLength, AssetIdLength)
       val transferCount    = Shorts.fromByteArray(bytes.slice(s0, s0 + 2))
@@ -193,17 +182,17 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   private def toJson(transfers: List[ParsedTransfer]): JsValue =
     Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) })
 
-  val byteDescription: ByteEntity[MassTransferTransaction] =
+  val byteDescription: ByteEntity[MassTransferTransaction] = {
     (
-      OneByte("Transaction type") ~
-        OneByte("Version") ~
-        PublicKeyAccountBytes("Sender's public key") ~
-        OptionAssetIdBytes("Asset") ~
-        TransfersBytes ~
-        LongBytes("Timestamp") ~
-        LongBytes("Fee") ~
-        BytesArrayUndefinedLength("Attachments") ~
-        ProofsBytes
+      ConstantByte(1, value = MassTransferTransaction.typeId, name = "Transaction type") ~
+        OneByte(2, "Version") ~
+        PublicKeyAccountBytes(3, "Sender's public key") ~
+        OptionAssetIdBytes(4, "Asset") ~
+        TransfersBytes(5) ~
+        LongBytes(6, "Timestamp") ~
+        LongBytes(7, "Fee") ~
+        BytesArrayUndefinedLength(8, "Attachments") ~
+        ProofsBytes(9)
     ).map {
       case ((((((((_, txVersion), sender), assetId), transfer), timestamp), fee), attachment), proofs) =>
         MassTransferTransaction(
@@ -217,8 +206,5 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
           proofs = proofs
         )
     }
-}
-
-object GenDoc extends App {
-  println(MassTransferTransaction.byteDescription.getDoc())
+  }
 }

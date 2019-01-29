@@ -2,10 +2,11 @@ package com.wavesplatform.transaction
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.crypto
-import monix.eval.Coeval
 import com.wavesplatform.account.{Alias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
+import com.wavesplatform.transaction.description._
+import monix.eval.Coeval
 
 import scala.util.{Failure, Success, Try}
 
@@ -74,5 +75,28 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
                  fee: Long,
                  timestamp: Long): Either[ValidationError, CreateAliasTransactionV2] = {
     signed(sender, version, alias, fee, timestamp, sender)
+  }
+
+  val byteDescription: ByteEntity[CreateAliasTransactionV2] = {
+    (
+      ConstantByte(1, 0, "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 2, name = "Version") ~
+        PublicKeyAccountBytes(4, "Sender's public key") ~
+        AliasBytes(5, "Alias object") ~
+        LongBytes(6, "Fee") ~
+        LongBytes(7, "Timestamp") ~
+        ProofsBytes(8)
+    ).map {
+      case (((((((_, _), version), senderPublicKey), alias), fee), timestamp), proofs) =>
+        CreateAliasTransactionV2(
+          version,
+          senderPublicKey,
+          alias,
+          fee,
+          timestamp,
+          proofs
+        )
+    }
   }
 }

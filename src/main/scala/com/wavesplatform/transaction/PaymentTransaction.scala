@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.TransactionParsers._
+import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -116,4 +117,25 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
         .fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
+  val byteDescription: ByteEntity[PaymentTransaction] = {
+    (
+      ConstantByte(1, value = typeId, name = "Transaction type") ~
+        LongBytes(2, "Timestamp") ~
+        PublicKeyAccountBytes(3, "Sender's public key") ~
+        AddressBytes(4, "Recipient's address") ~
+        LongBytes(5, "Amount") ~
+        LongBytes(6, "Fee") ~
+        SignatureBytes(7, "Signature")
+    ).map {
+      case ((((((_, timestamp), senderPublicKey), recipient), amount), fee), signature) =>
+        PaymentTransaction(
+          sender = senderPublicKey,
+          recipient = recipient,
+          amount = amount,
+          fee = fee,
+          timestamp = timestamp,
+          signature = signature
+        )
+    }
+  }
 }

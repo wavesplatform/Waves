@@ -6,6 +6,7 @@ import monix.eval.Coeval
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.description._
 
 import scala.util.{Failure, Success, Try}
 
@@ -56,5 +57,25 @@ object CreateAliasTransactionV1 extends TransactionParserFor[CreateAliasTransact
 
   def selfSigned(sender: PrivateKeyAccount, alias: Alias, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, alias, fee, timestamp, sender)
+  }
+
+  val byteDescription: ByteEntity[CreateAliasTransactionV1] = {
+    (
+      ConstantByte(1, value = typeId, name = "Transaction type") ~
+        PublicKeyAccountBytes(2, "Sender's public key") ~
+        AliasBytes(3, "Alias object") ~
+        LongBytes(4, "Fee") ~
+        LongBytes(5, "Timestamp") ~
+        SignatureBytes(6, "Signature")
+    ).map {
+      case (((((_, senderPublicKey), alias), fee), timestamp), signature) =>
+        CreateAliasTransactionV1(
+          sender = senderPublicKey,
+          alias = alias,
+          fee = fee,
+          timestamp = timestamp,
+          signature = signature
+        )
+    }
   }
 }

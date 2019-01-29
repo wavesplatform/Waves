@@ -10,6 +10,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 
 import scala.util.{Failure, Success, Try}
@@ -123,4 +124,30 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
     }.flatten
   }
 
+  val byteDescription: ByteEntity[SetAssetScriptTransaction] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 1, name = "Version") ~
+        OneByte(4, "Chain ID") ~
+        PublicKeyAccountBytes(5, "Sender's public key") ~
+        ByteStrDefinedLength(6, "Asset ID", AssetIdLength) ~
+        LongBytes(7, "Fee") ~
+        LongBytes(8, "Timestamp") ~
+        OptionScriptBytes(9, "Script") ~
+        ProofsBytes(10)
+    ).map {
+      case (((((((((_, _), version), chainId), sender), assetId), fee), timestamp), script), proofs) =>
+        SetAssetScriptTransaction(
+          version = version,
+          chainId = chainId,
+          sender = sender,
+          assetId = assetId,
+          script = script,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
+  }
 }

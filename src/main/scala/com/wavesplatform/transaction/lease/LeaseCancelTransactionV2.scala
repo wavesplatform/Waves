@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction.ValidationError.{GenericError, UnsupportedVersion}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 
 import scala.util.{Failure, Success, Try}
@@ -81,5 +82,30 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(version, chainId, sender, leaseId, fee, timestamp, sender)
+  }
+
+  val byteDescription: ByteEntity[LeaseCancelTransactionV2] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 2, name = "Version") ~
+        OneByte(4, "Chain ID") ~
+        PublicKeyAccountBytes(5, "Sender's public key") ~
+        LongBytes(6, "Fee") ~
+        LongBytes(7, "Timestamp") ~
+        ByteStrDefinedLength(8, "Lease ID", crypto.DigestSize) ~
+        ProofsBytes(9)
+    ).map {
+      case ((((((((_, _), version), chainId), senderPublicKey), fee), timestamp), leaseId), proofs) =>
+        LeaseCancelTransactionV2(
+          version = version,
+          chainId = chainId,
+          sender = senderPublicKey,
+          leaseId = leaseId,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
   }
 }

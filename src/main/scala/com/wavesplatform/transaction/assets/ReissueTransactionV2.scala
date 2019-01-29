@@ -7,6 +7,7 @@ import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAcc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.ValidationError.{GenericError, UnsupportedVersion}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 
 import scala.util._
 
@@ -88,4 +89,33 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
     signed(version, chainId, sender, assetId, quantity, reissuable, fee, timestamp, sender)
+
+  val byteDescription: ByteEntity[ReissueTransactionV2] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 2, name = "Version") ~
+        OneByte(4, "Chain ID") ~
+        PublicKeyAccountBytes(5, "Sender's public key") ~
+        ByteStrDefinedLength(6, "Asset ID", AssetIdLength) ~
+        LongBytes(7, "Quantity") ~
+        BooleanByte(8, "Reissuable flag (1 - True, 0 - False)") ~
+        LongBytes(9, "Fee") ~
+        LongBytes(10, "Timestamp") ~
+        ProofsBytes(11)
+    ).map {
+      case ((((((((((_, _), version), chainId), sender), assetId), quantity), reissuable), fee), timestamp), proofs) =>
+        ReissueTransactionV2(
+          version = version,
+          chainId = chainId,
+          sender = sender,
+          assetId = assetId,
+          quantity = quantity,
+          reissuable = reissuable,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
+  }
 }

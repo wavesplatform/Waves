@@ -7,6 +7,7 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.description._
 
 import scala.util.{Failure, Success, Try}
 
@@ -75,4 +76,29 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
     create(sender, assetId, quantity, reissuable, fee, timestamp, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     }
+
+  val byteDescription: ByteEntity[ReissueTransactionV1] = {
+    (
+      ConstantByte(1, value = typeId, name = "Transaction type") ~
+        SignatureBytes(2, "Signature") ~
+        ConstantByte(3, value = typeId, name = "Transaction type") ~
+        PublicKeyAccountBytes(4, "Sender's public key") ~
+        ByteStrDefinedLength(5, "Asset ID", AssetIdLength) ~
+        LongBytes(6, "Quantity") ~
+        BooleanByte(7, "Reissuable flag (1 - True, 0 - False)") ~
+        LongBytes(8, "Fee") ~
+        LongBytes(9, "Timestamp")
+    ).map {
+      case ((((((((_, signature), _), sender), assetId), quantity), reissuable), fee), timestamp) =>
+        ReissueTransactionV1(
+          sender = sender,
+          assetId = assetId,
+          quantity = quantity,
+          reissuable = reissuable,
+          fee = fee,
+          timestamp = timestamp,
+          signature = signature
+        )
+    }
+  }
 }

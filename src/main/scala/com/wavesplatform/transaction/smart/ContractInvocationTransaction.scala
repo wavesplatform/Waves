@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL, REF}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
@@ -146,4 +147,33 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
     signed(version, sender, contractAddress, fc, p, fee, timestamp, sender)
+
+  val byteDescription: ByteEntity[ContractInvocationTransaction] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 1, name = "Version") ~
+        OneByte(4, "Chain ID") ~
+        PublicKeyAccountBytes(5, "Sender's public key") ~
+        AddressBytes(6, "Contract address") ~
+        FunctionCallBytes(7, "Function call") ~
+        OptionPaymentBytes(8, "Payment") ~
+        LongBytes(9, "Fee") ~
+        LongBytes(10, "Timestamp") ~
+        ProofsBytes(11)
+    ).map {
+      case ((((((((((_, _), version), chainId), senderPublicKey), contractAddress), fc), payment), fee), timestamp), proofs) =>
+        ContractInvocationTransaction(
+          version,
+          chainId,
+          senderPublicKey,
+          contractAddress,
+          fc,
+          payment,
+          fee,
+          timestamp,
+          proofs
+        )
+    }
+  }
 }

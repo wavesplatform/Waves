@@ -7,6 +7,7 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.description._
 
 import scala.util.{Failure, Success, Try}
 
@@ -60,4 +61,26 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
 
   def selfSigned(sender: PrivateKeyAccount, assetId: ByteStr, quantity: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] =
     signed(sender, assetId, quantity, fee, timestamp, sender)
+
+  val byteDescription: ByteEntity[BurnTransactionV1] = {
+    (
+      ConstantByte(1, value = typeId, name = "Transaction type") ~
+        PublicKeyAccountBytes(2, "Sender's public key") ~
+        ByteStrDefinedLength(3, "Asset ID", AssetIdLength) ~
+        LongBytes(4, "Quantity") ~
+        LongBytes(5, "Fee") ~
+        LongBytes(6, "Timestamp") ~
+        SignatureBytes(7, "Signature")
+    ).map {
+      case ((((((_, sender), assetId), quantity), fee), timestamp), signature) =>
+        BurnTransactionV1(
+          sender = sender,
+          assetId = assetId,
+          quantity = quantity,
+          fee = fee,
+          timestamp = timestamp,
+          signature = signature
+        )
+    }
+  }
 }

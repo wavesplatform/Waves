@@ -7,6 +7,7 @@ import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.crypto.SignatureLength
+import com.wavesplatform.transaction.description._
 
 import scala.util.{Failure, Success, Try}
 
@@ -67,5 +68,27 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
                  timestamp: Long,
                  recipient: AddressOrAlias): Either[ValidationError, TransactionT] = {
     signed(sender, amount, fee, timestamp, recipient, sender)
+  }
+
+  val byteDescription: ByteEntity[LeaseTransactionV1] = {
+    (
+      ConstantByte(1, value = typeId, name = "Transaction type") ~
+        PublicKeyAccountBytes(2, "Sender's public key") ~
+        AddressOrAliasBytes(3, "Recipient") ~
+        LongBytes(4, "Amount") ~
+        LongBytes(5, "Fee") ~
+        LongBytes(6, "Timestamp") ~
+        SignatureBytes(7, "Signature")
+    ).map {
+      case ((((((_, sender), recipient), amount), fee), timestamp), signature) =>
+        LeaseTransactionV1(
+          sender,
+          amount,
+          fee,
+          timestamp,
+          recipient,
+          signature
+        )
+    }
   }
 }

@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
+import com.wavesplatform.transaction.description._
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 
@@ -128,5 +129,35 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
       }
       makeTransaction.run(0).value._2
     }.flatten
+  }
+
+  val byteDescription: ByteEntity[ExchangeTransactionV2] = {
+    (
+      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        ConstantByte(3, value = 2, name = "Version") ~
+        OrderBytes(4, "Buy order") ~
+        OrderBytes(5, "Sell order") ~
+        LongBytes(6, "Price") ~
+        LongBytes(7, "Amount") ~
+        LongBytes(8, "Buy matcher fee") ~
+        LongBytes(9, "Sell matcher fee") ~
+        LongBytes(10, "Fee") ~
+        LongBytes(11, "Timestamp") ~
+        ProofsBytes(12)
+    ).map {
+      case (((((((((((_, _), _), buyOrder), sellOrder), price), amount), buyMatcherFee), sellMatcherFee), fee), timestamp), proofs) =>
+        ExchangeTransactionV2(
+          buyOrder,
+          sellOrder,
+          amount,
+          price,
+          buyMatcherFee,
+          sellMatcherFee,
+          fee,
+          timestamp,
+          proofs
+        )
+    }
   }
 }
