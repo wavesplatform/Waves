@@ -38,23 +38,16 @@ import org.scalatest.{FreeSpec, Matchers}
 import scala.concurrent.duration._
 
 private object UtxPoolSpecification {
-  final case class TempDB(fs: FunctionalitySettings) extends AutoCloseable {
+  final case class TempDB(fs: FunctionalitySettings) {
     private[this] val closed = new AtomicBoolean(false)
     val path = Files.createTempDirectory("leveldb-test")
     val db   = openDB(path.toAbsolutePath.toString)
     val writer = new LevelDBWriter(db, fs, 100000, 2000, 120 * 60 * 1000)
 
-    def close(): Unit = {
-      if (closed.compareAndSet(false, true)) {
-        db.close()
-        TestHelpers.deleteRecursively(path)
-      }
-    }
-
-    override def finalize(): Unit = {
-      close()
-      super.finalize()
-    }
+    Runtime.getRuntime.addShutdownHook(new Thread(() => {
+      db.close()
+      TestHelpers.deleteRecursively(path)
+    }))
   }
 }
 
