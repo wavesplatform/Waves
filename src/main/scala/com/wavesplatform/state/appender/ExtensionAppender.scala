@@ -22,17 +22,7 @@ import scala.util.{Left, Right}
 
 object ExtensionAppender extends ScorexLogging with Instrumented {
 
-  def apply(checkpoint: CheckpointService,
-            blockchainUpdater: BlockchainUpdater with Blockchain,
-            utxStorage: UtxPool,
-            pos: PoSSelector,
-            time: Time,
-            settings: WavesSettings,
-            invalidBlocks: InvalidBlockStorage,
-            peerDatabase: PeerDatabase,
-            miner: Miner,
-            allChannels: ChannelGroup,
-            scheduler: Scheduler)(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
+  def apply(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, pos: PoSSelector, time: Time, settings: WavesSettings, invalidBlocks: InvalidBlockStorage, peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup, scheduler: Scheduler)(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] =
       Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
         {
@@ -40,13 +30,10 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
 
           extension.headOption.map(_.reference) match {
             case Some(lastCommonBlockId) =>
-              def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean =
-                extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
-
               val forkApplicationResultEi = Coeval {
                 extension.view
                   .map { b =>
-                    b -> appendBlock(checkpoint, blockchainUpdater, utxStorage, pos, time, settings)(b).right
+                    b -> appendBlock(blockchainUpdater, utxStorage, pos, time, settings)(b).right
                       .map {
                         _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                       }
@@ -76,9 +63,6 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
 
               val droppedBlocksEi = for {
                 commonBlockHeight <- blockchainUpdater.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
-                _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight),
-                                 (),
-                                 GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
                 droppedBlocks <- {
                   if (commonBlockHeight < initialHeight)
                     blockchainUpdater.removeAfter(lastCommonBlockId)

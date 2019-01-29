@@ -20,7 +20,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.openDB
 import com.wavesplatform.features.api.ActivationApiRoute
-import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
+import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute, WavesApiRoute}
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
@@ -28,7 +28,7 @@ import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import com.wavesplatform.state.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, forceStopApplication}
 import com.wavesplatform.utx.{MatcherUtxPool, UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
@@ -60,7 +60,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val blockchainUpdater = StorageFactory(settings, db, time)
 
-  private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
   private lazy val upnp         = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
   private val wallet: Wallet = try {
@@ -116,30 +115,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val miner =
       if (settings.minerSettings.enable)
-        new MinerImpl(allChannels, blockchainUpdater, checkpointService, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
+        new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
       else Miner.Disabled
 
     val processBlock =
-      BlockAppender(checkpointService, blockchainUpdater, time, utxStorage, pos, settings, allChannels, peerDatabase, miner, appenderScheduler) _
+      BlockAppender(blockchainUpdater, time, utxStorage, pos, settings, allChannels, peerDatabase, miner, appenderScheduler) _
 
-    val processCheckpoint =
-      CheckpointAppender(checkpointService, blockchainUpdater, blockchainUpdater, peerDatabase, miner, allChannels, appenderScheduler) _
-
-    val processFork = ExtensionAppender(
-      checkpointService,
-      blockchainUpdater,
-      utxStorage,
-      pos,
-      time,
-      settings,
-      knownInvalidBlocks,
-      peerDatabase,
-      miner,
-      allChannels,
-      appenderScheduler
-    ) _
+    val processFork = ExtensionAppender(blockchainUpdater, utxStorage, pos, time, settings, knownInvalidBlocks, peerDatabase, miner, allChannels, appenderScheduler) _
     val processMicroBlock =
-      MicroblockAppender(checkpointService, blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
+      MicroblockAppender(blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
 
     import blockchainUpdater.lastBlockInfo
 
@@ -197,9 +181,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     UtxPoolSynchronizer.start(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
     val microBlockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
     val blockSink      = newBlocks.mapTask(scala.Function.tupled(processBlock))
-    val checkpointSink = checkpoints.mapTask { case (s, c) => processCheckpoint(Some(s), c) }
 
-    Observable.merge(microBlockSink, blockSink, checkpointSink).subscribe()
+    Observable.merge(microBlockSink, blockSink).subscribe()
     miner.scheduleMining()
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
