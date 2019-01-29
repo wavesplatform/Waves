@@ -118,12 +118,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       )
     )
     val synchronizationSettings0 = settings0.synchronizationSettings.copy(maxBaseTargetOpt = Some(1L))
-    val settings = settings0.copy(
-      minerSettings = minerSettings,
-      featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false),
-      blockchainSettings = blockchainSettings0,
-      synchronizationSettings = synchronizationSettings0
-    )
+    val settings = settings0.copy(blockchainSettings = blockchainSettings0, minerSettings = minerSettings, synchronizationSettings = synchronizationSettings0, featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
 
     val bcu = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
