@@ -89,7 +89,7 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
   val byteDescription: ByteEntity[IssueTransactionV1] = {
     (ConstantByte(1, value = typeId, name = "Transaction type") ~
       SignatureBytes(2, "Signature") ~
-      ConstantByte(3, value = typeId, name = "Transaction type 2") ~
+      ConstantByte(3, value = typeId, name = "Transaction type") ~
       PublicKeyAccountBytes(4, "Sender's public key") ~
       BytesArrayUndefinedLength(5, "Asset name") ~
       BytesArrayUndefinedLength(6, "Description") ~

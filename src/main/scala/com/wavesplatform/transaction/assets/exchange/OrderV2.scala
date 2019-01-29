@@ -8,6 +8,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -130,4 +131,36 @@ object OrderV2 {
     }
     makeOrder.run(0).value._2
   }
+
+  val byteDescription: ByteEntity[OrderV2] = {
+    (
+      ConstantByte(1, 2, "Version") ~
+        PublicKeyAccountBytes(2, "Sender's public key") ~
+        PublicKeyAccountBytes(3, "Matcher's public key") ~
+        OptionAssetIdBytes(4, "Amount asset") ~
+        OptionAssetIdBytes(5, "Price asset") ~
+        OneByte(6, "Order type") ~
+        LongBytes(7, "Price") ~
+        LongBytes(8, "Amount") ~
+        LongBytes(9, "Timestamp") ~
+        LongBytes(10, "Expiration") ~
+        LongBytes(10, "Matcher's fee") ~
+        ProofsBytes(11)
+    ).map {
+      case (((((((((((_, sender), matcher), amountAsset), priceAsset), orderType), price), amount), timestamp), expiration), matchersFee), proofs) =>
+        OrderV2(
+          sender,
+          matcher,
+          AssetPair(amountAsset, priceAsset),
+          OrderType(orderType),
+          amount,
+          price,
+          timestamp,
+          expiration,
+          matchersFee,
+          proofs
+        )
+    }
+  }
+
 }

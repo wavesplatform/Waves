@@ -12,9 +12,13 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1, TransferTransactionV2}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 
 import scala.util.Try
@@ -83,6 +87,28 @@ sealed trait ByteEntity[T] { self =>
             additionalInfo
       }
       .mkString("\n")
+  }
+
+  def getStringDocForMD(): String = {
+
+    val docs = generateDoc()
+
+    val indicesMaxLength = docs.map(_.index.length).max
+    val namesMaxLength   = docs.map(_.name.length).max
+    val typesMaxLength   = docs.map(_.tpe.length).max
+    val lengthsMaxLength = docs.map(_.length.length).max
+
+    docs
+      .map {
+        case ByteEntityDescription(idx, name, tpe, length, additionalInfo) =>
+          s"| $idx | $name | $tpe | $length $additionalInfo\n"
+            .replace("...", "| ... | ... | ... | ... |")
+            .replace("(", "\\(")
+            .replace(")", "\\)")
+            .replace("*", "\\*")
+      }
+      .foldLeft("""| \# | Field name | Type | Length |""" + "\n| --- | --- | --- | --- |\n")(_ + _)
+
   }
 }
 
@@ -304,12 +330,12 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
       ByteEntityDescription(s"$index.2",
                             "Address or alias for transfer 1",
                             AddressOrAliasType,
-                            "depends on first byte (see Address/Alias data structures)"),
+                            "depends on first byte (1 - Address, 2 - Alias, see Address/Alias data structures)"),
       ByteEntityDescription(s"$index.3", "Amount for transfer 1", LongType, "8"),
       ByteEntityDescription(s"$index.4",
                             "Address or alias for transfer 2",
                             AddressOrAliasType,
-                            "depends on first byte (see Address/Alias data structures)"),
+                            "depends on first byte (1 - Address, 2 - Alias, see Address/Alias data structures)"),
       ByteEntityDescription(s"$index.5", "Amount for transfer 2", LongType, "8", "\n...")
     )
   }
@@ -377,7 +403,7 @@ case class OptionScriptBytes(index: Int, name: String) extends ByteEntity[Option
   def generateDoc(): Seq[ByteEntityDescription] = {
     Seq(
       ByteEntityDescription(s"${index.toString}.1", s"$name existence flag", ByteType, "1"),
-      ByteEntityDescription(s"${index.toString}.2", s"$name", "Script", "N", "research is needed ")
+      ByteEntityDescription(s"${index.toString}.2", s"$name", "Script", "S")
     )
   }
 
@@ -399,7 +425,7 @@ case class OptionScriptBytes(index: Int, name: String) extends ByteEntity[Option
 case class OptionPaymentBytes(index: Int, name: String) extends ByteEntity[Option[Payment]] {
 
   def generateDoc(): Seq[ByteEntityDescription] = {
-    Seq(ByteEntityDescription(index.toString, name, "Option[Payment]", "N", "research is needed"))
+    Seq(ByteEntityDescription(index.toString, name, "Option[Payment]", "N"))
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Option[(Option[Payment], Int)] = {
@@ -424,11 +450,7 @@ case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]]
       ByteEntityDescription(s"${index.toString}.2", "Key 1 length (N)", ShortType, "2"),
       ByteEntityDescription(s"${index.toString}.3", "Key 1 bytes", "UTF-8 encoded", "N"),
       ByteEntityDescription(s"${index.toString}.4", "Value 1 type (0 = integer, 1 = boolean, 2 = binary array, 3 = string)", ByteType, "1"),
-      ByteEntityDescription(s"${index.toString}.5",
-                            "Value 1 bytes",
-                            "Value 1 type",
-                            "depends on value type (see Data Transaction structure)",
-                            "\n...")
+      ByteEntityDescription(s"${index.toString}.5", "Value 1 bytes", "Value 1 type", "depends on value type", "\n...")
     )
   }
 
@@ -473,4 +495,48 @@ case class Composition[T1, T2](e1: ByteEntity[T1], e2: ByteEntity[T2]) extends B
       (v1, o2)   <- e1.deserialize(buf, offset)
       (v2, rest) <- e2.deserialize(buf, o2)
     } yield ((v1, v2), rest)
+}
+
+object Main extends App {
+  //println("GenesisTransaction:\n" + GenesisTransaction.byteDescription.getStringDocForMD() + "\n")
+
+//  println("#### Issue Transaction V1\n\n" + IssueTransactionV1.byteDescription.getStringDocForMD() + "\n")
+//  println("#### Issue Transaction V2\n\n" + IssueTransactionV2.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Reissue Transaction V1\n\n" + ReissueTransactionV1.byteDescription.getStringDocForMD() + "\n")
+//  println("#### Reissue Transaction V2\n\n" + ReissueTransactionV2.byteDescription.getStringDocForMD() + "\n")
+
+//  println("#### Transfer Transaction V1\n\n" + TransferTransactionV1.byteDescription.getStringDocForMD() + "\n")
+//  println("#### Transfer Transaction V2\n\n" + TransferTransactionV2.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Burn Transaction V1\n\n" + BurnTransactionV1.byteDescription.getStringDocForMD() + "\n")
+//  println("#### Burn Transaction V2\n\n" + BurnTransactionV2.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Exchange Transaction V1\n\n" + ExchangeTransactionV1.byteDescription.getStringDocForMD() + "\n")
+//  println("#### Exchange Transaction V2\n\n" + ExchangeTransactionV2.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Lease Transaction V1\n\n" + LeaseTransactionV1.byteDescription.getStringDocForMD() + "\n")
+//  println("#### Lease Transaction V2\n\n" + LeaseTransactionV2.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Lease Cancel Transaction V1\n\n" + LeaseCancelTransactionV1.byteDescription.getStringDocForMD() + "\n")
+//  println("#### Lease Cancel Transaction V2\n\n" + LeaseCancelTransactionV2.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Create Alias Transaction V1\n\n" + CreateAliasTransactionV1.byteDescription.getStringDocForMD() + "\n")
+//  println("#### Create Alias Transaction V2\n\n" + CreateAliasTransactionV2.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Mass Transfer Transaction\n\n" + MassTransferTransaction.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Data Transaction\n\n" + DataTransaction.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Sponsor Fee Transaction\n\n" + SponsorFeeTransaction.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Set Script Transaction\n\n" + SetScriptTransaction.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Set Asset Script Transaction\n\n" + SetAssetScriptTransaction.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Payment Transaction\n\n" + PaymentTransaction.byteDescription.getStringDocForMD() + "\n")
+//
+//  println("#### Contract Invocation Transaction\n\n" + ContractInvocationTransaction.byteDescription.getStringDocForMD() + "\n")
+
+  println("### Order V2\n\n" + OrderV2.byteDescription.getStringDocForMD() + "\n")
 }

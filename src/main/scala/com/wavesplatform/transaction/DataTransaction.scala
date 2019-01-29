@@ -125,15 +125,15 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
         LongBytes(7, "Fee") ~
         ProofsBytes(8)
     ).map {
-        case (((((((_, _), version), senderPublicKey), data), timestamp), fee), proofs) =>
-          DataTransaction(
-            version = version,
-            sender = senderPublicKey,
-            data = data,
-            fee = fee,
-            timestamp = timestamp,
-            proofs = proofs
-          )
-      }
+      case (((((((_, _), version), senderPublicKey), data), timestamp), fee), proofs) =>
+        DataTransaction(
+          version = version,
+          sender = senderPublicKey,
+          data = data,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
   }
 }
