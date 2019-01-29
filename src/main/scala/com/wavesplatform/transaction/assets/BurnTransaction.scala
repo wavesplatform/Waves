@@ -23,7 +23,7 @@ trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   override val json: Coeval[JsObject] = Coeval.evalOnce {
-    jsonBase() ++ Json.obj(,
+    jsonBase() ++ Json.obj(
       "version" -> version,
       "assetId" -> assetId.base58,
       "amount"  -> quantity,
