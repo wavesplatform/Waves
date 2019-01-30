@@ -4,7 +4,6 @@ import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.script.Script
@@ -25,13 +24,13 @@ case class IssueTransactionV1 private (sender: PublicKeyAccount,
     extends IssueTransaction
     with SignedTransaction
     with FastHashId {
+
   override val version: Byte                    = 1
   override val script: Option[Script]           = None
   override val builder: IssueTransactionV1.type = IssueTransactionV1
   override val bodyBytes: Coeval[Array[Byte]]   = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
   override val bytes: Coeval[Array[Byte]]       = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
   override val json: Coeval[JsObject]           = issueJson
-
 }
 
 object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with TransactionParser.HardcodedVersion1 {
@@ -40,13 +39,24 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
 
   override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
     Try {
-      val signature = ByteStr(bytes.slice(0, SignatureLength))
+      /*val signature = ByteStr(bytes.slice(0, SignatureLength))
       val txId      = bytes(SignatureLength)
       require(txId == typeId, s"Signed tx id is not match")
-      val (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, _) = IssueTransaction.parseBase(bytes, SignatureLength + 1)
-      IssueTransactionV1
+      val (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, _) = IssueTransaction.parseBase(bytes, SignatureLength + 1)*/
+
+      byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+        IssueTransaction
+          .validateIssueParams(tx.name, tx.description, tx.quantity, tx.decimals, tx.reissuable, tx.fee)
+          .map(_ => tx)
+          .fold(
+            left => Failure(new Exception(left.toString)),
+            right => Success(right)
+          )
+      }
+
+      /*IssueTransactionV1
         .create(sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
-        .fold(left => Failure(new Exception(left.toString)), right => Success(right))
+        .fold(left => Failure(new Exception(left.toString)), right => Success(right))*/
     }.flatten
 
   def create(sender: PublicKeyAccount,
@@ -85,20 +95,23 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
                  timestamp: Long): Either[ValidationError, TransactionT] =
     signed(sender, name, description, quantity, decimals, reissuable, fee, timestamp, sender)
 
-  val byteDescription: ByteEntity[IssueTransactionV1] = {
-    (ConstantByte(1, value = typeId, name = "Transaction type") ~
-      SignatureBytes(2, "Signature") ~
-      ConstantByte(3, value = typeId, name = "Transaction type") ~
-      PublicKeyAccountBytes(4, "Sender's public key") ~
-      BytesArrayUndefinedLength(5, "Asset name") ~
-      BytesArrayUndefinedLength(6, "Description") ~
-      LongBytes(7, "Quantity") ~
-      OneByte(8, "Decimals") ~
-      BooleanByte(9, "Reissuable flag (1 - True, 0 - False)") ~
-      LongBytes(10, "Fee") ~
-      LongBytes(11, "Timestamp"))
+  val byteTailDescription: ByteEntity[IssueTransactionV1] = {
+
+    val tailStartIndex = byteHeaderDescription.index
+
+    (SignatureBytes(tailStartIndex + 1, "Signature") ~
+      ConstantByte(tailStartIndex + 2, value = typeId, name = "Transaction type") ~
+      PublicKeyAccountBytes(tailStartIndex + 3, "Sender's public key") ~
+      BytesArrayUndefinedLength(tailStartIndex + 4, "Asset name") ~
+      BytesArrayUndefinedLength(tailStartIndex + 5, "Description") ~
+      LongBytes(tailStartIndex + 6, "Quantity") ~
+      OneByte(tailStartIndex + 7, "Decimals") ~
+      BooleanByte(tailStartIndex + 8, "Reissuable flag (1 - True, 0 - False)") ~
+      LongBytes(tailStartIndex + 9, "Fee") ~
+      LongBytes(tailStartIndex + 10, "Timestamp"))
       .map {
-        case ((((((((((_, signature), _), senderPublicKey), name), desc), quantity), decimals), reissuable), fee), timestamp) =>
+        case (((((((((signature, txId), senderPublicKey), name), desc), quantity), decimals), reissuable), fee), timestamp) =>
+          require(txId == typeId, s"Signed tx id is not match")
           IssueTransactionV1(
             sender = senderPublicKey,
             name = name,

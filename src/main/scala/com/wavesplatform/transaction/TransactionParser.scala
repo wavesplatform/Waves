@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.transaction.description.ByteEntity
+import com.wavesplatform.transaction.description.{ByteEntity, ConstantByte, OneByte}
 
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -23,6 +23,10 @@ trait TransactionParser {
   protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)]
   protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT]
 
+  val byteHeaderDescription: ByteEntity[Unit]
+  val byteTailDescription: ByteEntity[TransactionT]
+
+  // TODO fixme
   /**
     * Byte description of the transaction. Can be used for deserialization and generation of the documentation.
     *
@@ -42,11 +46,13 @@ trait TransactionParser {
     *   val txStringDocumentationForMD: String = byteDescription.getStringDocForMD
     * }}}
     */
-  val byteDescription: ByteEntity[TransactionT]
+  val byteDescription: ByteEntity[TransactionT] =
+    (byteHeaderDescription ~ byteTailDescription).map { case (_, tx) => tx }
 }
 
 object TransactionParser {
   trait HardcodedVersion1 extends TransactionParser {
+
     override val supportedVersions: Set[Byte] = Set(1)
 
     override protected def parseHeader(bytes: Array[Byte]): Try[(Byte, Int)] = Try {
@@ -55,6 +61,10 @@ object TransactionParser {
       val parsedTypeId = bytes.head
       if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
       (1, 1)
+    }
+
+    val byteHeaderDescription: ByteEntity[Unit] = {
+      ConstantByte(1, typeId, "Transaction type") map (_ => Unit)
     }
   }
 

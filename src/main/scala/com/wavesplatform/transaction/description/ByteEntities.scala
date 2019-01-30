@@ -19,12 +19,15 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 
 import scala.util.Try
 
-/** Represents description of the byte entity */
+/**
+  * Represents description of the byte entity
+  * Field `additionalInfo` can be used for specifying of the repeating byte entities
+  */
 case class ByteEntityDescription(index: String, name: String, tpe: String, length: String, additionalInfo: String = "")
 
 /**
   * Describes byte representation of the different types. Composition of Byte Entities can be used for deserialization
-  * and generation of the documentation of the complex data structures, such as transactions, messages, orders and so on
+  * and generation of the documentation of the complex data structures, such as transactions, messages, orders, etc
   */
 sealed trait ByteEntity[T] { self =>
 
@@ -41,19 +44,23 @@ sealed trait ByteEntity[T] { self =>
   private[description] val OrderV1Type        = "OrderV1"
   private[description] val OrderType          = "Order"
 
+  val index: Int
+
   private[description] def generateDoc(): Seq[ByteEntityDescription]
 
-  private[description] def deserialize(buf: Array[Byte], offset: Int): Option[(T, Int)]
+  private[description] def deserialize(buf: Array[Byte], offset: Int): Try[(T, Int)]
 
-  def deserializeFromByteArray(buf: Array[Byte]): Option[T] = deserialize(buf, 0) map { case (value, _) ⇒ value }
+  def deserializeFromByteArray(buf: Array[Byte]): Try[T] = deserialize(buf, 0) map { case (value, _) ⇒ value }
 
   def ~[U](other: ByteEntity[U]): ByteEntity[(T, U)] = Composition(this, other)
 
   def map[U](f: T => U): ByteEntity[U] = new ByteEntity[U] {
 
+    val index: Int = self.index
+
     def generateDoc(): Seq[ByteEntityDescription] = self.generateDoc()
 
-    def deserialize(buf: Array[Byte], offset: Int): Option[(U, Int)] = self.deserialize(buf, offset).map { case (t, o) => f(t) -> o }
+    def deserialize(buf: Array[Byte], offset: Int): Try[(U, Int)] = self.deserialize(buf, offset).map { case (t, o) => f(t) -> o }
   }
 
   /** Generates documentation as a string */
@@ -100,15 +107,17 @@ case class ConstantByte(index: Int, value: Byte, name: String) extends ByteEntit
 
   def generateDoc(): Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, s"$ByteType (constant, value = $value)", "1"))
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Byte, Int)] = Some(value -> (offset + 1))
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Byte, Int)] = {
+    Try { value -> (offset + 1) }
+  }
 }
 
 case class OneByte(index: Int, name: String) extends ByteEntity[Byte] {
 
   def generateDoc(): Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, ByteType, "1"))
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Byte, Int)] = {
-    Try { buf(offset) -> (offset + 1) }.toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Byte, Int)] = {
+    Try { buf(offset) -> (offset + 1) }
   }
 }
 
@@ -116,8 +125,8 @@ case class LongBytes(index: Int, name: String) extends ByteEntity[Long] {
 
   def generateDoc(): Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, LongType, "8"))
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Long, Int)] = {
-    Try { Longs.fromByteArray(buf.slice(offset, offset + 8)) -> (offset + 8) }.toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Long, Int)] = {
+    Try { Longs.fromByteArray(buf.slice(offset, offset + 8)) -> (offset + 8) }
   }
 }
 
@@ -125,8 +134,8 @@ case class IntBytes(index: Int, name: String) extends ByteEntity[Int] {
 
   def generateDoc(): Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, IntType, "4"))
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Int, Int)] = {
-    Try { Ints.fromByteArray(buf.slice(offset, offset + 4)) -> (offset + 4) }.toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Int, Int)] = {
+    Try { Ints.fromByteArray(buf.slice(offset, offset + 4)) -> (offset + 4) }
   }
 }
 
@@ -134,8 +143,8 @@ case class BooleanByte(index: Int, name: String) extends ByteEntity[Boolean] {
 
   def generateDoc(): Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, BooleanType, "1"))
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Boolean, Int)] = {
-    Try { (buf(offset) == 1) -> (offset + 1) }.toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Boolean, Int)] = {
+    Try { (buf(offset) == 1) -> (offset + 1) }
   }
 }
 
@@ -143,8 +152,8 @@ case class BytesArrayDefinedLength(index: Int, name: String, length: Int) extend
 
   def generateDoc(): Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, ByteArrayType, length.toString))
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Array[Byte], Int)] = {
-    Try { buf.slice(offset, offset + length) -> (offset + length) }.toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Array[Byte], Int)] = {
+    Try { buf.slice(offset, offset + length) -> (offset + length) }
   }
 }
 
@@ -157,14 +166,13 @@ case class BytesArrayUndefinedLength(index: Int, name: String) extends ByteEntit
     )
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Array[Byte], Int)] = {
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Array[Byte], Int)] = {
     Try {
       val length                 = Shorts.fromByteArray(buf.slice(offset, offset + 2))
       val (arrayStart, arrayEnd) = (offset + 2, offset + 2 + length)
       buf.slice(arrayStart, arrayEnd) -> arrayEnd
-    }.toOption
+    }
   }
-
 }
 
 case class ByteStrDefinedLength(index: Int, name: String, length: Int) extends ByteEntity[ByteStr] {
@@ -173,8 +181,8 @@ case class ByteStrDefinedLength(index: Int, name: String, length: Int) extends B
     Seq(ByteEntityDescription(index.toString, name, ByteStrType, length.toString))
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(ByteStr, Int)] = {
-    Try { ByteStr(buf.slice(offset, length)) -> (offset + length) }.toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(ByteStr, Int)] = {
+    Try { ByteStr(buf.slice(offset, length)) -> (offset + length) }
   }
 }
 
@@ -183,8 +191,8 @@ case class PublicKeyAccountBytes(index: Int, name: String) extends ByteEntity[Pu
   def generateDoc(): Seq[ByteEntityDescription] =
     Seq(ByteEntityDescription(index.toString, name, s"PublicKeyAccount ($ByteArrayType)", KeyLength.toString))
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(PublicKeyAccount, Int)] = {
-    Try { PublicKeyAccount(buf.slice(offset, offset + KeyLength)) -> (offset + KeyLength) }.toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(PublicKeyAccount, Int)] = {
+    Try { PublicKeyAccount(buf.slice(offset, offset + KeyLength)) -> (offset + KeyLength) }
   }
 }
 
@@ -192,8 +200,8 @@ case class SignatureBytes(index: Int, name: String) extends ByteEntity[ByteStr] 
 
   def generateDoc(): Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, ByteStrType, SignatureLength.toString))
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(ByteStr, Int)] = {
-    Try { ByteStr(buf.slice(offset, offset + SignatureLength)) -> (offset + SignatureLength) }.toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(ByteStr, Int)] = {
+    Try { ByteStr(buf.slice(offset, offset + SignatureLength)) -> (offset + SignatureLength) }
   }
 }
 
@@ -203,8 +211,8 @@ case class OptionLongBytes(index: Int, name: String, additionalInfo: String = ""
     Seq(ByteEntityDescription(index.toString, name, "Option[Long]", LongType, additionalInfo))
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Option[Long], Int)] = {
-    Try { Option(Longs.fromByteArray(buf.slice(offset, offset + 8))).filter(_ != 0) -> (offset + 8) }.toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Option[Long], Int)] = {
+    Try { Option(Longs.fromByteArray(buf.slice(offset, offset + 8))).filter(_ != 0) -> (offset + 8) }
   }
 }
 
@@ -219,11 +227,11 @@ case class OptionAssetIdBytes(index: Int, name: String) extends ByteEntity[Optio
     )
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Option[AssetId], Int)] = {
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Option[AssetId], Int)] = {
     Try {
       if (buf(offset) == (1: Byte)) Some(ByteStr(buf.slice(offset + 1, offset + 1 + AssetIdLength))) -> (offset + 1 + AssetIdLength)
       else (None, offset + 1)
-    }.toOption
+    }
   }
 }
 
@@ -233,15 +241,14 @@ case class AddressBytes(index: Int, name: String) extends ByteEntity[Address] {
     Seq(ByteEntityDescription(s"$index", s"$name", AddressType, s"${Address.AddressLength}"))
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Address, Int)] = {
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Address, Int)] = {
     Try {
 
       val recipientBytes = java.util.Arrays.copyOfRange(buf, offset, offset + Address.AddressLength)
-      val recepient      = Address.fromBytes(recipientBytes).explicitGet()
+      val recipient      = Address.fromBytes(recipientBytes).explicitGet()
 
-      recepient -> (offset + Address.AddressLength)
-
-    }.toOption
+      recipient -> (offset + Address.AddressLength)
+    }
   }
 }
 
@@ -254,10 +261,8 @@ case class AliasBytes(index: Int, name: String) extends ByteEntity[Alias] {
     )
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Alias, Int)] = {
-    Alias.fromBytes(buf).toOption.map { alias =>
-      alias -> (offset + alias.bytes.arr.length)
-    }
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Alias, Int)] = {
+    Try { Alias.fromBytes(buf).map(alias => alias -> (offset + alias.bytes.arr.length)).explicitGet() }
   }
 }
 
@@ -266,8 +271,8 @@ case class AddressOrAliasBytes(index: Int, name: String) extends ByteEntity[Addr
   def generateDoc(): Seq[ByteEntityDescription] =
     Seq(ByteEntityDescription(index.toString, name, AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)"))
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(AddressOrAlias, Int)] = {
-    AddressOrAlias.fromBytes(buf, offset).toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(AddressOrAlias, Int)] = {
+    Try { AddressOrAlias.fromBytes(buf, offset).explicitGet() }
   }
 }
 
@@ -284,10 +289,8 @@ case class ProofsBytes(index: Int) extends ByteEntity[Proofs] {
     )
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Proofs, Int)] = {
-    Proofs.fromBytes(buf.drop(offset)).toOption.map { p =>
-      p -> (offset + p.bytes.value.length)
-    }
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Proofs, Int)] = {
+    Try { Proofs.fromBytes(buf.drop(offset)).map(p => p -> (offset + p.bytes.value.length)).explicitGet() }
   }
 }
 
@@ -314,8 +317,7 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
     )
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(List[ParsedTransfer], Int)] = {
-
+  def deserialize(buf: Array[Byte], offset: Int): Try[(List[ParsedTransfer], Int)] = {
     Try {
 
       val transferCount = Shorts.fromByteArray(buf.slice(offset, offset + 2))
@@ -324,12 +326,11 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
         List.iterate(readTransfer(buf, offset + 2), transferCount) { case (_, offst) => readTransfer(buf, offst) }
 
       val resultOffset = transfersList.lastOption.map(_._2).getOrElse(offset + 2)
-      val resultList   = transfersList.map { case (ei, _) => ei }.sequence.right.get
+      val resultList   = transfersList.map { case (ei, _) => ei }.sequence.explicitGet()
 
       resultList -> resultOffset
     }
-
-  }.toOption
+  }
 
 }
 
@@ -343,7 +344,7 @@ case class OrderBytes(index: Int, name: String) extends ByteEntity[Order] {
     )
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Order, Int)] = {
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Order, Int)] = {
     Try {
 
       val orderSize = Ints.fromByteArray(buf.slice(offset, offset + 4))
@@ -354,7 +355,7 @@ case class OrderBytes(index: Int, name: String) extends ByteEntity[Order] {
       else
         OrderV2.parseBytes(buf.drop(4)).map(order => order -> (offset + 4 + orderSize))
 
-    }.flatten.toOption
+    }.flatten
   }
 }
 
@@ -362,13 +363,10 @@ case class OrderV1Bytes(index: Int, name: String, length: String) extends ByteEn
 
   def generateDoc(): Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, OrderV1Type, s"$length"))
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(OrderV1, Int)] = {
-    OrderV1
-      .parseBytes(buf)
-      .map { order =>
-        order -> (offset + order.bytes.value.length)
-      }
-      .toOption
+  def deserialize(buf: Array[Byte], offset: Int): Try[(OrderV1, Int)] = {
+    OrderV1.parseBytes(buf).map { order =>
+      order -> (offset + order.bytes.value.length)
+    }
   }
 }
 
@@ -381,18 +379,20 @@ case class OptionScriptBytes(index: Int, name: String) extends ByteEntity[Option
     )
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Option[Script], Int)] = {
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Option[Script], Int)] = {
+    Try {
 
-    val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) =
-      Deser.parseOption(buf, offset)(ScriptReader.fromBytes)
+      val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) =
+        Deser.parseOption(buf, offset)(ScriptReader.fromBytes)
 
-    val scriptEiOpt: Either[ValidationError.ScriptParseError, Option[Script]] = scriptOptEi match {
-      case None            => Right(None)
-      case Some(Right(sc)) => Right(Some(sc))
-      case Some(Left(err)) => Left(err)
+      val scriptEiOpt: Either[ValidationError.ScriptParseError, Option[Script]] = scriptOptEi match {
+        case None            => Right(None)
+        case Some(Right(sc)) => Right(Some(sc))
+        case Some(Left(err)) => Left(err)
+      }
+
+      scriptEiOpt.map(_ -> scriptEnd).explicitGet()
     }
-
-    scriptEiOpt.toOption.map(_ -> scriptEnd)
   }
 }
 
@@ -402,7 +402,7 @@ case class OptionPaymentBytes(index: Int, name: String) extends ByteEntity[Optio
     Seq(ByteEntityDescription(index.toString, name, "Option[Payment]", "N"))
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Option[Payment], Int)] = {
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Option[Payment], Int)] = {
 
     Try {
       val (payment: Option[(Option[AssetId], Long)], ofs) = Deser.parseOption(buf, offset)(arr => {
@@ -412,7 +412,7 @@ case class OptionPaymentBytes(index: Int, name: String) extends ByteEntity[Optio
       })
 
       payment.map(p => Payment(p._2, p._1)) -> ofs
-    }.toOption
+    }
   }
 }
 
@@ -428,8 +428,7 @@ case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]]
     )
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(List[DataEntry[_]], Int)] = {
-
+  def deserialize(buf: Array[Byte], offset: Int): Try[(List[DataEntry[_]], Int)] = {
     Try {
 
       val entryCount = Shorts.fromByteArray(buf.slice(offset, offset + 2))
@@ -439,8 +438,7 @@ case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]]
         parsed.map(_._1) -> parsed.last._2
       } else
         List.empty -> (offset + 2)
-
-    }.toOption
+    }
   }
 }
 
@@ -450,19 +448,21 @@ case class FunctionCallBytes(index: Int, name: String) extends ByteEntity[Terms.
     Seq(ByteEntityDescription(index.toString, name, "EXPR", "F"))
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[(Terms.FUNCTION_CALL, Int)] = {
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Terms.FUNCTION_CALL, Int)] = {
     Try {
       val (expr, remaining) = Serde.deserialize(buf, all = false).explicitGet()
       expr.asInstanceOf[FUNCTION_CALL] -> (buf.length - remaining)
-    }.toOption
+    }
   }
 }
 
 case class Composition[T1, T2](e1: ByteEntity[T1], e2: ByteEntity[T2]) extends ByteEntity[(T1, T2)] {
 
+  val index: Int = e2.index // use last index in composition
+
   def generateDoc(): Seq[ByteEntityDescription] = e1.generateDoc() ++ e2.generateDoc()
 
-  def deserialize(buf: Array[Byte], offset: Int): Option[((T1, T2), Int)] =
+  def deserialize(buf: Array[Byte], offset: Int): Try[((T1, T2), Int)] =
     for {
       (value1, offset1) <- e1.deserialize(buf, offset)
       (value2, offset2) <- e2.deserialize(buf, offset1)
