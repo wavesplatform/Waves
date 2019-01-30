@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompilerV1}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
-import com.wavesplatform.transaction.smart.script.v1.{ExprScript, ContractScript}
+import com.wavesplatform.transaction.smart.script.v1.{ContractScript, ExprScript}
 import com.wavesplatform.utils._
 
 import scala.util.{Failure, Success, Try}

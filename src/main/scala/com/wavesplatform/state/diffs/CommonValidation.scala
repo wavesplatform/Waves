@@ -8,12 +8,12 @@ import com.wavesplatform.lang.Version._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError._
-import com.wavesplatform.transaction.{smart, _}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{smart, _}
 
 import scala.util.{Left, Right}
 

@@ -41,8 +41,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     val config          = ConfigFactory.load()
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
     val origSettings    = WavesSettings.fromConfig(config)
-    val settings = origSettings.copy(
-      blockchainSettings = BlockchainSettings(
+    val settings = origSettings.copy(blockchainSettings = BlockchainSettings(
         'T',
         FunctionalitySettings.TESTNET.copy(
           preActivatedFeatures = Map(
@@ -51,9 +50,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
             BlockchainFeatures.Ride4DApps.id    -> 0
           )),
         genesisSettings
-      ),
-      featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
-    )
+      ), featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
 
     val bcu = StorageFactory(settings, db, new TestTime())
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
