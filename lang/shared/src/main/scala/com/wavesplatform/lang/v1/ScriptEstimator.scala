@@ -27,8 +27,9 @@ object ScriptEstimator {
       case BLOCK(f: FUNC, body) =>
         aux(
           EitherT.pure(body),
-          syms,
-          funcs + (FunctionHeader.User(f.name) -> Coeval.evalOnce(aux(EitherT.pure(f.body), syms, funcs).value().map(_._1).explicitGet()))
+          syms ++ f.args.map(arg => (arg, (TRUE, false))).toMap,
+          funcs + (FunctionHeader.User(f.name) -> Coeval.evalOnce(
+            aux(EitherT.pure(f.body), syms, funcs).value().map(_._1).explicitGet() + f.args.size * 5))
         ).map { case (comp, out) => (comp + 5, out) }
 
       case REF(key) =>
@@ -50,7 +51,7 @@ object ScriptEstimator {
 
       case t: FUNCTION_CALL =>
         for {
-          callCost <- EitherT.fromOption[Coeval](functionCosts.get(t.function), s"ScriptValidator: Unknown function '${t.function}'")
+          callCost <- EitherT.fromOption[Coeval]((functionCosts ++ funcs).get(t.function), s"ScriptValidator: Unknown function '${t.function}'")
           args <- t.args.foldLeft(EitherT.pure[Coeval, String]((0L, syms))) {
             case (accEi, arg) =>
               for {

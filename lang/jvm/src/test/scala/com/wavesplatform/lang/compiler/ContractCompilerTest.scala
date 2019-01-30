@@ -3,7 +3,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -43,7 +43,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val expectedResult = Right(
       Contract(
         List.empty,
-        List(ContractFunction(
+        List(CallableFunction(
           CallableAnnotation("invocation"),
           Terms.FUNC(
             "foo",

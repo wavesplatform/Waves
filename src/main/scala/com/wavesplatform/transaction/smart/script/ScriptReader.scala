@@ -37,7 +37,7 @@ object ScriptReader {
         case ContractV =>
           for {
             bytes <- ContractSerDe.deserialize(scriptBytes)
-            s = ContractScript(sv, bytes)
+            s     <- ContractScript(sv, bytes)
           } yield s
       }
     } yield s).left

@@ -141,16 +141,16 @@ object ContractSerDe {
     } yield FUNC(name, args, expr._1)
   }
 
-  private[lang] def serializeContractFunction(out: ByteArrayOutputStream, cf: ContractFunction): Unit = {
+  private[lang] def serializeContractFunction(out: ByteArrayOutputStream, cf: CallableFunction): Unit = {
     serializeCallAnnotation(out, cf.annotation)
     serializeFUNC(out, cf.u)
   }
 
-  private[lang] def deserializeContractFunction(bb: ByteBuffer): Either[String, ContractFunction] = {
+  private[lang] def deserializeContractFunction(bb: ByteBuffer): Either[String, CallableFunction] = {
     for {
       ca        <- deserializeCallAnnotation(bb)
       cf <- deserializeFUNC(bb)
-    } yield ContractFunction(ca, cf)
+    } yield CallableFunction(ca, cf)
   }
 
   def serializeVerifierFunction(out: ByteArrayOutputStream, vf: VerifierFunction): Unit = {

@@ -5,11 +5,12 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Version.ExprV1
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompilerV1, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.sumLong
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -86,5 +87,63 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
   property("evaluates if statement lazily") {
     val script = "let a = 1+2; let b = 3+4; let c = if (tx.amount > 5) then a else b; c"
     estimate(FunctionCosts, compile(script)).explicitGet() shouldBe (5 + 102) + 5 + (5 + 16 + 2) + 2
+  }
+
+  property("evaluates simple expression - const") {
+    val expr = CONST_LONG(42)
+    estimate(FunctionCosts, expr).explicitGet() shouldBe 1
+  }
+
+  property("evaluates simple expression - let + const + ref") {
+    val expr = BLOCK(
+      LET("x", CONST_LONG(42)),
+      REF("x")
+    )
+    estimate(FunctionCosts, expr).explicitGet() shouldBe 8
+  }
+
+  property("evaluates simple expression - let + func_call + ref") {
+    val functionCosts: Map[FunctionHeader, Coeval[Long]] = Map[FunctionHeader, Long](Plus -> 1).mapValues(Coeval.now)
+
+    val expr = BLOCK(
+      LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(1), CONST_LONG(2)))),
+      REF("x")
+    )
+    estimate(functionCosts, expr).explicitGet() shouldBe 10
+  }
+
+  property("estimate script with func statement") {
+    val exprWithoutFuncCall = BLOCK(
+      Terms.FUNC(
+        "first",
+        List("arg1", "arg2"),
+        LET_BLOCK(
+          LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(1)))),
+          REF("x")
+        )
+      ),
+      BLOCK(
+        LET("y", CONST_LONG(5)),
+        REF("y")
+      )
+    )
+
+    val exprWithFuncCall = BLOCK(
+      Terms.FUNC(
+        "first",
+        List("arg1", "arg2"),
+        LET_BLOCK(
+          LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(1)))),
+          REF("x")
+        )
+      ),
+      BLOCK(
+        LET("y", FUNCTION_CALL(FunctionHeader.User("first"), List(CONST_LONG(1), CONST_LONG(1)))),
+        REF("y")
+      )
+    )
+
+    estimate(FunctionCosts, exprWithoutFuncCall) shouldBe Right(5 + 5 + 1 + 2)
+    estimate(FunctionCosts, exprWithFuncCall) shouldBe Right((5 + 10 + 5 + 100 + 2 + 2) + 5 + 2 + 2)
   }
 }
