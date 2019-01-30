@@ -126,8 +126,6 @@ class MatcherActor(matcherSettings: MatcherSettings,
             })
 
             tradedPairs -= assetPair
-            deleteMessages(lastSequenceNr)
-            saveSnapshot(Snapshot(tradedPairs.keySet))
           }
 
         case _ => runFor(request)((sender, orderBook) => orderBook.tell(request, sender))
@@ -171,7 +169,11 @@ class MatcherActor(matcherSettings: MatcherSettings,
   }
 
   override def receiveRecover: Receive = {
-    case OrderBookCreated(pair) => if (orderBook(pair).isEmpty) createOrderBook(pair)
+    case event @ OrderBookCreated(pair) =>
+      if (orderBook(pair).isEmpty) {
+        log.debug(s"Replaying event $event")
+        createOrderBook(pair)
+      }
 
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
       lastSnapshotSequenceNr = metadata.sequenceNr
