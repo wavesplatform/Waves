@@ -28,17 +28,18 @@ trait TransactionParser {
     *
     * Implementation example:
     * {{{
-    *   val bytesDescription =
+    *   val bytesDescription: ByteEntity[Transaction] =
     *   (OneByte(1, "Transaction type") ~ OneByte(2, "Version") ~ LongBytes(3, "Fee"))
     *     .map { case ((txType, version), fee) =>
     *       Transaction(txType, version, fee)
     *     }
     *
     *   // deserialization from buf: Array[Byte]
-    *   val tx = byteDescription.deserializeFromByteArray(buf)
+    *   val tx: Option[Transaction] = byteDescription.deserializeFromByteArray(buf)
     *
     *   // generation of the documentation
-    *   val txDocumentation: String = byteDescription.getStringDoc()
+    *   val txStringDocumentation: String = byteDescription.getStringDoc
+    *   val txStringDocumentationForMD: String = byteDescription.getStringDocForMD
     * }}}
     */
   val byteDescription: ByteEntity[TransactionT]

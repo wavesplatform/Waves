@@ -19,8 +19,13 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 
 import scala.util.Try
 
+/** Represents description of the byte entity */
 case class ByteEntityDescription(index: String, name: String, tpe: String, length: String, additionalInfo: String = "")
 
+/**
+  * Describes byte representation of the different types. Composition of Byte Entities can be used for deserialization
+  * and generation of the documentation of the complex data structures, such as transactions, messages, orders and so on
+  */
 sealed trait ByteEntity[T] { self =>
 
   val ByteType           = "Byte"
@@ -48,7 +53,7 @@ sealed trait ByteEntity[T] { self =>
 
   def |(other: ByteEntity[T]): ByteEntity[T] = new ByteEntity[T] {
 
-    val index: Int                                = self.index
+    val index: Int = self.index
 
     def generateDoc(): Seq[ByteEntityDescription] = self.generateDoc() ++ other.generateDoc()
 
@@ -100,7 +105,6 @@ sealed trait ByteEntity[T] { self =>
             .replace("*", "\\*")
       }
       .foldLeft("""| \# | Field name | Type | Length |""" + "\n| --- | --- | --- | --- |\n")(_ + _)
-
   }
 }
 
@@ -484,7 +488,7 @@ case class Composition[T1, T2](e1: ByteEntity[T1], e2: ByteEntity[T2]) extends B
 
   def deserialize(buf: Array[Byte], offset: Int): Option[((T1, T2), Int)] =
     for {
-      (v1, o2)   <- e1.deserialize(buf, offset)
-      (v2, rest) <- e2.deserialize(buf, o2)
-    } yield ((v1, v2), rest)
+      (value1, offset1) <- e1.deserialize(buf, offset)
+      (value2, offset2) <- e2.deserialize(buf, offset1)
+    } yield ((value1, value2), offset2)
 }
