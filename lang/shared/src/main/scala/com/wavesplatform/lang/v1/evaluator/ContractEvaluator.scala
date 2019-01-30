@@ -2,12 +2,12 @@ package com.wavesplatform.lang.v1.evaluator
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableFunction, VerifierFunction}
+import com.wavesplatform.lang.contract.Contract.VerifierFunction
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, FieldNames, Types}
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
-import com.wavesplatform.lang.v1.task.imports.{raiseError}
+import com.wavesplatform.lang.v1.task.imports.{raiseError, _}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.Tx.Pmt
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
@@ -15,28 +15,26 @@ import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
 import scala.collection.mutable.ListBuffer
 
 object ContractEvaluator {
-
-  def buildEvExpr(f: CallableFunction, i: Invokation, declarations: List[DECLARATION]): BLOCK = {
-    val zeroExpr =
-      BLOCK(
-        LET(
-          f.annotation.invocationArgName,
-          Bindings
-            .buildInvocation(Recipient.Address(i.invoker), i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.contractAddress))
-        ),
-        BLOCK(f.u, i.fc)
-      )
-    declarations.foldRight(zeroExpr)((d, e) => BLOCK(d, e))
-  }
-
-  case class Invokation(name: String, fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
+  case class Invokation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
 
   def eval(c: Contract, i: Invokation): EvalM[EVALUATED] = {
-    c.cfs.find(_.u.name == i.name) match {
-      case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '${i.name} doesn't exist in the contract")
+    val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name
+    c.cfs.find(_.u.name == functionName) match {
+      case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '$functionName doesn't exist in the contract")
       case Some(f) =>
-        val expr = buildEvExpr(f, i, c.dec)
-        EvaluatorV1.evalExpr(expr)
+        val zeroExpr = Right(
+          BLOCK(
+            LET(f.annotation.invocationArgName,
+                Bindings
+                  .buildInvocation(Recipient.Address(i.invoker), i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.contractAddress))),
+            BLOCK(f.u, i.fc)
+          ))
+
+        for {
+          ze <- liftEither(zeroExpr)
+          expr = c.dec.foldRight(ze)((d, e) => BLOCK(d, e))
+          r <- EvaluatorV1.evalExpr(expr)
+        } yield r
     }
   }
 

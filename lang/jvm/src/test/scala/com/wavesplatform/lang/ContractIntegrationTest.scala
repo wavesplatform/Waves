@@ -65,7 +65,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     val result = ContractEvaluator(
       ctx.evaluationContext,
       compiled,
-      Invokation("foo", Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr.empty))), ByteStr.empty, None, ByteStr.empty)
+      Invokation(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr.empty))), ByteStr.empty, None, ByteStr.empty)
     ).explicitGet()
 
     result shouldBe expectedResult

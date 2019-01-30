@@ -4,14 +4,14 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto._
+import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.network.message.Message._
 import com.wavesplatform.network.message._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
-import com.wavesplatform.crypto._
 
 import scala.util.Try
 
@@ -157,36 +157,6 @@ object ScoreSpec extends MessageSpec[BigInt] {
   }
 }
 
-object CheckpointSpec extends MessageSpec[Checkpoint] {
-  override val messageCode: MessageCode = 100: Byte
-
-  private val HeightLength = Ints.BYTES
-
-  override val maxLength: Int = 4 + Checkpoint.MaxCheckpoints * (HeightLength + SignatureLength)
-
-  override def serializeData(checkpoint: Checkpoint): Array[Byte] =
-    Bytes.concat(checkpoint.toSign, checkpoint.signature)
-
-  override def deserializeData(bytes: Array[Byte]): Try[Checkpoint] = Try {
-    val lengthBytes = util.Arrays.copyOfRange(bytes, 0, Ints.BYTES)
-    val length      = Ints.fromByteArray(lengthBytes)
-
-    require(length <= Checkpoint.MaxCheckpoints)
-
-    val items = (0 until length).map { i =>
-      val position       = lengthBytes.length + (i * (HeightLength + SignatureLength))
-      val heightBytes    = util.Arrays.copyOfRange(bytes, position, position + HeightLength)
-      val height         = Ints.fromByteArray(heightBytes)
-      val blockSignature = util.Arrays.copyOfRange(bytes, position + HeightLength, position + HeightLength + SignatureLength)
-      BlockCheckpoint(height, blockSignature)
-    }
-
-    val signature = bytes.takeRight(SignatureLength)
-
-    Checkpoint(items, signature)
-  }
-}
-
 object TransactionSpec extends MessageSpec[Transaction] {
   override val messageCode: MessageCode = 25: Byte
 
@@ -257,7 +227,6 @@ object BasicMessagesRepo {
     GetBlockSpec,
     BlockSpec,
     ScoreSpec,
-    CheckpointSpec,
     TransactionSpec,
     MicroBlockInvSpec,
     MicroBlockRequestSpec,
