@@ -12,13 +12,9 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1, TransferTransactionV2}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 
 import scala.util.Try
@@ -53,6 +49,7 @@ sealed trait ByteEntity[T] { self =>
   def |(other: ByteEntity[T]): ByteEntity[T] = new ByteEntity[T] {
 
     val index: Int                                = self.index
+
     def generateDoc(): Seq[ByteEntityDescription] = self.generateDoc() ++ other.generateDoc()
 
     def deserialize(buf: Array[Byte], offset: Int): Option[(T, Int)] =
@@ -68,7 +65,7 @@ sealed trait ByteEntity[T] { self =>
     def deserialize(buf: Array[Byte], offset: Int): Option[(U, Int)] = self.deserialize(buf, offset).map { case (t, o) => f(t) -> o }
   }
 
-  def getStringDoc(): String = {
+  def getStringDoc: String = {
 
     val docs = generateDoc()
 
@@ -89,14 +86,9 @@ sealed trait ByteEntity[T] { self =>
       .mkString("\n")
   }
 
-  def getStringDocForMD(): String = {
+  def getStringDocForMD: String = {
 
     val docs = generateDoc()
-
-    val indicesMaxLength = docs.map(_.index.length).max
-    val namesMaxLength   = docs.map(_.name.length).max
-    val typesMaxLength   = docs.map(_.tpe.length).max
-    val lengthsMaxLength = docs.map(_.length.length).max
 
     docs
       .map {
@@ -473,7 +465,7 @@ case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]]
 case class FunctionCallBytes(index: Int, name: String) extends ByteEntity[Terms.FUNCTION_CALL] {
 
   def generateDoc(): Seq[ByteEntityDescription] = {
-    Seq(ByteEntityDescription(index.toString, name, "Term.EXPR", "N", "research is needed"))
+    Seq(ByteEntityDescription(index.toString, name, "EXPR", "F"))
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Option[(Terms.FUNCTION_CALL, Int)] = {
@@ -495,48 +487,4 @@ case class Composition[T1, T2](e1: ByteEntity[T1], e2: ByteEntity[T2]) extends B
       (v1, o2)   <- e1.deserialize(buf, offset)
       (v2, rest) <- e2.deserialize(buf, o2)
     } yield ((v1, v2), rest)
-}
-
-object Main extends App {
-  //println("GenesisTransaction:\n" + GenesisTransaction.byteDescription.getStringDocForMD() + "\n")
-
-//  println("#### Issue Transaction V1\n\n" + IssueTransactionV1.byteDescription.getStringDocForMD() + "\n")
-//  println("#### Issue Transaction V2\n\n" + IssueTransactionV2.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Reissue Transaction V1\n\n" + ReissueTransactionV1.byteDescription.getStringDocForMD() + "\n")
-//  println("#### Reissue Transaction V2\n\n" + ReissueTransactionV2.byteDescription.getStringDocForMD() + "\n")
-
-//  println("#### Transfer Transaction V1\n\n" + TransferTransactionV1.byteDescription.getStringDocForMD() + "\n")
-//  println("#### Transfer Transaction V2\n\n" + TransferTransactionV2.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Burn Transaction V1\n\n" + BurnTransactionV1.byteDescription.getStringDocForMD() + "\n")
-//  println("#### Burn Transaction V2\n\n" + BurnTransactionV2.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Exchange Transaction V1\n\n" + ExchangeTransactionV1.byteDescription.getStringDocForMD() + "\n")
-//  println("#### Exchange Transaction V2\n\n" + ExchangeTransactionV2.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Lease Transaction V1\n\n" + LeaseTransactionV1.byteDescription.getStringDocForMD() + "\n")
-//  println("#### Lease Transaction V2\n\n" + LeaseTransactionV2.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Lease Cancel Transaction V1\n\n" + LeaseCancelTransactionV1.byteDescription.getStringDocForMD() + "\n")
-//  println("#### Lease Cancel Transaction V2\n\n" + LeaseCancelTransactionV2.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Create Alias Transaction V1\n\n" + CreateAliasTransactionV1.byteDescription.getStringDocForMD() + "\n")
-//  println("#### Create Alias Transaction V2\n\n" + CreateAliasTransactionV2.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Mass Transfer Transaction\n\n" + MassTransferTransaction.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Data Transaction\n\n" + DataTransaction.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Sponsor Fee Transaction\n\n" + SponsorFeeTransaction.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Set Script Transaction\n\n" + SetScriptTransaction.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Set Asset Script Transaction\n\n" + SetAssetScriptTransaction.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Payment Transaction\n\n" + PaymentTransaction.byteDescription.getStringDocForMD() + "\n")
-//
-//  println("#### Contract Invocation Transaction\n\n" + ContractInvocationTransaction.byteDescription.getStringDocForMD() + "\n")
-
-  println("### Order V2\n\n" + OrderV2.byteDescription.getStringDocForMD() + "\n")
 }

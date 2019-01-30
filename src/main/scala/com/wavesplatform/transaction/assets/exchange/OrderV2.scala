@@ -139,7 +139,7 @@ object OrderV2 {
         PublicKeyAccountBytes(3, "Matcher's public key") ~
         OptionAssetIdBytes(4, "Amount asset") ~
         OptionAssetIdBytes(5, "Price asset") ~
-        OneByte(6, "Order type") ~
+        OneByte(6, "Order type (0 - Buy, 1 - Sell)") ~
         LongBytes(7, "Price") ~
         LongBytes(8, "Amount") ~
         LongBytes(9, "Timestamp") ~
@@ -162,5 +162,4 @@ object OrderV2 {
         )
     }
   }
-
 }
