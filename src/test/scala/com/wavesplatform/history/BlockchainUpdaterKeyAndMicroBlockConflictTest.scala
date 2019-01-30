@@ -7,8 +7,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import org.scalacheck.Gen
@@ -16,48 +14,6 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 
 class BlockchainUpdaterKeyAndMicroBlockConflictTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
-
-  private def preconditionsAndPayments(): Gen[(Block, Block, Seq[MicroBlock], Block)] =
-    for {
-      richAccount        <- accountGen
-      minerAccount       <- accountGen
-      leaseAmount <- smallFeeGen
-      lease <- validLeaseGen(richAccount, minerAccount.toAddress, leaseAmount)
-      leaseCancel <- validLeaseCancelGen(richAccount, lease.id())
-
-      tsAmount <- smallFeeGen
-      tsRecipient <- accountGen
-      transfer <- validTransferGen(richAccount, tsRecipient, tsAmount)
-    } yield {
-      val genesisBlock = unsafeBlock(
-        reference = randomSig,
-        txs = Seq(GenesisTransaction.create(richAccount, ENOUGH_AMT, 0).explicitGet()),
-        signer = TestBlock.defaultSigner,
-        version = 3,
-        timestamp = 0
-      )
-
-      val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-        totalRefTo = genesisBlock.signerData.signature,
-        base = Seq(lease),
-        micros = Seq(Seq(leaseCancel)),
-        signer = richAccount,
-        version = 3,
-        timestamp = System.currentTimeMillis()
-      )
-
-      val (keyBlock1, _) = unsafeChainBaseAndMicro(
-        totalRefTo = keyBlock.signerData.signature,
-        base = Seq(transfer),
-        micros = Nil,
-        signer = minerAccount,
-        version = 3,
-        timestamp = System.currentTimeMillis()
-      )
-
-      (genesisBlock, keyBlock, microBlocks, keyBlock1)
-    }
-
   property("new key block should be validated to previous") {
     forAll(preconditionsAndPayments()) {
       case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
@@ -72,77 +28,105 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest extends PropSpec with Proper
     }
   }
 
-  private def validTransferGen(from: PrivateKeyAccount, to: AddressOrAlias, amount: Long): Gen[Transaction] =
+  private[this] def preconditionsAndPayments(): Gen[(Block, Block, Seq[MicroBlock], Block)] = {
+    val FeeAmount = 400000
+
+    def validTransferGen(from: PrivateKeyAccount, to: AddressOrAlias, amount: Long): Gen[Transaction] =
+      for {
+        timestamp <- timestampGen
+      } yield TransferTransactionV1.selfSigned(None, from, to, amount, timestamp, None, FeeAmount, Array.empty).explicitGet()
+
+    def unsafeChainBaseAndMicro(totalRefTo: ByteStr,
+                                base: Seq[Transaction],
+                                micros: Seq[Seq[Transaction]],
+                                signer: PrivateKeyAccount,
+                                version: Byte,
+                                timestamp: Long): (Block, Seq[MicroBlock]) = {
+      val block = unsafeBlock(totalRefTo, base, signer, version, timestamp)
+      val microBlocks = micros
+        .foldLeft((block, Seq.empty[MicroBlock])) {
+          case ((lastTotal, allMicros), txs) =>
+            val (newTotal, micro) = unsafeMicro(totalRefTo, lastTotal, txs, signer, version, timestamp)
+            (newTotal, allMicros :+ micro)
+        }
+        ._2
+      (block, microBlocks)
+    }
+
+    def unsafeMicro(totalRefTo: ByteStr,
+                    prevTotal: Block,
+                    txs: Seq[Transaction],
+                    signer: PrivateKeyAccount,
+                    version: Byte,
+                    ts: Long): (Block, MicroBlock) = {
+      val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
+      val unsigned      = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.uniqueId, ByteStr.empty)
+      val signature     = crypto.sign(signer, unsigned.bytes())
+      val signed        = unsigned.copy(signature = ByteStr(signature))
+      (newTotalBlock, signed)
+    }
+
+    def unsafeBlock(reference: ByteStr,
+                    txs: Seq[Transaction],
+                    signer: PrivateKeyAccount,
+                    version: Byte,
+                    timestamp: Long,
+                    bTarget: Long = DefaultBaseTarget): Block = {
+      val unsigned = Block(
+        version = version,
+        timestamp = timestamp,
+        reference = reference,
+        consensusData = NxtLikeConsensusBlockData(
+          baseTarget = bTarget,
+          generationSignature = generationSignature
+        ),
+        transactionData = txs,
+        signerData = SignerData(
+          generator = signer,
+          signature = ByteStr.empty
+        ),
+        featureVotes = Set.empty
+      )
+
+      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes()))))
+    }
+
     for {
-      feeAmount <- smallFeeGen
-      timestamp <- timestampGen
-    } yield TransferTransactionV1.selfSigned(None, from, to, amount, timestamp, None, feeAmount, Array.empty).explicitGet()
+      richAccount   <- accountGen
+      secondAccount <- accountGen
 
-  private def validLeaseGen(from: PrivateKeyAccount, to: AddressOrAlias, amount: Long): Gen[LeaseTransactionV1] =
-    for {
-      feeAmount <- smallFeeGen
-      timestamp <- timestampGen
-    } yield LeaseTransactionV1.selfSigned(from, amount, feeAmount, timestamp, to).explicitGet()
+      tsAmount  = FeeAmount * 10
+      transfer1 <- validTransferGen(richAccount, secondAccount, tsAmount)
+      transfer2 <- validTransferGen(secondAccount, richAccount, tsAmount - FeeAmount)
+      transfer3 <- validTransferGen(secondAccount, richAccount, tsAmount - FeeAmount)
+    } yield {
+      val genesisBlock = unsafeBlock(
+        reference = randomSig,
+        txs = Seq(GenesisTransaction.create(richAccount, tsAmount + FeeAmount, 0).explicitGet()),
+        signer = TestBlock.defaultSigner,
+        version = 3,
+        timestamp = 0
+      )
 
-  private def validLeaseCancelGen(from: PrivateKeyAccount, leaseId: ByteStr): Gen[LeaseCancelTransactionV1] =
-    for {
-      feeAmount <- smallFeeGen
-      timestamp <- timestampGen
-    } yield LeaseCancelTransactionV1.selfSigned(from, leaseId, feeAmount, timestamp).explicitGet()
+      val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
+        totalRefTo = genesisBlock.signerData.signature,
+        base = Seq(transfer1),
+        micros = Seq(Seq(transfer2)),
+        signer = richAccount,
+        version = 3,
+        timestamp = System.currentTimeMillis()
+      )
 
-  private def unsafeChainBaseAndMicro(totalRefTo: ByteStr,
-                                      base: Seq[Transaction],
-                                      micros: Seq[Seq[Transaction]],
-                                      signer: PrivateKeyAccount,
-                                      version: Byte,
-                                      timestamp: Long): (Block, Seq[MicroBlock]) = {
-    val block = unsafeBlock(totalRefTo, base, signer, version, timestamp)
-    val microBlocks = micros
-      .foldLeft((block, Seq.empty[MicroBlock])) {
-        case ((lastTotal, allMicros), txs) =>
-          val (newTotal, micro) = unsafeMicro(totalRefTo, lastTotal, txs, signer, version, timestamp)
-          (newTotal, allMicros :+ micro)
-      }
-      ._2
-    (block, microBlocks)
+      val (keyBlock1, _) = unsafeChainBaseAndMicro(
+        totalRefTo = keyBlock.signerData.signature,
+        base = Seq(transfer3),
+        micros = Nil,
+        signer = secondAccount,
+        version = 3,
+        timestamp = System.currentTimeMillis()
+      )
+
+      (genesisBlock, keyBlock, microBlocks, keyBlock1)
+    }
   }
-
-  private def unsafeMicro(totalRefTo: ByteStr,
-                          prevTotal: Block,
-                          txs: Seq[Transaction],
-                          signer: PrivateKeyAccount,
-                          version: Byte,
-                          ts: Long): (Block, MicroBlock) = {
-    val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-    val unsigned      = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.uniqueId, ByteStr.empty)
-    val signature     = crypto.sign(signer, unsigned.bytes())
-    val signed        = unsigned.copy(signature = ByteStr(signature))
-    (newTotalBlock, signed)
-  }
-
-  private def unsafeBlock(reference: ByteStr,
-                          txs: Seq[Transaction],
-                          signer: PrivateKeyAccount,
-                          version: Byte,
-                          timestamp: Long,
-                          bTarget: Long = DefaultBaseTarget): Block = {
-    val unsigned = Block(
-      version = version,
-      timestamp = timestamp,
-      reference = reference,
-      consensusData = NxtLikeConsensusBlockData(
-        baseTarget = bTarget,
-        generationSignature = generationSignature
-      ),
-      transactionData = txs,
-      signerData = SignerData(
-        generator = signer,
-        signature = ByteStr.empty
-      ),
-      featureVotes = Set.empty
-    )
-
-    unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes()))))
-  }
-
 }
