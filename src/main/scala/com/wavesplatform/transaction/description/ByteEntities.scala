@@ -28,48 +28,35 @@ case class ByteEntityDescription(index: String, name: String, tpe: String, lengt
   */
 sealed trait ByteEntity[T] { self =>
 
-  val ByteType           = "Byte"
-  val BooleanType        = "Boolean"
-  val ShortType          = "Short"
-  val IntType            = "Int"
-  val LongType           = "Long"
-  val ByteArrayType      = "Array[Byte]"
-  val ByteStrType        = s"ByteStr ($ByteArrayType)"
-  val AddressType        = "Address"
-  val AliasType          = "Alias"
-  val AddressOrAliasType = "Address or Alias"
-  val OrderV1Type        = "OrderV1"
-  val OrderType          = "Order"
+  private[description] val ByteType           = "Byte"
+  private[description] val BooleanType        = "Boolean"
+  private[description] val ShortType          = "Short"
+  private[description] val IntType            = "Int"
+  private[description] val LongType           = "Long"
+  private[description] val ByteArrayType      = "Array[Byte]"
+  private[description] val ByteStrType        = s"ByteStr ($ByteArrayType)"
+  private[description] val AddressType        = "Address"
+  private[description] val AliasType          = "Alias"
+  private[description] val AddressOrAliasType = "Address or Alias"
+  private[description] val OrderV1Type        = "OrderV1"
+  private[description] val OrderType          = "Order"
 
-  val index: Int
+  private[description] def generateDoc(): Seq[ByteEntityDescription]
 
-  def generateDoc(): Seq[ByteEntityDescription]
-
-  def deserialize(buf: Array[Byte], offset: Int): Option[(T, Int)]
+  private[description] def deserialize(buf: Array[Byte], offset: Int): Option[(T, Int)]
 
   def deserializeFromByteArray(buf: Array[Byte]): Option[T] = deserialize(buf, 0) map { case (value, _) ⇒ value }
 
   def ~[U](other: ByteEntity[U]): ByteEntity[(T, U)] = Composition(this, other)
 
-  def |(other: ByteEntity[T]): ByteEntity[T] = new ByteEntity[T] {
-
-    val index: Int = self.index
-
-    def generateDoc(): Seq[ByteEntityDescription] = self.generateDoc() ++ other.generateDoc()
-
-    def deserialize(buf: Array[Byte], offset: Int): Option[(T, Int)] =
-      self.deserialize(buf, offset).orElse(other.deserialize(buf, offset))
-  }
-
   def map[U](f: T => U): ByteEntity[U] = new ByteEntity[U] {
-
-    val index: Int = self.index
 
     def generateDoc(): Seq[ByteEntityDescription] = self.generateDoc()
 
     def deserialize(buf: Array[Byte], offset: Int): Option[(U, Int)] = self.deserialize(buf, offset).map { case (t, o) => f(t) -> o }
   }
 
+  /** Generates documentation as a string */
   def getStringDoc: String = {
 
     val docs = generateDoc()
@@ -91,6 +78,7 @@ sealed trait ByteEntity[T] { self =>
       .mkString("\n")
   }
 
+  /** Generates documentation ready for pasting into .md files */
   def getStringDocForMD: String = {
 
     val docs = generateDoc()
@@ -471,8 +459,6 @@ case class FunctionCallBytes(index: Int, name: String) extends ByteEntity[Terms.
 }
 
 case class Composition[T1, T2](e1: ByteEntity[T1], e2: ByteEntity[T2]) extends ByteEntity[(T1, T2)] {
-
-  val index = 0
 
   def generateDoc(): Seq[ByteEntityDescription] = e1.generateDoc() ++ e2.generateDoc()
 

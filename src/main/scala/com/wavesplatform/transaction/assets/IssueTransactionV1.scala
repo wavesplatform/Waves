@@ -6,11 +6,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.script.Script
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
-
-import com.wavesplatform.transaction.description._
 
 import scala.util.{Failure, Success, Try}
 
