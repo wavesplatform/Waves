@@ -35,7 +35,6 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
                        "timestamp": 1526287561757,
                        "signature": "uapJcAJQryBhWThU43rYgMNmvdT7kY747vx5BBgxr2KvaeTRx8Vsuh4yu1JxBymU9LnAoo1zjQcPrWSuhi6dVPE",
                        "proofs": ["uapJcAJQryBhWThU43rYgMNmvdT7kY747vx5BBgxr2KvaeTRx8Vsuh4yu1JxBymU9LnAoo1zjQcPrWSuhi6dVPE"],
-                       "chainId": null,
                        "version": 1,
                        "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
                        "amount": 10000000000
