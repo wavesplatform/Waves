@@ -131,19 +131,13 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
     val exprWithFuncCall = BLOCK(
       Terms.FUNC(
         "first",
-        List("arg1", "arg2"),
-        LET_BLOCK(
-          LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(1)))),
-          REF("x")
-        )
+        List("arg1"),
+        REF("arg1")
       ),
-      BLOCK(
-        LET("y", FUNCTION_CALL(FunctionHeader.User("first"), List(CONST_LONG(1), CONST_LONG(1)))),
-        REF("y")
-      )
+      FUNCTION_CALL(FunctionHeader.User("first"), List(CONST_LONG(1)))
     )
 
     estimate(FunctionCosts, exprWithoutFuncCall) shouldBe Right(5 + 5 + 1 + 2)
-    estimate(FunctionCosts, exprWithFuncCall) shouldBe Right((5 + 10 + 5 + 100 + 2 + 2) + 5 + 2 + 2)
+    estimate(FunctionCosts, exprWithFuncCall) shouldBe Right(5 + 5 + 2 + 1 + 1)
   }
 }

@@ -24,13 +24,15 @@ object ScriptEstimator {
         aux(EitherT.pure(body), syms + ((let.name, (let.value, false))), funcs)
           .map { case (comp, out) => (comp + 5, out) }
 
-      case BLOCK(f: FUNC, body) =>
+      case BLOCK(f: FUNC, body) => {
+        val symsWithArgs = syms ++ f.args.map(arg => (arg, (TRUE, false))).toMap
         aux(
           EitherT.pure(body),
-          syms ++ f.args.map(arg => (arg, (TRUE, false))).toMap,
+          symsWithArgs,
           funcs + (FunctionHeader.User(f.name) -> Coeval.evalOnce(
-            aux(EitherT.pure(f.body), syms, funcs).value().map(_._1).explicitGet() + f.args.size * 5))
+            aux(EitherT.pure(f.body), symsWithArgs, funcs).value().map(_._1).explicitGet() + f.args.size * 5))
         ).map { case (comp, out) => (comp + 5, out) }
+      }
 
       case REF(key) =>
         val ei: EitherT[Coeval, String, (Long, Map[String, (EXPR, Boolean)])] = syms.get(key) match {
