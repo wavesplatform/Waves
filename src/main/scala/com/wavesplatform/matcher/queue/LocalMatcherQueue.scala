@@ -52,7 +52,10 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time)(
     p.future
   }
 
-  override def close(timeout: FiniteDuration): Unit = timer.cancel()
+  override def close(timeout: FiniteDuration): Unit = {
+    timer.cancel()
+    thread.shutdown()
+  }
 }
 
 object LocalMatcherQueue {

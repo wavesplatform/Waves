@@ -112,9 +112,10 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
 
   override def close(timeout: FiniteDuration): Unit = {
     duringShutdown.set(true)
+    val stoppingConsumer = consumerControl.get().shutdown()
     producer.complete()
     Await.result(producer.watchCompletion(), timeout)
-    Await.result(consumerControl.get().shutdown(), timeout)
+    Await.result(stoppingConsumer, timeout)
   }
 
 }

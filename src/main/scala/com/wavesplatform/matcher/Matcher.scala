@@ -204,6 +204,7 @@ class Matcher(actorSystem: ActorSystem,
 
     orderBooksSnapshotCache.close()
     Await.result(gracefulStop(matcher, stopMatcherTimeout, MatcherActor.Shutdown), stopMatcherTimeout)
+    materializer.shutdown()
     log.debug("Matcher's actor system has been shut down")
     db.close()
     log.debug("Matcher's database closed")
