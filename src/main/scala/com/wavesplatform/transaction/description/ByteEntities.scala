@@ -242,7 +242,7 @@ case class OptionAssetIdBytes(index: Int, name: String) extends ByteEntity[Optio
 case class AddressBytes(index: Int, name: String) extends ByteEntity[Address] {
 
   def generateDoc(): Seq[ByteEntityDescription] = {
-    Seq(ByteEntityDescription(s"$index", s"$name", AddressType, s"${Address.AddressLength} (see Address data structure)"))
+    Seq(ByteEntityDescription(s"$index", s"$name", AddressType, s"${Address.AddressLength}"))
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Option[(Address, Int)] = {
@@ -276,11 +276,7 @@ case class AliasBytes(index: Int, name: String) extends ByteEntity[Alias] {
 case class AddressOrAliasBytes(index: Int, name: String) extends ByteEntity[AddressOrAlias] {
 
   def generateDoc(): Seq[ByteEntityDescription] =
-    Seq(
-      ByteEntityDescription(index.toString,
-                            name,
-                            AddressOrAliasType,
-                            "depends on first byte (1 - Address, 2 - Alias, see Address/Alias data structures)"))
+    Seq(ByteEntityDescription(index.toString, name, AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)"))
 
   def deserialize(buf: Array[Byte], offset: Int): Option[(AddressOrAlias, Int)] = {
     AddressOrAlias.fromBytes(buf, offset).toOption
@@ -323,15 +319,9 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
   def generateDoc(): Seq[ByteEntityDescription] = {
     Seq(
       ByteEntityDescription(s"$index.1", "Number of transfers", ShortType, "2"),
-      ByteEntityDescription(s"$index.2",
-                            "Address or alias for transfer 1",
-                            AddressOrAliasType,
-                            "depends on first byte (1 - Address, 2 - Alias, see Address/Alias data structures)"),
+      ByteEntityDescription(s"$index.2", "Address or alias for transfer 1", AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)"),
       ByteEntityDescription(s"$index.3", "Amount for transfer 1", LongType, "8"),
-      ByteEntityDescription(s"$index.4",
-                            "Address or alias for transfer 2",
-                            AddressOrAliasType,
-                            "depends on first byte (1 - Address, 2 - Alias, see Address/Alias data structures)"),
+      ByteEntityDescription(s"$index.4", "Address or alias for transfer 2", AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)"),
       ByteEntityDescription(s"$index.5", "Amount for transfer 2", LongType, "8", "\n...")
     )
   }
