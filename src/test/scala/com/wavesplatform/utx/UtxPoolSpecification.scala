@@ -1,7 +1,6 @@
 package com.wavesplatform.utx
 
 import java.nio.file.Files
-import java.util.concurrent.atomic.AtomicBoolean
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform._
@@ -39,7 +38,6 @@ import scala.concurrent.duration._
 
 private object UtxPoolSpecification {
   final case class TempDB(fs: FunctionalitySettings) {
-    private[this] val closed = new AtomicBoolean(false)
     val path = Files.createTempDirectory("leveldb-test")
     val db   = openDB(path.toAbsolutePath.toString)
     val writer = new LevelDBWriter(db, fs, 100000, 2000, 120 * 60 * 1000)
