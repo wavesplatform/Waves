@@ -96,19 +96,16 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
     signed(sender, name, description, quantity, decimals, reissuable, fee, timestamp, sender)
 
   val byteTailDescription: ByteEntity[IssueTransactionV1] = {
-
-    val tailStartIndex = byteHeaderDescription.index
-
-    (SignatureBytes(tailStartIndex + 1, "Signature") ~
-      ConstantByte(tailStartIndex + 2, value = typeId, name = "Transaction type") ~
-      PublicKeyAccountBytes(tailStartIndex + 3, "Sender's public key") ~
-      BytesArrayUndefinedLength(tailStartIndex + 4, "Asset name") ~
-      BytesArrayUndefinedLength(tailStartIndex + 5, "Description") ~
-      LongBytes(tailStartIndex + 6, "Quantity") ~
-      OneByte(tailStartIndex + 7, "Decimals") ~
-      BooleanByte(tailStartIndex + 8, "Reissuable flag (1 - True, 0 - False)") ~
-      LongBytes(tailStartIndex + 9, "Fee") ~
-      LongBytes(tailStartIndex + 10, "Timestamp"))
+    (SignatureBytes(tailIndex(1), "Signature") ~
+      ConstantByte(tailIndex(2), value = typeId, name = "Transaction type") ~
+      PublicKeyAccountBytes(tailIndex(3), "Sender's public key") ~
+      BytesArrayUndefinedLength(tailIndex(4), "Asset name") ~
+      BytesArrayUndefinedLength(tailIndex(5), "Description") ~
+      LongBytes(tailIndex(6), "Quantity") ~
+      OneByte(tailIndex(7), "Decimals") ~
+      BooleanByte(tailIndex(8), "Reissuable flag (1 - True, 0 - False)") ~
+      LongBytes(tailIndex(9), "Fee") ~
+      LongBytes(tailIndex(10), "Timestamp"))
       .map {
         case (((((((((signature, txId), senderPublicKey), name), desc), quantity), decimals), reissuable), fee), timestamp) =>
           require(txId == typeId, s"Signed tx id is not match")

@@ -44,13 +44,14 @@ sealed trait ByteEntity[T] { self =>
   private[description] val OrderV1Type        = "OrderV1"
   private[description] val OrderType          = "Order"
 
+  /** Index of the byte entity. In case of composition of byte entities returns index of the last one */
   val index: Int
 
   private[description] def generateDoc(): Seq[ByteEntityDescription]
 
   private[description] def deserialize(buf: Array[Byte], offset: Int): Try[(T, Int)]
 
-  def deserializeFromByteArray(buf: Array[Byte]): Try[T] = deserialize(buf, 0) map { case (value, _) ⇒ value }
+  def deserializeFromByteArray(buf: Array[Byte]): Try[T] = deserialize(buf, 0) map { case (value, _) => value }
 
   def ~[U](other: ByteEntity[U]): ByteEntity[(T, U)] = Composition(this, other)
 

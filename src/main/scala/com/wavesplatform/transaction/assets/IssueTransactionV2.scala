@@ -119,20 +119,17 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
 
   val byteDescription: ByteEntity[IssueTransactionV2] = {
     (
-      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
-        ConstantByte(2, value = typeId, name = "Transaction type") ~
-        ConstantByte(3, value = 2, name = "Version") ~
-        OneByte(4, "Chain ID") ~
-        PublicKeyAccountBytes(5, "Sender's public key") ~
-        BytesArrayUndefinedLength(6, "Name") ~
-        BytesArrayUndefinedLength(7, "Description") ~
-        LongBytes(8, "Quantity") ~
-        OneByte(9, "Decimals") ~
-        BooleanByte(10, "Reissuable flag (1 - True, 0 - False)") ~
-        LongBytes(11, "Fee") ~
-        LongBytes(12, "Timestamp") ~
-        OptionScriptBytes(13, "Script") ~
-        ProofsBytes(14)
+        OneByte(tailIndex(1), "Chain ID") ~
+        PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
+        BytesArrayUndefinedLength(tailIndex(3), "Name") ~
+        BytesArrayUndefinedLength(tailIndex(4), "Description") ~
+        LongBytes(tailIndex(5), "Quantity") ~
+        OneByte(tailIndex(6), "Decimals") ~
+        BooleanByte(tailIndex(7), "Reissuable flag (1 - True, 0 - False)") ~
+        LongBytes(tailIndex(8), "Fee") ~
+        LongBytes(tailIndex(9), "Timestamp") ~
+        OptionScriptBytes(tailIndex(10), "Script") ~
+        ProofsBytes(tailIndex(11))
     ).map {
       case (((((((((((((_, _), version), chainId), senderPublicKey), name), desc), quantity), decimals), reissuable), fee), timestamp), script),
             proofs) =>

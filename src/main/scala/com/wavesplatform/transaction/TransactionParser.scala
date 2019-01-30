@@ -26,6 +26,12 @@ trait TransactionParser {
   val byteHeaderDescription: ByteEntity[Unit]
   val byteTailDescription: ByteEntity[TransactionT]
 
+  /**
+    * Returns index of byte entity in `byteTailDescription`
+    * taking into account the last index in `byteHeaderDescription`
+    */
+  protected def tailIndex(index: Int): Int = byteHeaderDescription.index + index
+
   // TODO fixme
   /**
     * Byte description of the transaction. Can be used for deserialization and generation of the documentation.
@@ -96,8 +102,13 @@ object TransactionParser {
 
       (parsedVersion, 3)
     }
-  }
 
+    val byteHeaderDescription: ByteEntity[Unit] = {
+      (ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
+        ConstantByte(2, value = typeId, name = "Transaction type") ~
+        OneByte(3, "Version")).map(_ => ())
+    }
+  }
 }
 
 abstract class TransactionParserFor[T <: Transaction](implicit override val classTag: ClassTag[T]) extends TransactionParser {
