@@ -128,7 +128,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
         BytesArrayUndefinedLength(7, "Description") ~
         LongBytes(8, "Quantity") ~
         OneByte(9, "Decimals") ~
-        BooleanByte(10, "Reissuable") ~
+        BooleanByte(10, "Reissuable flag (1 - True, 0 - False)") ~
         LongBytes(11, "Fee") ~
         LongBytes(12, "Timestamp") ~
         OptionScriptBytes(13, "Script") ~

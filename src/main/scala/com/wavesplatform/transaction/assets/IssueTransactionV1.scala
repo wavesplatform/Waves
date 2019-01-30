@@ -95,7 +95,7 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
       BytesArrayUndefinedLength(6, "Description") ~
       LongBytes(7, "Quantity") ~
       OneByte(8, "Decimals") ~
-      BooleanByte(9, "Reissuable") ~
+      BooleanByte(9, "Reissuable flag (1 - True, 0 - False)") ~
       LongBytes(10, "Fee") ~
       LongBytes(11, "Timestamp"))
       .map {
