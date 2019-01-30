@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1
 import cats.data.EitherT
 import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
-import com.wavesplatform.common.utils.EitherExt2
 
 object ScriptEstimator {
   def apply(declaredVals: Set[String], functionCosts: collection.Map[FunctionHeader, Coeval[Long]], t: EXPR): Either[String, Long] = {
@@ -25,13 +24,15 @@ object ScriptEstimator {
           .map { case (comp, out) => (comp + 5, out) }
 
       case BLOCK(f: FUNC, body) => {
-        val symsWithArgs = syms ++ f.args.map(arg => (arg, (TRUE, false))).toMap
-        aux(
-          EitherT.pure(body),
-          symsWithArgs,
-          funcs + (FunctionHeader.User(f.name) -> Coeval.evalOnce(
-            aux(EitherT.pure(f.body), symsWithArgs, funcs).value().map(_._1).explicitGet() + f.args.size * 5))
-        ).map { case (comp, out) => (comp + 5, out) }
+        aux(EitherT.pure(f.body), syms ++ f.args.map(arg => (arg, (TRUE, false))).toMap, funcs)
+          .flatMap {
+            case (funcComplexity, _) =>
+              aux(
+                EitherT.pure(body),
+                syms,
+                funcs + (FunctionHeader.User(f.name) -> Coeval.evalOnce(funcComplexity + f.args.size * 5))
+              ).map { case (comp, out) => (comp + 5, out) }
+          }
       }
 
       case REF(key) =>
