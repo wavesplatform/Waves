@@ -21,9 +21,13 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest extends PropSpec with Proper
     for {
       richAccount        <- accountGen
       minerAccount       <- accountGen
-      lease <- validLeaseGen(richAccount, minerAccount.toAddress)
+      leaseAmount <- smallFeeGen
+      lease <- validLeaseGen(richAccount, minerAccount.toAddress, leaseAmount)
       leaseCancel <- validLeaseCancelGen(richAccount, lease.id())
-      transfer <- validTransferGen(richAccount, ENOUGH_AMT - (lease.amount - lease.fee) * 2)
+
+      tsAmount <- smallFeeGen
+      tsRecipient <- accountGen
+      transfer <- validTransferGen(richAccount, tsRecipient, tsAmount)
     } yield {
       val genesisBlock = unsafeBlock(
         reference = randomSig,
@@ -37,13 +41,13 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest extends PropSpec with Proper
         totalRefTo = genesisBlock.signerData.signature,
         base = Seq(lease),
         micros = Seq(Seq(leaseCancel)),
-        signer = TestBlock.defaultSigner,
+        signer = richAccount,
         version = 3,
         timestamp = System.currentTimeMillis()
       )
 
       val (keyBlock1, _) = unsafeChainBaseAndMicro(
-        totalRefTo = genesisBlock.signerData.signature,
+        totalRefTo = keyBlock.signerData.signature,
         base = Seq(transfer),
         micros = Nil,
         signer = minerAccount,
@@ -58,38 +62,30 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest extends PropSpec with Proper
     forAll(preconditionsAndPayments()) {
       case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
         withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          val blocksApplied = for {
-            _ <- d.blockchainUpdater.processBlock(prevBlock)
-            _ <- d.blockchainUpdater.processBlock(keyBlock)
-          } yield ()
+          d.blockchainUpdater.processBlock(prevBlock) shouldBe 'right
+          d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
 
-          val r = microBlocks.foldLeft(blocksApplied) {
-            case (Right(_), curr) => d.blockchainUpdater.processMicroBlock(curr)
-            case (x, _)           => x
-          }
+          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
 
           d.blockchainUpdater.processBlock(keyBlock1) shouldBe 'right
         }
     }
   }
 
-  private def validTransferGen(from: PrivateKeyAccount, amount: Long): Gen[Transaction] =
+  private def validTransferGen(from: PrivateKeyAccount, to: AddressOrAlias, amount: Long): Gen[Transaction] =
     for {
       feeAmount <- smallFeeGen
       timestamp <- timestampGen
-      recipient <- accountGen
-    } yield TransferTransactionV1.selfSigned(None, from, recipient, amount, timestamp, None, feeAmount, Array.empty).explicitGet()
+    } yield TransferTransactionV1.selfSigned(None, from, to, amount, timestamp, None, feeAmount, Array.empty).explicitGet()
 
-  private def validLeaseGen(from: PrivateKeyAccount, to: AddressOrAlias): Gen[LeaseTransactionV1] =
+  private def validLeaseGen(from: PrivateKeyAccount, to: AddressOrAlias, amount: Long): Gen[LeaseTransactionV1] =
     for {
-      amount    <- smallFeeGen
       feeAmount <- smallFeeGen
       timestamp <- timestampGen
     } yield LeaseTransactionV1.selfSigned(from, amount, feeAmount, timestamp, to).explicitGet()
 
   private def validLeaseCancelGen(from: PrivateKeyAccount, leaseId: ByteStr): Gen[LeaseCancelTransactionV1] =
     for {
-      amount    <- smallFeeGen
       feeAmount <- smallFeeGen
       timestamp <- timestampGen
     } yield LeaseCancelTransactionV1.selfSigned(from, leaseId, feeAmount, timestamp).explicitGet()
