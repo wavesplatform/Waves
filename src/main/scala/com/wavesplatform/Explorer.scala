@@ -6,14 +6,14 @@ import java.util
 
 import com.google.common.primitives.Shorts
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, AddressScheme, Alias}
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{Height, TxNum}
-import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction, TransactionParsers}
+import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 import org.slf4j.bridge.SLF4JBridgeHandler
 
@@ -215,40 +215,6 @@ object Explorer extends ScorexLogging {
           for ((prefix, stats) <- result.asScala) {
             log.info(s"${keys(prefix)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
           }
-
-        case "ALSS" =>
-          val aliases = new util.HashMap[Alias, Seq[CreateAliasTransaction]]()
-          val height  = Height(db.get(Keys.height))
-
-          for (h <- 1 until height - 1) {
-            println(s"H: $h")
-            val (header, _) = db.get(Keys.blockHeaderAndSizeAt(Height(h))).get
-
-            for (n <- 0 until header.transactionCount) {
-              val txNum            = TxNum(n.toShort)
-              val transactionBytes = db.get(Keys.transactionBytesAt(Height(h), txNum)).getOrElse(throw new Exception(s"None.get for $h - $txNum")) //.get //.bytes()
-
-              val isCreateAlias = transactionBytes(0) == CreateAliasTransaction.typeId ||
-                transactionBytes(0) == 0 &&
-                  transactionBytes(1) == CreateAliasTransaction.typeId
-
-              if (isCreateAlias) {
-                TransactionParsers
-                  .parseBytes(transactionBytes)
-                  .foreach {
-                    case cat: CreateAliasTransaction => aliases.compute(cat.alias, (_, prevTx) => Option(prevTx).fold(Seq(cat))(_ :+ cat))
-                    case _                           =>
-                  }
-              }
-            }
-          }
-
-          val hijackedAliases = for {
-            (alias, txs) <- aliases.asScala
-            if txs.size > 1
-          } yield alias
-
-          hijackedAliases.foreach { println }
 
         case "TXBH" =>
           val txs = new ListBuffer[(TxNum, Transaction)]

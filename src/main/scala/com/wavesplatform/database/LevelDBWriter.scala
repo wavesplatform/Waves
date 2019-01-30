@@ -769,7 +769,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
           val tx = db
             .get(Keys.transactionAt(height, txNum))
             .collect { case lt: LeaseTransaction => lt }
-            .getOrElse(throw new Exception(s"Corrupted state! No transaction found in db, for id - ${txId.base58}"))
+            .get
 
           txs.append(tx)
         }

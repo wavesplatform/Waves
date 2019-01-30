@@ -20,14 +20,14 @@ object DisableHijackedAliases extends ScorexLogging {
     for (h <- 1 until height) {
       val (header, _) = rw
         .get(Keys.blockHeaderAndSizeAt(Height(h)))
-        .getOrElse(throw new Exception(s"Cannot get header at height: $h"))
+        .get
 
       for (n <- 0 until header.transactionCount) {
         val txNum = TxNum(n.toShort)
 
         val transactionBytes = rw
-          .get(Keys.transactionBytesAt(height, txNum))
-          .getOrElse(throw new Exception(s"Cannot get tx at $h - $n"))
+          .get(Keys.transactionBytesAt(Height(h), txNum))
+          .get
 
         val isCreateAlias = transactionBytes(0) == CreateAliasTransaction.typeId ||
           transactionBytes(0) == 0 &&
