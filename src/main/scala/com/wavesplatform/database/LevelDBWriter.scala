@@ -747,7 +747,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>
-    val txIds = new ListBuffer[TransactionId]()
+    val txs = new ListBuffer[LeaseTransaction]()
 
     val prefix   = Shorts.toByteArray(Keys.TransactionHeightNumByIdPrefix)
     val iterator = db.iterator
@@ -755,28 +755,28 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     try {
       iterator.seek(prefix)
       while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) {
-        val txId = iterator.next().getKey.drop(2)
-        txIds.append(TransactionId(ByteStr(txId)))
+
+        val kv = iterator.next()
+
+        val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
+
+        if (loadLeaseStatus(db, txId)) {
+          val heightNumBytes = kv.getValue
+
+          val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
+          val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
+
+          val tx = db
+            .get(Keys.transactionAt(height, txNum))
+            .collect { case lt: LeaseTransaction => lt }
+            .getOrElse(throw new Exception(s"Corrupted state! No transaction found in db, for id - ${txId.base58}"))
+
+          txs.append(tx)
+        }
       }
     } finally iterator.close()
 
-    txIds.toList
-      .filter(loadLeaseStatus(db, _))
-      .map { txId =>
-        val (h, n) = db
-          .get(Keys.transactionHNById(txId))
-          .getOrElse(throw new Exception(s"Corrupted state! No (H, n) found in db, for transaction with id - ${txId.base58}"))
-
-        val tx = db
-          .get(Keys.transactionAt(h, n))
-          .getOrElse(throw new Exception(s"Corrupted state! No transaction found in db, for id - ${txId.base58}"))
-
-        tx
-      }
-      .collect {
-        case t: LeaseTransaction => t
-      }
-      .toSet
+    txs.toSet
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]) = readOnly { db =>

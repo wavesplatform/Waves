@@ -301,19 +301,20 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
         val l = leases(Random.nextInt(leases.length - 1))
 
         val lc = LeaseCancelTransactionV1
-            .selfSigned(
-              leaser,
-              l.id(),
-              1 * 10 ^ 8,
-              ntpTime.correctedTime() + 1000
-            ).explicitGet()
+          .selfSigned(
+            leaser,
+            l.id(),
+            1 * 10 ^ 8,
+            ntpTime.correctedTime() + 1000
+          )
+          .explicitGet()
 
         val b = TestBlock
-            .create(
-              emptyBlock.timestamp + 2,
-              emptyBlock.uniqueId,
-              Seq(lc)
-            )
+          .create(
+            emptyBlock.timestamp + 2,
+            emptyBlock.uniqueId,
+            Seq(lc)
+          )
 
         val b2 = TestBlock
           .create(
@@ -327,10 +328,6 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
 
         bcu.allActiveLeases shouldBe (leases.toSet - l)
         defaultWriter.allActiveLeases shouldBe (leases.toSet - l)
-
-        leases.foreach { ls =>
-          println(defaultWriter.transactionInfo(ls.id()).get)
-        }
 
         bcu.shutdown()
       } finally {
