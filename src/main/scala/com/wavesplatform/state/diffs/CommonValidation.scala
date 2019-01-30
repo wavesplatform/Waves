@@ -8,12 +8,12 @@ import com.wavesplatform.lang.Version._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError._
-import com.wavesplatform.transaction.{smart, _}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{smart, _}
 
 import scala.util.{Left, Right}
 
@@ -130,8 +130,8 @@ object CommonValidation {
             activationBarrier(BlockchainFeatures.Ride4DApps, Some("Ride4DApps has not been activated yet"))
           case Some(ExprV1) | None => activationBarrier(BlockchainFeatures.SmartAccounts)
           case Some(ExprV2)        => activationBarrier(BlockchainFeatures.SmartAccountTrading, Some("Script version 2"))
-          case Some(ContractV)        => activationBarrier(BlockchainFeatures.Ride4DApps, Some("Ride4DApps has not been activated yet"))
-          case Some(v)         => Left(GenericError(s"Bad script version $v"))
+          case Some(ContractV)     => activationBarrier(BlockchainFeatures.Ride4DApps, Some("Ride4DApps has not been activated yet"))
+          case Some(v)             => Left(GenericError(s"Bad script version $v"))
         }
       case _: TransferTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)

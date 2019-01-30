@@ -15,11 +15,12 @@ import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
 import scala.collection.mutable.ListBuffer
 
 object ContractEvaluator {
-  case class Invokation(name: String, fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
+  case class Invokation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
 
   def eval(c: Contract, i: Invokation): EvalM[EVALUATED] = {
-    c.cfs.find(_.u.name == i.name) match {
-      case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '${i.name} doesn't exist in the contract")
+    val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name
+    c.cfs.find(_.u.name == functionName) match {
+      case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '$functionName doesn't exist in the contract")
       case Some(f) =>
         val zeroExpr = Right(
           BLOCK(

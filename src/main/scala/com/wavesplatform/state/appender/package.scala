@@ -1,19 +1,19 @@
 package com.wavesplatform.state
 
+import cats.implicits._
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
+import com.wavesplatform.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
+import com.wavesplatform.transaction._
+import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
-import com.wavesplatform.block.Block
-import com.wavesplatform.transaction.ValidationError.{BlockAppendError, BlockFromFuture, GenericError}
-import com.wavesplatform.transaction._
-import cats.implicits._
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.utils.{ScorexLogging, Time}
 
 import scala.util.{Left, Right}
 
@@ -49,31 +49,24 @@ package object appender extends ScorexLogging {
     }
   }
 
-  private[appender] def appendBlock(checkpoint: CheckpointService,
-                                    blockchainUpdater: BlockchainUpdater with Blockchain,
+  private[appender] def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain,
                                     utxStorage: UtxPool,
                                     pos: PoSSelector,
                                     time: Time,
                                     settings: WavesSettings,
                                     verify: Boolean)(block: Block): Either[ValidationError, Option[Int]] = {
-    val append =
-      if (verify) appendBlock(checkpoint, blockchainUpdater, utxStorage, pos, time, settings) _
-      else appendBlock(blockchainUpdater, utxStorage, verify = false) _
+    val append: Block => Either[ValidationError, Option[Int]] =
+      if (verify) appendBlock(blockchainUpdater, utxStorage, pos, time, settings) _
+      else appendBlock(blockchainUpdater, utxStorage, false) _
     append(block)
   }
 
-  private[appender] def appendBlock(checkpoint: CheckpointService,
-                                    blockchainUpdater: BlockchainUpdater with Blockchain,
+  private[appender] def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain,
                                     utxStorage: UtxPool,
                                     pos: PoSSelector,
                                     time: Time,
                                     settings: WavesSettings)(block: Block): Either[ValidationError, Option[Int]] =
     for {
-      _ <- Either.cond(
-        checkpoint.isBlockValid(block.signerData.signature, blockchainUpdater.height + 1),
-        (),
-        BlockAppendError(s"Block $block at height ${blockchainUpdater.height + 1} is not valid w.r.t. checkpoint", block)
-      )
       _ <- Either.cond(
         !blockchainUpdater.hasScript(block.sender),
         (),

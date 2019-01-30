@@ -19,7 +19,6 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
       settings.networkSettings should not be null
       settings.walletSettings should not be null
       settings.blockchainSettings should not be null
-      settings.checkpointsSettings should not be null
       settings.matcherSettings should not be null
       settings.minerSettings should not be null
       settings.restAPISettings should not be null
