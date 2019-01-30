@@ -295,6 +295,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (!shutdownInProgress) {
       shutdownInProgress = true
 
+      portfolioChanged.onComplete()
       utx.close()
 
       shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)

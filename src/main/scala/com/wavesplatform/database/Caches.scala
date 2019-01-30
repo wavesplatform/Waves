@@ -3,18 +3,19 @@ package com.wavesplatform.database
 import java.util
 
 import cats.syntax.monoid._
-import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
-import com.wavesplatform.state._
-import com.wavesplatform.transaction.{AssetId, Transaction}
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.metrics.LevelDBStats
+import com.wavesplatform.state._
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{AssetId, Transaction}
+import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.reflect.ClassTag
 
 abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain with ScorexLogging {
   import Caches._
@@ -49,7 +50,7 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
     val c = current
     if (height == c._1) {
-      c._3.map(b => (b, b.bytes().size))
+      c._3.map(b => (b, b.bytes().length))
     } else {
       loadBlockHeaderAndSize(height)
     }
@@ -59,7 +60,7 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
     val c = current
     if (c._3.exists(_.uniqueId == blockId)) {
-      c._3.map(b => (b, b.bytes().size))
+      c._3.map(b => (b, b.bytes().length))
     } else {
       loadBlockHeaderAndSize(blockId)
     }
@@ -123,7 +124,7 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
     transactionIds.entrySet().removeIf(_.getValue < oldestBlock)
   }
 
-  private val portfolioCache: LoadingCache[Address, Portfolio] = cache(maxCacheSize, loadPortfolio)
+  private val portfolioCache: LoadingCache[Address, Portfolio] = observedCache(maxCacheSize, portfolioChanged, loadPortfolio)
   protected def loadPortfolio(address: Address): Portfolio
   protected def discardPortfolio(address: Address): Unit = portfolioCache.invalidate(address)
   override def portfolio(a: Address): Portfolio          = portfolioCache.get(a)
@@ -271,11 +272,8 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
-    for ((address, portfolio)    <- newPortfolios.result()) {
-      portfolioCache.put(address, portfolio)
-      portfolioChanged.onNext(address)
-    }
-    for (id <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
+    for ((address, portfolio)    <- newPortfolios.result()) portfolioCache.put(address, portfolio)
+    for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
     blocksTs.put(newHeight, block.timestamp)
@@ -311,6 +309,9 @@ object Caches {
       .newBuilder()
       .maximumSize(maximumSize)
       .build(new CacheLoader[K, V] {
-        override def load(key: K) = loader(key)
+        override def load(key: K): V = loader(key)
       })
+
+  def observedCache[K <: AnyRef, V <: AnyRef](maximumSize: Int, changed: Observer[K], loader: K => V)(implicit ct: ClassTag[K]): LoadingCache[K, V] =
+    new ObservedLoadingCache(cache(maximumSize, loader), changed)
 }

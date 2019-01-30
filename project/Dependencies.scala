@@ -38,8 +38,9 @@ object Dependencies {
   )
 
   lazy val serialization = Seq(
-    "com.google.guava"  % "guava"      % "21.0",
-    "com.typesafe.play" %% "play-json" % "2.6.10"
+    "com.google.guava"         % "guava"      % "21.0",
+    "com.google.code.findbugs" % "jsr305"     % "3.0.2" % "compile", // to support guava
+    "com.typesafe.play"        %% "play-json" % "2.6.10"
   )
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 

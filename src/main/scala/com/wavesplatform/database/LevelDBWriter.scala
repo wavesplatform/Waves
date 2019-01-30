@@ -492,10 +492,7 @@ class LevelDBWriter(writableDB: DB,
           discardedBlock
         }
 
-        portfoliosToInvalidate.result().foreach { x =>
-          discardPortfolio(x)
-          portfolioChanged.onNext(x)
-        }
+        portfoliosToInvalidate.result().foreach(discardPortfolio)
         assetInfoToInvalidate.result().foreach(discardAssetDescription)
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
