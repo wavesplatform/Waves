@@ -82,10 +82,13 @@ class ReservedBalanceSpecification extends PropSpecLike with MatcherSpecLike wit
   var oh = new OrderHistoryStub(system)
   private val addressDir = system.actorOf(
     Props(
-      new AddressDirectory(_ => Portfolio.empty,
-                           _ => Future.failed(new IllegalStateException("Should not be used in the test")),
-                           matcherSettings,
-                           new TestOrderDB(100))
+      new AddressDirectory(
+        ignorePortfolioChanged,
+        _ => Portfolio.empty,
+        _ => Future.failed(new IllegalStateException("Should not be used in the test")),
+        matcherSettings,
+        new TestOrderDB(100)
+      )
     ))
 
   private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]): Long =

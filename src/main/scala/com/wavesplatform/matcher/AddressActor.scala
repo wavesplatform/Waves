@@ -16,6 +16,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import org.slf4j.LoggerFactory
 
+import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -35,9 +36,10 @@ class AddressActor(
 
   protected override def log = LoggerFacade(LoggerFactory.getLogger(s"AddressActor[$owner]"))
 
-  private val activeOrders  = mutable.AnyRefMap.empty[ByteStr, LimitOrder]
-  private val openVolume    = mutable.AnyRefMap.empty[Option[AssetId], Long].withDefaultValue(0L)
-  private var latestOrderTs = 0L
+  private val activeOrders   = mutable.AnyRefMap.empty[Order.Id, LimitOrder]
+  private val openVolume     = mutable.AnyRefMap.empty[Option[AssetId], Long].withDefaultValue(0L)
+  private var latestOrderTs  = 0L
+  private var markedToCancel = Set.empty[Order.Id]
 
   private def reserve(limitOrder: LimitOrder): Unit =
     for ((id, b) <- limitOrder.requiredBalance if b != 0) {
@@ -77,6 +79,17 @@ class AddressActor(
                                      id => activeOrders.contains(id) || orderDB.contains(id)) _
 
   private def handleCommands: Receive = {
+    case BalanceUpdated =>
+      val newPortfolio = portfolio
+      val toCancel     = ordersToDelete(toSpendable(newPortfolio), markedToCancel, activeOrders.values.toVector)
+      if (toCancel.nonEmpty) {
+        log.debug(s"Canceling: $toCancel")
+        toCancel.foreach { x =>
+          storeEvent(x)
+          markedToCancel += x.orderId
+        }
+      }
+
     case PlaceOrder(o) =>
       log.debug(s"New order: ${o.json()}")
       validator(o) match {
@@ -93,15 +106,20 @@ class AddressActor(
       }
     case CancelOrder(id) =>
       activeOrders.get(id) match {
-        case Some(lo) => storeEvent(QueueEvent.Canceled(lo.order.assetPair, id)).pipeTo(sender())
-        case None     => sender() ! OrderCancelRejected(s"Order $id not found")
+        case Some(lo) =>
+          markedToCancel += id
+          storeEvent(QueueEvent.Canceled(lo.order.assetPair, id)).pipeTo(sender())
+        case None => sender() ! OrderCancelRejected(s"Order $id not found")
       }
     case CancelAllOrders(maybePair, timestamp) =>
       if ((timestamp - latestOrderTs).abs <= maxTimestampDrift.toMillis) {
         val batchCancelFutures = for {
           lo <- activeOrders.values
           if maybePair.forall(_ == lo.order.assetPair)
-        } yield storeEvent(QueueEvent.Canceled(lo.order.assetPair, lo.order.id())).map(x => lo.order.id() -> x.asInstanceOf[WrappedMatcherResponse])
+        } yield {
+          markedToCancel += lo.order.id()
+          storeEvent(QueueEvent.Canceled(lo.order.assetPair, lo.order.id())).map(x => lo.order.id() -> x.asInstanceOf[WrappedMatcherResponse])
+        }
 
         Future.sequence(batchCancelFutures).map(_.toMap).map(BatchCancelCompleted).pipeTo(sender())
       } else {
@@ -146,6 +164,7 @@ class AddressActor(
       release(lo.order.id())
       val l = lo.order.amount - lo.amount
       handleOrderTerminated(lo, if (unmatchable) LimitOrder.Filled(l) else LimitOrder.Cancelled(l))
+      markedToCancel -= lo.order.id()
   }
 
   private def handleOrderExecuted(remaining: LimitOrder): Unit = if (remaining.order.sender.toAddress == owner) {
@@ -171,6 +190,47 @@ class AddressActor(
   }
 
   def receive: Receive = handleCommands orElse handleExecutionEvents orElse handleStatusRequests
+
+  private type SpendableBalance = Map[Option[AssetId], Long]
+
+  private def ordersToDelete(initBalance: SpendableBalance,
+                             initMarkedToCancel: Set[Order.Id],
+                             orders: IndexedSeq[LimitOrder]): Queue[QueueEvent.Canceled] = {
+    // Probably, we need to check orders with changed assets only.
+    // Now a user can have 100 active transaction maximum - easy to traverse.
+    val (_, r) = orders
+      .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
+      .view
+      .map { lo =>
+        (lo.order.id(), lo.order.assetPair, lo.requiredBalance)
+      }
+      .foldLeft((initBalance, Queue.empty[QueueEvent.Canceled])) {
+        case ((restBalance, toDelete), (id, assetPair, requiredBalance)) =>
+          remove(restBalance, requiredBalance) match {
+            case Some(updatedRestBalance) => (updatedRestBalance, toDelete)
+            case None =>
+              val updatedToDelete = if (markedToCancel.contains(id)) toDelete else toDelete.enqueue(QueueEvent.Canceled(assetPair, id))
+              (restBalance, updatedToDelete)
+          }
+      }
+    r
+  }
+
+  private def toSpendable(p: Portfolio): SpendableBalance =
+    p.assets
+      .map { case (k, v) => (Some(k): Option[AssetId]) -> v }
+      .updated(None, p.spendableBalance)
+      .withDefaultValue(0)
+
+  private def remove(from: SpendableBalance, xs: SpendableBalance): Option[SpendableBalance] =
+    xs.foldLeft[Option[SpendableBalance]](Some(from)) {
+      case (None, _)      => None
+      case (curr, (_, 0)) => curr
+      case (Some(curr), (assetId, amount)) =>
+        val updatedAmount = curr.getOrElse(assetId, 0L) - amount
+        if (updatedAmount < 0) None
+        else Some(curr.updated(assetId, updatedAmount))
+    }
 }
 
 object AddressActor {
@@ -186,6 +246,7 @@ object AddressActor {
   case class PlaceOrder(order: Order)                                     extends Command
   case class CancelOrder(orderId: ByteStr)                                extends Command
   case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long)    extends Command
+  case object BalanceUpdated                                              extends Command
 
   private case class CancelTimedOut(orderId: ByteStr)
 }

@@ -40,7 +40,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
 
   private def newProducer =
     Source
-      .queue[(QueueEvent, Promise[QueueEventWithMeta.Offset])](settings.producer.bufferSize, OverflowStrategy.backpressure)
+      .queue[(QueueEvent, Promise[QueueEventWithMeta])](settings.producer.bufferSize, OverflowStrategy.backpressure)
       .mapMaterializedValue { x =>
         producerControl.set(() => x.complete())
         x
@@ -51,9 +51,10 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
       }
       .via(Producer.flexiFlow(producerSettings))
       .map {
-        case ProducerMessage.Result(meta, ProducerMessage.Message(_, passThrough)) => passThrough.success(meta.offset())
-        case ProducerMessage.MultiResult(parts, passThrough)                       => throw new RuntimeException(s"MultiResult(parts=$parts, passThrough=$passThrough)")
-        case ProducerMessage.PassThroughResult(passThrough)                        => throw new RuntimeException(s"PassThroughResult(passThrough=$passThrough)")
+        case ProducerMessage.Result(meta, ProducerMessage.Message(msg, passThrough)) =>
+          passThrough.success(QueueEventWithMeta(meta.offset(), meta.timestamp(), msg.value()))
+        case ProducerMessage.MultiResult(parts, passThrough) => throw new RuntimeException(s"MultiResult(parts=$parts, passThrough=$passThrough)")
+        case ProducerMessage.PassThroughResult(passThrough)  => throw new RuntimeException(s"PassThroughResult(passThrough=$passThrough)")
       }
       .toMat(Sink.ignore)(Keep.left)
       .run()
@@ -76,7 +77,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
     ConsumerSettings(config, new StringDeserializer, deserializer)
   }
 
-  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Future[Unit]): Unit = {
+  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Unit): Unit = {
     log.info(s"Start consuming from $fromOffset")
     var currentOffset  = fromOffset
     val topicPartition = new TopicPartition(settings.topic, 0)
@@ -92,29 +93,28 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
           .plainSource(consumerSettings, Subscriptions.assignmentWithOffset(topicPartition -> currentOffset))
           .mapMaterializedValue(consumerControl.set)
           .buffer(settings.consumer.bufferSize, OverflowStrategy.backpressure)
-          .mapAsync(5) { msg =>
+          .map { msg =>
             // We can do it in parallel, because we're just applying verified events
             val req = QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value())
-            process(req).transform { x =>
-              currentOffset = msg.offset()
-              x
-            }
+            process(req)
+            currentOffset = math.max(currentOffset, msg.offset())
           }
       }
       .runWith(Sink.ignore)
   }
 
-  override def storeEvent(event: QueueEvent): Future[QueueEventWithMeta.Offset] = {
-    val p = Promise[QueueEventWithMeta.Offset]()
+  override def storeEvent(event: QueueEvent): Future[QueueEventWithMeta] = {
+    val p = Promise[QueueEventWithMeta]()
     producer.offer((event, p))
     p.future
   }
 
   override def close(timeout: FiniteDuration): Unit = {
     duringShutdown.set(true)
+    val stoppingConsumer = consumerControl.get().shutdown()
     producer.complete()
     Await.result(producer.watchCompletion(), timeout)
-    Await.result(consumerControl.get().shutdown(), timeout)
+    Await.result(stoppingConsumer, timeout)
   }
 
 }

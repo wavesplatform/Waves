@@ -10,7 +10,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import cats.instances.all._
 import com.typesafe.config._
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
@@ -30,7 +30,7 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, forceStopApplication}
-import com.wavesplatform.utx.{MatcherUtxPool, UtxPool, UtxPoolImpl}
+import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
@@ -58,7 +58,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val LocalScoreBroadcastDebounce = 1.second
 
-  private val blockchainUpdater = StorageFactory(settings, db, time)
+  private val portfolioChanged = ConcurrentSubject.publish[Address]
+
+  private val blockchainUpdater = StorageFactory(settings, db, time, portfolioChanged)
 
   private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
   private lazy val upnp         = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
@@ -99,16 +101,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val innerUtxStorage =
-      new UtxPoolImpl(time, blockchainUpdater, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    val utxStorage =
+      new UtxPoolImpl(time, blockchainUpdater, portfolioChanged, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    maybeUtx = Some(utxStorage)
 
     matcher = if (settings.matcherSettings.enable) {
-      Matcher(actorSystem, time, wallet, innerUtxStorage, allChannels, blockchainUpdater, settings, () => shutdownInProgress)
+      Matcher(actorSystem, time, wallet, utxStorage, allChannels, blockchainUpdater, portfolioChanged, settings, () => shutdownInProgress)
     } else None
-
-    val utxStorage =
-      if (settings.matcherSettings.enable) new MatcherUtxPool(innerUtxStorage, settings.matcherSettings, actorSystem.eventStream) else innerUtxStorage
-    maybeUtx = Some(utxStorage)
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
@@ -296,6 +295,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (!shutdownInProgress) {
       shutdownInProgress = true
 
+      portfolioChanged.onComplete()
       utx.close()
 
       shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)

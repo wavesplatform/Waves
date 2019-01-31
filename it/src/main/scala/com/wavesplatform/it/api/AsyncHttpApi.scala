@@ -65,8 +65,8 @@ object AsyncHttpApi extends Assertions {
         .build()
     }
 
-    def post(url: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-      retrying(f(_post(url).withApiKey(n.apiKey)).build())
+    def post(url: String, f: RequestBuilder => RequestBuilder = identity, waitForStatus: Boolean = false): Future[Response] =
+      retrying(f(_post(url).withApiKey(n.apiKey)).build(), waitForStatus = waitForStatus)
 
     def postJson[A: Writes](path: String, body: A): Future[Response] =
       post(path, stringify(toJson(body)))

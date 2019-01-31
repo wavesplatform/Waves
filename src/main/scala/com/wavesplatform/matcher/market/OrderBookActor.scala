@@ -17,8 +17,9 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, HasScriptType, NegativeAmount, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import kamon.Kamon
+import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
 import scala.annotation.tailrec
@@ -36,6 +37,8 @@ class OrderBookActor(owner: ActorRef,
     with ScorexLogging {
 
   override def persistenceId: String = OrderBookActor.name(assetPair)
+
+  protected override def log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[${assetPair.key}]"))
 
   private var savingSnapshot: Option[QueueEventWithMeta.Offset] = None
   private var lastProcessedOffset: Long                         = -1L
@@ -115,9 +118,9 @@ class OrderBookActor(owner: ActorRef,
   }
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = {
-    log.trace(s"Order accepted: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
+    log.trace(s"Order accepted: '${order.id()}', trying to match ...")
     matchTimer.measure(matchOrder(eventWithMeta, LimitOrder(order)))
-    sender() ! OrderAccepted(order)
+    sender() ! OrderAccepted(order) // TODO respond immediately
   }
 
   private def applyEvent(e: Event): Unit = {
@@ -251,7 +254,7 @@ class OrderBookActor(owner: ActorRef,
         publishEvent(OrderAdded(lo))
       }
 
-      log.debug(s"Recovering $persistenceId from $snapshot")
+      log.debug(s"Recovering from $snapshot")
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {

@@ -81,10 +81,10 @@ package object appender extends ScorexLogging {
       maybeDiscardedTxs <- blockchainUpdater.processBlock(block)
     } yield {
       utxStorage.removeAll(block.transactionData)
-      utxStorage.batched { ops =>
-        maybeDiscardedTxs.toSeq.flatten.foreach(ops.putIfNew)
+      maybeDiscardedTxs.map { discarded =>
+        discarded.foreach(utxStorage.putIfNew)
+        baseHeight
       }
-      maybeDiscardedTxs.map(_ => baseHeight)
     }
 
   private def blockConsensusValidation(blockchain: Blockchain, settings: WavesSettings, pos: PoSSelector, currentTs: Long, block: Block)(

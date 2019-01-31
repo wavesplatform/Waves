@@ -18,7 +18,7 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time)(
   private val timer                                       = new Timer("local-dex-queue", true)
   private val thread                                      = Executors.newSingleThreadExecutor()
 
-  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Future[Unit]): Unit = {
+  override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Unit): Unit = {
     if (settings.cleanBeforeConsume) store.dropUntil(fromOffset)
     lastUnreadOffset = fromOffset
 
@@ -39,20 +39,23 @@ class LocalMatcherQueue(settings: Settings, store: LocalQueueStore, time: Time)(
     )
   }
 
-  override def storeEvent(event: QueueEvent): Future[QueueEventWithMeta.Offset] = {
-    val p = Promise[QueueEventWithMeta.Offset]
+  override def storeEvent(event: QueueEvent): Future[QueueEventWithMeta] = {
+    val p = Promise[QueueEventWithMeta]
     // Need to guarantee the order
     thread.submit(new Runnable {
       override def run(): Unit = {
-        val ts = time.correctedTime()
-        log.trace(s"Store $event with timestamp=$ts")
-        p.success(store.enqueue(event, time.correctedTime()))
+        val ts     = time.correctedTime()
+        val offset = store.enqueue(event, time.correctedTime())
+        p.success(QueueEventWithMeta(offset, ts, event))
       }
     })
     p.future
   }
 
-  override def close(timeout: FiniteDuration): Unit = timer.cancel()
+  override def close(timeout: FiniteDuration): Unit = {
+    timer.cancel()
+    thread.shutdown()
+  }
 }
 
 object LocalMatcherQueue {

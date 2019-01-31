@@ -156,6 +156,11 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 
   @ApiModelProperty(hidden = true)
   override def hashCode(): Int = idStr.hashCode()
+
+  @ApiModelProperty(hidden = true)
+  override def toString: String = {
+    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee, proofs=$proofs)"
+  }
 }
 
 object Order {

@@ -166,9 +166,7 @@ case class DebugApiRoute(ws: WavesSettings,
       case Right(blocks) =>
         allChannels.broadcast(LocalScoreChanged(ng.score))
         if (returnTransactionsToUtx) {
-          utxStorage.batched { ops =>
-            blocks.flatMap(_.transactionData).foreach(ops.putIfNew)
-          }
+          blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
         }
         miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
