@@ -17,8 +17,8 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{ValidationError, Proofs, Transaction}
 import com.wavesplatform.transaction.ValidationError._
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.script.v1.ContractScript
 import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.transaction.smart.script.ContractScript.ContractScript
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import monix.eval.Coeval

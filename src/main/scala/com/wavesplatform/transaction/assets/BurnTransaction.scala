@@ -30,7 +30,7 @@ trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
       "fee"     -> fee
     ) ++ (chainByte match {
       case Some(chainByte) => Json.obj("chainId" -> chainByte)
-      case None => JsObject.empty
+      case None            => JsObject.empty
     })
   }
 
