@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV1, Log}
 import com.wavesplatform.transaction.{Authorized, Proven}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.{RealTransactionWrapper, Verifier}
-import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import com.wavesplatform.transaction.smart.script.v1.ContractScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
 import monix.eval.Coeval
@@ -20,7 +20,7 @@ object MatcherScriptRunner {
       val ctx = MatcherContext.build(script.version, AddressScheme.current.chainId, Coeval.evalOnce(order), !isTokenScript)
       EvaluatorV1.applywithLogging(ctx, s.expr)
 
-    case ContractScript(_, Contract(_, _, Some(vf))) =>
+    case ContractScript.ContractScript(_, Contract(_, _, Some(vf))) =>
       val ctx = MatcherContext.build(
         script.version,
         AddressScheme.current.chainId,
@@ -30,7 +30,7 @@ object MatcherScriptRunner {
       val evalContract = ContractEvaluator.verify(vf, RealTransactionWrapper.ord(order))
       EvaluatorV1.evalWithLogging(ctx, evalContract)
 
-    case ContractScript(_, Contract(_, _, None)) =>
+    case ContractScript.ContractScript(_, Contract(_, _, None)) =>
       (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](order) match {
         case Right(_) => Right(TRUE)
         case Left(_)  => Right(FALSE)
