@@ -102,6 +102,22 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
     estimate(FunctionCosts, expr).explicitGet() shouldBe 8
   }
 
+  property("recursive let block") {
+    val expr = BLOCK(
+      LET("x", REF("y")),
+      BLOCK(LET("y", REF("x")), IF(TRUE, REF("x"), REF("y")))
+    )
+    estimate(FunctionCosts, expr).explicitGet() shouldBe 18
+  }
+
+  property("recursive func block") {
+    val expr = BLOCK(
+      FUNC("x", List.empty, FUNCTION_CALL(FunctionHeader.User("y"), List.empty)),
+      BLOCK(FUNC("y", List.empty, FUNCTION_CALL(FunctionHeader.User("x"), List.empty)), FUNCTION_CALL(FunctionHeader.User("y"), List.empty))
+    )
+    estimate(FunctionCosts, expr) shouldBe 'left
+  }
+
   property("evaluates simple expression - let + func_call + ref") {
     val functionCosts: Map[FunctionHeader, Coeval[Long]] = Map[FunctionHeader, Long](Plus -> 1).mapValues(Coeval.now)
 
