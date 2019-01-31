@@ -113,7 +113,10 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("definition of user function") {
     val expr = Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))
-    Decompiler(expr, opcodes) shouldBe "func foo (bar,buz) = { TRUE }"
+    Decompiler(expr, opcodes) shouldBe
+      """func foo (bar,buz) = {
+         |    TRUE
+         |}""".stripMargin
   }
 
   property("v2 with LET in BLOCK") {
@@ -188,7 +191,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       )
     )
     Decompiler(expr, opcodes) shouldBe
-      """{e
+      """{
         |    let v =
         |        p;
         |    { if (

@@ -9,7 +9,6 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 // TODO: Декомпилировать контракт с ContactInvocation (fomo.ride)
 // TODO: Сам контракт состоит из деклараций, списка контрактных функций и верифайера (Contract.scala). Декомпилировать его
 
-
 object Decompiler {
 
   def out (in :String, ident :Int):String =
@@ -17,8 +16,10 @@ object Decompiler {
 
   def decl (e: DECLARATION, ident :Int, opCodes :Map[Short,String]): String =
     e match {
-      case Terms.FUNC(name, args, body) => out("{ func " + name + " (" +
-        args.map(_.toString).mkString(",") + ") = " + body + " }", ident)
+      case Terms.FUNC(name, args, body) =>
+        out("func " + name + " (" + args.map(_.toString).mkString(","), ident) + ") = {\n" +
+        out(body + "\n", 1 + ident) +
+        out("}", ident)
       case Terms.LET(name, value) => out("let " + name + " =\n" + expr(value, 1 + ident, opCodes), ident)
     }
 
