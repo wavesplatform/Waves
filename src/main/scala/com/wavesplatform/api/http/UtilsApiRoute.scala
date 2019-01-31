@@ -137,7 +137,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
               case (script, complexity) =>
                 Json.obj(
                   "script" -> code,
-                  // "scriptText" -> script.text, // ddd!!!
+                  "scriptText" -> Script.decompile(script),
                   "complexity" -> complexity,
                   "extraFee"   -> CommonValidation.ScriptExtraFee
                 )

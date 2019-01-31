@@ -150,6 +150,8 @@ package object utils extends ScorexLogging {
     if (isAssetScript) lazyAssetContexts(version)().compilerContext
     else lazyContexts(version)().compilerContext
 
+  val defaultCompilerContext: CompilerContext = compilerContext(ContractV,false)
+
   def varNames(version: Version): Set[String] = compilerContext(version, isAssetScript = false).varDefs.keySet
 
   @tailrec

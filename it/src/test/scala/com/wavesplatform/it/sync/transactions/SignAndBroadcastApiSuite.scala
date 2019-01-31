@@ -49,8 +49,9 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     val obsoleteTx = Json.obj("type" -> 1, "sender" -> firstAddress, "recipient" -> firstAddress, "amount" -> 1, "fee" -> 100000)
     assertSignBadJson(obsoleteTx, "UnsupportedTransactionType")
     assertSignBadJson(obsoleteTx + ("type" -> Json.toJson(2)), "UnsupportedTransactionType")
-    
-    val bigBaseTx = Json.obj("type" -> 4, "sender" -> firstAddress, "recipient" -> firstAddress, "amount" -> 1, "fee" -> 100000, "attachment" -> "W" * 524291)
+
+    val bigBaseTx =
+      Json.obj("type" -> 4, "sender" -> firstAddress, "recipient" -> firstAddress, "amount" -> 1, "fee" -> 100000, "attachment" -> "W" * 524291)
     assertSignBadJson(bigBaseTx, "base58Decode input exceeds")
   }
 

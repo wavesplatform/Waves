@@ -16,9 +16,9 @@ import scala.util.{Failure, Success, Try}
 
 object ScriptCompiler extends ScorexLogging {
 
+
   def contract(scriptText: String): Either[String, Script] = {
-    val ctx = compilerContext(ContractV, isAssetScript = false)
-    ContractCompiler(ctx, Parser.parseContract(scriptText).get.value)
+    ContractCompiler(defaultCompilerContext, Parser.parseContract(scriptText).get.value)
       .map(s => ContractScript(ContractV, s))
   }
 

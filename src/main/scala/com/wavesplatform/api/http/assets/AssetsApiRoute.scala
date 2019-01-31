@@ -278,7 +278,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         ) ++ (script.toSeq.map { script =>
           "scriptDetails" -> Json.obj(
             "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
-            "script"           -> JsString(script.bytes().base64),
+            "script"           -> JsString(script.bytes().base64)
           )
         })
       )

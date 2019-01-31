@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.compiler
 
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompilerV1, Terms}
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.{Decompiler, Terms}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import org.scalatest.{Matchers, PropSpec}
@@ -9,7 +9,17 @@ import org.scalatest.prop.PropertyChecks
 
 class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
-  val opcodes = scala.collection.immutable.Map[Int,String](1-> "+", 100->"sigVerify")
+  val opcodes = scala.collection.immutable.Map[Short, String](1.toShort -> "+", 100.toShort -> "sigVerify")
+
+  property("getter") {
+    val expr = Terms.GETTER(Terms.FUNCTION_CALL(
+                              function = FunctionHeader.User("testfunc"),
+                              args = List(TRUE)
+                            ),
+                            "testfield")
+    Decompiler(expr, opcodes) shouldBe
+      """testfunc(true).testfield""".stripMargin
+  }
 
   property("simple if") {
     val expr = IF(TRUE, CONST_LONG(1), CONST_STRING("XXX"))
@@ -25,9 +35,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("if with complicated else branch") {
-    val expr = IF(TRUE, CONST_LONG(1),
-      IF(TRUE, CONST_LONG(1),
-        CONST_STRING("XXX")))
+    val expr = IF(TRUE, CONST_LONG(1), IF(TRUE, CONST_LONG(1), CONST_STRING("XXX")))
     Decompiler(expr, opcodes) shouldBe
       """{ if (
         |    true
@@ -47,10 +55,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("if with complicated then branch") {
-    val expr = IF(TRUE,
-      IF(TRUE, CONST_LONG(1),
-        CONST_STRING("XXX")),
-      CONST_LONG(1))
+    val expr = IF(TRUE, IF(TRUE, CONST_LONG(1), CONST_STRING("XXX")), CONST_LONG(1))
     Decompiler(expr, opcodes) shouldBe
       """{ if (
         |    true
@@ -74,7 +79,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     Decompiler(expr, opcodes) shouldBe "{ let a = 1; true }"
   }
 
-  property("native function call without args") {
+  property("native function call with one arg") {
     val expr = Terms.FUNCTION_CALL(
       function = FunctionHeader.Native(100),
       args = List(TRUE)
@@ -82,15 +87,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     Decompiler(expr, opcodes) shouldBe "sigVerify(true)"
   }
 
-
-  property("undefined native function call without args") {
+  property("undefined native function call  one arg") {
     val expr = Terms.FUNCTION_CALL(
       function = FunctionHeader.Native(101),
       args = List(TRUE)
     )
     Decompiler(expr, opcodes) shouldBe "<Native_101>(true)"
   }
-
 
   property("user function call with one args") {
     val expr = Terms.FUNCTION_CALL(
@@ -108,9 +111,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     Decompiler(expr, opcodes) shouldBe "foo()"
   }
 
-  property("user function declaration") {
+  property("definition of user function") {
     val expr = Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))
-    Decompiler(expr, opcodes) shouldBe "{ func foo (bar,buz) = TRUE }"
+    Decompiler(expr, opcodes) shouldBe "func foo (bar,buz) = { TRUE }"
   }
 
   property("v2 with LET in BLOCK") {
@@ -119,7 +122,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       TRUE
     )
     Decompiler(expr, opcodes) shouldBe
-    """{
+      """{
       |    let vari =
       |        p;
       |    true
@@ -127,12 +130,11 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("let and function call in block") {
-    val expr = Terms.BLOCK(
-      Terms.LET("v", REF("p")),
-      Terms.FUNCTION_CALL(
-        PureContext._isInstanceOf.header,
-        List(REF("v"), Terms.CONST_STRING("a"))
-      ))
+    val expr = Terms.BLOCK(Terms.LET("v", REF("p")),
+                           Terms.FUNCTION_CALL(
+                             PureContext._isInstanceOf.header,
+                             List(REF("v"), Terms.CONST_STRING("a"))
+                           ))
     Decompiler(expr, opcodes) shouldBe
       """{
         |    let v =
@@ -143,16 +145,17 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("complicated let in let and function call in block") {
     val expr = Terms.BLOCK(
-      Terms.LET("v", Terms.BLOCK(
-        Terms.LET("v", REF("p")),
-        Terms.FUNCTION_CALL(
-          PureContext._isInstanceOf.header,
-          List(REF("v"), Terms.CONST_STRING("a"))
-        ))),
+      Terms.LET("v",
+                Terms.BLOCK(Terms.LET("v", REF("p")),
+                            Terms.FUNCTION_CALL(
+                              PureContext._isInstanceOf.header,
+                              List(REF("v"), Terms.CONST_STRING("a"))
+                            ))),
       Terms.FUNCTION_CALL(
         PureContext._isInstanceOf.header,
         List(REF("v"), Terms.CONST_STRING("a"))
-      ))
+      )
+    )
     Decompiler(expr, opcodes) shouldBe
       """{
         |    let v =
@@ -185,7 +188,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       )
     )
     Decompiler(expr, opcodes) shouldBe
-      """{
+      """{e
         |    let v =
         |        p;
         |    { if (
@@ -213,26 +216,24 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   property("new match") {
     val expr = Terms.BLOCK(
       Terms.LET("v", REF("p")),
+      Terms.IF(
         Terms.IF(
-          Terms.IF(
-            Terms.FUNCTION_CALL(
-              PureContext._isInstanceOf.header,
-              List(REF("v"), Terms.CONST_STRING("a"))
-            ),
-            TRUE,
-            Terms.FUNCTION_CALL(
-              PureContext._isInstanceOf.header,
-              List(REF("v"), Terms.CONST_STRING("b"))
-            )
-         ),
-          Terms.BLOCK(
-            Terms.LET("z", Terms.REF("x")
-            ), TRUE),
-          FALSE
-        )
+          Terms.FUNCTION_CALL(
+            PureContext._isInstanceOf.header,
+            List(REF("v"), Terms.CONST_STRING("a"))
+          ),
+          TRUE,
+          Terms.FUNCTION_CALL(
+            PureContext._isInstanceOf.header,
+            List(REF("v"), Terms.CONST_STRING("b"))
+          )
+        ),
+        Terms.BLOCK(Terms.LET("z", Terms.REF("x")), TRUE),
+        FALSE
       )
+    )
     Decompiler(expr, opcodes) shouldBe
-    """{
+      """{
       |    let v =
       |        p;
       |    { if (

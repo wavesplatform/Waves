@@ -5,6 +5,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -33,7 +34,7 @@ package object compiler {
                    ("p2", TYPEPARAM('T'), "p2"))(l => Right(l.head))
 
   private val arr = ARR(IndexedSeq[EVALUATED](null, null))
-  val compilerContext = Monoid
+  val compilerContext: CompilerContext = Monoid
     .combine(
       PureContext.build(ExprV1),
       CTX(

@@ -3,7 +3,10 @@ package com.wavesplatform.transaction.smart.script
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
+import com.wavesplatform.transaction.smart.script.v1.ContractScript
+import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
 import monix.eval.Coeval
 
 trait Script {
@@ -36,4 +39,9 @@ object Script {
       script <- ScriptReader.fromBytes(bytes)
     } yield script
 
+
+  def decompile(s:Script): String = s match {
+    case ExprScriprImpl(_, e, _) => Decompiler(e, com.wavesplatform.utils.defaultCompilerContext.opCodes)
+    case ContractScript(_, _)    => ???
+  }
 }

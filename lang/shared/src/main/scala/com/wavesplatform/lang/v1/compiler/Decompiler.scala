@@ -3,23 +3,26 @@ package com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 
-// TODO: сделать ручку
-// TODO: переполнение стека
-// TODO: декомпилить контракт, который может быть списком функций
+// TODO: сделать ручку (отложить)
+// TODO: переполнение стека (отложить)
+// TODO: Поправить API и остальные комменты в PullRequest
+// TODO: Декомпилировать контракт с ContactInvocation (fomo.ride)
+// TODO: Сам контракт состоит из деклараций, списка контрактных функций и верифайера (Contract.scala). Декомпилировать его
+
 
 object Decompiler {
 
   def out (in :String, ident :Int):String =
     Array.fill( 4*ident )(" ").mkString("") + in
 
-  def decl (e: DECLARATION, ident :Int, opCodes :Map[Int,String]): String =
+  def decl (e: DECLARATION, ident :Int, opCodes :Map[Short,String]): String =
     e match {
       case Terms.FUNC(name, args, body) => out("{ func " + name + " (" +
         args.map(_.toString).mkString(",") + ") = " + body + " }", ident)
       case Terms.LET(name, value) => out("let " + name + " =\n" + expr(value, 1 + ident, opCodes), ident)
     }
 
-  def expr(e: EXPR, ident :Int, OpCodes :Map[Int,String]): String =
+  def expr(e: EXPR, ident :Int, OpCodes :Map[Short,String]): String =
     e match {
       case Terms.TRUE => out("true", ident)
       case Terms.FALSE => out("false", ident)
@@ -50,17 +53,16 @@ object Decompiler {
         case FunctionHeader.User(name) => out(name + "(" + args.map(expr(_, 0, OpCodes)).mkString(",") + ")", ident)
       }
       case Terms.REF(ref) => out(ref, ident)
-      // TODO: need case and test for GETTER(_,_)
+      case Terms.GETTER(get_expr, fld) => out(expr(get_expr, ident, OpCodes) + "." + fld, ident)
 
       case Terms.ARR(_) => ??? // never happens
       case _: Terms.CaseObj => ??? // never happens
-
     }
 
-  def apply(e0 :EXPR, opCodes:scala.collection.immutable.Map[Int,String]): String =
+  def apply(e0 :EXPR, opCodes:Map[Short,String]): String =
     expr(e0, 0, opCodes)
 
-  def apply(e0 :DECLARATION, opCodes:scala.collection.immutable.Map[Int,String]): String =
+  def apply(e0 :DECLARATION, opCodes:Map[Short,String]): String =
     decl(e0, 0, opCodes)
 
 }
