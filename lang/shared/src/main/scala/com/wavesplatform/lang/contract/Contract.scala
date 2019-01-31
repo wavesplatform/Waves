@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.contract
 
-import com.wavesplatform.lang.contract.Contract.{ContractFunction, VerifierFunction}
+import com.wavesplatform.lang.contract.Contract.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -18,7 +18,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 
 case class Contract(
     dec: List[DECLARATION],
-    cfs: List[ContractFunction],
+    cfs: List[CallableFunction],
     vf: Option[VerifierFunction]
 )
 
@@ -53,6 +53,6 @@ object Contract {
     def annotation: Annotation
     def u: Terms.FUNC
   }
-  case class ContractFunction(override val annotation: CallableAnnotation, override val u: Terms.FUNC) extends AnnotatedFunction
+  case class CallableFunction(override val annotation: CallableAnnotation, override val u: Terms.FUNC) extends AnnotatedFunction
   case class VerifierFunction(override val annotation: VerifierAnnotation, override val u: Terms.FUNC) extends AnnotatedFunction
 }

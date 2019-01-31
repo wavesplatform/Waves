@@ -4,16 +4,17 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Version
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction}
-import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.Version.ExprV1
+import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.{ContractScript, ExprScript}
+import com.wavesplatform.transaction.smart.script.ContractScript
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -53,11 +54,11 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
       Version.ContractV,
       Contract(
         List.empty,
-        List(ContractFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
+        List(CallableFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
         None
       )
     )
-  } yield (genesis, SetScriptTransaction.selfSigned(version, master, Some(script), fee, ts).explicitGet())
+  } yield (genesis, SetScriptTransaction.selfSigned(version, master, script.toOption, fee, ts).explicitGet())
 
   property("setting contract results in account state") {
     forAll(preconditionsAndSetContract) {

@@ -14,7 +14,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.script.v1.ContractScript
+import com.wavesplatform.transaction.smart.script.ContractScript.ContractScript
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, WavesEnvironment}
 import monix.eval.Coeval
 

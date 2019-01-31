@@ -8,8 +8,9 @@ import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompilerV1}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.transaction.smart.script.ContractScript._
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
-import com.wavesplatform.transaction.smart.script.v1.{ContractScript, ExprScript}
 import com.wavesplatform.utils._
 
 import scala.util.{Failure, Success, Try}
@@ -19,7 +20,7 @@ object ScriptCompiler extends ScorexLogging {
   def contract(scriptText: String): Either[String, Script] = {
     val ctx = compilerContext(ContractV, isAssetScript = false)
     ContractCompiler(ctx, Parser.parseContract(scriptText).get.value)
-      .map(s => ContractScript(ContractV, s))
+      .flatMap(s => ContractScript(ContractV, s))
   }
 
   def apply(scriptText: String, isAssetScript: Boolean): Either[String, (Script, Long)] = {
@@ -53,7 +54,7 @@ object ScriptCompiler extends ScorexLogging {
 
   def estimate(script: Script, version: Version): Either[String, Long] = script match {
     case s: ExprScriprImpl => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
-    case s: ContractScript => Right(1)
+    case s: ContractScript => ContractScript.estimateComplexity(version, s.expr).map(_._2)
     case _                 => ???
   }
 
