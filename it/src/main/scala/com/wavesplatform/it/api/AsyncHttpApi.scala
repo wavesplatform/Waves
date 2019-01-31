@@ -218,8 +218,8 @@ object AsyncHttpApi extends Assertions {
           "recipient"  -> recipient,
           "fee"        -> fee,
           "version"    -> version,
-          "assetId"    -> {if (assetId.isDefined) JsString(assetId.get) else JsNull},
-          "feeAssetId" -> {if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull}
+          "assetId"    -> { if (assetId.isDefined) JsString(assetId.get) else JsNull },
+          "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
         ))
     }
 
@@ -338,7 +338,7 @@ object AsyncHttpApi extends Assertions {
       signAndBroadcast(
         Json.obj(
           "type"      -> MassTransferTransaction.typeId,
-          "assetId"   -> {if (assetId.isDefined) JsString(assetId.get) else JsNull},
+          "assetId"   -> { if (assetId.isDefined) JsString(assetId.get) else JsNull },
           "sender"    -> sourceAddress,
           "fee"       -> fee,
           "version"   -> 1,
@@ -493,10 +493,7 @@ object AsyncHttpApi extends Assertions {
     def getGeneratedBlocks(address: String, from: Long, to: Long): Future[Seq[Block]] =
       get(s"/blocks/address/$address/$from/$to").as[Seq[Block]]
 
-    def retrying(r: Request,
-                 interval: FiniteDuration = 1.second,
-                 statusCode: Int = OK_200,
-                 waitForStatus: Boolean = false): Future[Response] = {
+    def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = OK_200, waitForStatus: Boolean = false): Future[Response] = {
       def executeRequest: Future[Response] = {
         n.log.trace(s"Executing request '$r'")
         if (r.getStringData != null) n.log.debug(s"Request's body '${r.getStringData}'")

@@ -38,8 +38,8 @@ import scala.concurrent.duration._
 
 private object UtxPoolSpecification {
   final case class TempDB(fs: FunctionalitySettings) {
-    val path = Files.createTempDirectory("leveldb-test")
-    val db   = openDB(path.toAbsolutePath.toString)
+    val path   = Files.createTempDirectory("leveldb-test")
+    val db     = openDB(path.toAbsolutePath.toString)
     val writer = new LevelDBWriter(db, fs, 100000, 2000, 120 * 60 * 1000)
 
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
@@ -59,7 +59,8 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     val config          = ConfigFactory.load()
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
     val origSettings    = WavesSettings.fromConfig(config)
-    val settings = origSettings.copy(blockchainSettings = BlockchainSettings(
+    val settings = origSettings.copy(
+      blockchainSettings = BlockchainSettings(
         'T',
         FunctionalitySettings.TESTNET.copy(
           preActivatedFeatures = Map(
@@ -68,10 +69,12 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
             BlockchainFeatures.Ride4DApps.id    -> 0
           )),
         genesisSettings
-      ), featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+      ),
+      featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
+    )
 
     val dbContext = TempDB(settings.blockchainSettings.functionalitySettings)
-    val bcu = StorageFactory(settings, dbContext.db, new TestTime())
+    val bcu       = StorageFactory(settings, dbContext.db, new TestTime())
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
     bcu
   }
