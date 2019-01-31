@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluat
 import com.wavesplatform.lang.v1.task.imports.{raiseError, _}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.Tx.Pmt
-import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{DataItem, Ord, Recipient, Tx}
 
 import scala.collection.mutable.ListBuffer
 
@@ -44,6 +44,14 @@ object ContractEvaluator {
       BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
+
+  def verify(v: VerifierFunction, ord: Ord): EvalM[EVALUATED] = {
+    val t = Bindings.orderObject(ord, proofsEnabled = true)
+    val expr =
+      BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+    EvaluatorV1.evalExpr(expr)
+  }
+
 
   def apply(ctx: EvaluationContext, c: Contract, i: Invokation): Either[ExecutionError, ContractResult] = {
     val log = ListBuffer[LogItem]()

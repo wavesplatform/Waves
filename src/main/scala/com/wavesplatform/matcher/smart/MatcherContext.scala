@@ -34,12 +34,17 @@ object MatcherContext {
     val orderType: CaseType = buildOrderType(proofsEnabled)
     val matcherTypes        = Seq(addressType, orderType, assetPairType)
 
-    val matcherVars: Map[String, ((FINAL, String), LazyVal)] = Map(
+    val txMap: Map[String, ((FINAL, String), LazyVal)] =
+      if (version == ExprV1 || version == ExprV2)
+        Map(("tx", ((orderType.typeRef, "Processing order"), LazyVal(EitherT(inputEntityCoeval)))))
+      else Map.empty
+
+    val commonMatcherVars: Map[String, ((FINAL, String), LazyVal)] = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "undefined height placeholder"), LazyVal(EitherT(heightCoeval)))),
-      ("tx", ((orderType.typeRef, "Processing order"), LazyVal(EitherT(inputEntityCoeval)))),
       ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
       ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
     )
+    val matcherVars = commonMatcherVars ++ txMap
 
     def inaccessibleFunction(name: String, internalName: Short): BaseFunction = {
       val msg = s"Function $name is inaccessible when running script on matcher"
