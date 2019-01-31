@@ -97,7 +97,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val txToSwapBC1 =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = pkByAddress(AliceBC1),
           recipient = AddressOrAlias.fromString(swapBC1).explicitGet(),
@@ -119,7 +118,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val txToSwapBC1 =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = pkByAddress(swapBC1),
           recipient = AddressOrAlias.fromString(AliceBC1).explicitGet(),
@@ -144,7 +142,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val unsigned =
       TransferTransactionV2
         .create(
-          version = 2,
           assetId = None,
           sender = pkByAddress(swapBC1),
           recipient = AddressOrAlias.fromString(BobBC1).explicitGet(),
@@ -180,7 +177,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
     val selfSignedToAlice = TransferTransactionV2
       .selfSigned(
-        version = 2,
         assetId = None,
         sender = pkByAddress(swapBC1),
         recipient = AddressOrAlias.fromString(AliceBC1).explicitGet(),

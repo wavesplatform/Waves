@@ -34,8 +34,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
 
     val res = Range(0, settings.transactions).map { i =>
       val tx = TransferTransactionV2
-        .create(2,
-                None,
+        .create(None,
                 bank,
                 owners(1),
                 totalAmountOnNewAccount - 2 * enoughFee - i,

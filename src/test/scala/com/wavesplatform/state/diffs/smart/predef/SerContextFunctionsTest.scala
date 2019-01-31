@@ -37,7 +37,6 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
 
     val ttx = TransferTransactionV2
       .create(
-        2,
         None,
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
         Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get,

@@ -26,7 +26,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = sender.privateKey,
           recipient = acc0,
@@ -83,7 +82,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = acc0,
           recipient = acc3,
@@ -101,7 +99,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val unsigned =
       TransferTransactionV2
         .create(
-          version = 2,
           assetId = None,
           sender = acc0,
           recipient = acc3,
@@ -148,7 +145,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = acc0,
           recipient = acc3,
@@ -167,7 +163,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = acc0,
           recipient = acc3,

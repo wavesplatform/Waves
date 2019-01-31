@@ -345,7 +345,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val transferV2 = TransferTransactionV2
     .create(
-      2,
       None,
       publicKey,
       Address.fromString(sender.address).right.get,

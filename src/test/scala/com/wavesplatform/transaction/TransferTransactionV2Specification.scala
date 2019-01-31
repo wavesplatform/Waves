@@ -12,8 +12,6 @@ import play.api.libs.json.Json
 
 class TransferTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
-  private val versionGen: Gen[Byte] = Gen.oneOf(TransferTransactionV2.supportedVersions.toSeq)
-
   property("VersionedTransferTransactionSpecification serialization roundtrip") {
     forAll(transferV2Gen) { tx: TransferTransactionV2 =>
       val recovered = TransferTransactionV2.parseBytes(tx.bytes()).get
@@ -29,10 +27,10 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
   }
 
   property("VersionedTransferTransactionSpecification id doesn't depend on proof") {
-    forAll(versionGen, accountGen, accountGen, proofsGen, proofsGen, bytes32gen) {
-      case (version, acc1, acc2, proofs1, proofs2, attachment) =>
-        val tx1 = TransferTransactionV2.create(version, None, acc2, acc2.toAddress, 1, 1, None, 1, attachment, proofs1).explicitGet()
-        val tx2 = TransferTransactionV2.create(version, None, acc2, acc2.toAddress, 1, 1, None, 1, attachment, proofs2).explicitGet()
+    forAll(accountGen, accountGen, proofsGen, proofsGen, bytes32gen) {
+      case (acc1, acc2, proofs1, proofs2, attachment) =>
+        val tx1 = TransferTransactionV2.create(None, acc2, acc2.toAddress, 1, 1, None, 1, attachment, proofs1).explicitGet()
+        val tx2 = TransferTransactionV2.create(None, acc2, acc2.toAddress, 1, 1, None, 1, attachment, proofs2).explicitGet()
         tx1.id() shouldBe tx2.id()
     }
   }
@@ -72,7 +70,6 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
 
     val tx = TransferTransactionV2
       .create(
-        2,
         None,
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),

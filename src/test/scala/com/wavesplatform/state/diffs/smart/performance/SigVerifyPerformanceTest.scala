@@ -31,10 +31,9 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
 
   private def scriptedSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[TransferTransactionV2] =
     for {
-      version <- Gen.oneOf(TransferTransactionV2.supportedVersions.toSeq)
       amt     <- smallFeeGen
       fee     <- smallFeeGen
-    } yield TransferTransactionV2.selfSigned(version, None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
+    } yield TransferTransactionV2.selfSigned(None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
 
   private def differentTransfers(typed: EXPR) =
     for {
