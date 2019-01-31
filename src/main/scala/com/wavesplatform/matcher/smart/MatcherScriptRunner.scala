@@ -9,7 +9,6 @@ import com.wavesplatform.transaction.{Authorized, Proven}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.{RealTransactionWrapper, Verifier}
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
-import com.wavesplatform.transaction.smart.script.v1.ContractScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
 import monix.eval.Coeval
 
