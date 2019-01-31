@@ -429,7 +429,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
           .right
           .get,
         ReissueTransactionV2
-          .selfSigned(version, AddressScheme.current.chainId, reissuer, assetId, quantity, reissuable, fee, timestamp)
+          .selfSigned(AddressScheme.current.chainId, reissuer, assetId, quantity, reissuable, fee, timestamp)
           .right
           .get
       )

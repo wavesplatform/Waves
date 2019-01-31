@@ -518,7 +518,6 @@ object TransactionFactory {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       tx <- ReissueTransactionV2.signed(
-        request.version,
         AddressScheme.current.chainId,
         sender,
         ByteStr.decodeBase58(request.assetId).get,
@@ -532,7 +531,6 @@ object TransactionFactory {
 
   def reissueAssetV2(request: ReissueV2Request, sender: PublicKeyAccount): Either[ValidationError, ReissueTransactionV2] =
     ReissueTransactionV2.create(
-      request.version,
       AddressScheme.current.chainId,
       sender,
       ByteStr.decodeBase58(request.assetId).get,

@@ -29,14 +29,13 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
 
   def generator: Gen[((Seq[com.wavesplatform.transaction.Transaction], ReissueTransactionV2))] =
     for {
-      version                                                                  <- versionGen(ReissueTransactionV2)
       (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
       fee                                                                      <- smallFeeGen
       reissuable                                                               <- Gen.oneOf(true, false)
     } yield {
       val issue = IssueTransactionV1.selfSigned(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).explicitGet()
       val reissue1 = ReissueTransactionV2
-        .selfSigned(version, AddressScheme.current.chainId, sender, issue.assetId(), quantity, reissuable = reissuable, fee, timestamp)
+        .selfSigned(AddressScheme.current.chainId, sender, issue.assetId(), quantity, reissuable = reissuable, fee, timestamp)
         .explicitGet()
       (Seq(issue), reissue1)
     }
@@ -62,7 +61,6 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
     """),
        ReissueTransactionV2
          .create(
-           2,
            'T',
            PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
            ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,

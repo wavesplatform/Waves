@@ -271,7 +271,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val reissueV2 = ReissueTransactionV2
     .create(
-      2,
       chainId,
       publicKey,
       ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
