@@ -48,7 +48,8 @@ object ApiError {
         error match {
           case ValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
           case ValidationError.TransactionNotAllowedByScript(vars, scriptSrc, isTokenScript) =>
-            TransactionNotAllowedByScript(tx, vars, scriptSrc, isTokenScript)
+            if (isTokenScript) TransactionNotAllowedByAssetScript(tx, vars, scriptSrc)
+            else TransactionNotAllowedByAccountScript(tx, vars, scriptSrc)
           case ValidationError.ScriptExecutionError(err, src, vars, isToken) =>
             ScriptExecutionError(tx, err, src, vars, isToken)
           case _ => StateCheckFailed(tx, fromValidationError(error).message)
@@ -260,11 +261,17 @@ case class ScriptExecutionError(tx: Transaction, error: String, scriptSrc: Strin
 
 }
 
-case class TransactionNotAllowedByScript(tx: Transaction, log: Log, scriptSrc: String, isTokenScript: Boolean) extends ApiError {
-
+case class TransactionNotAllowedByAccountScript(tx: Transaction, log: Log, scriptSrc: String) extends ApiError {
   override val id: Int             = 307
   override val code: StatusCode    = StatusCodes.BadRequest
-  override val message: String     = s"Transaction is not allowed by ${if (isTokenScript) "token" else "account"}-script"
+  override val message: String     = s"Transaction is not allowed by account-script"
+  override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
+}
+
+case class TransactionNotAllowedByAssetScript(tx: Transaction, log: Log, scriptSrc: String) extends ApiError {
+  override val id: Int             = 308
+  override val code: StatusCode    = StatusCodes.BadRequest
+  override val message: String     = s"Transaction is not allowed by token-script"
   override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
 }
 
