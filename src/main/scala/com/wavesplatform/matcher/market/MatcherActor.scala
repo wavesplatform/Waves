@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.market
 
 import java.util.concurrent.atomic.AtomicReference
 
-import akka.actor.{Actor, ActorRef, PoisonPill, Props, SupervisorStrategy, Terminated}
+import akka.actor.{ActorRef, Props, SupervisorStrategy, Terminated}
 import akka.persistence._
 import com.google.common.base.Charsets
 import com.wavesplatform.matcher.MatcherSettings
@@ -38,7 +38,6 @@ class MatcherActor(matcherSettings: MatcherSettings,
 
   private var shutdownStatus: ShutdownStatus = ShutdownStatus(
     initiated = false,
-    orderBooksStopped = false,
     oldMessagesDeleted = false,
     oldSnapshotsDeleted = false,
     onComplete = () => ()
@@ -133,12 +132,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
       lastProcessedNr = math.max(request.offset, lastProcessedNr)
 
     case Shutdown =>
-      shutdownStatus = shutdownStatus.copy(
-        initiated = true,
-        onComplete = { () =>
-          context.stop(self)
-        }
-      )
+      shutdownStatus = shutdownStatus.copy(initiated = true, onComplete = () => context.stop(self))
 
       context.children.foreach(context.unwatch)
       context.become(snapshotsCommands orElse shutdownFallback)
@@ -150,13 +144,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
           oldMessagesDeleted = true,
           oldSnapshotsDeleted = true
         )
-      }
-
-      if (context.children.isEmpty) {
-        shutdownStatus = shutdownStatus.copy(orderBooksStopped = true)
         shutdownStatus.tryComplete()
-      } else {
-        context.actorOf(Props(new GracefulShutdownActor(context.children.toVector, self)))
       }
 
     case Terminated(ref) =>
@@ -282,10 +270,6 @@ class MatcherActor(matcherSettings: MatcherSettings,
   }
 
   private def shutdownFallback: Receive = {
-    case ShutdownComplete =>
-      shutdownStatus = shutdownStatus.copy(orderBooksStopped = true)
-      shutdownStatus.tryComplete()
-
     case _ if shutdownStatus.initiated => sender() ! DuringShutdown
   }
 
@@ -311,18 +295,13 @@ object MatcherActor {
         assetDescription
       ))
 
-  private case class ShutdownStatus(initiated: Boolean,
-                                    oldMessagesDeleted: Boolean,
-                                    oldSnapshotsDeleted: Boolean,
-                                    orderBooksStopped: Boolean,
-                                    onComplete: () => Unit) {
+  private case class ShutdownStatus(initiated: Boolean, oldMessagesDeleted: Boolean, oldSnapshotsDeleted: Boolean, onComplete: () => Unit) {
     def completed: ShutdownStatus = copy(
       initiated = true,
       oldMessagesDeleted = true,
-      oldSnapshotsDeleted = true,
-      orderBooksStopped = true
+      oldSnapshotsDeleted = true
     )
-    def isCompleted: Boolean = initiated && oldMessagesDeleted && oldSnapshotsDeleted && orderBooksStopped
+    def isCompleted: Boolean = initiated && oldMessagesDeleted && oldSnapshotsDeleted
     def tryComplete(): Unit  = if (isCompleted) onComplete()
   }
 
@@ -341,8 +320,6 @@ object MatcherActor {
 
   case object Shutdown
 
-  case object ShutdownComplete
-
   case class AssetInfo(decimals: Int)
   implicit val assetInfoFormat: Format[AssetInfo] = Json.format[AssetInfo]
 
@@ -358,20 +335,5 @@ object MatcherActor {
     else if (buffer1.isEmpty) -1
     else if (buffer2.isEmpty) 1
     else ByteArray.compare(buffer1.get, buffer2.get)
-  }
-
-  class GracefulShutdownActor(children: Vector[ActorRef], receiver: ActorRef) extends Actor {
-    children.map(context.watch).foreach(_ ! PoisonPill)
-
-    override def receive: Receive = state(children.size)
-
-    private def state(expectedResponses: Int): Receive = {
-      case _: Terminated =>
-        if (expectedResponses > 1) context.become(state(expectedResponses - 1))
-        else {
-          receiver ! ShutdownComplete
-          context.stop(self)
-        }
-    }
   }
 }
