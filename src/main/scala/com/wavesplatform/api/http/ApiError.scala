@@ -276,7 +276,7 @@ case class TransactionNotAllowedByAssetScript(tx: Transaction, log: Log, scriptS
 }
 
 case class SignatureError(error: String) extends ApiError {
-  override val id: Int          = 308
+  override val id: Int          = 309
   override val code: StatusCode = StatusCodes.InternalServerError
   override val message: String  = s"Signature error: $error"
 }
