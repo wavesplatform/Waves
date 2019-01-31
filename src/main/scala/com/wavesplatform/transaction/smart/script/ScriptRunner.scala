@@ -9,16 +9,14 @@ import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Authorized, Proven, Transaction}
-import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.{Authorized, Proven}
 import com.wavesplatform.transaction.smart.{BlockchainContext, RealTransactionWrapper, Verifier}
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
 import com.wavesplatform.transaction.smart.script.v1.ContractScript
 import monix.eval.Coeval
-import shapeless._
 
 object ScriptRunner {
-  type TxOrd = Transaction :+: Order :+: CNil
+  type TxOrd = BlockchainContext.In
 
   def apply(height: Int, in: TxOrd, blockchain: Blockchain, script: Script, isTokenScript: Boolean): (Log, Either[ExecutionError, EVALUATED]) = {
     script match {
