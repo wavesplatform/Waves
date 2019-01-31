@@ -64,6 +64,15 @@ sealed trait ByteEntity[T] { self =>
     def deserialize(buf: Array[Byte], offset: Int): Try[(U, Int)] = self.deserialize(buf, offset).map { case (t, o) => f(t) -> o }
   }
 
+//  def flatMap[U](f: T => ByteEntity[U]): ByteEntity[U] = new ByteEntity[U] {
+//
+//    val index: Int = self.index
+//
+//    def generateDoc(): Seq[ByteEntityDescription] = self.generateDoc()
+//
+//    def deserialize(buf: Array[Byte], offset: Int): Try[(U, Int)] = self.deserialize(buf, offset).flatMap { case (t, o) => f(t).deserialize(buf, o) }
+//  }
+
   /** Generates documentation as a string */
   def getStringDoc: String = {
 
