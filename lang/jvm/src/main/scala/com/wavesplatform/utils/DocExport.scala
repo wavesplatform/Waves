@@ -23,7 +23,7 @@ object DocExport {
         new Environment {
           override def height: Long                                                                                    = ???
           override def chainId: Byte                                                                                   = 66
-          override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
+          override def inputEntity: Environment.InputEntity                                                            = ???
           override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
           override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
           override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???

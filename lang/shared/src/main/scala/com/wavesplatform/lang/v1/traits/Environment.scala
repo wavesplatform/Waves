@@ -1,12 +1,17 @@
 package com.wavesplatform.lang.v1.traits
 
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.compiler.Terms.CaseObj
 import shapeless._
+
+object Environment {
+  type InputEntity = Tx :+: Ord :+: CaseObj :+: CNil
+}
 
 trait Environment {
   def height: Long
   def chainId: Byte
-  def inputEntity: Tx :+: Ord :+: CNil
+  def inputEntity: Environment.InputEntity
   def transactionById(id: Array[Byte]): Option[Tx]
   def transactionHeightById(id: Array[Byte]): Option[Long]
   def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]
