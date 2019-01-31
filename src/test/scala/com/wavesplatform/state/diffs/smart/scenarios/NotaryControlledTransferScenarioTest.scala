@@ -67,7 +67,6 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
-          2,
           AddressScheme.current.chainId,
           company,
           "name".getBytes(StandardCharsets.UTF_8),

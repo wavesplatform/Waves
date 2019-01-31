@@ -97,7 +97,6 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         if (smartToken)
           IssueTransactionV2
             .selfSigned(
-              IssueTransactionV2.supportedVersions.head,
               AddressScheme.current.chainId,
               richAcc,
               "test".getBytes(),

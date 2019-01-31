@@ -14,8 +14,7 @@ import play.api.libs.json.{JsPath, Reads}
 object SignedIssueV2Request {
   implicit val signedExchangeRequestReads: Reads[SignedIssueV2Request] = {
     (
-      (JsPath \ "version").read[Byte] and
-        (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "senderPublicKey").read[String] and
         (JsPath \ "name").read[String] and
         (JsPath \ "description").read[String] and
         (JsPath \ "quantity").read[Long] and
@@ -30,9 +29,7 @@ object SignedIssueV2Request {
 }
 
 @ApiModel(value = "Signed Smart issue transaction")
-case class SignedIssueV2Request(@ApiModelProperty(required = true)
-                                version: Byte,
-                                @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+case class SignedIssueV2Request(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
                                 senderPublicKey: String,
                                 @ApiModelProperty(required = true)
                                 name: String,
@@ -63,7 +60,6 @@ case class SignedIssueV2Request(@ApiModelProperty(required = true)
         case Some(s) => Script.fromBase64String(s).map(Some(_))
       }
       t <- IssueTransactionV2.create(
-        version,
         AddressScheme.current.chainId,
         _sender,
         name.getBytes(Charsets.UTF_8),

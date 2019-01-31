@@ -230,7 +230,6 @@ object TransactionFactory {
         case Some(s) => Script.fromBase64String(s).map(Some(_))
       }
       tx <- IssueTransactionV2.signed(
-        version = request.version,
         chainId = AddressScheme.current.chainId,
         sender = sender,
         name = request.name.getBytes(Charsets.UTF_8),
@@ -252,7 +251,6 @@ object TransactionFactory {
         case Some(s) => Script.fromBase64String(s).map(Some(_))
       }
       tx <- IssueTransactionV2.create(
-        version = request.version,
         chainId = AddressScheme.current.chainId,
         sender = sender,
         name = request.name.getBytes(Charsets.UTF_8),

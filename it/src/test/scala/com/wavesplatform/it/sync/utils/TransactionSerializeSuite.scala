@@ -173,7 +173,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val issueV2 = IssueTransactionV2
     .create(
-      2,
       chainId,
       publicKey,
       "Gigacoin".getBytes,

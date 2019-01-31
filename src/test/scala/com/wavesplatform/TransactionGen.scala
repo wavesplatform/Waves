@@ -131,17 +131,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
     proofs                                                                   <- proofsGen
     script                                                                   <- Gen.option(Gen.oneOf(scriptGen, contractGen))
     issue = IssueTransactionV2
-      .selfSigned(2: Byte,
-                  AddressScheme.current.chainId,
-                  sender,
-                  assetName,
-                  description,
-                  quantity,
-                  decimals,
-                  reissuable = true,
-                  script,
-                  iFee,
-                  timestamp)
+      .selfSigned(AddressScheme.current.chainId, sender, assetName, description, quantity, decimals, reissuable = true, script, iFee, timestamp)
       .explicitGet()
   } yield
     (Seq(issue),
@@ -419,7 +409,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
                   timestamp: Long): Gen[IssueTransaction] = {
     val issuev1 = IssueTransactionV1.selfSigned(issuer, assetName, description, quantity, decimals, reissuable, fee, timestamp).explicitGet()
     val issuev2 = IssueTransactionV2
-      .selfSigned(2, AddressScheme.current.chainId, issuer, assetName, description, quantity, decimals, reissuable, None, fee, timestamp)
+      .selfSigned(AddressScheme.current.chainId, issuer, assetName, description, quantity, decimals, reissuable, None, fee, timestamp)
       .right
       .get
     Gen.oneOf(Seq(issuev1, issuev2))
@@ -780,12 +770,11 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
   def smartIssueTransactionGen(senderGen: Gen[PrivateKeyAccount] = accountGen,
                                sGen: Gen[Option[Script]] = Gen.option(scriptGen)): Gen[IssueTransactionV2] =
     for {
-      version                                                                     <- Gen.oneOf(IssueTransactionV2.supportedVersions.toSeq)
       script                                                                      <- sGen
       (_, assetName, description, quantity, decimals, reissuable, fee, timestamp) <- issueParamGen
       sender                                                                      <- senderGen
     } yield
       IssueTransactionV2
-        .selfSigned(version, AddressScheme.current.chainId, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
+        .selfSigned(AddressScheme.current.chainId, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
         .explicitGet()
 }

@@ -411,10 +411,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
       asset1 = IssueTransactionV2
-        .selfSigned(2: Byte, chainId, buyer, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 3)
+        .selfSigned(chainId, buyer, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 3)
         .explicitGet()
       asset2 = IssueTransactionV2
-        .selfSigned(2: Byte, chainId, seller, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 4)
+        .selfSigned(chainId, seller, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(1: Byte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
@@ -526,10 +526,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
       asset1 = IssueTransactionV2
-        .selfSigned(2: Byte, chainId, buyer, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 3)
+        .selfSigned(chainId, buyer, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 3)
         .explicitGet()
       asset2 = IssueTransactionV2
-        .selfSigned(2: Byte, chainId, seller, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 4)
+        .selfSigned(chainId, seller, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(1: Byte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
