@@ -85,7 +85,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("ContractFunction must return WriteSet/PaymentSet/ContractResult")
+    compiler.ContractCompiler(ctx, expr) should produce(
+      "Compilation failed: ContractFunction must return WriteSet/TransferSet/ContractResult or it super type")
   }
 
   property("hodlContract") {
