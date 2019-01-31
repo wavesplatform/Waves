@@ -3,18 +3,18 @@ import cats.Show
 import cats.implicits._
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract._
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1.handlePart
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, CASETYPEREF}
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Expressions
-import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, LET}
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, LET}
 import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 
 object ContractCompiler {
 
@@ -43,13 +43,15 @@ object ContractCompiler {
           _ <- Either
             .cond(
               tpe match {
-                case CASETYPEREF(FieldNames.WriteSet, _)       => true
-                case CASETYPEREF(FieldNames.TransferSet, _)     => true
-                case CASETYPEREF(FieldNames.ContractResult, _) => true
-                case _                                => false
+                case _
+                    if tpe <= UNION(WavesContext.writeSetType.typeRef,
+                                    WavesContext.contractTransferSetType.typeRef,
+                                    WavesContext.contractResultType.typeRef) =>
+                  true
+                case _ => false
               },
               (),
-              Generic(0, 0, s"ContractFunction must return WriteSet/PaymentSet/ContractResult, but got '$tpe'")
+              Generic(0, 0, s"ContractFunction must return WriteSet/TransferSet/ContractResult or it super type, but got '$tpe'")
             )
             .toCompileM
         } yield CallableFunction(c, func)
@@ -57,9 +59,9 @@ object ContractCompiler {
         for {
           _ <- Either
             .cond(tpe match {
-              case BOOLEAN => true
-              case _       => false
-            }, (), Generic(0, 0, s"VerifierFunction must return BOOLEAN, but got '$tpe'"))
+              case _ if (tpe <= BOOLEAN) => true
+              case _                     => false
+            }, (), Generic(0, 0, s"VerifierFunction must return BOOLEAN or it super type, but got '$tpe'"))
             .toCompileM
         } yield VerifierFunction(c, func)
     }
