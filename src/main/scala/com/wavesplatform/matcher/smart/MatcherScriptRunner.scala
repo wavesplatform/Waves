@@ -19,7 +19,7 @@ object MatcherScriptRunner {
       val ctx = MatcherContext.build(script.stdLibVersion, AddressScheme.current.chainId, Coeval.evalOnce(order), !isTokenScript)
       EvaluatorV1.applywithLogging(ctx, s.expr)
 
-    case ContractScript.ContractScriptImpl(_, Contract(_, _, Some(vf))) =>
+    case ContractScript.ContractScriptImpl(_, Contract(_, _, Some(vf)), _) =>
       val ctx = MatcherContext.build(
         script.stdLibVersion,
         AddressScheme.current.chainId,
@@ -29,7 +29,7 @@ object MatcherScriptRunner {
       val evalContract = ContractEvaluator.verify(vf, RealTransactionWrapper.ord(order))
       EvaluatorV1.evalWithLogging(ctx, evalContract)
 
-    case ContractScript.ContractScriptImpl(_, Contract(_, _, None)) =>
+    case ContractScript.ContractScriptImpl(_, Contract(_, _, None), _) =>
       (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](order) match {
         case Right(_) => Right(TRUE)
         case Left(_)  => Right(FALSE)

@@ -5,7 +5,7 @@ import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompilerV1}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
@@ -21,14 +21,14 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions._
-    val Right(v) = ExpressionCompilerV1(compilerContext, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1))))
+    val Right(v) = ExpressionCompiler(compilerContext, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1))))
     v._2 shouldBe LONG
   }
 
   property("should infer inner types") {
     import com.wavesplatform.lang.v1.parser.Expressions._
     val Right(v) =
-      ExpressionCompilerV1(
+      ExpressionCompiler(
         compilerContext,
         FUNCTION_CALL(AnyPos,
                       PART.VALID(AnyPos, "getElement"),
@@ -43,7 +43,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     }
 
     val expectedResult = Right(LONG)
-    ExpressionCompilerV1(compilerContext, expr).map(_._2) match {
+    ExpressionCompiler(compilerContext, expr).map(_._2) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
@@ -211,7 +211,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
           | }
           | a + b
       """.stripMargin
-      Parser.parseScript(script).get.value
+      Parser.parseExpr(script).get.value
     },
     expectedResult = {
       Right(
@@ -407,7 +407,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)], ctx: CompilerContext): Unit =
     property(propertyName) {
-      compiler.ExpressionCompilerV1(ctx, expr) shouldBe expectedResult
+      compiler.ExpressionCompiler(ctx, expr) shouldBe expectedResult
     }
 
 }

@@ -22,7 +22,7 @@ object ContractInvocationTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: ContractInvocationTransaction): Either[ValidationError, Diff] = {
     val sc = blockchain.accountScript(tx.contractAddress)
     sc match {
-      case Some(ContractScriptImpl(_, contract)) =>
+      case Some(ContractScriptImpl(_, contract, _)) =>
         val functionName = tx.fc.function.asInstanceOf[FunctionHeader.User].name
         contract.cfs.find(_.u.name == functionName) match {
           case None => Left(GenericError(s"No function '$functionName' at address ${tx.contractAddress}"))

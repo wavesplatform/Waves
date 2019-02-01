@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -697,8 +697,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val r = EvaluatorV1
       .applywithLogging[EVALUATED](context.evaluationContext,
-                                   new ExpressionCompilerV1(context.compilerContext)
-                                     .compile(script, List.empty)
+                                   ExpressionCompiler
+                                     .compile(script, context.compilerContext)
                                      .explicitGet())
     (r._1, r._2.map {
       case CONST_BOOLEAN(b) => b

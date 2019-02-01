@@ -30,4 +30,9 @@ object ScriptType extends TaggedType[Int] {
     case 1 => Expression
     case 2 => Contract
   }
+
+  def parseString(s: String) = s match {
+    case "EXPRESSION" => Expression
+    case "CONTRACT" => Contract
+  }
 }

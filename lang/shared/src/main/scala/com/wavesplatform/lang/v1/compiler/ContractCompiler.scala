@@ -5,14 +5,14 @@ import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract._
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1.handlePart
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler.handlePart
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, LET}
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 
@@ -32,7 +32,7 @@ object ContractCompiler {
       compiledBody <- local {
         for {
           _ <- modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))
-          r <- compiler.ExpressionCompilerV1.compileFunc(AnyPos, af.f)
+          r <- compiler.ExpressionCompiler.compileFunc(AnyPos, af.f)
         } yield r
       }
     } yield (annotations, compiledBody)
@@ -72,14 +72,14 @@ object ContractCompiler {
     dec match {
       case let @ LET(pos, _, _, _, _) =>
         for {
-          (name, tpe, expr) <- compiler.ExpressionCompilerV1.compileLet(pos, let)
+          (name, tpe, expr) <- compiler.ExpressionCompiler.compileLet(pos, let)
           _ <- modify[CompilerContext, CompilationError] { ctx =>
             CompilerContext.vars.modify(ctx)(_ + (name -> (tpe -> s"Defined at ${pos.start}")))
           }
         } yield Terms.LET(name, expr)
       case func @ FUNC(pos, _, _, _) =>
         for {
-          (func, tpe, argTps) <- compiler.ExpressionCompilerV1.compileFunc(pos, func)
+          (func, tpe, argTps) <- compiler.ExpressionCompiler.compileFunc(pos, func)
           _ <- modify[CompilerContext, CompilationError] { ctx =>
             CompilerContext.functions.modify(ctx) { funDefs =>
               val fts      = FunctionTypeSignature(tpe, argTps, FunctionHeader.User(func.name))
@@ -106,4 +106,16 @@ object ContractCompiler {
       .run(c)
       .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
       .value
+
+
+  def compile(input: String, ctx: CompilerContext): Either[String, Contract] = {
+    Parser.parseContract(input) match {
+      case fastparse.core.Parsed.Success(xs, _) =>
+        ContractCompiler(ctx, xs) match {
+          case Left(err)              => Left(err.toString)
+          case Right(c) => Right(c)
+        }
+      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+    }
+  }
 }

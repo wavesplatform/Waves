@@ -23,17 +23,17 @@ object ContractScript {
         (),
         s"Contract function (${funcMaxComplexity._1}) is too complex: ${funcMaxComplexity._2} > $maxComplexity"
       )
-      s = new ContractScriptImpl(version, contract)
+      s = new ContractScriptImpl(version, contract, funcMaxComplexity._2)
     } yield s
   }
 
-  case class ContractScriptImpl(stdLibVersion: StdLibVersion, expr: Contract) extends Script {
-    override val complexity: Long = -1
+  case class ContractScriptImpl(stdLibVersion: StdLibVersion, expr: Contract, maxComplexity: Long) extends Script {
+    override val complexity: Long = maxComplexity
     override type Expr = Contract
     override val text: String = expr.toString
     override val bytes: Coeval[ByteStr] =
       Coeval.evalOnce {
-        val s = Array(0:Byte, ScriptType.Contract.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(expr)
+        val s = Array(0: Byte, ScriptType.Contract.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(expr)
         ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
       }
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)

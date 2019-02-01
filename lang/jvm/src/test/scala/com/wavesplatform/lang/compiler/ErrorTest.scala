@@ -2,7 +2,7 @@ package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common.{NoShrink, multiplierFunction, produce}
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -95,7 +95,7 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
   private def errorTests(exprs: ((String, String), Expressions.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
       property(s"Error: $label") {
-        ExpressionCompilerV1(compilerContext, input) should produce(error)
+        ExpressionCompiler(compilerContext, input) should produce(error)
       }
   }
 

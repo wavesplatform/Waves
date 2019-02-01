@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.StdLibVersion.V1
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
@@ -47,10 +47,10 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
         case 2 => scriptWithWavesFunctions(dataTransaction, transfer)
         case 3 => scriptWithCryptoFunctions
       }
-      .map(x => Parser.parseScript(x).get.value)
+      .map(x => Parser.parseExpr(x).get.value)
 
     typedScript = {
-      val compilerScript = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
+      val compilerScript = ExpressionCompiler(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
       ExprScript(compilerScript).explicitGet()
     }
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(1, recipient, Some(typedScript), 100000000L, ts).explicitGet()

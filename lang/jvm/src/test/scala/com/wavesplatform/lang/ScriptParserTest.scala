@@ -16,7 +16,7 @@ import scorex.crypto.encode.{Base58 => ScorexBase58}
 
 class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
-  private def parse(x: String): EXPR = Parser.parseScript(x) match {
+  private def parse(x: String): EXPR = Parser.parseExpr(x) match {
     case Success(r, _)            => r
     case e: Failure[Char, String] => catchParseError(x, e)
   }
@@ -1277,6 +1277,6 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     }
     val script = s"$manyLets\n$lastStmt"
 
-    Parser.parseScript(script) shouldBe an[Success[_, _, _]]
+    Parser.parseExpr(script) shouldBe an[Success[_, _, _]]
   }
 }
