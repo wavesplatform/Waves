@@ -3,12 +3,15 @@ package com.wavesplatform.matcher.market
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor.{Actor, ActorRef, Kill, Props, Terminated}
+import akka.persistence.inmemory.extension.{InMemorySnapshotStorage, StorageExtension}
+import akka.persistence.serialization.Snapshot
+import akka.serialization.SerializationExtension
 import akka.testkit.{ImplicitSender, TestActorRef, TestProbe}
 import com.wavesplatform.NTPTime
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, MarketData, SaveSnapshot}
-import com.wavesplatform.matcher.market.MatcherActorSpecification.FailAtStartActor
+import com.wavesplatform.matcher.market.MatcherActorSpecification.{FailAtStartActor, NothingDoActor, RecoveringActor}
 import com.wavesplatform.matcher.market.OrderBookActor.OrderBookSnapshotUpdated
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
@@ -69,9 +72,9 @@ class MatcherActorSpecification
           TestActorRef(
             new MatcherActor(
               matcherSettings,
-              (_, _) => (),
+              doNothingOnRecovery,
               ob,
-              (_, _) => Props(new FailAtStartActor(pair)),
+              (_, _) => Props(new FailAtStartActor),
               blockchain.assetDescription
             )
           ))
@@ -106,6 +109,77 @@ class MatcherActorSpecification
         probe.expectMsgType[Terminated]
 
         ob.get()(pair1) shouldBe 'left
+      }
+    }
+
+    "continue the work when recovery is successful" in {
+      val pair    = AssetPair(randomAssetId, randomAssetId)
+      val ob      = emptyOrderBookRefs
+      var working = false
+
+      provideSnapshot(pair)
+      system.actorOf(
+        Props(
+          new MatcherActor(
+            matcherSettings,
+            startResult => working = startResult.isRight,
+            ob,
+            (_, matcherActor) => Props(new RecoveringActor(matcherActor, pair)),
+            blockchain.assetDescription
+          )
+        )
+      )
+
+      eventually(timeout(2.seconds))(working shouldBe true)
+    }
+
+    "stop the work" when {
+      "an order book as failed during recovery" in {
+        val pair    = AssetPair(randomAssetId, randomAssetId)
+        val ob      = emptyOrderBookRefs
+        var stopped = false
+
+        provideSnapshot(pair)
+        val actor = watch(
+          system.actorOf(
+            Props(
+              new MatcherActor(
+                matcherSettings,
+                startResult => stopped = startResult.isLeft,
+                ob,
+                (_, _) => Props(new FailAtStartActor),
+                blockchain.assetDescription
+              )
+            )
+          ))
+
+        expectTerminated(actor)
+        stopped shouldBe true
+      }
+
+      "received Shutdown during start" in {
+        val pair    = AssetPair(randomAssetId, randomAssetId)
+        val ob      = emptyOrderBookRefs
+        var stopped = false
+
+        provideSnapshot(pair)
+        val actor = watch(
+          system.actorOf(
+            Props(
+              new MatcherActor(
+                matcherSettings,
+                startResult => stopped = startResult.isLeft,
+                ob,
+                (_, _) => Props(new NothingDoActor),
+                blockchain.assetDescription
+              )
+            )
+          )
+        )
+        actor ! MatcherActor.Shutdown
+
+        expectTerminated(actor)
+        stopped shouldBe true
       }
     }
 
@@ -181,7 +255,7 @@ class MatcherActorSpecification
       TestActorRef(
         new MatcherActor(
           matcherSettings.copy(snapshotsInterval = 17),
-          (_, _) => (),
+          doNothingOnRecovery,
           emptyOrderBookRefs,
           (assetPair, _) => {
             val idx = assetPairs.indexOf(assetPair)
@@ -223,7 +297,7 @@ class MatcherActorSpecification
       TestActorRef(
         new MatcherActor(
           matcherSettings,
-          (_, _) => (),
+          doNothingOnRecovery,
           ob,
           (assetPair, matcher) =>
             OrderBookActor.props(matcher, TestProbe().ref, assetPair, _ => {}, _ => {}, _ => {}, matcherSettings, txFactory, ntpTime),
@@ -236,12 +310,29 @@ class MatcherActorSpecification
     x.underlyingActor.recoveryFinished shouldBe true
     x
   }
+
+  private def provideSnapshot(pairs: AssetPair*): Unit = {
+    val snapshot = SerializationExtension(system).serialize(Snapshot(MatcherActor.Snapshot(pairs.toSet))).get
+    val p        = TestProbe()
+    p.send(
+      StorageExtension(system).snapshotStorage,
+      InMemorySnapshotStorage.Save(MatcherActor.name, 0, 0, snapshot)
+    )
+    p.expectMsg(akka.actor.Status.Success(""))
+  }
+
+  private def doNothingOnRecovery(x: Either[String, (ActorRef, QueueEventWithMeta.Offset)]): Unit = {}
+
   private def emptyOrderBookRefs             = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private def randomAssetId: Option[AssetId] = Some(ByteStr(randomBytes()))
 }
 
 object MatcherActorSpecification {
-  private class FailAtStartActor(pair: AssetPair) extends Actor {
+  private class NothingDoActor extends Actor { override def receive: Receive = Actor.ignoringBehavior }
+  private class RecoveringActor(owner: ActorRef, assetPair: AssetPair) extends NothingDoActor {
+    owner ! OrderBookSnapshotUpdated(assetPair, 0)
+  }
+  private class FailAtStartActor extends Actor {
     throw new RuntimeException("I don't want to work today")
     override def receive: Receive = Actor.emptyBehavior
   }

@@ -106,7 +106,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeUtx = Some(utxStorage)
 
     matcher = if (settings.matcherSettings.enable) {
-      Matcher(actorSystem, time, wallet, utxStorage, allChannels, blockchainUpdater, portfolioChanged, settings, () => shutdownInProgress)
+      Matcher(actorSystem, time, wallet, utxStorage, allChannels, blockchainUpdater, portfolioChanged, settings)
     } else None
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
@@ -274,7 +274,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         classOf[LeaseApiRoute],
         classOf[AliasApiRoute]
       )
-      val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).loggingCompositeRoute
+      val combinedRoute = CompositeHttpService(apiTypes, apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")

@@ -4,8 +4,10 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import akka.kafka._
 import akka.kafka.scaladsl.{Consumer, Producer}
+import akka.pattern.ask
 import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.util.Timeout
 import com.wavesplatform.matcher.queue.KafkaMatcherQueue.Settings
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.kafka.clients.producer.ProducerRecord
@@ -77,9 +79,11 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
     ConsumerSettings(config, new StringDeserializer, deserializer)
   }
 
+  private val metadataConsumer = mat.system.actorOf(KafkaConsumerActor.props(consumerSettings))
+
   override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Unit): Unit = {
     log.info(s"Start consuming from $fromOffset")
-    var currentOffset  = fromOffset
+    var currentOffset  = fromOffset // Store locally to know a previous processed offset when the source is restarted
     val topicPartition = new TopicPartition(settings.topic, 0)
 
     RestartSource
@@ -97,7 +101,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
             // We can do it in parallel, because we're just applying verified events
             val req = QueueEventWithMeta(msg.offset(), msg.timestamp(), msg.value())
             process(req)
-            currentOffset = math.max(currentOffset, msg.offset())
+            currentOffset = msg.offset() // Messages are received one-by-one, e.g. offsets: 1, 2, 3, ...
           }
       }
       .runWith(Sink.ignore)
@@ -109,8 +113,32 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
     p.future
   }
 
+  override def lastEventOffset: Future[QueueEventWithMeta.Offset] = {
+    implicit val timeout: Timeout = Timeout(consumerSettings.metadataRequestTimeout)
+
+    // We need to list topic first, see the EndOffsets documentation
+    (metadataConsumer ? Metadata.ListTopics).mapTo[Metadata.Topics].flatMap { topics =>
+      topics.response.getOrElse(Map.empty).get(settings.topic) match {
+        case None => Future.successful(-1L)
+        case Some(partitions) =>
+          if (partitions.size != 1) throw new IllegalStateException(s"DEX can work only with one partition, given: $partitions")
+          val topicPartition = new TopicPartition(settings.topic, partitions.head.partition())
+          (metadataConsumer ? Metadata.GetEndOffsets(Set(topicPartition)))
+            .mapTo[Metadata.EndOffsets]
+            .map { r =>
+              // -1 because by contract lastEventOffset must return -1 if there is no topic or it is empty
+              // also see https://github.com/apache/kafka/blob/trunk/clients/src/main/java/org/apache/kafka/clients/consumer/KafkaConsumer.java#L2025
+              r.response
+                .getOrElse(Map.empty)
+                .getOrElse(topicPartition, throw new IllegalStateException(s"Unexpected behaviour, no info for $topicPartition: $r")) - 1
+            }
+      }
+    }
+  }
+
   override def close(timeout: FiniteDuration): Unit = {
     duringShutdown.set(true)
+    mat.system.stop(metadataConsumer)
     val stoppingConsumer = consumerControl.get().shutdown()
     producer.complete()
     Await.result(producer.watchCompletion(), timeout)

@@ -59,6 +59,8 @@ case class OrderCancelRejected(message: String)
 
 case object OrderBookUnavailable extends WrappedMatcherResponse(C.ServiceUnavailable, "Order book is unavailable. Please contact the administrator")
 
+case object DuringStart extends WrappedMatcherResponse(C.ServiceUnavailable, "System is starting")
+
 case object DuringShutdown extends WrappedMatcherResponse(C.ServiceUnavailable, "System is going shutdown")
 
 case class GetOrderBookResponse(orderBookResult: OrderBookResult) extends MatcherResponse(C.OK, OrderBookResult.toJson(orderBookResult))

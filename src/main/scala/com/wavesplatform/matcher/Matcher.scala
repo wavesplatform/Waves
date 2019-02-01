@@ -2,16 +2,17 @@ package com.wavesplatform.matcher
 
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{ConcurrentHashMap, Executors}
+import java.util.concurrent.{ConcurrentHashMap, Executors, TimeoutException}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.gracefulStop
+import akka.pattern.{AskTimeoutException, gracefulStop}
 import akka.stream.ActorMaterializer
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.db._
+import com.wavesplatform.matcher.Matcher.Status
 import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor}
@@ -21,14 +22,15 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, EitherExt2}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{CanNotStartMatcher, ScorexLogging, Time, forceStopApplication}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import monix.reactive.Observable
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 
 class Matcher(actorSystem: ActorSystem,
@@ -38,15 +40,18 @@ class Matcher(actorSystem: ActorSystem,
               blockchain: Blockchain,
               portfoliosChanged: Observable[Address],
               settings: WavesSettings,
-              matcherPrivateKey: PrivateKeyAccount,
-              isDuringShutdown: () => Boolean)
+              matcherPrivateKey: PrivateKeyAccount)
     extends ScorexLogging {
 
   import settings._
 
-  private implicit val materializer: ActorMaterializer = ActorMaterializer()(actorSystem)
+  private implicit val as: ActorSystem                 = actorSystem
+  private implicit val materializer: ActorMaterializer = ActorMaterializer()
+  import as.dispatcher
 
-  private val currentOffset      = new AtomicReference[QueueEventWithMeta.Offset](-1L)
+  private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
+  private val currentOffset                   = new AtomicReference[QueueEventWithMeta.Offset](-1L) // Used only for REST API
+
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings)
@@ -115,7 +120,7 @@ class Matcher(actorSystem: ActorSystem,
       validateOrder,
       orderBooksSnapshotCache,
       settings,
-      isDuringShutdown,
+      () => status.get(),
       db,
       time,
       () => currentOffset.get()
@@ -130,20 +135,27 @@ class Matcher(actorSystem: ActorSystem,
 
   private def bumpOffset(newOffset: Long): Unit = currentOffset.getAndAccumulate(newOffset, math.max)
 
+  private val snapshotsRestore = Promise[Unit]()
+
   lazy val matcher: ActorRef = actorSystem.actorOf(
     MatcherActor.props(
-      matcherSettings,
-      (self, oldestSnapshotOffset) => {
-        currentOffset.set(oldestSnapshotOffset)
-        matcherQueue.startConsume(
-          oldestSnapshotOffset + 1,
-          eventWithMeta => {
-            log.debug(s"[offset=${eventWithMeta.offset}, ts=${eventWithMeta.timestamp}] Consumed ${eventWithMeta.event}")
+      matcherSettings, {
+        case Left(msg) =>
+          log.error(s"Can't start matcher: $msg")
+          forceStopApplication(CanNotStartMatcher)
 
-            self ! eventWithMeta
-            bumpOffset(eventWithMeta.offset)
-          }
-        )
+        case Right((self, oldestSnapshotOffset)) =>
+          currentOffset.set(oldestSnapshotOffset)
+          snapshotsRestore.trySuccess(())
+          matcherQueue.startConsume(
+            oldestSnapshotOffset + 1,
+            eventWithMeta => {
+              log.debug(s"[offset=${eventWithMeta.offset}, ts=${eventWithMeta.timestamp}] Consumed ${eventWithMeta.event}")
+
+              self ! eventWithMeta
+              bumpOffset(eventWithMeta.offset)
+            }
+          )
       },
       orderBooks,
       orderBookProps,
@@ -166,6 +178,7 @@ class Matcher(actorSystem: ActorSystem,
 
   def shutdown(): Unit = {
     log.info("Shutting down matcher")
+    setStatus(Status.Stopping)
 
     Await.result(matcherServerBinding.unbind(), 10.seconds)
 
@@ -197,15 +210,60 @@ class Matcher(actorSystem: ActorSystem,
 
     log.info(s"Starting matcher on: ${matcherSettings.bindAddress}:${matcherSettings.port} ...")
 
-    implicit val as: ActorSystem                 = actorSystem
-    implicit val materializer: ActorMaterializer = ActorMaterializer()
-
-    val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, restAPISettings).compositeRoute
+    val combinedRoute = CompositeHttpService(matcherApiTypes, matcherApiRoutes, restAPISettings).compositeRoute
     matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, matcherSettings.bindAddress, matcherSettings.port), 5.seconds)
 
     log.info(s"Matcher bound to ${matcherServerBinding.localAddress}")
 
     actorSystem.actorOf(MatcherTransactionWriter.props(db, matcherSettings), MatcherTransactionWriter.name)
+
+    val startGuard = for {
+      _ <- waitSnapshotsRestored(settings.matcherSettings.snapshotsLoadingTimeout)
+      deadline = settings.matcherSettings.startEventsProcessingTimeout.fromNow
+      lastOffsetQueue <- getLastOffset(deadline)
+      _ = log.info(s"Last queue offset is $lastOffsetQueue")
+      _ <- waitOffsetReached(lastOffsetQueue, deadline)
+    } yield ()
+
+    startGuard.onComplete {
+      case Success(_) => setStatus(Status.Working)
+      case Failure(e) =>
+        log.error(s"Can't start matcher: ${e.getMessage}", e)
+        forceStopApplication(CanNotStartMatcher)
+    }
+  }
+
+  private def setStatus(newStatus: Status): Unit = {
+    status.set(newStatus)
+    log.info(s"Status now is $newStatus")
+  }
+
+  private def waitSnapshotsRestored(timeout: FiniteDuration): Future[Unit] = {
+    val failure = Promise[Unit]()
+    actorSystem.scheduler.scheduleOnce(timeout) {
+      failure.failure(new TimeoutException("Can't restore snapshots in time"))
+    }
+
+    Future.firstCompletedOf[Unit](List(snapshotsRestore.future, failure.future))
+  }
+
+  private def getLastOffset(deadline: Deadline): Future[QueueEventWithMeta.Offset] = matcherQueue.lastEventOffset.recoverWith {
+    case _: AskTimeoutException =>
+      if (deadline.isOverdue()) Future.failed(new TimeoutException("Can't get last offset from queue"))
+      else getLastOffset(deadline)
+  }
+
+  private def waitOffsetReached(lastQueueOffset: QueueEventWithMeta.Offset, deadline: Deadline): Future[Unit] = {
+    val p = Promise[Unit]()
+
+    def loop(): Unit = {
+      if (currentOffset.get() >= lastQueueOffset) p.trySuccess(())
+      else if (deadline.isOverdue()) p.tryFailure(new TimeoutException("Can't process all events in time"))
+      else actorSystem.scheduler.scheduleOnce(1.second)(loop())
+    }
+
+    loop()
+    p.future
   }
 }
 
@@ -219,20 +277,27 @@ object Matcher extends ScorexLogging {
             allChannels: ChannelGroup,
             blockchain: Blockchain,
             portfoliosChanged: Observable[Address],
-            settings: WavesSettings,
-            isDuringShutdown: () => Boolean): Option[Matcher] =
+            settings: WavesSettings): Option[Matcher] =
     try {
       val privateKey = (for {
         address <- Address.fromString(settings.matcherSettings.account)
         pk      <- wallet.privateKeyAccount(address)
       } yield pk).explicitGet()
 
-      val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, portfoliosChanged, settings, privateKey, isDuringShutdown)
+      val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, portfoliosChanged, settings, privateKey)
       matcher.runMatcher()
       Some(matcher)
     } catch {
       case NonFatal(e) =>
         log.warn("Error starting matcher", e)
+        forceStopApplication(CanNotStartMatcher)
         None
     }
+
+  sealed trait Status
+  object Status {
+    case object Starting extends Status
+    case object Working  extends Status
+    case object Stopping extends Status
+  }
 }
