@@ -78,7 +78,7 @@ object EnvironmentFunctionsBenchmark {
   private val defaultEnvironment: Environment = new Environment {
     override def height: Long                                                                                    = 1
     override def chainId: Byte                                                                                   = ChainId
-    override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
+    override def inputEntity: Environment.InputEntity                                                            = ???
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(alias: String): Either[String, Recipient.Address]                                  = ???
