@@ -39,7 +39,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     val alias = Alias.fromString(s"alias:${AddressScheme.current.chainId.toChar}:asdasdasdv").explicitGet()
     assertBadRequestAndResponse(
-      sender.signedBroadcast(CreateAliasTransactionV2.selfSigned(acc2, 2, alias, minFee, ts).explicitGet().json()),
+      sender.signedBroadcast(CreateAliasTransactionV2.selfSigned(acc2, alias, minFee, ts).explicitGet().json()),
       "Your transaction has incorrect type."
     )
   }

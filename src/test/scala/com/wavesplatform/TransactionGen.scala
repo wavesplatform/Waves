@@ -356,19 +356,17 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
     timestamp: Long           <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     alias: Alias              <- aliasGen
-    version                   <- Gen.oneOf(CreateAliasTransactionV2.supportedVersions.toSeq)
     tx <- Gen.oneOf(
       CreateAliasTransactionV1.selfSigned(sender, alias, MinIssueFee, timestamp).explicitGet(),
-      CreateAliasTransactionV2.selfSigned(sender, version, alias, MinIssueFee, timestamp).explicitGet()
+      CreateAliasTransactionV2.selfSigned(sender, alias, MinIssueFee, timestamp).explicitGet()
     )
   } yield tx
 
   def createAliasGen(sender: PrivateKeyAccount, alias: Alias, fee: Long, timestamp: Long): Gen[CreateAliasTransaction] = {
     for {
-      version <- Gen.oneOf(CreateAliasTransactionV2.supportedVersions.toSeq)
       tx <- Gen.oneOf(
         CreateAliasTransactionV1.selfSigned(sender, alias, fee, timestamp).explicitGet(),
-        CreateAliasTransactionV2.selfSigned(sender, version, alias, fee, timestamp).explicitGet()
+        CreateAliasTransactionV2.selfSigned(sender, alias, fee, timestamp).explicitGet()
       )
     } yield tx
   }

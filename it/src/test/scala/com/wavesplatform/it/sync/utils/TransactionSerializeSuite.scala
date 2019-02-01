@@ -133,7 +133,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val aliasV2 = CreateAliasTransactionV2
     .create(
-      2,
       publicKey,
       Alias.buildWithCurrentChainId("myalias").right.get,
       minFee,

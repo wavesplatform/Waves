@@ -454,7 +454,6 @@ object TransactionFactory {
       alias  <- Alias.buildWithCurrentChainId(request.alias)
       tx <- CreateAliasTransactionV2.signed(
         sender,
-        request.version,
         alias,
         request.fee,
         timestamp = request.timestamp.getOrElse(time.getTimestamp()),
@@ -466,7 +465,6 @@ object TransactionFactory {
     for {
       alias <- Alias.buildWithCurrentChainId(request.alias)
       tx <- CreateAliasTransactionV2.create(
-        request.version,
         sender,
         alias,
         request.fee,
