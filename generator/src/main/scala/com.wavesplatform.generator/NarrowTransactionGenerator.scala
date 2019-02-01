@@ -185,8 +185,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             senderAndAssetOpt.flatMap {
               case (sender, asset) =>
                 logOption(
-                  MassTransferTransaction.selfSigned(MassTransferTransaction.version,
-                                                     asset,
+                  MassTransferTransaction.selfSigned(asset,
                                                      sender,
                                                      transfers.toList,
                                                      ts,
@@ -217,7 +216,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
           case SponsorFeeTransaction =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(SponsorFeeTransaction.selfSigned(1, sender, assetTx.id(), Some(Random.nextInt(1000)), 100000000L, ts))
+              logOption(SponsorFeeTransaction.selfSigned(sender, assetTx.id(), Some(Random.nextInt(1000)), 100000000L, ts))
             })
         }
 

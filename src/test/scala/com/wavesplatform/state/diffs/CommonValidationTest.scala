@@ -135,7 +135,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         if (sponsorship)
           Seq(
             SponsorFeeTransaction
-              .selfSigned(1, richAcc, issueTx.id(), Some(10), if (smartToken) {
+              .selfSigned(richAcc, issueTx.id(), Some(10), if (smartToken) {
                 Constants.UnitsInWave + ScriptExtraFee
               } else {
                 Constants.UnitsInWave

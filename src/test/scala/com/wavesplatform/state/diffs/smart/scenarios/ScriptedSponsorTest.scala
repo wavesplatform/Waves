@@ -117,7 +117,6 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       sponsorTx = SponsorFeeTransaction
         .selfSigned(
-          1: Byte,
           contract,
           issueTx.id(),
           Some(1),
@@ -187,7 +186,6 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       sponsorTx = SponsorFeeTransaction
         .selfSigned(
-          1: Byte,
           sponsor,
           issueTx.id(),
           Some(1),

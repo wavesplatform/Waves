@@ -311,7 +311,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val sponsor = SponsorFeeTransaction
     .create(
-      1,
       publicKey,
       ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
       Some(100000),

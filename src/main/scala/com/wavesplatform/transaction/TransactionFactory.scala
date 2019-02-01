@@ -660,7 +660,6 @@ object TransactionFactory {
       signer  <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       assetId <- ByteStr.decodeBase58(request.assetId).toEither.left.map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
       tx <- SponsorFeeTransaction.signed(
-        request.version,
         sender,
         assetId,
         request.minSponsoredAssetFee,
@@ -674,7 +673,6 @@ object TransactionFactory {
     for {
       assetId <- ByteStr.decodeBase58(request.assetId).toEither.left.map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
       tx <- SponsorFeeTransaction.create(
-        request.version,
         sender,
         assetId,
         request.minSponsoredAssetFee,

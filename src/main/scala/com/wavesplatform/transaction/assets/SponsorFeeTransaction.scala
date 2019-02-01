@@ -12,8 +12,7 @@ import play.api.libs.json.{JsObject, Json}
 
 import scala.util.{Failure, Success, Try}
 
-case class SponsorFeeTransaction private (version: Byte,
-                                          sender: PublicKeyAccount,
+case class SponsorFeeTransaction private (sender: PublicKeyAccount,
                                           assetId: ByteStr,
                                           minSponsoredAssetFee: Option[Long],
                                           fee: Long,
@@ -48,6 +47,7 @@ case class SponsorFeeTransaction private (version: Byte,
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte, builder.typeId, version), bodyBytes(), proofs.bytes()))
 
   override def checkedAssets(): Seq[AssetId] = Seq(assetId)
+  override def version: Byte                 = 1
 }
 
 object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction] with TransactionParser.MultipleVersions {
@@ -70,46 +70,41 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
       val timestamp = Longs.fromByteArray(bytes.slice(minFeeStart + 16, minFeeStart + 24))
       val tx = for {
         proofs <- Proofs.fromBytes(bytes.drop(minFeeStart + 24))
-        tx     <- SponsorFeeTransaction.create(version, sender, assetId, Some(minFee).filter(_ != 0), fee, timestamp, proofs)
+        tx     <- SponsorFeeTransaction.create(sender, assetId, Some(minFee).filter(_ != 0), fee, timestamp, proofs)
       } yield {
         tx
       }
       tx.fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
-  def create(version: Byte,
-             sender: PublicKeyAccount,
+  def create(sender: PublicKeyAccount,
              assetId: ByteStr,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] =
-    if (!supportedVersions.contains(version)) {
-      Left(ValidationError.UnsupportedVersion(version))
-    } else if (minSponsoredAssetFee.exists(_ < 0)) {
+    if (minSponsoredAssetFee.exists(_ < 0)) {
       Left(ValidationError.NegativeMinFee(minSponsoredAssetFee.get, "asset"))
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
-      Right(SponsorFeeTransaction(version, sender, assetId, minSponsoredAssetFee.filter(_ != 0), fee, timestamp, proofs))
+      Right(SponsorFeeTransaction(sender, assetId, minSponsoredAssetFee.filter(_ != 0), fee, timestamp, proofs))
     }
 
-  def signed(version: Byte,
-             sender: PublicKeyAccount,
+  def signed(sender: PublicKeyAccount,
              assetId: ByteStr,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
-    create(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
+    create(sender, assetId, minSponsoredAssetFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
 
-  def selfSigned(version: Byte,
-                 sender: PrivateKeyAccount,
+  def selfSigned(sender: PrivateKeyAccount,
                  assetId: ByteStr,
                  minSponsoredAssetFee: Option[Long],
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] =
-    signed(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, sender)
+    signed(sender, assetId, minSponsoredAssetFee, fee, timestamp, sender)
 }
