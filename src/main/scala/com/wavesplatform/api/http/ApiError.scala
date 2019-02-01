@@ -275,6 +275,12 @@ case class TransactionNotAllowedByAssetScript(tx: Transaction, log: Log, scriptS
   override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
 }
 
+case class SignatureError(error: String) extends ApiError {
+  override val id: Int          = 309
+  override val code: StatusCode = StatusCodes.InternalServerError
+  override val message: String  = s"Signature error: $error"
+}
+
 object ScriptErrorJson {
   def apply(errId: Int, tx: Transaction, message: String, scriptSrc: String, log: Log): JsObject =
     Json.obj(
