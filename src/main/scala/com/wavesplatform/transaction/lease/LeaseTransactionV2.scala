@@ -15,20 +15,24 @@ case class LeaseTransactionV2 private (sender: PublicKeyAccount, amount: Long, f
     with FastHashId {
 
   override val builder: TransactionParser = LeaseTransactionV2
+
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val assetId: Option[AssetId] = None // placeholder for future enhancement
     Bytes.concat(Array(builder.typeId, version), assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte)), bytesBase())
   }
+
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
-  override def version: Byte              = 2
+
+  override def version: Byte = 2
 }
 
 object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte                 = LeaseTransaction.typeId
   override def supportedVersions: Set[Byte] = Set(2)
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override val typeId: Byte = LeaseTransaction.typeId
+
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, 0, AssetIdLength)
       (for {
@@ -39,16 +43,18 @@ object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with 
         lt     <- LeaseTransactionV2.create(sender, quantity, fee, timestamp, recipient, proofs)
       } yield lt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
+  }
 
   def create(sender: PublicKeyAccount,
              amount: Long,
              fee: Long,
              timestamp: Long,
              recipient: AddressOrAlias,
-             proofs: Proofs): Either[ValidationError, TransactionT] =
+             proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
       _ <- LeaseTransaction.validateLeaseParams(amount, fee, recipient, sender)
     } yield LeaseTransactionV2(sender, amount, fee, timestamp, recipient, proofs)
+  }
 
   def signed(sender: PublicKeyAccount,
              amount: Long,

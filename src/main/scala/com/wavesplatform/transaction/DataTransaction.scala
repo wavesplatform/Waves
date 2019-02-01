@@ -19,17 +19,17 @@ case class DataTransaction private (sender: PublicKeyAccount, data: List[DataEnt
 
   override val builder: TransactionParser        = DataTransaction
   override val assetFee: (Option[AssetId], Long) = (None, fee)
-
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    Bytes.concat(
-      Array(builder.typeId, version),
-      sender.publicKey,
-      Shorts.toByteArray(data.size.toShort),
-      data.flatMap(_.toBytes).toArray,
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee)
-    )
-  }
+  override val bodyBytes: Coeval[Array[Byte]] =
+    Coeval.evalOnce {
+      Bytes.concat(
+        Array(builder.typeId, version),
+        sender.publicKey,
+        Shorts.toByteArray(data.size.toShort),
+        data.flatMap(_.toBytes).toArray,
+        Longs.toByteArray(timestamp),
+        Longs.toByteArray(fee)
+      )
+    }
 
   implicit val dataItemFormat: Format[DataEntry[_]] = DataEntry.Format
 
@@ -41,7 +41,8 @@ case class DataTransaction private (sender: PublicKeyAccount, data: List[DataEnt
   }
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
-  override def version: Byte              = 1
+
+  override def version: Byte = 1
 }
 
 object DataTransaction extends TransactionParserFor[DataTransaction] with TransactionParser.MultipleVersions {
@@ -52,7 +53,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
   val MaxBytes      = 150 * 1024
   val MaxEntryCount = 100
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       val p0     = KeyLength
       val sender = PublicKeyAccount(bytes.slice(0, p0))
@@ -72,6 +73,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
       } yield tx
       txEi.fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
+  }
 
   def create(sender: PublicKeyAccount,
              data: List[DataEntry[_]],

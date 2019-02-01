@@ -27,17 +27,22 @@ case class IssueTransactionV2 private (chainId: Byte,
     extends IssueTransaction
     with FastHashId
     with ChainSpecific {
-  override val builder: TransactionParser = IssueTransactionV2
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(
-      Array(builder.typeId, version, chainId),
-      bytesBase(),
-      Deser.serializeOption(script)(s => s.bytes().arr)
-    ))
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(issueJson() ++ Json.obj("chainId" -> chainId, "script" -> script.map(_.bytes().base64)))
-  override def version: Byte          = 2
+  override val builder: TransactionParser = IssueTransactionV2
+
+  override val bodyBytes: Coeval[Array[Byte]] =
+    Coeval.evalOnce(
+      Bytes.concat(
+        Array(builder.typeId, version, chainId),
+        bytesBase(),
+        Deser.serializeOption(script)(s => s.bytes().arr)
+      )
+    )
+
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+  override val json: Coeval[JsObject]     = Coeval.evalOnce(issueJson() ++ Json.obj("chainId" -> chainId, "script" -> script.map(_.bytes().base64)))
+
+  override def version: Byte = 2
 }
 
 object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with TransactionParser.MultipleVersions {
@@ -47,7 +52,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
 
   private def currentChainId = AddressScheme.current.chainId
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       val chainId                                                                                       = bytes(0)
       val (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, scriptStart) = IssueTransaction.parseBase(bytes, 1)
@@ -67,6 +72,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
       } yield tx).left.map(e => new Throwable(e.toString)).toTry
 
     }.flatten
+  }
 
   def create(chainId: Byte,
              sender: PublicKeyAccount,
@@ -78,11 +84,12 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
              script: Option[Script],
              fee: Long,
              timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] =
+             proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
       _ <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
     } yield IssueTransactionV2(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
+  }
 
   def signed(chainId: Byte,
              sender: PublicKeyAccount,
@@ -94,11 +101,12 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
              script: Option[Script],
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     for {
       unverified <- create(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty)
       proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unverified.bodyBytes()))))
     } yield unverified.copy(proofs = proofs)
+  }
 
   def selfSigned(chainId: Byte,
                  sender: PrivateKeyAccount,
@@ -109,6 +117,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
                  reissuable: Boolean,
                  script: Option[Script],
                  fee: Long,
-                 timestamp: Long): Either[ValidationError, TransactionT] =
+                 timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
+  }
 }

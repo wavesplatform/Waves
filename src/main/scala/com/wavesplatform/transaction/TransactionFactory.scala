@@ -183,7 +183,6 @@ object TransactionFactory {
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
       tx <- SetAssetScriptTransaction.signed(
-        request.version,
         AddressScheme.current.chainId,
         sender,
         ByteStr.decodeBase58(request.assetId).get,
@@ -201,7 +200,6 @@ object TransactionFactory {
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
       tx <- SetAssetScriptTransaction.create(
-        request.version,
         AddressScheme.current.chainId,
         sender,
         ByteStr.decodeBase58(request.assetId).get,

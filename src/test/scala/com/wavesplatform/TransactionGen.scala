@@ -136,7 +136,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
   } yield
     (Seq(issue),
      SetAssetScriptTransaction
-       .create(version, AddressScheme.current.chainId, sender, issue.id(), script, 1 * Constants.UnitsInWave + ScriptExtraFee, timestamp, proofs)
+       .create(AddressScheme.current.chainId, sender, issue.id(), script, 1 * Constants.UnitsInWave + ScriptExtraFee, timestamp, proofs)
        .explicitGet())
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {

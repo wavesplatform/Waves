@@ -21,12 +21,17 @@ case class ReissueTransactionV2 private (chainId: Byte,
     extends ReissueTransaction
     with FastHashId
     with ChainSpecific {
+
   override val builder: TransactionParser = ReissueTransactionV2
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(
-      Array(builder.typeId, version, chainId),
-      bytesBase(),
-    ))
+
+  override val bodyBytes: Coeval[Array[Byte]] =
+    Coeval.evalOnce(
+      Bytes.concat(
+        Array(builder.typeId, version, chainId),
+        bytesBase(),
+      )
+    )
+
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
   override def chainByte: Option[Byte] = Some(chainId)
@@ -39,7 +44,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
   override def supportedVersions: Set[Byte] = Set(2)
   private def currentChainId: Byte          = AddressScheme.current.chainId
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       val chainId                                                      = bytes(0)
       val (sender, assetId, quantity, reissuable, fee, timestamp, end) = ReissueTransaction.parseBase(bytes, 1)
@@ -50,6 +55,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
       } yield tx)
         .fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
+  }
 
   def create(chainId: Byte,
              sender: PublicKeyAccount,
@@ -58,11 +64,12 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] =
+             proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
       _ <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
       _ <- ReissueTransaction.validateReissueParams(quantity, fee)
     } yield ReissueTransactionV2(chainId, sender, assetId, quantity, reissuable, fee, timestamp, proofs)
+  }
 
   def signed(chainId: Byte,
              sender: PublicKeyAccount,
@@ -71,11 +78,12 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     for {
       unverified <- create(chainId, sender, assetId, quantity, reissuable, fee, timestamp, Proofs.empty)
       proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unverified.bodyBytes()))))
     } yield unverified.copy(proofs = proofs)
+  }
 
   def selfSigned(chainId: Byte,
                  sender: PrivateKeyAccount,
@@ -83,6 +91,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
                  quantity: Long,
                  reissuable: Boolean,
                  fee: Long,
-                 timestamp: Long): Either[ValidationError, TransactionT] =
+                 timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(chainId, sender, assetId, quantity, reissuable, fee, timestamp, sender)
+  }
 }

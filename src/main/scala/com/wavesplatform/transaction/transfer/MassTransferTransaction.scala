@@ -28,12 +28,12 @@ case class MassTransferTransaction private (assetId: Option[AssetId],
     extends ProvenTransaction
     with VersionedTransaction
     with FastHashId {
+
   override val builder: MassTransferTransaction.type = MassTransferTransaction
-
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
-
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+
     val assetIdBytes = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+
     val transferBytes = transfers
       .map { case ParsedTransfer(recipient, amount) => recipient.bytes.arr ++ Longs.toByteArray(amount) }
       .fold(Array())(_ ++ _)
@@ -49,8 +49,11 @@ case class MassTransferTransaction private (assetId: Option[AssetId],
       Deser.serializeArray(attachment)
     )
   }
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
 
-  override def jsonBase(): JsObject =
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
+
+  override def jsonBase(): JsObject = {
     super.jsonBase() ++ Json.obj(
       "version"       -> version,
       "assetId"       -> assetId.map(_.base58),
@@ -58,6 +61,7 @@ case class MassTransferTransaction private (assetId: Option[AssetId],
       "transferCount" -> transfers.size,
       "totalAmount"   -> transfers.map(_.amount).sum
     )
+  }
 
   override val json: Coeval[JsObject] = Coeval.evalOnce {
     jsonBase() ++ Json.obj("transfers" -> toJson(transfers))
@@ -66,17 +70,15 @@ case class MassTransferTransaction private (assetId: Option[AssetId],
   def compactJson(recipients: Set[AddressOrAlias]): JsObject =
     jsonBase() ++ Json.obj("transfers" -> toJson(transfers.filter(t => recipients.contains(t.address))))
 
-  override val bytes: Coeval[Array[Byte]]    = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
   override def checkedAssets(): Seq[AssetId] = assetId.toSeq
-  override def version: Byte                 = 1
+  override def version: Byte                 = MassTransferTransaction.version
 }
 
 object MassTransferTransaction extends TransactionParserFor[MassTransferTransaction] with TransactionParser.OneVersion {
 
   override val typeId: Byte  = 11
   override val version: Byte = 1
-
-  val MaxTransferCount = 100
+  val MaxTransferCount       = 100
 
   @ApiModel
   case class Transfer(
@@ -87,7 +89,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
   implicit val transferFormat: Format[Transfer] = Json.format
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       val sender           = PublicKeyAccount(bytes.slice(0, KeyLength))
       val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, KeyLength, AssetIdLength)
@@ -116,6 +118,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
       } yield mtt
       tx.fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
+  }
 
   def create(assetId: Option[AssetId],
              sender: PublicKeyAccount,
@@ -171,6 +174,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     }
   }
 
-  private def toJson(transfers: List[ParsedTransfer]): JsValue =
+  private def toJson(transfers: List[ParsedTransfer]): JsValue = {
     Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) })
+  }
 }

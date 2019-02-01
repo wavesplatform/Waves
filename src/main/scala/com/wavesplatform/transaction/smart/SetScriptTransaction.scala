@@ -22,14 +22,16 @@ case class SetScriptTransaction private (chainId: Byte, sender: PublicKeyAccount
 
   override val builder: TransactionParser = SetScriptTransaction
 
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(
-      Array(builder.typeId, version, chainId),
-      sender.publicKey,
-      Deser.serializeOption(script)(s => s.bytes().arr),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp)
-    ))
+  val bodyBytes: Coeval[Array[Byte]] =
+    Coeval.evalOnce(
+      Bytes.concat(
+        Array(builder.typeId, version, chainId),
+        sender.publicKey,
+        Deser.serializeOption(script)(s => s.bytes().arr),
+        Longs.toByteArray(fee),
+        Longs.toByteArray(timestamp)
+      )
+    )
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val json                              = Coeval.evalOnce(jsonBase() ++ Json.obj("chainId" -> chainId, "version" -> version, "script" -> script.map(_.bytes().base64)))
@@ -45,7 +47,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
 
   private def chainId = AddressScheme.current.chainId
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       val chainId = bytes(0)
       val sender  = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
@@ -66,21 +68,25 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
         tx        <- create(sender, scriptOpt, fee, timestamp, proofs)
       } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
+  }
 
-  def create(sender: PublicKeyAccount, script: Option[Script], fee: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, TransactionT] =
+  def create(sender: PublicKeyAccount, script: Option[Script], fee: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
     } yield new SetScriptTransaction(chainId, sender, script, fee, timestamp, proofs)
+  }
 
   def signed(sender: PublicKeyAccount,
              script: Option[Script],
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     create(sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
+  }
 
-  def selfSigned(sender: PrivateKeyAccount, script: Option[Script], fee: Long, timestamp: Long): Either[ValidationError, TransactionT] =
+  def selfSigned(sender: PrivateKeyAccount, script: Option[Script], fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, script, fee, timestamp, sender)
+  }
 }

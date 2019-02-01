@@ -279,7 +279,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val setasset = SetAssetScriptTransaction
     .create(
-      1,
       chainId,
       publicKey,
       ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get,

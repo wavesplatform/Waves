@@ -34,7 +34,7 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
   override val typeId: Byte                 = TransferTransaction.typeId
   override val supportedVersions: Set[Byte] = Set(2)
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       (for {
         parsed <- TransferTransaction.parseBase(bytes, 0)
@@ -51,6 +51,7 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
                                            proofs)
       } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
+  }
 
   def create(assetId: Option[AssetId],
              sender: PublicKeyAccount,

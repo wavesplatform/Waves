@@ -22,7 +22,8 @@ case class LeaseCancelTransactionV2 private (chainId: Byte, sender: PublicKeyAcc
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(Bytes.concat(Array(builder.typeId, version, chainId), bytesBase()))
 
-  override val bytes         = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+  override val bytes = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+
   override def version: Byte = 2
 }
 
@@ -31,9 +32,9 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
   override val typeId: Byte = LeaseCancelTransaction.typeId
 
   override def supportedVersions: Set[Byte] = Set(2)
-  private def currentChainId                = AddressScheme.current.chainId
+  private def currentChainId: Byte          = AddressScheme.current.chainId
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       val chainId                                = bytes(0)
       val (sender, fee, timestamp, leaseId, end) = LeaseCancelTransaction.parseBase(bytes, 1)
@@ -42,17 +43,19 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
         tx     <- LeaseCancelTransactionV2.create(chainId, sender, leaseId, fee, timestamp, proofs)
       } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
+  }
 
   def create(chainId: Byte,
              sender: PublicKeyAccount,
              leaseId: ByteStr,
              fee: Long,
              timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] =
+             proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
       _ <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
       _ <- LeaseCancelTransaction.validateLeaseCancelParams(leaseId, fee)
     } yield LeaseCancelTransactionV2(chainId, sender, leaseId, fee, timestamp, proofs)
+  }
 
   def signed(chainId: Byte,
              sender: PublicKeyAccount,

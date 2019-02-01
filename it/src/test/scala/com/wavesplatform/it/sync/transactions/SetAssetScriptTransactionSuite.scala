@@ -159,13 +159,12 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
-    def sastx(version: Byte = SetAssetScriptTransaction.supportedVersions.head,
-              fee: Long = setAssetScriptFee,
+    def sastx(fee: Long = setAssetScriptFee,
               timestamp: Long = System.currentTimeMillis,
               assetId: ByteStr = ByteStr.decodeBase58(assetWScript).get,
     ): SetAssetScriptTransaction =
       SetAssetScriptTransaction
-        .signed(version, AddressScheme.current.chainId, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)
+        .signed(AddressScheme.current.chainId, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)
         .right
         .get
 
@@ -274,7 +273,6 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
     val nonIssuerUnsignedTx = SetAssetScriptTransaction(
-      1,
       AddressScheme.current.chainId,
       accountA,
       ByteStr.decodeBase58(assetWScript).get,
@@ -296,7 +294,6 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     //try to change unchangeable script
     val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(
-      1,
       AddressScheme.current.chainId,
       accountA,
       ByteStr.decodeBase58(assetWScript).get,
