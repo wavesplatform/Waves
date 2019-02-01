@@ -621,7 +621,6 @@ object TransactionFactory {
       contract <- Address.fromString(request.contractAddress)
 
       tx <- ContractInvocationTransaction.signed(
-        request.version,
         sender,
         contract,
         ContractInvocationRequest.buildFunctionCall(request.call),
@@ -637,7 +636,6 @@ object TransactionFactory {
       contract <- Address.fromString(request.contractAddress)
       fc = ContractInvocationRequest.buildFunctionCall(request.call)
       tx <- ContractInvocationTransaction.create(
-        request.version,
         sender,
         contract,
         fc,

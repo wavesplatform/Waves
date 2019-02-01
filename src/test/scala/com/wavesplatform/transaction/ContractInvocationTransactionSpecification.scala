@@ -63,7 +63,6 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
 
     val tx = ContractInvocationTransaction
       .selfSigned(
-        1,
         PrivateKeyAccount("test3".getBytes()),
         PrivateKeyAccount("test4".getBytes()),
         Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr(Base64.decode("YWxpY2U=").get)))),
@@ -83,7 +82,6 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
   property("Signed ContractInvocationTransactionRequest parser") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedContractInvocationRequest(
-      version = 1,
       senderPublicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
       fee = 1,
       call = ContractInvocationRequest.FunctionCallPart("bar", List(BinaryDataEntry("", ByteStr.decodeBase64("YWxpY2U=").get))),

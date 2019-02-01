@@ -129,7 +129,6 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx =
       ContractInvocationTransaction
         .selfSigned(
-          version = 1,
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty),
@@ -155,7 +154,6 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx =
       ContractInvocationTransaction
         .selfSigned(
-          version = 1,
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.51.waves))),
@@ -175,7 +173,6 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx =
       ContractInvocationTransaction
         .selfSigned(
-          version = 1,
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.49.waves))),

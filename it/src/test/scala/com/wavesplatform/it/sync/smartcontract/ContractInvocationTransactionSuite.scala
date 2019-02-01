@@ -108,7 +108,6 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     val tx =
       ContractInvocationTransaction
         .selfSigned(
-          version = 1,
           sender = caller,
           contractAddress = contract,
           fc = fc,
