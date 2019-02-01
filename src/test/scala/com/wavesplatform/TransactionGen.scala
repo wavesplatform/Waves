@@ -436,10 +436,9 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
 
   def createBurn(burner: PrivateKeyAccount, assetId: AssetId, amount: Long, fee: Long, timestamp: Long): Gen[BurnTransaction] = {
     for {
-      version <- versionGen(BurnTransactionV2)
       tx <- Gen.oneOf(
         BurnTransactionV1.selfSigned(burner, assetId, amount, fee, timestamp).explicitGet(),
-        BurnTransactionV2.selfSigned(version, AddressScheme.current.chainId, burner, assetId, amount, fee, timestamp).explicitGet()
+        BurnTransactionV2.selfSigned(AddressScheme.current.chainId, burner, assetId, amount, fee, timestamp).explicitGet()
       )
     } yield tx
   }

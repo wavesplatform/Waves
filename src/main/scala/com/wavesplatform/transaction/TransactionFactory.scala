@@ -573,7 +573,6 @@ object TransactionFactory {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       tx <- BurnTransactionV2.signed(
-        request.version,
         AddressScheme.current.chainId,
         sender,
         ByteStr.decodeBase58(request.assetId).get,
@@ -585,7 +584,6 @@ object TransactionFactory {
     } yield tx
 
   def burnAssetV2(request: BurnV2Request, sender: PublicKeyAccount): Either[ValidationError, BurnTransactionV2] = BurnTransactionV2.create(
-    request.version,
     AddressScheme.current.chainId,
     sender,
     ByteStr.decodeBase58(request.assetId).get,

@@ -75,7 +75,6 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
     val tx = BurnTransactionV2
       .create(
-        2,
         'T',
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
