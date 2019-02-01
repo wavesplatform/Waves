@@ -104,7 +104,7 @@ package object state {
 
     def effectiveBalance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
-      val balances    = blockchain.balanceSnapshots(address, bottomLimit, atHeight)
+      val balances    = blockchain.balanceSnapshots(address, bottomLimit, atHeight, onlyFinishedBlocks = true)
       if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
     }
 

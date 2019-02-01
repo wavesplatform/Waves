@@ -426,8 +426,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       _.bestLiquidDiff.orderFills.get(orderId).orEmpty.combine(blockchain.filledVolumeAndFee(orderId)))
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] =
-    if (to <= blockchain.height || ngState.isEmpty) {
+  override def balanceSnapshots(address: Address, from: Int, to: Int, onlyFinishedBlocks: Boolean): Seq[BalanceSnapshot] =
+    if (onlyFinishedBlocks || to <= blockchain.height || ngState.isEmpty) {
       blockchain.balanceSnapshots(address, from, to)
     } else {
       val bs = BalanceSnapshot(height, portfolio(address))

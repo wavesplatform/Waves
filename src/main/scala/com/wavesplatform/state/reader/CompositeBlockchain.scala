@@ -124,8 +124,8 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
-  override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] = {
-    if (to <= inner.height || maybeDiff.isEmpty) {
+  override def balanceSnapshots(address: Address, from: Int, to: Int, onlyFinishedBlocks: Boolean): Seq[BalanceSnapshot] = {
+    if (onlyFinishedBlocks || to <= inner.height || maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
     } else {
       val bs = BalanceSnapshot(height, portfolio(address))
