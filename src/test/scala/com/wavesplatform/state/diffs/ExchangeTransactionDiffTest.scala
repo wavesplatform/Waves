@@ -489,23 +489,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  def compile(scriptText: String, ctx: CompilerContext): Either[String, (Script, Long)] = {
-    val compiler = new ExpressionCompilerV1(ctx)
-
-    val directives = DirectiveParser(scriptText)
-
-    val scriptWithoutDirectives =
-      scriptText.linesIterator
-        .filter(str => !str.contains("{-#"))
-        .mkString("\n")
-
-    for {
-      expr       <- compiler.compile(scriptWithoutDirectives, directives)
-      script     <- ExprScript(expr)
-      complexity <- ScriptEstimator(ctx.varDefs.keySet, functionCosts(ExprV1), expr)
-    } yield (script, complexity)
-  }
-
   def smartTradePreconditions(buyerScriptSrc: String,
                               sellerScriptSrc: String,
                               txScript: String): Gen[(GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction)] = {
