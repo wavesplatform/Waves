@@ -25,7 +25,6 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = sender.privateKey,
           recipient = contract,
@@ -47,7 +46,6 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = sender.privateKey,
           recipient = caller,

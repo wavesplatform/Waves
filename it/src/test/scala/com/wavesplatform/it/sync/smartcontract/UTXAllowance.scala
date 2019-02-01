@@ -49,7 +49,6 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
     val txA =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = accounts(0),
           recipient = accounts(0),
@@ -69,7 +68,6 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
     val txB =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = accounts(1),
           recipient = accounts(1),

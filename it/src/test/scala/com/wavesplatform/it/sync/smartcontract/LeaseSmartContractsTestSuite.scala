@@ -54,7 +54,6 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val unsignedLeasing =
       LeaseTransactionV2
         .create(
-          2,
           acc0,
           transferAmount,
           minFee + 0.2.waves,

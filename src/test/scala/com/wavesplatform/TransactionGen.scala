@@ -182,7 +182,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
 
   def createLease(sender: PrivateKeyAccount, amount: Long, fee: Long, timestamp: Long, recipient: AddressOrAlias) = {
     val v1 = LeaseTransactionV1.selfSigned(sender, amount, fee, timestamp, recipient).explicitGet()
-    val v2 = LeaseTransactionV2.selfSigned(LeaseTransactionV2.supportedVersions.head, sender, amount, fee, timestamp, recipient).explicitGet()
+    val v2 = LeaseTransactionV2.selfSigned(sender, amount, fee, timestamp, recipient).explicitGet()
     Gen.oneOf(v1, v2)
   }
 
@@ -761,7 +761,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
       setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(typed).explicitGet())
       transfer  <- transferGeneratorPV2(ts, master, recipient.toAddress, ENOUGH_AMT / 2)
       fee       <- smallFeeGen
-      lease = LeaseTransactionV2.selfSigned(LeaseTransactionV2.supportedVersions.head, master, ENOUGH_AMT / 2, fee, ts, recipient).explicitGet()
+      lease = LeaseTransactionV2.selfSigned(master, ENOUGH_AMT / 2, fee, ts, recipient).explicitGet()
     } yield (genesis, setScript, lease, transfer)
 
   def smartIssueTransactionGen(senderGen: Gen[PrivateKeyAccount] = accountGen,

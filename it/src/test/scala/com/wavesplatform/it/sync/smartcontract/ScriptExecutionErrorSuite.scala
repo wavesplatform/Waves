@@ -62,7 +62,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
     assertBadRequestAndResponse(
       sender.signedBroadcast(
         TransferTransactionV2
-          .selfSigned(2, None, acc0, acc1.toAddress, 1000, ts, None, minFee, Array())
+          .selfSigned(None, acc0, acc1.toAddress, 1000, ts, None, minFee, Array())
           .explicitGet()
           .json()),
       "not a boolean"

@@ -335,7 +335,6 @@ object TransactionFactory {
       signer       <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- LeaseTransactionV2.signed(
-        request.version,
         sender,
         request.amount,
         request.fee,
@@ -349,7 +348,6 @@ object TransactionFactory {
     for {
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- LeaseTransactionV2.create(
-        request.version,
         sender,
         request.amount,
         request.fee,

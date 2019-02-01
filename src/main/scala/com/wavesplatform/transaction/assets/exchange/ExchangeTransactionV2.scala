@@ -22,7 +22,9 @@ case class ExchangeTransactionV2(buyOrder: Order,
                                  timestamp: Long,
                                  proofs: Proofs)
     extends ExchangeTransaction {
+
   import ExchangeTransactionV2._
+
   override def version: Byte                     = 2
   override val builder                           = ExchangeTransactionV2
   override val assetFee: (Option[AssetId], Long) = (None, fee)

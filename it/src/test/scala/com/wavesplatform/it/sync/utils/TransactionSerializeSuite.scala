@@ -225,7 +225,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val leaseV2 = LeaseTransactionV2
     .create(
-      2,
       publicKey,
       10000000,
       minFee,
