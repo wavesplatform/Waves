@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, TransferSending}
-import com.wavesplatform.lang.Version.ExprV1
+import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.mining.MiningConstraints.MaxScriptRunsInBlock
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -91,7 +91,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
       .selfSigned(
         version = 1,
         sender = sender,
-        script = Some(ExprScript(ExprV1, Terms.TRUE, checkSize = false).explicitGet()),
+        script = Some(ExprScript(V1, Terms.TRUE, checkSize = false).explicitGet()),
         fee = 1000000,
         timestamp = System.currentTimeMillis() - 5.minutes.toMillis
       )

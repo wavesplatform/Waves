@@ -13,14 +13,14 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesCont
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.{Common, Version}
+import com.wavesplatform.lang.{Common, StdLibVersion}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   property("contract compiles when uses annotation bindings and correct return type") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
     val expr = {
       val script =
         """
@@ -92,9 +92,9 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(Version.ContractV),
+          PureContext.build(StdLibVersion.V3),
           CryptoContext.build(com.wavesplatform.lang.Global),
-          WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false)
+          WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false)
         ))
       .compilerContext
     val expr = {

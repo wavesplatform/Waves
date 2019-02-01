@@ -49,7 +49,7 @@ object JsAPI {
     toJs(TRUE) // later
   }
 
-  def wavesContext(v: com.wavesplatform.lang.Version.Version) = WavesContext.build(
+  def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion) = WavesContext.build(
     v,
     new Environment {
       override def height: Long                                                                                    = 0
@@ -64,8 +64,8 @@ object JsAPI {
     isTokenContext = false
   )
 
-  val v1                   = com.wavesplatform.lang.Version.ExprV1
-  val v3                   = com.wavesplatform.lang.Version.ContractV
+  val v1                   = com.wavesplatform.lang.StdLibVersion.V1
+  val v3                   = com.wavesplatform.lang.StdLibVersion.V3
   val exprWavesContext     = wavesContext(v1)
   val contractWavesContext = wavesContext(v3)
 

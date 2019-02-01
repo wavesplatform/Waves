@@ -6,7 +6,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.Version.ExprV1
+import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark.pureEvalContext
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -21,7 +21,7 @@ import scorex.crypto.signatures.Curve25519
 import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
-  val pureEvalContext = PureContext.build(ExprV1).evaluationContext
+  val pureEvalContext = PureContext.build(V1).evaluationContext
 }
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)

@@ -34,7 +34,7 @@ object ScriptRunner {
           isTokenScript
         )
         EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
-      case ContractScript.ContractScript(_, Contract(_, _, Some(vf))) =>
+      case ContractScript.ContractScriptImpl(_, Contract(_, _, Some(vf))) =>
         val ctx = BlockchainContext.build(
           script.version,
           AddressScheme.current.chainId,
@@ -47,7 +47,7 @@ object ScriptRunner {
                                         _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), ???))
         EvaluatorV1.evalWithLogging(ctx, evalContract)
 
-      case ContractScript.ContractScript(_, Contract(_, _, None)) =>
+      case ContractScript.ContractScriptImpl(_, Contract(_, _, None)) =>
         val t: Proven with Authorized = in.eliminate(_.asInstanceOf[Proven with Authorized], _.eliminate(_.asInstanceOf[Proven with Authorized], ???))
         (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](t) match {
           case Right(_) => Right(TRUE)

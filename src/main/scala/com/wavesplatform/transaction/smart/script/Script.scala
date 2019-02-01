@@ -2,14 +2,14 @@ package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
 import monix.eval.Coeval
 
 trait Script {
   type Expr
 
-  val version: Version
+  val version: StdLibVersion
 
   val expr: Expr
   val text: String

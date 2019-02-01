@@ -1,14 +1,14 @@
 package com.wavesplatform.lang
 
 import cats.kernel.Monoid
-import com.wavesplatform.lang.Version.ContractV
+import com.wavesplatform.lang.StdLibVersion.V3
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 
 object JavaAdapter {
-  private val version = ContractV
+  private val version = V3
 
   lazy val compiler =
     new ExpressionCompilerV1(

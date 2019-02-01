@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
-import com.wavesplatform.lang.Version
-import com.wavesplatform.lang.Version.{ExprV1, _}
+import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.StdLibVersion.{V1, _}
 import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
@@ -18,9 +18,9 @@ import scala.util.{Failure, Success, Try}
 object ScriptCompiler extends ScorexLogging {
 
   def contract(scriptText: String): Either[String, Script] = {
-    val ctx = compilerContext(ContractV, isAssetScript = false)
+    val ctx = compilerContext(V3, isAssetScript = false)
     ContractCompiler(ctx, Parser.parseContract(scriptText).get.value)
-      .flatMap(s => ContractScript(ContractV, s))
+      .flatMap(s => ContractScript(V3, s))
   }
 
   def apply(scriptText: String, isAssetScript: Boolean): Either[String, (Script, Long)] = {
@@ -39,7 +39,7 @@ object ScriptCompiler extends ScorexLogging {
     } yield (script, complexity)
   }
 
-  def tryCompile(src: String, version: Version, isAssetScript: Boolean, directives: List[Directive]): Either[String, EXPR] = {
+  def tryCompile(src: String, version: StdLibVersion, isAssetScript: Boolean, directives: List[Directive]): Either[String, EXPR] = {
     val compiler = new ExpressionCompilerV1(compilerContext(version, isAssetScript))
     try {
       compiler.compile(src, directives)
@@ -52,19 +52,19 @@ object ScriptCompiler extends ScorexLogging {
     }
   }
 
-  def estimate(script: Script, version: Version): Either[String, Long] = script match {
+  def estimate(script: Script, version: StdLibVersion): Either[String, Long] = script match {
     case s: ExprScriprImpl => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
-    case s: ContractScript => ContractScript.estimateComplexity(version, s.expr).map(_._2)
+    case s: ContractScriptImpl => ContractScript.estimateComplexity(version, s.expr).map(_._2)
     case _                 => ???
   }
 
-  private def extractVersion(directives: List[Directive]): Either[String, Version] = {
+  private def extractVersion(directives: List[Directive]): Either[String, StdLibVersion] = {
     directives
       .find(_.key == DirectiveKey.LANGUAGE_VERSION)
       .map(d =>
         Try(d.value.toInt) match {
           case Success(v) =>
-            val ver = Version(v)
+            val ver = StdLibVersion(v)
             Either
               .cond(
                 SupportedVersions(ver),
@@ -74,7 +74,7 @@ object ScriptCompiler extends ScorexLogging {
           case Failure(ex) =>
             Left("Can't parse language version")
       })
-      .getOrElse(ExprV1.asRight)
+      .getOrElse(V1.asRight)
   }
 
 }

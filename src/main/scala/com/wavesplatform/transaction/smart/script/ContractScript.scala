@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart.script
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Version.{ExprV1, Version}
+import com.wavesplatform.lang.StdLibVersion.{V1, StdLibVersion}
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.SIGVERIFY
@@ -12,9 +12,9 @@ import monix.eval.Coeval
 
 object ContractScript {
 
-  private val maxComplexity = 20 * functionCosts(ExprV1)(FunctionHeader.Native(SIGVERIFY))()
+  private val maxComplexity = 20 * functionCosts(V1)(FunctionHeader.Native(SIGVERIFY))()
 
-  def apply(version: Version, contract: Contract): Either[String, Script] = {
+  def apply(version: StdLibVersion, contract: Contract): Either[String, Script] = {
     for {
       funcMaxComplexity <- estimateComplexity(version, contract)
       _ <- Either.cond(
@@ -22,11 +22,11 @@ object ContractScript {
         (),
         s"Contract function (${funcMaxComplexity._1}) is too complex: ${funcMaxComplexity._2} > $maxComplexity"
       )
-      s = new ContractScript(version, contract)
+      s = new ContractScriptImpl(version, contract)
     } yield s
   }
 
-  case class ContractScript(version: Version, expr: Contract) extends Script {
+  case class ContractScriptImpl(version: StdLibVersion, expr: Contract) extends Script {
     override val complexity: Long = -1
     override type Expr = Contract
     override val text: String = expr.toString
@@ -38,7 +38,7 @@ object ContractScript {
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
   }
 
-  def estimateComplexity(version: Version, contract: Contract): Either[String, (String, Long)] = {
+  def estimateComplexity(version: StdLibVersion, contract: Contract): Either[String, (String, Long)] = {
     import cats.implicits._
     type E[A] = Either[String, A]
     val funcsWithComplexity: Seq[E[(String, Long)]] =

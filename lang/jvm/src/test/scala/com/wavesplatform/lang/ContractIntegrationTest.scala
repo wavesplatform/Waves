@@ -20,9 +20,9 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
 
   property("Simple test") {
     val ctx: CTX =
-      PureContext.build(Version.ContractV) |+|
+      PureContext.build(StdLibVersion.V3) |+|
         CTX(sampleTypes, Map.empty, Array.empty) |+|
-        WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false)
+        WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false)
 
     val src =
       """
