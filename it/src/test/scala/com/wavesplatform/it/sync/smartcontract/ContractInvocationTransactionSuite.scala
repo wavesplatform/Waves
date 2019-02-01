@@ -133,7 +133,6 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     val tx =
       DataTransaction
         .create(
-          version = 1: Byte,
           sender = contract,
           data = List(StringDataEntry("a", "OOO")),
           feeAmount = 1.waves,

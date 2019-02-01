@@ -45,7 +45,6 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
 
     forAll(massTransferGen) {
       case MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
-
         val tooManyTransfers   = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, 1L))
         val tooManyTransfersEi = create(assetId, sender, tooManyTransfers, timestamp, fee, attachment, proofs)
         tooManyTransfersEi shouldBe Left(GenericError(s"Number of transfers ${tooManyTransfers.length} is greater than $MaxTransferCount"))

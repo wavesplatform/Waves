@@ -12,7 +12,7 @@ import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
 
-case class DataTransaction private (version: Byte, sender: PublicKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
+case class DataTransaction private (sender: PublicKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
     extends ProvenTransaction
     with VersionedTransaction
     with FastHashId {
@@ -41,6 +41,7 @@ case class DataTransaction private (version: Byte, sender: PublicKeyAccount, dat
   }
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+  override def version: Byte              = 1
 }
 
 object DataTransaction extends TransactionParserFor[DataTransaction] with TransactionParser.MultipleVersions {
@@ -67,20 +68,17 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
       val feeAmount = Longs.fromByteArray(bytes.drop(p1 + 8))
       val txEi = for {
         proofs <- Proofs.fromBytes(bytes.drop(p1 + 16))
-        tx     <- create(version, sender, entries, feeAmount, timestamp, proofs)
+        tx     <- create(sender, entries, feeAmount, timestamp, proofs)
       } yield tx
       txEi.fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
-  def create(version: Byte,
-             sender: PublicKeyAccount,
+  def create(sender: PublicKeyAccount,
              data: List[DataEntry[_]],
              feeAmount: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
-    if (!supportedVersions.contains(version)) {
-      Left(ValidationError.UnsupportedVersion(version))
-    } else if (data.lengthCompare(MaxEntryCount) > 0 || data.exists(!_.valid)) {
+    if (data.lengthCompare(MaxEntryCount) > 0 || data.exists(!_.valid)) {
       Left(ValidationError.TooBigArray)
     } else if (data.exists(_.key.isEmpty)) {
       Left(ValidationError.GenericError("Empty key found"))
@@ -89,27 +87,22 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
     } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
-      val tx = DataTransaction(version, sender, data, feeAmount, timestamp, proofs)
+      val tx = DataTransaction(sender, data, feeAmount, timestamp, proofs)
       Either.cond(tx.bytes().length <= MaxBytes, tx, ValidationError.TooBigArray)
     }
   }
 
-  def signed(version: Byte,
-             sender: PublicKeyAccount,
+  def signed(sender: PublicKeyAccount,
              data: List[DataEntry[_]],
              feeAmount: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(version, sender, data, feeAmount, timestamp, Proofs.empty).right.map { unsigned =>
+    create(sender, data, feeAmount, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
-  def selfSigned(version: Byte,
-                 sender: PrivateKeyAccount,
-                 data: List[DataEntry[_]],
-                 feeAmount: Long,
-                 timestamp: Long): Either[ValidationError, TransactionT] = {
-    signed(version, sender, data, feeAmount, timestamp, sender)
+  def selfSigned(sender: PrivateKeyAccount, data: List[DataEntry[_]], feeAmount: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+    signed(sender, data, feeAmount, timestamp, sender)
   }
 }

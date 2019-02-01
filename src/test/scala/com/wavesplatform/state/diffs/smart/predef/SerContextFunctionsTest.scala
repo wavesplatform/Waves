@@ -25,7 +25,6 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
 
     val dtx = DataTransaction
       .create(
-        1,
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
         List(entry1, entry2, entry3, entry4),
         100000,

@@ -593,7 +593,6 @@ object TransactionFactory {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       tx <- DataTransaction.signed(
-        request.version,
         sender,
         request.data,
         request.fee,
@@ -604,7 +603,6 @@ object TransactionFactory {
 
   def data(request: DataRequest, sender: PublicKeyAccount): Either[ValidationError, DataTransaction] =
     DataTransaction.create(
-      request.version,
       sender,
       request.data,
       request.fee,
