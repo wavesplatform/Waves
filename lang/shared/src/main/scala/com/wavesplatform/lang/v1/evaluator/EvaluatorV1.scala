@@ -51,10 +51,14 @@ object EvaluatorV1 {
       case _     => ???
     }
 
-  private def evalGetter(expr: EXPR, field: String): EvalM[EVALUATED] =
-    evalExpr(expr).map(_.asInstanceOf[CaseObj]) map {
-      _.fields(field)
+  private def evalGetter(expr: EXPR, field: String): EvalM[EVALUATED] = {
+    evalExpr(expr).flatMap { exprResult =>
+      exprResult.asInstanceOf[CaseObj].fields.get(field) match {
+        case Some(f) => f.pure[EvalM]
+        case None    => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$field' not found")
+      }
     }
+  }
 
   private def evalFunctionCall(header: FunctionHeader, args: List[EXPR]): EvalM[EVALUATED] =
     for {
