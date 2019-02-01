@@ -65,8 +65,8 @@ object JsAPI {
   )
 
   val v1                   = com.wavesplatform.lang.StdLibVersion.V1
+  val v2                   = com.wavesplatform.lang.StdLibVersion.V2
   val v3                   = com.wavesplatform.lang.StdLibVersion.V3
-  val exprWavesContext     = wavesContext(v1)
   val contractWavesContext = wavesContext(v3)
 
   val cryptoContext = CryptoContext.build(Global)
@@ -80,11 +80,11 @@ object JsAPI {
   }
 
   @JSExportTopLevel("fullContext")
-  val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(v1), cryptoContext, exprWavesContext))
+  val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, wavesContext(v3)))
 
-  val fullContractContext: CTX      = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, contractWavesContext))
-  val fullAssetScriptContext: CTX   = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, wavesContext(v3, true)))
-  val fullAccountScriptContext: CTX = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, wavesContext(v3, false)))
+  val fullContractContext: CTX           = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, contractWavesContext))
+  val activatedAssetScriptContext: CTX   = Monoid.combineAll(Seq(PureContext.build(v2), cryptoContext, wavesContext(v2, true)))
+  val activatedAccountScriptContext: CTX = Monoid.combineAll(Seq(PureContext.build(v2), cryptoContext, wavesContext(v2, false)))
 
   @JSExportTopLevel("getTypes")
   def getTypes() = fullContext.types.map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v.typeRef))).toJSArray
@@ -114,9 +114,9 @@ object JsAPI {
   def compile(input: String, isAccountScript: Boolean): js.Dynamic = {
     val context =
       if (isAccountScript) {
-        fullAccountScriptContext.compilerContext
+        activatedAccountScriptContext.compilerContext
       } else {
-        fullAssetScriptContext.compilerContext
+        activatedAssetScriptContext.compilerContext
       }
     compileWithContext(input, context)
   }
