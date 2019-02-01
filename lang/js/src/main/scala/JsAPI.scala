@@ -2,15 +2,15 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.{CTX, Serde}
-import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompilerV1}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompilerV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.{CTX, Serde}
 import fastparse.core.Parsed.{Failure, Success}
 import shapeless.{:+:, CNil}
 
@@ -49,7 +49,7 @@ object JsAPI {
     toJs(TRUE) // later
   }
 
-  def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion) = WavesContext.build(
+  def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean = false) = WavesContext.build(
     v,
     new Environment {
       override def height: Long                                                                                    = 0
@@ -61,7 +61,7 @@ object JsAPI {
       override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
       override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     },
-    isTokenContext = false
+    isTokenContext
   )
 
   val v1                   = com.wavesplatform.lang.StdLibVersion.V1
@@ -82,7 +82,9 @@ object JsAPI {
   @JSExportTopLevel("fullContext")
   val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(v1), cryptoContext, exprWavesContext))
 
-  val fullContractContext: CTX = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, contractWavesContext))
+  val fullContractContext: CTX      = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, contractWavesContext))
+  val fullAssetScriptContext: CTX   = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, wavesContext(v3, true)))
+  val fullAccountScriptContext: CTX = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, wavesContext(v3, false)))
 
   @JSExportTopLevel("getTypes")
   def getTypes() = fullContext.types.map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v.typeRef))).toJSArray
@@ -109,7 +111,17 @@ object JsAPI {
   val compilerContext = fullContext.compilerContext
 
   @JSExportTopLevel("compile")
-  def compile(input: String): js.Dynamic = {
+  def compile(input: String, isAccountScript: Boolean): js.Dynamic = {
+    val context =
+      if (isAccountScript) {
+        fullAccountScriptContext.compilerContext
+      } else {
+        fullAssetScriptContext.compilerContext
+      }
+    compileWithContext(input, context)
+  }
+
+  def compileWithContext(input: String, context: CompilerContext): js.Dynamic = {
 
     def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
 
@@ -121,7 +133,7 @@ object JsAPI {
     (Parser.parseScript(input) match {
       case Success(value, _)    => Right[String, Expressions.EXPR](value)
       case Failure(_, _, extra) => Left[String, Expressions.EXPR](extra.traced.trace)
-    }).flatMap(ExpressionCompilerV1(fullContractContext.compilerContext, _))
+    }).flatMap(ExpressionCompilerV1(context, _))
       .flatMap(ast => serialize(ast._1).map(x => (x, ast)))
       .fold(
         err => {

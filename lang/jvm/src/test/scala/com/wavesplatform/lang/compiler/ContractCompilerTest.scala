@@ -85,7 +85,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("ContractFunction must return WriteSet/PaymentSet/ContractResult")
+    compiler.ContractCompiler(ctx, expr) should produce(
+      "Compilation failed: ContractFunction must return WriteSet/TransferSet/ContractResult or it super type")
   }
 
   property("hodlContract") {
@@ -136,6 +137,34 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |	}
           |
           |
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+  }
+
+  property("contract functions could return parent type values") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          | @Callable(invocation)
+          | func foo(a:ByteStr) = {
+          |  throw()
+          | }
+          |
+          | @Callable(i)
+          | func bar() = {
+          |   if (true) then WriteSet(List(DataEntry("entr1","entr2")))
+          |   else TransferSet(List(ContractTransfer(i.caller, wavesBalance(i.contractAddress), base58'somestr')))
+          | }
+          |
+          | @Verifier(t)
+          | func verify() = {
+          |   throw()
+          | }
           |
         """.stripMargin
       Parser.parseContract(script).get.value
