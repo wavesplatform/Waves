@@ -240,7 +240,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   val mass = MassTransferTransaction
     .create(
-      1,
       None,
       publicKey,
       transfers,

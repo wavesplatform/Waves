@@ -96,20 +96,18 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("invalid transfer should not be in UTX or blockchain") {
     import com.wavesplatform.transaction.transfer._
 
-    def request(version: Byte = MassTransferTransaction.version,
-                transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),
+    def request(transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),
                 fee: Long = calcMassTransferFee(1),
                 timestamp: Long = System.currentTimeMillis,
                 attachment: Array[Byte] = Array.emptyByteArray) = {
       val txEi = for {
         parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
-        tx              <- MassTransferTransaction.selfSigned(version, None, sender.privateKey, parsedTransfers, timestamp, fee, attachment)
+        tx              <- MassTransferTransaction.selfSigned(None, sender.privateKey, parsedTransfers, timestamp, fee, attachment)
       } yield tx
 
       val (signature, idOpt) = txEi.fold(_ => (List(fakeSignature), None), tx => (tx.proofs.base58().toList, Some(tx.id())))
 
-      val req = SignedMassTransferRequest(version,
-                                          Base58.encode(sender.publicKey.publicKey),
+      val req = SignedMassTransferRequest(Base58.encode(sender.publicKey.publicKey),
                                           None,
                                           transfers,
                                           fee,

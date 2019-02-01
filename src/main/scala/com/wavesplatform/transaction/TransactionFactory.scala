@@ -112,7 +112,6 @@ object TransactionFactory {
       signer    <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.signed(
-        request.version,
         request.assetId.map(s => ByteStr.decodeBase58(s).get),
         sender,
         transfers,
@@ -127,7 +126,6 @@ object TransactionFactory {
     for {
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.create(
-        request.version,
         request.assetId.map(s => ByteStr.decodeBase58(s).get),
         sender,
         transfers,

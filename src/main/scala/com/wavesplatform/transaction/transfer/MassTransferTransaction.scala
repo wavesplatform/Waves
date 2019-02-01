@@ -18,8 +18,7 @@ import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scala.annotation.meta.field
 import scala.util.{Either, Failure, Success, Try}
 
-case class MassTransferTransaction private (version: Byte,
-                                            assetId: Option[AssetId],
+case class MassTransferTransaction private (assetId: Option[AssetId],
                                             sender: PublicKeyAccount,
                                             transfers: List[ParsedTransfer],
                                             timestamp: Long,
@@ -69,6 +68,7 @@ case class MassTransferTransaction private (version: Byte,
 
   override val bytes: Coeval[Array[Byte]]    = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
   override def checkedAssets(): Seq[AssetId] = assetId.toSeq
+  override def version: Byte                 = 1
 }
 
 object MassTransferTransaction extends TransactionParserFor[MassTransferTransaction] with TransactionParser.OneVersion {
@@ -112,13 +112,12 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
         feeAmount               = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
         (attachment, attachEnd) = Deser.parseArraySize(bytes, s1 + 16)
         proofs <- Proofs.fromBytes(bytes.drop(attachEnd))
-        mtt    <- MassTransferTransaction.create(version, assetIdOpt.map(ByteStr(_)), sender, transfers, timestamp, feeAmount, attachment, proofs)
+        mtt    <- MassTransferTransaction.create(assetIdOpt.map(ByteStr(_)), sender, transfers, timestamp, feeAmount, attachment, proofs)
       } yield mtt
       tx.fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
-  def create(version: Byte,
-             assetId: Option[AssetId],
+  def create(assetId: Option[AssetId],
              sender: PublicKeyAccount,
              transfers: List[ParsedTransfer],
              timestamp: Long,
@@ -130,9 +129,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     }.fold(
       ex => Left(ValidationError.OverflowError),
       totalAmount =>
-        if (version != MassTransferTransaction.version) {
-          Left(ValidationError.UnsupportedVersion(version))
-        } else if (transfers.lengthCompare(MaxTransferCount) > 0) {
+        if (transfers.lengthCompare(MaxTransferCount) > 0) {
           Left(ValidationError.GenericError(s"Number of transfers ${transfers.length} is greater than $MaxTransferCount"))
         } else if (transfers.exists(_.amount < 0)) {
           Left(ValidationError.GenericError("One of the transfers has negative amount"))
@@ -141,32 +138,30 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
         } else if (feeAmount <= 0) {
           Left(ValidationError.InsufficientFee())
         } else {
-          Right(MassTransferTransaction(version, assetId, sender, transfers, timestamp, feeAmount, attachment, proofs))
+          Right(MassTransferTransaction(assetId, sender, transfers, timestamp, feeAmount, attachment, proofs))
       }
     )
   }
 
-  def signed(version: Byte,
-             assetId: Option[AssetId],
+  def signed(assetId: Option[AssetId],
              sender: PublicKeyAccount,
              transfers: List[ParsedTransfer],
              timestamp: Long,
              feeAmount: Long,
              attachment: Array[Byte],
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(version, assetId, sender, transfers, timestamp, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
+    create(assetId, sender, transfers, timestamp, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
-  def selfSigned(version: Byte,
-                 assetId: Option[AssetId],
+  def selfSigned(assetId: Option[AssetId],
                  sender: PrivateKeyAccount,
                  transfers: List[ParsedTransfer],
                  timestamp: Long,
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
-    signed(version, assetId, sender, transfers, timestamp, feeAmount, attachment, sender)
+    signed(assetId, sender, transfers, timestamp, feeAmount, attachment, sender)
   }
 
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
