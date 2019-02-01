@@ -16,12 +16,12 @@ object MatcherScriptRunner {
 
   def apply(script: Script, order: Order, isTokenScript: Boolean): (Log, Either[String, EVALUATED]) = script match {
     case s: ExprScriprImpl =>
-      val ctx = MatcherContext.build(script.version, AddressScheme.current.chainId, Coeval.evalOnce(order), !isTokenScript)
+      val ctx = MatcherContext.build(script.stdLibVersion, AddressScheme.current.chainId, Coeval.evalOnce(order), !isTokenScript)
       EvaluatorV1.applywithLogging(ctx, s.expr)
 
     case ContractScript.ContractScriptImpl(_, Contract(_, _, Some(vf))) =>
       val ctx = MatcherContext.build(
-        script.version,
+        script.stdLibVersion,
         AddressScheme.current.chainId,
         Coeval.evalOnce(???) /*order not used in global context where @Verifier annotation is used */,
         proofsEnabled = true

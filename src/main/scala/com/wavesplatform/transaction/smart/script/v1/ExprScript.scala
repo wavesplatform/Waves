@@ -31,12 +31,12 @@ object ExprScript {
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s
 
-  case class ExprScriprImpl(version: StdLibVersion, expr: EXPR, complexity: Long) extends Script {
+  case class ExprScriprImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends Script {
     override type Expr = EXPR
     override val text: String = expr.toString
     override val bytes: Coeval[ByteStr] =
       Coeval.evalOnce {
-        val s = Array(version.toByte) ++ Serde.serialize(expr)
+        val s = Array(stdLibVersion.toByte) ++ Serde.serialize(expr)
         ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
       }
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(isExprContainsBlockV2(expr))

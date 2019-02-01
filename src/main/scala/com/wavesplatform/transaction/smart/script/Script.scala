@@ -9,7 +9,7 @@ import monix.eval.Coeval
 trait Script {
   type Expr
 
-  val version: StdLibVersion
+  val stdLibVersion: StdLibVersion
 
   val expr: Expr
   val text: String
@@ -19,11 +19,11 @@ trait Script {
   val containsBlockV2: Coeval[Boolean]
 
   override def equals(obj: scala.Any): Boolean = obj match {
-    case that: Script => version == that.version && expr == that.expr
+    case that: Script => stdLibVersion == that.stdLibVersion && expr == that.expr
     case _            => false
   }
 
-  override def hashCode(): Int = version * 31 + expr.hashCode()
+  override def hashCode(): Int = stdLibVersion * 31 + expr.hashCode()
 }
 
 object Script {

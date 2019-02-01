@@ -26,7 +26,7 @@ object ScriptRunner {
     script match {
       case s: ExprScriprImpl =>
         val ctx = BlockchainContext.build(
-          script.version,
+          script.stdLibVersion,
           AddressScheme.current.chainId,
           Coeval.evalOnce(in),
           Coeval.evalOnce(height),
@@ -36,7 +36,7 @@ object ScriptRunner {
         EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
       case ContractScript.ContractScriptImpl(_, Contract(_, _, Some(vf))) =>
         val ctx = BlockchainContext.build(
-          script.version,
+          script.stdLibVersion,
           AddressScheme.current.chainId,
           Coeval.evalOnce(in),
           Coeval.evalOnce(height),

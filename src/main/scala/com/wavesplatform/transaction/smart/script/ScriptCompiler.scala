@@ -53,9 +53,9 @@ object ScriptCompiler extends ScorexLogging {
   }
 
   def estimate(script: Script, version: StdLibVersion): Either[String, Long] = script match {
-    case s: ExprScriprImpl => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
+    case s: ExprScriprImpl     => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
     case s: ContractScriptImpl => ContractScript.estimateComplexity(version, s.expr).map(_._2)
-    case _                 => ???
+    case _                     => ???
   }
 
   private def extractVersion(directives: List[Directive]): Either[String, StdLibVersion] = {

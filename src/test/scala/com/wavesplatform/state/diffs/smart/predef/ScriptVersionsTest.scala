@@ -68,29 +68,5 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
     "has bindings defined in V2" in {
       eval[EVALUATED](orderTypeBindings, V2) shouldBe Testing.evaluated(true)
     }
-
-    "only works after SmartAccountTrading feature activation" in {
-      import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
-
-      val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccountTrading.id -> 3))
-      val setup = for {
-        master <- accountGen
-        ts     <- positiveLongGen
-        genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-        script  = ExprScript(V2, TRUE, checkSize = false).explicitGet()
-        tx      = SetScriptTransaction.selfSigned(1, master, Some(script), 100000, ts + 1).explicitGet()
-      } yield (genesis, tx)
-
-      forAll(setup) {
-        case (genesis, tx) =>
-          assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settings) { blockDiffEi =>
-            blockDiffEi should produce("Script version 2 has not been activated yet")
-          }
-
-          assertDiffEi(Seq(block(Seq(genesis)), block(Seq())), block(Seq(tx)), settings) { blockDiffEi =>
-            blockDiffEi shouldBe 'right
-          }
-      }
-    }
   }
 }
