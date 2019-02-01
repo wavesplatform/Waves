@@ -14,7 +14,6 @@ import com.wavesplatform.matcher.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder}
@@ -35,6 +34,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
+import scala.util.Failure
 
 @Path("/matcher")
 @Api(value = "/matcher/")
@@ -112,8 +112,11 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 
   @inline
   private def askAddressActor[A: ClassTag](sender: Address, msg: AddressActor.Command): Future[A] = {
-    val m = Env(sender, msg)
-    (addressActor ? m).mapTo[A].recoverWith { case e => Future.failed(new RuntimeException(s"$m", e)) }
+    (addressActor ? Env(sender, msg))
+      .mapTo[A]
+      .andThen {
+        case Failure(e) => log.warn(s"Error processing $msg", e)
+      }
   }
 
   @Path("/")
@@ -304,7 +307,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def loadOrders(address: Address, pair: Option[AssetPair], activeOnly: Boolean): Route = complete {
-    askAddressActor[Seq[(ByteStr, OrderInfo)]](address, AddressActor.GetOrders(pair, activeOnly))
+    askAddressActor[Seq[(ByteStr, OrderInfo[OrderStatus])]](address, AddressActor.GetOrders(pair, activeOnly))
       .map(orders =>
         StatusCodes.OK -> orders.map {
           case (id, oi) =>
@@ -315,8 +318,10 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
               "price"     -> oi.price,
               "timestamp" -> oi.timestamp,
               "filled" -> (oi.status match {
-                case LimitOrder.Filled(f) => f
-                case _                    => 0L
+                case OrderStatus.Filled(f)          => f
+                case OrderStatus.PartiallyFilled(f) => f
+                case OrderStatus.Cancelled(f)       => f
+                case _                              => 0L
               }),
               "status"    -> oi.status.name,
               "assetPair" -> oi.assetPair.json
@@ -470,7 +475,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       complete(
         DBUtils
           .order(db, orderId)
-          .fold[Future[OrderStatus]](Future.successful(LimitOrder.NotFound)) { order =>
+          .fold[Future[OrderStatus]](Future.successful(OrderStatus.NotFound)) { order =>
             askAddressActor[OrderStatus](order.sender, GetOrderStatus(orderId))
           }
           .map(_.json))
@@ -486,7 +491,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def orderBookDelete: Route = (path("orderbook" / AssetPairPM) & delete & withAuth) { p =>
     withAssetPair(p) { pair =>
-      complete(storeEvent(QueueEvent.OrderBookDeleted(pair)))
+      complete(storeEvent(QueueEvent.OrderBookDeleted(pair)).map(_ => SimpleResponse(StatusCodes.Accepted, "Deleting order book")))
     }
   }
 

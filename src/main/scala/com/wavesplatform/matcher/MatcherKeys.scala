@@ -4,6 +4,7 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.Key
 import com.wavesplatform.matcher.model.OrderInfo
+import com.wavesplatform.matcher.model.OrderInfo.FinalOrderInfo
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange._
@@ -20,7 +21,8 @@ object MatcherKeys {
     o => o.version +: o.bytes()
   )
 
-  def orderInfo(orderId: ByteStr): Key[Option[OrderInfo]] = Key.opt("matcher-order-info", bytes(2, orderId.arr), OrderInfo.decode, OrderInfo.encode)
+  def orderInfo(orderId: ByteStr): Key[Option[FinalOrderInfo]] =
+    Key.opt("matcher-order-info", bytes(2, orderId.arr), OrderInfo.decode, OrderInfo.encode)
 
   // activeOrdersOldestSeqNr = 3
   // activeOrdersSeqNr = 4

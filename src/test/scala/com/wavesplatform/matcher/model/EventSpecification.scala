@@ -11,7 +11,7 @@ class EventSpecification extends FreeSpec with Matchers with MatcherTestData {
     val pair      = AssetPair(None, mkAssetId("BTC"))
     val counter   = sell(pair, 840340L, 0.00000238, matcherFee = Some(300000L))
     val submitted = buy(pair, 425532L, 0.00000238, matcherFee = Some(300000L))
-    val exec      = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    val exec      = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), 0L)
     exec.executedAmount shouldBe 420169L
     exec.counterRemainingAmount shouldBe 420171L
     exec.counterRemainingAmount shouldBe counter.amount - exec.executedAmount
@@ -29,7 +29,7 @@ class EventSpecification extends FreeSpec with Matchers with MatcherTestData {
     val counter   = sell(pair, 100000000, 0.0008, matcherFee = Some(2000L))
     val submitted = buy(pair, 120000000, 0.00085, matcherFee = Some(1000L))
 
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), 0L)
     exec.submittedRemainingAmount shouldBe 20000000L
     exec.submittedRemainingFee shouldBe 167L
   }
@@ -42,7 +42,7 @@ class EventSpecification extends FreeSpec with Matchers with MatcherTestData {
     val bobPk     = PrivateKeyAccount("bob".getBytes("utf-8"))
     val submitted = sell(pair, 223345000L, 0.00031887, matcherFee = Some(300000), sender = Some(bobPk))
 
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), 0L)
     exec.executedAmount shouldBe 223344937L
   }
 }

@@ -68,7 +68,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     ob.allOrders shouldEqual Seq(
       SellLimitOrder(
         restAmount,
-        ord3.matcherFee - LimitOrder.getPartialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
+        ord3.matcherFee - LimitOrder.partialFee(ord3.matcherFee, ord3.amount, ord3.amount - restAmount),
         ord3
       ))
   }
@@ -103,7 +103,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     val corrected2 = Order.correctAmount(leftovers1, ord1.price)
     val restAmount = ord1.amount - corrected2
     // See OrderExecuted.submittedRemainingFee
-    val restFee = ord1.matcherFee - LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, corrected2)
+    val restFee = ord1.matcherFee - LimitOrder.partialFee(ord1.matcherFee, ord1.amount, corrected2)
     ob.allOrders.toSeq shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
   }
 
@@ -120,7 +120,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
     ob.add(ord3, ntpNow)
 
     val restAmount = ord1.amount - (ord3.amount - ord2.amount)
-    val restFee    = ord1.matcherFee - LimitOrder.getPartialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
+    val restFee    = ord1.matcherFee - LimitOrder.partialFee(ord1.matcherFee, ord1.amount, ord3.amount - ord2.amount)
     ob.allOrders.toSeq shouldEqual Seq(SellLimitOrder(restAmount, restFee, ord1))
   }
 
@@ -135,7 +135,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
 
     val restSAmount = Order.correctAmount(700000L, 280)
     val restAmount  = 30000000000L - restSAmount
-    val restFee     = s.matcherFee - LimitOrder.getPartialFee(s.matcherFee, s.amount, restSAmount)
+    val restFee     = s.matcherFee - LimitOrder.partialFee(s.matcherFee, s.amount, restSAmount)
     ob.allOrders shouldEqual Seq(SellLimitOrder(restAmount, restFee, s))
   }
 

@@ -4,7 +4,6 @@ import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.model.Events.OrderExecuted
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
@@ -22,7 +21,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
   }
 
   def createTransaction(submitted: LimitOrder, counter: LimitOrder, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
-    val executedAmount    = OrderExecuted(submitted, counter).executedAmount
+    val executedAmount    = LimitOrder.executedAmount(submitted, counter)
     val price             = counter.price
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) = calculateMatcherFee(buy, sell, executedAmount)

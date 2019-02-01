@@ -52,7 +52,7 @@ class OrderBookActor(owner: ActorRef,
           case _: QueueEvent.OrderBookDeleted =>
             sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq(), Seq()))
             updateSnapshot(OrderBook.Snapshot())
-            orderBook.cancelAll().foreach(publishEvent)
+            processEvents(orderBook.cancelAll())
             context.stop(self)
         }
       }
@@ -71,17 +71,18 @@ class OrderBookActor(owner: ActorRef,
 
     case SaveSnapshot(globalEventNr) =>
       if (savingSnapshot.isEmpty) {
+        log.debug(s"About to save snapshot $orderBook")
         saveSnapshotAt(globalEventNr)
         savingSnapshot = Some(globalEventNr)
       }
   }
 
-  private def processEvents(timestamp: Long, events: Seq[Event]): Unit = {
+  private def processEvents(events: Seq[Event]): Unit = {
     for (e <- events) {
       e match {
         case Events.OrderAdded(order) =>
           log.info(s"OrderAdded(${order.order.id()}, amount=${order.amount})")
-        case x @ Events.OrderExecuted(submitted, counter) =>
+        case x @ Events.OrderExecuted(submitted, counter, timestamp) =>
           log.info(s"OrderExecuted(s=${submitted.order.idStr()}, c=${counter.order.idStr()}, amount=${x.executedAmount})")
           lastTrade = Some(LastTrade(counter.price, x.executedAmount, x.submitted.order.orderType))
           createTransaction(submitted, counter, timestamp) match {
@@ -92,7 +93,6 @@ class OrderBookActor(owner: ActorRef,
               log.warn(s"""Can't create tx: $ex
                           |o1: (amount=${submitted.amount}, fee=${submitted.fee}): ${Json.prettyPrint(submitted.order.json())}
                           |o2: (amount=${counter.amount}, fee=${counter.fee}): ${Json.prettyPrint(counter.order.json())}""".stripMargin)
-              (None, None)
           }
         case Events.OrderCanceled(order, unmatchable) =>
           log.info(s"OrderCanceled(${order.order.idStr()}, system=$unmatchable)")
@@ -108,8 +108,8 @@ class OrderBookActor(owner: ActorRef,
   private def onCancelOrder(request: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
     cancelTimer.measure(orderBook.cancel(orderIdToCancel) match {
       case Some(cancelEvent) =>
-        processEvents(request.timestamp, Seq(cancelEvent))
-        sender() ! cancelEvent
+        processEvents(Seq(cancelEvent))
+        sender() ! OrderCanceled(orderIdToCancel)
       case None =>
         log.warn(s"Error cancelling $orderIdToCancel: order not found")
         sender() ! OrderCancelRejected("Order not found")
@@ -117,8 +117,7 @@ class OrderBookActor(owner: ActorRef,
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
     log.trace(s"Order accepted: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
-    processEvents(eventWithMeta.timestamp, orderBook.add(order, eventWithMeta.timestamp))
-    sender() ! OrderAccepted(order)
+    processEvents(orderBook.add(order, eventWithMeta.timestamp))
   }
 
   override def receiveCommand: Receive = fullCommands
@@ -132,23 +131,13 @@ class OrderBookActor(owner: ActorRef,
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook
       lastProcessedOffset = snapshot.eventNr
-
-      updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
-      for (lo <- orderBook.allOrders) {
-        publishEvent(OrderAdded(lo))
-      }
-
+      processEvents(orderBook.allOrders.map(OrderAdded).toSeq)
       log.debug(s"Recovering $persistenceId from $snapshot")
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     log.warn(s"Restarting actor because of $message", reason)
     super.preRestart(reason, message)
-  }
-
-  private def publishEvent(e: Event): Unit = {
-    addressActor ! e
-    context.system.eventStream.publish(e)
   }
 
   private def saveSnapshotAt(globalEventNr: QueueEventWithMeta.Offset): Unit =

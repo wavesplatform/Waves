@@ -133,9 +133,10 @@ object AsyncMatcherHttpApi extends Assertions {
         case _          => Failure(new RuntimeException(s"Unexpected failure from matcher"))
       }
 
-    def deleteOrderBook(assetPair: AssetPair): Future[OrderBookResponse] =
-      retrying(_delete(s"${matcherNode.matcherApiEndpoint}/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build())
-        .as[OrderBookResponse]
+    def deleteOrderBook(assetPair: AssetPair): Future[MessageMatcherResponse] =
+      retrying(_delete(s"${matcherNode.matcherApiEndpoint}/matcher/orderbook/${assetPair.toUri}").withApiKey(matcherNode.apiKey).build(),
+               statusCode = 202)
+        .as[MessageMatcherResponse]
 
     def marketStatus(assetPair: AssetPair): Future[MarketStatusResponse] =
       matcherGet(s"/matcher/orderbook/${assetPair.toUri}/status").as[MarketStatusResponse]

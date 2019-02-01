@@ -12,7 +12,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
-import com.wavesplatform.matcher.market.MatcherActor
+import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.ByteStr

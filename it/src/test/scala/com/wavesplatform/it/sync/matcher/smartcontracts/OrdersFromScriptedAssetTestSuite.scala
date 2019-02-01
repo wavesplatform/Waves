@@ -17,7 +17,6 @@ import com.wavesplatform.transaction.smart.script.v1.ScriptV1
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import play.api.libs.json.Json
 
-import scala.concurrent.duration._
 import scala.util.Random
 
 /**
@@ -53,29 +52,6 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
       version = 2
     )
     matcherNode.expectIncorrectOrderPlacement(order, 400, "OrderRejected")
-  }
-
-  "if counter order has expired then cancel its only, not a submitted order" in {
-    val pair = AssetPair.createAssetPair("WAVES", AllowAssetId).get
-
-    // place expiring counter order
-    val counterId =
-      matcherNode
-        .placeOrder(matcherPk, pair, OrderType.SELL, 2.waves, 10, version = 2, fee = smartTradeFee, timeToLive = 61.seconds)
-        .message
-        .id
-    matcherNode.waitOrderStatus(pair, counterId, "Accepted")
-
-    // wait counter order's lifetime
-    Thread.sleep(65.seconds.toMillis)
-    matcherNode.orderBook(pair).asks.size shouldBe 1
-
-    // place a submitted order
-    val submittedId =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 2.waves, 10, version = 2, fee = smartTradeFee).message.id
-
-    matcherNode.waitOrderStatus(pair, counterId, "Cancelled")
-    matcherNode.orderStatus(submittedId, pair).status shouldBe "Accepted"
   }
 
   "can execute against unscripted, if the script returns TRUE" in {

@@ -11,20 +11,20 @@ import org.scalatest.{FreeSpec, Matchers}
 class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestData with PropertyChecks with NoShrink {
   import OrderDBSpec._
 
-  private def finalizedOrderInfoGen(o: Order): Gen[(Order, OrderInfo)] =
+  private def finalizedOrderInfoGen(o: Order): Gen[(Order, OrderInfo[OrderStatus.Final])] =
     for {
       filledAmount <- Gen.choose(0, o.amount)
-      status       <- Gen.oneOf(LimitOrder.Filled(o.amount), LimitOrder.Cancelled(filledAmount))
+      status       <- Gen.oneOf(OrderStatus.Filled(o.amount), OrderStatus.Cancelled(filledAmount))
     } yield o -> o.toInfo(status)
 
-  private def finalizedOrderSeqGen(orderCount: Int): Gen[(PrivateKeyAccount, AssetPair, Seq[(Order, OrderInfo)])] =
+  private def finalizedOrderSeqGen(orderCount: Int): Gen[(PrivateKeyAccount, AssetPair, Seq[(Order, OrderInfo[OrderStatus.Final])])] =
     for {
       sender    <- accountGen
       pair      <- distinctPairGen
       orderList <- Gen.listOfN(orderCount, orderGenerator(sender, pair).flatMap(o => finalizedOrderInfoGen(o)))
     } yield (sender, pair, orderList)
 
-  private val finalizedOrderInfoGen: Gen[(Order, OrderInfo)] = for {
+  private val finalizedOrderInfoGen: Gen[(Order, OrderInfo[OrderStatus.Final])] = for {
     (o, _) <- orderGenerator
     result <- finalizedOrderInfoGen(o)
   } yield result
@@ -51,11 +51,11 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
     }
 
     "does not overwrite finalized info" in test { odb =>
-      val dualFinalizedOrderInfoGen: Gen[(Order, OrderInfo, OrderInfo)] = for {
+      val dualFinalizedOrderInfoGen: Gen[(Order, OrderInfo[OrderStatus.Final], OrderInfo[OrderStatus.Final])] = for {
         (o, _)       <- orderGenerator
         filledAmount <- Gen.choose(0, o.amount)
-        s1           <- Gen.oneOf(LimitOrder.Filled(o.amount), LimitOrder.Cancelled(filledAmount))
-        s2           <- Gen.oneOf(LimitOrder.Filled(o.amount), LimitOrder.Cancelled(filledAmount))
+        s1           <- Gen.oneOf(OrderStatus.Filled(o.amount), OrderStatus.Cancelled(filledAmount))
+        s2           <- Gen.oneOf(OrderStatus.Filled(o.amount), OrderStatus.Cancelled(filledAmount))
       } yield
         (
           o,
@@ -69,23 +69,6 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
           odb.saveOrderInfo(o.id(), o.sender, oi2)
 
           odb.status(o.id()) shouldBe oi1.status
-      }
-    }
-
-    "does not store non-final order info" in test { odb =>
-      val nonFinalOrderInfoGen: Gen[(Order, OrderInfo)] = for {
-        (o, _)       <- orderGenerator
-        filledAmount <- Gen.choose(0, o.amount)
-        status       <- Gen.oneOf(LimitOrder.PartiallyFilled(filledAmount), LimitOrder.Accepted)
-      } yield o -> OrderInfo(o.orderType, o.amount, o.price, o.timestamp, status, o.assetPair)
-
-      forAll(nonFinalOrderInfoGen) {
-        case (o, oi) =>
-          an[IllegalArgumentException] should be thrownBy {
-            odb.saveOrderInfo(o.id(), o.sender, oi)
-          }
-
-          odb.status(o.id()) shouldBe LimitOrder.NotFound
       }
     }
 
@@ -107,7 +90,7 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
       val paramGen = for {
         (sender, pair, finalizedOrders) <- finalizedOrderSeqGen(20)
         activeOrders                    <- Gen.listOfN(20, orderGenerator(sender, pair))
-      } yield (sender, pair, activeOrders.map(o => o.id() -> o.toInfo(LimitOrder.Accepted)), finalizedOrders)
+      } yield (sender, pair, activeOrders.map(o => o.id() -> o.toInfo(OrderStatus.Accepted)), finalizedOrders)
 
       forAll(paramGen) {
         case (sender, pair, active, finalized) =>
@@ -127,6 +110,6 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
 
 object OrderDBSpec {
   private implicit class OrderExt(val o: Order) extends AnyVal {
-    def toInfo(status: LimitOrder.OrderStatus) = OrderInfo(o.orderType, o.amount, o.price, o.timestamp, status, o.assetPair)
+    def toInfo(status: OrderStatus) = OrderInfo(o.orderType, o.amount, o.price, o.timestamp, status, o.assetPair)
   }
 }

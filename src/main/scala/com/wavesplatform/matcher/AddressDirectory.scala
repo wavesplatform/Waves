@@ -54,9 +54,11 @@ class AddressDirectory(portfolioChanged: Observable[Address],
 
     case e @ Events.OrderAdded(lo) =>
       forward(lo.order.sender, e)
-    case e @ Events.OrderExecuted(submitted, counter) =>
+    case e @ Events.OrderExecuted(submitted, counter, _) =>
       forward(submitted.order.sender, e)
-      forward(counter.order.sender, e)
+      if (counter.order.sender != submitted.order.sender) {
+        forward(counter.order.sender, e)
+      }
     case e @ Events.OrderCanceled(lo, _) =>
       forward(lo.order.sender, e)
 

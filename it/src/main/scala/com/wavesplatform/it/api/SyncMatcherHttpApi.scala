@@ -59,7 +59,7 @@ object SyncMatcherHttpApi extends Assertions {
     def marketStatus(assetPair: AssetPair): MarketStatusResponse =
       sync(async(m).marketStatus(assetPair), RequestAwaitTime)
 
-    def deleteOrderBook(assetPair: AssetPair): OrderBookResponse =
+    def deleteOrderBook(assetPair: AssetPair): MessageMatcherResponse =
       sync(async(m).deleteOrderBook(assetPair), RequestAwaitTime)
 
     def fullOrderHistory(sender: PrivateKeyAccount): Seq[OrderbookHistory] =

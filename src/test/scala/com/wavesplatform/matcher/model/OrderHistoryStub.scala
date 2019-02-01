@@ -1,9 +1,7 @@
 package com.wavesplatform.matcher.model
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.Address
-import com.wavesplatform.matcher.api.SimpleResponse
 import com.wavesplatform.matcher.{AddressActor, TestOrderDB}
 import com.wavesplatform.state.{ByteStr, Portfolio}
 import com.wavesplatform.utils.Time
@@ -28,7 +26,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
             5.seconds,
             time,
             new TestOrderDB(100),
-            _ => Future.successful(SimpleResponse(StatusCodes.OK, "")),
+            _ => Future.successful(0),
           )))
     )
 
