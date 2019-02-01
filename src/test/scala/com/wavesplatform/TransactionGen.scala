@@ -118,7 +118,8 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
   }
 
   val contractGen = Gen.const(
-    ContractScript(ContractV, Contract(List.empty, List(ContractFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), Terms.REF("a")))), None)))
+    ContractScript(ContractV,
+                   Contract(List.empty, List(ContractFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), Terms.REF("a")))), None)))
 
   val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = for {
     version                                                                  <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)

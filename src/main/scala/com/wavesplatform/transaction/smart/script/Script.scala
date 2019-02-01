@@ -39,8 +39,7 @@ object Script {
       script <- ScriptReader.fromBytes(bytes)
     } yield script
 
-
-  def decompile(s:Script): String = s match {
+  def decompile(s: Script): String = s match {
     case ExprScriprImpl(_, e, _) => Decompiler(e, com.wavesplatform.utils.defaultCompilerContext.opCodes)
     case ContractScript(_, _)    => ???
   }

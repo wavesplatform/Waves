@@ -5,7 +5,9 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 
 // TODO: сделать ручку (отложить)
 // TODO: переполнение стека (отложить)
-// TODO: Поправить API и остальные комменты в PullRequest
+// DONE: Поправить API и остальные комменты в PullRequest
+// TODO: Написать тест для BYTESTR
+// TODO: Добавить IntegrationTest в точку, где контракт ждет
 // TODO: Декомпилировать контракт с ContactInvocation (fomo.ride)
 // TODO: Сам контракт состоит из деклараций, списка контрактных функций и верифайера (Contract.scala). Декомпилировать его
 
