@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -19,7 +20,7 @@ import com.wavesplatform.{RequestGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 
-class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestGen {
+class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with DBCacheSettings with RequestGen {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
@@ -35,7 +36,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
     import TestFunctionalitySettings.Enabled
     "correctly joins height ranges" in {
       val fs     = Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccountTrading.id -> 0))
-      val writer = new LevelDBWriter(db, fs, 100000, 2000, 120 * 60 * 1000)
+      val writer = new LevelDBWriter(db, fs, maxCacheSize, 2000, 120 * 60 * 1000)
       writer.merge(Seq(15, 12, 3), Seq(12, 5)) shouldEqual Seq((15, 12), (12, 12), (3, 5))
       writer.merge(Seq(12, 5), Seq(15, 12, 3)) shouldEqual Seq((12, 15), (12, 12), (5, 3))
       writer.merge(Seq(8, 4), Seq(8, 4)) shouldEqual Seq((8, 8), (4, 4))
@@ -43,14 +44,14 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
   }
   "hasScript" - {
     "returns false if a script was not set" in {
-      val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+      val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
       writer.hasScript(accountGen.sample.get.toAddress) shouldBe false
     }
 
     "returns false if a script was set and then unset" in {
       assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
       resetTest { (_, account) =>
-        val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+        val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
         writer.hasScript(account) shouldBe false
       }
     }
@@ -59,7 +60,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
       "if there is a script in db" in {
         assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
         test { (_, account) =>
-          val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+          val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
           writer.hasScript(account) shouldBe true
         }
       }
@@ -106,7 +107,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with RequestG
   }
 
   def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+    val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)

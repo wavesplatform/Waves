@@ -20,6 +20,13 @@ object WavesContext {
   import Types._
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
+  lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
+  val contractTransfer =
+    CaseType(FieldNames.ContractTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+  lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
+  lazy val contractResultType =
+    CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
+
   def build(version: Version, env: Environment, isTokenContext: Boolean): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
@@ -367,17 +374,11 @@ object WavesContext {
       wavesBalanceF
     )
 
-    lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
-    val contractTransfer =
-      CaseType(FieldNames.ContractTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
-    lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
-    lazy val contractResultType =
-      CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
-
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
-      types ++ (if (version == ContractV) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
+      types ++ (if (version == ContractV)
+                  List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
                 else List.empty),
       commonVars ++ vars(version),
       functions
