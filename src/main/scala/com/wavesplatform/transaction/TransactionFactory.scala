@@ -396,7 +396,6 @@ object TransactionFactory {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       tx <- LeaseCancelTransactionV2.signed(
-        request.version,
         AddressScheme.current.chainId,
         sender,
         ByteStr.decodeBase58(request.txId).get,
@@ -408,7 +407,6 @@ object TransactionFactory {
 
   def leaseCancelV2(request: LeaseCancelV2Request, sender: PublicKeyAccount): Either[ValidationError, LeaseCancelTransactionV2] =
     LeaseCancelTransactionV2.create(
-      request.version,
       AddressScheme.current.chainId,
       sender,
       ByteStr.decodeBase58(request.txId).get,

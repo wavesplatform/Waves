@@ -11,13 +11,7 @@ import monix.eval.Coeval
 
 import scala.util.{Failure, Success, Try}
 
-case class LeaseCancelTransactionV2 private (version: Byte,
-                                             chainId: Byte,
-                                             sender: PublicKeyAccount,
-                                             leaseId: ByteStr,
-                                             fee: Long,
-                                             timestamp: Long,
-                                             proofs: Proofs)
+case class LeaseCancelTransactionV2 private (chainId: Byte, sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, proofs: Proofs)
     extends LeaseCancelTransaction
     with FastHashId {
 
@@ -28,8 +22,8 @@ case class LeaseCancelTransactionV2 private (version: Byte,
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(Bytes.concat(Array(builder.typeId, version, chainId), bytesBase()))
 
-  override val bytes = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
-
+  override val bytes         = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+  override def version: Byte = 2
 }
 
 object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransactionV2] with TransactionParser.MultipleVersions {
@@ -45,41 +39,33 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
       val (sender, fee, timestamp, leaseId, end) = LeaseCancelTransaction.parseBase(bytes, 1)
       (for {
         proofs <- Proofs.fromBytes(bytes.drop(end))
-        tx     <- LeaseCancelTransactionV2.create(version, chainId, sender, leaseId, fee, timestamp, proofs)
+        tx     <- LeaseCancelTransactionV2.create(chainId, sender, leaseId, fee, timestamp, proofs)
       } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
-  def create(version: Byte,
-             chainId: Byte,
+  def create(chainId: Byte,
              sender: PublicKeyAccount,
              leaseId: ByteStr,
              fee: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] =
     for {
-      _ <- Either.cond(supportedVersions.contains(version), (), UnsupportedVersion(version))
       _ <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
       _ <- LeaseCancelTransaction.validateLeaseCancelParams(leaseId, fee)
-    } yield LeaseCancelTransactionV2(version, chainId, sender, leaseId, fee, timestamp, proofs)
+    } yield LeaseCancelTransactionV2(chainId, sender, leaseId, fee, timestamp, proofs)
 
-  def signed(version: Byte,
-             chainId: Byte,
+  def signed(chainId: Byte,
              sender: PublicKeyAccount,
              leaseId: ByteStr,
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(version, chainId, sender, leaseId, fee, timestamp, Proofs.empty).right.map { unsigned =>
+    create(chainId, sender, leaseId, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
-  def selfSigned(version: Byte,
-                 chainId: Byte,
-                 sender: PrivateKeyAccount,
-                 leaseId: ByteStr,
-                 fee: Long,
-                 timestamp: Long): Either[ValidationError, TransactionT] = {
-    signed(version, chainId, sender, leaseId, fee, timestamp, sender)
+  def selfSigned(chainId: Byte, sender: PrivateKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+    signed(chainId, sender, leaseId, fee, timestamp, sender)
   }
 }

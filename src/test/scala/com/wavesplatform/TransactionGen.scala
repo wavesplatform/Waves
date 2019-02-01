@@ -189,7 +189,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
   def createLeaseCancel(sender: PrivateKeyAccount, leaseId: ByteStr, cancelFee: Long, timestamp: Long) = {
     val v1 = LeaseCancelTransactionV1.selfSigned(sender, leaseId, cancelFee, timestamp + 1).explicitGet()
     val v2 = LeaseCancelTransactionV2
-      .selfSigned(LeaseTransactionV2.supportedVersions.head, AddressScheme.current.chainId, sender, leaseId, cancelFee, timestamp + 1)
+      .selfSigned(AddressScheme.current.chainId, sender, leaseId, cancelFee, timestamp + 1)
       .right
       .get
     Gen.oneOf(v1, v2)

@@ -200,7 +200,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val leasecancelV2 = LeaseCancelTransactionV2
     .create(
-      2,
       'I',
       publicKey,
       ByteStr.decodeBase58("DJWkQxRyJNqWhq9qSQpK2D4tsrct6eZbjSv3AH4PSha6").get,

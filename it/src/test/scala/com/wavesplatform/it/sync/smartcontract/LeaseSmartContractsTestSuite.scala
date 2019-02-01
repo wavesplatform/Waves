@@ -82,7 +82,6 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val unsignedCancelLeasing =
       LeaseCancelTransactionV2
         .create(
-          version = 2,
           chainId = AddressScheme.current.chainId,
           sender = acc0,
           leaseId = ByteStr.decodeBase58(leasingId).get,
