@@ -3,14 +3,6 @@ package com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 
-// TODO: сделать ручку (отложить)
-// TODO: переполнение стека (отложить)
-// DONE: Поправить API и остальные комменты в PullRequest
-// TODO: Написать тест для BYTESTR
-// TODO: Добавить IntegrationTest в точку, где контракт ждет
-// TODO: Декомпилировать контракт с ContactInvocation (fomo.ride)
-// TODO: Сам контракт состоит из деклараций, списка контрактных функций и верифайера (Contract.scala). Декомпилировать его
-
 object Decompiler {
 
   def out (in :String, ident :Int):String =
@@ -48,7 +40,7 @@ object Decompiler {
         decl(declPar, 1 + ident, OpCodes) + ";\n" +
         expr(body, 1 + ident, OpCodes) + "\n" +
         out("}", ident)
-      case Terms.CONST_BYTESTR(bs) => out("'" + bs + "'", ident) // TODO: need test for bytestr
+      case Terms.CONST_BYTESTR(bs) => out("'" + bs + "'", ident)
       case Terms.FUNCTION_CALL(func, args) => func match {
         case FunctionHeader.Native(name) => out(
           OpCodes.getOrElse(name, "<Native_" + name + ">") +
