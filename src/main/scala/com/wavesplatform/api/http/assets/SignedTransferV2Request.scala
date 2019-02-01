@@ -12,7 +12,7 @@ import play.api.libs.json._
 object SignedTransferV2Request {
 
   implicit val writes: Writes[SignedTransferV2Request] =
-    Json.writes[SignedTransferV2Request].transform((request: JsObject) => request + ("version", JsNumber(2)))
+    Json.writes[SignedTransferV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2)))
 
   implicit val reads: Reads[SignedTransferV2Request] = (
     (JsPath \ "senderPublicKey").read[String] and

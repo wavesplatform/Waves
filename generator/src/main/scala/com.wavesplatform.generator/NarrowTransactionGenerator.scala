@@ -185,12 +185,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             senderAndAssetOpt.flatMap {
               case (sender, asset) =>
                 logOption(
-                  MassTransferTransaction.selfSigned(asset,
-                                                     sender,
-                                                     transfers.toList,
-                                                     ts,
-                                                     200000 + 50000 * transferCount,
-                                                     Array.fill(r.nextInt(100))(r.nextInt().toByte)))
+                  MassTransferTransaction
+                    .selfSigned(asset, sender, transfers.toList, ts, 200000 + 50000 * transferCount, Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
           case DataTransaction =>
             val sender = randomFrom(accounts).get

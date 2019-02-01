@@ -43,5 +43,5 @@ object SignedLeaseCancelV2Request {
   )(SignedLeaseCancelV2Request.apply _)
 
   implicit val writes =
-    Json.writes[SignedLeaseCancelV2Request].transform((request: JsObject) => request + ("version", JsNumber(2)))
+    Json.writes[SignedLeaseCancelV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2)))
 }

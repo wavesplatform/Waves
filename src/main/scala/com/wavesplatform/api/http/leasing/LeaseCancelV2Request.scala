@@ -23,5 +23,5 @@ object LeaseCancelV2Request {
   }
 
   implicit val leaseCancelRequestWrites: Writes[LeaseCancelV2Request] =
-    Json.writes[LeaseCancelV2Request].transform((request: JsObject) => request + ("version", JsNumber(2)))
+    Json.writes[LeaseCancelV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2)))
 }

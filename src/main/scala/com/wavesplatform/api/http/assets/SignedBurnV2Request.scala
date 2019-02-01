@@ -45,5 +45,5 @@ object SignedBurnV2Request {
   )(SignedBurnV2Request.apply _)
 
   implicit val writes: Writes[SignedBurnV2Request] =
-    Json.writes[SignedBurnV2Request].transform((request: JsObject) => request + ("version", JsNumber(2)))
+    Json.writes[SignedBurnV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2)))
 }

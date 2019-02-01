@@ -5,7 +5,7 @@ import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAcc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.ValidationError.{GenericError, UnsupportedVersion}
+import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
 

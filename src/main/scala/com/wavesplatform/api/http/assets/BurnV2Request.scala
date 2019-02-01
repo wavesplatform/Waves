@@ -17,5 +17,5 @@ object BurnV2Request {
   }
 
   implicit val burnV2Writes: Writes[BurnV2Request] =
-    Json.writes[BurnV2Request].transform((request: JsObject) => request + ("version", JsNumber(2)))
+    Json.writes[BurnV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2)))
 }

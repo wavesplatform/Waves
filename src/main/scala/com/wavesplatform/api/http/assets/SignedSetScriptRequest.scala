@@ -20,7 +20,7 @@ object SignedSetScriptRequest {
   )(SignedSetScriptRequest.apply _)
 
   implicit val signedSetScriptRequestWrites: OWrites[SignedSetScriptRequest] =
-    Json.writes[SignedSetScriptRequest].transform((request: JsObject) => request + ("version", JsNumber(1)))
+    Json.writes[SignedSetScriptRequest].transform((request: JsObject) => request + ("version" -> JsNumber(1)))
 }
 
 @ApiModel(value = "Proven SetScript transaction")
