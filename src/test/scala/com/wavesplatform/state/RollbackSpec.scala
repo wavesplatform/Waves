@@ -317,7 +317,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(SetScriptTransaction.selfSigned(1, sender, Some(script), 400000, nextTs).explicitGet())
+              Seq(SetScriptTransaction.selfSigned(sender, Some(script), 400000, nextTs).explicitGet())
             ))
 
           val blockWithScriptId = d.lastBlockId
@@ -328,7 +328,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               blockWithScriptId,
-              Seq(SetScriptTransaction.selfSigned(1, sender, None, 800000, nextTs).explicitGet())
+              Seq(SetScriptTransaction.selfSigned(sender, None, 800000, nextTs).explicitGet())
             ))
 
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty

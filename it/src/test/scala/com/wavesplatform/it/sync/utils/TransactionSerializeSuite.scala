@@ -299,7 +299,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val setscript = SetScriptTransaction
     .create(
-      1,
       publicKey,
       None,
       setScriptFee,

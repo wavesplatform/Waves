@@ -140,20 +140,19 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
        .explicitGet())
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
-    version                   <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
     sender: PrivateKeyAccount <- accountGen
     fee                       <- smallFeeGen
     timestamp                 <- timestampGen
     proofs                    <- proofsGen
     script                    <- Gen.option(scriptGen)
-  } yield SetScriptTransaction.create(version, sender, script, fee, timestamp, proofs).explicitGet()
+  } yield SetScriptTransaction.create(sender, script, fee, timestamp, proofs).explicitGet()
 
   def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] =
     for {
       version   <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
       fee       <- smallFeeGen
       timestamp <- timestampGen
-    } yield SetScriptTransaction.selfSigned(version, sender, Some(s), fee, timestamp).explicitGet()
+    } yield SetScriptTransaction.selfSigned(sender, Some(s), fee, timestamp).explicitGet()
 
   val paymentGen: Gen[PaymentTransaction] = for {
     sender: PrivateKeyAccount    <- accountGen

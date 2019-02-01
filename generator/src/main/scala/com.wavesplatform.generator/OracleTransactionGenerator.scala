@@ -25,7 +25,7 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
 
     val setScript: Transaction =
       SetScriptTransaction
-        .selfSigned(1, scriptedAccount, Some(script), enoughFee, System.currentTimeMillis())
+        .selfSigned(scriptedAccount, Some(script), enoughFee, System.currentTimeMillis())
         .explicitGet()
 
     val setDataTx: Transaction = DataTransaction

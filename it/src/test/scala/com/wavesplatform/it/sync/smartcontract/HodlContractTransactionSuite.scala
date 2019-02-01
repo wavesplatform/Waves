@@ -105,7 +105,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val script = ScriptCompiler.contract(scriptText).explicitGet()
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, contract, Some(script), setScriptFee, System.currentTimeMillis())
+      .selfSigned(contract, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender

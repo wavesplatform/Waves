@@ -417,13 +417,13 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         .selfSigned(chainId, seller, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
-        .selfSigned(1: Byte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
+        .selfSigned(MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
         .explicitGet()
       setSellerScript = SetScriptTransaction
-        .selfSigned(1: Byte, seller, sellerScript, enoughFee, ts + 6)
+        .selfSigned(seller, sellerScript, enoughFee, ts + 6)
         .explicitGet()
       setBuyerScript = SetScriptTransaction
-        .selfSigned(1: Byte, buyer, buyerScript, enoughFee, ts + 7)
+        .selfSigned(buyer, buyerScript, enoughFee, ts + 7)
         .explicitGet()
       assetPair = AssetPair(Some(asset1.id()), Some(asset2.id()))
       o1 <- Gen.oneOf(
@@ -532,13 +532,13 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         .selfSigned(chainId, seller, "Asset#2".getBytes, "".getBytes, 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
-        .selfSigned(1: Byte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
+        .selfSigned(MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
         .explicitGet()
       setSellerScript = SetScriptTransaction
-        .selfSigned(1: Byte, seller, sellerScript, enoughFee, ts + 6)
+        .selfSigned(seller, sellerScript, enoughFee, ts + 6)
         .explicitGet()
       setBuyerScript = SetScriptTransaction
-        .selfSigned(1: Byte, buyer, buyerScript, enoughFee, ts + 7)
+        .selfSigned(buyer, buyerScript, enoughFee, ts + 7)
         .explicitGet()
       assetPair = AssetPair(Some(asset1.id()), Some(asset2.id()))
       o1        = OrderV2.buy(seller, MATCHER, assetPair, 1000000, 1000000, ts + 8, ts + 10000, enoughFee)

@@ -148,7 +148,6 @@ object TransactionFactory {
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
       tx <- SetScriptTransaction.signed(
-        request.version,
         sender,
         script,
         request.fee,
@@ -164,7 +163,6 @@ object TransactionFactory {
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
       tx <- SetScriptTransaction.create(
-        request.version,
         sender,
         script,
         request.fee,

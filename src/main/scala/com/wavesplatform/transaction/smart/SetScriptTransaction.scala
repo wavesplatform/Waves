@@ -15,13 +15,7 @@ import play.api.libs.json.Json
 
 import scala.util.{Failure, Success, Try}
 
-case class SetScriptTransaction private (version: Byte,
-                                         chainId: Byte,
-                                         sender: PublicKeyAccount,
-                                         script: Option[Script],
-                                         fee: Long,
-                                         timestamp: Long,
-                                         proofs: Proofs)
+case class SetScriptTransaction private (chainId: Byte, sender: PublicKeyAccount, script: Option[Script], fee: Long, timestamp: Long, proofs: Proofs)
     extends ProvenTransaction
     with VersionedTransaction
     with FastHashId {
@@ -41,6 +35,7 @@ case class SetScriptTransaction private (version: Byte,
   override val json                              = Coeval.evalOnce(jsonBase() ++ Json.obj("chainId" -> chainId, "version" -> version, "script" -> script.map(_.bytes().base64)))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+  override def version: Byte              = 1
 }
 
 object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] with TransactionParser.MultipleVersions {
@@ -68,35 +63,24 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
         scriptOpt <- scriptEiOpt
         _         <- Either.cond(chainId == chainId, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
         proofs    <- Proofs.fromBytes(bytes.drop(scriptEnd + 16))
-        tx        <- create(version, sender, scriptOpt, fee, timestamp, proofs)
+        tx        <- create(sender, scriptOpt, fee, timestamp, proofs)
       } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
-  def create(version: Byte,
-             sender: PublicKeyAccount,
-             script: Option[Script],
-             fee: Long,
-             timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] =
+  def create(sender: PublicKeyAccount, script: Option[Script], fee: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, TransactionT] =
     for {
-      _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
-    } yield new SetScriptTransaction(version, chainId, sender, script, fee, timestamp, proofs)
+    } yield new SetScriptTransaction(chainId, sender, script, fee, timestamp, proofs)
 
-  def signed(version: Byte,
-             sender: PublicKeyAccount,
+  def signed(sender: PublicKeyAccount,
              script: Option[Script],
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
-    create(version, sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
+    create(sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
 
-  def selfSigned(version: Byte,
-                 sender: PrivateKeyAccount,
-                 script: Option[Script],
-                 fee: Long,
-                 timestamp: Long): Either[ValidationError, TransactionT] =
-    signed(version, sender, script, fee, timestamp, sender)
+  def selfSigned(sender: PrivateKeyAccount, script: Option[Script], fee: Long, timestamp: Long): Either[ValidationError, TransactionT] =
+    signed(sender, script, fee, timestamp, sender)
 }

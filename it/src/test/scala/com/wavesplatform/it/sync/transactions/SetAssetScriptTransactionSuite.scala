@@ -252,7 +252,6 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(
-        SetScriptTransaction.supportedVersions.head,
         accountA,
         Some(
           ScriptCompiler(

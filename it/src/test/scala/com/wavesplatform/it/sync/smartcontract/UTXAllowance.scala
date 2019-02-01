@@ -34,7 +34,7 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
 
       val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
       val setScriptTransaction = SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, acc, Some(script), setScriptFee, System.currentTimeMillis())
+        .selfSigned(acc, Some(script), setScriptFee, System.currentTimeMillis())
         .right
         .get
 

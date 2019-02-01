@@ -91,11 +91,10 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
   def preconditionsAndSetContract(
       senderBindingToContract: String => Gen[Contract]): Gen[(List[GenesisTransaction], SetScriptTransaction, ContractInvocationTransaction)] =
     for {
-      setScriptVersion <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
-      ciVersion        <- Gen.oneOf(ContractInvocationTransaction.supportedVersions.toSeq)
-      master           <- accountGen
-      invoker          <- accountGen
-      ts               <- timestampGen
+      ciVersion <- Gen.oneOf(ContractInvocationTransaction.supportedVersions.toSeq)
+      master    <- accountGen
+      invoker   <- accountGen
+      ts        <- timestampGen
       genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
       fee         <- smallFeeGen
@@ -103,7 +102,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       funcBinding <- validAliasStringGen
       contract    <- senderBindingToContract(funcBinding)
       script      = ContractScript(Version.ContractV, contract)
-      setContract = SetScriptTransaction.selfSigned(setScriptVersion, master, script.toOption, fee, ts).explicitGet()
+      setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
       ci          = ContractInvocationTransaction.selfSigned(ciVersion, invoker, master, fc, None, fee, ts).explicitGet()
     } yield (List(genesis, genesis2), setContract, ci)

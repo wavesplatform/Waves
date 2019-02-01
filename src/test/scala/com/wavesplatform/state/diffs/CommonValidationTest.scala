@@ -149,7 +149,6 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           Seq(
             SetScriptTransaction
               .selfSigned(
-                SetScriptTransaction.supportedVersions.head,
                 recipientAcc,
                 Some(script),
                 1 * Constants.UnitsInWave,

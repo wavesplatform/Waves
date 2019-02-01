@@ -246,7 +246,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
       ts      <- timestampGen
     } yield {
-      val setScript = SetScriptTransaction.selfSigned(version, master, Some(script), 100000, ts + 1).explicitGet()
+      val setScript = SetScriptTransaction.selfSigned(master, Some(script), 100000, ts + 1).explicitGet()
       Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
     }
 

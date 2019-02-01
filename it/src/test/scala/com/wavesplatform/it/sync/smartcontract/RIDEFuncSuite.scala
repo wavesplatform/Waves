@@ -36,7 +36,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val tx =
       sender.signedBroadcast(
-        SetScriptTransaction.selfSigned(1, pkNewAddress, Some(compiled), setScriptFee, System.currentTimeMillis()).explicitGet().json())
+        SetScriptTransaction.selfSigned(pkNewAddress, Some(compiled), setScriptFee, System.currentTimeMillis()).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
     assertBadRequestAndResponse(
@@ -75,7 +75,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val updTx =
       sender.signedBroadcast(
-        SetScriptTransaction.selfSigned(1, pkNewAddress, Some(updated), setScriptFee + smartFee, System.currentTimeMillis()).explicitGet().json())
+        SetScriptTransaction.selfSigned(pkNewAddress, Some(updated), setScriptFee + smartFee, System.currentTimeMillis()).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(updTx.id)
 
     assertBadRequestAndResponse(

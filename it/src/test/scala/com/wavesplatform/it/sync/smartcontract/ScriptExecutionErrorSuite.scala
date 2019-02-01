@@ -34,7 +34,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     val compiled = ScriptCompiler(scriptSrc, isAssetScript = false).explicitGet()._1
 
-    val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(1, acc2, Some(compiled), setScriptFee, ts).explicitGet().json())
+    val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(acc2, Some(compiled), setScriptFee, ts).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
     val alias = Alias.fromString(s"alias:${AddressScheme.current.chainId.toChar}:asdasdasdv").explicitGet()
@@ -54,7 +54,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     val tx = sender.signAndBroadcast(
       SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), setScriptFee, ts)
+        .selfSigned(acc0, Some(script), setScriptFee, ts)
         .explicitGet()
         .json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
