@@ -7,20 +7,20 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
-import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.{Global, Version}
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{ValidationError, Proofs, Transaction}
+import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError._
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ContractScript.ContractScript
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, WavesEnvironment}
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import monix.eval.Coeval
 import shapeless.Coproduct
 import scala.util.{Failure, Success, Try}
@@ -122,10 +122,29 @@ object ContractInvocationTransactionDiff {
                                 Right(nextDiff)
                               case Some(script) =>
                                 Try {
+                                  import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
                                   ScriptRunner(
                                     blockchain.height,
                                     Coproduct[ScriptRunner.TxOrd](
-                                      TransferTransactionV2
+                                      CaseObj(
+                                        buildTransferTransactionType(false).typeRef,
+                                        Map(
+                                          "assetId"         -> asset,
+                                          "sender"          -> tx.contractAddress.bytes,
+                                          "senderPublicKey" -> ByteStr(Array[Byte]()),
+                                          "bobyBytes"       -> ByteStr(Array[Byte]()),
+                                          "recipient"       -> addressRepr.bytes,
+                                          "amount"          -> amount,
+                                          "timestamp"       -> tx.timestamp,
+                                          "id"              -> tx.id(),
+                                          "feeAssetId"      -> Option.empty[ByteStr],
+                                          "fee"             -> 0L,
+                                          //"proofs" ->  Proofs.empty,
+                                          "version"   -> 0,
+                                          "attacment" -> ByteStr(Array[Byte]())
+                                        )
+                                      )
+                                      /*TransferTransactionV2
                                         .create(2: Byte,
                                                 asset,
                                                 tx.sender, // XXX it need to be contract public key.
@@ -136,7 +155,8 @@ object ContractInvocationTransactionDiff {
                                                 0L,
                                                 Array[Byte](),
                                                 Proofs.empty)
-                                        .asInstanceOf[Transaction]),
+                                        .asInstanceOf[Transaction] */
+                                    ),
                                     CompositeBlockchain.composite(blockchain, diff.right.get),
                                     script,
                                     true
