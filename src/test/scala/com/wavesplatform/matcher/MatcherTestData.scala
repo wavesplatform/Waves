@@ -2,6 +2,7 @@ package com.wavesplatform.matcher
 
 import java.util.concurrent.atomic.AtomicLong
 
+import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
@@ -38,6 +39,11 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     a1 <- assetIdGen(1.toByte)
     a2 <- assetIdGen(2.toByte)
   } yield AssetPair(a1, a2)
+
+  protected def mkAssetId(prefix: String): Option[ByteStr] = {
+    val prefixBytes = prefix.getBytes(Charsets.UTF_8)
+    Some(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
+  }
 
   val assetPairGen = Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, None))), (1, assetIdGen(2).map(AssetPair(None, _))))
 

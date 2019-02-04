@@ -23,7 +23,10 @@ sealed abstract class WrappedMatcherResponse(statusCode: StatusCode, val json: J
   def this(code: StatusCode, message: String) =
     this(code,
          Json.obj(
-           "success" -> (code == C.OK),
+           "success" -> (code match {
+             case _: C.Success => true
+             case _            => false
+           }),
            "message" -> message,
            "result"  -> JsNull // For backward compatibility
          ))

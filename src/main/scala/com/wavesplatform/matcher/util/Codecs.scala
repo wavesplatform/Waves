@@ -2,8 +2,7 @@ package com.wavesplatform.matcher.util
 
 import java.nio.ByteBuffer
 
-import com.wavesplatform.matcher.model.LimitOrder
-import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
+import com.wavesplatform.matcher.model.OrderStatus
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.AssetId
 
@@ -27,12 +26,12 @@ object Codecs {
     }
 
     def putFinalOrderStatus(st: OrderStatus): ByteBuffer = st match {
-      case LimitOrder.Filled(filled)    => b.put(0.toByte).putLong(filled)
-      case LimitOrder.Cancelled(filled) => b.put(1.toByte).putLong(filled)
-      case other                        => throw new IllegalArgumentException(s"Can't encode non-final order status $other")
+      case OrderStatus.Filled(filled)    => b.put(0.toByte).putLong(filled)
+      case OrderStatus.Cancelled(filled) => b.put(1.toByte).putLong(filled)
+      case other                         => throw new IllegalArgumentException(s"Can't encode order status $other")
     }
 
-    def getFinalOrderStatus: OrderStatus =
-      if (b.get() == 1) LimitOrder.Cancelled(b.getLong) else LimitOrder.Filled(b.getLong)
+    def getFinalOrderStatus: OrderStatus.Final =
+      if (b.get() == 1) OrderStatus.Cancelled(b.getLong) else OrderStatus.Filled(b.getLong)
   }
 }

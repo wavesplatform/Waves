@@ -217,7 +217,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
       matcherNode.reservedBalance(aliceAcc) shouldBe empty
       matcherNode.tradableBalance(aliceAcc, wctUsdPair)(s"$UsdId") shouldBe aliceUsdBalance - bobReceiveUsdAmount
 
-      val expectedReservedWaves = matcherFee - LimitOrder.getPartialFee(matcherFee, wctUsdSellAmount, executedAmount)
+      val expectedReservedWaves = matcherFee - LimitOrder.partialFee(matcherFee, wctUsdSellAmount, executedAmount)
       matcherNode.reservedBalance(bobAcc)("WAVES") shouldBe expectedReservedWaves
 
       matcherNode.cancelOrder(bobAcc, wctUsdPair, matcherNode.fullOrderHistory(bobAcc).head.id)
@@ -306,7 +306,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     val aliceOrder   = matcherNode.prepareOrder(aliceAcc, wavesUsdPair, OrderType.BUY, 100000L, 1000L)
     val aliceOrderId = matcherNode.placeOrder(aliceOrder).message.id
 
-    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, aliceOrderId, "Filled", Some(0), 1.minute)
+    matcherNode.waitOrderStatusAndAmount(wavesUsdPair, aliceOrderId, "Cancelled", Some(0), 1.minute)
 
     withClue("Alice's reserved balance:") {
       matcherNode.reservedBalance(aliceAcc) shouldBe empty
@@ -316,7 +316,7 @@ class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
     aliceOrders should not be empty
 
     val order = aliceOrders.find(_.id == aliceOrderId).getOrElse(throw new IllegalStateException(s"Alice should have the $aliceOrderId order"))
-    order.status shouldBe "Filled"
+    order.status shouldBe "Cancelled"
 
     matcherNode.cancelOrder(matcherAcc, wavesUsdPair, bobOrderId)
   }

@@ -18,7 +18,7 @@ import play.api.libs.json._
 import scorex.utils._
 
 class MatcherActor(matcherSettings: MatcherSettings,
-                   recoveryCompletedWithEventNr: (ActorRef, Long, Long) => Unit,
+                   recoveryCompletedWithEventNr: (ActorRef, Long) => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
                    assetDescription: ByteStr => Option[AssetDescription])
@@ -171,7 +171,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
     case RecoveryCompleted =>
       if (orderBooks.get().isEmpty) {
         log.info("Recovery completed!")
-        recoveryCompletedWithEventNr(self, -1, -1)
+        recoveryCompletedWithEventNr(self, -1)
       } else {
         log.info(s"Recovery completed, waiting order books to restore: ${orderBooks.get().keys.mkString(", ")}")
         context.become(collectOrderBooks(orderBooks.get().size, Long.MaxValue, Long.MinValue, Map.empty))
@@ -220,7 +220,7 @@ class MatcherActor(matcherSettings: MatcherSettings,
     log.trace(s"Expecting snapshots at: ${snapshotsState.nearestSnapshotOffsets}")
 
     unstashAll()
-    recoveryCompletedWithEventNr(self, oldestEventNr, newestEventNr)
+    recoveryCompletedWithEventNr(self, oldestEventNr)
   }
 
   private def snapshotsCommands: Receive = {
@@ -282,7 +282,7 @@ object MatcherActor {
   def name: String = "matcher"
 
   def props(matcherSettings: MatcherSettings,
-            recoveryCompletedWithEventNr: (ActorRef, Long, Long) => Unit,
+            recoveryCompletedWithEventNr: (ActorRef, Long) => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             orderBookProps: (AssetPair, ActorRef) => Props,
             assetDescription: ByteStr => Option[AssetDescription]): Props =

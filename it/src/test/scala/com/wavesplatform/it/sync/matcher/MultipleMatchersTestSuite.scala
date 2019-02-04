@@ -72,7 +72,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     executeCommands(places ++ cancels)
   }
 
-  "Wait all requests are processed" in {
+  "Wait until all requests are processed" in {
     matcher1Node.waitForStableOffset(10, 100, 200.millis)
     matcher2Node.waitForStableOffset(10, 100, 200.millis)
   }

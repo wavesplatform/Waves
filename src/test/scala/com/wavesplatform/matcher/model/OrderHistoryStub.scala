@@ -1,17 +1,17 @@
 package com.wavesplatform.matcher.model
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.Address
-import com.wavesplatform.matcher.api.SimpleResponse
+import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.matcher.{AddressActor, TestOrderDB}
 import com.wavesplatform.state.{ByteStr, Portfolio}
+import com.wavesplatform.utils.Time
 
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class OrderHistoryStub(system: ActorSystem) {
+class OrderHistoryStub(system: ActorSystem, time: Time) {
   private val refs   = mutable.AnyRefMap.empty[Address, ActorRef]
   private val orders = mutable.AnyRefMap.empty[ByteStr, Address]
 
@@ -25,8 +25,9 @@ class OrderHistoryStub(system: ActorSystem) {
             Portfolio.empty,
             5.seconds,
             5.seconds,
+            time,
             new TestOrderDB(100),
-            _ => Future.successful(SimpleResponse(StatusCodes.OK, "")),
+            e => Future.successful(QueueEventWithMeta(0, 0, e)),
           )))
     )
 

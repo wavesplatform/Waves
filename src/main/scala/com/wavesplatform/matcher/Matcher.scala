@@ -1,21 +1,18 @@
 package com.wavesplatform.matcher
 
 import java.io.File
-import java.lang.{Long => jLong}
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{ConcurrentHashMap, Executors, TimeUnit}
+import java.util.concurrent.{ConcurrentHashMap, Executors}
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.{ask, gracefulStop}
+import akka.pattern.gracefulStop
 import akka.stream.ActorMaterializer
-import akka.util.Timeout
-import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.db._
-import com.wavesplatform.matcher.api.{AlreadyProcessed, MatcherApiRoute, MatcherResponse, OrderBookSnapshotHttpCache}
+import com.wavesplatform.matcher.api.{MatcherApiRoute, OrderBookSnapshotHttpCache}
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
@@ -31,9 +28,8 @@ import io.netty.channel.group.ChannelGroup
 import monix.reactive.Observable
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.control.NonFatal
-import scala.util.Failure
 
 class Matcher(actorSystem: ActorSystem,
               time: Time,
@@ -52,7 +48,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private val currentOffset      = new AtomicReference[QueueEventWithMeta.Offset](-1L)
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
-  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook](1000, 0.9f, 10)
+  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings)
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
@@ -64,7 +60,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private val marketStatuses = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
 
-  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook): Unit = {
+  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook.AggregatedSnapshot): Unit = {
     orderBookCache.put(assetPair, newSnapshot)
     orderBooksSnapshotCache.invalidate(assetPair)
   }
@@ -93,11 +89,6 @@ class Matcher(actorSystem: ActorSystem,
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
 
-  private val requests: LoadingCache[jLong, Promise[MatcherResponse]] = CacheBuilder
-    .newBuilder()
-    .expireAfterWrite(6.seconds.toSeconds, TimeUnit.SECONDS)
-    .build[jLong, Promise[MatcherResponse]](CacheLoader.from((_: jLong) => Promise[MatcherResponse]))
-
   private def validateOrder(o: Order) =
     for {
       _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
@@ -112,21 +103,13 @@ class Matcher(actorSystem: ActorSystem,
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 
-  private def storeEvent(event: QueueEvent): Future[MatcherResponse] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-    matcherQueue.storeEvent(event).flatMap { eventWithMeta =>
-      log.debug(s"[offset=${eventWithMeta.offset}, ts=${eventWithMeta.timestamp}] Produced ${eventWithMeta.event}")
-      requests.get(jLong.valueOf(eventWithMeta.offset)).future
-    }
-  }
-
   lazy val matcherApiRoutes: Seq[MatcherApiRoute] = Seq(
     MatcherApiRoute(
       pairBuilder,
       matcherPublicKey,
       matcher,
       addressActors,
-      storeEvent,
+      matcherQueue.storeEvent,
       p => Option(orderBooks.get()).flatMap(_.get(p)),
       p => Option(marketStatuses.get(p)),
       validateOrder,
@@ -145,38 +128,20 @@ class Matcher(actorSystem: ActorSystem,
 
   private val exchangeTxPool = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
+  private def bumpOffset(newOffset: Long): Unit = currentOffset.getAndAccumulate(newOffset, math.max)
+
   lazy val matcher: ActorRef = actorSystem.actorOf(
     MatcherActor.props(
       matcherSettings,
-      (self, oldestSnapshotOffset, newestSnapshotOffset) => {
-        import actorSystem.dispatcher
-        implicit val timeout: Timeout = 5.seconds
-
+      (self, oldestSnapshotOffset) => {
         currentOffset.set(oldestSnapshotOffset)
         matcherQueue.startConsume(
           oldestSnapshotOffset + 1,
           eventWithMeta => {
             log.debug(s"[offset=${eventWithMeta.offset}, ts=${eventWithMeta.timestamp}] Consumed ${eventWithMeta.event}")
 
-            // Ignoring possible timeouts or other errors
-            // If an order book doesn't process a message, it will re-process all its messages after fix + restart
-            self
-              .ask(eventWithMeta)
-              .mapTo[MatcherResponse]
-              .map { r =>
-                currentOffset.getAndAccumulate(eventWithMeta.offset, math.max(_, _))
-                // We don't need to resolve old requests, those was did before restart, because we lost clients connections
-                if (eventWithMeta.offset > newestSnapshotOffset) r match {
-                  case AlreadyProcessed =>
-                  case _                => requests.get(jLong.valueOf(eventWithMeta.offset)).trySuccess(r)
-                }
-              }
-              .onComplete {
-                case Failure(e) =>
-                  log.warn(s"An error during processing an event with offset ${eventWithMeta.offset}: ${e.getMessage}", e)
-                  requests.get(jLong.valueOf(eventWithMeta.offset)).tryFailure(e)
-                case _ =>
-              }
+            self ! eventWithMeta
+            bumpOffset(eventWithMeta.offset)
           }
         )
       },
@@ -188,8 +153,9 @@ class Matcher(actorSystem: ActorSystem,
   )
 
   private lazy val addressActors =
-    actorSystem.actorOf(Props(new AddressDirectory(portfoliosChanged, utx.portfolio, storeEvent, matcherSettings, OrderDB(matcherSettings, db))),
-                        "addresses")
+    actorSystem.actorOf(
+      Props(new AddressDirectory(portfoliosChanged, utx.portfolio, matcherQueue.storeEvent, matcherSettings, time, OrderDB(matcherSettings, db))),
+      "addresses")
 
   private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
   private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)
@@ -244,7 +210,7 @@ class Matcher(actorSystem: ActorSystem,
 }
 
 object Matcher extends ScorexLogging {
-  type StoreEvent = QueueEvent => Future[MatcherResponse]
+  type StoreEvent = QueueEvent => Future[QueueEventWithMeta]
 
   def apply(actorSystem: ActorSystem,
             time: Time,

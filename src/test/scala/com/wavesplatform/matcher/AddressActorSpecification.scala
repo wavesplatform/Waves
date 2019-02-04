@@ -5,11 +5,11 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
+import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.matcher.AddressActor.{BalanceUpdated, PlaceOrder}
-import com.wavesplatform.matcher.api.AlreadyProcessed
 import com.wavesplatform.matcher.model.LimitOrder
-import com.wavesplatform.matcher.queue.QueueEvent
+import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{ByteStr, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV1}
 import com.wavesplatform.wallet.Wallet
@@ -23,7 +23,8 @@ class AddressActorSpecification
     with WordSpecLike
     with Matchers
     with BeforeAndAfterAll
-    with ImplicitSender {
+    with ImplicitSender
+    with NTPTime {
 
   private val assetId    = ByteStr("asset".getBytes)
   private val matcherFee = 30000L
@@ -165,6 +166,10 @@ class AddressActorSpecification
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder1.assetPair, sellTokenOrder1.id()))
       eventsProbe.expectMsg(QueueEvent.Canceled(sellTokenOrder2.assetPair, sellTokenOrder2.id()))
     }
+
+    "schedule expired order cancellation" in {
+      pending
+    }
   }
 
   /**
@@ -181,10 +186,11 @@ class AddressActorSpecification
           currentPortfolio.get(),
           1.day,
           1.day,
+          ntpTime,
           EmptyOrderDB,
           event => {
             eventsProbe.ref ! event
-            Future.successful(AlreadyProcessed)
+            Future.successful(QueueEventWithMeta(0, 0, event))
           }
         )))
     f(addressActor, eventsProbe, (updatedPortfolio, notify) => {

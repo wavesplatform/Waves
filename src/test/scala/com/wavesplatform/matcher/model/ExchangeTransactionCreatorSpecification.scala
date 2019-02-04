@@ -1,11 +1,10 @@
 package com.wavesplatform.matcher.model
 
-import com.google.common.base.Charsets
 import com.wavesplatform.NoShrink
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{Blockchain, ByteStr, EitherExt2}
+import com.wavesplatform.state.{Blockchain, EitherExt2}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV1, ExchangeTransactionV2}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -63,10 +62,4 @@ class ExchangeTransactionCreatorSpecification
       }
     }
   }
-
-  private def mkAssetId(prefix: String) = {
-    val prefixBytes = prefix.getBytes(Charsets.UTF_8)
-    Some(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
-  }
-
 }
