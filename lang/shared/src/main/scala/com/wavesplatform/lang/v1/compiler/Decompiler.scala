@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
+import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.Contract.ContractFunction
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
@@ -15,7 +17,7 @@ object Decompiler {
     e match {
       case Terms.FUNC(name, args, body) =>
         out("func " + name + " (" + args.map(_.toString).mkString(","), ident) + ") = {\n" +
-        out(body + "\n", 1 + ident) +
+        out(Decompiler(body, opcodes) + "\n", 1 + ident) +
         out("}", ident)
       case Terms.LET(name, value) => out("let " + name + " =\n" + expr(value, 1 + ident, opcodes), ident)
     }
@@ -56,24 +58,18 @@ object Decompiler {
       case _: Terms.CaseObj => ??? // never happens
     }
 
-  def apply(e :CONTRACT, opcodes:Map[Short,String]): String = {
+  def apply(e :Contract, ident :Int, opcodes:Map[Short,String]): String = {
     e match {
-      case CONTRACT(pos, decl, fs) => fs.map(expr => Decompiler.apply(expr, opcodes)).mkString("\n")
+      case Contract(dec, cfs, vf) =>
+        dec.map(expr => expr.toString).mkString("") +
+        cfs.map(expr => expr match {
+          case ContractFunction(annotation, u) =>
+            out("@Callable(" + annotation.invocationArgName + ")\n", ident) +
+            Decompiler.decl(u, ident, opcodes)
+          case _ => ???
+        }).mkString("") +
+        vf.getOrElse("")
     }
-  }
-
-  def apply(e0 :ANNOTATEDFUNC, opcodes:Map[Short,String]): String = {
-    e0 match {
-      case ANNOTATEDFUNC(position, anns, f) => Decompiler(anns, opcodes) + Decompiler(f :com.wavesplatform.lang.v1.parser.Expressions.FUNC, opcodes)
-    }
-  }
-  
-  def apply(e0: Seq[ANNOTATION], opCodes:Map[Short,String]): String = {
-    e0.mkString(",-todo-")
-  }
-  
-  def apply(e0 :com.wavesplatform.lang.v1.parser.Expressions.FUNC, opcodes:Map[Short,String]): String = {
-    Decompiler(e0, opcodes)
   }
 
   def apply(e0 :EXPR, opcodes:Map[Short,String]): String =
