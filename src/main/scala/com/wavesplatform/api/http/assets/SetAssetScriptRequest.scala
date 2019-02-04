@@ -3,7 +3,7 @@ package com.wavesplatform.api.http.assets
 import play.api.libs.json.{Format, JsNumber, JsObject, Json}
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 
-case class SetAssetScriptRequest(version: Byte, sender: String, assetId: String, script: Option[String], fee: Long, timestamp: Option[Long] = None) {}
+case class SetAssetScriptRequest(sender: String, assetId: String, script: Option[String], fee: Long, timestamp: Option[Long] = None) {}
 
 object SetAssetScriptRequest {
   implicit val jsonFormat: Format[SetAssetScriptRequest] = Json.format

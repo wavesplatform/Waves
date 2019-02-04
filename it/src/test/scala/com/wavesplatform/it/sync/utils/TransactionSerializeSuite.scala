@@ -109,7 +109,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val burnV2 = BurnTransactionV2
     .create(
-      2,
       chainId,
       publicKey,
       ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
@@ -134,7 +133,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val aliasV2 = CreateAliasTransactionV2
     .create(
-      2,
       publicKey,
       Alias.buildWithCurrentChainId("myalias").right.get,
       minFee,
@@ -146,7 +144,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val data = DataTransaction
     .create(
-      1,
       publicKey,
       List(IntegerDataEntry("int", 24), BooleanDataEntry("bool", true), BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))),
       minFee,
@@ -173,7 +170,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val issueV2 = IssueTransactionV2
     .create(
-      2,
       chainId,
       publicKey,
       "Gigacoin".getBytes,
@@ -202,7 +198,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val leasecancelV2 = LeaseCancelTransactionV2
     .create(
-      2,
       'I',
       publicKey,
       ByteStr.decodeBase58("DJWkQxRyJNqWhq9qSQpK2D4tsrct6eZbjSv3AH4PSha6").get,
@@ -227,7 +222,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val leaseV2 = LeaseTransactionV2
     .create(
-      2,
       publicKey,
       10000000,
       minFee,
@@ -245,7 +239,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   val mass = MassTransferTransaction
     .create(
-      1,
       None,
       publicKey,
       transfers,
@@ -272,7 +265,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val reissueV2 = ReissueTransactionV2
     .create(
-      2,
       chainId,
       publicKey,
       ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
@@ -287,7 +279,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val setasset = SetAssetScriptTransaction
     .create(
-      1,
       chainId,
       publicKey,
       ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get,
@@ -307,7 +298,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val setscript = SetScriptTransaction
     .create(
-      1,
       publicKey,
       None,
       setScriptFee,
@@ -319,7 +309,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val sponsor = SponsorFeeTransaction
     .create(
-      1,
       publicKey,
       ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
       Some(100000),
@@ -347,7 +336,6 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val transferV2 = TransferTransactionV2
     .create(
-      2,
       None,
       publicKey,
       Address.fromString(sender.address).right.get,

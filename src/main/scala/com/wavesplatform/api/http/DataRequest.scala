@@ -13,16 +13,13 @@ object DataRequest {
   implicit val signedDataRequestReads   = Json.reads[SignedDataRequest]
 }
 
-case class DataRequest(@(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1") version: Byte,
-                       sender: String,
+case class DataRequest(sender: String,
                        @(ApiModelProperty @field)(required = true) data: List[DataEntry[_]],
                        @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
                        timestamp: Option[Long] = None)
 
 @ApiModel(value = "Signed Data transaction")
-case class SignedDataRequest(@(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1")
-                             version: Byte,
-                             @(ApiModelProperty @field)(value = "Base58 encoded sender public key", required = true)
+case class SignedDataRequest(@(ApiModelProperty @field)(value = "Base58 encoded sender public key", required = true)
                              senderPublicKey: String,
                              @(ApiModelProperty @field)(value = "Data to put into blockchain", required = true)
                              data: List[DataEntry[_]],
@@ -38,6 +35,6 @@ case class SignedDataRequest(@(ApiModelProperty @field)(required = true, dataTyp
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- DataTransaction.create(version, _sender, data, fee, timestamp, _proofs)
+      t           <- DataTransaction.create(_sender, data, fee, timestamp, _proofs)
     } yield t
 }

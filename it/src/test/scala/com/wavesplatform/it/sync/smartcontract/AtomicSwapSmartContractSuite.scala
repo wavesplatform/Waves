@@ -74,11 +74,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val pkSwapBC1 = pkByAddress(swapBC1)
     val script    = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
     val sc1SetTx = SetScriptTransaction
-      .selfSigned(version = SetScriptTransaction.supportedVersions.head,
-                  sender = pkSwapBC1,
-                  script = Some(script),
-                  fee = setScriptFee,
-                  timestamp = System.currentTimeMillis())
+      .selfSigned(sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender
@@ -97,7 +93,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val txToSwapBC1 =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = pkByAddress(AliceBC1),
           recipient = AddressOrAlias.fromString(swapBC1).explicitGet(),
@@ -119,7 +114,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val txToSwapBC1 =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = pkByAddress(swapBC1),
           recipient = AddressOrAlias.fromString(AliceBC1).explicitGet(),
@@ -144,7 +138,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val unsigned =
       TransferTransactionV2
         .create(
-          version = 2,
           assetId = None,
           sender = pkByAddress(swapBC1),
           recipient = AddressOrAlias.fromString(BobBC1).explicitGet(),
@@ -180,7 +173,6 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
     val selfSignedToAlice = TransferTransactionV2
       .selfSigned(
-        version = 2,
         assetId = None,
         sender = pkByAddress(swapBC1),
         recipient = AddressOrAlias.fromString(AliceBC1).explicitGet(),

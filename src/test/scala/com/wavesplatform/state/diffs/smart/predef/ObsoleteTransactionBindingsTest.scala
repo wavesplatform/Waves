@@ -78,7 +78,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
     untypedScript               = Parser.parseScript(script(genesis, payment)).get.value
     typedScript                 = ExprScript(ExpressionCompilerV1(compilerContext(ExprV1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction
-      .selfSigned(1, recipient, Some(typedScript), 100000000L, ts)
+      .selfSigned(recipient, Some(typedScript), 100000000L, ts)
       .explicitGet()
     nextTransfer <- transferGeneratorPV2(ts, recipient, master.toAddress, ENOUGH_AMT)
   } yield (genesis, payment, setScriptTransaction, nextTransfer)

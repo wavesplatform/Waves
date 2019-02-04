@@ -34,12 +34,12 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     val compiled = ScriptCompiler(scriptSrc, isAssetScript = false).explicitGet()._1
 
-    val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(1, acc2, Some(compiled), setScriptFee, ts).explicitGet().json())
+    val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(acc2, Some(compiled), setScriptFee, ts).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
     val alias = Alias.fromString(s"alias:${AddressScheme.current.chainId.toChar}:asdasdasdv").explicitGet()
     assertBadRequestAndResponse(
-      sender.signedBroadcast(CreateAliasTransactionV2.selfSigned(acc2, 2, alias, minFee, ts).explicitGet().json()),
+      sender.signedBroadcast(CreateAliasTransactionV2.selfSigned(acc2, alias, minFee, ts).explicitGet().json()),
       "Your transaction has incorrect type."
     )
   }
@@ -54,7 +54,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     val tx = sender.signAndBroadcast(
       SetScriptTransaction
-        .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), setScriptFee, ts)
+        .selfSigned(acc0, Some(script), setScriptFee, ts)
         .explicitGet()
         .json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
@@ -62,7 +62,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
     assertBadRequestAndResponse(
       sender.signedBroadcast(
         TransferTransactionV2
-          .selfSigned(2, None, acc0, acc1.toAddress, 1000, ts, None, minFee, Array())
+          .selfSigned(None, acc0, acc1.toAddress, 1000, ts, None, minFee, Array())
           .explicitGet()
           .json()),
       "not a boolean"

@@ -78,7 +78,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
         ts     <- positiveLongGen
         genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
         script  = ExprScript(ExprV2, TRUE, checkSize = false).explicitGet()
-        tx      = SetScriptTransaction.selfSigned(1, master, Some(script), 100000, ts + 1).explicitGet()
+        tx      = SetScriptTransaction.selfSigned(master, Some(script), 100000, ts + 1).explicitGet()
       } yield (genesis, tx)
 
       forAll(setup) {

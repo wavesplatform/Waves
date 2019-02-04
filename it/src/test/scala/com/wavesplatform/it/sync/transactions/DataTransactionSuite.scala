@@ -49,7 +49,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
              fee: Long = 100000,
              timestamp: Long = System.currentTimeMillis,
              version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
-      DataTransaction.selfSigned(version, sender.privateKey, entries, fee, timestamp).explicitGet()
+      DataTransaction.selfSigned(sender.privateKey, entries, fee, timestamp).explicitGet()
 
     val (balance1, eff1) = notMiner.accountBalances(firstAddress)
     val invalidTxs = Seq(

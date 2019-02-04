@@ -25,7 +25,6 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = sender.privateKey,
           recipient = contract,
@@ -47,7 +46,6 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = sender.privateKey,
           recipient = caller,
@@ -84,7 +82,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
 
     val script = ScriptCompiler.contract(scriptText).explicitGet()
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, contract, Some(script), setScriptFee, System.currentTimeMillis())
+      .selfSigned(contract, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender
@@ -110,7 +108,6 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     val tx =
       ContractInvocationTransaction
         .selfSigned(
-          version = 1,
           sender = caller,
           contractAddress = contract,
           fc = fc,
@@ -135,7 +132,6 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     val tx =
       DataTransaction
         .create(
-          version = 1: Byte,
           sender = contract,
           data = List(StringDataEntry("a", "OOO")),
           feeAmount = 1.waves,
