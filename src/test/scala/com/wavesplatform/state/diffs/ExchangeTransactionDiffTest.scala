@@ -450,13 +450,26 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  def scriptGen(caseType: String, v: Boolean): String = {
-    s"""
-       |match tx {
-       | case o: $caseType => $v
-       | case _ => ${!v}
+  def scriptGen(caseType: String, v: Boolean): Gen[String] = Gen.oneOf(true, false).map { full =>
+    val expr =
+      s"""
+       |  match tx {
+       |   case o: $caseType => $v
+       |   case _ => ${!v}
+       |  }
+     """.stripMargin
+    lazy val contract = s"""
+       |
+       |{-# STDLIB_VERSION 3 #-}
+       |{-# SCRIPT_TYPE CONTRACT #-}
+       |
+       | @Verifier(tx)
+       | func verify() = {
+       | $expr
        |}
       """.stripMargin
+
+    if (full) contract else expr
   }
 
   def changeOrderSignature(signWith: Array[Byte], o: Order): Order = {
@@ -483,19 +496,21 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  def smartTradePreconditions(buyerScriptSrc: String,
-                              sellerScriptSrc: String,
-                              txScript: String): Gen[(GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction)] = {
+  def smartTradePreconditions(buyerScriptSrc: Gen[String],
+                              sellerScriptSrc: Gen[String],
+                              txScript: Gen[String]): Gen[(GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction)] = {
     val enoughFee = 100000000
-
-    val txScriptCompiled = ScriptCompiler(txScript, isAssetScript = false).explicitGet()._1
-
-    val sellerScript = Some(ScriptCompiler(sellerScriptSrc, isAssetScript = false).explicitGet()._1)
-    val buyerScript  = Some(ScriptCompiler(buyerScriptSrc, isAssetScript = false).explicitGet()._1)
 
     val chainId = AddressScheme.current.chainId
 
     for {
+      txScript <- txScript
+      txScriptCompiled = ScriptCompiler(txScript, isAssetScript = false).explicitGet()._1
+      sellerScriptSrc <- sellerScriptSrc
+      sellerScript = Some(ScriptCompiler(sellerScriptSrc, isAssetScript = false).explicitGet()._1)
+      buyerScriptSrc <- buyerScriptSrc
+      buyerScript = Some(ScriptCompiler(buyerScriptSrc, isAssetScript = false).explicitGet()._1)
+
       buyer  <- accountGen
       seller <- accountGen
       ts     <- timestampGen
