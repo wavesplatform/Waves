@@ -7,7 +7,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Version
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction}
+import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV2
+import com.wavesplatform.transaction.smart.script.ContractScript
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
@@ -31,9 +31,8 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
   def dataContract(senderBinding: String, argName: String, funcName: String) = Contract(
     List.empty,
     List(
-      ContractFunction(
+      CallableFunction(
         CallableAnnotation(senderBinding),
-        None,
         Terms.FUNC(
           funcName,
           List(argName),
@@ -55,9 +54,8 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
   def paymentContract(senderBinding: String, argName: String, funcName: String, recipientAddress: Address, recipientAmount: Long) = Contract(
     List.empty,
     List(
-      ContractFunction(
+      CallableFunction(
         CallableAnnotation(senderBinding),
-        None,
         Terms.FUNC(
           funcName,
           List(argName),
@@ -104,8 +102,8 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       arg         <- genBoundedString(1, 32)
       funcBinding <- validAliasStringGen
       contract    <- senderBindingToContract(funcBinding)
-      script      = ScriptV2(Version.V3, contract)
-      setContract = SetScriptTransaction.selfSigned(setScriptVersion, master, Some(script), fee, ts).explicitGet()
+      script      = ContractScript(Version.ContractV, contract)
+      setContract = SetScriptTransaction.selfSigned(setScriptVersion, master, script.toOption, fee, ts).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
       ci          = ContractInvocationTransaction.selfSigned(ciVersion, invoker, master, fc, None, fee, ts).explicitGet()
     } yield (List(genesis, genesis2), setContract, ci)

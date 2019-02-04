@@ -11,14 +11,13 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.CheckpointServiceImpl
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.BlockWithMaxBaseTargetTest.Env
 import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.{BlockchainUpdater, CheckpointService, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utils.BaseTargetReachedMaximum
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -38,13 +37,13 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   "base target limit" - {
     "node should stop if base target greater than maximum in block creation " in {
       withEnv {
-        case Env(settings, pos, bcu, checkpoint, utxPoolStub, scheduler, account, lastBlock) =>
+        case Env(settings, pos, bcu, utxPoolStub, scheduler, account, lastBlock) =>
           var stopReasonCode = 0
 
           val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           val wallet      = Wallet(WalletSettings(None, Some("123"), None))
           val miner =
-            new MinerImpl(allChannels, bcu, checkpoint, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler)
+            new MinerImpl(allChannels, bcu, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler)
 
           val signal = new Semaphore(1)
           signal.acquire()
@@ -76,7 +75,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
 
     "node should stop if base target greater than maximum in block append" in {
       withEnv {
-        case Env(settings, pos, bcu, checkpoint, utxPoolStub, scheduler, _, lastBlock) =>
+        case Env(settings, pos, bcu, utxPoolStub, scheduler, _, lastBlock) =>
           var stopReasonCode = 0
 
           val signal = new Semaphore(1)
@@ -96,7 +95,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
             }
           })
 
-          val blockAppendTask = BlockAppender(checkpoint, bcu, ntpTime, utxPoolStub, pos, settings, scheduler)(lastBlock)
+          val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, settings, scheduler)(lastBlock)
           Await.result(blockAppendTask.runAsync(scheduler), Duration.Inf)
 
           signal.tryAcquire(10, TimeUnit.SECONDS)
@@ -120,16 +119,15 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
     )
     val synchronizationSettings0 = settings0.synchronizationSettings.copy(maxBaseTargetOpt = Some(1L))
     val settings = settings0.copy(
-      minerSettings = minerSettings,
-      featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false),
       blockchainSettings = blockchainSettings0,
-      synchronizationSettings = synchronizationSettings0
+      minerSettings = minerSettings,
+      synchronizationSettings = synchronizationSettings0,
+      featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
     val bcu = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
 
-    val checkpoint = new CheckpointServiceImpl(db, settings.checkpointsSettings)
     val utxPoolStub = new UtxPool {
       override def putIfNew(tx: Transaction)                               = ???
       override def removeAll(txs: Traversable[Transaction]): Unit          = {}
@@ -166,7 +164,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
 
       bcu.processBlock(firstBlock).explicitGet()
 
-      f(Env(settings, pos, bcu, checkpoint, utxPoolStub, schedulerService, account, secondBlock))
+      f(Env(settings, pos, bcu, utxPoolStub, schedulerService, account, secondBlock))
 
       bcu.shutdown()
     } finally {
@@ -181,7 +179,6 @@ object BlockWithMaxBaseTargetTest {
   final case class Env(settings: WavesSettings,
                        pos: PoSSelector,
                        bcu: BlockchainUpdater with NG,
-                       checkpoint: CheckpointService,
                        utxPool: UtxPool,
                        schedulerService: SchedulerService,
                        miner: PrivateKeyAccount,

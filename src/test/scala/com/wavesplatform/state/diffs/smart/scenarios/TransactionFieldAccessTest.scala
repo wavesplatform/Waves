@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.Version.ExprV1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs.smart._
@@ -22,7 +22,7 @@ class TransactionFieldAccessTest extends PropSpec with PropertyChecks with Match
   private def preconditionsTransferAndLease(
       code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransactionV2)] = {
     val untyped = Parser.parseScript(code).get.value
-    val typed   = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untyped).explicitGet()._1
+    val typed   = ExpressionCompilerV1(compilerContext(ExprV1, isAssetScript = false), untyped).explicitGet()._1
     preconditionsTransferAndLease(typed)
   }
 

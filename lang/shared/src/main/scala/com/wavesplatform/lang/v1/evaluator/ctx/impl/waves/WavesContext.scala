@@ -88,7 +88,7 @@ object WavesContext {
         ("@data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"),
         ("@index", LONG, "index")
       ) {
-        BLOCKV1(
+        LET_BLOCK(
           LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(REF("@data"), REF("@index"))), "value")),
           IF(FUNCTION_CALL(PureContext._isInstanceOf, List(REF("@val"), CONST_STRING(dataType.innerType.name))), REF("@val"), REF("unit"))
         )
@@ -115,7 +115,7 @@ object WavesContext {
         FUNCTION_CALL(
           FunctionHeader.User("Address"),
           List(
-            BLOCKV1(
+            LET_BLOCK(
               LET(
                 "@afpk_withoutChecksum",
                 FUNCTION_CALL(
@@ -183,7 +183,7 @@ object WavesContext {
     lazy val addressFromStringF: BaseFunction =
       UserFunction("addressFromString", optionAddress, "Decode account address", ("@string", STRING, "string address represntation")) {
 
-        BLOCKV1(
+        LET_BLOCK(
           LET("@afs_addrBytes",
               FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(REF("@string"), EnvironmentFunctions.AddressPrefix)))),
           IF(
@@ -377,7 +377,7 @@ object WavesContext {
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
-      types ++ (if (version == V3) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
+      types ++ (if (version == ContractV) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
                 else List.empty),
       commonVars ++ vars(version),
       functions
@@ -385,6 +385,6 @@ object WavesContext {
   }
 
   val verifierInput =
-    UnionType("VerifierInput", (buildOrderType(true) :: buildActiveTransactionTypes(true, V3)).map(_.typeRef))
+    UnionType("VerifierInput", (buildOrderType(true) :: buildActiveTransactionTypes(true, ContractV)).map(_.typeRef))
 
 }

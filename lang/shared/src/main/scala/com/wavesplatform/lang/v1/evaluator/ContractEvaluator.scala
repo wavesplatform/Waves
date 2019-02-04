@@ -15,23 +15,24 @@ import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
 import scala.collection.mutable.ListBuffer
 
 object ContractEvaluator {
-  case class Invokation(name: String, fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
+  case class Invokation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
 
   def eval(c: Contract, i: Invokation): EvalM[EVALUATED] = {
-    c.cfs.find(_.u.name == i.name) match {
-      case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '${i.name} doesn't exist in the contract")
+    val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name
+    c.cfs.find(_.u.name == functionName) match {
+      case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '$functionName doesn't exist in the contract")
       case Some(f) =>
         val zeroExpr = Right(
-          BLOCKV2(
-            LET(f.c.invocationArgName,
+          BLOCK(
+            LET(f.annotation.invocationArgName,
                 Bindings
                   .buildInvocation(Recipient.Address(i.invoker), i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.contractAddress))),
-            BLOCKV2(f.u, i.fc)
+            BLOCK(f.u, i.fc)
           ))
 
         for {
           ze <- liftEither(zeroExpr)
-          expr = c.dec.foldRight(ze)((d, e) => BLOCKV2(d, e))
+          expr = c.dec.foldRight(ze)((d, e) => BLOCK(d, e))
           r <- EvaluatorV1.evalExpr(expr)
         } yield r
     }
@@ -40,7 +41,7 @@ object ContractEvaluator {
   def verify(v: VerifierFunction, tx: Tx): EvalM[EVALUATED] = {
     val t = Bindings.transactionObject(tx, proofsEnabled = true)
     val expr =
-      BLOCKV2(LET(v.v.txArgName, t), BLOCKV2(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+      BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 

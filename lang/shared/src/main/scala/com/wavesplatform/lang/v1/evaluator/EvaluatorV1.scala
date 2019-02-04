@@ -99,8 +99,8 @@ object EvaluatorV1 {
     } yield result
 
   def evalExpr(t: EXPR): EvalM[EVALUATED] = t match {
-    case BLOCKV1(let, inner) => evalLetBlock(let, inner)
-    case BLOCKV2(dec, inner) =>
+    case LET_BLOCK(let, inner) => evalLetBlock(let, inner)
+    case BLOCK(dec, inner) =>
       dec match {
         case l: LET  => evalLetBlock(l, inner)
         case f: FUNC => evalFuncBlock(f, inner)

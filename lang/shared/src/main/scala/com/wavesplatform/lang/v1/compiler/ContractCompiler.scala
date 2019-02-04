@@ -52,7 +52,7 @@ object ContractCompiler {
               Generic(0, 0, s"ContractFunction must return WriteSet/PaymentSet/ContractResult, but got '$tpe'")
             )
             .toCompileM
-        } yield ContractFunction(c, None, func)
+        } yield CallableFunction(c, func)
       case (List(c: VerifierAnnotation), (func, tpe, _)) =>
         for {
           _ <- Either
@@ -95,7 +95,7 @@ object ContractCompiler {
       ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
       l  <- contract.fs.traverse[CompileM, AnnotatedFunction](compileAnnotatedFunc)
       v  = l.find(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
-      fs = l.filter(_.isInstanceOf[ContractFunction]).map(_.asInstanceOf[ContractFunction])
+      fs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
     } yield Contract(ds, fs, v)
   }
 

@@ -3,7 +3,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -20,7 +20,7 @@ import org.scalatest.{Matchers, PropSpec}
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   property("contract compiles when uses annotation bindings and correct return type") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
     val expr = {
       val script =
         """
@@ -43,13 +43,12 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val expectedResult = Right(
       Contract(
         List.empty,
-        List(ContractFunction(
+        List(CallableFunction(
           CallableAnnotation("invocation"),
-          None,
           Terms.FUNC(
             "foo",
             List("a"),
-            BLOCKV2(
+            BLOCK(
               LET("sender0", GETTER(GETTER(REF("invocation"), "caller"), "bytes")),
               FUNCTION_CALL(
                 User(FieldNames.WriteSet),
@@ -93,9 +92,9 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(Version.V3),
+          PureContext.build(Version.ContractV),
           CryptoContext.build(com.wavesplatform.lang.Global),
-          WavesContext.build(Version.V3, Common.emptyBlockchainEnvironment(), false)
+          WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false)
         ))
       .compilerContext
     val expr = {

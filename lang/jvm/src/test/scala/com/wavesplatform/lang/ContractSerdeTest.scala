@@ -24,7 +24,6 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 //    "empty" in {
 //      val cf = ContractFunction(
 //        CallableAnnotation("whoooo"),
-//        Some(PayableAnnotation("whoaaa", "cryptoruble")),
 //        FUNC("anotherFunc", List("argssss"), CONST_BOOLEAN(true))
 //      )
 //      val bytes = ContractSerDe.serializeContractFunction(,cf)
@@ -38,9 +37,8 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
         ),
         List(
-          ContractFunction(
+          CallableFunction(
             CallableAnnotation("whoooo"),
-            Some(PayableAnnotation("whoaaa", "cryptoruble")),
             FUNC("anotherFunc", List("argssss"), CONST_BOOLEAN(true))
           )
         ),
@@ -56,9 +54,8 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
       Contract(
         List(),
         List(
-          ContractFunction(
+          CallableFunction(
             CallableAnnotation("sender"),
-            None, //  Some(PayableAnnotation("whoaaa", "cryptoruble")),
             FUNC("foo", List("a"), REF("a"))
           )
         ),

@@ -1,11 +1,15 @@
 package com.wavesplatform.utx
 
+import java.nio.file.Files
+
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform._
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.db.openDB
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -19,10 +23,11 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
+import com.wavesplatform.utx.UtxPoolSpecification.TempDB
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
@@ -31,7 +36,20 @@ import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink with WithDB {
+private object UtxPoolSpecification {
+  final case class TempDB(fs: FunctionalitySettings) {
+    val path   = Files.createTempDirectory("leveldb-test")
+    val db     = openDB(path.toAbsolutePath.toString)
+    val writer = new LevelDBWriter(db, fs, 100000, 2000, 120 * 60 * 1000)
+
+    Runtime.getRuntime.addShutdownHook(new Thread(() => {
+      db.close()
+      TestHelpers.deleteRecursively(path)
+    }))
+  }
+}
+
+class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink {
   val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import CommonValidation.{ScriptExtraFee => extraFee}
@@ -47,14 +65,16 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         FunctionalitySettings.TESTNET.copy(
           preActivatedFeatures = Map(
             BlockchainFeatures.MassTransfer.id  -> 0,
-            BlockchainFeatures.SmartAccounts.id -> 0
+            BlockchainFeatures.SmartAccounts.id -> 0,
+            BlockchainFeatures.Ride4DApps.id    -> 0
           )),
         genesisSettings
       ),
       featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val bcu = StorageFactory(settings, db, new TestTime())
+    val dbContext = TempDB(settings.blockchainSettings.functionalitySettings)
+    val bcu       = StorageFactory(settings, dbContext.db, new TestTime())
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
     bcu
   }
@@ -221,7 +241,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     compiler.compile(code, List.empty).explicitGet()
   }
 
-  private val script: Script = ScriptV1(expr).explicitGet()
+  private val script: Script = ExprScript(expr).explicitGet()
 
   private def preconditionsGen(lastBlockId: ByteStr, master: PrivateKeyAccount): Gen[Seq[Block]] =
     for {

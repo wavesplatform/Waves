@@ -10,7 +10,7 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, ValidationError}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -89,7 +89,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       recipientAcc <- accountGen
       ts = System.currentTimeMillis()
     } yield {
-      val script = ScriptV1(TRUE).explicitGet()
+      val script = ExprScript(TRUE).explicitGet()
 
       val genesisTx = GenesisTransaction.create(richAcc, ENOUGH_AMT, ts).explicitGet()
 
