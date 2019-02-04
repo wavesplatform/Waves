@@ -295,6 +295,19 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(11)
   }
 
+  property("function overload is denied") {
+    eval[EVALUATED](
+      """
+                      |
+                      |func extract(x:Int, y: Int) = {
+                      |   4
+                      |}
+                      | extract(10)
+                    """.stripMargin,
+      Some(pointAInstance)
+    ) should produce("already defined")
+  }
+
   property("context won't change after inner let") {
     val script = "{ let x = 3; x } + { let x = 5; x}"
     eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(8)

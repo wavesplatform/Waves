@@ -112,7 +112,7 @@ object ExpressionCompiler {
     } yield compiledMatch
   }
 
-  private def compileBlock(pos: Expressions.Pos, declaration: Expressions.Declaration, expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] =
+  def compileBlock(pos: Expressions.Pos, declaration: Expressions.Declaration, expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] =
     declaration match {
       case l: Expressions.LET  => compileLetBlock(pos, l, expr)
       case f: Expressions.FUNC => compileFuncBlock(pos, f, expr)
@@ -171,12 +171,18 @@ object ExpressionCompiler {
     } yield (func, compiledFuncBody._2, argTypes)
   }
 
+  def updateCtx(letName: String, letType: Types.FINAL, p: Pos): CompileM[Unit] =
+    modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (letType -> s"Defined at ${p.start}"))))
+
+  def updateCtx(funcName: String, typeSig: FunctionTypeSignature): CompileM[Unit] =
+    modify[CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> List(typeSig))))
+
   private def compileLetBlock(p: Pos, let: Expressions.LET, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
     for {
       compiledLet <- compileLet(p, let)
       (letName, letType, letExpr) = compiledLet
       compiledBody <- local {
-        modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (letType -> s"Defined at ${p.start}"))))
+        updateCtx(letName, letType, p)
           .flatMap(_ => compileExpr(body))
       }
     } yield (BLOCK(LET(letName, letExpr), compiledBody._1), compiledBody._2)
@@ -188,7 +194,7 @@ object ExpressionCompiler {
       (func, compiledFuncBodyType, argTypes) = f
       typeSig                                = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(func.name))
       compiledBody <- local {
-        modify[CompilerContext, CompilationError](functions.modify(_)(_ + (func.name -> List(typeSig))))
+        updateCtx(func.name, typeSig)
           .flatMap(_ => compileExpr(body))
       }
     } yield (BLOCK(func, compiledBody._1), compiledBody._2)
