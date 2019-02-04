@@ -7,9 +7,7 @@ import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.{CreateAliasTransaction, CreateAliasTransactionV2, Proofs, ValidationError}
 import cats.implicits._
 
-case class SignedCreateAliasV2Request(@ApiModelProperty(required = true)
-                                      version: Byte,
-                                      @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+case class SignedCreateAliasV2Request(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                       senderPublicKey: String,
                                       @ApiModelProperty(required = true)
                                       fee: Long,
@@ -26,7 +24,7 @@ case class SignedCreateAliasV2Request(@ApiModelProperty(required = true)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _alias      <- Alias.buildWithCurrentChainId(alias)
-      _t          <- CreateAliasTransactionV2.create(version, _sender, _alias, fee, timestamp, _proofs)
+      _t          <- CreateAliasTransactionV2.create(_sender, _alias, fee, timestamp, _proofs)
     } yield _t
 }
 

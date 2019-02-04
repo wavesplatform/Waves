@@ -11,8 +11,6 @@ import play.api.libs.json.{JsPath, Reads}
 
 case class SignedReissueV2Request(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
                                   senderPublicKey: String,
-                                  @ApiModelProperty(required = true)
-                                  version: Byte,
                                   @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
                                   assetId: String,
                                   @ApiModelProperty(required = true, example = "1000000")
@@ -33,14 +31,13 @@ case class SignedReissueV2Request(@ApiModelProperty(value = "Base58 encoded Issu
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _assetId    <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
-      _t          <- ReissueTransactionV2.create(version, chainId, _sender, _assetId, quantity, reissuable, fee, timestamp, _proofs)
+      _t          <- ReissueTransactionV2.create(chainId, _sender, _assetId, quantity, reissuable, fee, timestamp, _proofs)
     } yield _t
 }
 
 object SignedReissueV2Request {
   implicit val assetReissueRequestReads: Reads[SignedReissueV2Request] = (
     (JsPath \ "senderPublicKey").read[String] and
-      (JsPath \ "version").read[Byte] and
       (JsPath \ "assetId").read[String] and
       (JsPath \ "quantity").read[Long] and
       (JsPath \ "reissuable").read[Boolean] and

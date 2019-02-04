@@ -24,14 +24,15 @@ case class LeaseTransactionV1 private (sender: PublicKeyAccount,
   override val builder: TransactionParser = LeaseTransactionV1
   val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
-  override def version: Byte              = 1
+
+  override def version: Byte = 1
 }
 
 object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with TransactionParser.HardcodedVersion1 {
 
   override val typeId: Byte = LeaseTransaction.typeId
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       (for {
         parsed <- LeaseTransaction.parseBase(bytes, 0)
@@ -40,16 +41,18 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
         lt <- LeaseTransactionV1.create(sender, quantity, fee, timestamp, recipient, signature)
       } yield lt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
+  }
 
   def create(sender: PublicKeyAccount,
              amount: Long,
              fee: Long,
              timestamp: Long,
              recipient: AddressOrAlias,
-             signature: ByteStr): Either[ValidationError, TransactionT] =
+             signature: ByteStr): Either[ValidationError, TransactionT] = {
     LeaseTransaction
       .validateLeaseParams(amount, fee, recipient, sender)
       .map(_ => LeaseTransactionV1(sender, amount, fee, timestamp, recipient, signature))
+  }
 
   def signed(sender: PublicKeyAccount,
              amount: Long,
@@ -70,7 +73,7 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
     signed(sender, amount, fee, timestamp, recipient, sender)
   }
 
-  val byteDescription: ByteEntity[LeaseTransactionV1] = {
+  val byteTailDescription: ByteEntity[LeaseTransactionV1] = {
     (
       ConstantByte(1, value = typeId, name = "Transaction type") ~
         PublicKeyAccountBytes(2, "Sender's public key") ~

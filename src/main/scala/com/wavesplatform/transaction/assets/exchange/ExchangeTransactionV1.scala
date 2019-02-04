@@ -33,12 +33,14 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
   @ApiModelProperty(hidden = true)
   override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
 
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Array(builder.typeId) ++
-      Ints.toByteArray(buyOrder.bytes().length) ++ Ints.toByteArray(sellOrder.bytes().length) ++
-      buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
-      Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
-      Longs.toByteArray(timestamp))
+  override val bodyBytes: Coeval[Array[Byte]] =
+    Coeval.evalOnce(
+      Array(builder.typeId) ++
+        Ints.toByteArray(buyOrder.bytes().length) ++ Ints.toByteArray(sellOrder.bytes().length) ++
+        buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+        Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
+        Longs.toByteArray(timestamp)
+    )
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature.arr)
 
@@ -86,7 +88,7 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
     }
   }
 
-  override def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] = {
+  override def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     def read[T](f: Array[Byte] => T, size: Int): State[Int, T] = State { from =>
       val end = from + size
       (end, f(bytes.slice(from, end)))
@@ -113,7 +115,7 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
     }.flatten
   }
 
-  val byteDescription: ByteEntity[ExchangeTransactionV1] = {
+  val byteTailDescription: ByteEntity[ExchangeTransactionV1] = {
     (
       ConstantByte(1, value = ExchangeTransactionV1.typeId, name = "Transaction type") ~
         IntBytes(2, "Buy order object length (BN)") ~

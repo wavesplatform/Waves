@@ -67,7 +67,6 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
-          2,
           AddressScheme.current.chainId,
           company,
           "name".getBytes(StandardCharsets.UTF_8),
@@ -84,7 +83,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
       assetId = issueTransaction.id()
 
       kingDataTransaction = DataTransaction
-        .selfSigned(1, king, List(BinaryDataEntry("notary1PK", ByteStr(notary.publicKey))), 1000, ts + 1)
+        .selfSigned(king, List(BinaryDataEntry("notary1PK", ByteStr(notary.publicKey))), 1000, ts + 1)
         .explicitGet()
 
       transferFromCompanyToA = TransferTransactionV1
@@ -96,11 +95,11 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
         .explicitGet()
 
       notaryDataTransaction = DataTransaction
-        .selfSigned(1, notary, List(BooleanDataEntry(transferFromAToB.id().base58, true)), 1000, ts + 4)
+        .selfSigned(notary, List(BooleanDataEntry(transferFromAToB.id().base58, true)), 1000, ts + 4)
         .explicitGet()
 
       accountBDataTransaction = DataTransaction
-        .selfSigned(1, accountB, List(BooleanDataEntry(transferFromAToB.id().base58, true)), 1000, ts + 5)
+        .selfSigned(accountB, List(BooleanDataEntry(transferFromAToB.id().base58, true)), 1000, ts + 5)
         .explicitGet()
     } yield
       (Seq(genesis1, genesis2, genesis3, genesis4, genesis5),

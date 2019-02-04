@@ -35,12 +35,12 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[Privat
 
     val setScripts = Range(0, settings.scripts) flatMap (_ =>
       accounts.map { i =>
-        SetScriptTransaction.selfSigned(1, i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
+        SetScriptTransaction.selfSigned(i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
       })
 
     val txs = Range(0, settings.transfers).map { i =>
       TransferTransactionV2
-        .selfSigned(2, None, bank, bank, 1.waves - 2 * fee, System.currentTimeMillis(), None, fee, Array.emptyByteArray)
+        .selfSigned(None, bank, bank, 1.waves - 2 * fee, System.currentTimeMillis(), None, fee, Array.emptyByteArray)
         .explicitGet()
     }
 

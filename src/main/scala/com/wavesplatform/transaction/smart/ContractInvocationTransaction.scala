@@ -20,8 +20,7 @@ import play.api.libs.json.{Format, JsObject}
 
 import scala.util.{Failure, Success, Try}
 
-case class ContractInvocationTransaction private (version: Byte,
-                                                  chainId: Byte,
+case class ContractInvocationTransaction private (chainId: Byte,
                                                   sender: PublicKeyAccount,
                                                   contractAddress: Address,
                                                   fc: Terms.FUNCTION_CALL,
@@ -33,55 +32,71 @@ case class ContractInvocationTransaction private (version: Byte,
     with VersionedTransaction
     with FastHashId {
 
-  override val builder: TransactionParser = ContractInvocationTransaction
-
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(
-      Array(builder.typeId, version, chainId),
-      sender.publicKey,
-      contractAddress.bytes.arr,
-      Serde.serialize(fc),
-      Deser.serializeOption(payment)(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId)(_.arr)),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp)
-    ))
   import ContractInvocationTransaction.paymentPartFormat
   import play.api.libs.json.Json
+
+  override val builder: TransactionParser = ContractInvocationTransaction
+
+  val bodyBytes: Coeval[Array[Byte]] =
+    Coeval.evalOnce(
+      Bytes.concat(
+        Array(builder.typeId, version, chainId),
+        sender.publicKey,
+        contractAddress.bytes.arr,
+        Serde.serialize(fc),
+        Deser.serializeOption(payment)(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId)(_.arr)),
+        Longs.toByteArray(fee),
+        Longs.toByteArray(timestamp)
+      )
+    )
+
   override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase()
-      ++ Json.obj(
-        "version"         -> version,
-        "contractAddress" -> contractAddress.bytes,
-        "call"            -> ContractInvocationTransaction.functionCallToJson(fc),
-        "payment"         -> payment
-      ))
+  override val json: Coeval[JsObject] =
+    Coeval.evalOnce(
+      jsonBase()
+        ++ Json.obj(
+          "version"         -> version,
+          "contractAddress" -> contractAddress.bytes,
+          "call"            -> ContractInvocationTransaction.functionCallToJson(fc),
+          "payment"         -> payment
+        )
+    )
+
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
+
+  override def version: Byte = 1
 }
 
 object ContractInvocationTransaction extends TransactionParserFor[ContractInvocationTransaction] with TransactionParser.MultipleVersions {
-  import play.api.libs.json.Json
-  case class Payment(amount: Long, assetId: Option[AssetId])
-  implicit val paymentPartFormat: Format[ContractInvocationTransaction.Payment] = Json.format
 
   import play.api.libs.json._
-  def functionCallToJson(fc: Terms.FUNCTION_CALL) = Json.obj(
-    "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].name),
-    "args" -> JsArray(fc.args.map {
-      case Terms.CONST_LONG(l)    => Json.obj("key" -> "", "type" -> "integer", "value" -> l)
-      case Terms.CONST_BOOLEAN(l) => Json.obj("key" -> "", "type" -> "boolean", "value" -> l)
-      case Terms.CONST_BYTESTR(l) => Json.obj("key" -> "", "type" -> "binary", "value" -> l.base64)
-      case Terms.CONST_STRING(l)  => Json.obj("key" -> "", "type" -> "string", "value" -> l)
-      case _                      => ???
-    })
-  )
+  import play.api.libs.json.Json
+
+  case class Payment(amount: Long, assetId: Option[AssetId])
+
+  implicit val paymentPartFormat: Format[ContractInvocationTransaction.Payment] = Json.format
+
+  def functionCallToJson(fc: Terms.FUNCTION_CALL): JsObject = {
+    Json.obj(
+      "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].name),
+      "args" -> JsArray(
+        fc.args.map {
+          case Terms.CONST_LONG(l)    => Json.obj("key" -> "", "type" -> "integer", "value" -> l)
+          case Terms.CONST_BOOLEAN(l) => Json.obj("key" -> "", "type" -> "boolean", "value" -> l)
+          case Terms.CONST_BYTESTR(l) => Json.obj("key" -> "", "type" -> "binary", "value" -> l.base64)
+          case Terms.CONST_STRING(l)  => Json.obj("key" -> "", "type" -> "string", "value" -> l)
+          case _                      => ???
+        }
+      )
+    )
+  }
 
   override val typeId: Byte                 = 16
   override val supportedVersions: Set[Byte] = Set(1)
 
-  private def networkByte = AddressScheme.current.chainId
+  private def currentChainId = AddressScheme.current.chainId
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       val chainId            = bytes(0)
       val sender             = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
@@ -99,23 +114,21 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       val fee         = Longs.fromByteArray(feeTsProofs.slice(0, 8))
       val timestamp   = Longs.fromByteArray(feeTsProofs.slice(8, 16))
       (for {
-        _      <- Either.cond(chainId == networkByte, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
+        _      <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
         proofs <- Proofs.fromBytes(feeTsProofs.drop(16))
-        tx     <- create(version, sender, contractAddress, fc.asInstanceOf[FUNCTION_CALL], payment.map(p => Payment(p._2, p._1)), fee, timestamp, proofs)
+        tx     <- create(sender, contractAddress, fc.asInstanceOf[FUNCTION_CALL], payment.map(p => Payment(p._2, p._1)), fee, timestamp, proofs)
       } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
+  }
 
-  def create(version: Byte,
-             sender: PublicKeyAccount,
+  def create(sender: PublicKeyAccount,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Option[Payment],
              fee: Long,
              timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] =
+             proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
-      _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
-      _ <- Either.cond(supportedVersions.contains(version), (), ValidationError.UnsupportedVersion(version))
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
       _ <- p match {
         case Some(Payment(amt, token)) => Either.cond(amt > 0, (), ValidationError.NegativeAmount(0, token.toString))
@@ -125,30 +138,31 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                        (),
                        GenericError("all arguments of contractInvocation must be EVALUATED"))
-    } yield new ContractInvocationTransaction(version, networkByte, sender, contractAddress, fc, p, fee, timestamp, proofs)
+    } yield new ContractInvocationTransaction(currentChainId, sender, contractAddress, fc, p, fee, timestamp, proofs)
+  }
 
-  def signed(version: Byte,
-             sender: PublicKeyAccount,
+  def signed(sender: PublicKeyAccount,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Option[Payment],
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
-    create(version, sender, contractAddress, fc, p, fee, timestamp, Proofs.empty).right.map { unsigned =>
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+    create(sender, contractAddress, fc, p, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
+  }
 
-  def selfSigned(version: Byte,
-                 sender: PrivateKeyAccount,
+  def selfSigned(sender: PrivateKeyAccount,
                  contractAddress: Address,
                  fc: Terms.FUNCTION_CALL,
                  p: Option[Payment],
                  fee: Long,
-                 timestamp: Long): Either[ValidationError, TransactionT] =
-    signed(version, sender, contractAddress, fc, p, fee, timestamp, sender)
+                 timestamp: Long): Either[ValidationError, TransactionT] = {
+    signed(sender, contractAddress, fc, p, fee, timestamp, sender)
+  }
 
-  val byteDescription: ByteEntity[ContractInvocationTransaction] = {
+  val byteTailDescription: ByteEntity[ContractInvocationTransaction] = {
     (
       ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
         ConstantByte(2, value = typeId, name = "Transaction type") ~
@@ -164,7 +178,6 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
     ).map {
       case ((((((((((_, _), version), chainId), senderPublicKey), contractAddress), fc), payment), fee), timestamp), proofs) =>
         ContractInvocationTransaction(
-          version,
           chainId,
           senderPublicKey,
           contractAddress,

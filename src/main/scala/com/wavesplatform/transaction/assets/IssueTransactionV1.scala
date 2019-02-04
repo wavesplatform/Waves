@@ -26,10 +26,10 @@ case class IssueTransactionV1 private (sender: PublicKeyAccount,
     with FastHashId {
 
   override val version: Byte                    = 1
-  override val script: Option[Script]           = None
   override val builder: IssueTransactionV1.type = IssueTransactionV1
   override val bodyBytes: Coeval[Array[Byte]]   = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
   override val bytes: Coeval[Array[Byte]]       = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
+  override val script: Option[Script]           = None
   override val json: Coeval[JsObject]           = issueJson
 }
 
@@ -37,7 +37,7 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
 
   override val typeId: Byte = IssueTransaction.typeId
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] =
     Try {
       /*val signature = ByteStr(bytes.slice(0, SignatureLength))
       val txId      = bytes(SignatureLength)
@@ -67,10 +67,11 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signature: ByteStr): Either[ValidationError, TransactionT] =
+             signature: ByteStr): Either[ValidationError, TransactionT] = {
     IssueTransaction
       .validateIssueParams(name, description, quantity, decimals, reissuable, fee)
       .map(_ => IssueTransactionV1(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature))
+  }
 
   def signed(sender: PublicKeyAccount,
              name: Array[Byte],
@@ -80,10 +81,11 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
     }
+  }
 
   def selfSigned(sender: PrivateKeyAccount,
                  name: Array[Byte],
@@ -92,8 +94,9 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
                  decimals: Byte,
                  reissuable: Boolean,
                  fee: Long,
-                 timestamp: Long): Either[ValidationError, TransactionT] =
+                 timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, name, description, quantity, decimals, reissuable, fee, timestamp, sender)
+  }
 
   val byteTailDescription: ByteEntity[IssueTransactionV1] = {
     (SignatureBytes(tailIndex(1), "Signature") ~
