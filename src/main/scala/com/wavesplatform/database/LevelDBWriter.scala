@@ -678,8 +678,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
       val toHeigth = this.heightOf(to).getOrElse(this.height)
-      val wbh = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
-      val lbh = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
+      val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
+      val lbh      = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
       for {
         (wh, lh) <- merge(wbh, lbh)
         wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))

@@ -138,7 +138,8 @@ class MinerImpl(allChannels: ChannelGroup,
     val refBlockID          = referencedBlockInfo.blockId
     lazy val currentTime    = timeService.correctedTime()
     lazy val blockDelay     = currentTime - lastBlock.timestamp
-    lazy val balance        = GeneratingBalanceProvider.balance(blockchainUpdater, blockchainSettings.functionalitySettings, lastBlock.uniqueId, account.toAddress)
+    lazy val balance =
+      GeneratingBalanceProvider.balance(blockchainUpdater, blockchainSettings.functionalitySettings, lastBlock.uniqueId, account.toAddress)
 
     measureSuccessful(
       blockBuildTimeStats,
