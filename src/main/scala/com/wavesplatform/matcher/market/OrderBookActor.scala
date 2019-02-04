@@ -20,7 +20,7 @@ import play.api.libs.json._
 class OrderBookActor(owner: ActorRef,
                      addressActor: ActorRef,
                      assetPair: AssetPair,
-                     updateSnapshot: OrderBook.Snapshot => Unit,
+                     updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
                      updateMarketStatus: MarketStatus => Unit,
                      broadcastTx: ExchangeTransaction => Unit,
                      createTransaction: CreateTransaction,
@@ -51,7 +51,7 @@ class OrderBookActor(owner: ActorRef,
           case x: QueueEvent.Canceled => onCancelOrder(request, x.orderId)
           case _: QueueEvent.OrderBookDeleted =>
             sender() ! GetOrderBookResponse(OrderBookResult(time.correctedTime(), assetPair, Seq(), Seq()))
-            updateSnapshot(OrderBook.Snapshot())
+            updateSnapshot(OrderBook.AggregatedSnapshot())
             processEvents(orderBook.cancelAll())
             context.stop(self)
         }
@@ -102,21 +102,19 @@ class OrderBookActor(owner: ActorRef,
     }
 
     updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
-    updateSnapshot(orderBook.snapshot)
+    updateSnapshot(orderBook.aggregatedSnapshot)
   }
 
   private def onCancelOrder(request: QueueEventWithMeta, orderIdToCancel: ByteStr): Unit =
     cancelTimer.measure(orderBook.cancel(orderIdToCancel) match {
       case Some(cancelEvent) =>
         processEvents(Seq(cancelEvent))
-        sender() ! OrderCanceled(orderIdToCancel)
       case None =>
         log.warn(s"Error cancelling $orderIdToCancel: order not found")
-        sender() ! OrderCancelRejected("Order not found")
     })
 
   private def onAddOrder(eventWithMeta: QueueEventWithMeta, order: Order): Unit = addTimer.measure {
-    log.trace(s"Order accepted: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
+    log.trace(s"Order accepted [${eventWithMeta.offset}]: '${order.id()}' in '${order.assetPair.key}', trying to match ...")
     processEvents(orderBook.add(order, eventWithMeta.timestamp))
   }
 
@@ -124,15 +122,16 @@ class OrderBookActor(owner: ActorRef,
 
   override def receiveRecover: Receive = {
     case RecoveryCompleted =>
-      updateSnapshot(orderBook.snapshot)
+      updateSnapshot(orderBook.aggregatedSnapshot)
       owner ! OrderBookSnapshotUpdated(assetPair, lastProcessedOffset)
       log.debug(s"Recovery completed: $orderBook")
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
-      orderBook = snapshot.orderBook
+      log.debug(s"Recovering $persistenceId from $snapshot")
+      orderBook = OrderBook(snapshot.orderBook)
       lastProcessedOffset = snapshot.eventNr
       processEvents(orderBook.allOrders.map(OrderAdded).toSeq)
-      log.debug(s"Recovering $persistenceId from $snapshot")
+
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -140,15 +139,17 @@ class OrderBookActor(owner: ActorRef,
     super.preRestart(reason, message)
   }
 
-  private def saveSnapshotAt(globalEventNr: QueueEventWithMeta.Offset): Unit =
-    saveSnapshot(Snapshot(globalEventNr, orderBook))
+  private def saveSnapshotAt(globalEventNr: QueueEventWithMeta.Offset): Unit = {
+    log.trace(s"Saving snapshot. Global seqNr=$globalEventNr, local seqNr=$lastProcessedOffset")
+    saveSnapshot(Snapshot(globalEventNr, orderBook.snapshot))
+  }
 }
 
 object OrderBookActor {
   def props(parent: ActorRef,
             addressActor: ActorRef,
             assetPair: AssetPair,
-            updateSnapshot: OrderBook.Snapshot => Unit,
+            updateSnapshot: OrderBook.AggregatedSnapshot => Unit,
             updateMarketStatus: MarketStatus => Unit,
             broadcastTx: ExchangeTransaction => Unit,
             settings: MatcherSettings,
@@ -179,7 +180,7 @@ object OrderBookActor {
   }
 
   case class LastTrade(price: Long, amount: Long, side: OrderType)
-  case class Snapshot(eventNr: Long, orderBook: OrderBook)
+  case class Snapshot(eventNr: Long, orderBook: OrderBook.Snapshot)
 
   // Internal messages
   case class OrderBookSnapshotUpdated(assetPair: AssetPair, eventNr: Long)

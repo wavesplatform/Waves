@@ -81,7 +81,7 @@ object EventSerializers {
   }
 
   implicit val snapshotFormat: Format[Snapshot] = Format(
-    ((JsPath \ "n").readNullable[Long].map(_.getOrElse(-1L)) and (JsPath \ "o").read[OrderBook])(Snapshot),
+    ((JsPath \ "n").readNullable[Long].map(_.getOrElse(-1L)) and (JsPath \ "o").read[OrderBook.Snapshot])(Snapshot),
     Writes[Snapshot](s => Json.obj("n" -> s.eventNr, "o" -> s.orderBook))
   )
 }

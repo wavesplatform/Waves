@@ -27,8 +27,11 @@ object OrderDB {
       ro.get(MatcherKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
     }
 
-    override def saveOrder(o: Order): Unit = {
-      db.readWrite(_.put(MatcherKeys.order(o.id()), Some(o)))
+    override def saveOrder(o: Order): Unit = db.readWrite { rw =>
+      val k = MatcherKeys.order(o.id())
+      if (!rw.has(k)) {
+        rw.put(k, Some(o))
+      }
     }
 
     override def saveOrderInfo(id: ByteStr, sender: Address, oi: FinalOrderInfo): Unit = {

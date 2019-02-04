@@ -53,7 +53,7 @@ class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with Transac
           ntpTime,
           _ =>
             Some(
-              OrderBook.Snapshot(
+              OrderBook.AggregatedSnapshot(
                 Seq.tabulate(15)(i => LevelAgg(200 - i * 10, 1000 - 10 * i)),
                 Seq.tabulate(15)(i => LevelAgg(200 - i * 10, 1000 - 10 * i)),
               ))

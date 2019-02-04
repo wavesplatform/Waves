@@ -12,6 +12,7 @@ import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo, OrderStatus, Orde
 import com.wavesplatform.matcher.queue.QueueEvent
 import com.wavesplatform.state.{ByteStr, Portfolio}
 import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import org.slf4j.LoggerFactory
@@ -51,7 +52,7 @@ class AddressActor(
     for ((id, b) <- limitOrder.requiredBalance if b != 0) {
       val prevBalance = openVolume(id)
       val newBalance  = prevBalance + b
-      log.trace(s"${limitOrder.order.id()}: $id -> +$b ($prevBalance -> $newBalance)")
+      log.trace(s"${limitOrder.order.id()}, ${assetIdStr(id)}: $prevBalance + $b = $newBalance")
       openVolume += id -> newBalance
     }
   }
@@ -60,7 +61,7 @@ class AddressActor(
     for (limitOrder <- activeOrders.get(orderId); (id, b) <- limitOrder.requiredBalance if b != 0) {
       val prevBalance = openVolume(id)
       val newBalance  = prevBalance - b
-      log.trace(s"${limitOrder.order.id()}: $id -> -$b ($prevBalance -> $newBalance)")
+      log.trace(s"${limitOrder.order.id()}, ${assetIdStr(id)}: $prevBalance - $b = $newBalance")
       openVolume += id -> newBalance
     }
 
@@ -144,16 +145,16 @@ class AddressActor(
       }
   }
 
-  private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], error: Resp): Future[Resp] =
+  private def store(id: ByteStr, event: QueueEvent, eventCache: MutableMap[ByteStr, Promise[Resp]], error: Resp): Future[Resp] = {
+    val promisedResponse = Promise[api.WrappedMatcherResponse]
+    eventCache += id -> promisedResponse
     storeEvent(event).transformWith {
       case Failure(e) =>
         log.error(s"Error persisting $event", e)
         Future.successful(error)
-      case Success(_) =>
-        val promisedResponse = Promise[api.WrappedMatcherResponse]
-        eventCache += id -> promisedResponse
-        promisedResponse.future
+      case Success(_) => promisedResponse.future
     }
+  }
 
   private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
     store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected("Error persisting event"))
@@ -236,6 +237,7 @@ class AddressActor(
 
   private def handleOrderTerminated(lo: LimitOrder, status: OrderStatus.Final): Unit = {
     log.trace(s"Order ${lo.order.id()} terminated: $status")
+    orderDB.saveOrder(lo.order)
     pendingCancellation.remove(lo.order.id()).foreach(_.success(api.OrderCancelRejected("Order already terminated")))
     expiration.remove(lo.order.id()).foreach(_.cancel())
     activeOrders.remove(lo.order.id())

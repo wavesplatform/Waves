@@ -13,7 +13,7 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
-import com.wavesplatform.matcher.model.LimitOrder
+import com.wavesplatform.matcher.model.{LimitOrder, OrderBook}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -112,7 +112,7 @@ object MatcherTool extends ScorexLogging {
               } yield s"${lo.order.id()} -> $lo").mkString("\n")
 
             println(s"Last snapshot: $lastSnapshot")
-            println(s"Orders:\n${formatOrders(lastSnapshot.allOrders)}")
+            println(s"Orders:\n${formatOrders(OrderBook(lastSnapshot).allOrders)}")
           }
         } finally {
           Await.ready(system.terminate(), Duration.Inf)

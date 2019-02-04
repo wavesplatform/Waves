@@ -12,7 +12,8 @@ import kamon.Kamon
 
 import scala.concurrent.duration._
 
-class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapshot: AssetPair => Option[OrderBook.Snapshot]) extends AutoCloseable {
+class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapshot: AssetPair => Option[OrderBook.AggregatedSnapshot])
+    extends AutoCloseable {
   import OrderBookSnapshotHttpCache._
 
   private val depthRanges = settings.depthRanges.sorted
@@ -23,7 +24,7 @@ class OrderBookSnapshotHttpCache(settings: Settings, time: Time, orderBookSnapsh
     .expireAfterAccess(settings.cacheTimeout.length, settings.cacheTimeout.unit)
     .build[Key, HttpResponse](new CacheLoader[Key, HttpResponse] {
       override def load(key: Key): HttpResponse = {
-        val orderBook = orderBookSnapshot(key.pair).getOrElse(OrderBook.Snapshot())
+        val orderBook = orderBookSnapshot(key.pair).getOrElse(OrderBook.AggregatedSnapshot())
         val entity = OrderBookResult(
           time.correctedTime(),
           key.pair,

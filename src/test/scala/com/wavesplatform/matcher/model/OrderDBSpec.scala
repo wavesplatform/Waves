@@ -110,6 +110,6 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
 
 object OrderDBSpec {
   private implicit class OrderExt(val o: Order) extends AnyVal {
-    def toInfo(status: OrderStatus) = OrderInfo(o.orderType, o.amount, o.price, o.timestamp, status, o.assetPair)
+    def toInfo[A <: OrderStatus](status: A) = OrderInfo[A](o.orderType, o.amount, o.price, o.timestamp, status, o.assetPair)
   }
 }

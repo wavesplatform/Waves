@@ -43,15 +43,19 @@ class OrderBook private (private[OrderBook] val bids: OrderBook.Side, private[Or
       case OrderType.SELL => doMatch(ts, sell, LimitOrder(o), Seq.empty, asks, bids)
     }).reverse
 
-  def snapshot: Snapshot = Snapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
-  override def toString  = s"""{"bids":${formatSide(bids)},"asks":${formatSide(asks)}}"""
+  def snapshot: Snapshot                     = Snapshot(bids.toMap, asks.toMap)
+  def aggregatedSnapshot: AggregatedSnapshot = AggregatedSnapshot(bids.aggregated.toSeq, asks.aggregated.toSeq)
+
+  override def toString = s"""{"bids":${formatSide(bids)},"asks":${formatSide(asks)}}"""
 }
 
 object OrderBook {
-  type Level = Vector[LimitOrder]
-  type Side  = mutable.TreeMap[Price, Level]
+  type Level        = Vector[LimitOrder]
+  type Side         = mutable.TreeMap[Price, Level]
+  type SideSnapshot = Map[Price, Seq[LimitOrder]]
 
-  case class Snapshot(bids: Seq[LevelAgg] = Seq.empty, asks: Seq[LevelAgg] = Seq.empty)
+  case class Snapshot(bids: SideSnapshot, asks: SideSnapshot)
+  case class AggregatedSnapshot(bids: Seq[LevelAgg] = Seq.empty, asks: Seq[LevelAgg] = Seq.empty)
 
   implicit class SideExt(val side: Side) extends AnyVal {
     def best: Option[LimitOrder] = side.headOption.flatMap(_._2.headOption)
@@ -157,24 +161,17 @@ object OrderBook {
       (JsPath \ "order").format[Order]
   )(limitOrder, lo => (lo.amount, lo.fee, lo.order))
 
-  private type SideJson = Map[Price, Seq[LimitOrder]]
-
-  implicit val priceMapFormat: Format[SideJson] =
+  implicit val priceMapFormat: Format[SideSnapshot] =
     implicitly[Format[Map[String, Seq[LimitOrder]]]].inmap(
       _.map { case (k, v) => k.toLong   -> v },
       _.map { case (k, v) => k.toString -> v }
     )
 
-  implicit val orderBookFormat: Format[OrderBook] = (
-    (JsPath \ "bids").format[SideJson] and
-      (JsPath \ "asks").format[SideJson]
-  )(apply, unapply)
+  implicit val snapshotFormat: Format[OrderBook.Snapshot] = Json.format
 
   def empty: OrderBook = new OrderBook(mutable.TreeMap.empty(bidsOrdering), mutable.TreeMap.empty(asksOrdering))
 
-  private def unapply(ob: OrderBook): (Map[Price, Level], Map[Price, Level]) = (ob.bids.toMap, ob.asks.toMap)
-
-  private def transformSide(side: SideJson, expectedSide: OrderType, ordering: Ordering[Long]): Side = {
+  private def transformSide(side: SideSnapshot, expectedSide: OrderType, ordering: Ordering[Long]): Side = {
     val bidMap = mutable.TreeMap.empty[Price, Level](ordering)
     for ((p, level) <- side) {
       val v = Vector.newBuilder[LimitOrder]
@@ -188,6 +185,6 @@ object OrderBook {
     bidMap
   }
 
-  private def apply(bids: SideJson, asks: SideJson): OrderBook =
-    new OrderBook(transformSide(bids, OrderType.BUY, bidsOrdering), transformSide(asks, OrderType.SELL, asksOrdering))
+  def apply(snapshot: Snapshot): OrderBook =
+    new OrderBook(transformSide(snapshot.bids, OrderType.BUY, bidsOrdering), transformSide(snapshot.asks, OrderType.SELL, asksOrdering))
 }

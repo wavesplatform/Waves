@@ -25,10 +25,10 @@ import scala.util.Random
 class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTPTime with ImplicitSender with MatcherTestData with PathMockFactory {
 
   private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
-  private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.Snapshot]
+  private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
   private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
 
-  private def update(ap: AssetPair)(snapshot: OrderBook.Snapshot): Unit = obc.put(ap, snapshot)
+  private def update(ap: AssetPair)(snapshot: OrderBook.AggregatedSnapshot): Unit = obc.put(ap, snapshot)
 
   private def obcTest(f: (AssetPair, ActorRef, TestProbe) => Unit): Unit = {
     obc.clear()
@@ -80,7 +80,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
       actor ! wrap(ord1)
       actor ! wrap(ord2)
 
-      tp.receiveN(2)
+      tp.receiveN(3)
 
       actor ! SaveSnapshot(Long.MaxValue)
       tp.expectMsgType[OrderBookSnapshotUpdated]

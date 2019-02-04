@@ -7,9 +7,8 @@ import java.util.concurrent.{ConcurrentHashMap, Executors}
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.pattern.{AskTimeoutException, ask, gracefulStop}
+import akka.pattern.gracefulStop
 import akka.stream.ActorMaterializer
-import akka.util.Timeout
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.db._
@@ -30,7 +29,6 @@ import monix.reactive.Observable
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.Failure
 import scala.util.control.NonFatal
 
 class Matcher(actorSystem: ActorSystem,
@@ -50,7 +48,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private val currentOffset      = new AtomicReference[QueueEventWithMeta.Offset](-1L)
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
-  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.Snapshot](1000, 0.9f, 10)
+  private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings)
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
@@ -62,7 +60,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private val marketStatuses = new ConcurrentHashMap[AssetPair, MarketStatus](1000, 0.9f, 10)
 
-  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook.Snapshot): Unit = {
+  private def updateOrderBookCache(assetPair: AssetPair)(newSnapshot: OrderBook.AggregatedSnapshot): Unit = {
     orderBookCache.put(assetPair, newSnapshot)
     orderBooksSnapshotCache.invalidate(assetPair)
   }
@@ -136,24 +134,14 @@ class Matcher(actorSystem: ActorSystem,
     MatcherActor.props(
       matcherSettings,
       (self, oldestSnapshotOffset) => {
-        import actorSystem.dispatcher
-        implicit val timeout: Timeout = 5.seconds
-
         currentOffset.set(oldestSnapshotOffset)
         matcherQueue.startConsume(
           oldestSnapshotOffset + 1,
           eventWithMeta => {
             log.debug(s"[offset=${eventWithMeta.offset}, ts=${eventWithMeta.timestamp}] Consumed ${eventWithMeta.event}")
 
-            // Ignoring possible timeouts or other errors
-            // If an order book doesn't process a message, it will re-process all its messages after fix + restart
-            (self ? eventWithMeta)
-              .map(_ => bumpOffset(eventWithMeta.offset))
-              .andThen {
-                case Failure(ate: AskTimeoutException) => log.trace(s"Event ${eventWithMeta.offset}: ${ate.getMessage}")
-                case Failure(e)                        => log.warn(s"An error during processing an event with offset ${eventWithMeta.offset}: ${e.getMessage}", e)
-              }
-              .recover { case NonFatal(_) => () }
+            self ! eventWithMeta
+            bumpOffset(eventWithMeta.offset)
           }
         )
       },

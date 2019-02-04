@@ -44,7 +44,6 @@ class AddressDirectory(portfolioChanged: Observable[Address],
 
   private def forward(address: Address, msg: Any): Unit = {
     val handler = children.getOrElseUpdate(address, createAddressActor(address))
-    log.trace(s"Forwarding $msg to $handler")
     handler.forward(msg)
   }
 
