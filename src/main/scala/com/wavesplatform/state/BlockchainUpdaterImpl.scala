@@ -387,7 +387,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   }
 
   private[this] def portfolioAt(a: Address, mb: ByteStr): Portfolio = {
-    val p = ngState.fold(Portfolio.empty)(_.totalDiffOf(mb).flatMap(_._2.portfolios.get(a)).getOrElse(Portfolio.empty))
+    val p = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
     blockchain.portfolio(a).combine(p)
   }
 
