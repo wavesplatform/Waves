@@ -58,7 +58,6 @@ object StateSyntheticBenchmark {
       } yield
         TransferTransactionV2
           .selfSigned(
-            TransferTransactionV2.supportedVersions.head,
             None,
             sender,
             recipient.toAddress,
@@ -82,7 +81,6 @@ object StateSyntheticBenchmark {
         Seq(
           SetScriptTransaction
             .selfSigned(
-              SetScriptTransaction.supportedVersions.head,
               richAccount,
               Some(ExprScript(typedScript).explicitGet()),
               1000000,

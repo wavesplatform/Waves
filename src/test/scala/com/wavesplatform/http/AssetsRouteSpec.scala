@@ -58,7 +58,6 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
 
     "accepts VersionedTransferRequest" in {
       val req = TransferV2Request(
-        version = 2,
         assetId = None,
         amount = 1 * Waves,
         feeAssetId = None,

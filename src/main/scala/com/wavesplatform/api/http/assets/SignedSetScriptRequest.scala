@@ -12,21 +12,19 @@ import play.api.libs.json._
 
 object SignedSetScriptRequest {
   implicit val signedSetScriptRequestReads: Reads[SignedSetScriptRequest] = (
-    (JsPath \ "version").read[Byte] and
-      (JsPath \ "senderPublicKey").read[String] and
+    (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "script").readNullable[String] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "proofs").read[List[ProofStr]]
   )(SignedSetScriptRequest.apply _)
 
-  implicit val signedSetScriptRequestWrites: OWrites[SignedSetScriptRequest] = Json.writes[SignedSetScriptRequest]
+  implicit val signedSetScriptRequestWrites: OWrites[SignedSetScriptRequest] =
+    Json.writes[SignedSetScriptRequest].transform((request: JsObject) => request + ("version" -> JsNumber(1)))
 }
 
 @ApiModel(value = "Proven SetScript transaction")
-case class SignedSetScriptRequest(@ApiModelProperty(required = true)
-                                  version: Byte,
-                                  @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+case class SignedSetScriptRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                   senderPublicKey: String,
                                   @ApiModelProperty(value = "Base64 encoded script(including version and checksum)", required = true)
                                   script: Option[String],
@@ -46,6 +44,6 @@ case class SignedSetScriptRequest(@ApiModelProperty(required = true)
       }
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- SetScriptTransaction.create(version, _sender, _script, fee, timestamp, _proofs)
+      t           <- SetScriptTransaction.create(_sender, _script, fee, timestamp, _proofs)
     } yield t
 }

@@ -170,7 +170,6 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val blackTx = TransferTransactionV2
       .selfSigned(
-        2,
         Some(ByteStr.decodeBase58(blackAsset).get),
         pkByAddress(secondAddress),
         pkByAddress(thirdAddress),
@@ -185,7 +184,6 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val incorrectTx = TransferTransactionV2
       .selfSigned(
-        2,
         Some(ByteStr.decodeBase58(blackAsset).get),
         pkByAddress(secondAddress),
         pkByAddress(thirdAddress),

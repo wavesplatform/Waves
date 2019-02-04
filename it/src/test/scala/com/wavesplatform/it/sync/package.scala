@@ -62,7 +62,6 @@ package object sync {
   def createSignedIssueRequest(tx: IssueTransactionV2): SignedIssueV2Request = {
     import tx._
     SignedIssueV2Request(
-      2.toByte,
       Base58.encode(tx.sender.publicKey),
       new String(name),
       new String(description),

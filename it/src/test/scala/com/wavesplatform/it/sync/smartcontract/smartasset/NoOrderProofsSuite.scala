@@ -71,7 +71,6 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
 
     val incorrectTrTx = TransferTransactionV2
       .create(
-        2,
         Some(ByteStr.decodeBase58(assetWProofs).get),
         pkByAddress(firstAddress),
         pkByAddress(thirdAddress),
@@ -92,7 +91,6 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
 
     val incorrectBrTx = BurnTransactionV2
       .create(
-        2,
         AddressScheme.current.chainId,
         pkByAddress(firstAddress),
         ByteStr.decodeBase58(assetWProofs).get,

@@ -89,7 +89,6 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
   private def setScriptTx(sender: PrivateKeyAccount) =
     SetScriptTransaction
       .selfSigned(
-        version = 1,
         sender = sender,
         script = Some(ExprScript(V1, Terms.TRUE, checkSize = false).explicitGet()),
         fee = 1000000,
@@ -98,7 +97,6 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
       .explicitGet()
 
   private def toRequest(tx: SetScriptTransaction): SignedSetScriptRequest = SignedSetScriptRequest(
-    version = tx.version,
     senderPublicKey = Base58.encode(tx.sender.publicKey),
     script = tx.script.map(_.bytes().base64),
     fee = tx.fee,

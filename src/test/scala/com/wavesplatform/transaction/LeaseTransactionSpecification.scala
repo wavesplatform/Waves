@@ -84,7 +84,6 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
 
     val tx = LeaseTransactionV2
       .create(
-        2,
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         10000000,
         1000000,

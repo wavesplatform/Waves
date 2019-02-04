@@ -23,7 +23,6 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = sender.privateKey,
           recipient = contract,
@@ -45,7 +44,6 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = sender.privateKey,
           recipient = caller,
@@ -107,7 +105,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val script = ScriptCompiler.contract(scriptText).explicitGet()
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, contract, Some(script), setScriptFee, System.currentTimeMillis())
+      .selfSigned(contract, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender
@@ -131,7 +129,6 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx =
       ContractInvocationTransaction
         .selfSigned(
-          version = 1,
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty),
@@ -157,7 +154,6 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx =
       ContractInvocationTransaction
         .selfSigned(
-          version = 1,
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.51.waves))),
@@ -177,7 +173,6 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx =
       ContractInvocationTransaction
         .selfSigned(
-          version = 1,
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.49.waves))),

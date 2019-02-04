@@ -82,7 +82,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with DBCacheS
     def resetGen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = baseGen(ts).map {
       case (master, blocks) =>
         val unsetScriptTx = SetScriptTransaction
-          .selfSigned(1, master, None, 5000000, ts + 1)
+          .selfSigned(master, None, 5000000, ts + 1)
           .explicitGet()
 
         val block1 = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq(unsetScriptTx))
@@ -93,7 +93,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with WithDB with DBCacheS
     def baseGen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = accountGen.map { master =>
       val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       val setScriptTx = SetScriptTransaction
-        .selfSigned(1, master, Some(ExprScript(Terms.TRUE).explicitGet()), 5000000, ts)
+        .selfSigned(master, Some(ExprScript(Terms.TRUE).explicitGet()), 5000000, ts)
         .explicitGet()
 
       val block = TestBlock.create(ts, Seq(genesisTx, setScriptTx))
