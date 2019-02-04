@@ -70,6 +70,55 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
   }
 
+  property("contract compiles callable functions independently") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          | @Callable(invocation)
+          | func foo(a:ByteStr) = {
+          |  let sender0 = invocation.caller.bytes
+          |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender0)))
+          | }
+          |
+          | @Callable(invocation)
+          | func foo1(a:ByteStr) = {
+          |  foo(a)
+          | }
+          |
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Can't find a function 'foo'")
+  }
+
+  property("contract can access declarations") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          | let x = 0
+          |
+          | func bar() = {
+          |   x
+          | }
+          |
+          | @Callable(invocation)
+          | func foo(a:ByteStr) = {
+          |  let aux = bar()
+          |  let sender0 = invocation.caller.bytes
+          |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender0)))
+          | }
+          |
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+  }
+
   property("contract compiles fails when incorrect return type") {
     val ctx = compilerContext
     val expr = {

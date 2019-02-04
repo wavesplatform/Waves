@@ -5,14 +5,14 @@ import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract._
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1.handlePart
+import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1.{compileFunc, handlePart}
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Expressions
+import com.wavesplatform.lang.v1.parser.Expressions.FUNC
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, LET}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 
@@ -59,35 +59,28 @@ object ContractCompiler {
         for {
           _ <- Either
             .cond(tpe match {
-              case _ if (tpe <= BOOLEAN) => true
-              case _                     => false
+              case _ if tpe <= BOOLEAN => true
+              case _                   => false
             }, (), Generic(0, 0, s"VerifierFunction must return BOOLEAN or it super type, but got '$tpe'"))
             .toCompileM
         } yield VerifierFunction(c, func)
     }
   }
 
-  // TODO: Check scope leak!
   def compileDeclaration(dec: Expressions.Declaration): CompileM[DECLARATION] = {
     dec match {
-      case let @ LET(pos, _, _, _, _) =>
+      case l: Expressions.LET =>
         for {
-          (name, tpe, expr) <- compiler.ExpressionCompilerV1.compileLet(pos, let)
-          _ <- modify[CompilerContext, CompilationError] { ctx =>
-            CompilerContext.vars.modify(ctx)(_ + (name -> (tpe -> s"Defined at ${pos.start}")))
-          }
-        } yield Terms.LET(name, expr)
-      case func @ FUNC(pos, _, _, _) =>
+          compiledLet <- ExpressionCompilerV1.compileLet(dec.position, l)
+          (letName, letType, letExpr) = compiledLet
+          _ <- ExpressionCompilerV1.updateCtx(letName, letType, dec.position)
+        } yield Terms.LET(letName, letExpr)
+      case f: FUNC =>
         for {
-          (func, tpe, argTps) <- compiler.ExpressionCompilerV1.compileFunc(pos, func)
-          _ <- modify[CompilerContext, CompilationError] { ctx =>
-            CompilerContext.functions.modify(ctx) { funDefs =>
-              val fts      = FunctionTypeSignature(tpe, argTps, FunctionHeader.User(func.name))
-              val knownFts = funDefs.getOrElse(func.name, Nil)
-
-              funDefs.updated(func.name, fts :: knownFts)
-            }
-          }
+          cf <- compileFunc(dec.position, f)
+          (func, compiledFuncBodyType, argTypes) = cf
+          typeSig                                = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(func.name))
+          _ <- ExpressionCompilerV1.updateCtx(func.name, typeSig)
         } yield func
     }
   }
@@ -95,7 +88,7 @@ object ContractCompiler {
   private def compileContract(contract: Expressions.CONTRACT): CompileM[Contract] = {
     for {
       ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
-      l  <- contract.fs.traverse[CompileM, AnnotatedFunction](compileAnnotatedFunc)
+      l  <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
       v  = l.find(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
       fs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
     } yield Contract(ds, fs, v)
