@@ -81,7 +81,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       None)
 
     Decompiler(contract :Contract, 0, opcodes) shouldBe
-      """@Callable(i)
+      """(d@Callable(i)
         |func testfunc (amount) = {
         |    {
         |    let pmt =
@@ -257,6 +257,123 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
           |}""".stripMargin
   }
 
+  property("decompilation of real contract from Maxim Smolyakov") {
+    val scriptText = BLOCK(
+    LET("startHeight", CONST_LONG(1375557)),
+    BLOCK(
+      LET("startPrice", CONST_LONG(100000)),
+      BLOCK(
+        LET("interval", FUNCTION_CALL(Native(104), List(CONST_LONG(24), CONST_LONG(60)))),
+        BLOCK(
+          LET("exp", FUNCTION_CALL(Native(104), List(FUNCTION_CALL(Native(104), List(CONST_LONG(100), CONST_LONG(60))), CONST_LONG(1000)))),
+          BLOCK(
+            LET("$match0", REF("tx")),
+            IF(
+              FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("ExchangeTransaction"))),
+              BLOCK(
+                LET("e", REF("$match0")),
+                BLOCK(
+                  LET("days", FUNCTION_CALL(Native(105), List(FUNCTION_CALL(Native(101), List(REF("height"), REF("startHeight"))), REF("interval")))),
+                  IF(
+                    IF(
+                      IF(
+                        FUNCTION_CALL(
+                          Native(103),
+                          List(
+                            GETTER(REF("e"), "price"),
+                            FUNCTION_CALL(Native(104),
+                                          List(REF("startPrice"),
+                                               FUNCTION_CALL(Native(100),
+                                                             List(CONST_LONG(1), FUNCTION_CALL(Native(104), List(REF("days"), REF("days"))))))))),
+                        FUNCTION_CALL(
+                          User("!"),
+                          List(FUNCTION_CALL(User("isDefined"), List(GETTER(GETTER(GETTER(REF("e"), "sellOrder"), "assetPair"), "priceAsset"))))),
+                        FALSE),
+                      FUNCTION_CALL(
+                        Native(103),
+                        List(REF("exp"),
+                             FUNCTION_CALL(Native(101),
+                                           List(GETTER(GETTER(REF("e"), "sellOrder"), "expiration"),
+                                                GETTER(GETTER(REF("e"), "sellOrder"), "timestamp"))))),
+                      FALSE),
+                    FUNCTION_CALL(
+                      Native(103),
+                      List(REF("exp"),
+                           FUNCTION_CALL(Native(101),
+                                         List(GETTER(GETTER(REF("e"), "buyOrder"), "expiration"), GETTER(GETTER(REF("e"), "buyOrder"), "timestamp"))))),
+                    FALSE))),
+              IF(FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("BurnTransaction"))), BLOCK(LET("tx", REF("$match0")), TRUE), FALSE)))))))
+    Decompiler(scriptText, opcodes) shouldBe
+      """{
+        |    let startHeight =
+        |        1375557;
+        |    {
+        |        let startPrice =
+        |            100000;
+        |        {
+        |            let interval =
+        |                <Native_104>(24,60);
+        |            {
+        |                let exp =
+        |                    <Native_104>(<Native_104>(100,60),1000);
+        |                {
+        |                    let $match0 =
+        |                        tx;
+        |                    { if (
+        |                        +($match0,"ExchangeTransaction")
+        |                        )
+        |                    then
+        |                        {
+        |                            let e =
+        |                                $match0;
+        |                            {
+        |                                let days =
+        |                                    <Native_105>(<Native_101>(height,startHeight),interval);
+        |                                { if (
+        |                                    { if (
+        |                                        { if (
+        |                                            <Native_103>(e.price,<Native_104>(startPrice,sigVerify(1,<Native_104>(days,days))))
+        |                                            )
+        |                                        then
+        |                                            !(isDefined(e.sellOrder.assetPair.priceAsset))
+        |                                        else
+        |                                            false
+        |                                        }
+        |                                        )
+        |                                    then
+        |                                        <Native_103>(exp,<Native_101>(e.sellOrder.expiration,e.sellOrder.timestamp))
+        |                                    else
+        |                                        false
+        |                                    }
+        |                                    )
+        |                                then
+        |                                    <Native_103>(exp,<Native_101>(e.buyOrder.expiration,e.buyOrder.timestamp))
+        |                                else
+        |                                    false
+        |                                }
+        |                            }
+        |                        }
+        |                    else
+        |                        { if (
+        |                            +($match0,"BurnTransaction")
+        |                            )
+        |                        then
+        |                            {
+        |                                let tx =
+        |                                    $match0;
+        |                                true
+        |                            }
+        |                        else
+        |                            false
+        |                        }
+        |                    }
+        |                }
+        |            }
+        |        }
+        |    }
+        |}""".stripMargin
+  }
+
   property("getter") {
     val expr = Terms.GETTER(Terms.FUNCTION_CALL(
                               function = FunctionHeader.User("testfunc"),
@@ -361,7 +478,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val expr = Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))
     Decompiler(expr, opcodes) shouldBe
       """func foo (bar,buz) = {
-         |    TRUE
+         |    true
          |}""".stripMargin
   }
 
