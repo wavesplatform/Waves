@@ -116,7 +116,7 @@ object ExpressionCompilerV1 {
     } yield compiledMatch
   }
 
-  private def compileBlock(pos: Expressions.Pos, declaration: Expressions.Declaration, expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] =
+  def compileBlock(pos: Expressions.Pos, declaration: Expressions.Declaration, expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] =
     declaration match {
       case l: Expressions.LET  => compileLetBlock(pos, l, expr)
       case f: Expressions.FUNC => compileFuncBlock(pos, f, expr)
