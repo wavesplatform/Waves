@@ -4,16 +4,13 @@ import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.ContractFunction
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
-import com.wavesplatform.lang.v1.parser.Expressions.{ANNOTATEDFUNC, ANNOTATION, BINARY_OP, CONTRACT, MATCH, MATCH_CASE}
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.{AnyPos, RealPos}
 
 object Decompiler {
 
-  def out (in :String, ident :Int):String =
+  private def out (in :String, ident :Int):String =
     Array.fill( 4*ident )(" ").mkString("") + in
 
-  def decl (e: DECLARATION, ident :Int, opcodes :Map[Short,String]): String =
+  private def decl (e: DECLARATION, ident :Int, opcodes :Map[Short,String]): String =
     e match {
       case Terms.FUNC(name, args, body) =>
         out("func " + name + " (" + args.map(_.toString).mkString(","), ident) + ") = {\n" +
@@ -22,7 +19,7 @@ object Decompiler {
       case Terms.LET(name, value) => out("let " + name + " =\n" + expr(value, 1 + ident, opcodes), ident)
     }
 
-  def expr(e: EXPR, ident :Int, opcodes :Map[Short,String]): String =
+  private def expr(e: EXPR, ident :Int, opcodes :Map[Short,String]): String =
     e match {
       case Terms.TRUE => out("true", ident)
       case Terms.FALSE => out("false", ident)
@@ -45,7 +42,7 @@ object Decompiler {
         decl(declPar, 1 + ident, opcodes) + ";\n" +
         expr(body, 1 + ident, opcodes) + "\n" +
         out("}", ident)
-      case Terms.CONST_BYTESTR(bs) => out("'" + bs + "'", ident)
+      case Terms.CONST_BYTESTR(bs) => out("base58'" + bs.base58 + "'", ident)
       case Terms.FUNCTION_CALL(func, args) => func match {
         case FunctionHeader.Native(name) => out(
           opcodes.getOrElse(name, "<Native_" + name + ">") +
@@ -58,14 +55,14 @@ object Decompiler {
       case _: Terms.CaseObj => ??? // never happens
     }
 
-  def apply(e :Contract, ident :Int, opcodes:Map[Short,String]): String = {
+  def apply(e :Contract, opcodes:Map[Short,String]): String = {
     e match {
       case Contract(dec, cfs, vf) =>
         dec.map(expr => expr.toString).mkString("") +
         cfs.map(expr => expr match {
           case ContractFunction(annotation, u) =>
-            out("@Callable(" + annotation.invocationArgName + ")\n", ident) +
-            Decompiler.decl(u, ident, opcodes)
+            out("@Callable(" + annotation.invocationArgName + ")\n", 0) +
+            Decompiler.decl(u, 0, opcodes)
           case _ => ???
         }).mkString("") +
         vf.getOrElse("")

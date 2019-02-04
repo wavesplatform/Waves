@@ -26,7 +26,7 @@ import scala.collection.mutable.ArrayBuffer
 
 class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
-  val opcodes = scala.collection.immutable.Map[Short, String](1.toShort -> "+", 100.toShort -> "sigVerify")
+  val opcodes = scala.collection.immutable.Map[Short, String](1.toShort -> "+", 2.toShort -> "throw", 100.toShort -> "sigVerify", 1101.toShort -> "List")
 
   property("Invoke contract compilation") {
     val scriptText =
@@ -80,8 +80,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                                                   List(FUNCTION_CALL(User("ContractTransfer"), List(GETTER(REF("i"), "caller"), REF("amount"), REF("unit")))))))))))))),
       None)
 
-    Decompiler(contract :Contract, 0, opcodes) shouldBe
-      """(d@Callable(i)
+    Decompiler(contract :Contract, opcodes) shouldBe
+      """@Callable(i)
         |func testfunc (amount) = {
         |    {
         |    let pmt =
@@ -90,9 +90,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |        false
         |        )
         |    then
-        |        <Native_2>("impossible")
+        |        throw("impossible")
         |    else
-        |        ContractResult(WriteSet(<Native_1101>(DataEntry("1","1"))),TransferSet(<Native_1101>(ContractTransfer(i.caller,amount,unit))))
+        |        ContractResult(WriteSet(List(DataEntry("1","1"))),TransferSet(List(ContractTransfer(i.caller,amount,unit))))
         |    }
         |}
         |}""".stripMargin
