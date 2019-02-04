@@ -177,6 +177,20 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) should produce("Annotation not recognized")
   }
 
+  property("Verifier function must have 0 arguments") {
+    val ctx = compilerContext
+    val expr = {
+      val script =
+        """
+          | @Verifier(arg)
+          | func foo(a: Int) = {
+          |  true
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
+  }
 
 
   property("hodlContract") {

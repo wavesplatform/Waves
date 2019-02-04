@@ -90,8 +90,13 @@ object ContractCompiler {
       l  <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
       verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
       v <- verifierFunctions match {
-        case Nil       => Option.empty[VerifierFunction].pure[CompileM]
-        case vf :: Nil => Option.apply(vf).pure[CompileM]
+        case Nil => Option.empty[VerifierFunction].pure[CompileM]
+        case vf :: Nil =>
+          if (vf.u.args.isEmpty)
+            Option.apply(vf).pure[CompileM]
+          else
+            raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
+              Generic(contract.position.start, contract.position.start, "Verifier function must have 0 arguments"))
         case _ =>
           raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
             Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
