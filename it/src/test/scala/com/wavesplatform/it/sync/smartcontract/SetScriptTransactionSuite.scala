@@ -26,7 +26,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = sender.privateKey,
           recipient = acc0,
@@ -60,7 +59,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(SetScriptTransaction.supportedVersions.head, acc0, Some(script), setScriptFee, System.currentTimeMillis())
+      .selfSigned(acc0, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender
@@ -83,7 +82,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = acc0,
           recipient = acc3,
@@ -101,7 +99,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val unsigned =
       TransferTransactionV2
         .create(
-          version = 2,
           assetId = None,
           sender = acc0,
           recipient = acc3,
@@ -127,7 +124,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   test("can clear script at acc0") {
     val unsigned = SetScriptTransaction
       .create(
-        version = SetScriptTransaction.supportedVersions.head,
         sender = acc0,
         script = None,
         fee = setScriptFee + 0.004.waves,
@@ -148,7 +144,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = acc0,
           recipient = acc3,
@@ -167,7 +162,6 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          version = 2,
           assetId = None,
           sender = acc0,
           recipient = acc3,

@@ -198,7 +198,6 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
           feeAssetId = None,
           feeAmount = Waves / 3,
           attachment = Array.emptyByteArray,
-          version = 2,
           proofs = Proofs(Seq.empty)
         )
         .right
@@ -286,7 +285,6 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       feeAssetId.map(_.base58),
       fee,
       timestamp,
-      version,
       attachment.headOption.map(_ => Base58.encode(attachment)),
       proofs.proofs.map(_.base58)
     )

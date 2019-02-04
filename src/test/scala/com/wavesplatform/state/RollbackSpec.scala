@@ -45,7 +45,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       case 2 =>
         List(
           MassTransferTransaction
-            .selfSigned(1, None, sender, List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)), nextTs, 10000, Array.empty[Byte])
+            .selfSigned(None, sender, List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)), nextTs, 10000, Array.empty[Byte])
             .explicitGet())
       case _ => List(TransferTransactionV1.selfSigned(None, sender, recipient, amount, nextTs, None, 1000, Array.empty[Byte]).explicitGet())
     }
@@ -295,7 +295,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(DataTransaction.selfSigned(1, sender, List(dataEntry), 1, nextTs).explicitGet())
+              Seq(DataTransaction.selfSigned(sender, List(dataEntry), 1, nextTs).explicitGet())
             ))
 
           d.blockchainUpdater.accountData(sender, dataEntry.key) should contain(dataEntry)
@@ -317,7 +317,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(SetScriptTransaction.selfSigned(1, sender, Some(script), 400000, nextTs).explicitGet())
+              Seq(SetScriptTransaction.selfSigned(sender, Some(script), 400000, nextTs).explicitGet())
             ))
 
           val blockWithScriptId = d.lastBlockId
@@ -328,7 +328,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               blockWithScriptId,
-              Seq(SetScriptTransaction.selfSigned(1, sender, None, 800000, nextTs).explicitGet())
+              Seq(SetScriptTransaction.selfSigned(sender, None, 800000, nextTs).explicitGet())
             ))
 
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty

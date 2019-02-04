@@ -192,11 +192,11 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient                  <- accountGen
       assetId = issueTx.id()
       senderNotIssuer = SponsorFeeTransaction
-        .selfSigned(1, notSponsor, assetId, None, 1 * Constants.UnitsInWave, ts + 1)
+        .selfSigned(notSponsor, assetId, None, 1 * Constants.UnitsInWave, ts + 1)
         .right
         .get
       insufficientFee = SponsorFeeTransaction
-        .selfSigned(1, notSponsor, assetId, None, 1 * Constants.UnitsInWave - 1, ts + 1)
+        .selfSigned(notSponsor, assetId, None, 1 * Constants.UnitsInWave - 1, ts + 1)
         .right
         .get
     } yield (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee)
@@ -225,11 +225,11 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       assetId = issueTx.id()
       minFee <- smallFeeGen
       senderNotIssuer = SponsorFeeTransaction
-        .selfSigned(1, notSponsor, assetId, Some(minFee), 1 * Constants.UnitsInWave, ts + 1)
+        .selfSigned(notSponsor, assetId, Some(minFee), 1 * Constants.UnitsInWave, ts + 1)
         .right
         .get
       insufficientFee = SponsorFeeTransaction
-        .selfSigned(1, master, assetId, Some(minFee), 1 * Constants.UnitsInWave - 1, ts + 1)
+        .selfSigned(master, assetId, Some(minFee), 1 * Constants.UnitsInWave - 1, ts + 1)
         .right
         .get
     } yield (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee)
@@ -257,7 +257,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .selfSigned(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, reissuable = false, 100000000, ts + 1)
         .explicitGet()
       assetId = issue.id()
-      sponsor = SponsorFeeTransaction.selfSigned(1, master, assetId, Some(100), 100000000, ts + 2).explicitGet()
+      sponsor = SponsorFeeTransaction.selfSigned(master, assetId, Some(100), 100000000, ts + 2).explicitGet()
       assetTransfer = TransferTransactionV1
         .selfSigned(Some(assetId), master, recipient, issue.quantity, ts + 3, None, 100000, Array.emptyByteArray)
         .right

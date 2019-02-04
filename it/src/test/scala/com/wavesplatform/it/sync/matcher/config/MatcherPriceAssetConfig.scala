@@ -33,7 +33,6 @@ object MatcherPriceAssetConfig {
 
   val IssueUsdTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
-      2,
       AddressScheme.current.chainId,
       sender = alicePk,
       name = usdAssetName.getBytes(),
@@ -50,7 +49,6 @@ object MatcherPriceAssetConfig {
 
   val IssueWctTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
-      2,
       AddressScheme.current.chainId,
       sender = bobPk,
       name = wctAssetName.getBytes(),
@@ -67,7 +65,6 @@ object MatcherPriceAssetConfig {
 
   val IssueEthTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
-      2,
       AddressScheme.current.chainId,
       sender = alicePk,
       name = ethAssetName.getBytes(),
@@ -84,7 +81,6 @@ object MatcherPriceAssetConfig {
 
   val IssueBtcTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
-      2,
       AddressScheme.current.chainId,
       sender = bobPk,
       name = btcAssetName.getBytes(),

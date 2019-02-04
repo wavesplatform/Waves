@@ -80,7 +80,6 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
 
     val tx = CreateAliasTransactionV2
       .create(
-        2,
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         Alias.buildWithCurrentChainId("myalias").explicitGet(),
         100000,

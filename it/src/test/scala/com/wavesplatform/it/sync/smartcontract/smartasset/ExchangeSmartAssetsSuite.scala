@@ -30,7 +30,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
     val entry4 = StringDataEntry("str", "test")
 
-    dtx = DataTransaction.selfSigned(1, acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()
+    dtx = DataTransaction.selfSigned(acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()
     sender.signedBroadcast(dtx.json(), waitForTx = true)
   }
 

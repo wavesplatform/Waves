@@ -130,7 +130,6 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
           val assetsTransfers = parsedTransfersList(endpoint, assetId, transferAmount, richAccountPk, accounts)
           val tx = MassTransferTransaction
             .selfSigned(
-              version = MassTransferTransaction.version,
               assetId = assetId,
               sender = richAccountPk,
               transfers = assetsTransfers,

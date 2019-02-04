@@ -106,8 +106,7 @@ package object http {
   )(TransferTransactionV1.apply, unlift(TransferTransactionV1.unapply))
 
   implicit val versionedTransferTransactionFormat: Format[TransferTransactionV2] = (
-    (JsPath \ "version").format[Byte] and
-      (JsPath \ "sender").format[PublicKeyAccount] and
+    (JsPath \ "sender").format[PublicKeyAccount] and
       (JsPath \ "recipient").format[AddressOrAlias] and
       (JsPath \ "assetId").formatNullable[AssetId] and
       (JsPath \ "amount").format[Long] and
