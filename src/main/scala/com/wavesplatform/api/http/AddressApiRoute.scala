@@ -359,7 +359,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     BalanceDetails(
       account.address,
       portfolio.balance,
-      GeneratingBalanceProvider.balance(blockchain, functionalitySettings, blockchain.lastBlockId.getOrElse(ByteStr.empty), account),
+      GeneratingBalanceProvider.balance(blockchain, functionalitySettings, account),
       portfolio.balance - portfolio.lease.out,
       portfolio.effectiveBalance
     )

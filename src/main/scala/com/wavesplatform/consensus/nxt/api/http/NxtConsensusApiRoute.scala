@@ -33,9 +33,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
     Address.fromString(address) match {
       case Left(_) => complete(InvalidAddress)
       case Right(account) =>
-        complete(
-          Json.obj("address" -> account.address,
-                   "balance" -> GeneratingBalanceProvider.balance(blockchain, fs, blockchain.lastBlockId.getOrElse(ByteStr.empty), account)))
+        complete(Json.obj("address" -> account.address, "balance" -> GeneratingBalanceProvider.balance(blockchain, fs, account)))
     }
   }
 

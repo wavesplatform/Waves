@@ -55,7 +55,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
           val portfolio       = state.portfolio(lease1.sender)
           val expectedBalance = xfer1.amount + xfer2.amount - 2 * Fee
           portfolio.balance shouldBe expectedBalance
-          GeneratingBalanceProvider.balance(state, fs, state.lastBlockId.get, leaser) shouldBe 0
+          GeneratingBalanceProvider.balance(state, fs, leaser, state.lastBlockId.get) shouldBe 0
           portfolio.lease shouldBe LeaseBalance(0, expectedBalance)
           portfolio.effectiveBalance shouldBe 0
         }

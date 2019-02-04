@@ -139,7 +139,7 @@ class MinerImpl(allChannels: ChannelGroup,
     lazy val currentTime    = timeService.correctedTime()
     lazy val blockDelay     = currentTime - lastBlock.timestamp
     lazy val balance =
-      GeneratingBalanceProvider.balance(blockchainUpdater, blockchainSettings.functionalitySettings, refBlockID, account.toAddress)
+      GeneratingBalanceProvider.balance(blockchainUpdater, blockchainSettings.functionalitySettings, account.toAddress, refBlockID)
 
     measureSuccessful(
       blockBuildTimeStats,
@@ -269,7 +269,7 @@ class MinerImpl(allChannels: ChannelGroup,
   }
 
   private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKeyAccount): Either[String, Long] = {
-    val balance = GeneratingBalanceProvider.balance(blockchainUpdater, fs, block.uniqueId, account.toAddress)
+    val balance = GeneratingBalanceProvider.balance(blockchainUpdater, fs, account.toAddress, block.uniqueId)
 
     if (GeneratingBalanceProvider.isMiningAllowed(blockchainUpdater, height, balance)) {
       for {
