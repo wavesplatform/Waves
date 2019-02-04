@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.compiler
 
 import cats.Show
 import cats.implicits._
-import com.wavesplatform.lang.directives.Directive
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
@@ -16,12 +15,12 @@ import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 
-class ExpressionCompilerV1(ctx: CompilerContext) {
+object ExpressionCompiler {
 
-  def compile(input: String, directives: List[Directive]): Either[String, EXPR] = {
-    Parser.parseScript(input) match {
+  def compile(input: String, ctx: CompilerContext): Either[String, EXPR] = {
+    Parser.parseExpr(input) match {
       case fastparse.core.Parsed.Success(xs, _) =>
-        ExpressionCompilerV1(ctx, xs) match {
+        ExpressionCompiler(ctx, xs) match {
           case Left(err)              => Left(err.toString)
           case Right((expr, BOOLEAN)) => Right(expr)
           case Right((_, _))          => Left("Script should return boolean")
@@ -29,9 +28,6 @@ class ExpressionCompilerV1(ctx: CompilerContext) {
       case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
-}
-
-object ExpressionCompilerV1 {
 
   def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
     expr match {

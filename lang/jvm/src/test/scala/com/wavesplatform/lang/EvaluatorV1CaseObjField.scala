@@ -3,7 +3,7 @@ package com.wavesplatform.lang
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.Version.ExprV1
+import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -15,7 +15,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 class EvaluatorV1CaseObjField extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  def context(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.build(ExprV1).evaluationContext, sampleUnionContext(p))
+  def context(p: CaseObj): EvaluationContext = Monoid.combine(PureContext.build(V1).evaluationContext, sampleUnionContext(p))
 
   property("case custom type field access") {
     ev[CONST_LONG](

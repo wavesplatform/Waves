@@ -124,7 +124,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
           .left
           .map(_.m)
           .flatMap { script =>
-            ScriptCompiler.estimate(script, script.version).map((script, _))
+            ScriptCompiler.estimate(script, script.stdLibVersion).map((script, _))
           }
           .fold(
             e => ScriptCompilerError(e), {

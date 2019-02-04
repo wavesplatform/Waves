@@ -7,15 +7,6 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 
-/*
- Contact is a list of annotated definitions
- ContractInvokation is (ContractFunction name, ContractFunction args)
-
- In PoC:
-  - No declarations
-  - ContractFunctions can't invoke each other
- */
-
 case class Contract(
     dec: List[DECLARATION],
     cfs: List[CallableFunction],

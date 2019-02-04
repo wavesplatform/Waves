@@ -4,13 +4,16 @@ import cats._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.script.ContractScript
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{smart, _}
@@ -110,6 +113,23 @@ object CommonValidation {
         ValidationError.ActivationError(msg.getOrElse(tx.getClass.getSimpleName) + " has not been activated yet")
       )
 
+    def scriptActivation(sc: Script) = {
+      val ab = activationBarrier(BlockchainFeatures.Ride4DApps, Some("Ride4DApps has not been activated yet"))
+      def scriptVersionActivation(sc: Script) = sc.stdLibVersion match {
+        case V1 | V2 if sc.containsBlockV2.value => ab
+        case V1 | V2                             => Right(tx)
+        case V3                                  => ab
+      }
+      def scriptTypeActivation(sc: Script) = sc match {
+        case e: ExprScriprImpl                    => Right(tx)
+        case c: ContractScript.ContractScriptImpl => ab
+      }
+      for {
+        _ <- scriptVersionActivation(sc)
+        _ <- scriptTypeActivation(sc)
+      } yield tx
+
+    }
     tx match {
       case _: BurnTransactionV1        => Right(tx)
       case _: PaymentTransaction       => Right(tx)
@@ -125,22 +145,18 @@ object CommonValidation {
       case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
       case sst: SetScriptTransaction =>
-        sst.script.map(_.version) match {
-          case Some(v) if (v == ExprV1 || v == ExprV2) && sst.script.exists(_.containsBlockV2.value) =>
-            activationBarrier(BlockchainFeatures.Ride4DApps, Some("Ride4DApps has not been activated yet"))
-          case Some(ExprV1) | None => activationBarrier(BlockchainFeatures.SmartAccounts)
-          case Some(ExprV2)        => activationBarrier(BlockchainFeatures.SmartAccountTrading, Some("Script version 2"))
-          case Some(ContractV)     => activationBarrier(BlockchainFeatures.Ride4DApps, Some("Ride4DApps has not been activated yet"))
-          case Some(v)             => Left(GenericError(s"Bad script version $v"))
+        sst.script match {
+          case None     => Right(tx)
+          case Some(sc) => scriptActivation(sc)
         }
       case _: TransferTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
       case it: SetAssetScriptTransaction =>
-        if (it.script.isEmpty) {
-          Left(GenericError("Cannot set empty script"))
-        } else {
-          activationBarrier(BlockchainFeatures.SmartAssets)
+        it.script match {
+          case None     => Left(GenericError("Cannot set empty script"))
+          case Some(sc) => scriptActivation(sc)
         }
+
       case _: ReissueTransactionV2          => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: BurnTransactionV2             => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseTransactionV2            => activationBarrier(BlockchainFeatures.SmartAccounts)

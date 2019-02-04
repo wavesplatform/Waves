@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.Version
+import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -100,7 +100,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       arg         <- genBoundedString(1, 32)
       funcBinding <- validAliasStringGen
       contract    <- senderBindingToContract(funcBinding)
-      script      = ContractScript(Version.ContractV, contract)
+      script      = ContractScript(StdLibVersion.V3, contract)
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
       ci          = ContractInvocationTransaction.selfSigned(invoker, master, fc, None, fee, ts).explicitGet()

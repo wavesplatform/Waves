@@ -331,7 +331,7 @@ object Parser {
       } | acc
   }
 
-  def parseScript(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
+  def parseExpr(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
 
   def parseContract(str: String): core.Parsed[CONTRACT, Char, String] =
     P(Start ~ (declaration.rep) ~ (annotatedFunc.rep) ~ End)
