@@ -44,11 +44,12 @@ object ScriptRunner {
           isTokenScript
         )
         val evalContract = in.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.apply(t)),
-                                        _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), ???))
+                                        _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), _ => ???))
         EvaluatorV1.evalWithLogging(ctx, evalContract)
 
       case ContractScript.ContractScriptImpl(_, Contract(_, _, None), _) =>
-        val t: Proven with Authorized = in.eliminate(_.asInstanceOf[Proven with Authorized], _.eliminate(_.asInstanceOf[Proven with Authorized], ???))
+        val t: Proven with Authorized =
+          in.eliminate(_.asInstanceOf[Proven with Authorized], _.eliminate(_.asInstanceOf[Proven with Authorized], _ => ???))
         (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](t) match {
           case Right(_) => Right(TRUE)
           case Left(_)  => Right(FALSE)
