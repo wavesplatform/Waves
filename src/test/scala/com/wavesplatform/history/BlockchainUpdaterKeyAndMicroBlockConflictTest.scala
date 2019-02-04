@@ -14,7 +14,12 @@ import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 
-class BlockchainUpdaterKeyAndMicroBlockConflictTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
+class BlockchainUpdaterKeyAndMicroBlockConflictTest
+    extends PropSpec
+    with PropertyChecks
+    with DomainScenarioDrivenPropertyCheck
+    with Matchers
+    with TransactionGen {
   property("new key block should be validated to previous") {
     forAll(Preconditions.conflictingTransfers()) {
       case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
@@ -32,10 +37,10 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest extends PropSpec with Proper
       case (genesisBlock, leaseBlock, keyBlock, microBlocks, transferBlock, secondAccount) =>
         withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
           Seq(genesisBlock, leaseBlock, keyBlock).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount, d.blockchainUpdater.height, 0) > 0)
+          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0) > 0)
 
           microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount, d.blockchainUpdater.height, 0) > 0)
+          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0, leaseBlock.uniqueId) > 0)
 
           assert(d.blockchainUpdater.processBlock(transferBlock).toString.contains("negative effective balance"))
         }
@@ -69,7 +74,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest extends PropSpec with Proper
         richAccount   <- accountGen
         secondAccount <- accountGen
 
-        tsAmount  = FeeAmount * 10
+        tsAmount = FeeAmount * 10
         transfer1 <- validTransferGen(richAccount, secondAccount, tsAmount)
         transfer2 <- validTransferGen(secondAccount, richAccount, tsAmount - FeeAmount)
         transfer3 <- validTransferGen(secondAccount, richAccount, tsAmount - FeeAmount)
@@ -110,10 +115,10 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest extends PropSpec with Proper
         secondAccount <- accountGen
         randomAccount <- accountGen
 
-        tsAmount  = FeeAmount * 10
-        lease <- validLeaseGen(richAccount, secondAccount, tsAmount)
+        tsAmount = FeeAmount * 10
+        lease       <- validLeaseGen(richAccount, secondAccount, tsAmount)
         leaseCancel <- validLeaseCancelGen(richAccount, lease.id())
-        transfer <- validTransferGen(richAccount, randomAccount, tsAmount)
+        transfer    <- validTransferGen(richAccount, randomAccount, tsAmount)
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,

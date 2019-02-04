@@ -73,7 +73,7 @@ package object appender extends ScorexLogging {
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
       _ <- blockConsensusValidation(blockchainUpdater, settings, pos, time.correctedTime(), block) { height =>
-        val balance = GeneratingBalanceProvider.balance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, height, block.sender)
+        val balance = GeneratingBalanceProvider.balance(blockchainUpdater, settings.blockchainSettings.functionalitySettings, blockchainUpdater.blockAt(height).fold(ByteStr.empty)(_.reference), block.sender)
         Either.cond(
           GeneratingBalanceProvider.isEffectiveBalanceValid(blockchainUpdater,
                                                             settings.blockchainSettings.functionalitySettings,

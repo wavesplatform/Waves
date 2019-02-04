@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
@@ -358,7 +359,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     BalanceDetails(
       account.address,
       portfolio.balance,
-      GeneratingBalanceProvider.balance(blockchain, functionalitySettings, blockchain.height, account),
+      GeneratingBalanceProvider.balance(blockchain, functionalitySettings, blockchain.lastBlockId.getOrElse(ByteStr.empty), account),
       portfolio.balance - portfolio.lease.out,
       portfolio.effectiveBalance
     )
@@ -381,7 +382,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     Address
       .fromString(address)
       .right
-      .map(acc => ToResponseMarshallable(Balance(acc.address, confirmations, blockchain.effectiveBalance(acc, blockchain.height, confirmations))))
+      .map(acc => ToResponseMarshallable(Balance(acc.address, confirmations, blockchain.effectiveBalance(acc, confirmations, ByteStr.empty))))
       .getOrElse(InvalidAddress)
   }
 

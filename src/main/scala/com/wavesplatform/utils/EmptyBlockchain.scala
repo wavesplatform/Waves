@@ -68,7 +68,7 @@ object EmptyBlockchain extends Blockchain {
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = VolumeAndFee(0, 0)
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def balanceSnapshots(address: Address, from: Int, to: Int, onlyFinishedBlocks: Boolean): Seq[BalanceSnapshot] = Seq.empty
+  override def balanceSnapshots(address: Address, from: Int, to: ByteStr): Seq[BalanceSnapshot] = Seq.empty
 
   override def accountScript(address: Address): Option[Script] = None
 

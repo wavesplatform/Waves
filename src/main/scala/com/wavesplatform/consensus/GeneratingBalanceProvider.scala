@@ -1,10 +1,11 @@
 package com.wavesplatform.consensus
 
+import com.wavesplatform.account.Address
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.account.Address
-import com.wavesplatform.block.Block
 
 object GeneratingBalanceProvider {
   private val MinimalEffectiveBalanceForGenerator1: Long = 1000000000000L
@@ -23,8 +24,8 @@ object GeneratingBalanceProvider {
         .get(BlockchainFeatures.SmallerMinimalGeneratingBalance.id)
         .exists(height >= _) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2
 
-  def balance(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, account: Address): Long = {
-    val depth = if (height >= fs.generationBalanceDepthFrom50To1000AfterHeight) SecondDepth else FirstDepth
-    blockchain.effectiveBalance(account, height, depth)
+  def balance(blockchain: Blockchain, fs: FunctionalitySettings, block: ByteStr, account: Address): Long = {
+    val depth = if (blockchain.heightOf(block).exists(_ >= fs.generationBalanceDepthFrom50To1000AfterHeight)) SecondDepth else FirstDepth
+    blockchain.effectiveBalance(account, depth, block)
   }
 }
