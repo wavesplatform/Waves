@@ -243,7 +243,7 @@ lazy val lang =
     .withoutSuffixFor(JVMPlatform)
     .settings(
       version := "1.0.0",
-      coverageExcludedPackages := "",
+      coverageExcludedPackages := ".*",
       // the following line forces scala version across all dependencies
       scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true))),
       test in assembly := {},
