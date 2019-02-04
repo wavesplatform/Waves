@@ -139,6 +139,46 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       "Compilation failed: ContractFunction must return WriteSet/TransferSet/ContractResult or it super type")
   }
 
+  property("contract compiles fails if has more than one verifier function") {
+    val ctx = compilerContext
+    val expr = {
+      val script =
+        """
+          |
+          | @Verifier(tx)
+          | func foo() = {
+          |  true
+          | }
+          | 
+          | @Verifier(tx)
+          | func bar() = {
+          |  false
+          | }
+          |
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("more than 1 verifier function")
+  }
+
+  property("contract compiles fails if has unknown annotation") {
+    val ctx = compilerContext
+    val expr = {
+      val script =
+        """
+          | @Whooaaaa(arg)
+          | func foo() = {
+          |  true
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Annotation not recognized")
+  }
+
+
+
   property("hodlContract") {
     val ctx = Monoid
       .combineAll(
