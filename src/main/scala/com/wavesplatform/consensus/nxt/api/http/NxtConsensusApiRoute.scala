@@ -3,7 +3,6 @@ package com.wavesplatform.consensus.nxt.api.http
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
