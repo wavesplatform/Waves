@@ -4,7 +4,7 @@ import cats.data.EitherT
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -20,7 +20,7 @@ import monix.eval.Coeval
 
 object MatcherContext {
 
-  def build(version: Version, nByte: Byte, in: Coeval[Order], proofsEnabled: Boolean): EvaluationContext = {
+  def build(version: StdLibVersion, nByte: Byte, in: Coeval[Order], proofsEnabled: Boolean): EvaluationContext = {
     val baseContext = Monoid.combine(PureContext.build(version), CryptoContext.build(Global)).evaluationContext
 
     val inputEntityCoeval: Coeval[Either[String, CaseObj]] =
@@ -34,12 +34,17 @@ object MatcherContext {
     val orderType: CaseType = buildOrderType(proofsEnabled)
     val matcherTypes        = Seq(addressType, orderType, assetPairType)
 
-    val matcherVars: Map[String, ((FINAL, String), LazyVal)] = Map(
+    val txMap: Map[String, ((FINAL, String), LazyVal)] =
+      if (version == V1 || version == V2)
+        Map(("tx", ((orderType.typeRef, "Processing order"), LazyVal(EitherT(inputEntityCoeval)))))
+      else Map.empty
+
+    val commonMatcherVars: Map[String, ((FINAL, String), LazyVal)] = Map(
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "undefined height placeholder"), LazyVal(EitherT(heightCoeval)))),
-      ("tx", ((orderType.typeRef, "Processing order"), LazyVal(EitherT(inputEntityCoeval)))),
       ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
       ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
     )
+    val matcherVars = commonMatcherVars ++ txMap
 
     def inaccessibleFunction(name: String, internalName: Short): BaseFunction = {
       val msg = s"Function $name is inaccessible when running script on matcher"

@@ -8,8 +8,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.Version._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
+import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -32,7 +32,7 @@ import scala.util.Try
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private val pureContext = PureContext.build(ExprV1)
+  private val pureContext = PureContext.build(V1)
 
   private val defaultCryptoContext = CryptoContext.build(Global)
 
@@ -40,11 +40,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     Seq(
       defaultCryptoContext,
       pureContext,
-      WavesContext.build(ExprV1, environment, isTokenContext = false)
+      WavesContext.build(V1, environment, isTokenContext = false)
     )
   )
 
-  private val pureEvalContext: EvaluationContext = PureContext.build(ExprV1).evaluationContext
+  private val pureEvalContext: EvaluationContext = PureContext.build(V1).evaluationContext
 
   private def ev[T <: EVALUATED](context: EvaluationContext = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)
@@ -697,8 +697,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val r = EvaluatorV1
       .applywithLogging[EVALUATED](context.evaluationContext,
-                                   new ExpressionCompilerV1(context.compilerContext)
-                                     .compile(script, List.empty)
+                                   ExpressionCompiler
+                                     .compile(script, context.compilerContext)
                                      .explicitGet())
     (r._1, r._2.map {
       case CONST_BOOLEAN(b) => b

@@ -43,6 +43,7 @@ object Expressions {
   }
 
   sealed trait Declaration extends Positioned {
+    def position: Pos
     def name: PART[String]
     def allowShadowing: Boolean
   }

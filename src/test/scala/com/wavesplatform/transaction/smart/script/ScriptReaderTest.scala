@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Version.{ContractV, ExprV1}
+import com.wavesplatform.lang.StdLibVersion.{V3, V1}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.v1.Serde
@@ -15,14 +15,14 @@ class ScriptReaderTest extends FreeSpec with Matchers {
   val checksumLength = 4
 
   "should parse all bytes for V1" in {
-    val body     = Array(ExprV1.toByte) ++ Serde.serialize(TRUE) ++ "foo".getBytes
+    val body     = Array(V1.toByte) ++ Serde.serialize(TRUE) ++ "foo".getBytes
     val allBytes = body ++ crypto.secureHash(body).take(checksumLength)
     ScriptReader.fromBytes(allBytes) should produce("bytes left")
   }
 
   "should parse all bytes for V3" in {
     val sc = ContractScript(
-      ContractV,
+      V3,
       Contract(List.empty, List(CallableFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), Terms.REF("a")))), None)
     ).explicitGet()
 

@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -45,7 +45,7 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(ContractV, contract) shouldBe Right(("second", 41))
+    ContractScript.estimateComplexity(V3, contract) shouldBe Right(("second", 41))
   }
 
   property("estimate contract script with context correctly") {
@@ -84,6 +84,6 @@ class ContractScriptComplexityTest extends PropSpec with PropertyChecks with Mat
       )
     )
 
-    ContractScript.estimateComplexity(ContractV, contract) shouldBe Right(("first", 68))
+    ContractScript.estimateComplexity(V3, contract) shouldBe Right(("first", 68))
   }
 }

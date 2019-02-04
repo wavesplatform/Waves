@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -389,10 +389,10 @@ object PureContext {
     functions
   )
 
-  def build(version: Version): CTX =
+  def build(version: StdLibVersion): CTX =
     version match {
-      case ExprV1 | ExprV2 => ctx
-      case ContractV       => Monoid.combine(ctx, CTX(Seq.empty, Map.empty, Array(listConstructor1, listConstructor2, listConstructor3)))
+      case V1 | V2 => ctx
+      case V3       => Monoid.combine(ctx, CTX(Seq.empty, Map.empty, Array(listConstructor1, listConstructor2, listConstructor3)))
     }
 
 }
