@@ -88,6 +88,13 @@ object ContractCompiler {
     for {
       ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
       l  <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
+      _ <- Either
+        .cond(
+          l.map(_.u.name).toSet.size == l.size,
+          (),
+          Generic(contract.position.start, contract.position.start, "Contract functions must have unique names")
+        )
+        .toCompileM
       verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
       v <- verifierFunctions match {
         case Nil => Option.empty[VerifierFunction].pure[CompileM]
