@@ -10,17 +10,18 @@ import com.wavesplatform.lang.v1.compiler.Terms.CaseObj
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.smart.script.ContractTransfer
 import monix.eval.Coeval
 import shapeless._
 
 object WavesEnvironment {
-  type In = Transaction :+: Order :+: CaseObj :+: CNil
+  type In = Transaction :+: Order :+: ContractTransfer :+: CNil
 }
 
 class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[Int], blockchain: Blockchain) extends Environment {
   override def height: Long = h()
 
-  override def inputEntity: Tx :+: Ord :+: CaseObj :+: CNil = {
+  override def inputEntity: Tx :+: Ord :+: ContractTransfer :+: CNil = {
     in.apply()
       .map(InputPoly)
   }

@@ -1,33 +1,36 @@
 package com.wavesplatform.state.diffs
 
-import com.google.common.base.Throwables
+import cats.implicits._
 import cats.kernel.Monoid
+import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
-import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError._
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
+import com.wavesplatform.transaction.smart.script.{ContractTransfer, Script, ScriptRunner}
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, WavesEnvironment}
 import monix.eval.Coeval
 import shapeless.Coproduct
+
 import scala.util.{Failure, Success, Try}
 
 object ContractInvocationTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: ContractInvocationTransaction): Either[ValidationError, Diff] = {
     val sc = blockchain.accountScript(tx.contractAddress)
+
     sc match {
       case Some(ContractScriptImpl(_, contract, _)) =>
         val functionName = tx.fc.function.asInstanceOf[FunctionHeader.User].name
@@ -99,89 +102,7 @@ object ContractInvocationTransactionDiff {
                     )
                     _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - sum doesn't overflow
                     _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - whatever else tranfser/massTransfer ensures
-                    _ <- ps.foldLeft(Either.right[ValidationError, Diff](dataDiff)) { (diff, payment) =>
-                      val (addressRepr, amount, asset) = payment
-                      val address                      = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
-                      asset match {
-                        case None =>
-                          diff combine Right(
-                            Diff.stateOps(
-                              portfolios = Map(
-                                address            -> Portfolio(amount, LeaseBalance.empty, Map.empty),
-                                tx.contractAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)
-                              )))
-                        case Some(assetId) =>
-                          diff combine {
-                            val nextDiff = Diff.stateOps(
-                              portfolios = Map(
-                                address            -> Portfolio(0, LeaseBalance.empty, Map(assetId -> amount)),
-                                tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(assetId -> -amount))
-                              ))
-                            blockchain.assetScript(assetId) match {
-                              case None =>
-                                Right(nextDiff)
-                              case Some(script) =>
-                                Try {
-                                  import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
-                                  ScriptRunner(
-                                    blockchain.height,
-                                    Coproduct[ScriptRunner.TxOrd](
-                                      CaseObj(
-                                        buildTransferTransactionType(false).typeRef,
-                                        Map(
-                                          "assetId"         -> asset,
-                                          "sender"          -> tx.contractAddress.bytes,
-                                          "senderPublicKey" -> ByteStr(Array[Byte]()),
-                                          "bobyBytes"       -> ByteStr(Array[Byte]()),
-                                          "recipient"       -> addressRepr.bytes,
-                                          "amount"          -> amount,
-                                          "timestamp"       -> tx.timestamp,
-                                          "id"              -> tx.id(),
-                                          "feeAssetId"      -> Option.empty[ByteStr],
-                                          "fee"             -> 0L,
-                                          //"proofs" ->  Proofs.empty,
-                                          "version"   -> 0,
-                                          "attacment" -> ByteStr(Array[Byte]())
-                                        )
-                                      )
-                                      /*TransferTransactionV2
-                                        .create(2: Byte,
-                                                asset,
-                                                tx.sender, // XXX it need to be contract public key.
-                                                address,
-                                                amount,
-                                                tx.timestamp,
-                                                None,
-                                                0L,
-                                                Array[Byte](),
-                                                Proofs.empty)
-                                        .asInstanceOf[Transaction] */
-                                    ),
-                                    CompositeBlockchain.composite(blockchain, diff.right.get),
-                                    script,
-                                    true
-                                  ) match {
-                                    case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, true))
-                                    case (log, Right(FALSE)) =>
-                                      Left(TransactionNotAllowedByScript(log, script.text, true))
-                                    case (_, Right(TRUE)) => Right(nextDiff)
-                                    case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
-                                  }
-
-                                } match {
-                                  case Failure(e) =>
-                                    Left(
-                                      ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}",
-                                                           script.text,
-                                                           List.empty,
-                                                           true))
-                                  case Success(s) => s
-
-                                }
-                            }
-                          }
-                      }
-                    }
+                    _ <- foldContractTransfers(blockchain, tx)(ps, dataDiff)
                   } yield {
                     val paymentReceiversMap: Map[Address, Portfolio] = Monoid
                       .combineAll(pmts)
@@ -202,5 +123,74 @@ object ContractInvocationTransactionDiff {
       case _ => Left(GenericError(s"No contract at address ${tx.contractAddress}"))
     }
 
+  }
+
+  private def foldContractTransfers(blockchain: Blockchain, tx: ContractInvocationTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
+                                                                                               dataDiff: Diff): Either[ValidationError, Diff] = {
+
+    ps.foldLeft(Either.right[ValidationError, Diff](dataDiff)) { (diffEi, payment) =>
+      val (addressRepr, amount, asset) = payment
+      val address                      = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
+      asset match {
+        case None =>
+          diffEi combine Right(
+            Diff.stateOps(
+              portfolios = Map(
+                address            -> Portfolio(amount, LeaseBalance.empty, Map.empty),
+                tx.contractAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)
+              )))
+        case Some(assetId) =>
+          diffEi combine {
+            val nextDiff = Diff.stateOps(
+              portfolios = Map(
+                address            -> Portfolio(0, LeaseBalance.empty, Map(assetId -> amount)),
+                tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(assetId -> -amount))
+              ))
+            blockchain.assetScript(assetId) match {
+              case None =>
+                Right(nextDiff)
+              case Some(script) =>
+                diffEi flatMap (d => validateContractTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script))
+            }
+          }
+      }
+    }
+  }
+
+  private def validateContractTransferWithSmartAssetScript(blockchain: Blockchain, tx: ContractInvocationTransaction)(
+      totalDiff: Diff,
+      addressRepr: Recipient.Address,
+      amount: Long,
+      asset: Option[ByteStr],
+      nextDiff: Diff,
+      script: Script): Either[ValidationError, Diff] = {
+      Try {
+        ScriptRunner(
+          blockchain.height,
+          Coproduct[TxOrd](
+            ContractTransfer(
+              asset,
+              Recipient.Address(tx.contractAddress.bytes),
+              Recipient.Address(addressRepr.bytes),
+              amount,
+              tx.timestamp,
+              tx.id()
+            )),
+          CompositeBlockchain.composite(blockchain, totalDiff),
+          script,
+          true
+        ) match {
+          case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, true))
+          case (log, Right(FALSE)) =>
+            Left(TransactionNotAllowedByScript(log, script.text, isTokenScript = true))
+          case (_, Right(TRUE)) => Right(nextDiff)
+          case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
+        }
+      } match {
+        case Failure(e) =>
+          Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", script.text, List.empty, true))
+        case Success(s) => s
+
+    }
   }
 }
