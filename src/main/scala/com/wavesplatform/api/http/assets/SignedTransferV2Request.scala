@@ -7,10 +7,13 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
-import play.api.libs.json.{JsPath, Json, Reads, Writes}
+import play.api.libs.json._
 
 object SignedTransferV2Request {
-  implicit val writes: Writes[SignedTransferV2Request] = Json.writes[SignedTransferV2Request]
+
+  implicit val writes: Writes[SignedTransferV2Request] =
+    Json.writes[SignedTransferV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2)))
+
   implicit val reads: Reads[SignedTransferV2Request] = (
     (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").readNullable[String] and
@@ -19,7 +22,6 @@ object SignedTransferV2Request {
       (JsPath \ "feeAssetId").readNullable[String] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "version").read[Byte] and
       (JsPath \ "attachment").readNullable[String] and
       (JsPath \ "proofs").read[List[ProofStr]]
   )(SignedTransferV2Request.apply _)
@@ -40,8 +42,6 @@ case class SignedTransferV2Request(@ApiModelProperty(value = "Base58 encoded sen
                                    fee: Long,
                                    @ApiModelProperty(required = true)
                                    timestamp: Long,
-                                   @ApiModelProperty(required = true)
-                                   version: Byte,
                                    @ApiModelProperty(value = "Base58 encoded attachment")
                                    attachment: Option[String],
                                    @ApiModelProperty(required = true)
@@ -56,6 +56,6 @@ case class SignedTransferV2Request(@ApiModelProperty(value = "Base58 encoded sen
       _proofs     <- Proofs.create(_proofBytes)
       _recipient  <- AddressOrAlias.fromString(recipient)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
-      t           <- TransferTransactionV2.create(version, _assetId, _sender, _recipient, amount, timestamp, _feeAssetId, fee, _attachment.arr, _proofs)
+      t           <- TransferTransactionV2.create(_assetId, _sender, _recipient, amount, timestamp, _feeAssetId, fee, _attachment.arr, _proofs)
     } yield t
 }

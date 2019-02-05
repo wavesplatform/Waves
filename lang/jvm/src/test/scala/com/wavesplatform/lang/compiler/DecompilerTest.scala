@@ -4,22 +4,21 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.contract.Contract._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.{Common, Version}
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-import com.wavesplatform.lang.v1.compiler.{Decompiler, Terms}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{Decompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
+import com.wavesplatform.lang.{Common, StdLibVersion}
 import org.scalatest.prop.PropertyChecks
-
-import scala.collection.mutable.ArrayBuffer
+import org.scalatest.{Matchers, PropSpec}
 
 class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
-  val opcodes = scala.collection.immutable.Map[Short, String](1.toShort -> "+", 2.toShort -> "throw", 100.toShort -> "sigVerify", 1101.toShort -> "List")
+  val opcodes =
+    scala.collection.immutable.Map[Short, String](1.toShort -> "+", 2.toShort -> "throw", 100.toShort -> "sigVerify", 1101.toShort -> "List")
 
   property("Invoke contract compilation") {
     val scriptText =
@@ -41,7 +40,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       """.stripMargin
     val parsedScript = com.wavesplatform.lang.v1.parser.Parser.parseContract(scriptText).get.value
 
-    val ctx             = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx             = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
     val compledContract = compiler.ContractCompiler(ctx, parsedScript)
 
     compledContract.getOrElse("error").toString shouldBe
@@ -77,7 +76,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val contract = Contract(
       List(FUNC("fooHelper2", List(), FALSE), FUNC("fooHelper", List(), IF(FUNCTION_CALL(User("fooHelper2"), List()), TRUE, FALSE))),
       List(
-        ContractFunction(
+        CallableFunction(
           CallableAnnotation("invocation"),
           FUNC(
             "foo",
@@ -91,15 +90,24 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                   List(FUNCTION_CALL(
                     Native(1102),
                     List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("b"), CONST_LONG(1))),
-                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x"))))))),
+                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x"))))
+                  ))
+                ),
                 FUNCTION_CALL(
                   User("WriteSet"),
                   List(FUNCTION_CALL(
                     Native(1102),
                     List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
-                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x")))))))))))),
-      Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
-    Decompiler(contract :Contract, opcodes) shouldBe
+                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x"))))
+                  ))
+                )
+              )
+            )
+          )
+        )),
+      Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
+    )
+    Decompiler(contract: Contract, opcodes) shouldBe
       """func fooHelper2 () = {
         |    false
         |}
@@ -136,9 +144,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("Invoke contract decompilation") {
     val contract = Contract(
-      List(), // dec
-      List(   // cfs
-        ContractFunction(
+      List(),
+      List(
+        CallableFunction(
           CallableAnnotation("i"),
           FUNC(
             "testfunc",
@@ -151,15 +159,24 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                 FUNCTION_CALL(
                   User("ContractResult"),
                   List(
-                    FUNCTION_CALL(User("WriteSet"),
-                                  List(FUNCTION_CALL(Native(1101), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("1"), CONST_STRING("1"))))))),
-                    FUNCTION_CALL(User("TransferSet"),
-                                  List(
-                                    FUNCTION_CALL(Native(1101),
-                                                  List(FUNCTION_CALL(User("ContractTransfer"), List(GETTER(REF("i"), "caller"), REF("amount"), REF("unit")))))))))))))),
-      None)
+                    FUNCTION_CALL(
+                      User("WriteSet"),
+                      List(FUNCTION_CALL(Native(1101), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("1"), CONST_STRING("1"))))))),
+                    FUNCTION_CALL(
+                      User("TransferSet"),
+                      List(FUNCTION_CALL(Native(1101),
+                                         List(FUNCTION_CALL(User("ContractTransfer"), List(GETTER(REF("i"), "caller"), REF("amount"), REF("unit"))))))
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )),
+      None
+    )
 
-    Decompiler(contract :Contract, opcodes) shouldBe
+    Decompiler(contract: Contract, opcodes) shouldBe
       """
         |@Callable(i)
         |func testfunc (amount) = {
@@ -177,7 +194,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |}
         |}""".stripMargin
   }
-
 
   property("decompilation of real contract from dKiselev") {
     val scriptText =
@@ -339,50 +355,67 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("decompilation of real contract from Maxim Smolyakov") {
     val scriptText = BLOCK(
-    LET("startHeight", CONST_LONG(1375557)),
-    BLOCK(
-      LET("startPrice", CONST_LONG(100000)),
+      LET("startHeight", CONST_LONG(1375557)),
       BLOCK(
-        LET("interval", FUNCTION_CALL(Native(104), List(CONST_LONG(24), CONST_LONG(60)))),
+        LET("startPrice", CONST_LONG(100000)),
         BLOCK(
-          LET("exp", FUNCTION_CALL(Native(104), List(FUNCTION_CALL(Native(104), List(CONST_LONG(100), CONST_LONG(60))), CONST_LONG(1000)))),
+          LET("interval", FUNCTION_CALL(Native(104), List(CONST_LONG(24), CONST_LONG(60)))),
           BLOCK(
-            LET("$match0", REF("tx")),
-            IF(
-              FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("ExchangeTransaction"))),
-              BLOCK(
-                LET("e", REF("$match0")),
+            LET("exp", FUNCTION_CALL(Native(104), List(FUNCTION_CALL(Native(104), List(CONST_LONG(100), CONST_LONG(60))), CONST_LONG(1000)))),
+            BLOCK(
+              LET("$match0", REF("tx")),
+              IF(
+                FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("ExchangeTransaction"))),
                 BLOCK(
-                  LET("days", FUNCTION_CALL(Native(105), List(FUNCTION_CALL(Native(101), List(REF("height"), REF("startHeight"))), REF("interval")))),
-                  IF(
+                  LET("e", REF("$match0")),
+                  BLOCK(
+                    LET("days",
+                        FUNCTION_CALL(Native(105), List(FUNCTION_CALL(Native(101), List(REF("height"), REF("startHeight"))), REF("interval")))),
                     IF(
                       IF(
+                        IF(
+                          FUNCTION_CALL(
+                            Native(103),
+                            List(
+                              GETTER(REF("e"), "price"),
+                              FUNCTION_CALL(Native(104),
+                                            List(REF("startPrice"),
+                                                 FUNCTION_CALL(Native(100),
+                                                               List(CONST_LONG(1), FUNCTION_CALL(Native(104), List(REF("days"), REF("days")))))))
+                            )
+                          ),
+                          FUNCTION_CALL(User("!"),
+                                        List(FUNCTION_CALL(User("isDefined"),
+                                                           List(GETTER(GETTER(GETTER(REF("e"), "sellOrder"), "assetPair"), "priceAsset"))))),
+                          FALSE
+                        ),
                         FUNCTION_CALL(
                           Native(103),
-                          List(
-                            GETTER(REF("e"), "price"),
-                            FUNCTION_CALL(Native(104),
-                                          List(REF("startPrice"),
-                                               FUNCTION_CALL(Native(100),
-                                                             List(CONST_LONG(1), FUNCTION_CALL(Native(104), List(REF("days"), REF("days"))))))))),
-                        FUNCTION_CALL(
-                          User("!"),
-                          List(FUNCTION_CALL(User("isDefined"), List(GETTER(GETTER(GETTER(REF("e"), "sellOrder"), "assetPair"), "priceAsset"))))),
-                        FALSE),
+                          List(REF("exp"),
+                               FUNCTION_CALL(Native(101),
+                                             List(GETTER(GETTER(REF("e"), "sellOrder"), "expiration"),
+                                                  GETTER(GETTER(REF("e"), "sellOrder"), "timestamp"))))
+                        ),
+                        FALSE
+                      ),
                       FUNCTION_CALL(
                         Native(103),
                         List(REF("exp"),
                              FUNCTION_CALL(Native(101),
-                                           List(GETTER(GETTER(REF("e"), "sellOrder"), "expiration"),
-                                                GETTER(GETTER(REF("e"), "sellOrder"), "timestamp"))))),
-                      FALSE),
-                    FUNCTION_CALL(
-                      Native(103),
-                      List(REF("exp"),
-                           FUNCTION_CALL(Native(101),
-                                         List(GETTER(GETTER(REF("e"), "buyOrder"), "expiration"), GETTER(GETTER(REF("e"), "buyOrder"), "timestamp"))))),
-                    FALSE))),
-              IF(FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("BurnTransaction"))), BLOCK(LET("tx", REF("$match0")), TRUE), FALSE)))))))
+                                           List(GETTER(GETTER(REF("e"), "buyOrder"), "expiration"),
+                                                GETTER(GETTER(REF("e"), "buyOrder"), "timestamp"))))
+                      ),
+                      FALSE
+                    )
+                  )
+                ),
+                IF(FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("BurnTransaction"))), BLOCK(LET("tx", REF("$match0")), TRUE), FALSE)
+              )
+            )
+          )
+        )
+      )
+    )
     Decompiler(scriptText, opcodes) shouldBe
       """{
         |    let startHeight =
@@ -454,7 +487,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |}""".stripMargin
   }
 
-
   property("bytestring") {
     val test = Base58.encode("abc".getBytes("UTF-8"))
     // ([REVIEW]: may be i`am make a mistake here)
@@ -466,7 +498,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |    param
         |}""".stripMargin
   }
-
 
   property("getter") {
     val expr = Terms.GETTER(Terms.FUNCTION_CALL(

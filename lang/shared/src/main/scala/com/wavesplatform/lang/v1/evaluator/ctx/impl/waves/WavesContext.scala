@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -20,7 +20,14 @@ object WavesContext {
   import Types._
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  def build(version: Version, env: Environment, isTokenContext: Boolean): CTX = {
+  lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
+  val contractTransfer =
+    CaseType(FieldNames.ContractTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+  lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
+  lazy val contractResultType =
+    CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
+
+  def build(version: StdLibVersion, env: Environment, isTokenContext: Boolean): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     val proofsEnabled = !isTokenContext
@@ -367,17 +374,11 @@ object WavesContext {
       wavesBalanceF
     )
 
-    lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
-    val contractTransfer =
-      CaseType(FieldNames.ContractTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
-    lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
-    lazy val contractResultType =
-      CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
-
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
-      types ++ (if (version == ContractV) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
+      types ++ (if (version == V3)
+                  List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
                 else List.empty),
       commonVars ++ vars(version),
       functions
@@ -385,6 +386,6 @@ object WavesContext {
   }
 
   val verifierInput =
-    UnionType("VerifierInput", (buildOrderType(true) :: buildActiveTransactionTypes(true, ContractV)).map(_.typeRef))
+    UnionType("VerifierInput", (buildOrderType(true) :: buildActiveTransactionTypes(true, V3)).map(_.typeRef))
 
 }

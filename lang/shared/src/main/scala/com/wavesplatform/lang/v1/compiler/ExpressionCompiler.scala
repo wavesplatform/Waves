@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.compiler
 
 import cats.Show
 import cats.implicits._
-import com.wavesplatform.lang.directives.Directive
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
@@ -16,12 +15,12 @@ import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 
-class ExpressionCompilerV1(ctx: CompilerContext) {
+object ExpressionCompiler {
 
-  def compile(input: String, directives: List[Directive]): Either[String, EXPR] = {
-    Parser.parseScript(input) match {
+  def compile(input: String, ctx: CompilerContext): Either[String, EXPR] = {
+    Parser.parseExpr(input) match {
       case fastparse.core.Parsed.Success(xs, _) =>
-        ExpressionCompilerV1(ctx, xs) match {
+        ExpressionCompiler(ctx, xs) match {
           case Left(err)              => Left(err.toString)
           case Right((expr, BOOLEAN)) => Right(expr)
           case Right((_, _))          => Left("Script should return boolean")
@@ -29,9 +28,6 @@ class ExpressionCompilerV1(ctx: CompilerContext) {
       case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
-}
-
-object ExpressionCompilerV1 {
 
   def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
     expr match {
@@ -116,7 +112,7 @@ object ExpressionCompilerV1 {
     } yield compiledMatch
   }
 
-  private def compileBlock(pos: Expressions.Pos, declaration: Expressions.Declaration, expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] =
+  def compileBlock(pos: Expressions.Pos, declaration: Expressions.Declaration, expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] =
     declaration match {
       case l: Expressions.LET  => compileLetBlock(pos, l, expr)
       case f: Expressions.FUNC => compileFuncBlock(pos, f, expr)
@@ -175,12 +171,18 @@ object ExpressionCompilerV1 {
     } yield (func, compiledFuncBody._2, argTypes)
   }
 
+  def updateCtx(letName: String, letType: Types.FINAL, p: Pos): CompileM[Unit] =
+    modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (letType -> s"Defined at ${p.start}"))))
+
+  def updateCtx(funcName: String, typeSig: FunctionTypeSignature): CompileM[Unit] =
+    modify[CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> List(typeSig))))
+
   private def compileLetBlock(p: Pos, let: Expressions.LET, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
     for {
       compiledLet <- compileLet(p, let)
       (letName, letType, letExpr) = compiledLet
       compiledBody <- local {
-        modify[CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> (letType -> s"Defined at ${p.start}"))))
+        updateCtx(letName, letType, p)
           .flatMap(_ => compileExpr(body))
       }
     } yield (BLOCK(LET(letName, letExpr), compiledBody._1), compiledBody._2)
@@ -192,7 +194,7 @@ object ExpressionCompilerV1 {
       (func, compiledFuncBodyType, argTypes) = f
       typeSig                                = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(func.name))
       compiledBody <- local {
-        modify[CompilerContext, CompilationError](functions.modify(_)(_ + (func.name -> List(typeSig))))
+        updateCtx(func.name, typeSig)
           .flatMap(_ => compileExpr(body))
       }
     } yield (BLOCK(func, compiledBody._1), compiledBody._2)

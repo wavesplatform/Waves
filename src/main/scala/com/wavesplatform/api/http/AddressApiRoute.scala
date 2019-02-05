@@ -9,14 +9,11 @@ import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.script.v1.ContractScript
-import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet

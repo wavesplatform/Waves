@@ -82,9 +82,9 @@ object SyncHttpApi extends Assertions {
     def get(path: String): Response =
       sync(async(n).get(path))
 
-    def utx = sync(async(n).utx)
+    def utx: Seq[Transaction] = sync(async(n).utx)
 
-    def utxSize = sync(async(n).utxSize)
+    def utxSize: Int = sync(async(n).utxSize)
 
     def printDebugMessage(db: DebugMessage): Response =
       sync(async(n).printDebugMessage(db))
@@ -176,8 +176,8 @@ object SyncHttpApi extends Assertions {
     def sign(jsObject: JsObject): JsObject =
       sync(async(n).sign(jsObject))
 
-    def createAlias(targetAddress: String, alias: String, fee: Long): Transaction =
-      sync(async(n).createAlias(targetAddress, alias, fee))
+    def createAlias(targetAddress: String, alias: String, fee: Long, version: Byte = 2): Transaction =
+      sync(async(n).createAlias(targetAddress, alias, fee, version))
 
     def aliasByAddress(targetAddress: String): Seq[String] =
       sync(async(n).aliasByAddress(targetAddress))
@@ -268,9 +268,9 @@ object SyncHttpApi extends Assertions {
 
     def blockAt(height: Int): Block = sync(async(n).blockAt(height))
 
-    def blockSeq(fromHeight: Int, toHeight: Int) = sync(async(n).blockSeq(fromHeight, toHeight))
+    def blockSeq(fromHeight: Int, toHeight: Int): Seq[Block] = sync(async(n).blockSeq(fromHeight, toHeight))
 
-    def blockHeadersSeq(fromHeight: Int, toHeight: Int) = sync(async(n).blockHeadersSeq(fromHeight, toHeight))
+    def blockHeadersSeq(fromHeight: Int, toHeight: Int): Seq[BlockHeaders] = sync(async(n).blockHeadersSeq(fromHeight, toHeight))
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       sync(async(n).rollback(to, returnToUTX))

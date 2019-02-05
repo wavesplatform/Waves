@@ -2,17 +2,16 @@ package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
-import com.wavesplatform.transaction.smart.script.v1.ContractScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
 import monix.eval.Coeval
 
 trait Script {
   type Expr
 
-  val version: Version
+  val stdLibVersion: StdLibVersion
 
   val expr: Expr
 
@@ -22,11 +21,11 @@ trait Script {
   val containsBlockV2: Coeval[Boolean]
 
   override def equals(obj: scala.Any): Boolean = obj match {
-    case that: Script => version == that.version && expr == that.expr
+    case that: Script => stdLibVersion == that.stdLibVersion && expr == that.expr
     case _            => false
   }
 
-  override def hashCode(): Int = version * 31 + expr.hashCode()
+  override def hashCode(): Int = stdLibVersion * 31 + expr.hashCode()
 }
 
 object Script {
@@ -40,7 +39,7 @@ object Script {
     } yield script
 
   def decompile(s: Script): String = s match {
-    case ExprScriprImpl(_, e, _)     => Decompiler(e, com.wavesplatform.utils.defaultCompilerContext.opCodes)
-    case ContractScript(_, contract) => ???
+    case ExprScriprImpl(_, e, _)                                                                      => Decompiler(e, com.wavesplatform.utils.defaultCompilerContext.opCodes)
+    case com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl(_, contract, _) => ???
   }
 }

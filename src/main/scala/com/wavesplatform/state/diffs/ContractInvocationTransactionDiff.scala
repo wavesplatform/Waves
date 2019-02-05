@@ -9,12 +9,12 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
-import com.wavesplatform.lang.{Global, Version}
+import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.script.v1.ContractScript
+import com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, WavesEnvironment}
 import monix.eval.Coeval
 
@@ -22,7 +22,7 @@ object ContractInvocationTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: ContractInvocationTransaction): Either[ValidationError, Diff] = {
     val sc = blockchain.accountScript(tx.contractAddress)
     sc match {
-      case Some(ContractScript(_, contract)) =>
+      case Some(ContractScriptImpl(_, contract, _)) =>
         val functionName = tx.fc.function.asInstanceOf[FunctionHeader.User].name
         contract.cfs.find(_.u.name == functionName) match {
           case None => Left(GenericError(s"No function '$functionName' at address ${tx.contractAddress}"))
@@ -30,9 +30,9 @@ object ContractInvocationTransactionDiff {
             val ctx = Monoid
               .combineAll(
                 Seq(
-                  PureContext.build(Version.ContractV),
+                  PureContext.build(StdLibVersion.V3),
                   CryptoContext.build(Global),
-                  WavesContext.build(Version.ContractV,
+                  WavesContext.build(StdLibVersion.V3,
                                      new WavesEnvironment(AddressScheme.current.chainId, Coeval(tx.asInstanceOf[In]), Coeval(height), blockchain),
                                      false)
                 ))
@@ -41,9 +41,7 @@ object ContractInvocationTransactionDiff {
             val invoker                                       = tx.sender.toAddress.bytes
             val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.map(p => (p.amount, p.assetId))
             val res =
-              ContractEvaluator.apply(ctx,
-                                      contract,
-                                      ContractEvaluator.Invokation(functionName, tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
+              ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
             res.left
               .map(a => GenericError(a.toString): ValidationError)
               .flatMap {

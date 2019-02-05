@@ -8,7 +8,6 @@ import scala.annotation.meta.field
 
 @ApiModel
 case class MassTransferRequest(
-    @(ApiModelProperty @field)(dataType = "integer", example = "1", required = true) version: Byte,
     @(ApiModelProperty @field)(
       dataType = "string",
       example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",

@@ -2,15 +2,15 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.{CTX, Serde}
-import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompilerV1}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.{CTX, Serde}
 import fastparse.core.Parsed.{Failure, Success}
 import shapeless.{:+:, CNil}
 
@@ -49,7 +49,7 @@ object JsAPI {
     toJs(TRUE) // later
   }
 
-  def wavesContext(v: com.wavesplatform.lang.Version.Version) = WavesContext.build(
+  def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean = false) = WavesContext.build(
     v,
     new Environment {
       override def height: Long                                                                                    = 0
@@ -61,12 +61,12 @@ object JsAPI {
       override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
       override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     },
-    isTokenContext = false
+    isTokenContext
   )
 
-  val v1                   = com.wavesplatform.lang.Version.ExprV1
-  val v3                   = com.wavesplatform.lang.Version.ContractV
-  val exprWavesContext     = wavesContext(v1)
+  val v1                   = com.wavesplatform.lang.StdLibVersion.V1
+  val v2                   = com.wavesplatform.lang.StdLibVersion.V2
+  val v3                   = com.wavesplatform.lang.StdLibVersion.V3
   val contractWavesContext = wavesContext(v3)
 
   val cryptoContext = CryptoContext.build(Global)
@@ -80,9 +80,11 @@ object JsAPI {
   }
 
   @JSExportTopLevel("fullContext")
-  val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(v1), cryptoContext, exprWavesContext))
+  val fullContext: CTX = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, wavesContext(v3)))
 
-  val fullContractContext: CTX = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, contractWavesContext))
+  val fullContractContext: CTX           = Monoid.combineAll(Seq(PureContext.build(v3), cryptoContext, contractWavesContext))
+  val activatedAssetScriptContext: CTX   = Monoid.combineAll(Seq(PureContext.build(v2), cryptoContext, wavesContext(v2, true)))
+  val activatedAccountScriptContext: CTX = Monoid.combineAll(Seq(PureContext.build(v2), cryptoContext, wavesContext(v2, false)))
 
   @JSExportTopLevel("getTypes")
   def getTypes() = fullContext.types.map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v.typeRef))).toJSArray
@@ -109,7 +111,17 @@ object JsAPI {
   val compilerContext = fullContext.compilerContext
 
   @JSExportTopLevel("compile")
-  def compile(input: String): js.Dynamic = {
+  def compile(input: String, isAccountScript: Boolean): js.Dynamic = {
+    val context =
+      if (isAccountScript) {
+        activatedAccountScriptContext.compilerContext
+      } else {
+        activatedAssetScriptContext.compilerContext
+      }
+    compileWithContext(input, context)
+  }
+
+  def compileWithContext(input: String, context: CompilerContext): js.Dynamic = {
 
     def hash(m: Array[Byte]) = Global.keccak256(Global.blake2b256(m))
 
@@ -118,10 +130,10 @@ object JsAPI {
       Right(s ++ hash(s).take(4))
     }
 
-    (Parser.parseScript(input) match {
+    (Parser.parseExpr(input) match {
       case Success(value, _)    => Right[String, Expressions.EXPR](value)
       case Failure(_, _, extra) => Left[String, Expressions.EXPR](extra.traced.trace)
-    }).flatMap(ExpressionCompilerV1(fullContractContext.compilerContext, _))
+    }).flatMap(ExpressionCompiler(context, _))
       .flatMap(ast => serialize(ast._1).map(x => (x, ast)))
       .fold(
         err => {

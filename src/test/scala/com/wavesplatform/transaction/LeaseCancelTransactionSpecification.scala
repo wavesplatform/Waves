@@ -81,7 +81,6 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
 
     val tx = LeaseCancelTransactionV2
       .create(
-        2,
         'T',
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         ByteStr.decodeBase58("DJWkQxRyJNqWhq9qSQpK2D4tsrct6eZbjSv3AH4PSha6").get,

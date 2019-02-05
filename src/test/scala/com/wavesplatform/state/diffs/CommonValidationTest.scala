@@ -97,7 +97,6 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         if (smartToken)
           IssueTransactionV2
             .selfSigned(
-              IssueTransactionV2.supportedVersions.head,
               AddressScheme.current.chainId,
               richAcc,
               "test".getBytes(),
@@ -136,7 +135,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         if (sponsorship)
           Seq(
             SponsorFeeTransaction
-              .selfSigned(1, richAcc, issueTx.id(), Some(10), if (smartToken) {
+              .selfSigned(richAcc, issueTx.id(), Some(10), if (smartToken) {
                 Constants.UnitsInWave + ScriptExtraFee
               } else {
                 Constants.UnitsInWave
@@ -150,7 +149,6 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           Seq(
             SetScriptTransaction
               .selfSigned(
-                SetScriptTransaction.supportedVersions.head,
                 recipientAcc,
                 Some(script),
                 1 * Constants.UnitsInWave,

@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -40,7 +39,7 @@ object ValidationError {
   case class GenericError(err: String)                         extends ValidationError
 
   object GenericError {
-    def apply(ex: Throwable): GenericError = new GenericError(Throwables.getStackTraceAsString(ex))
+    def apply(ex: Throwable): GenericError = new GenericError(ex.getMessage)
   }
 
   case class InvalidSignature(s: Signed, details: Option[InvalidSignature] = None) extends ValidationError {

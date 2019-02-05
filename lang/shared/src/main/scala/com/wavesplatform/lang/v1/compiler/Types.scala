@@ -76,5 +76,7 @@ object Types {
       case (NOTHING, _)           => false
       case (l1: FINAL, l2: FINAL) => l1.u >= l2.u
     }
+
+    def <=(l2: FINAL): Boolean = l2 >= l1
   }
 }

@@ -2,21 +2,16 @@ package com.wavesplatform.api.http
 
 import java.security.SecureRandom
 
-import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Version
-import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.utils.Time
-
-import io.swagger.annotations._
-import play.api.libs.json._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.utils.Time
+import io.swagger.annotations._
+import javax.ws.rs.Path
+import play.api.libs.json._
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
@@ -130,7 +125,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
           .left
           .map(_.m)
           .flatMap { script =>
-            ScriptCompiler.estimate(script, script.version).map((script, _))
+            ScriptCompiler.estimate(script, script.stdLibVersion).map((script, _))
           }
           .fold(
             e => ScriptCompilerError(e), {

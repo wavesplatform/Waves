@@ -3,8 +3,8 @@ package com.wavesplatform.state.diffs.smart.performance
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.Version.ExprV1
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
+import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.metrics.Instrumented
@@ -31,10 +31,9 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
 
   private def scriptedSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[TransferTransactionV2] =
     for {
-      version <- Gen.oneOf(TransferTransactionV2.supportedVersions.toSeq)
-      amt     <- smallFeeGen
-      fee     <- smallFeeGen
-    } yield TransferTransactionV2.selfSigned(version, None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
+      amt <- smallFeeGen
+      fee <- smallFeeGen
+    } yield TransferTransactionV2.selfSigned(None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
 
   private def differentTransfers(typed: EXPR) =
     for {
@@ -53,8 +52,8 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
 
   ignore("parallel native signature verification vs sequential scripted signature verification") {
     val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
-    val untypedScript = Parser.parseScript(textScript).get.value
-    val typedScript   = ExpressionCompilerV1(compilerContext(ExprV1, isAssetScript = false), untypedScript).explicitGet()._1
+    val untypedScript = Parser.parseExpr(textScript).get.value
+    val typedScript   = ExpressionCompiler(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
 
     forAll(differentTransfers(typedScript)) {
       case (gen, setScript, transfers, scriptTransfers) =>

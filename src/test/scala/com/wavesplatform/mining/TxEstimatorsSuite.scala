@@ -4,7 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Version.ExprV1
+import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -58,7 +58,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
   }
 
   private val assetId = ByteStr("coin_id".getBytes())
-  private val script  = ExprScript(ExprV1, Terms.TRUE, checkSize = false).explicitGet()
+  private val script  = ExprScript(V1, Terms.TRUE, checkSize = false).explicitGet()
 
   private val transferWavesTx = TransferTransactionV1
     .selfSigned(

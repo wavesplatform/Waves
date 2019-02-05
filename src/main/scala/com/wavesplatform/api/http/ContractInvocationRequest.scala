@@ -33,7 +33,6 @@ object ContractInvocationRequest {
 }
 
 case class ContractInvocationRequest(
-    @(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1") version: Byte,
     sender: String,
     @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
     @(ApiModelProperty @field)(required = true) call: ContractInvocationRequest.FunctionCallPart,
@@ -42,8 +41,6 @@ case class ContractInvocationRequest(
     timestamp: Option[Long] = None)
 @ApiModel(value = "Signed Data transaction")
 case class SignedContractInvocationRequest(
-    @(ApiModelProperty @field)(required = true, dataType = "java.lang.Integer", value = "1", allowableValues = "1")
-    version: Byte,
     @(ApiModelProperty @field)(value = "Base58 encoded sender public key", required = true) senderPublicKey: String,
     @(ApiModelProperty @field)(required = true) fee: Long,
     @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") contractAddress: String,
@@ -59,7 +56,6 @@ case class SignedContractInvocationRequest(
       _proofBytes      <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs          <- Proofs.create(_proofBytes)
       t <- ContractInvocationTransaction.create(
-        version,
         _sender,
         _contractAddress,
         ContractInvocationRequest.buildFunctionCall(call),
