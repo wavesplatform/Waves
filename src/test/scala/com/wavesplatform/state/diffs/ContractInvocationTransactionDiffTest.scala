@@ -222,4 +222,24 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     }
   }
 
+  property("invoking contract disable by payment smart asset") {
+    forAll(for {
+      a <- accountGen
+      quantity = 1000000
+      am     <- Gen.choose[Long](1L, quantity)
+      master <- accountGen
+      ts     <- timestampGen
+      asset = IssueTransactionV2
+        .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetBanned), enoughFee, ts)
+        .explicitGet()
+      contractGen = (paymentContractGen(a, am, Some(asset.id())) _)
+      r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)))
+    } yield (a, am, r._1, r._2, r._3, asset, master)) {
+      case (acc, amount, genesis, setScript, ci, asset, master) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
+          blockDiffEi should produce("TransactionNotAllowedByScript")
+        }
+    }
+  }
+
 }
