@@ -192,7 +192,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
   }
 
-
   property("hodlContract") {
     val ctx = Monoid
       .combineAll(
@@ -274,5 +273,32 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
+  }
+
+  property("contract compilation fails if functions has the same name") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          |@Callable(i)
+          |func sameName() = {
+          |   WriteSet(List(DataEntry("a", "a")))
+          |}
+          |
+          |@Callable(i)
+          |func sameName() = {
+          |   WriteSet(List(DataEntry("b", "b")))
+          |}
+          |
+          |@Verifier(i)
+          |func sameName() = {
+          |   true
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Contract functions must have unique names")
   }
 }
