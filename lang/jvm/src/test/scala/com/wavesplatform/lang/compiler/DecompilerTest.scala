@@ -1,24 +1,17 @@
 package com.wavesplatform.lang.compiler
 
-import java.util.concurrent.Callable
-
-import cats.instances.unit
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction}
+import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, ContractFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.{Common, Version}
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.v1.compiler.{Decompiler, Terms}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ContractResult
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.parser.BinaryOperation.{LT_OP, SUB_OP, SUM_OP}
-import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
-import com.wavesplatform.lang.v1.parser.Expressions.{ANNOTATEDFUNC, ANNOTATION, BINARY_OP, CONTRACT, MATCH, MATCH_CASE}
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.{AnyPos, RealPos}
-import fastparse.parsers.Combinators.Not
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 
@@ -55,6 +48,92 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       "Contract(List(),List(ContractFunction(CallableAnnotation(i),FUNC(testfunc,List(amount),BLOCK(LET(pmt,CONST_LONG(1)),IF(FALSE,FUNCTION_CALL(Native(2),List(CONST_STRING(impossible))),FUNCTION_CALL(User(ContractResult),List(FUNCTION_CALL(User(WriteSet),List(FUNCTION_CALL(Native(1101),List(FUNCTION_CALL(User(DataEntry),List(CONST_STRING(1), CONST_STRING(1))))))), FUNCTION_CALL(User(TransferSet),List(FUNCTION_CALL(Native(1101),List(FUNCTION_CALL(User(ContractTransfer),List(GETTER(REF(i),caller), REF(amount), REF(unit)))))))))))))),None)"
   }
 
+  property("Invoke contract with verifier decompilation") {
+    val scriptText =
+      """
+        |
+        |func fooHelper2() = {
+        |   false
+        |}
+        |
+        |func fooHelper() = {
+        |   fooHelper2() || false
+        |}
+        |
+        |@Callable(invocation)
+        |func foo(a:ByteStr) = {
+        |  let x = invocation.caller.bytes
+        |  if (fooHelper())
+        |    then WriteSet(List(DataEntry("b", 1), DataEntry("sender", x)))
+        |    else WriteSet(List(DataEntry("a", a), DataEntry("sender", x)))
+        |}
+        |
+        |@Verifier(t)
+        |func verify() = {
+        |  true
+        |}
+        |
+      """.stripMargin
+    val contract = Contract(
+      List(FUNC("fooHelper2", List(), FALSE), FUNC("fooHelper", List(), IF(FUNCTION_CALL(User("fooHelper2"), List()), TRUE, FALSE))),
+      List(
+        ContractFunction(
+          CallableAnnotation("invocation"),
+          FUNC(
+            "foo",
+            List("a"),
+            BLOCK(
+              LET("x", GETTER(GETTER(REF("invocation"), "caller"), "bytes")),
+              IF(
+                FUNCTION_CALL(User("fooHelper"), List()),
+                FUNCTION_CALL(
+                  User("WriteSet"),
+                  List(FUNCTION_CALL(
+                    Native(1102),
+                    List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("b"), CONST_LONG(1))),
+                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x"))))))),
+                FUNCTION_CALL(
+                  User("WriteSet"),
+                  List(FUNCTION_CALL(
+                    Native(1102),
+                    List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
+                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x")))))))))))),
+      Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
+    Decompiler(contract :Contract, opcodes) shouldBe
+      """func fooHelper2 () = {
+        |    false
+        |}
+        |
+        |func fooHelper () = {
+        |    { if (
+        |    fooHelper2()
+        |    )
+        |then
+        |    true
+        |else
+        |    false
+        |}
+        |}
+        |@Callable(invocation)
+        |func foo (a) = {
+        |    {
+        |    let x =
+        |                        invocation.caller.bytes;
+        |    { if (
+        |        fooHelper()
+        |        )
+        |    then
+        |        WriteSet(<Native_1102>(DataEntry("b",1),DataEntry("sender",x)))
+        |    else
+        |        WriteSet(<Native_1102>(DataEntry("a",a),DataEntry("sender",x)))
+        |    }
+        |}
+        |}@Verifier(t)
+        |func verify () = {
+        |    true
+        |}""".stripMargin
+  }
+
   property("Invoke contract decompilation") {
     val contract = Contract(
       List(), // dec
@@ -81,7 +160,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       None)
 
     Decompiler(contract :Contract, opcodes) shouldBe
-      """@Callable(i)
+      """
+        |@Callable(i)
         |func testfunc (amount) = {
         |    {
         |    let pmt =
@@ -373,6 +453,20 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |    }
         |}""".stripMargin
   }
+
+
+  property("bytestring") {
+    val test = Base58.encode("abc".getBytes("UTF-8"))
+    // ([REVIEW]: may be i`am make a mistake here)
+    val expr = Terms.BLOCK(Terms.LET("param", CONST_BYTESTR(ByteStr(test.getBytes()))), REF("param"))
+    Decompiler(expr, opcodes) shouldBe
+      """{
+        |    let param =
+        |        base58'3K3F4C';
+        |    param
+        |}""".stripMargin
+  }
+
 
   property("getter") {
     val expr = Terms.GETTER(Terms.FUNCTION_CALL(

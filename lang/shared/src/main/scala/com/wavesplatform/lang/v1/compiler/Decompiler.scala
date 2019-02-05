@@ -1,9 +1,10 @@
 package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.ContractFunction
+import com.wavesplatform.lang.contract.Contract.{ContractFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types.NOTHING
 
 object Decompiler {
 
@@ -58,14 +59,19 @@ object Decompiler {
   def apply(e :Contract, opcodes:Map[Short,String]): String = {
     e match {
       case Contract(dec, cfs, vf) =>
-        dec.map(expr => expr.toString).mkString("") +
+        dec.map(expr => decl(expr, 0, opcodes)).mkString("\n\n") +
         cfs.map(expr => expr match {
           case ContractFunction(annotation, u) =>
-            out("@Callable(" + annotation.invocationArgName + ")\n", 0) +
-            Decompiler.decl(u, 0, opcodes)
+            out("\n@Callable(" + annotation.invocationArgName + ")\n", 0) +
+              Decompiler.decl(u, 0, opcodes)
           case _ => ???
-        }).mkString("") +
-        vf.getOrElse("")
+        }).mkString("\n") +
+          (vf match {
+            case Some(VerifierFunction(annotation, u)) =>
+            out("@Verifier(" + annotation.txArgName + ")\n", 0) +
+              Decompiler.decl(u, 0, opcodes)
+            case None => ""
+        })
     }
   }
 
