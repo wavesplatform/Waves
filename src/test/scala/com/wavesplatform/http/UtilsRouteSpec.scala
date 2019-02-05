@@ -13,6 +13,7 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue}
 import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 
@@ -33,7 +34,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   routePath("/script/compile") in {
     Post(routePath("/script/compile"), "1 == 2") ~> route ~> check {
       val json           = responseAs[JsValue]
-      val expectedScript = ExprScript(script).explicitGet()
+      val expectedScript = ExprScript(StdLibVersion.V2, script).explicitGet()
 
       Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
       (json \ "complexity").as[Long] shouldBe 3

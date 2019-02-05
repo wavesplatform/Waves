@@ -3,8 +3,8 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.Version
-import com.wavesplatform.lang.Version.ExprV1
+import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
@@ -32,7 +32,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     fee    <- smallFeeGen
     script <- Gen.option(scriptGen)
-  } yield (genesis, SetScriptTransaction.selfSigned(version, master, script, fee, ts).explicitGet())
+  } yield (genesis, SetScriptTransaction.selfSigned(master, script, fee, ts).explicitGet())
 
   property("setting script results in account state") {
     forAll(preconditionsAndSetContract) {
@@ -51,14 +51,14 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     fee <- smallFeeGen
     script = ContractScript(
-      Version.ContractV,
+      StdLibVersion.V3,
       Contract(
         List.empty,
         List(CallableFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), FUNCTION_CALL(Native(203), List(REF("a"), REF("sender")))))),
         None
       )
     )
-  } yield (genesis, SetScriptTransaction.selfSigned(version, master, script.toOption, fee, ts).explicitGet())
+  } yield (genesis, SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet())
 
   property("setting contract results in account state") {
     forAll(preconditionsAndSetContract) {
@@ -86,8 +86,8 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
       ts     <- positiveLongGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       expr    = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
-      script  = ExprScript(ExprV1, expr, checkSize = false).explicitGet()
-      tx      = SetScriptTransaction.selfSigned(1, master, Some(script), 100000, ts + 1).explicitGet()
+      script  = ExprScript(V1, expr, checkSize = false).explicitGet()
+      tx      = SetScriptTransaction.selfSigned(master, Some(script), 100000, ts + 1).explicitGet()
     } yield (genesis, tx)
 
     forAll(setup) {

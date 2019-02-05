@@ -4,9 +4,9 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.Version.ExprV1
+import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompilerV1, Terms}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -30,7 +30,7 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
     val tx              = CaseObj(transactionType.typeRef, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combine(
-        PureContext.build(ExprV1),
+        PureContext.build(V1),
         CTX(
           Seq(transactionType),
           Map(("tx", ((transactionType.typeRef, "Fake transaction"), LazyVal(EitherT.pure(tx))))),
@@ -40,8 +40,8 @@ class ScriptEstimatorTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   private def compile(code: String): EXPR = {
-    val untyped = Parser.parseScript(code).get.value
-    ExpressionCompilerV1(ctx.compilerContext, untyped).map(_._1).explicitGet()
+    val untyped = Parser.parseExpr(code).get.value
+    ExpressionCompiler(ctx.compilerContext, untyped).map(_._1).explicitGet()
   }
 
   private def estimate(functionCosts: collection.Map[FunctionHeader, Coeval[Long]], script: EXPR) =

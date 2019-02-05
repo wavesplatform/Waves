@@ -4,9 +4,7 @@ import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, JsNumber, JsObject, Json}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 
-case class IssueV2Request(@ApiModelProperty(required = true)
-                          version: Byte,
-                          @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+case class IssueV2Request(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
                           sender: String,
                           @ApiModelProperty(value = "Name of Asset", required = true)
                           name: String,

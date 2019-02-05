@@ -117,7 +117,6 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       sponsorTx = SponsorFeeTransaction
         .selfSigned(
-          1: Byte,
           contract,
           issueTx.id(),
           Some(1),
@@ -127,7 +126,6 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       transferToRecipient = TransferTransactionV2
         .selfSigned(
-          2: Byte,
           Some(issueTx.id()),
           contract,
           recipient,
@@ -140,7 +138,6 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       setScript = SetScriptTransaction
         .selfSigned(
-          1: Byte,
           contract,
           Some(script),
           ENOUGH_FEE,
@@ -149,7 +146,6 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       transferTx = TransferTransactionV2
         .selfSigned(
-          2: Byte,
           None,
           recipient,
           accountGen.sample.get,
@@ -189,7 +185,6 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       sponsorTx = SponsorFeeTransaction
         .selfSigned(
-          1: Byte,
           sponsor,
           issueTx.id(),
           Some(1),
@@ -199,7 +194,6 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       transferToContract = TransferTransactionV2
         .selfSigned(
-          2: Byte,
           Some(issueTx.id()),
           sponsor,
           contract,
@@ -212,7 +206,6 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       setScript = SetScriptTransaction
         .selfSigned(
-          1: Byte,
           contract,
           Some(script),
           ENOUGH_FEE,
@@ -221,7 +214,6 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       transferTx = TransferTransactionV2
         .selfSigned(
-          2: Byte,
           None,
           contract,
           sponsor,

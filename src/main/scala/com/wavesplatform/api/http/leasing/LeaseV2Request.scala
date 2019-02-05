@@ -3,9 +3,7 @@ package com.wavesplatform.api.http.leasing
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 
-case class LeaseV2Request(@ApiModelProperty(required = true)
-                          version: Byte,
-                          @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+case class LeaseV2Request(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                           sender: String,
                           @ApiModelProperty(required = true)
                           amount: Long,

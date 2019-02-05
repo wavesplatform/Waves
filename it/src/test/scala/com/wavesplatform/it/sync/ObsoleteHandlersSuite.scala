@@ -14,7 +14,7 @@ import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request,
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.api.http.DataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
@@ -35,7 +35,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val fee                                     = calcMassTransferFee(2)
     implicit val w: Writes[MassTransferRequest] = Json.writes[MassTransferRequest]
     val transfers                               = List(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))
-    val json                                    = sender.postJson("/assets/masstransfer", MassTransferRequest(MassTransferTransaction.version, None, firstAddress, transfers, fee, None))
+    val json                                    = sender.postJson("/assets/masstransfer", MassTransferRequest(None, firstAddress, transfers, fee, None))
     val tx                                      = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }
@@ -60,7 +60,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val reissue     = Json.parse(reissueJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(reissue)
 
-    val sponsorJson = sender.postJson("/assets/sponsor", SponsorFeeRequest(1, firstAddress, issue, Some(100L), sponsorFee))
+    val sponsorJson = sender.postJson("/assets/sponsor", SponsorFeeRequest(firstAddress, issue, Some(100L), sponsorFee))
     val sponsor     = Json.parse(sponsorJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(sponsor)
   }
@@ -93,7 +93,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
       StringDataEntry("str", "AAA-AAA")
     )
     val fee  = calcDataFee(data)
-    val json = sender.postJson("/addresses/data", DataRequest(1, firstAddress, data, fee))
+    val json = sender.postJson("/addresses/data", DataRequest(firstAddress, data, fee))
     val tx   = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }

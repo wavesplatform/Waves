@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.Version
+import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -91,21 +91,19 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
   def preconditionsAndSetContract(
       senderBindingToContract: String => Gen[Contract]): Gen[(List[GenesisTransaction], SetScriptTransaction, ContractInvocationTransaction)] =
     for {
-      setScriptVersion <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
-      ciVersion        <- Gen.oneOf(ContractInvocationTransaction.supportedVersions.toSeq)
-      master           <- accountGen
-      invoker          <- accountGen
-      ts               <- timestampGen
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
       genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
       fee         <- smallFeeGen
       arg         <- genBoundedString(1, 32)
       funcBinding <- validAliasStringGen
       contract    <- senderBindingToContract(funcBinding)
-      script      = ContractScript(Version.ContractV, contract)
-      setContract = SetScriptTransaction.selfSigned(setScriptVersion, master, script.toOption, fee, ts).explicitGet()
+      script      = ContractScript(StdLibVersion.V3, contract)
+      setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
-      ci          = ContractInvocationTransaction.selfSigned(ciVersion, invoker, master, fc, None, fee, ts).explicitGet()
+      ci          = ContractInvocationTransaction.selfSigned(invoker, master, fc, None, fee, ts).explicitGet()
     } yield (List(genesis, genesis2), setContract, ci)
 
   property("invoking contract results contract's state") {

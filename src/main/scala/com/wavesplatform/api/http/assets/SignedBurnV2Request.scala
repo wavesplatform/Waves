@@ -7,11 +7,9 @@ import com.wavesplatform.transaction.assets.BurnTransactionV2
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
-import play.api.libs.json.{JsPath, Json, Reads, Writes}
+import play.api.libs.json._
 
-case class SignedBurnV2Request(@ApiModelProperty(value = "BurnTransaction format version", required = true)
-                               version: Byte,
-                               @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+case class SignedBurnV2Request(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
                                senderPublicKey: String,
                                @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
                                assetId: String,
@@ -32,14 +30,13 @@ case class SignedBurnV2Request(@ApiModelProperty(value = "BurnTransaction format
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       chainId = AddressScheme.current.chainId
-      _t <- BurnTransactionV2.create(version, chainId, _sender, _assetId, quantity, fee, timestamp, _proofs)
+      _t <- BurnTransactionV2.create(chainId, _sender, _assetId, quantity, fee, timestamp, _proofs)
     } yield _t
 }
 
 object SignedBurnV2Request {
   implicit val reads: Reads[SignedBurnV2Request] = (
-    (JsPath \ "version").read[Byte] and
-      (JsPath \ "senderPublicKey").read[String] and
+    (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").read[String] and
       (JsPath \ "quantity").read[Long].orElse((JsPath \ "amount").read[Long]) and
       (JsPath \ "fee").read[Long] and
@@ -47,5 +44,6 @@ object SignedBurnV2Request {
       (JsPath \ "proofs").read[List[ProofStr]]
   )(SignedBurnV2Request.apply _)
 
-  implicit val writes: Writes[SignedBurnV2Request] = Json.writes[SignedBurnV2Request]
+  implicit val writes: Writes[SignedBurnV2Request] =
+    Json.writes[SignedBurnV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2)))
 }

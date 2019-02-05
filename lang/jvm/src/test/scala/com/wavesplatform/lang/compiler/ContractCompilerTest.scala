@@ -13,14 +13,15 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesCont
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.{Common, Version}
+import com.wavesplatform.lang.{Common, StdLibVersion}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   property("contract compiles when uses annotation bindings and correct return type") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext,
+                             WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), isTokenContext = false).compilerContext)
     val expr = {
       val script =
         """
@@ -70,6 +71,55 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
   }
 
+  property("contract compiles callable functions independently") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          | @Callable(invocation)
+          | func foo(a:ByteStr) = {
+          |  let sender0 = invocation.caller.bytes
+          |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender0)))
+          | }
+          |
+          | @Callable(invocation)
+          | func foo1(a:ByteStr) = {
+          |  foo(a)
+          | }
+          |
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Can't find a function 'foo'")
+  }
+
+  property("contract can access declarations") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          | let x = 0
+          |
+          | func bar() = {
+          |   x
+          | }
+          |
+          | @Callable(invocation)
+          | func foo(a:ByteStr) = {
+          |  let aux = bar()
+          |  let sender0 = invocation.caller.bytes
+          |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender0)))
+          | }
+          |
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+  }
+
   property("contract compiles fails when incorrect return type") {
     val ctx = compilerContext
     val expr = {
@@ -89,13 +139,67 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       "Compilation failed: ContractFunction must return WriteSet/TransferSet/ContractResult or it super type")
   }
 
+  property("contract compiles fails if has more than one verifier function") {
+    val ctx = compilerContext
+    val expr = {
+      val script =
+        """
+          |
+          | @Verifier(tx)
+          | func foo() = {
+          |  true
+          | }
+          | 
+          | @Verifier(tx)
+          | func bar() = {
+          |  false
+          | }
+          |
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("more than 1 verifier function")
+  }
+
+  property("contract compiles fails if has unknown annotation") {
+    val ctx = compilerContext
+    val expr = {
+      val script =
+        """
+          | @Whooaaaa(arg)
+          | func foo() = {
+          |  true
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Annotation not recognized")
+  }
+
+  property("Verifier function must have 0 arguments") {
+    val ctx = compilerContext
+    val expr = {
+      val script =
+        """
+          | @Verifier(arg)
+          | func foo(a: Int) = {
+          |  true
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
+  }
+
+
   property("hodlContract") {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(Version.ContractV),
+          PureContext.build(StdLibVersion.V3),
           CryptoContext.build(com.wavesplatform.lang.Global),
-          WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false)
+          WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false)
         ))
       .compilerContext
     val expr = {
@@ -145,7 +249,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract functions could return parent type values") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
     val expr = {
       val script =
         """

@@ -211,7 +211,6 @@ object OrdersFromScriptedAssetTestSuite {
   private def mkAllowAsset(id: Int = Random.nextInt(1000) + 1): IssueTransactionV2 = {
     IssueTransactionV2
       .selfSigned(
-        2,
         AddressScheme.current.chainId,
         sender = matcherPk,
         name = s"AllowAsset-$id".getBytes(),
@@ -235,7 +234,6 @@ object OrdersFromScriptedAssetTestSuite {
 
   private val DenyAsset = IssueTransactionV2
     .selfSigned(
-      2,
       AddressScheme.current.chainId,
       sender = matcherPk,
       name = "DenyAsset".getBytes(),
