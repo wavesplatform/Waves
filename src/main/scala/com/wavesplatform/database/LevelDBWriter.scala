@@ -89,7 +89,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   override protected def loadScore(): BigInt = readOnly(db => db.get(Keys.score(db.get(Keys.height))))
 
-//  override protected def loadLastBlock(): Option[Block] = readOnly(db => db.get(Keys.blockAt(db.get(Keys.height))))
   override protected def loadLastBlock(): Option[Block] = readOnly { db =>
     val height = Height(db.get(Keys.height))
     loadBlock(height, db)
@@ -168,7 +167,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override protected def loadAssetDescription(assetId: ByteStr): Option[AssetDescription] = readOnly { db =>
-    transactionInfo(assetId) match {
+    transactionInfo(assetId, db) match {
       case Some((_, i: IssueTransaction)) =>
         val ai          = db.fromHistory(Keys.assetInfoHistory(assetId), Keys.assetInfo(assetId)).getOrElse(AssetInfo(i.reissuable, i.quantity))
         val sponsorship = db.fromHistory(Keys.sponsorshipHistory(assetId), Keys.sponsorship(assetId)).fold(0L)(_.minFee)
@@ -454,8 +453,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
             val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
             val txSeqNr  = rw.get(kTxSeqNr)
             val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
+
             rw.get(kTxHNSeq)
-              .headOption
               .filter(_._1 == Height(currentHeight))
               .foreach { _ =>
                 rw.delete(kTxHNSeq)
@@ -570,7 +569,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     assetId
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly { db =>
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
+
+  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction)] = {
     val txId = TransactionId(id)
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
@@ -651,7 +652,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
-    transactionInfo(leaseId) match {
+    transactionInfo(leaseId, db) match {
       case Some((h, lt: LeaseTransaction)) =>
         Some(LeaseDetails(lt.sender, lt.recipient, h, lt.amount, loadLeaseStatus(db, leaseId)))
       case _ => None
@@ -749,32 +750,23 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>
     val txs = new ListBuffer[LeaseTransaction]()
 
-    val prefix   = Shorts.toByteArray(Keys.TransactionHeightNumByIdPrefix)
-    val iterator = db.iterator
+    db.iterateOver(Keys.TransactionHeightNumByIdPrefix) { kv =>
+      val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
 
-    try {
-      iterator.seek(prefix)
-      while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) {
+      if (loadLeaseStatus(db, txId)) {
+        val heightNumBytes = kv.getValue
 
-        val kv = iterator.next()
+        val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
+        val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
 
-        val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
+        val tx = db
+          .get(Keys.transactionAt(height, txNum))
+          .collect { case lt: LeaseTransaction => lt }
+          .get
 
-        if (loadLeaseStatus(db, txId)) {
-          val heightNumBytes = kv.getValue
-
-          val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
-          val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
-
-          val tx = db
-            .get(Keys.transactionAt(height, txNum))
-            .collect { case lt: LeaseTransaction => lt }
-            .get
-
-          txs.append(tx)
-        }
+        txs.append(tx)
       }
-    } finally iterator.close()
+    }
 
     txs.toSet
   }
@@ -806,10 +798,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     val height = Height(h)
 
-    val cDataOffset = 1 + 8 + SignatureLength
+    val consensuDataOffset = 1 + 8 + SignatureLength
 
     // version + timestamp + reference + baseTarget + genSig
-    val txCountOffset = cDataOffset + 8 + Block.GeneratorSignatureLength
+    val txCountOffset = consensuDataOffset + 8 + Block.GeneratorSignatureLength
 
     val headerKey = Keys.blockHeaderBytesAt(height)
 
@@ -825,9 +817,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
     db.get(headerKey)
       .map { headerBytes =>
-        val bytesBeforeCData = headerBytes.take(cDataOffset)
-        val cDataBytes       = headerBytes.slice(cDataOffset, cDataOffset + 40)
-        val version          = headerBytes.head
+        val bytesBeforeCData   = headerBytes.take(consensuDataOffset)
+        val consensusDataBytes = headerBytes.slice(consensuDataOffset, consensuDataOffset + 40)
+        val version            = headerBytes.head
         val (txCount, txCountBytes) = if (version == 1 || version == 2) {
           val byte = headerBytes(txCountOffset)
           (byte.toInt, Array[Byte](byte))
@@ -846,8 +838,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         val txBytes = txCountBytes ++ readTransactionBytes(txCount)
 
         val bytes = bytesBeforeCData ++
-          Ints.toByteArray(cDataBytes.length) ++
-          cDataBytes ++
+          Ints.toByteArray(consensusDataBytes.length) ++
+          consensusDataBytes ++
           Ints.toByteArray(txBytes.length) ++
           txBytes ++
           bytesAfterTxs
@@ -1018,22 +1010,15 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       .putInt(h)
       .array()
 
-    val iterator = db.iterator
+    db.iterateOver(prefix) { entry =>
+      val k = entry.getKey
+      val v = entry.getValue
 
-    try {
-      iterator.seek(prefix)
-      while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) {
-        val entry = iterator.next()
-
-        val k = entry.getKey
-        val v = entry.getValue
-
-        for {
-          idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-          tx  <- TransactionParsers.parseBytes(v)
-        } txs.append((TxNum(idx), tx))
-      }
-    } finally iterator.close()
+      for {
+        idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
+        tx  <- TransactionParsers.parseBytes(v)
+      } txs.append((TxNum(idx), tx))
+    }
 
     txs.toList
   }

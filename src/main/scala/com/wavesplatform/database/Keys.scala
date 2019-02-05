@@ -101,9 +101,7 @@ object Keys {
   def changedDataKeys(height: Int, addressId: BigInt): Key[Seq[String]] =
     Key("changed-data-keys", hAddr(49, height, addressId), readStrings, writeStrings)
 
-  // New Keys
-
-  val BlockHeaderPrefix: Short = 101
+  val BlockHeaderPrefix: Short = 50
 
   def blockHeaderAndSizeAt(height: Height): Key[Option[(BlockHeader, Int)]] =
     Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeaderAndSize, writeBlockHeaderAndSize)
@@ -116,7 +114,7 @@ object Keys {
       _ => throw new Exception("Key \"block-header-bytes-at-height\" - is read only!")
     )
 
-  val TransactionInfoPrefix: Short = 102
+  val TransactionInfoPrefix: Short = 51
   def transactionAt(height: Height, n: TxNum): Key[Option[Transaction]] =
     Key.opt[Transaction](
       "nth-transaction-info-at-height",
@@ -133,11 +131,11 @@ object Keys {
       identity
     )
 
-  val AddressTransactionSeqNrPrefix: Short = 103
+  val AddressTransactionSeqNrPrefix: Short = 52
   def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
     bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, addressId.toByteArray)
 
-  val AddressTransactionHNPrefix: Short = 104
+  val AddressTransactionHNPrefix: Short = 53
   def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
     Key.opt(
       "address-transaction-height-type-and-nums",
@@ -146,7 +144,7 @@ object Keys {
       writeTransactionHNSeqAndType
     )
 
-  val TransactionHeightNumByIdPrefix: Short = 105
+  val TransactionHeightNumByIdPrefix: Short = 54
   def transactionHNById(txId: TransactionId): Key[Option[(Height, TxNum)]] =
     Key.opt(
       "transaction-height-and-nums-by-id",
