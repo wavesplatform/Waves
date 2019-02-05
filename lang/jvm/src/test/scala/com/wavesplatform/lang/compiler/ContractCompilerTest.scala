@@ -135,8 +135,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce(
-      "Compilation failed: ContractFunction must return WriteSet/TransferSet/ContractResult or it super type")
+    compiler.ContractCompiler(ctx, expr) should produce(FieldNames.Error)
   }
 
   property("contract compiles fails if has more than one verifier function") {
@@ -191,7 +190,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
   }
-
 
   property("hodlContract") {
     val ctx = Monoid
