@@ -166,6 +166,26 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
           case (blockDiff, newState) =>
             newState.balance(acc, None) shouldBe amount
             newState.balance(invoker, Some(asset.id())) shouldBe (asset.quantity - 1)
+            newState.balance(ci.contractAddress, Some(asset.id())) shouldBe 1
+        }
+    }
+  }
+
+  property("asset script ban nvoking contract with payment") {
+    forAll(for {
+      a  <- accountGen
+      am <- smallFeeGen
+      contractGen = (paymentContractGen(a, am) _)
+      invoker <- accountGen
+      ts      <- timestampGen
+      asset = IssueTransactionV2
+        .selfSigned(chainId, invoker, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, Some(assetBanned), enoughFee, ts)
+        .explicitGet()
+      r <- preconditionsAndSetContract(contractGen, Gen.oneOf(Seq(invoker)), Some(Payment(1, Some(asset.id()))))
+    } yield (a, am, r._1, r._2, r._3, asset, invoker)) {
+      case (acc, amount, genesis, setScript, ci, asset, invoker) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
+          blockDiffEi should produce("TransactionNotAllowedByScript")
         }
     }
   }
