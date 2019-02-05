@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.parser.Expressions.FUNC
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
@@ -50,7 +50,7 @@ object ContractCompiler {
                 case _ => false
               },
               (),
-              Generic(0, 0, s"ContractFunction must return WriteSet/TransferSet/ContractResult or it super type, but got '$tpe'")
+              Generic(0, 0, s"${FieldNames.Error}, but got '$tpe'")
             )
             .toCompileM
         } yield CallableFunction(c, func)

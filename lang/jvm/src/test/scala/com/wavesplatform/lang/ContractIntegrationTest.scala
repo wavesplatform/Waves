@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, sampleTypes}
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invokation
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
@@ -65,7 +65,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     val result = ContractEvaluator(
       ctx.evaluationContext,
       compiled,
-      Invokation(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr.empty))), ByteStr.empty, None, ByteStr.empty)
+      Invocation(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr.empty))), ByteStr.empty, None, ByteStr.empty)
     ).explicitGet()
 
     result shouldBe expectedResult
