@@ -181,7 +181,8 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
 
     nodes.waitForHeightArise()
     val height = sender.height
-
+    
+    nodes.waitForHeightArise()
     val entry1     = StringDataEntry("oracle", "yes")
     val dtx = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1)) + smartFee).id
     nodes.waitForHeightAriseAndTxPresent(dtx)
