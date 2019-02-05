@@ -51,7 +51,7 @@ trait ApiMarshallers {
   implicit val stringUnmarshaller: FromEntityUnmarshaller[String] = PredefinedFromEntityUnmarshallers.stringUnmarshaller
   implicit val intUnmarshaller: FromEntityUnmarshaller[Int]       = stringUnmarshaller.map(_.toInt)
 
-  implicit def playJsonMarshaller[A](implicit writes: Writes[A], printer: JsValue => String = Json.prettyPrint): ToEntityMarshaller[A] =
+  implicit def playJsonMarshaller[A](implicit writes: Writes[A], printer: JsValue => String = Json.stringify): ToEntityMarshaller[A] =
     jsonStringMarshaller.compose(printer).compose(writes.writes)
 
   // preserve support for using plain strings as request entities
