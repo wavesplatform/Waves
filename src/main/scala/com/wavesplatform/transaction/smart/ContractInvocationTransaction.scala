@@ -5,10 +5,9 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL, REF}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, REF}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
@@ -16,9 +15,9 @@ import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
-import play.api.libs.json.{Format, JsObject}
+import play.api.libs.json.JsObject
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class ContractInvocationTransaction private (chainId: Byte,
                                                   sender: PublicKeyAccount,
@@ -69,8 +68,7 @@ case class ContractInvocationTransaction private (chainId: Byte,
 
 object ContractInvocationTransaction extends TransactionParserFor[ContractInvocationTransaction] with TransactionParser.MultipleVersions {
 
-  import play.api.libs.json._
-  import play.api.libs.json.Json
+  import play.api.libs.json.{Json, _}
 
   case class Payment(amount: Long, assetId: Option[AssetId])
 
@@ -94,31 +92,25 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
   override val typeId: Byte                 = 16
   override val supportedVersions: Set[Byte] = Set(1)
 
-  private def currentChainId = AddressScheme.current.chainId
+  private def currentChainId: Byte = AddressScheme.current.chainId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      val chainId            = bytes(0)
-      val sender             = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
-      val contractAddress    = Address.fromBytes(bytes.drop(KeyLength + 1).take(Address.AddressLength)).explicitGet()
-      val fcStart            = KeyLength + 1 + Address.AddressLength
-      val rest               = bytes.drop(fcStart)
-      val (fc, remaining)    = Serde.deserialize(rest, all = false).explicitGet()
-      val paymentFeeTsProofs = rest.takeRight(remaining)
-      val (payment: Option[(Option[AssetId], Long)], offset) = Deser.parseOption(paymentFeeTsProofs, 0)(arr => {
-        val amt: Long                             = Longs.fromByteArray(arr.take(8))
-        val (maybeAsset: Option[AssetId], offset) = Deser.parseOption(arr, 8)(ByteStr(_))
-        (maybeAsset, amt)
-      })
-      val feeTsProofs = paymentFeeTsProofs.drop(offset)
-      val fee         = Longs.fromByteArray(feeTsProofs.slice(0, 8))
-      val timestamp   = Longs.fromByteArray(feeTsProofs.slice(8, 16))
-      (for {
-        _      <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId ${chainId.toInt}"))
-        proofs <- Proofs.fromBytes(feeTsProofs.drop(16))
-        tx     <- create(sender, contractAddress, fc.asInstanceOf[FUNCTION_CALL], payment.map(p => Payment(p._2, p._1)), fee, timestamp, proofs)
-      } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      Either
+        .cond(tx.chainId == currentChainId, (), GenericError(s"Wrong chainId ${tx.chainId.toInt}"))
+        .flatMap(_ => Either.cond(tx.fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: ${tx.fee}")))
+        .flatMap(_ =>
+          tx.payment match {
+            case Some(Payment(amt, token)) => Either.cond(amt > 0, (), ValidationError.NegativeAmount(0, token.toString))
+            case _                         => Right(())
+        })
+        .flatMap(_ =>
+          Either.cond(tx.fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
+                      (),
+                      GenericError("all arguments of contractInvocation must be EVALUATED")))
+        .map(_ => tx)
+        .foldToTry
+    }
   }
 
   def create(sender: PublicKeyAccount,
@@ -163,29 +155,24 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
   }
 
   val byteTailDescription: ByteEntity[ContractInvocationTransaction] = {
-    (
-      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
-        ConstantByte(2, value = typeId, name = "Transaction type") ~
-        ConstantByte(3, value = 1, name = "Version") ~
-        OneByte(4, "Chain ID") ~
-        PublicKeyAccountBytes(5, "Sender's public key") ~
-        AddressBytes(6, "Contract address") ~
-        FunctionCallBytes(7, "Function call") ~
-        OptionPaymentBytes(8, "Payment") ~
-        LongBytes(9, "Fee") ~
-        LongBytes(10, "Timestamp") ~
-        ProofsBytes(11)
-    ).map {
-      case ((((((((((_, _), version), chainId), senderPublicKey), contractAddress), fc), payment), fee), timestamp), proofs) =>
+    (OneByte(tailIndex(1), "Chain ID") ~
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
+      AddressBytes(tailIndex(3), "Contract address") ~
+      FunctionCallBytes(tailIndex(4), "Function call") ~
+      OptionPaymentBytes(tailIndex(5), "Payment") ~
+      LongBytes(tailIndex(6), "Fee") ~
+      LongBytes(tailIndex(7), "Timestamp") ~
+      ProofsBytes(tailIndex(8))).map {
+      case (((((((chainId, senderPublicKey), contractAddress), fc), payment), fee), timestamp), proofs) =>
         ContractInvocationTransaction(
-          chainId,
-          senderPublicKey,
-          contractAddress,
-          fc,
-          payment,
-          fee,
-          timestamp,
-          proofs
+          chainId = chainId,
+          sender = senderPublicKey,
+          contractAddress = contractAddress,
+          fc = fc,
+          payment = payment,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
         )
     }
   }

@@ -6,11 +6,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction.TransactionParsers._
-import com.wavesplatform.transaction.description.{AddressBytes, ByteEntity, ConstantByte, LongBytes}
+import com.wavesplatform.transaction.description.{AddressBytes, ByteEntity, LongBytes}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class GenesisTransaction private (recipient: Address, amount: Long, timestamp: Long, signature: ByteStr) extends Transaction {
 
@@ -66,24 +66,14 @@ object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with 
   }
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      require(bytes.length >= BASE_LENGTH, "Data does not match base length")
 
-      var position = 0
+    require(bytes.length >= BASE_LENGTH, "Data does not match base length")
 
-      val timestampBytes = java.util.Arrays.copyOfRange(bytes, position, position + TimestampLength)
-      val timestamp      = Longs.fromByteArray(timestampBytes)
-      position += TimestampLength
-
-      val recipientBytes = java.util.Arrays.copyOfRange(bytes, position, position + RECIPIENT_LENGTH)
-      val recipient      = Address.fromBytes(recipientBytes).explicitGet()
-      position += RECIPIENT_LENGTH
-
-      val amountBytes = java.util.Arrays.copyOfRange(bytes, position, position + AmountLength)
-      val amount      = Longs.fromByteArray(amountBytes)
-
-      GenesisTransaction.create(recipient, amount, timestamp).fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      Either
+        .cond(tx.amount >= 0, tx, ValidationError.NegativeAmount(tx.amount, "waves"))
+        .foldToTry
+    }
   }
 
   def create(recipient: Address, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
@@ -96,18 +86,15 @@ object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with 
   }
 
   val byteTailDescription: ByteEntity[GenesisTransaction] = {
-    (
-      ConstantByte(1, value = typeId, name = "Transaction type") ~
-        LongBytes(2, "Timestamp") ~
-        AddressBytes(3, "Recipient's address") ~
-        LongBytes(4, "Amount")
-    ).map {
-      case (((_, timestamp), recipient), amount) =>
+    (LongBytes(tailIndex(1), "Timestamp") ~
+      AddressBytes(tailIndex(2), "Recipient's address") ~
+      LongBytes(tailIndex(3), "Amount")).map {
+      case ((timestamp, recipient), amount) =>
         GenesisTransaction(
-          recipient,
-          amount,
-          timestamp,
-          ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
+          recipient = recipient,
+          amount = amount,
+          timestamp = timestamp,
+          signature = ByteStr(generateSignature(recipient, amount, timestamp))
         )
     }
   }

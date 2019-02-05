@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.assets
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
@@ -10,7 +11,7 @@ import com.wavesplatform.transaction.smart.script.Script
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class IssueTransactionV1 private (sender: PublicKeyAccount,
                                        name: Array[Byte],
@@ -37,27 +38,14 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
 
   override val typeId: Byte = IssueTransaction.typeId
 
-  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] =
-    Try {
-      /*val signature = ByteStr(bytes.slice(0, SignatureLength))
-      val txId      = bytes(SignatureLength)
-      require(txId == typeId, s"Signed tx id is not match")
-      val (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, _) = IssueTransaction.parseBase(bytes, SignatureLength + 1)*/
-
-      byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
-        IssueTransaction
-          .validateIssueParams(tx.name, tx.description, tx.quantity, tx.decimals, tx.reissuable, tx.fee)
-          .map(_ => tx)
-          .fold(
-            left => Failure(new Exception(left.toString)),
-            right => Success(right)
-          )
-      }
-
-      /*IssueTransactionV1
-        .create(sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
-        .fold(left => Failure(new Exception(left.toString)), right => Success(right))*/
-    }.flatten
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      IssueTransaction
+        .validateIssueParams(tx)
+        .map(_ => tx)
+        .foldToTry
+    }
+  }
 
   def create(sender: PublicKeyAccount,
              name: Array[Byte],

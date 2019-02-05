@@ -14,13 +14,30 @@ trait TransactionParser {
   def supportedVersions: Set[Byte]
 
   def parseBytes(bytes: Array[Byte]): Try[TransactionT] =
-    parseHeader(bytes) flatMap (offset => parseTail(bytes.drop(offset)))
+    parseHeader(bytes) flatMap (offset => parseTail(bytes drop offset))
 
   /** @return offset */
   protected def parseHeader(bytes: Array[Byte]): Try[Int]
   protected def parseTail(bytes: Array[Byte]): Try[TransactionT]
 
+  /** Byte description of the header of the transaction */
   val byteHeaderDescription: ByteEntity[Unit]
+
+  /**
+    * Byte description of the transaction. Can be used for deserialization.
+    *
+    * Implementation example:
+    * {{{
+    *   val bytesTailDescription: ByteEntity[Transaction] =
+    *   (OneByte(1, "Transaction type") ~ OneByte(2, "Version") ~ LongBytes(3, "Fee"))
+    *     .map { case ((txType, version), fee) =>
+    *       Transaction(txType, version, fee)
+    *     }
+    *
+    *   // deserialization from buf: Array[Byte]
+    *   val tx: Try[Transaction] = byteTailDescription.deserializeFromByteArray(buf)
+    * }}}
+    */
   val byteTailDescription: ByteEntity[TransactionT]
 
   /**
@@ -29,27 +46,17 @@ trait TransactionParser {
     */
   protected def tailIndex(index: Int): Int = byteHeaderDescription.index + index
 
-  // TODO fixme
   /**
-    * Byte description of the transaction. Can be used for deserialization and generation of the documentation.
+    * Full byte description of the transaction (header + tail). Can be used for deserialization and generation of the documentation.
     *
-    * Implementation example:
+    * Usage example:
     * {{{
-    *   val bytesDescription: ByteEntity[Transaction] =
-    *   (OneByte(1, "Transaction type") ~ OneByte(2, "Version") ~ LongBytes(3, "Fee"))
-    *     .map { case ((txType, version), fee) =>
-    *       Transaction(txType, version, fee)
-    *     }
-    *
-    *   // deserialization from buf: Array[Byte]
-    *   val tx: Option[Transaction] = byteDescription.deserializeFromByteArray(buf)
-    *
     *   // generation of the documentation
     *   val txStringDocumentation: String = byteDescription.getStringDoc
     *   val txStringDocumentationForMD: String = byteDescription.getStringDocForMD
     * }}}
     */
-  val byteDescription: ByteEntity[TransactionT] =
+  lazy val byteDescription: ByteEntity[TransactionT] =
     (byteHeaderDescription ~ byteTailDescription).map { case (_, tx) => tx }
 }
 
@@ -70,7 +77,7 @@ object TransactionParser {
       1
     }
 
-    val byteHeaderDescription: ByteEntity[Unit] = {
+    lazy val byteHeaderDescription: ByteEntity[Unit] = {
       ConstantByte(1, typeId, "Transaction type") map (_ => Unit)
     }
   }
@@ -94,9 +101,8 @@ object TransactionParser {
       2
     }
 
-    val byteHeaderDescription: ByteEntity[Unit] = {
-      (ConstantByte(1, value = typeId, name = "Transaction type") ~
-        OneByte(2, "Version")).map(_ => ())
+    lazy val byteHeaderDescription: ByteEntity[Unit] = {
+      (ConstantByte(1, value = typeId, name = "Transaction type") ~ ConstantByte(2, value = version, name = "Version")).map(_ => Unit)
     }
   }
 
@@ -116,10 +122,10 @@ object TransactionParser {
       3
     }
 
-    val byteHeaderDescription: ByteEntity[Unit] = {
+    lazy val byteHeaderDescription: ByteEntity[Unit] = {
       (ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
         ConstantByte(2, value = typeId, name = "Transaction type") ~
-        OneByte(3, "Version")).map(_ => ())
+        OneByte(3, "Version")).map(_ => Unit)
     }
   }
 }

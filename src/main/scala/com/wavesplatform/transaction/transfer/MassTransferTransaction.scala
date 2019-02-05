@@ -6,7 +6,6 @@ import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
@@ -17,7 +16,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 
 import scala.annotation.meta.field
-import scala.util.{Either, Failure, Success, Try}
+import scala.util.{Either, Try}
 
 case class MassTransferTransaction private (assetId: Option[AssetId],
                                             sender: PublicKeyAccount,
@@ -50,6 +49,7 @@ case class MassTransferTransaction private (assetId: Option[AssetId],
       Deser.serializeArray(attachment)
     )
   }
+
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
@@ -91,36 +91,25 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   implicit val transferFormat: Format[Transfer] = Json.format
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-
-      val sender           = PublicKeyAccount(bytes.slice(0, KeyLength))
-      val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, KeyLength, AssetIdLength)
-      val transferCount    = Shorts.fromByteArray(bytes.slice(s0, s0 + 2))
-
-      def readTransfer(offset: Int): (Validation[ParsedTransfer], Int) = {
-        AddressOrAlias.fromBytes(bytes, offset) match {
-          case Right((addr, ofs)) =>
-            val amount = Longs.fromByteArray(bytes.slice(ofs, ofs + 8))
-            (Right[ValidationError, ParsedTransfer](ParsedTransfer(addr, amount)), ofs + 8)
-          case Left(e) => (Left(e), offset)
-        }
-      }
-
-      val transfersList: List[(Validation[ParsedTransfer], Int)] =
-        List.iterate(readTransfer(s0 + 2), transferCount) { case (_, offset) => readTransfer(offset) }
-
-      val s1 = transfersList.lastOption.map(_._2).getOrElse(s0 + 2)
-      val tx: Validation[MassTransferTransaction] = for {
-        transfers <- transfersList.map { case (ei, _) => ei }.sequence
-        timestamp               = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
-        feeAmount               = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
-        (attachment, attachEnd) = Deser.parseArraySize(bytes, s1 + 16)
-        proofs <- Proofs.fromBytes(bytes.drop(attachEnd))
-        mtt    <- MassTransferTransaction.create(assetIdOpt.map(ByteStr(_)), sender, transfers, timestamp, feeAmount, attachment, proofs)
-      } yield mtt
-
-      tx.fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      Try { tx.transfers.map(_.amount).fold(tx.fee)(Math.addExact) }
+        .fold(
+          ex => Left(ValidationError.OverflowError),
+          totalAmount =>
+            if (tx.transfers.lengthCompare(MaxTransferCount) > 0) {
+              Left(ValidationError.GenericError(s"Number of transfers ${tx.transfers.length} is greater than $MaxTransferCount"))
+            } else if (tx.transfers.exists(_.amount < 0)) {
+              Left(ValidationError.GenericError("One of the transfers has negative amount"))
+            } else if (tx.attachment.length > TransferTransaction.MaxAttachmentSize) {
+              Left(ValidationError.TooBigArray)
+            } else if (tx.fee <= 0) {
+              Left(ValidationError.InsufficientFee())
+            } else {
+              Right(tx)
+          }
+        )
+        .foldToTry
+    }
   }
 
   def create(assetId: Option[AssetId],
@@ -182,18 +171,14 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   }
 
   val byteTailDescription: ByteEntity[MassTransferTransaction] = {
-    (
-      ConstantByte(1, value = MassTransferTransaction.typeId, name = "Transaction type") ~
-        OneByte(2, "Version") ~
-        PublicKeyAccountBytes(3, "Sender's public key") ~
-        OptionAssetIdBytes(4, "Asset") ~
-        TransfersBytes(5) ~
-        LongBytes(6, "Timestamp") ~
-        LongBytes(7, "Fee") ~
-        BytesArrayUndefinedLength(8, "Attachments") ~
-        ProofsBytes(9)
-    ).map {
-      case ((((((((_, txVersion), sender), assetId), transfer), timestamp), fee), attachment), proofs) =>
+    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
+      OptionAssetIdBytes(tailIndex(2), "Asset") ~
+      TransfersBytes(tailIndex(3)) ~
+      LongBytes(tailIndex(4), "Timestamp") ~
+      LongBytes(tailIndex(5), "Fee") ~
+      BytesArrayUndefinedLength(tailIndex(6), "Attachments") ~
+      ProofsBytes(tailIndex(7))).map {
+      case ((((((sender, assetId), transfer), timestamp), fee), attachment), proofs) =>
         MassTransferTransaction(
           assetId = assetId,
           sender = sender,

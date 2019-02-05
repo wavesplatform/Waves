@@ -1,15 +1,15 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.common.primitives.Bytes
-import com.wavesplatform.crypto
-import monix.eval.Coeval
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto
 import com.wavesplatform.transaction._
-import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.description._
+import monix.eval.Coeval
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class ReissueTransactionV1 private (sender: PublicKeyAccount,
                                          assetId: ByteStr,
@@ -35,15 +35,12 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
   override val typeId: Byte = ReissueTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      val signature = ByteStr(bytes.slice(0, SignatureLength))
-      val txId      = bytes(SignatureLength)
-      require(txId == typeId, s"Signed tx id is not match")
-      val (sender, assetId, quantity, reissuable, fee, timestamp, _) = ReissueTransaction.parseBase(bytes, SignatureLength + 1)
-      ReissueTransactionV1
-        .create(sender, assetId, quantity, reissuable, fee, timestamp, signature)
-        .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      ReissueTransaction
+        .validateReissueParams(tx)
+        .map(_ => tx)
+        .foldToTry
+    }
   }
 
   def create(sender: PublicKeyAccount,
@@ -82,18 +79,16 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
   }
 
   val byteTailDescription: ByteEntity[ReissueTransactionV1] = {
-    (
-      ConstantByte(1, value = typeId, name = "Transaction type") ~
-        SignatureBytes(2, "Signature") ~
-        ConstantByte(3, value = typeId, name = "Transaction type") ~
-        PublicKeyAccountBytes(4, "Sender's public key") ~
-        ByteStrDefinedLength(5, "Asset ID", AssetIdLength) ~
-        LongBytes(6, "Quantity") ~
-        BooleanByte(7, "Reissuable flag (1 - True, 0 - False)") ~
-        LongBytes(8, "Fee") ~
-        LongBytes(9, "Timestamp")
-    ).map {
-      case ((((((((_, signature), _), sender), assetId), quantity), reissuable), fee), timestamp) =>
+    (SignatureBytes(tailIndex(1), "Signature") ~
+      ConstantByte(tailIndex(2), value = typeId, name = "Transaction type") ~
+      PublicKeyAccountBytes(tailIndex(3), "Sender's public key") ~
+      ByteStrDefinedLength(tailIndex(4), "Asset ID", AssetIdLength) ~
+      LongBytes(tailIndex(5), "Quantity") ~
+      BooleanByte(tailIndex(6), "Reissuable flag (1 - True, 0 - False)") ~
+      LongBytes(tailIndex(7), "Fee") ~
+      LongBytes(tailIndex(8), "Timestamp")).map {
+      case (((((((signature, txId), sender), assetId), quantity), reissuable), fee), timestamp) =>
+        require(txId == typeId, s"Signed tx id is not match")
         ReissueTransactionV1(
           sender = sender,
           assetId = assetId,

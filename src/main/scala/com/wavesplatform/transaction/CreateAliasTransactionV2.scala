@@ -4,11 +4,12 @@ import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{Alias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 final case class CreateAliasTransactionV2 private (sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, proofs: Proofs)
     extends CreateAliasTransaction {
@@ -28,15 +29,11 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
   override def supportedVersions: Set[Byte] = Set(2)
 
   override protected def parseTail(bytes: Array[Byte]): Try[CreateAliasTransactionV2] = {
-    Try {
-      for {
-        (sender, alias, fee, timestamp, end) <- CreateAliasTransaction.parseBase(0, bytes)
-        result <- (for {
-          proofs <- Proofs.fromBytes(bytes.drop(end))
-          tx     <- CreateAliasTransactionV2.create(sender, alias, fee, timestamp, proofs)
-        } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
-      } yield result
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      Either
+        .cond(tx.fee > 0, tx, ValidationError.InsufficientFee)
+        .foldToTry
+    }
   }
 
   def create(sender: PublicKeyAccount,
@@ -67,17 +64,12 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
   }
 
   val byteTailDescription: ByteEntity[CreateAliasTransactionV2] = {
-    (
-      ConstantByte(1, 0, "Transaction multiple version mark") ~
-        ConstantByte(2, value = typeId, name = "Transaction type") ~
-        ConstantByte(3, value = 2, name = "Version") ~
-        PublicKeyAccountBytes(4, "Sender's public key") ~
-        AliasBytes(5, "Alias object") ~
-        LongBytes(6, "Fee") ~
-        LongBytes(7, "Timestamp") ~
-        ProofsBytes(8)
-    ).map {
-      case (((((((_, _), version), senderPublicKey), alias), fee), timestamp), proofs) =>
+    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
+      AliasBytes(tailIndex(2), "Alias object") ~
+      LongBytes(tailIndex(3), "Fee") ~
+      LongBytes(tailIndex(4), "Timestamp") ~
+      ProofsBytes(tailIndex(5))).map {
+      case ((((senderPublicKey, alias), fee), timestamp), proofs) =>
         CreateAliasTransactionV2(
           senderPublicKey,
           alias,

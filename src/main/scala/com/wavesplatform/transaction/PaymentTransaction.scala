@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction
 
-import java.util
-
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -13,7 +11,7 @@ import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class PaymentTransaction private (sender: PublicKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends SignedTransaction {
@@ -78,56 +76,32 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
   }
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      require(bytes.length >= BaseLength, "Data does not match base length")
 
-      var position = 0
+    require(bytes.length >= BaseLength, "Data does not match base length")
 
-      //READ TIMESTAMP
-      val timestampBytes = bytes.take(TimestampLength)
-      val timestamp      = Longs.fromByteArray(timestampBytes)
-      position += TimestampLength
-
-      //READ SENDER
-      val senderBytes = util.Arrays.copyOfRange(bytes, position, position + SenderLength)
-      val sender      = PublicKeyAccount(senderBytes)
-      position += SenderLength
-
-      //READ RECIPIENT
-      val recipientBytes = util.Arrays.copyOfRange(bytes, position, position + RecipientLength)
-      val recipient      = Address.fromBytes(recipientBytes).explicitGet()
-      position += RecipientLength
-
-      //READ AMOUNT
-      val amountBytes = util.Arrays.copyOfRange(bytes, position, position + AmountLength)
-      val amount      = Longs.fromByteArray(amountBytes)
-      position += AmountLength
-
-      //READ FEE
-      val feeBytes = util.Arrays.copyOfRange(bytes, position, position + FeeLength)
-      val fee      = Longs.fromByteArray(feeBytes)
-      position += FeeLength
-
-      //READ SIGNATURE
-      val signatureBytes = util.Arrays.copyOfRange(bytes, position, position + SignatureLength)
-
-      PaymentTransaction
-        .create(sender, recipient, amount, fee, timestamp, ByteStr(signatureBytes))
-        .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      (
+        if (tx.amount <= 0) {
+          Left(ValidationError.NegativeAmount(tx.amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
+        } else if (tx.fee <= 0) {
+          Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
+        } else if (Try(Math.addExact(tx.amount, tx.fee)).isFailure) {
+          Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
+        } else {
+          Right(tx)
+        }
+      ).foldToTry
+    }
   }
 
   val byteTailDescription: ByteEntity[PaymentTransaction] = {
-    (
-      ConstantByte(1, value = typeId, name = "Transaction type") ~
-        LongBytes(2, "Timestamp") ~
-        PublicKeyAccountBytes(3, "Sender's public key") ~
-        AddressBytes(4, "Recipient's address") ~
-        LongBytes(5, "Amount") ~
-        LongBytes(6, "Fee") ~
-        SignatureBytes(7, "Signature")
-    ).map {
-      case ((((((_, timestamp), senderPublicKey), recipient), amount), fee), signature) =>
+    (LongBytes(tailIndex(1), "Timestamp") ~
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
+      AddressBytes(tailIndex(3), "Recipient's address") ~
+      LongBytes(tailIndex(4), "Amount") ~
+      LongBytes(tailIndex(5), "Fee") ~
+      SignatureBytes(tailIndex(6), "Signature")).map {
+      case (((((timestamp, senderPublicKey), recipient), amount), fee), signature) =>
         PaymentTransaction(
           sender = senderPublicKey,
           recipient = recipient,

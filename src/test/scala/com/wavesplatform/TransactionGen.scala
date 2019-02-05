@@ -123,22 +123,6 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
       Contract(List.empty, List(CallableFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), Terms.REF("a")))), None)).explicitGet()
   )
 
-  val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = for {
-    version                                                                  <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
-    (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
-    fee                                                                      <- smallFeeGen
-    timestamp                                                                <- timestampGen
-    proofs                                                                   <- proofsGen
-    script                                                                   <- Gen.option(Gen.oneOf(scriptGen, contractGen))
-    issue = IssueTransactionV2
-      .selfSigned(AddressScheme.current.chainId, sender, assetName, description, quantity, decimals, reissuable = true, script, iFee, timestamp)
-      .explicitGet()
-  } yield
-    (Seq(issue),
-     SetAssetScriptTransaction
-       .create(AddressScheme.current.chainId, sender, issue.id(), script, 1 * Constants.UnitsInWave + ScriptExtraFee, timestamp, proofs)
-       .explicitGet())
-
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
     sender: PrivateKeyAccount <- accountGen
     fee                       <- smallFeeGen
@@ -337,9 +321,8 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
 
   val massTransferGen: Gen[MassTransferTransaction] = massTransferGen(MaxTransferCount)
 
-  def massTransferGen(maxTransfersCount: Int) =
+  def massTransferGen(maxTransfersCount: Int): Gen[MassTransferTransaction] = {
     for {
-      version                                                      <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
       (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
       transferCount                                                <- Gen.choose(0, maxTransfersCount)
       transferGen = for {
@@ -348,6 +331,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
     } yield MassTransferTransaction.selfSigned(assetId, sender, recipients, timestamp, feeAmount, attachment).explicitGet()
+  }
 
   val MinIssueFee = 100000000
 
@@ -380,6 +364,21 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
     fee                       <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
     timestamp                 <- positiveLongGen
   } yield (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp)
+
+  val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = for {
+    (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
+    fee                                                                      <- smallFeeGen
+    timestamp                                                                <- timestampGen
+    proofs                                                                   <- proofsGen
+    script                                                                   <- Gen.option(Gen.oneOf(scriptGen, contractGen))
+    issue = IssueTransactionV2
+      .selfSigned(AddressScheme.current.chainId, sender, assetName, description, quantity, decimals, reissuable = true, script, iFee, timestamp)
+      .explicitGet()
+  } yield
+    (Seq(issue),
+     SetAssetScriptTransaction
+       .create(AddressScheme.current.chainId, sender, issue.id(), script, 1 * Constants.UnitsInWave + ScriptExtraFee, timestamp, proofs)
+       .explicitGet())
 
   val issueReissueBurnGen: Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
     amount                    <- positiveLongGen
@@ -417,7 +416,6 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
                     fee: Long,
                     timestamp: Long): Gen[ReissueTransaction] = {
     for {
-      version <- versionGen(ReissueTransactionV2)
       tx <- Gen.oneOf(
         ReissueTransactionV1
           .selfSigned(reissuer, assetId, quantity, reissuable, fee, timestamp)

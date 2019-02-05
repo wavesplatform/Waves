@@ -1,18 +1,17 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import cats.data.State
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
 import com.wavesplatform.transaction.description._
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class ExchangeTransactionV1(buyOrder: OrderV1,
                                  sellOrder: OrderV1,
@@ -26,7 +25,8 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
     extends ExchangeTransaction
     with SignedTransaction {
 
-  override def version: Byte                     = 1
+  override def version: Byte = 1
+
   override val builder                           = ExchangeTransactionV1
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
@@ -89,58 +89,37 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
   }
 
   override def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    def read[T](f: Array[Byte] => T, size: Int): State[Int, T] = State { from =>
-      val end = from + size
-      (end, f(bytes.slice(from, end)))
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      ExchangeTransaction
+        .validateExchangeParams(tx)
+        .map(_ => tx)
+        .foldToTry
     }
-
-    Try {
-      val makeTransaction = for {
-        o1Size         <- read(Ints.fromByteArray _, 4)
-        o2Size         <- read(Ints.fromByteArray _, 4)
-        o1             <- read(OrderV1.parseBytes _, o1Size).map(_.get)
-        o2             <- read(OrderV1.parseBytes _, o2Size).map(_.get)
-        price          <- read(Longs.fromByteArray _, 8)
-        amount         <- read(Longs.fromByteArray _, 8)
-        buyMatcherFee  <- read(Longs.fromByteArray _, 8)
-        sellMatcherFee <- read(Longs.fromByteArray _, 8)
-        fee            <- read(Longs.fromByteArray _, 8)
-        timestamp      <- read(Longs.fromByteArray _, 8)
-        signature      <- read(ByteStr.apply, SignatureLength)
-      } yield {
-        create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
-          .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-      }
-      makeTransaction.run(0).value._2
-    }.flatten
   }
 
   val byteTailDescription: ByteEntity[ExchangeTransactionV1] = {
-    (
-      ConstantByte(1, value = ExchangeTransactionV1.typeId, name = "Transaction type") ~
-        IntBytes(2, "Buy order object length (BN)") ~
-        IntBytes(3, "Sell order object length (SN)") ~
-        OrderV1Bytes(4, "Buy order object", "BN") ~
-        OrderV1Bytes(4, "Sell order object", "SN") ~
-        LongBytes(6, "Price") ~
-        LongBytes(7, "Amount") ~
-        LongBytes(8, "Buy matcher fee") ~
-        LongBytes(9, "Sell matcher fee") ~
-        LongBytes(10, "Fee") ~
-        LongBytes(11, "Timestamp") ~
-        SignatureBytes(12, "Signature")
-    ).map {
-      case (((((((((((_, _), _), buyOrder), sellOrder), price), amount), buyMatcherFee), sellMatcherFee), fee), timestamp), signature) =>
+    (IntBytes(tailIndex(1), "Buy order object length (BN)") ~
+      IntBytes(tailIndex(2), "Sell order object length (SN)") ~
+      OrderV1Bytes(tailIndex(3), "Buy order object", "BN") ~
+      OrderV1Bytes(tailIndex(4), "Sell order object", "SN") ~
+      LongBytes(tailIndex(5), "Price") ~
+      LongBytes(tailIndex(6), "Amount") ~
+      LongBytes(tailIndex(7), "Buy matcher fee") ~
+      LongBytes(tailIndex(8), "Sell matcher fee") ~
+      LongBytes(tailIndex(9), "Fee") ~
+      LongBytes(tailIndex(10), "Timestamp") ~
+      SignatureBytes(tailIndex(11), "Signature")).map {
+      case ((((((((((_, _), buyOrder), sellOrder), price), amount), buyMatcherFee), sellMatcherFee), fee), timestamp), signature) =>
         ExchangeTransactionV1(
-          buyOrder,
-          sellOrder,
-          amount,
-          price,
-          buyMatcherFee,
-          sellMatcherFee,
-          fee,
-          timestamp,
-          signature
+          buyOrder = buyOrder,
+          sellOrder = sellOrder,
+          amount = amount,
+          price = price,
+          buyMatcherFee = buyMatcherFee,
+          sellMatcherFee = sellMatcherFee,
+          fee = fee,
+          timestamp = timestamp,
+          signature = signature
         )
     }
   }

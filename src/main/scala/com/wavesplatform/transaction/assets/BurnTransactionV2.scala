@@ -1,15 +1,16 @@
 package com.wavesplatform.transaction.assets
 
-import com.google.common.primitives.Bytes
-import com.wavesplatform.crypto
-import monix.eval.Coeval
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.transaction._
 import cats.implicits._
+import com.google.common.primitives.Bytes
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
+import monix.eval.Coeval
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 final case class BurnTransactionV2 private (chainId: Byte,
                                             sender: PublicKeyAccount,
@@ -40,18 +41,12 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
   override val supportedVersions: Set[Byte] = Set(2)
 
   override protected def parseTail(bytes: Array[Byte]): Try[BurnTransactionV2] = {
-    Try {
-      val chainId                                          = bytes(0)
-      val (sender, assetId, quantity, fee, timestamp, end) = BurnTransaction.parseBase(1, bytes)
-
-      (for {
-        proofs <- Proofs.fromBytes(bytes.drop(end))
-        tx     <- create(chainId, sender, assetId, quantity, fee, timestamp, proofs)
-      } yield tx).fold(
-        err => Failure(new Exception(err.toString)),
-        t => Success(t)
-      )
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      BurnTransaction
+        .validateBurnParams(tx)
+        .map(_ => tx)
+        .foldToTry
+    }
   }
 
   def create(chainId: Byte,
@@ -89,27 +84,22 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
   }
 
   val byteTailDescription: ByteEntity[BurnTransactionV2] = {
-    (
-      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
-        ConstantByte(2, value = typeId, name = "Transaction type") ~
-        ConstantByte(3, 2, "Version") ~
-        OneByte(4, "Chain ID") ~
-        PublicKeyAccountBytes(5, "Sender's public key") ~
-        ByteStrDefinedLength(6, "Asset ID", AssetIdLength) ~
-        LongBytes(7, "Quantity") ~
-        LongBytes(8, "Fee") ~
-        LongBytes(9, "Timestamp") ~
-        ProofsBytes(10)
-    ).map {
-      case (((((((((_, _), version), chainId), sender), assetId), quantity), fee), timestamp), proofs) =>
+    (OneByte(tailIndex(1), "Chain ID") ~
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
+      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength) ~
+      LongBytes(tailIndex(4), "Quantity") ~
+      LongBytes(tailIndex(5), "Fee") ~
+      LongBytes(tailIndex(6), "Timestamp") ~
+      ProofsBytes(tailIndex(7))).map {
+      case ((((((chainId, sender), assetId), quantity), fee), timestamp), proofs) =>
         BurnTransactionV2(
-          chainId,
-          sender,
-          assetId,
-          quantity,
-          fee,
-          timestamp,
-          proofs
+          chainId = chainId,
+          sender = sender,
+          assetId = assetId,
+          quantity = quantity,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
         )
     }
   }

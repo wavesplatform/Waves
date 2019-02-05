@@ -1,15 +1,15 @@
 package com.wavesplatform.transaction.lease
 
 import com.google.common.primitives.Bytes
-import com.wavesplatform.crypto
-import monix.eval.Coeval
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto
 import com.wavesplatform.transaction._
-import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction.description._
+import monix.eval.Coeval
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class LeaseTransactionV1 private (sender: PublicKeyAccount,
                                        amount: Long,
@@ -33,14 +33,12 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
   override val typeId: Byte = LeaseTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      (for {
-        parsed <- LeaseTransaction.parseBase(bytes, 0)
-        (sender, recipient, quantity, fee, timestamp, end) = parsed
-        signature                                          = ByteStr(bytes.slice(end, end + SignatureLength))
-        lt <- LeaseTransactionV1.create(sender, quantity, fee, timestamp, recipient, signature)
-      } yield lt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      LeaseTransaction
+        .validateLeaseParams(tx)
+        .map(_ => tx)
+        .foldToTry
+    }
   }
 
   def create(sender: PublicKeyAccount,
@@ -74,23 +72,20 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
   }
 
   val byteTailDescription: ByteEntity[LeaseTransactionV1] = {
-    (
-      ConstantByte(1, value = typeId, name = "Transaction type") ~
-        PublicKeyAccountBytes(2, "Sender's public key") ~
-        AddressOrAliasBytes(3, "Recipient") ~
-        LongBytes(4, "Amount") ~
-        LongBytes(5, "Fee") ~
-        LongBytes(6, "Timestamp") ~
-        SignatureBytes(7, "Signature")
-    ).map {
-      case ((((((_, sender), recipient), amount), fee), timestamp), signature) =>
+    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
+      AddressOrAliasBytes(tailIndex(2), "Recipient") ~
+      LongBytes(tailIndex(3), "Amount") ~
+      LongBytes(tailIndex(4), "Fee") ~
+      LongBytes(tailIndex(5), "Timestamp") ~
+      SignatureBytes(tailIndex(6), "Signature")).map {
+      case (((((sender, recipient), amount), fee), timestamp), signature) =>
         LeaseTransactionV1(
-          sender,
-          amount,
-          fee,
-          timestamp,
-          recipient,
-          signature
+          sender = sender,
+          amount = amount,
+          fee = fee,
+          timestamp = timestamp,
+          recipient = recipient,
+          signature = signature
         )
     }
   }

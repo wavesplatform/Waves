@@ -9,7 +9,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class TransferTransactionV2 private (sender: PublicKeyAccount,
                                           recipient: AddressOrAlias,
@@ -27,7 +27,8 @@ case class TransferTransactionV2 private (sender: PublicKeyAccount,
   override val builder: TransactionParser     = TransferTransactionV2
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Array(builder.typeId, version) ++ bytesBase())
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
-  override def version: Byte                  = 2
+
+  override def version: Byte = 2
 }
 
 object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2] with TransactionParser.MultipleVersions {
@@ -36,22 +37,12 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
   override val supportedVersions: Set[Byte] = Set(2)
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      (for {
-        parsed <- TransferTransaction.parseBase(bytes, 0)
-        (sender, assetIdOpt, feeAssetIdOpt, timestamp, amount, feeAmount, recipient, attachment, end) = parsed
-        proofs <- Proofs.fromBytes(bytes.drop(end))
-        tt <- TransferTransactionV2.create(assetIdOpt.map(ByteStr(_)),
-                                           sender,
-                                           recipient,
-                                           amount,
-                                           timestamp,
-                                           feeAssetIdOpt.map(ByteStr(_)),
-                                           feeAmount,
-                                           attachment,
-                                           proofs)
-      } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      TransferTransaction
+        .validate(tx)
+        .map(_ => tx)
+        .foldToTry
+    }
   }
 
   def create(assetId: Option[AssetId],
@@ -94,21 +85,16 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
   }
 
   val byteTailDescription: ByteEntity[TransferTransactionV2] = {
-    (
-      ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
-        ConstantByte(2, value = typeId, name = "Transaction type") ~
-        ConstantByte(3, value = 2, name = "Version") ~
-        PublicKeyAccountBytes(4, "Sender's public key") ~
-        OptionAssetIdBytes(5, "Asset ID") ~
-        OptionAssetIdBytes(6, "Fee's asset ID") ~
-        LongBytes(7, "Timestamp") ~
-        LongBytes(8, "Amount") ~
-        LongBytes(9, "Fee") ~
-        AddressOrAliasBytes(10, "Recipient") ~
-        BytesArrayUndefinedLength(11, "Attachment") ~
-        ProofsBytes(12)
-    ).map {
-      case (((((((((((_, _), version), senderPublicKey), assetId), feeAssetId), timestamp), amount), fee), recipient), attachments), proofs) =>
+    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
+      OptionAssetIdBytes(tailIndex(2), "Asset ID") ~
+      OptionAssetIdBytes(tailIndex(3), "Fee's asset ID") ~
+      LongBytes(tailIndex(4), "Timestamp") ~
+      LongBytes(tailIndex(5), "Amount") ~
+      LongBytes(tailIndex(6), "Fee") ~
+      AddressOrAliasBytes(tailIndex(7), "Recipient") ~
+      BytesArrayUndefinedLength(tailIndex(8), "Attachment") ~
+      ProofsBytes(tailIndex(9))).map {
+      case ((((((((senderPublicKey, assetId), feeAssetId), timestamp), amount), fee), recipient), attachments), proofs) =>
         TransferTransactionV2(
           senderPublicKey,
           recipient,
