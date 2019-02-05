@@ -154,6 +154,12 @@ object ExpressionCompilerV1 {
           names.toSet.size == names.size
         }
       ctx <- get[CompilerContext, CompilationError]
+      _ <- func.args.toList
+        .map(_._1)
+        .traverse[CompileM, String](handlePart)
+        .map(_.filter(ctx.varDefs.contains(_))).asInstanceOf[CompileM[List[String]]]
+        .ensureOr(duplicatedVars => AlreadyDefined(p.start, p.end, s"${duplicatedVars.mkString("'")}", false))(duplicatedVars =>
+          duplicatedVars.isEmpty)
       argTypes <- func.args.toList.traverse[CompileM, (String, FINAL)] {
         case (argName, argType) =>
           for {

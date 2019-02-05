@@ -171,4 +171,24 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
+
+  property("functions could not define in args already defined vars") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          |@Callable(i)
+          |func some(i: Int) = {
+          |   if (i.contractAddress == "abc") then
+          |      WriteSet(List(DataEntry("a", "a")))
+          |   else
+          |      WriteSet(List(DataEntry("a", "b")))
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("already defined in the scope")
+  }
 }
