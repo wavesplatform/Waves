@@ -159,7 +159,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
       AddressBytes(tailIndex(3), "Contract address") ~
       FunctionCallBytes(tailIndex(4), "Function call") ~
-      OptionPaymentBytes(tailIndex(5), "Payment") ~
+      OptionBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")) ~
       LongBytes(tailIndex(6), "Fee") ~
       LongBytes(tailIndex(7), "Timestamp") ~
       ProofsBytes(tailIndex(8))).map {

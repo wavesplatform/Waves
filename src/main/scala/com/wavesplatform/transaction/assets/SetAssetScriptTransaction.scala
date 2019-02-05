@@ -104,7 +104,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
       ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength) ~
       LongBytes(tailIndex(4), "Fee") ~
       LongBytes(tailIndex(5), "Timestamp") ~
-      OptionScriptBytes(tailIndex(6), "Script") ~
+      OptionBytes(index = tailIndex(6), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(6), "Script")) ~
       ProofsBytes(tailIndex(7))).map {
       case ((((((chainId, sender), assetId), fee), timestamp), script), proofs) =>
         SetAssetScriptTransaction(

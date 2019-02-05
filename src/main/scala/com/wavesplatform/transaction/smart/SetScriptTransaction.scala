@@ -80,7 +80,7 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
   val byteTailDescription: ByteEntity[SetScriptTransaction] = {
     (OneByte(tailIndex(1), "Chain ID") ~
       PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
-      OptionScriptBytes(tailIndex(3), "Script") ~
+      OptionBytes(index = tailIndex(3), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(3), "Script")) ~
       LongBytes(tailIndex(4), "Fee") ~
       LongBytes(tailIndex(5), "Timestamp") ~
       ProofsBytes(tailIndex(6))).map {

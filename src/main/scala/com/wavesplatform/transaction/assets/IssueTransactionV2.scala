@@ -121,7 +121,7 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
       BooleanByte(tailIndex(7), "Reissuable flag (1 - True, 0 - False)") ~
       LongBytes(tailIndex(8), "Fee") ~
       LongBytes(tailIndex(9), "Timestamp") ~
-      OptionScriptBytes(tailIndex(10), "Script") ~
+      OptionBytes(index = tailIndex(10), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(10), "Script")) ~
       ProofsBytes(tailIndex(11))).map {
       case ((((((((((chainId, senderPublicKey), name), desc), quantity), decimals), reissuable), fee), timestamp), script), proofs) =>
         IssueTransactionV2(

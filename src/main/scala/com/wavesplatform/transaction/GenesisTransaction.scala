@@ -66,14 +66,16 @@ object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with 
   }
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
+    Try {
 
-    require(bytes.length >= BASE_LENGTH, "Data does not match base length")
+      require(bytes.length >= BASE_LENGTH, "Data does not match base length")
 
-    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
-      Either
-        .cond(tx.amount >= 0, tx, ValidationError.NegativeAmount(tx.amount, "waves"))
-        .foldToTry
-    }
+      byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+        Either
+          .cond(tx.amount >= 0, tx, ValidationError.NegativeAmount(tx.amount, "waves"))
+          .foldToTry
+      }
+    }.flatten
   }
 
   def create(recipient: Address, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {

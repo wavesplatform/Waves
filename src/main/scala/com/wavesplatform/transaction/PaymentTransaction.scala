@@ -76,22 +76,24 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
   }
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
+    Try {
 
-    require(bytes.length >= BaseLength, "Data does not match base length")
+      require(bytes.length >= BaseLength, "Data does not match base length")
 
-    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
-      (
-        if (tx.amount <= 0) {
-          Left(ValidationError.NegativeAmount(tx.amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
-        } else if (tx.fee <= 0) {
-          Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
-        } else if (Try(Math.addExact(tx.amount, tx.fee)).isFailure) {
-          Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-        } else {
-          Right(tx)
-        }
-      ).foldToTry
-    }
+      byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+        (
+          if (tx.amount <= 0) {
+            Left(ValidationError.NegativeAmount(tx.amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
+          } else if (tx.fee <= 0) {
+            Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
+          } else if (Try(Math.addExact(tx.amount, tx.fee)).isFailure) {
+            Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
+          } else {
+            Right(tx)
+          }
+        ).foldToTry
+      }
+    }.flatten
   }
 
   val byteTailDescription: ByteEntity[PaymentTransaction] = {

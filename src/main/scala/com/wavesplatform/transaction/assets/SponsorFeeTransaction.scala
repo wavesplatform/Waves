@@ -112,7 +112,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
       OneByte(tailIndex(2), "Version") ~
       PublicKeyAccountBytes(tailIndex(3), "Sender's public key") ~
       ByteStrDefinedLength(tailIndex(4), "Asset ID", AssetIdLength) ~
-      SponsorFeeOptionLongBytes(tailIndex(5), "Minimal fee in assets*", " * Zero value assume canceling sponsorship") ~
+      SponsorFeeOptionLongBytes(tailIndex(5), "Minimal fee in assets*") ~
       LongBytes(tailIndex(6), "Fee") ~
       LongBytes(tailIndex(7), "Timestamp") ~
       ProofsBytes(tailIndex(8))).map {
