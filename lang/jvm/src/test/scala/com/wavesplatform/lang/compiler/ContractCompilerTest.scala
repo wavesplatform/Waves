@@ -135,8 +135,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce(
-      "Compilation failed: ContractFunction must return WriteSet/TransferSet/ContractResult or it super type")
+    compiler.ContractCompiler(ctx, expr) should produce(FieldNames.Error)
   }
 
   property("contract compiles fails if has more than one verifier function") {
@@ -274,6 +273,34 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
+
+  property("contract compilation fails if functions has the same name") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          |@Callable(i)
+          |func sameName() = {
+          |   WriteSet(List(DataEntry("a", "a")))
+          |}
+          |
+          |@Callable(i)
+          |func sameName() = {
+          |   WriteSet(List(DataEntry("b", "b")))
+          |}
+          |
+          |@Verifier(i)
+          |func sameName() = {
+          |   true
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Contract functions must have unique names")
+  }
+}
 
   property("contract compilation fails if declaration and annotation bindings has the same name") {
     val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
