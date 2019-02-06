@@ -87,6 +87,7 @@ object ContractCompiler {
   private def compileContract(contract: Expressions.CONTRACT): CompileM[Contract] = {
     for {
       ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
+      _  <- validateDuplicateVarsInContract(contract)
       l  <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
       verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
       v <- verifierFunctions match {
@@ -103,6 +104,21 @@ object ContractCompiler {
       }
       fs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
     } yield Contract(ds, fs, v)
+  }
+
+  private def validateDuplicateVarsInContract(contract: Expressions.CONTRACT): CompileM[Any] = {
+    for {
+      ctx <- get[CompilerContext, CompilationError]
+      annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, String](handlePart)
+      annotatedFuncArgs <- contract.fs.flatMap(_.f.args.map(_._1)).traverse[CompileM, String](handlePart)
+      _ <- annotationVars
+        .ensure(Generic(contract.position.start, contract.position.start, "Annotation var already defined"))(aVs =>
+          aVs.forall(!ctx.varDefs.contains(_)))
+      _ <- annotationVars
+        .ensure(Generic(contract.position.start, contract.position.start, "Contract func args already defined in annotation vars")) { aVs =>
+          aVs.forall(!annotatedFuncArgs.contains(_))
+        }
+    } yield ()
   }
 
   def apply(c: CompilerContext, contract: Expressions.CONTRACT): Either[String, Contract] =

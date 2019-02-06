@@ -150,12 +150,6 @@ object ExpressionCompiler {
           names.toSet.size == names.size
         }
       ctx <- get[CompilerContext, CompilationError]
-      _ <- func.args.toList
-        .map(_._1)
-        .traverse[CompileM, String](handlePart)
-        .map(_.filter(ctx.varDefs.contains(_))).asInstanceOf[CompileM[List[String]]]
-        .ensureOr(duplicatedVars => AlreadyDefined(p.start, p.end, s"${duplicatedVars.mkString("'")}", false))(duplicatedVars =>
-          duplicatedVars.isEmpty)
       argTypes <- func.args.toList.traverse[CompileM, (String, FINAL)] {
         case (argName, argType) =>
           for {
@@ -243,8 +237,7 @@ object ExpressionCompiler {
       key <- handlePart(keyPart)
       ctx <- get[CompilerContext, CompilationError]
       result <- ctx.varDefs
-        .get(key)
-        .fold(raiseError[CompilerContext, CompilationError, (EXPR, FINAL)](DefNotFound(p.start, p.end, key)))(t =>
+        .get(key).fold(raiseError[CompilerContext, CompilationError, (EXPR, FINAL)](DefNotFound(p.start, p.end, key)))(t =>
           (REF(key): EXPR, t._1: FINAL).pure[CompileM])
     } yield result
   }

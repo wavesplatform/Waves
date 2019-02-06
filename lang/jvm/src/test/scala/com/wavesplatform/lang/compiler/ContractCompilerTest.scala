@@ -192,7 +192,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
   }
 
-
   property("hodlContract") {
     val ctx = Monoid
       .combineAll(
@@ -276,8 +275,27 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
 
-  property("functions could not define in args already defined vars") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false).compilerContext)
+  property("contract compilation fails if declaration and annotation vars has the same name") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          |let x = 42
+          |
+          |@Callable(x)
+          |func some(i: Int) = {
+          |    WriteSet(List(DataEntry("a", "a")))
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Annotation var already defined")
+  }
+
+  property("contract compilation fails if annotation vars and func args has the same name") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
     val expr = {
       val script =
         """
@@ -293,6 +311,25 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("already defined in the scope")
+    compiler.ContractCompiler(ctx, expr) should produce("Contract func args already defined in annotation vars")
+  }
+
+  property("contract compiles if declaration vars and func args has the same name") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          |let x = 42
+          |
+          |@Callable(i)
+          |func some(x: Int) = {
+          |    WriteSet(List(DataEntry("a", "a")))
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
 }
