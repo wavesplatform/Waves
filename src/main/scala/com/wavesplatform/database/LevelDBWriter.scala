@@ -784,13 +784,23 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
   }
 
-  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readOnly { db =>
+  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+    writableDB.get(Keys.blockHeaderAndSizeAt(Height(height)))
+  }
+
+  def loadBlockHeaderAndSize(height: Int, db: ReadOnlyDB): Option[(BlockHeader, Int)] = {
     db.get(Keys.blockHeaderAndSizeAt(Height(height)))
   }
 
-  override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = readOnly { db =>
-    db.get(Keys.heightOf(blockId))
+  override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
+    writableDB
+      .get(Keys.heightOf(blockId))
       .flatMap(loadBlockHeaderAndSize)
+  }
+
+  def loadBlockHeaderAndSize(blockId: ByteStr, db: ReadOnlyDB): Option[(BlockHeader, Int)] = {
+    db.get(Keys.heightOf(blockId))
+      .flatMap(loadBlockHeaderAndSize(_, db))
   }
 
   override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
