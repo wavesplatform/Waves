@@ -115,7 +115,6 @@ object ContractCompiler {
   }
 
   private def validateDuplicateVarsInContract(contract: Expressions.CONTRACT): CompileM[Any] = {
-
     for {
       ctx <- get[CompilerContext, CompilationError]
       annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, String](handlePart)
@@ -128,7 +127,6 @@ object ContractCompiler {
             args <- argSeq.toList.traverse[CompileM, String](handlePart)
           } yield anns.forall(a => args.contains(a))
       }
-
       _ <- annotationVars
         .ensure(Generic(contract.position.start, contract.position.start, "Annotation bindings overrides already defined var"))(aVs =>
           aVs.forall(!ctx.varDefs.contains(_)))
