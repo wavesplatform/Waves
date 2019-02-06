@@ -10,7 +10,7 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, ValidationError}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -89,7 +89,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       recipientAcc <- accountGen
       ts = System.currentTimeMillis()
     } yield {
-      val script = ScriptV1(TRUE).explicitGet()
+      val script = ExprScript(TRUE).explicitGet()
 
       val genesisTx = GenesisTransaction.create(richAcc, ENOUGH_AMT, ts).explicitGet()
 
@@ -97,7 +97,6 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         if (smartToken)
           IssueTransactionV2
             .selfSigned(
-              IssueTransactionV2.supportedVersions.head,
               AddressScheme.current.chainId,
               richAcc,
               "test".getBytes(),
@@ -136,7 +135,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         if (sponsorship)
           Seq(
             SponsorFeeTransaction
-              .selfSigned(1, richAcc, issueTx.id(), Some(10), if (smartToken) {
+              .selfSigned(richAcc, issueTx.id(), Some(10), if (smartToken) {
                 Constants.UnitsInWave + ScriptExtraFee
               } else {
                 Constants.UnitsInWave
@@ -150,7 +149,6 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           Seq(
             SetScriptTransaction
               .selfSigned(
-                SetScriptTransaction.supportedVersions.head,
                 recipientAcc,
                 Some(script),
                 1 * Constants.UnitsInWave,

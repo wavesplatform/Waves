@@ -121,8 +121,7 @@ trait TransferSending extends ScorexLogging {
                 feeAmount = x.fee,
                 attachment = if (includeAttachment) {
                   Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
-                } else Array.emptyByteArray,
-                version = 2
+                } else Array.emptyByteArray
               )
               .right
               .get)
@@ -145,7 +144,6 @@ trait TransferSending extends ScorexLogging {
       feeAssetId.map(_.base58),
       fee,
       timestamp,
-      2,
       attachment.headOption.map(_ => Base58.encode(attachment)),
       proofs.base58().toList
     )

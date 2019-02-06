@@ -257,7 +257,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
       }).toRight("No issue transaction found with given asset ID")
       description <- blockchain.assetDescription(id).toRight("Failed to get description of the asset")
       script = description.script.filter(_ => full)
-      complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.version))
+      complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.stdLibVersion))
     } yield {
       JsObject(
         Seq(

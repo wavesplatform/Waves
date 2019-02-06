@@ -8,8 +8,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.Version._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
+import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -49,7 +49,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   private def ev[T <: EVALUATED](context: EvaluationContext = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV1[T](context, expr)
 
-  private def simpleDeclarationAndUsage(i: Int) = BLOCKV2(LET("x", CONST_LONG(i)), REF("x"))
+  private def simpleDeclarationAndUsage(i: Int) = BLOCK(LET("x", CONST_LONG(i)), REF("x"))
 
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => FUNCTION_CALL(sumLong.header, List(acc, CONST_LONG(1))))
@@ -60,9 +60,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("return error and log of failed evaluation") {
     val (log, Left(err)) = EvaluatorV1.applywithLogging[EVALUATED](
       pureEvalContext,
-      expr = BLOCKV2(
+      expr = BLOCK(
         LET("x", CONST_LONG(3)),
-        BLOCKV2(
+        BLOCK(
           LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
           FUNCTION_CALL(PureContext.eq.header, List(REF("z"), CONST_LONG(1)))
         )
@@ -77,7 +77,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on unused let") {
     ev[EVALUATED](
-      expr = BLOCKV2(
+      expr = BLOCK(
         LET("x", CONST_LONG(3)),
         CONST_LONG(3)
       )) shouldBe evaluated(3)
@@ -85,11 +85,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on x = y") {
     ev[EVALUATED](
-      expr = BLOCKV2(LET("x", CONST_LONG(3)),
-                     BLOCKV2(
-                       LET("y", REF("x")),
-                       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("y")))
-                     ))) shouldBe evaluated(6)
+      expr = BLOCK(LET("x", CONST_LONG(3)),
+                   BLOCK(
+                     LET("y", REF("x")),
+                     FUNCTION_CALL(sumLong.header, List(REF("x"), REF("y")))
+                   ))) shouldBe evaluated(6)
   }
 
   property("successful on simple get") {
@@ -98,7 +98,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on get used further in expr") {
     ev[EVALUATED](
-      expr = BLOCKV2(
+      expr = BLOCK(
         LET("x", CONST_LONG(3)),
         FUNCTION_CALL(PureContext.eq.header, List(REF("x"), CONST_LONG(2)))
       )) shouldBe evaluated(false)
@@ -106,17 +106,17 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on multiple lets") {
     ev[EVALUATED](
-      expr = BLOCKV2(
+      expr = BLOCK(
         LET("x", CONST_LONG(3)),
-        BLOCKV2(LET("y", CONST_LONG(3)), FUNCTION_CALL(PureContext.eq.header, List(REF("x"), REF("y"))))
+        BLOCK(LET("y", CONST_LONG(3)), FUNCTION_CALL(PureContext.eq.header, List(REF("x"), REF("y"))))
       )) shouldBe evaluated(true)
   }
 
   property("successful on multiple lets with expression") {
     ev[EVALUATED](
-      expr = BLOCKV2(
+      expr = BLOCK(
         LET("x", CONST_LONG(3)),
-        BLOCKV2(
+        BLOCK(
           LET("y", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
           FUNCTION_CALL(PureContext.eq.header, List(REF("x"), REF("y")))
         )
@@ -175,7 +175,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )
     ev[EVALUATED](
       context = context,
-      expr = BLOCKV2(LET("Z", REF("badVal")), FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), "X"), CONST_LONG(2))))
+      expr = BLOCK(LET("Z", REF("badVal")), FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), "X"), CONST_LONG(2))))
     ) shouldBe evaluated(5)
   }
 
@@ -195,7 +195,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
                                  ))
     ev[EVALUATED](
       context = context,
-      expr = BLOCKV2(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)))), FUNCTION_CALL(sumLong.header, List(REF("X"), REF("X"))))
+      expr = BLOCK(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)))), FUNCTION_CALL(sumLong.header, List(REF("X"), REF("X"))))
     ) shouldBe evaluated(2L)
 
     functionEvaluated shouldBe 1
@@ -262,7 +262,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     )
 
     val expr = GETTER(
-      BLOCKV2(
+      BLOCK(
         LET("fooInstance", FUNCTION_CALL(fooCtor.header, List.empty)),
         FUNCTION_CALL(fooTransform.header, List(REF("fooInstance")))
       ),
@@ -697,8 +697,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val r = EvaluatorV1
       .applywithLogging[EVALUATED](context.evaluationContext,
-                                   new ExpressionCompilerV1(context.compilerContext)
-                                     .compile(script, List.empty)
+                                   ExpressionCompiler
+                                     .compile(script, context.compilerContext)
                                      .explicitGet())
     (r._1, r._2.map {
       case CONST_BOOLEAN(b) => b

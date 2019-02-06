@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -12,7 +13,7 @@ import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
@@ -22,7 +23,7 @@ import org.scalatest.{FreeSpec, Matchers}
 
 import scala.util.Random
 
-class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with RequestGen {
+class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with WithDB with DBCacheSettings with RequestGen {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
@@ -38,29 +39,22 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     import TestFunctionalitySettings.Enabled
     "correctly joins height ranges" in {
       val fs     = Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccountTrading.id -> 0))
-      val writer = new LevelDBWriter(db, fs, 100000, 2000, 120 * 60 * 1000)
+      val writer = new LevelDBWriter(db, fs, maxCacheSize, 2000, 120 * 60 * 1000)
       writer.merge(Seq(15, 12, 3), Seq(12, 5)) shouldEqual Seq((15, 12), (12, 12), (3, 5))
       writer.merge(Seq(12, 5), Seq(15, 12, 3)) shouldEqual Seq((12, 15), (12, 12), (5, 3))
       writer.merge(Seq(8, 4), Seq(8, 4)) shouldEqual Seq((8, 8), (4, 4))
     }
-
-    "preserves compatibility until SmartAccountTrading feature is activated" in {
-      val writer = new LevelDBWriter(db, Enabled, 100000, 2000, 120 * 60 * 1000)
-      writer.merge(Seq(15, 12, 3), Seq(12, 5)) shouldEqual Seq((15, 12), (12, 12), (3, 12), (3, 5))
-      writer.merge(Seq(12, 5), Seq(15, 12, 3)) shouldEqual Seq((12, 15), (12, 12), (5, 12), (5, 3))
-      writer.merge(Seq(8, 4), Seq(8, 4)) shouldEqual Seq((8, 8), (4, 8), (4, 4))
-    }
   }
   "hasScript" - {
     "returns false if a script was not set" in {
-      val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+      val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
       writer.hasScript(accountGen.sample.get.toAddress) shouldBe false
     }
 
     "returns false if a script was set and then unset" in {
       assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
       resetTest { (_, account) =>
-        val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+        val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
         writer.hasScript(account) shouldBe false
       }
     }
@@ -69,7 +63,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
       "if there is a script in db" in {
         assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
         test { (_, account) =>
-          val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+          val writer = new LevelDBWriter(db, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
           writer.hasScript(account) shouldBe true
         }
       }
@@ -91,7 +85,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     def resetGen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = baseGen(ts).map {
       case (master, blocks) =>
         val unsetScriptTx = SetScriptTransaction
-          .selfSigned(1, master, None, 5000000, ts + 1)
+          .selfSigned(master, None, 5000000, ts + 1)
           .explicitGet()
 
         val block1 = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq(unsetScriptTx))
@@ -102,7 +96,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     def baseGen(ts: Long): Gen[(PrivateKeyAccount, Seq[Block])] = accountGen.map { master =>
       val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       val setScriptTx = SetScriptTransaction
-        .selfSigned(1, master, Some(ScriptV1(Terms.TRUE).explicitGet()), 5000000, ts)
+        .selfSigned(master, Some(ExprScript(Terms.TRUE).explicitGet()), 5000000, ts)
         .explicitGet()
 
       val block = TestBlock.create(ts, Seq(genesisTx, setScriptTx))
@@ -116,7 +110,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
   }
 
   def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (LevelDBWriter, PrivateKeyAccount) => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
+    val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)

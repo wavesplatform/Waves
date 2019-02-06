@@ -5,15 +5,15 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.Version.V1
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
+import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.compilerContext
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
@@ -219,8 +219,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   private def createScript(code: String) = {
-    val Parsed.Success(expr, _) = Parser.parseScript(code).get
-    ScriptV1(ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), expr).explicitGet()._1).explicitGet()
+    val Parsed.Success(expr, _) = Parser.parseExpr(code).get
+    ExprScript(ExpressionCompiler(compilerContext(V1, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
   def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransactionV1, ReissueTransactionV1)] =
@@ -236,8 +236,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
       issue = IssueTransactionV2
-        .selfSigned(version,
-                    AddressScheme.current.chainId,
+        .selfSigned(AddressScheme.current.chainId,
                     accountA,
                     assetName,
                     description,

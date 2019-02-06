@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -20,7 +20,14 @@ object WavesContext {
   import Types._
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
-  def build(version: Version, env: Environment, isTokenContext: Boolean): CTX = {
+  lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
+  val contractTransfer =
+    CaseType(FieldNames.ContractTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+  lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
+  lazy val contractResultType =
+    CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
+
+  def build(version: StdLibVersion, env: Environment, isTokenContext: Boolean): CTX = {
     val environmentFunctions = new EnvironmentFunctions(env)
 
     val proofsEnabled = !isTokenContext
@@ -88,7 +95,7 @@ object WavesContext {
         ("@data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"),
         ("@index", LONG, "index")
       ) {
-        BLOCKV1(
+        LET_BLOCK(
           LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(REF("@data"), REF("@index"))), "value")),
           IF(FUNCTION_CALL(PureContext._isInstanceOf, List(REF("@val"), CONST_STRING(dataType.innerType.name))), REF("@val"), REF("unit"))
         )
@@ -115,7 +122,7 @@ object WavesContext {
         FUNCTION_CALL(
           FunctionHeader.User("Address"),
           List(
-            BLOCKV1(
+            LET_BLOCK(
               LET(
                 "@afpk_withoutChecksum",
                 FUNCTION_CALL(
@@ -183,7 +190,7 @@ object WavesContext {
     lazy val addressFromStringF: BaseFunction =
       UserFunction("addressFromString", optionAddress, "Decode account address", ("@string", STRING, "string address represntation")) {
 
-        BLOCKV1(
+        LET_BLOCK(
           LET("@afs_addrBytes",
               FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(removePrefixExpr(REF("@string"), EnvironmentFunctions.AddressPrefix)))),
           IF(
@@ -367,17 +374,11 @@ object WavesContext {
       wavesBalanceF
     )
 
-    lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
-    val contractTransfer =
-      CaseType(FieldNames.ContractTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
-    lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
-    lazy val contractResultType =
-      CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
-
     val types = buildWavesTypes(proofsEnabled, version)
 
     CTX(
-      types ++ (if (version == V3) List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
+      types ++ (if (version == V3)
+                  List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
                 else List.empty),
       commonVars ++ vars(version),
       functions

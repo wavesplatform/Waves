@@ -12,8 +12,7 @@ import play.api.libs.json._
 
 object SignedMassTransferRequest {
   implicit val MassTransferRequestReads: Reads[SignedMassTransferRequest] = (
-    (JsPath \ "version").read[Byte] and
-      (JsPath \ "senderPublicKey").read[String] and
+    (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").readNullable[String] and
       (JsPath \ "transfers").read[List[Transfer]] and
       (JsPath \ "fee").read[Long] and
@@ -24,9 +23,7 @@ object SignedMassTransferRequest {
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")
-case class SignedMassTransferRequest(@ApiModelProperty(required = true)
-                                     version: Byte,
-                                     @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                      senderPublicKey: String,
                                      @ApiModelProperty(value = "Base58 encoded Asset ID")
                                      assetId: Option[String],
@@ -49,6 +46,6 @@ case class SignedMassTransferRequest(@ApiModelProperty(required = true)
       _proofs     <- Proofs.create(_proofBytes)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
       _transfers  <- MassTransferTransaction.parseTransfersList(transfers)
-      t           <- MassTransferTransaction.create(version, _assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
+      t           <- MassTransferTransaction.create(_assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
     } yield t
 }

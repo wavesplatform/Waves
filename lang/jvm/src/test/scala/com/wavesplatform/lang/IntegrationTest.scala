@@ -4,11 +4,11 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LONG}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompilerV1, Terms}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
@@ -120,12 +120,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   private def eval[T <: EVALUATED](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
-    val untyped                                                = Parser.parseScript(code).get.value
+    val untyped                                                = Parser.parseExpr(code).get.value
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
-      Monoid.combineAll(Seq(PureContext.build(V1), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
-    val typed = ExpressionCompilerV1(ctx.compilerContext, untyped)
+      Monoid.combineAll(Seq(PureContext.build(V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
+    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
 
@@ -184,10 +184,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED]("fraction(9223372036854775807, -2, -4)") shouldBe evaluated(Long.MaxValue / 2)
   }
 
-  def compile(script: String): Either[String, Terms.EXPR] = {
-    val compiler = new ExpressionCompilerV1(CTX.empty.compilerContext)
-    compiler.compile(script, List.empty)
-  }
+  def compile(script: String): Either[String, Terms.EXPR] =
+    ExpressionCompiler.compile(script, CTX.empty.compilerContext)
 
   property("wrong script return type") {
     compile("1") should produce("should return boolean")
@@ -297,6 +295,19 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(11)
   }
 
+  property("function overload is denied") {
+    eval[EVALUATED](
+      """
+                      |
+                      |func extract(x:Int, y: Int) = {
+                      |   4
+                      |}
+                      | extract(10)
+                    """.stripMargin,
+      Some(pointAInstance)
+    ) should produce("already defined")
+  }
+
   property("context won't change after inner let") {
     val script = "{ let x = 3; x } + { let x = 5; x}"
     eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(8)
@@ -338,7 +349,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val expr = FUNCTION_CALL(
       function = PureContext.sumLong.header,
       args = List(
-        BLOCKV2(
+        BLOCK(
           dec = LET("x", CONST_LONG(5l)),
           body = REF("x")
         ),

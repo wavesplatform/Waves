@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -11,8 +10,6 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 import scala.concurrent.duration._
 
@@ -41,24 +38,6 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 
       withClue("mining was too fast, can't continue") {
         matcherNode.height shouldBe <(activationHeight)
-      }
-
-      withClue("duplicate names in contracts are denied") {
-        val setScriptTransaction = SetScriptTransaction
-          .selfSigned(
-            SetScriptTransaction.supportedVersions.head,
-            bobAcc,
-            Some(ScriptCompiler(sDupNames, isAssetScript = false).explicitGet()._1),
-            0.014.waves,
-            System.currentTimeMillis()
-          )
-          .explicitGet()
-
-        assertBadRequestAndResponse(
-          matcherNode
-            .signedBroadcast(setScriptTransaction.json()),
-          "VarNames: duplicate variable names are temporarily denied:"
-        )
       }
 
       setContract(Some("true"), bobAcc)

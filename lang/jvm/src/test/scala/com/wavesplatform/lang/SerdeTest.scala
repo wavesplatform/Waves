@@ -3,8 +3,8 @@ package com.wavesplatform.lang
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.Version._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
+import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Expressions
@@ -24,21 +24,21 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     "IF" in roundTripTest(IF(TRUE, CONST_LONG(0), CONST_LONG(1)))
 
     "BLOCKV1" in roundTripTest(
-      BLOCKV1(
+      LET_BLOCK(
         let = LET("foo", TRUE),
         body = FALSE
       )
     )
 
     "BLOCKV2 with LET" in roundTripTest(
-      BLOCKV2(
+      BLOCK(
         dec = LET("foo", TRUE),
         body = FALSE
       )
     )
 
     "BLOCKV2 with FUNC" in roundTripTest(
-      BLOCKV2(
+      BLOCK(
         FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true)),
         CONST_BOOLEAN(false)
       )
@@ -118,7 +118,7 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
   }
 
   private def roundTripTest(untypedExpr: Expressions.EXPR): Assertion = {
-    val typedExpr = ExpressionCompilerV1(PureContext.build(V1).compilerContext, untypedExpr).map(_._1).explicitGet()
+    val typedExpr = ExpressionCompiler(PureContext.build(V1).compilerContext, untypedExpr).map(_._1).explicitGet()
     roundTripTest(typedExpr)
   }
 

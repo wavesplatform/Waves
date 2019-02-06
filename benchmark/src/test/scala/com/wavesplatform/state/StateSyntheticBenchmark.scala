@@ -4,14 +4,14 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Version.V1
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
+import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.StateSyntheticBenchmark._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.compilerContext
 import org.openjdk.jmh.annotations._
@@ -58,7 +58,6 @@ object StateSyntheticBenchmark {
       } yield
         TransferTransactionV2
           .selfSigned(
-            TransferTransactionV2.supportedVersions.head,
             None,
             sender,
             recipient.toAddress,
@@ -75,16 +74,15 @@ object StateSyntheticBenchmark {
       super.init()
 
       val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
-      val untypedScript = Parser.parseScript(textScript).get.value
-      val typedScript   = ExpressionCompilerV1(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
+      val untypedScript = Parser.parseExpr(textScript).get.value
+      val typedScript   = ExpressionCompiler(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
 
       val setScriptBlock = nextBlock(
         Seq(
           SetScriptTransaction
             .selfSigned(
-              SetScriptTransaction.supportedVersions.head,
               richAccount,
-              Some(ScriptV1(typedScript).explicitGet()),
+              Some(ExprScript(typedScript).explicitGet()),
               1000000,
               System.currentTimeMillis()
             )

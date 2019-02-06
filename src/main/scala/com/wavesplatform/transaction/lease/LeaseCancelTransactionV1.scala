@@ -31,7 +31,7 @@ object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransact
 
   override val typeId: Byte = LeaseCancelTransaction.typeId
 
-  override protected def parseTail(version: Byte, bytes: Array[Byte]): Try[TransactionT] =
+  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
       val (sender, fee, timestamp, leaseId, end) = LeaseCancelTransaction.parseBase(bytes, 0)
       val signature                              = ByteStr(bytes.slice(end, KeyLength + 16 + crypto.DigestSize + SignatureLength))
@@ -39,9 +39,11 @@ object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransact
         .create(sender, leaseId, fee, timestamp, signature)
         .fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
+  }
 
-  def create(sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] =
+  def create(sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] = {
     LeaseCancelTransaction.validateLeaseCancelParams(leaseId, fee).map(_ => LeaseCancelTransactionV1(sender, leaseId, fee, timestamp, signature))
+  }
 
   def signed(sender: PublicKeyAccount,
              leaseId: ByteStr,

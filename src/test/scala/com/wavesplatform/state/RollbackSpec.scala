@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.ValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
@@ -45,7 +45,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       case 2 =>
         List(
           MassTransferTransaction
-            .selfSigned(1, None, sender, List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)), nextTs, 10000, Array.empty[Byte])
+            .selfSigned(None, sender, List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)), nextTs, 10000, Array.empty[Byte])
             .explicitGet())
       case _ => List(TransferTransactionV1.selfSigned(None, sender, recipient, amount, nextTs, None, 1000, Array.empty[Byte]).explicitGet())
     }
@@ -295,7 +295,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(DataTransaction.selfSigned(1, sender, List(dataEntry), 1, nextTs).explicitGet())
+              Seq(DataTransaction.selfSigned(sender, List(dataEntry), 1, nextTs).explicitGet())
             ))
 
           d.blockchainUpdater.accountData(sender, dataEntry.key) should contain(dataEntry)
@@ -309,7 +309,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       case (sender, initialBalance) =>
         withDomain(createSettings(SmartAccounts -> 0)) { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
-          val script = ScriptV1(TRUE).explicitGet()
+          val script = ExprScript(TRUE).explicitGet()
 
           val genesisBlockId = d.lastBlockId
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty
@@ -317,7 +317,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(SetScriptTransaction.selfSigned(1, sender, Some(script), 400000, nextTs).explicitGet())
+              Seq(SetScriptTransaction.selfSigned(sender, Some(script), 400000, nextTs).explicitGet())
             ))
 
           val blockWithScriptId = d.lastBlockId
@@ -328,7 +328,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               blockWithScriptId,
-              Seq(SetScriptTransaction.selfSigned(1, sender, None, 800000, nextTs).explicitGet())
+              Seq(SetScriptTransaction.selfSigned(sender, None, 800000, nextTs).explicitGet())
             ))
 
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty

@@ -1,24 +1,15 @@
 package com.wavesplatform.lang.contract
 
-import com.wavesplatform.lang.contract.Contract.{ContractFunction, VerifierFunction}
+import com.wavesplatform.lang.contract.Contract.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 
-/*
- Contact is a list of annotated definitions
- ContractInvokation is (ContractFunction name, ContractFunction args)
-
- In PoC:
-  - No declarations
-  - ContractFunctions can't invoke each other
- */
-
 case class Contract(
     dec: List[DECLARATION],
-    cfs: List[ContractFunction],
+    cfs: List[CallableFunction],
     vf: Option[VerifierFunction]
 )
 
@@ -31,7 +22,9 @@ object Contract {
     def parse(name: String, args: List[String]): Either[CompilationError, Annotation] = {
       (name, args) match {
         case ("Callable", s :: Nil)           => Right(CallableAnnotation(s))
+        case ("Callable", s :: xs)           => Left(Generic(0, 0, "Incorrect amount of bound args in Callable, should be one, e.g. @Callable(inv)"))
         case ("Verifier", s :: Nil)           => Right(VerifierAnnotation(s))
+        case ("Verifier", s :: xs)           => Left(Generic(0, 0, "Incorrect amount of bound args in Verifier, should be one, e.g. @Verifier(tx)"))
         case _                                => Left(Generic(0, 0, "Annotation not recognized"))
       }
     }
@@ -53,6 +46,6 @@ object Contract {
     def annotation: Annotation
     def u: Terms.FUNC
   }
-  case class ContractFunction(override val annotation: CallableAnnotation, override val u: Terms.FUNC) extends AnnotatedFunction
+  case class CallableFunction(override val annotation: CallableAnnotation, override val u: Terms.FUNC) extends AnnotatedFunction
   case class VerifierFunction(override val annotation: VerifierAnnotation, override val u: Terms.FUNC) extends AnnotatedFunction
 }

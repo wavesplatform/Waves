@@ -82,8 +82,7 @@ class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with
       .copy(
         minerSettings = MicroblocksActivatedAt0WavesSettings.minerSettings.copy(
           maxTransactionsInMicroBlock = 1
-        )
-      )
+        ))
     forAll(preconditionsAndPayments(10, Block.MaxTransactionsPerBlockVer3)) {
       case (genBlock, keyBlock, microBlocks) =>
         withDomain(oneTxPerMicroSettings) { d =>

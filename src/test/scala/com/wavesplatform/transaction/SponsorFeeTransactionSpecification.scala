@@ -55,7 +55,6 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
 
     val tx = SponsorFeeTransaction
       .create(
-        1,
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
         Some(100000),
@@ -87,7 +86,6 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
 
     val tx = SponsorFeeTransaction
       .create(
-        1,
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
         None,
@@ -99,7 +97,6 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       .get
     val tx1 = SponsorFeeTransaction
       .create(
-        1,
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
         Some(0),
@@ -130,7 +127,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
           .get
         minFee <- smallFeeGen
         assetId = issue.assetId()
-      } yield SponsorFeeTransaction.selfSigned(1, sender, assetId, Some(minFee), fee, timestamp) should produce("insufficient fee")
+      } yield SponsorFeeTransaction.selfSigned(sender, assetId, Some(minFee), fee, timestamp) should produce("insufficient fee")
     }
   }
 
@@ -145,7 +142,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
           .get
         minFee  = None
         assetId = issue.assetId()
-      } yield SponsorFeeTransaction.selfSigned(1, sender, assetId, minFee, fee, timestamp) should produce("insufficient fee")
+      } yield SponsorFeeTransaction.selfSigned(sender, assetId, minFee, fee, timestamp) should produce("insufficient fee")
     }
   }
 
@@ -155,7 +152,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
       issue   = IssueTransactionV1.selfSigned(acc, name, desc, quantity, decimals, reissuable, fee, ts).explicitGet()
       minFee <- Gen.choose(1, issue.quantity)
-      sponsor  = SponsorFeeTransaction.selfSigned(version = 1, acc, issue.id(), Some(minFee), One, ts).explicitGet()
+      sponsor  = SponsorFeeTransaction.selfSigned(acc, issue.id(), Some(minFee), One, ts).explicitGet()
       transfer = TransferTransactionV1.selfSigned(None, acc, acc, 1, ts, feeAssetId = Some(issue.id()), minFee, Array()).explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer)
 
@@ -178,7 +175,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
       issue   = IssueTransactionV1.selfSigned(acc, name, desc, quantity, decimals, reissuable, fee, ts).explicitGet()
       minFee <- Gen.choose(1000000, issue.quantity)
-      sponsor   = SponsorFeeTransaction.selfSigned(version = 1, acc, issue.id(), Some(minFee), One, ts).explicitGet()
+      sponsor   = SponsorFeeTransaction.selfSigned(acc, issue.id(), Some(minFee), One, ts).explicitGet()
       transfer1 = TransferTransactionV1.selfSigned(None, acc, acc, 1, ts, feeAssetId = Some(issue.id()), minFee + 7, Array()).explicitGet()
       transfer2 = TransferTransactionV1.selfSigned(None, acc, acc, 1, ts, feeAssetId = Some(issue.id()), minFee + 9, Array()).explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer1, transfer2)
@@ -203,9 +200,9 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       issue   = IssueTransactionV1.selfSigned(acc, name, desc, quantity, decimals, reissuable, fee, ts).explicitGet()
       minFee <- Gen.choose(1, issue.quantity / 11)
 
-      sponsor1  = SponsorFeeTransaction.selfSigned(version = 1, acc, issue.id(), Some(minFee), One, ts).explicitGet()
+      sponsor1  = SponsorFeeTransaction.selfSigned(acc, issue.id(), Some(minFee), One, ts).explicitGet()
       transfer1 = TransferTransactionV1.selfSigned(None, acc, acc, 1, ts, Some(issue.id()), feeAmount = minFee, Array()).explicitGet()
-      sponsor2  = SponsorFeeTransaction.selfSigned(version = 1, acc, issue.id(), Some(minFee * 10), One, ts).explicitGet()
+      sponsor2  = SponsorFeeTransaction.selfSigned(acc, issue.id(), Some(minFee * 10), One, ts).explicitGet()
       transfer2 = TransferTransactionV1.selfSigned(None, acc, acc, 1, ts, Some(issue.id()), feeAmount = minFee * 10, Array()).explicitGet()
     } yield (acc, genesis, issue, sponsor1, transfer1, sponsor2, transfer2)
 

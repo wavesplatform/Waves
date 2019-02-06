@@ -10,7 +10,7 @@ import com.wavesplatform.common.state.ByteStr._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -90,10 +90,10 @@ package object utils extends ScorexLogging {
     }
   }
 
-  private val lazyAssetContexts: Map[Version, Coeval[CTX]] =
+  private val lazyAssetContexts: Map[StdLibVersion, Coeval[CTX]] =
     Seq
       .tabulate(2) { v =>
-        val version = com.wavesplatform.lang.Version.fromInt(v + 1)
+        val version = com.wavesplatform.lang.StdLibVersion.parseVersion(v + 1)
         version -> Coeval.evalOnce(
           Monoid
             .combineAll(Seq(
@@ -105,10 +105,10 @@ package object utils extends ScorexLogging {
       }
       .toMap
 
-  private val lazyContexts: Map[Version, Coeval[CTX]] =
+  private val lazyContexts: Map[StdLibVersion, Coeval[CTX]] =
     Seq
       .tabulate(3) { v =>
-        val version: Version = com.wavesplatform.lang.Version(v + 1)
+        val version: StdLibVersion = com.wavesplatform.lang.StdLibVersion(v + 1)
         version -> Coeval.evalOnce(
           Monoid
             .combineAll(Seq(
@@ -121,12 +121,12 @@ package object utils extends ScorexLogging {
       }
       .toMap
 
-  def dummyEvalContext(version: Version): EvaluationContext = lazyContexts(version)().evaluationContext
+  def dummyEvalContext(version: StdLibVersion): EvaluationContext = lazyContexts(version)().evaluationContext
 
-  private val lazyFunctionCosts: Map[Version, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
+  private val lazyFunctionCosts: Map[StdLibVersion, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
     lazyContexts.mapValues(_.map(ctx => estimate(ctx.evaluationContext)))
 
-  def functionCosts(version: Version): Map[FunctionHeader, Coeval[Long]] = lazyFunctionCosts(version)()
+  def functionCosts(version: StdLibVersion): Map[FunctionHeader, Coeval[Long]] = lazyFunctionCosts(version)()
 
   def estimate(ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
@@ -146,11 +146,11 @@ package object utils extends ScorexLogging {
     costs.toMap
   }
 
-  def compilerContext(version: Version, isAssetScript: Boolean): CompilerContext =
+  def compilerContext(version: StdLibVersion, isAssetScript: Boolean): CompilerContext =
     if (isAssetScript) lazyAssetContexts(version)().compilerContext
     else lazyContexts(version)().compilerContext
 
-  def varNames(version: Version): Set[String] = compilerContext(version, isAssetScript = false).varDefs.keySet
+  def varNames(version: StdLibVersion): Set[String] = compilerContext(version, isAssetScript = false).varDefs.keySet
 
   @tailrec
   final def untilTimeout[T](timeout: FiniteDuration, delay: FiniteDuration = 100.milliseconds, onFailure: => Unit = {})(fn: => T): T = {

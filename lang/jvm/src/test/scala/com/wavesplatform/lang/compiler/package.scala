@@ -3,7 +3,7 @@ package com.wavesplatform.lang
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.multiplierFunction
-import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -35,7 +35,7 @@ package object compiler {
   private val arr = ARR(IndexedSeq[EVALUATED](null, null))
   val compilerContext = Monoid
     .combine(
-      PureContext.build(V1),
+      PureContext.build(V3),
       CTX(
         Seq(pointType, Common.pointTypeA, Common.pointTypeB),
         Map(

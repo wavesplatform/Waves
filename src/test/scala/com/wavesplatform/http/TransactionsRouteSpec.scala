@@ -8,12 +8,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.Version.V1
+import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.smart.script.v1.ScriptV1
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
@@ -209,7 +209,7 @@ class TransactionsRouteSpec
             decimals = 8,
             reissuable = false,
             totalVolume = Long.MaxValue,
-            script = Some(ScriptV1(V1, TRUE, checkSize = false).explicitGet()),
+            script = Some(ExprScript(V1, TRUE, checkSize = false).explicitGet()),
             sponsorship = 5
           )))
           .anyNumberOfTimes()

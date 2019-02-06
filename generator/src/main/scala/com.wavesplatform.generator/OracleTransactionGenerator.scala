@@ -25,18 +25,18 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
 
     val setScript: Transaction =
       SetScriptTransaction
-        .selfSigned(1, scriptedAccount, Some(script), enoughFee, System.currentTimeMillis())
+        .selfSigned(scriptedAccount, Some(script), enoughFee, System.currentTimeMillis())
         .explicitGet()
 
     val setDataTx: Transaction = DataTransaction
-      .selfSigned(1, oracle, settings.requiredData.toList, enoughFee, System.currentTimeMillis())
+      .selfSigned(oracle, settings.requiredData.toList, enoughFee, System.currentTimeMillis())
       .explicitGet()
 
     val transactions: List[Transaction] =
       List
         .fill(settings.transactions) {
           TransferTransactionV2
-            .selfSigned(2, None, scriptedAccount, oracle, 1.waves, System.currentTimeMillis(), None, enoughFee, Array.emptyByteArray)
+            .selfSigned(None, scriptedAccount, oracle, 1.waves, System.currentTimeMillis(), None, enoughFee, Array.emptyByteArray)
             .explicitGet()
         }
 

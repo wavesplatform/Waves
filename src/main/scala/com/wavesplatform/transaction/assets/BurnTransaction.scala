@@ -1,12 +1,12 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
-import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction._
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction._
+import monix.eval.Coeval
+import play.api.libs.json.{JsObject, Json}
 
 trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
 
@@ -24,12 +24,14 @@ trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
 
   override val json: Coeval[JsObject] = Coeval.evalOnce {
     jsonBase() ++ Json.obj(
-      "chainId" -> chainByte,
       "version" -> version,
       "assetId" -> assetId.base58,
       "amount"  -> quantity,
       "fee"     -> fee
-    )
+    ) ++ (chainByte match {
+      case Some(chainByte) => Json.obj("chainId" -> chainByte)
+      case None            => JsObject.empty
+    })
   }
 
   val byteBase: Coeval[Array[Byte]] = Coeval.evalOnce {
