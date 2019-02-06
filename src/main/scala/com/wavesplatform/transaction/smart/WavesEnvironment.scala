@@ -5,17 +5,22 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
-import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.Tx.ContractTransfer
+import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import monix.eval.Coeval
 import shapeless._
 
-class WavesEnvironment(nByte: Byte, in: Coeval[Transaction :+: Order :+: CNil], h: Coeval[Int], blockchain: Blockchain) extends Environment {
+object WavesEnvironment {
+  type In = Transaction :+: Order :+: ContractTransfer :+: CNil
+}
+
+class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[Int], blockchain: Blockchain) extends Environment {
   override def height: Long = h()
 
-  override def inputEntity: Tx :+: Ord :+: CNil = {
+  override def inputEntity: Environment.InputEntity = {
     in.apply()
       .map(InputPoly)
   }
