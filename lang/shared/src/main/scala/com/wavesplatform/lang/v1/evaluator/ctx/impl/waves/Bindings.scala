@@ -104,6 +104,23 @@ object Bindings {
 
   def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType.typeRef, Map("bytes" -> sender.bytes))
 
+  def contractTransfer(ct: ContractTransfer): CaseObj =
+    transactionObject(
+      Transfer(
+        Proven(h = Header(id = ct.id, fee = 0, timestamp = ct.timestamp, version = 0),
+               sender = ct.sender,
+               bodyBytes = ByteStr.empty,
+               senderPk = ByteStr.empty,
+               proofs = IndexedSeq.empty),
+        feeAssetId = None,
+        assetId = ct.assetId,
+        amount = ct.amount,
+        recipient = ct.recipient,
+        attachment = ByteStr.empty
+      ),
+      false
+    )
+
   def transactionObject(tx: Tx, proofsEnabled: Boolean): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>

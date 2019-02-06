@@ -1,11 +1,11 @@
 package com.wavesplatform.lang.v1.traits
 
+import com.wavesplatform.lang.v1.traits.domain.Tx.ContractTransfer
 import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.lang.v1.compiler.Terms.CaseObj
 import shapeless._
 
 object Environment {
-  type InputEntity = Tx :+: Ord :+: CaseObj :+: CNil
+  type InputEntity = Tx :+: Ord :+: ContractTransfer :+: CNil
 }
 
 trait Environment {
