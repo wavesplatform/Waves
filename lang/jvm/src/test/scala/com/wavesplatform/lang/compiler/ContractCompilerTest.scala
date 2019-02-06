@@ -275,7 +275,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
 
-  property("contract compilation fails if declaration and annotation vars has the same name") {
+  property("contract compilation fails if declaration and annotation bindings has the same name") {
     val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
     val expr = {
       val script =
@@ -291,10 +291,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("Annotation var already defined")
+    compiler.ContractCompiler(ctx, expr) should produce("already defined")
   }
 
-  property("contract compilation fails if annotation vars and func args has the same name") {
+  property("contract compilation fails if annotation bindings and func args has the same name") {
     val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
     val expr = {
       val script =
@@ -311,7 +311,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("Contract func args already defined in annotation vars")
+    compiler.ContractCompiler(ctx, expr) should produce("override annotation bindings")
   }
 
   property("contract compiles if declaration vars and func args has the same name") {

@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Expressions.FUNC
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
+import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 object ContractCompiler {
@@ -107,16 +108,26 @@ object ContractCompiler {
   }
 
   private def validateDuplicateVarsInContract(contract: Expressions.CONTRACT): CompileM[Any] = {
+
     for {
       ctx <- get[CompilerContext, CompilationError]
       annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, String](handlePart)
-      annotatedFuncArgs <- contract.fs.flatMap(_.f.args.map(_._1)).traverse[CompileM, String](handlePart)
+      annotatedFuncArgs: Seq[(Seq[Expressions.PART[String]], Seq[Expressions.PART[String]])] = contract.fs.map(af =>
+        (af.anns.flatMap(_.args), af.f.args.map(_._1)))
+      annAndFuncArgsIntersection = annotatedFuncArgs.toVector.traverse[CompileM, Boolean] {
+        case (annSeq, argSeq) =>
+          for {
+            anns <- annSeq.toList.traverse[CompileM, String](handlePart)
+            args <- argSeq.toList.traverse[CompileM, String](handlePart)
+          } yield anns.forall(a => args.contains(a))
+      }
+
       _ <- annotationVars
-        .ensure(Generic(contract.position.start, contract.position.start, "Annotation var already defined"))(aVs =>
+        .ensure(Generic(contract.position.start, contract.position.start, "Annotation bindings overrides already defined var"))(aVs =>
           aVs.forall(!ctx.varDefs.contains(_)))
-      _ <- annotationVars
-        .ensure(Generic(contract.position.start, contract.position.start, "Contract func args already defined in annotation vars")) { aVs =>
-          aVs.forall(!annotatedFuncArgs.contains(_))
+      _ <- annAndFuncArgsIntersection
+        .ensure(Generic(contract.position.start, contract.position.start, "Contract func args override annotation bindings")) { is =>
+          !(is contains true)
         }
     } yield ()
   }
