@@ -365,8 +365,6 @@ case class AddressApiRoute(settings: RestAPISettings,
     )
   }
 
-  // lazy val of CTX
-
   private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
     val script: Option[Script] = blockchain
       .accountScript(account)

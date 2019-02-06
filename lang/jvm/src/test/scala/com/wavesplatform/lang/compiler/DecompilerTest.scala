@@ -48,31 +48,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("Invoke contract with verifier decompilation") {
-    val scriptText =
-      """
-        |
-        |func fooHelper2() = {
-        |   false
-        |}
-        |
-        |func fooHelper() = {
-        |   fooHelper2() || false
-        |}
-        |
-        |@Callable(invocation)
-        |func foo(a:ByteStr) = {
-        |  let x = invocation.caller.bytes
-        |  if (fooHelper())
-        |    then WriteSet(List(DataEntry("b", 1), DataEntry("sender", x)))
-        |    else WriteSet(List(DataEntry("a", a), DataEntry("sender", x)))
-        |}
-        |
-        |@Verifier(t)
-        |func verify() = {
-        |  true
-        |}
-        |
-      """.stripMargin
     val contract = Contract(
       List(FUNC("fooHelper2", List(), FALSE), FUNC("fooHelper", List(), IF(FUNCTION_CALL(User("fooHelper2"), List()), TRUE, FALSE))),
       List(
