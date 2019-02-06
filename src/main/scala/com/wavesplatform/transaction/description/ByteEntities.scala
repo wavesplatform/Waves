@@ -23,7 +23,7 @@ import scala.util.{Failure, Success, Try}
   * Represents description of the byte entity
   * Field `additionalInfo` can be used for specifying of the repeating byte entities
   */
-case class ByteEntityDescription(index: String, name: String, tpe: String, length: String, additionalInfo: String = "")
+case class ByteEntityDescription(index: Int, name: String, tpe: String, length: String, subIndex: Int = 0, additionalInfo: String = "")
 
 /**
   * Describes byte representation of the different types. Composition of Byte Entities can be used for deserialization
@@ -33,7 +33,6 @@ sealed trait ByteEntity[T] { self =>
 
   private[description] val ByteType           = "Byte"
   private[description] val BooleanType        = "Boolean"
-  private[description] val ShortType          = "Short"
   private[description] val IntType            = "Int"
   private[description] val LongType           = "Long"
   private[description] val ByteArrayType      = "Array[Byte]"
@@ -43,6 +42,7 @@ sealed trait ByteEntity[T] { self =>
   private[description] val AddressOrAliasType = "Address or Alias"
   private[description] val OrderV1Type        = "OrderV1"
   private[description] val OrderType          = "Order"
+  private[description] val UnimportantType    = ""
 
   /** Index of the byte entity. In case of composition of byte entities returns index of the last one */
   val index: Int
@@ -71,8 +71,8 @@ sealed trait ByteEntity[T] { self =>
 
     docs
       .map {
-        case ByteEntityDescription(idx, name, tpe, length, additionalInfo) =>
-          s"| $idx | $name | $tpe | $length $additionalInfo\n"
+        case ByteEntityDescription(idx, name, tpe, length, subIndex, additionalInfo) =>
+          s"| $idx${Option(subIndex).filter(_ != 0).fold("")(si => s".$si")} | $name | $tpe | $length $additionalInfo\n"
             .replace("...", "| ... | ... | ... | ... |")
             .replace("(", "\\(")
             .replace(")", "\\)")
@@ -84,7 +84,7 @@ sealed trait ByteEntity[T] { self =>
 
 case class ConstantByte(index: Int, value: Byte, name: String) extends ByteEntity[Byte] {
 
-  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, s"$ByteType (constant, value = $value)", "1"))
+  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, s"$ByteType (constant, value = $value)", "1"))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Byte, Int)] = {
     Try { value -> (offset + 1) }
@@ -93,7 +93,7 @@ case class ConstantByte(index: Int, value: Byte, name: String) extends ByteEntit
 
 case class OneByte(index: Int, name: String) extends ByteEntity[Byte] {
 
-  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, ByteType, "1"))
+  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, ByteType, "1"))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Byte, Int)] = {
     Try { buf(offset) -> (offset + 1) }
@@ -102,7 +102,7 @@ case class OneByte(index: Int, name: String) extends ByteEntity[Byte] {
 
 case class LongBytes(index: Int, name: String) extends ByteEntity[Long] {
 
-  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, LongType, "8"))
+  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, LongType, "8"))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Long, Int)] = {
     Try { Longs.fromByteArray(buf.slice(offset, offset + 8)) -> (offset + 8) }
@@ -111,7 +111,7 @@ case class LongBytes(index: Int, name: String) extends ByteEntity[Long] {
 
 case class IntBytes(index: Int, name: String) extends ByteEntity[Int] {
 
-  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, IntType, "4"))
+  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, IntType, "4"))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Int, Int)] = {
     Try { Ints.fromByteArray(buf.slice(offset, offset + 4)) -> (offset + 4) }
@@ -120,7 +120,7 @@ case class IntBytes(index: Int, name: String) extends ByteEntity[Int] {
 
 case class BooleanByte(index: Int, name: String) extends ByteEntity[Boolean] {
 
-  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, BooleanType, "1"))
+  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, BooleanType, "1"))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Boolean, Int)] = {
     Try { (buf(offset) == 1) -> (offset + 1) }
@@ -129,7 +129,7 @@ case class BooleanByte(index: Int, name: String) extends ByteEntity[Boolean] {
 
 case class BytesArrayDefinedLength(index: Int, name: String, length: Int) extends ByteEntity[Array[Byte]] {
 
-  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, ByteArrayType, length.toString))
+  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, ByteArrayType, length.toString))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Array[Byte], Int)] = {
     Try { buf.slice(offset, offset + length) -> (offset + length) }
@@ -140,8 +140,8 @@ case class BytesArrayUndefinedLength(index: Int, name: String) extends ByteEntit
 
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
-      ByteEntityDescription(s"$index.1", s"$name length (N)", "", "2"),
-      ByteEntityDescription(s"$index.2", name, ByteArrayType, "N")
+      ByteEntityDescription(index, s"$name length (N)", UnimportantType, "2", subIndex = 1),
+      ByteEntityDescription(index, name, ByteArrayType, "N", subIndex = 2)
     )
   }
 
@@ -157,7 +157,7 @@ case class BytesArrayUndefinedLength(index: Int, name: String) extends ByteEntit
 case class ByteStrDefinedLength(index: Int, name: String, length: Int) extends ByteEntity[ByteStr] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(ByteEntityDescription(index.toString, name, ByteStrType, length.toString))
+    Seq(ByteEntityDescription(index, name, ByteStrType, length.toString))
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(ByteStr, Int)] = {
@@ -168,7 +168,7 @@ case class ByteStrDefinedLength(index: Int, name: String, length: Int) extends B
 case class PublicKeyAccountBytes(index: Int, name: String) extends ByteEntity[PublicKeyAccount] {
 
   def generateDoc: Seq[ByteEntityDescription] =
-    Seq(ByteEntityDescription(index.toString, name, s"PublicKeyAccount ($ByteArrayType)", KeyLength.toString))
+    Seq(ByteEntityDescription(index, name, s"PublicKeyAccount ($ByteArrayType)", KeyLength.toString))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(PublicKeyAccount, Int)] = {
     Try { PublicKeyAccount(buf.slice(offset, offset + KeyLength)) -> (offset + KeyLength) }
@@ -177,7 +177,7 @@ case class PublicKeyAccountBytes(index: Int, name: String) extends ByteEntity[Pu
 
 case class SignatureBytes(index: Int, name: String) extends ByteEntity[ByteStr] {
 
-  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, ByteStrType, SignatureLength.toString))
+  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, ByteStrType, SignatureLength.toString))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(ByteStr, Int)] = {
     Try { ByteStr(buf.slice(offset, offset + SignatureLength)) -> (offset + SignatureLength) }
@@ -187,7 +187,7 @@ case class SignatureBytes(index: Int, name: String) extends ByteEntity[ByteStr] 
 case class SponsorFeeOptionLongBytes(index: Int, name: String) extends ByteEntity[Option[Long]] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(ByteEntityDescription(index.toString, name, LongType, "8"))
+    Seq(ByteEntityDescription(index, name, LongType, "8"))
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Option[Long], Int)] = {
@@ -198,7 +198,7 @@ case class SponsorFeeOptionLongBytes(index: Int, name: String) extends ByteEntit
 case class AddressBytes(index: Int, name: String) extends ByteEntity[Address] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(ByteEntityDescription(s"$index", s"$name", AddressType, s"${Address.AddressLength}"))
+    Seq(ByteEntityDescription(index, name, AddressType, s"${Address.AddressLength}"))
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Address, Int)] = {
@@ -216,8 +216,8 @@ case class AliasBytes(index: Int, name: String) extends ByteEntity[Alias] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
-      ByteEntityDescription(s"${index.toString}.1", s"$name length (A)", ShortType, "2"),
-      ByteEntityDescription(s"${index.toString}.2", s"$name", AliasType, "A")
+      ByteEntityDescription(index, s"$name length (A)", UnimportantType, "2", subIndex = 1),
+      ByteEntityDescription(index, s"$name", AliasType, "A", subIndex = 2)
     )
   }
 
@@ -233,7 +233,7 @@ case class AliasBytes(index: Int, name: String) extends ByteEntity[Alias] {
 case class AddressOrAliasBytes(index: Int, name: String) extends ByteEntity[AddressOrAlias] {
 
   def generateDoc: Seq[ByteEntityDescription] =
-    Seq(ByteEntityDescription(index.toString, name, AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)"))
+    Seq(ByteEntityDescription(index, name, AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)"))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(AddressOrAlias, Int)] = {
     Try { AddressOrAlias.fromBytes(buf, offset).explicitGet() }
@@ -244,12 +244,12 @@ case class ProofsBytes(index: Int) extends ByteEntity[Proofs] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
-      ByteEntityDescription(s"$index.1", "Proofs version (0x01)", ByteType, "1"),
-      ByteEntityDescription(s"$index.2", "Proofs count", ShortType, "2"),
-      ByteEntityDescription(s"$index.3", "Proof 1 length (P1)", ShortType, "2"),
-      ByteEntityDescription(s"$index.4", "Proof 1", ByteStrType, "P1"),
-      ByteEntityDescription(s"$index.5", "Proof 2 length (P2)", ShortType, "2"),
-      ByteEntityDescription(s"$index.6", "Proof 2 ", ByteStrType, "P2", "\n...")
+      ByteEntityDescription(index, s"Proofs version (${Proofs.Version})", UnimportantType, "1", subIndex = 1),
+      ByteEntityDescription(index, "Proofs count", UnimportantType, "2", subIndex = 2),
+      ByteEntityDescription(index, "Proof 1 length (P1)", UnimportantType, "2", subIndex = 3),
+      ByteEntityDescription(index, "Proof 1", ByteStrType, "P1", subIndex = 4),
+      ByteEntityDescription(index, "Proof 2 length (P2)", UnimportantType, "2", subIndex = 5),
+      ByteEntityDescription(index, "Proof 2 ", ByteStrType, "P2", subIndex = 6, additionalInfo = "\n...")
     )
   }
 
@@ -273,11 +273,11 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
-      ByteEntityDescription(s"$index.1", "Number of transfers", ShortType, "2"),
-      ByteEntityDescription(s"$index.2", "Address or alias for transfer 1", AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)"),
-      ByteEntityDescription(s"$index.3", "Amount for transfer 1", LongType, "8"),
-      ByteEntityDescription(s"$index.4", "Address or alias for transfer 2", AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)"),
-      ByteEntityDescription(s"$index.5", "Amount for transfer 2", LongType, "8", "\n...")
+      ByteEntityDescription(index, "Number of transfers", UnimportantType, "2", 1),
+      ByteEntityDescription(index, "Address or alias for transfer 1", AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)", 2),
+      ByteEntityDescription(index, "Amount for transfer 1", LongType, "8", 3),
+      ByteEntityDescription(index, "Address or alias for transfer 2", AddressOrAliasType, "depends on first byte (1 - Address, 2 - Alias)", 4),
+      ByteEntityDescription(index, "Amount for transfer 2", LongType, "8", 5, additionalInfo = "\n...")
     )
   }
 
@@ -302,9 +302,9 @@ case class OrderBytes(index: Int, name: String) extends ByteEntity[Order] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
-      ByteEntityDescription(s"${index.toString}.1", s"$name size (N)", IntType, "4"),
-      ByteEntityDescription(s"${index.toString}.2", s"$name version mark", ByteType, "1 (version 1) / 0 (version 2)"),
-      ByteEntityDescription(s"${index.toString}.3", s"$name", OrderType, "N")
+      ByteEntityDescription(index, s"$name size (N)", UnimportantType, "4", subIndex = 1),
+      ByteEntityDescription(index, s"$name version mark", UnimportantType, "1 (version 1) / 0 (version 2)", subIndex = 2),
+      ByteEntityDescription(index, name, OrderType, "N", subIndex = 3)
     )
   }
 
@@ -325,7 +325,7 @@ case class OrderBytes(index: Int, name: String) extends ByteEntity[Order] {
 
 case class OrderV1Bytes(index: Int, name: String, length: String) extends ByteEntity[OrderV1] {
 
-  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index.toString, name, OrderV1Type, s"$length"))
+  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, OrderV1Type, s"$length"))
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(OrderV1, Int)] = {
     OrderV1.parseBytes(buf.drop(offset)).map { order =>
@@ -338,11 +338,11 @@ case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]]
 
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(
-      ByteEntityDescription(s"${index.toString}.1", "Data entries count", ShortType, "2"),
-      ByteEntityDescription(s"${index.toString}.2", "Key 1 length (K1)", ShortType, "2"),
-      ByteEntityDescription(s"${index.toString}.3", "Key 1 bytes", "UTF-8 encoded", "K1"),
-      ByteEntityDescription(s"${index.toString}.4", "Value 1 type (0 = integer, 1 = boolean, 2 = binary array, 3 = string)", ByteType, "1"),
-      ByteEntityDescription(s"${index.toString}.5", "Value 1 bytes", "Value 1 type", "depends on value type", "\n...")
+      ByteEntityDescription(index, "Data entries count", UnimportantType, "2", subIndex = 1),
+      ByteEntityDescription(index, "Key 1 length (K1)", UnimportantType, "2", subIndex = 2),
+      ByteEntityDescription(index, "Key 1 bytes", "UTF-8 encoded", "K1", subIndex = 3),
+      ByteEntityDescription(index, "Value 1 type (0 = integer, 1 = boolean, 2 = binary array, 3 = string)", UnimportantType, "1", subIndex = 4),
+      ByteEntityDescription(index, "Value 1 bytes", "Value 1 type", "depends on value type", subIndex = 5, additionalInfo = "\n...")
     )
   }
 
@@ -363,7 +363,7 @@ case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]]
 case class FunctionCallBytes(index: Int, name: String) extends ByteEntity[Terms.FUNCTION_CALL] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(ByteEntityDescription(index.toString, name, "EXPR", "F"))
+    Seq(ByteEntityDescription(index, name, "EXPR", "F"))
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Terms.FUNCTION_CALL, Int)] = {
@@ -377,7 +377,7 @@ case class FunctionCallBytes(index: Int, name: String) extends ByteEntity[Terms.
 case class AssetIdBytes(index: Int, name: String) extends ByteEntity[AssetId] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(ByteEntityDescription(index.toString, name, "AssetId (ByteStr = Array[Byte])", AssetIdLength.toString))
+    Seq(ByteEntityDescription(index, name, "AssetId (ByteStr = Array[Byte])", AssetIdLength.toString))
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(AssetId, Int)] = {
@@ -388,7 +388,10 @@ case class AssetIdBytes(index: Int, name: String) extends ByteEntity[AssetId] {
 case class ScriptBytes(index: Int, name: String) extends ByteEntity[Script] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(ByteEntityDescription(index.toString, name, "Script", "S (encoded in first 2 bytes)"))
+    Seq(
+      ByteEntityDescription(index, s"$name length (S)", UnimportantType, "2", subIndex = 1),
+      ByteEntityDescription(index, name, "Script", "S", subIndex = 2)
+    )
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Script, Int)] = {
@@ -402,7 +405,10 @@ case class ScriptBytes(index: Int, name: String) extends ByteEntity[Script] {
 case class PaymentBytes(index: Int, name: String) extends ByteEntity[Payment] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(ByteEntityDescription(index.toString, name, "Payment (Long, Option[AssetId])", "OP (encoded in first 2 bytes)"))
+    Seq(
+      ByteEntityDescription(index, s"$name length (P)", UnimportantType, "2", subIndex = 1),
+      ByteEntityDescription(index, name, "Payment (Long, Option[AssetId])", "P", subIndex = 2)
+    )
   }
 
   def deserialize(buf: Array[Byte], offset: Int): Try[(Payment, Int)] = {
@@ -428,12 +434,11 @@ case class OptionBytes[U](index: Int, name: String, nestedByteEntity: ByteEntity
     extends ByteEntity[Option[U]] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
-    ByteEntityDescription(s"${index.toString}.1", s"$name $firstByteInterpretation", "", "1") +:
+    ByteEntityDescription(index, s"$name $firstByteInterpretation", UnimportantType, "1", subIndex = 1) +:
       nestedByteEntity.generateDoc.map { desc =>
       desc.copy(
-        index = s"${index.toString}.2",
-        tpe = desc.tpe + " (Optional)",
-        length = desc.length + "/0 (depends on byte above)"
+        length = desc.length + s"/0 (depends on byte in $index.1)",
+        subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
       )
     }
   }

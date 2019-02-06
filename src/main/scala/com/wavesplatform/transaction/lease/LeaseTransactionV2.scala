@@ -77,12 +77,7 @@ object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with 
   }
 
   val byteTailDescription: ByteEntity[LeaseTransactionV2] = {
-    (OptionBytes(
-      index = tailIndex(1),
-      name = "Leasing asset",
-      nestedByteEntity = AssetIdBytes(tailIndex(1), "Leasing asset"),
-      firstByteInterpretation = "flag (0 - Waves, 1 - asset)"
-    ) ~
+    (OptionBytes(tailIndex(1), "Leasing asset", AssetIdBytes(tailIndex(1), "Leasing asset"), "flag (1 - asset, 0 - Waves)") ~
       PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
       AddressOrAliasBytes(tailIndex(3), "Recipient") ~
       LongBytes(tailIndex(4), "Amount") ~

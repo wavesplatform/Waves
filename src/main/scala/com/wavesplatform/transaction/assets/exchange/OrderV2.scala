@@ -8,7 +8,6 @@ import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 
 import scala.util.Try

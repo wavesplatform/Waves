@@ -172,7 +172,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
   val byteTailDescription: ByteEntity[MassTransferTransaction] = {
     (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
-      OptionBytes(index = tailIndex(2), name = "Leasing asset", nestedByteEntity = AssetIdBytes(tailIndex(2), "Asset")) ~
+      OptionBytes(index = tailIndex(2), name = "Asset ID", nestedByteEntity = AssetIdBytes(tailIndex(2), "Asset ID")) ~
       TransfersBytes(tailIndex(3)) ~
       LongBytes(tailIndex(4), "Timestamp") ~
       LongBytes(tailIndex(5), "Fee") ~
