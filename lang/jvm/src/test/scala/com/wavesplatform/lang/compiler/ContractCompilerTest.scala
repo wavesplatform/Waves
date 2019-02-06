@@ -135,8 +135,60 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce(
-      "Compilation failed: ContractFunction must return WriteSet/TransferSet/ContractResult or it super type")
+    compiler.ContractCompiler(ctx, expr) should produce(FieldNames.Error)
+  }
+
+  property("contract compiles fails if has more than one verifier function") {
+    val ctx = compilerContext
+    val expr = {
+      val script =
+        """
+          |
+          | @Verifier(tx)
+          | func foo() = {
+          |  true
+          | }
+          | 
+          | @Verifier(tx)
+          | func bar() = {
+          |  false
+          | }
+          |
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("more than 1 verifier function")
+  }
+
+  property("contract compiles fails if has unknown annotation") {
+    val ctx = compilerContext
+    val expr = {
+      val script =
+        """
+          | @Whooaaaa(arg)
+          | func foo() = {
+          |  true
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Annotation not recognized")
+  }
+
+  property("Verifier function must have 0 arguments") {
+    val ctx = compilerContext
+    val expr = {
+      val script =
+        """
+          | @Verifier(arg)
+          | func foo(a: Int) = {
+          |  true
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("must have 0 arguments")
   }
 
   property("hodlContract") {
@@ -220,5 +272,32 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
+  }
+
+  property("contract compilation fails if functions has the same name") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          |@Callable(i)
+          |func sameName() = {
+          |   WriteSet(List(DataEntry("a", "a")))
+          |}
+          |
+          |@Callable(i)
+          |func sameName() = {
+          |   WriteSet(List(DataEntry("b", "b")))
+          |}
+          |
+          |@Verifier(i)
+          |func sameName() = {
+          |   true
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("Contract functions must have unique names")
   }
 }

@@ -47,7 +47,7 @@ object ContractInvocationTransactionDiff {
 
       val invoker                                       = tx.sender.toAddress.bytes
       val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.map(p => (p.amount, p.assetId))
-      ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invokation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
+      ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
     }
 
     sc match {
