@@ -144,8 +144,16 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         forAll(longAttachment) { a =>
           posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment"))
         }
-        forAll(posNum[Long]) { quantity =>
-          posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError)
+        forAll(posNum[Long], assetIdGen) { (quantity, assetId) =>
+          val maybeAssetIdStr = assetId.map(_.base58)
+          posting(
+            tr.copy(
+              amount = quantity,
+              assetId = maybeAssetIdStr,
+              fee = Long.MaxValue,
+              feeAssetId = maybeAssetIdStr
+            )
+          ) should produce(OverflowError)
         }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee())
