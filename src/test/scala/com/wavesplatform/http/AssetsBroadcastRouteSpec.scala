@@ -127,7 +127,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
         forAll(nonPositiveLong) { q =>
-          posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of waves"))
+          posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of ${tr.assetId.getOrElse("waves")}"))
         }
         forAll(invalidBase58) { pk =>
           posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress)

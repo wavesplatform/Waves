@@ -4,13 +4,13 @@ import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import com.wavesplatform.crypto._
 
 trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
   def assetId: Option[AssetId]
@@ -62,12 +62,22 @@ object TransferTransaction {
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
-  def validate(amount: Long, feeAmount: Long, attachment: Array[Byte]): Either[ValidationError, Unit] = {
+  def validate(amt: Long,
+               maybeAmtAsset: Option[AssetId],
+               feeAmt: Long,
+               maybeFeeAsset: Option[AssetId],
+               attachment: Array[Byte]): Either[ValidationError, Unit] = {
+
+    val sumValid: validation.Validated[Long] =
+      if (maybeAmtAsset == maybeFeeAsset)
+        validateSum(Seq(amt, feeAmt))
+      else (amt + feeAmt).valid
+
     (
-      validateAmount(amount, "waves"),
-      validateFee(feeAmount),
+      validateAmount(amt, maybeAmtAsset.map(_.base58).getOrElse("waves")),
+      validateFee(feeAmt),
       validateAttachment(attachment),
-      validateSum(Seq(amount, feeAmount))
+      sumValid
     ).mapN { case _ => () }
       .toEither
       .leftMap(_.head)
