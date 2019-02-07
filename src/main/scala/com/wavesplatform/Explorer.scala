@@ -28,7 +28,7 @@ object Explorer extends ScorexLogging {
     "version",
     "height",
     "score",
-    "block-at-height",
+    "block-at-height", // not used now
     "height-of",
     "waves-balance-history",
     "waves-balance",
@@ -43,11 +43,11 @@ object Explorer extends ScorexLogging {
     "lease-status",
     "filled-volume-and-fee-history",
     "filled-volume-and-fee",
-    "transaction-info",
+    "transaction-info", // not used now
     "address-transaction-history",
     "address-transaction-ids-at-height",
     "changed-addresses",
-    "transaction-ids-at-height",
+    "transaction-ids-at-height", // not used now
     "address-id-of-alias",
     "last-address-id",
     "address-to-id",
@@ -66,13 +66,20 @@ object Explorer extends ScorexLogging {
     "addresses-for-waves",
     "addresses-for-asset-seq-nr",
     "addresses-for-asset",
-    "address-transaction-ids-seq-nr",
-    "address-transaction-ids",
+    "address-transaction-ids-seq-nr", // not used now
+    "address-transaction-ids", // not used now
     "alias-is-disabled",
     "carry-fee-history",
     "carry-fee",
     "asset-script-history",
-    "asset-script"
+    "asset-script",
+    "safe-rollback-height",
+    "changed-data-keys",
+    "block-header-at-height",
+    "nth-transaction-info-at-height",
+    "address-transaction-seq-nr",
+    "address-transaction-height-type-and-nums",
+    "transaction-height-and-nums-by-id",
   )
 
   def main(args: Array[String]): Unit = {
