@@ -31,6 +31,18 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         }
     }
 
+    forAll(Preconditions.conflictingTransfersInMicro()) {
+      case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
+        withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
+          d.blockchainUpdater.processBlock(prevBlock) shouldBe 'right
+          d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
+
+          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
+
+          d.blockchainUpdater.processBlock(keyBlock1) shouldBe 'right
+        }
+    }
+
     forAll(Preconditions.leaseAndLeaseCancel()) {
       case (genesisBlock, leaseBlock, keyBlock, microBlocks, transferBlock, secondAccount) =>
         withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
@@ -78,6 +90,46 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
 
         val (keyBlock1, _) = unsafeChainBaseAndMicro(
           totalRefTo = keyBlock.signerData.signature,
+          base = Seq(transfer3),
+          micros = Nil,
+          signer = secondAccount,
+          version = 3,
+          timestamp = System.currentTimeMillis()
+        )
+
+        (genesisBlock, keyBlock, microBlocks, keyBlock1)
+      }
+    }
+
+    def conflictingTransfersInMicro(): Gen[(Block, Block, Seq[MicroBlock], Block)] = {
+      for {
+        richAccount   <- accountGen
+        secondAccount <- accountGen
+
+        tsAmount = FeeAmount * 10
+        transfer1 <- transfer(richAccount, secondAccount, tsAmount)
+        transfer2 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount)
+        transfer3 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount)
+      } yield {
+        val genesisBlock = unsafeBlock(
+          reference = randomSig,
+          txs = Seq(GenesisTransaction.create(richAccount, tsAmount + FeeAmount, 0).explicitGet()),
+          signer = TestBlock.defaultSigner,
+          version = 3,
+          timestamp = 0
+        )
+
+        val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
+          totalRefTo = genesisBlock.signerData.signature,
+          base = Seq(transfer1),
+          micros = Seq(Seq(), Seq(transfer2)),
+          signer = richAccount,
+          version = 3,
+          timestamp = System.currentTimeMillis()
+        )
+
+        val (keyBlock1, _) = unsafeChainBaseAndMicro(
+          totalRefTo = microBlocks.head.totalResBlockSig,
           base = Seq(transfer3),
           micros = Nil,
           signer = secondAccount,
