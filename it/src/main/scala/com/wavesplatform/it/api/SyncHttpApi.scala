@@ -9,7 +9,7 @@ import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Req
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
@@ -101,6 +101,9 @@ object SyncHttpApi extends Assertions {
     def postJsonWithApiKey[A: Writes](path: String, body: A): Response =
       sync(async(n).postJsonWithApiKey(path, body))
 
+    def getWithApiKey(path: String): Response =
+      sync(async(n).getWithApiKey(path))
+
     def accountBalances(acc: String): (Long, Long) =
       sync(async(n).accountBalances(acc))
 
@@ -132,6 +135,8 @@ object SyncHttpApi extends Assertions {
 
     def assetDistribution(asset: String): AssetDistribution =
       sync(async(n).assetDistribution(asset))
+
+    def debugPortfoliosFor(address: String, considerUnspent: Boolean): Portfolio = sync(async(n).debugPortfoliosFor(address, considerUnspent))
 
     def issue(sourceAddress: String,
               name: String,
@@ -300,6 +305,8 @@ object SyncHttpApi extends Assertions {
     def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None, waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).setAssetScript(assetId, sender, fee, script)), waitForTx)
     }
+
+    def waitForUtxIncreased(fromSize: Int): Int = sync(async(n).waitForUtxIncreased(fromSize))
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
