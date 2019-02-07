@@ -13,16 +13,20 @@ import scala.util.Right
 object ExchangeTransactionDiff {
 
   def apply(blockchain: Blockchain, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
+
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
     val buyer   = tx.buyOrder.senderPublicKey.toAddress
     val seller  = tx.sellOrder.senderPublicKey.toAddress
+
     val assetIds = Set(tx.buyOrder.assetPair.amountAsset,
                        tx.buyOrder.assetPair.priceAsset,
                        tx.sellOrder.assetPair.amountAsset,
                        tx.sellOrder.assetPair.priceAsset).flatten
+
     val assets             = assetIds.map(blockchain.assetDescription)
     val smartTradesEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAccountTrading.id)
     val smartAssetsEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAssets.id)
+
     for {
       _ <- Either.cond(assets.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       _ <- Either.cond(
@@ -49,9 +53,28 @@ object ExchangeTransactionDiff {
 
       def wavesPortfolio(amt: Long) = Portfolio(amt, LeaseBalance.empty, Map.empty)
 
+      def matcherOrderFeePortfolio(order: Order): Portfolio = {
+
+        lazy val default = wavesPortfolio(order.matcherFee) // in case of Order V1/V2/V3 (matcherFeeAssetId = None - Waves) fee is in Waves
+
+        order match {
+          case ov3: OrderV3 => ov3.matcherFeeAssetId.fold(default)(assetId => Portfolio(0, LeaseBalance.empty, Map(assetId -> ov3.matcherFee)))
+          case _            => default
+        }
+      }
+
+      val matcherFeePortfolio =
+        Monoid.combineAll(
+          Seq(
+            wavesPortfolio(-t.fee),
+            matcherOrderFeePortfolio(t.buyOrder),
+            matcherOrderFeePortfolio(t.sellOrder)
+          )
+        )
+
       val feeDiff = Monoid.combineAll(
         Seq(
-          Map(matcher -> wavesPortfolio(t.buyMatcherFee + t.sellMatcherFee - t.fee)),
+          Map(matcher -> matcherFeePortfolio),
           Map(buyer   -> wavesPortfolio(-t.buyMatcherFee)),
           Map(seller  -> wavesPortfolio(-t.sellMatcherFee))
         ))
