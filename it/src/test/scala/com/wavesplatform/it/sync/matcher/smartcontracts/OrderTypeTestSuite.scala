@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.api.http.TransactionNotAllowedByScript
+import com.wavesplatform.api.http.TransactionNotAllowedByAccountScript
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
@@ -160,7 +160,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
         val txs = matcherNode.transactionsByOrder(bobOrd2)
         txs.size shouldBe 1
-        matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByScript.ErrorCode
+        matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAccountScript.ErrorCode
       }
     }
   }

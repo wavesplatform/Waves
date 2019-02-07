@@ -159,9 +159,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
-    def sastx(fee: Long = setAssetScriptFee,
-              timestamp: Long = System.currentTimeMillis,
-              assetId: ByteStr = ByteStr.decodeBase58(assetWScript).get,
+    def sastx(fee: Long = setAssetScriptFee, timestamp: Long = System.currentTimeMillis, assetId: ByteStr = ByteStr.decodeBase58(assetWScript).get,
     ): SetAssetScriptTransaction =
       SetAssetScriptTransaction
         .signed(AddressScheme.current.chainId, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)

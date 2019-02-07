@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.api.http.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.api.http.TransactionNotAllowedByScript
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi.NodeExtSync
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -126,7 +126,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
     val txs = matcherNode.transactionsByOrder(submittedId)
     txs.size shouldBe 1
-    matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByScript.ErrorCode
+    matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.ErrorCode
   }
 
   "can't execute against scripted, if one script returns FALSE" in {
@@ -153,7 +153,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
     val txs = matcherNode.transactionsByOrder(submittedId)
     txs.size shouldBe 1
-    matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByScript.ErrorCode
+    matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.ErrorCode
   }
 
   private def issueAsset(): String = {
