@@ -17,8 +17,8 @@ import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json._
 import scorex.utils._
 
-class MatcherActor(matcherSettings: MatcherSettings,
-                   recoveryCompletedWithEventNr: (ActorRef, Long) => Unit,
+class MatcherActor(settings: MatcherSettings,
+                   recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
                    assetDescription: ByteStr => Option[AssetDescription])
@@ -67,16 +67,10 @@ class MatcherActor(matcherSettings: MatcherSettings,
     )
   }
 
-  private def createOrderBookActor(pair: AssetPair): ActorRef = {
-    val r = context.actorOf(orderBookActorProps(pair, self), OrderBookActor.name(pair))
-    childrenNames += r -> pair
-    context.watch(r)
-    r
-  }
-
   private def createOrderBook(pair: AssetPair): ActorRef = {
     log.info(s"Creating order book for $pair")
-    val orderBook = createOrderBookActor(pair)
+    val orderBook = context.watch(context.actorOf(orderBookActorProps(pair, self), OrderBookActor.name(pair)))
+    childrenNames += orderBook -> pair
     orderBooks.updateAndGet(_ + (pair -> Right(orderBook)))
     tradedPairs += pair -> createMarketData(pair)
     orderBook
@@ -148,12 +142,13 @@ class MatcherActor(matcherSettings: MatcherSettings,
       }
 
     case Terminated(ref) =>
+      log.error(s"$ref is terminated")
       orderBooks.getAndUpdate { m =>
         childrenNames.get(ref).fold(m)(m.updated(_, Left(())))
       }
 
     case OrderBookSnapshotUpdated(assetPair, eventNr) =>
-      snapshotsState = snapshotsState.updated(assetPair, eventNr, lastProcessedNr, matcherSettings.snapshotsInterval)
+      snapshotsState = snapshotsState.updated(assetPair, eventNr, lastProcessedNr, settings.snapshotsInterval)
   }
 
   override def receiveRecover: Receive = {
@@ -171,10 +166,11 @@ class MatcherActor(matcherSettings: MatcherSettings,
     case RecoveryCompleted =>
       if (orderBooks.get().isEmpty) {
         log.info("Recovery completed!")
-        recoveryCompletedWithEventNr(self, -1)
+        recoveryCompletedWithEventNr(Right((self, -1)))
       } else {
-        log.info(s"Recovery completed, waiting order books to restore: ${orderBooks.get().keys.mkString(", ")}")
-        context.become(collectOrderBooks(orderBooks.get().size, Long.MaxValue, Long.MinValue, Map.empty))
+        val obs = orderBooks.get()
+        log.info(s"Recovery completed, waiting order books to restore: ${obs.keys.mkString(", ")}")
+        context.become(collectOrderBooks(obs.size, Long.MaxValue, Long.MinValue, Map.empty))
       }
   }
 
@@ -195,14 +191,13 @@ class MatcherActor(matcherSettings: MatcherSettings,
       else becomeWorking(updatedOldestEventNr, updatedNewestEventNr, updatedCurrentOffsets)
 
     case Terminated(ref) =>
-      orderBooks.getAndUpdate { m =>
-        childrenNames.get(ref).fold(m)(m.updated(_, Left(())))
-      }
+      context.stop(self)
+      recoveryCompletedWithEventNr(Left(s"$ref is terminated"))
 
-      val updatedRestOrderBooksNumber = restOrderBooksNumber - 1
-      if (updatedRestOrderBooksNumber > 0)
-        context.become(collectOrderBooks(updatedRestOrderBooksNumber, oldestEventNr, newestEventNr, currentOffsets))
-      else becomeWorking(oldestEventNr, newestEventNr, currentOffsets)
+    case Shutdown =>
+      context.children.foreach(context.unwatch)
+      context.stop(self)
+      recoveryCompletedWithEventNr(Left("Received Shutdown command"))
 
     case _ => stash()
   }
@@ -214,13 +209,14 @@ class MatcherActor(matcherSettings: MatcherSettings,
       startOffsetToSnapshot = lastProcessedNr,
       currentOffsets = currentOffsets,
       lastProcessedNr = lastProcessedNr,
-      interval = matcherSettings.snapshotsInterval
+      interval = settings.snapshotsInterval
     )
 
+    log.info(s"All snapshots are loaded, oldestEventNr: $oldestEventNr, newestEventNr: $newestEventNr")
     log.trace(s"Expecting snapshots at: ${snapshotsState.nearestSnapshotOffsets}")
 
     unstashAll()
-    recoveryCompletedWithEventNr(self, oldestEventNr)
+    recoveryCompletedWithEventNr(Right((self, oldestEventNr)))
   }
 
   private def snapshotsCommands: Receive = {
@@ -282,7 +278,7 @@ object MatcherActor {
   def name: String = "matcher"
 
   def props(matcherSettings: MatcherSettings,
-            recoveryCompletedWithEventNr: (ActorRef, Long) => Unit,
+            recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             orderBookProps: (AssetPair, ActorRef) => Props,
             assetDescription: ByteStr => Option[AssetDescription]): Props =

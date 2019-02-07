@@ -122,6 +122,7 @@ class OrderBookActor(owner: ActorRef,
 
   override def receiveRecover: Receive = {
     case RecoveryCompleted =>
+      updateMarketStatus(MarketStatus(lastTrade, orderBook.bestBid, orderBook.bestAsk))
       updateSnapshot(orderBook.aggregatedSnapshot)
       owner ! OrderBookSnapshotUpdated(assetPair, lastProcessedOffset)
       log.debug(s"Recovery completed: $orderBook")

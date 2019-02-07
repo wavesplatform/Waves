@@ -26,6 +26,8 @@ case class MatcherSettings(enable: Boolean,
                            journalDataDir: String,
                            snapshotsDataDir: String,
                            snapshotsInterval: Int,
+                           snapshotsLoadingTimeout: FiniteDuration,
+                           startEventsProcessingTimeout: FiniteDuration,
                            makeSnapshotsAtStart: Boolean,
                            priceAssets: Seq[String],
                            maxTimestampDiff: FiniteDuration,
@@ -56,21 +58,23 @@ object MatcherSettings {
   }
 
   def fromConfig(config: Config): MatcherSettings = {
-    val enabled              = config.as[Boolean](s"$configPath.enable")
-    val account              = config.as[String](s"$configPath.account")
-    val bindAddress          = config.as[String](s"$configPath.bind-address")
-    val port                 = config.as[Int](s"$configPath.port")
-    val minOrderFee          = config.as[Long](s"$configPath.min-order-fee")
-    val orderMatchTxFee      = config.as[Long](s"$configPath.order-match-tx-fee")
-    val dataDirectory        = config.as[String](s"$configPath.data-directory")
-    val journalDirectory     = config.as[String](s"$configPath.journal-directory")
-    val snapshotsDirectory   = config.as[String](s"$configPath.snapshots-directory")
-    val snapshotsInterval    = config.as[Int](s"$configPath.snapshots-interval")
-    val makeSnapshotsAtStart = config.as[Boolean](s"$configPath.make-snapshots-at-start")
-    val maxOrdersPerRequest  = config.as[Int](s"$configPath.rest-order-limit")
-    val orderTimestampDrift  = config.as[FiniteDuration](s"$configPath.order-timestamp-drift")
-    val baseAssets           = config.as[List[String]](s"$configPath.price-assets")
-    val maxTimestampDiff     = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
+    val enabled                      = config.as[Boolean](s"$configPath.enable")
+    val account                      = config.as[String](s"$configPath.account")
+    val bindAddress                  = config.as[String](s"$configPath.bind-address")
+    val port                         = config.as[Int](s"$configPath.port")
+    val minOrderFee                  = config.as[Long](s"$configPath.min-order-fee")
+    val orderMatchTxFee              = config.as[Long](s"$configPath.order-match-tx-fee")
+    val dataDirectory                = config.as[String](s"$configPath.data-directory")
+    val journalDirectory             = config.as[String](s"$configPath.journal-directory")
+    val snapshotsDirectory           = config.as[String](s"$configPath.snapshots-directory")
+    val snapshotsInterval            = config.as[Int](s"$configPath.snapshots-interval")
+    val snapshotsLoadingTimeout      = config.as[FiniteDuration](s"$configPath.snapshots-loading-timeout")
+    val startEventsProcessingTimeout = config.as[FiniteDuration](s"$configPath.start-events-processing-timeout")
+    val makeSnapshotsAtStart         = config.as[Boolean](s"$configPath.make-snapshots-at-start")
+    val maxOrdersPerRequest          = config.as[Int](s"$configPath.rest-order-limit")
+    val orderTimestampDrift          = config.as[FiniteDuration](s"$configPath.order-timestamp-drift")
+    val baseAssets                   = config.as[List[String]](s"$configPath.price-assets")
+    val maxTimestampDiff             = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
 
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
     val blacklistedNames  = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
@@ -95,6 +99,8 @@ object MatcherSettings {
       journalDirectory,
       snapshotsDirectory,
       snapshotsInterval,
+      snapshotsLoadingTimeout,
+      startEventsProcessingTimeout,
       makeSnapshotsAtStart,
       baseAssets,
       maxTimestampDiff,

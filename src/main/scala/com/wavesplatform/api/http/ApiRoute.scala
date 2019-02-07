@@ -12,7 +12,7 @@ import play.api.libs.json.{JsResultException, Reads}
 
 trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
   val settings: RestAPISettings
-  val route: Route
+  def route: Route
 
   private lazy val apiKeyHash = Base58.decode(settings.apiKeyHash).toOption
 

@@ -22,6 +22,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    order-match-tx-fee = 100000
         |    snapshots-interval = 999
         |    make-snapshots-at-start = yes
+        |    snapshots-loading-timeout = 423s
+        |    start-events-processing-timeout = 543s
         |    rest-order-limit = 100
         |    order-timestamp-drift = 10m
         |    price-assets = [
@@ -75,6 +77,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(999)
     settings.makeSnapshotsAtStart should be(true)
+    settings.snapshotsLoadingTimeout should be(423.seconds)
+    settings.startEventsProcessingTimeout should be(543.seconds)
     settings.maxOrdersPerRequest should be(100)
     settings.orderTimestampDrift should be(10.minutes.toMillis)
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))

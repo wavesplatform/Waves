@@ -52,6 +52,12 @@ class LocalQueueStore(db: DB) {
         }
   }
 
+  def newestOffset: Option[QueueEventWithMeta.Offset] = {
+    val idx      = newestIdx.get()
+    val eventKey = lpqElement(idx)
+    eventKey.parse(db.get(eventKey.keyBytes)).map(_.offset)
+  }
+
   def dropUntil(offset: QueueEventWithMeta.Offset): Unit = db.readWrite { rw =>
     val oldestIdx = math.max(db.get(lqOldestIdx), 0)
     (oldestIdx until offset).foreach { offset =>
