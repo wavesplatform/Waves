@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.matcher.smartcontracts
 
 import com.typesafe.config.Config
+import com.wavesplatform.api.http.TransactionNotAllowedByScript
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
@@ -9,6 +10,7 @@ import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 
@@ -22,10 +24,10 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
 
   {
     val issueTx = matcherNode.signedIssue(createSignedIssueRequest(IssueUsdTx))
-    nodes.waitForHeightAriseAndTxPresent(issueTx.id)
+    nodes.waitForTransaction(issueTx.id)
 
     val transferTx = aliceNode.transfer(aliceNode.address, aliceAcc.address, defaultAssetQuantity, 100000, Some(UsdId.toString), None, 2)
-    nodes.waitForHeightAriseAndTxPresent(transferTx.id)
+    nodes.waitForTransaction(transferTx.id)
   }
 
   private val predefAssetPair = wavesUsdPair
@@ -149,14 +151,16 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
           .id
 
         matcherNode.waitOrderStatus(predefAssetPair, aliceOrd1, "Filled", 1.minute)
-        matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Cancelled", 1.minute)
+        matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Filled", 1.minute)
         matcherNode.waitOrderStatus(predefAssetPair, bobOrd1, "Filled", 1.minute)
-        matcherNode.waitOrderStatus(aliceWavesPair, bobOrd2, "Accepted", 1.minute)
+        matcherNode.waitOrderStatus(aliceWavesPair, bobOrd2, "Filled", 1.minute)
 
         val exchangeTx1 = matcherNode.transactionsByOrder(bobOrd1).headOption.getOrElse(fail("Expected an exchange transaction"))
-        nodes.waitForHeightAriseAndTxPresent(exchangeTx1.id)
+        nodes.waitForTransaction(exchangeTx1.id)
 
-        setContract(None, aliceAcc)
+        val txs = matcherNode.transactionsByOrder(bobOrd2)
+        txs.size shouldBe 1
+        matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByScript.ErrorCode
       }
     }
   }

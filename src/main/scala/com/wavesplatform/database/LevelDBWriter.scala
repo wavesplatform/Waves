@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{Paged, ScorexLogging}
+import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
@@ -61,8 +62,13 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int, val maxRollbackDepth: Int, val rememberBlocksInterval: Long)
-    extends Caches
+class LevelDBWriter(writableDB: DB,
+                    portfolioChanged: Observer[Address],
+                    fs: FunctionalitySettings,
+                    val maxCacheSize: Int,
+                    val maxRollbackDepth: Int,
+                    val rememberBlocksInterval: Long)
+    extends Caches(portfolioChanged)
     with ScorexLogging {
 
   private val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000

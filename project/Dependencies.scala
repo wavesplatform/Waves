@@ -38,8 +38,9 @@ object Dependencies {
   )
 
   lazy val serialization = Seq(
-    "com.google.guava"  % "guava"      % "21.0",
-    "com.typesafe.play" %% "play-json" % "2.6.10"
+    "com.google.guava"         % "guava"      % "21.0",
+    "com.google.code.findbugs" % "jsr305"     % "3.0.2" % "compile", // to support guava
+    "com.typesafe.play"        %% "play-json" % "2.6.10"
   )
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
@@ -65,6 +66,8 @@ object Dependencies {
   lazy val matcher = Seq(
     akkaModule("persistence"),
     akkaModule("persistence-tck") % "test",
+    "com.github.dnvriend"         %% "akka-persistence-inmemory" % "2.5.15.1" % "test",
+    "com.typesafe.akka"           %% "akka-stream-kafka" % "1.0-M1",
     "org.ethereum"                % "leveldbjni-all" % "1.18.3"
   )
 

@@ -175,4 +175,6 @@ package object utils extends ScorexLogging {
     val obj           = runtimeMirror.reflectModule(module)
     obj.instance.asInstanceOf[T]
   }
+
+  @tailrec def doWhile[T](z: T)(cond: T => Boolean)(f: T => T): T = if (cond(z)) doWhile(f(z))(cond)(f) else z
 }

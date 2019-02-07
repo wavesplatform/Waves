@@ -15,6 +15,8 @@ import com.wavesplatform.state.bench.DataTestData
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils.Base58
 import monix.eval.Coeval
+import monix.execution.UncaughtExceptionReporter
+import monix.reactive.Observer
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -122,7 +124,8 @@ object WavesEnvironmentBenchmark {
     }
 
     val environment: Environment = {
-      val state = new LevelDBWriter(db, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000)
+      val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
+      val state            = new LevelDBWriter(db, portfolioChanges, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000)
       new WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new NotImplementedError("tx is not implemented")),

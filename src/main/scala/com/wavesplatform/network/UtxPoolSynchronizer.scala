@@ -42,21 +42,19 @@ object UtxPoolSynchronizer extends ScorexLogging {
         }
 
         if (toAdd.nonEmpty) {
-          utx.batched { ops =>
-            toAdd
-              .groupBy { case (channel, _) => channel }
-              .foreach {
-                case (sender, xs) =>
-                  val channelMatcher: ChannelMatcher = { (_: Channel) != sender }
-                  xs.foreach {
-                    case (_, tx) =>
-                      ops.putIfNew(tx) match {
-                        case Right((true, _)) => allChannels.write(RawBytes.from(tx), channelMatcher)
-                        case _                =>
-                      }
-                  }
-              }
-          }
+          toAdd
+            .groupBy { case (channel, _) => channel }
+            .foreach {
+              case (sender, xs) =>
+                val channelMatcher: ChannelMatcher = { (_: Channel) != sender }
+                xs.foreach {
+                  case (_, tx) =>
+                    utx.putIfNew(tx) match {
+                      case Right((true, _)) => allChannels.write(RawBytes.from(tx), channelMatcher)
+                      case _                =>
+                    }
+                }
+            }
           allChannels.flush()
         }
       }

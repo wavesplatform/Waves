@@ -12,6 +12,8 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import monix.execution.UncaughtExceptionReporter
+import monix.reactive.Observer
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
 import org.scalacheck.{Arbitrary, Gen}
@@ -27,7 +29,8 @@ trait BaseState {
     LevelDBFactory.factory.open(new File(dir), options)
   }
 
-  val state: LevelDBWriter = new LevelDBWriter(db, fsSettings, 100000, 2000, 120 * 60 * 1000)
+  private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
+  val state: LevelDBWriter     = new LevelDBWriter(db, portfolioChanges, fsSettings, 100000, 2000, 120 * 60 * 1000)
 
   private var _richAccount: PrivateKeyAccount = _
   def richAccount: PrivateKeyAccount          = _richAccount

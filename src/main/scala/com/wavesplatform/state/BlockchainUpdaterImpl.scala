@@ -19,10 +19,10 @@ import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
-import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, time: Time)
+class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[Address], settings: WavesSettings, time: Time)
     extends BlockchainUpdater
     with NG
     with ScorexLogging
@@ -108,7 +108,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         (),
         GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")
       )
-      .flatMap(_ =>
+      .flatMap[ValidationError, Option[DiscardedTransactions]](_ =>
         (ngState match {
           case None =>
             blockchain.lastBlockId match {
@@ -195,8 +195,12 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
             case ((newBlockDiff, carry, updatedTotalConstraint), discarded) =>
               val height = blockchain.height + 1
               restTotalConstraint = updatedTotalConstraint
+              val prevNgState = ngState
               ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
+
+              prevNgState.toIterable.flatMap(_.bestLiquidDiff.portfolios.keys).foreach(portfolioChanged.onNext)
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
+
               if ((block.timestamp > time
                     .getTimestamp() - settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
                 log.info(s"New height: $height")
@@ -207,18 +211,21 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
   }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = {
-    val ng = ngState
-    if (ng.exists(_.contains(blockId))) {
+    val prevNgState = ngState
+    val r = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
       Right(Seq.empty)
     } else {
-      val discardedNgBlock = ng.map(_.bestLiquidBlock).toSeq
+      val discardedNgBlock = prevNgState.map(_.bestLiquidBlock).toSeq
       ngState = None
       blockchain
         .rollbackTo(blockId)
         .map(_ ++ discardedNgBlock)
         .leftMap(err => GenericError(err))
     }
+
+    prevNgState.toIterable.flatMap(_.bestLiquidDiff.portfolios.keys).foreach(portfolioChanged.onNext)
+    r
   }
 
   override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, Unit] = {
@@ -255,6 +262,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
               ng.append(microBlock, diff, carry, System.currentTimeMillis)
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
+              diff.portfolios.keys.foreach(portfolioChanged.onNext)
             }
         }
     }

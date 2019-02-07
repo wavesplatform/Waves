@@ -1,10 +1,14 @@
 package com.wavesplatform.matcher
 
+import java.util.concurrent.atomic.AtomicLong
+
+import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
+import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -17,18 +21,29 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   val bytes32gen: Gen[Array[Byte]]       = Gen.listOfN(signatureSize, Arbitrary.arbitrary[Byte]).map(xs => xs.toArray)
   val WalletSeed                         = ByteStr("Matcher".getBytes())
-  val MatcherSeed                        = crypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
+  val MatcherSeed: Array[Byte]           = crypto.secureHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
   val MatcherAccount                     = PrivateKeyAccount(MatcherSeed)
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long]         = Gen.choose(1, Long.MaxValue)
 
   val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
 
+  private val seqNr = new AtomicLong(-1)
+
+  def wrap(x: Order): QueueEventWithMeta                           = wrap(seqNr.incrementAndGet(), x)
+  def wrap(n: Long, x: Order): QueueEventWithMeta                  = wrap(n, QueueEvent.Placed(x))
+  private def wrap(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
+
   def assetIdGen(prefix: Byte) = Gen.listOfN(signatureSize - 1, Arbitrary.arbitrary[Byte]).map(xs => Some(ByteStr(Array(prefix, xs: _*))))
   val distinctPairGen: Gen[AssetPair] = for {
     a1 <- assetIdGen(1.toByte)
     a2 <- assetIdGen(2.toByte)
   } yield AssetPair(a1, a2)
+
+  protected def mkAssetId(prefix: String): Option[ByteStr] = {
+    val prefixBytes = prefix.getBytes(Charsets.UTF_8)
+    Some(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
+  }
 
   val assetPairGen = Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, None))), (1, assetIdGen(2).map(AssetPair(None, _))))
 
@@ -45,7 +60,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       |    order-history-file: null
       |    min-order-fee: 100000
       |    order-match-tx-fee: 100000
-      |    snapshots-interval: 1d
+      |    snapshots-interval: 100000
       |    max-open-orders: 1000
       |    price-assets: ["BASE1", "BASE2", "BASE"]
       |    blacklisted-assets: ["BLACKLST"]
@@ -129,17 +144,22 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 
+  def orderGenerator(sender: PrivateKeyAccount, pair: AssetPair): Gen[Order] =
+    for {
+      orderType          <- orderTypeGenerator
+      amount: Long       <- maxWavesAmountGen
+      price: Long        <- maxWavesAmountGen
+      timestamp: Long    <- createdTimeGen
+      expiration: Long   <- maxTimeGen
+      matcherFee: Long   <- maxWavesAmountGen
+      orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
+    } yield Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, orderVersion)
+
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     pair                      <- assetPairGen
-    orderType                 <- orderTypeGenerator
-    amount: Long              <- maxWavesAmountGen
-    price: Long               <- maxWavesAmountGen
-    timestamp: Long           <- createdTimeGen
-    expiration: Long          <- maxTimeGen
-    matcherFee: Long          <- maxWavesAmountGen
-    orderVersion: Byte        <- Gen.oneOf(1: Byte, 2: Byte)
-  } yield (Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, orderVersion), sender)
+    order                     <- orderGenerator(sender, pair)
+  } yield order -> sender
 
   val buyLimitOrderGenerator: Gen[BuyLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen

@@ -22,14 +22,15 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
-import monix.execution.{CancelableFuture, Scheduler}
 import monix.execution.schedulers.SchedulerService
+import monix.execution.{CancelableFuture, Scheduler}
+import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong
 import scala.util.{Left, Right}
 
-class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings, utxSettings: UtxSettings)
+class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer[Address], fs: FunctionalitySettings, utxSettings: UtxSettings)
     extends ScorexLogging
     with Instrumented
     with AutoCloseable
@@ -41,7 +42,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
   private implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
 
   private val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private val pessimisticPortfolios = new PessimisticPortfolios
+  private val pessimisticPortfolios = new PessimisticPortfolios(portfolioChanges)
 
   private val removeInvalidTask: Task[Unit] =
     Task.eval(removeInvalid()) >>
@@ -156,12 +157,6 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
     (txs, finalConstraint)
   }
 
-  override private[utx] def createBatchOps: UtxBatchOps = new BatchOpsImpl(blockchain)
-
-  private class BatchOpsImpl(b: Blockchain) extends UtxBatchOps {
-    override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = outer.putIfNew(b, tx)
-  }
-
   private def canReissue(b: Blockchain, tx: Transaction) = tx match {
     case r: ReissueTransaction if b.assetDescription(r.assetId).exists(!_.reissuable) => Left(GenericError(s"Asset is not reissuable"))
     case _                                                                            => Right(())
@@ -208,26 +203,25 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
 
 object UtxPoolImpl {
 
-  private class PessimisticPortfolios {
+  private class PessimisticPortfolios(portfolioChanges: Observer[Address]) {
     private type Portfolios = Map[Address, Portfolio]
     private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
     private val transactions          = new ConcurrentHashMap[Address, Set[ByteStr]]()
 
     def add(txId: ByteStr, txDiff: Diff): Unit = {
-      val nonEmptyPessimisticPortfolios = txDiff.portfolios
-        .map {
-          case (addr, portfolio) => addr -> portfolio.pessimistic
-        }
-        .filterNot {
-          case (_, portfolio) => portfolio.isEmpty
-        }
+      val pessimisticPortfolios         = txDiff.portfolios.map { case (addr, portfolio)        => addr -> portfolio.pessimistic }
+      val nonEmptyPessimisticPortfolios = pessimisticPortfolios.filterNot { case (_, portfolio) => portfolio.isEmpty }
 
       if (nonEmptyPessimisticPortfolios.nonEmpty &&
           Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
         nonEmptyPessimisticPortfolios.keys.foreach { address =>
           transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
+          portfolioChanges.onNext(address)
         }
       }
+
+      // Because we need to notify about balance changes when they are applied
+      pessimisticPortfolios.iterator.collect { case (addr, p) if p.isEmpty => addr }.foreach(portfolioChanges.onNext)
     }
 
     def getAggregated(accountAddr: Address): Portfolio = {
@@ -244,6 +238,7 @@ object UtxPoolImpl {
       if (Option(transactionPortfolios.remove(txId)).isDefined) {
         transactions.keySet().asScala.foreach { addr =>
           transactions.put(addr, transactions.getOrDefault(addr, Set.empty) - txId)
+          portfolioChanges.onNext(addr)
         }
       }
     }
