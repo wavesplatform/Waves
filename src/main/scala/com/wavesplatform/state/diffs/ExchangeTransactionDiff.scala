@@ -6,7 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderV3}
 
 import scala.util.Right
 
@@ -93,26 +93,40 @@ object ExchangeTransactionDiff {
   }
 
   private def enoughVolume(exTrans: ExchangeTransaction, blockchain: Blockchain): Either[ValidationError, ExchangeTransaction] = {
+
     val filledBuy  = blockchain.filledVolumeAndFee(exTrans.buyOrder.id())
     val filledSell = blockchain.filledVolumeAndFee(exTrans.sellOrder.id())
 
-    val buyTotal             = filledBuy.volume + exTrans.amount
-    val sellTotal            = filledSell.volume + exTrans.amount
+    val buyTotal  = filledBuy.volume + exTrans.amount
+    val sellTotal = filledSell.volume + exTrans.amount
+
     lazy val buyAmountValid  = exTrans.buyOrder.amount >= buyTotal
     lazy val sellAmountValid = exTrans.sellOrder.amount >= sellTotal
 
-    def isFeeValid(feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long): Boolean =
-      feeTotal <= BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
+    def isFeeValid(feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long, order: Order): Boolean = {
+      feeTotal <= (order match {
+        case _: OrderV3 => BigInt(maxfee)
+        case _          => BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
+      })
+    }
 
-    lazy val buyFeeValid = isFeeValid(feeTotal = filledBuy.fee + exTrans.buyMatcherFee,
-                                      amountTotal = buyTotal,
-                                      maxfee = exTrans.buyOrder.matcherFee,
-                                      maxAmount = exTrans.buyOrder.amount)
+    lazy val buyFeeValid =
+      isFeeValid(
+        feeTotal = filledBuy.fee + exTrans.buyMatcherFee,
+        amountTotal = buyTotal,
+        maxfee = exTrans.buyOrder.matcherFee,
+        maxAmount = exTrans.buyOrder.amount,
+        order = exTrans.buyOrder
+      )
 
-    lazy val sellFeeValid = isFeeValid(feeTotal = filledSell.fee + exTrans.sellMatcherFee,
-                                       amountTotal = sellTotal,
-                                       maxfee = exTrans.sellOrder.matcherFee,
-                                       maxAmount = exTrans.sellOrder.amount)
+    lazy val sellFeeValid =
+      isFeeValid(
+        feeTotal = filledSell.fee + exTrans.sellMatcherFee,
+        amountTotal = sellTotal,
+        maxfee = exTrans.sellOrder.matcherFee,
+        maxAmount = exTrans.sellOrder.amount,
+        order = exTrans.sellOrder
+      )
 
     if (!buyAmountValid) Left(OrderValidationError(exTrans.buyOrder, s"Too much buy. Already filled volume for the order: ${filledBuy.volume}"))
     else if (!sellAmountValid)
