@@ -243,7 +243,9 @@ case class DebugApiRoute(ws: WavesSettings,
           case (address, Right(offset)) =>
             AccountMiningInfo(
               address.stringRepr,
-              ng.effectiveBalance(address, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height)),
+              ng.effectiveBalance(address,
+                                  ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height),
+                                  ng.microblockIds.lastOption.getOrElse(ByteStr.empty)),
               System.currentTimeMillis() + offset.toMillis
             )
         }

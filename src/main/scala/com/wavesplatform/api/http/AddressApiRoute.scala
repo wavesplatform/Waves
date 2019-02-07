@@ -358,7 +358,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     BalanceDetails(
       account.address,
       portfolio.balance,
-      GeneratingBalanceProvider.balance(blockchain, functionalitySettings, blockchain.height, account),
+      GeneratingBalanceProvider.balance(blockchain, functionalitySettings, account),
       portfolio.balance - portfolio.lease.out,
       portfolio.effectiveBalance
     )
@@ -381,7 +381,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     Address
       .fromString(address)
       .right
-      .map(acc => ToResponseMarshallable(Balance(acc.address, confirmations, blockchain.effectiveBalance(acc, blockchain.height, confirmations))))
+      .map(acc => ToResponseMarshallable(Balance(acc.address, confirmations, blockchain.effectiveBalance(acc, confirmations))))
       .getOrElse(InvalidAddress)
   }
 

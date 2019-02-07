@@ -386,6 +386,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     blockchain.portfolio(a).combine(p)
   }
 
+  private[this] def portfolioAt(a: Address, mb: ByteStr): Portfolio = {
+    val p = ngState.fold(Portfolio.empty)(_.diffFor(mb)._1.portfolios.getOrElse(a, Portfolio.empty))
+    blockchain.portfolio(a).combine(p)
+  }
+
   override def transactionInfo(id: AssetId): Option[(Int, Transaction)] =
     ngState
       .fold(Diff.empty)(_.bestLiquidDiff)
@@ -426,13 +431,15 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       _.bestLiquidDiff.orderFills.get(orderId).orEmpty.combine(blockchain.filledVolumeAndFee(orderId)))
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] =
-    if (to <= blockchain.height || ngState.isEmpty) {
+  override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = {
+    val blockchainBlock = blockchain.blockById(to)
+    if (blockchainBlock.nonEmpty || ngState.isEmpty) {
       blockchain.balanceSnapshots(address, from, to)
     } else {
-      val bs = BalanceSnapshot(height, portfolio(address))
+      val bs = BalanceSnapshot(height, portfolioAt(address, to))
       if (blockchain.height > 0 && from < this.height) bs +: blockchain.balanceSnapshots(address, from, to) else Seq(bs)
     }
+  }
 
   override def accountScript(address: Address): Option[Script] = ngState.fold(blockchain.accountScript(address)) { ng =>
     ng.bestLiquidDiff.scripts.get(address) match {

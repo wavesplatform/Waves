@@ -3,6 +3,7 @@ package com.wavesplatform.state.reader
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
@@ -124,8 +125,8 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
-  override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] = {
-    if (to <= inner.height || maybeDiff.isEmpty) {
+  override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = {
+    if (inner.blockById(to).isDefined || maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
     } else {
       val bs = BalanceSnapshot(height, portfolio(address))

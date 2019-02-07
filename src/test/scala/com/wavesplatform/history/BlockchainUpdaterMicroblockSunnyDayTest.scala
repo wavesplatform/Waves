@@ -71,9 +71,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should produce("unavailable funds")
 
-        effBalance(genesis.recipient, domain) > 0 shouldBe true
-        effBalance(masterToAlice.recipient, domain) > 0 shouldBe true
-        effBalance(aliceToBob.recipient, domain) > 0 shouldBe true
+        effBalance(genesis.recipient, domain) should be > 0L
+        effBalance(masterToAlice.recipient, domain) should be > 0L
+        effBalance(aliceToBob.recipient, domain) should be > 0L
     }
   }
 

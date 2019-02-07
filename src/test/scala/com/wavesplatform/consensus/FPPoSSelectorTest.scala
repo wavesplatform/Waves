@@ -33,7 +33,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
           val miner1 = miners.head
           val miner2 = miners.tail.head
 
-          val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, blockchain.height, 0)
+          val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, 0)
 
           val fork1 = mkFork(10, miner1, blockchain)
           val fork2 = mkFork(10, miner2, blockchain)
@@ -69,7 +69,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
         case Env(pos, blockchain, miners) =>
           val miner        = miners.head
           val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+          val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
           val lastBlock    = blockchain.lastBlock.get
           val block        = forgeBlock(miner, blockchain, pos)()
 
@@ -84,7 +84,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
         case Env(pos, blockchain, miners) =>
           val miner        = miners.head
           val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+          val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
           val lastBlock    = blockchain.lastBlock.get
           val block        = forgeBlock(miner, blockchain, pos)(updateDelay = _ - 1)
 
@@ -289,7 +289,7 @@ object FPPoSSelectorTest {
     val height       = blockchain.height
     val lastBlock    = blockchain.lastBlock.get
     val ggParentTS   = blockchain.blockAt(height - 2).map(_.timestamp)
-    val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+    val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
     val delay = updateDelay(
       pos
         .getValidBlockDelay(
