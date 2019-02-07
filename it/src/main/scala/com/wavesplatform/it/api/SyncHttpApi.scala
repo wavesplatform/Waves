@@ -95,6 +95,12 @@ object SyncHttpApi extends Assertions {
     def seed(address: String): String =
       sync(async(n).seed(address))
 
+    def lastBlock: Block = sync(async(n).lastBlock)
+
+    def lastBlockHeaders: BlockHeaders = sync(async(n).lastBlockHeaders)
+
+    def blockHeadersAt(height: Int): BlockHeaders = sync(async(n).blockHeadersAt(height))
+
     def postJson[A: Writes](path: String, body: A): Response =
       sync(async(n).postJson(path, body))
 
