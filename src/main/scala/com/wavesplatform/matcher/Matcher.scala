@@ -22,7 +22,7 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, EitherExt2}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
-import com.wavesplatform.utils.{CanNotStartMatcher, ScorexLogging, Time, forceStopApplication}
+import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, Time, forceStopApplication}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
@@ -50,7 +50,7 @@ class Matcher(actorSystem: ActorSystem,
   import as.dispatcher
 
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
-  private val currentOffset                   = new AtomicReference[QueueEventWithMeta.Offset](-1L) // Used only for REST API
+  private var currentOffset                   = -1L // Used only for REST API
 
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
@@ -123,7 +123,7 @@ class Matcher(actorSystem: ActorSystem,
       () => status.get(),
       db,
       time,
-      () => currentOffset.get()
+      () => currentOffset
     )
   )
 
@@ -133,8 +133,6 @@ class Matcher(actorSystem: ActorSystem,
 
   private val exchangeTxPool = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
-  private def bumpOffset(newOffset: Long): Unit = currentOffset.getAndAccumulate(newOffset, math.max)
-
   private val snapshotsRestore = Promise[Unit]()
 
   lazy val matcher: ActorRef = actorSystem.actorOf(
@@ -142,10 +140,10 @@ class Matcher(actorSystem: ActorSystem,
       matcherSettings, {
         case Left(msg) =>
           log.error(s"Can't start matcher: $msg")
-          forceStopApplication(CanNotStartMatcher)
+          forceStopApplication(ErrorStartingMatcher)
 
         case Right((self, oldestSnapshotOffset)) =>
-          currentOffset.set(oldestSnapshotOffset)
+          currentOffset = oldestSnapshotOffset
           snapshotsRestore.trySuccess(())
           matcherQueue.startConsume(
             oldestSnapshotOffset + 1,
@@ -153,7 +151,7 @@ class Matcher(actorSystem: ActorSystem,
               log.debug(s"[offset=${eventWithMeta.offset}, ts=${eventWithMeta.timestamp}] Consumed ${eventWithMeta.event}")
 
               self ! eventWithMeta
-              bumpOffset(eventWithMeta.offset)
+              currentOffset = eventWithMeta.offset
             }
           )
       },
@@ -229,7 +227,7 @@ class Matcher(actorSystem: ActorSystem,
       case Success(_) => setStatus(Status.Working)
       case Failure(e) =>
         log.error(s"Can't start matcher: ${e.getMessage}", e)
-        forceStopApplication(CanNotStartMatcher)
+        forceStopApplication(ErrorStartingMatcher)
     }
   }
 
@@ -257,7 +255,7 @@ class Matcher(actorSystem: ActorSystem,
     val p = Promise[Unit]()
 
     def loop(): Unit = {
-      if (currentOffset.get() >= lastQueueOffset) p.trySuccess(())
+      if (currentOffset >= lastQueueOffset) p.trySuccess(())
       else if (deadline.isOverdue()) p.tryFailure(new TimeoutException("Can't process all events in time"))
       else actorSystem.scheduler.scheduleOnce(1.second)(loop())
     }
@@ -290,7 +288,7 @@ object Matcher extends ScorexLogging {
     } catch {
       case NonFatal(e) =>
         log.warn("Error starting matcher", e)
-        forceStopApplication(CanNotStartMatcher)
+        forceStopApplication(ErrorStartingMatcher)
         None
     }
 
