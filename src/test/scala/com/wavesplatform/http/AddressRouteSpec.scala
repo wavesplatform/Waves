@@ -7,7 +7,7 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.v1.compiler.Decompiler
+import com.wavesplatform.lang.v1.compiler.{Decompiler, DecompilerContext}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Blockchain
@@ -181,7 +181,7 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
       (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AAAABnZlcmlmeQAAAAAAAAABBt/lCgQ="
-      (response \ "scriptText").as[String] shouldBe Decompiler(testContract, Map.empty[Short, String])
+      (response \ "scriptText").as[String] shouldBe Decompiler(testContract, DecompilerContext(Map.empty[Short, String]))
       (response \ "complexity").as[Long] shouldBe 11
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }

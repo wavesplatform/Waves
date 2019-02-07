@@ -39,7 +39,8 @@ object Script {
     } yield script
 
   def decompile(s: Script): String = s match {
-    case ExprScriprImpl(_, expr, _)                                                                      => Decompiler(expr, com.wavesplatform.utils.defaultCompilerContext.opCodes)
-    case com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl(_, contract, _) => Decompiler(contract, com.wavesplatform.utils.defaultCompilerContext.opCodes)
+    case ExprScriprImpl(_, expr, _) => Decompiler(expr, com.wavesplatform.utils.defaultDecompilerContext)
+    case com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl(_, contract, _) =>
+      Decompiler(contract, com.wavesplatform.utils.defaultDecompilerContext)
   }
 }

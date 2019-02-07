@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.compiler
 
 import cats.Monoid
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, CaseType, DefinedType, FunctionTypeSignature}
@@ -16,11 +15,6 @@ case class CompilerContext(predefTypes: Map[String, DefinedType], varDefs: Varia
 
   def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = allFuncDefs.getOrElse(name, List.empty)
 
-  lazy val opCodes: Map[Short, String] = functionDefs
-    .mapValues(_.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name))
-    .toList
-    .flatMap { case (name, codes) => codes.map((_, name)) }
-    .toMap
 }
 
 object CompilerContext {

@@ -1,14 +1,18 @@
 package com.wavesplatform.lang.v1
 
 import cats.Monoid
-import com.wavesplatform.lang.v1.compiler.CompilerContext
+import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.ctx._
+
 import scala.annotation.meta.field
 import scala.scalajs.js.annotation._
 
 @JSExportTopLevel("CTX")
-case class CTX(@(JSExport @field) types: Seq[DefinedType], @(JSExport @field) vars: Map[String, ((FINAL, String), LazyVal)], @(JSExport @field) functions: Array[BaseFunction]) {
+case class CTX(@(JSExport @field) types: Seq[DefinedType],
+               @(JSExport @field) vars: Map[String, ((FINAL, String), LazyVal)],
+               @(JSExport @field) functions: Array[BaseFunction]) {
   lazy val typeDefs = types.map(t => t.name -> t).toMap
   lazy val evaluationContext: EvaluationContext = {
     if (functions.map(_.header).distinct.size != functions.size) {
@@ -22,6 +26,14 @@ case class CTX(@(JSExport @field) types: Seq[DefinedType], @(JSExport @field) va
     varDefs = vars.mapValues(_._1),
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
   )
+
+  lazy val decompilerContext: DecompilerContext = DecompilerContext(
+    opCodes = compilerContext.functionDefs
+      .mapValues(_.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name))
+      .toList
+      .flatMap { case (name, codes) => codes.map((_, name)) }
+      .toMap)
+
 }
 object CTX {
   val empty = CTX(Seq.empty, Map.empty, Array.empty)
