@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.TxNum
 
 object KeyHelpers {
   def h(prefix: Short, height: Int): Array[Byte] =
@@ -20,6 +21,8 @@ object KeyHelpers {
   def hash(prefix: Short, hashBytes: ByteStr) = bytes(prefix, hashBytes.arr)
 
   def hAddr(prefix: Short, height: Int, addressId: BigInt): Array[Byte] = hBytes(prefix, height, addressId.toByteArray)
+
+  def hNum(prefix: Short, height: Int, num: TxNum): Array[Byte] = hBytes(prefix, height, Shorts.toByteArray(num))
 
   def historyKey(name: String, prefix: Short, b: Array[Byte]) = Key(name, bytes(prefix, b), readIntSeq, writeIntSeq)
 

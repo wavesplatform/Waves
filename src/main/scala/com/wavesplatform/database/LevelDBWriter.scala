@@ -1,9 +1,14 @@
 package com.wavesplatform.database
 
+import java.nio.ByteBuffer
+
+import cats.Monoid
 import com.google.common.cache.CacheBuilder
+import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils._
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
@@ -15,16 +20,16 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{Paged, ScorexLogging}
 import org.iq80.leveldb.DB
-import cats.Monoid
 
 import scala.annotation.tailrec
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.{SeqView, immutable, mutable}
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.collection.{immutable, mutable}
+import scala.util.Try
 
 object LevelDBWriter {
 
@@ -84,7 +89,10 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   override protected def loadScore(): BigInt = readOnly(db => db.get(Keys.score(db.get(Keys.height))))
 
-  override protected def loadLastBlock(): Option[Block] = readOnly(db => db.get(Keys.blockAt(db.get(Keys.height))))
+  override protected def loadLastBlock(): Option[Block] = readOnly { db =>
+    val height = Height(db.get(Keys.height))
+    loadBlock(height, db)
+  }
 
   override protected def loadScript(address: Address): Option[Script] = readOnly { db =>
     addressId(address).fold(Option.empty[Script]) { addressId =>
@@ -159,7 +167,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override protected def loadAssetDescription(assetId: ByteStr): Option[AssetDescription] = readOnly { db =>
-    db.get(Keys.transactionInfo(assetId)) match {
+    transactionInfo(assetId, db) match {
       case Some((_, i: IssueTransaction)) =>
         val ai          = db.fromHistory(Keys.assetInfoHistory(assetId), Keys.assetInfo(assetId)).getOrElse(AssetInfo(i.reissuable, i.quantity))
         val sponsorship = db.fromHistory(Keys.sponsorshipHistory(assetId), Keys.sponsorship(assetId)).fold(0L)(_.minFee)
@@ -192,9 +200,8 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
                                   wavesBalances: Map[BigInt, Long],
                                   assetBalances: Map[BigInt, Map[ByteStr, Long]],
                                   leaseBalances: Map[BigInt, LeaseBalance],
+                                  addressTransactions: Map[AddressId, List[TransactionId]],
                                   leaseStates: Map[ByteStr, Boolean],
-                                  transactions: Map[ByteStr, (Transaction, Set[BigInt])],
-                                  addressTransactions: Map[BigInt, List[(Int, ByteStr)]],
                                   reissuedAssets: Map[ByteStr, AssetInfo],
                                   filledQuantity: Map[ByteStr, VolumeAndFee],
                                   scripts: Map[BigInt, Option[Script]],
@@ -212,9 +219,19 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       rw.put(Keys.safeRollbackHeight, height - maxRollbackDepth)
     }
 
-    rw.put(Keys.blockAt(height), Some(block))
+    val transactions: Map[TransactionId, (Transaction, TxNum)] =
+      block.transactionData.zipWithIndex.map { in =>
+        val (tx, idx) = in
+        val k         = TransactionId(tx.id())
+        val v         = (tx, TxNum(idx.toShort))
+        k -> v
+      }.toMap
+
+    rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block, block.bytes().length)))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
+
     val lastAddressId = loadMaxAddressId() + newAddresses.size
+
     rw.put(Keys.lastAddressId, Some(lastAddressId))
     rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
 
@@ -327,10 +344,15 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       }
     }
 
-    for ((addressId, txs) <- addressTransactions) {
+    for ((addressId, txIds) <- addressTransactions) {
       val kk        = Keys.addressTransactionSeqNr(addressId)
       val nextSeqNr = rw.get(kk) + 1
-      rw.put(Keys.addressTransactionIds(addressId, nextSeqNr), txs)
+      val txTypeNumSeq = txIds.map { txId =>
+        val (tx, num) = transactions(txId)
+
+        (tx.builder.typeId, num)
+      }
+      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq)))
       rw.put(kk, nextSeqNr)
     }
 
@@ -338,8 +360,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       rw.put(Keys.addressIdOfAlias(alias), Some(addressId))
     }
 
-    for ((id, (tx, _)) <- transactions) {
-      rw.put(Keys.transactionInfo(id), Some((height, tx)))
+    for ((id, (tx, num)) <- transactions) {
+      rw.put(Keys.transactionAt(Height(height), num), Some(tx))
+      rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
     }
 
     val activationWindowSize = fs.activationWindowSize(height)
@@ -368,8 +391,6 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     rw.put(Keys.carryFee(height), carry)
     expiredKeys ++= updateHistory(rw, Keys.carryFeeHistory, threshold, Keys.carryFee)
 
-    rw.put(Keys.transactionIdsAtHeight(height), transactions.keys.toSeq)
-
     expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
@@ -389,12 +410,19 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
         val scriptsToDiscard       = Seq.newBuilder[Address]
         val assetScriptsToDiscard  = Seq.newBuilder[ByteStr]
 
+        val h = Height(currentHeight)
+
         val discardedBlock = readWrite { rw =>
           log.trace(s"Rolling back to ${currentHeight - 1}")
           rw.put(Keys.height, currentHeight - 1)
 
-          for (addressId <- rw.get(Keys.changedAddresses(currentHeight))) {
-            val address = rw.get(Keys.idToAddress(addressId))
+          val (discardedHeader, _) = rw
+            .get(Keys.blockHeaderAndSizeAt(h))
+            .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
+
+          for (aId <- rw.get(Keys.changedAddresses(currentHeight))) {
+            val addressId = AddressId(aId)
+            val address   = rw.get(Keys.idToAddress(addressId))
             balancesToInvalidate += (address -> None)
 
             for (assetId <- rw.get(Keys.assetList(addressId))) {
@@ -424,19 +452,21 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
             val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
             val txSeqNr  = rw.get(kTxSeqNr)
-            val kTxIds   = Keys.addressTransactionIds(addressId, txSeqNr)
-            for ((_, id) <- rw.get(kTxIds).headOption; (h, _) <- rw.get(Keys.transactionInfo(id)) if h == currentHeight) {
-              rw.delete(kTxIds)
-              rw.put(kTxSeqNr, (txSeqNr - 1).max(0))
-            }
+            val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
+
+            rw.get(kTxHNSeq)
+              .filter(_._1 == Height(currentHeight))
+              .foreach { _ =>
+                rw.delete(kTxHNSeq)
+                rw.put(kTxSeqNr, (txSeqNr - 1).max(0))
+              }
           }
 
-          val txIdsAtHeight = Keys.transactionIdsAtHeight(currentHeight)
-          for (txId <- rw.get(txIdsAtHeight)) {
-            forgetTransaction(txId)
-            val ktxId = Keys.transactionInfo(txId)
+          val transactions = transactionsAtHeight(h)
 
-            for ((_, tx) <- rw.get(ktxId)) {
+          transactions.foreach {
+            case (num, tx) =>
+              forgetTransaction(tx.id())
               tx match {
                 case _: GenesisTransaction                                                       => // genesis transaction can not be rolled back
                 case _: PaymentTransaction | _: TransferTransaction | _: MassTransferTransaction =>
@@ -476,27 +506,29 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
                   ordersToInvalidate += rollbackOrderFill(rw, tx.buyOrder.id(), currentHeight)
                   ordersToInvalidate += rollbackOrderFill(rw, tx.sellOrder.id(), currentHeight)
               }
-            }
 
-            rw.delete(ktxId)
+              if (tx.builder.typeId != GenesisTransaction.typeId) {
+                rw.delete(Keys.transactionAt(h, num))
+                rw.delete(Keys.transactionHNById(TransactionId(tx.id())))
+              }
           }
 
-          rw.delete(txIdsAtHeight)
-
-          val discardedBlock = rw
-            .get(Keys.blockAt(currentHeight))
-            .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
-
-          rw.delete(Keys.blockAt(currentHeight))
-          rw.delete(Keys.heightOf(discardedBlock.uniqueId))
-
+          rw.delete(Keys.blockHeaderAndSizeAt(h))
+          rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.filterHistory(Keys.carryFeeHistory, currentHeight)
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
             DisableHijackedAliases.revert(rw)
           }
-          discardedBlock
+
+          Block
+            .fromHeaderAndTransactions(
+              discardedHeader,
+              transactions
+                .map(_._2)
+            )
+            .explicitGet()
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -537,50 +569,79 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     assetId
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(db => db.get(Keys.transactionInfo(id)))
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
 
-  override def transactionHeight(id: ByteStr): Option[Int] = readOnly(db => db.get(Keys.transactionHeight(id)))
+  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction)] = {
+    val txId = TransactionId(id)
+    for {
+      (height, num) <- db.get(Keys.transactionHNById(txId))
+      tx            <- db.get(Keys.transactionAt(height, num))
+    } yield (height, tx)
+  }
 
-  override def addressTransactions(address: Address,
-                                   types: Set[Type],
-                                   count: Int,
-                                   fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] = {
+  override def transactionHeight(id: ByteStr): Option[Int] = readOnly { db =>
+    val txId = TransactionId(id)
+    db.get(Keys.transactionHNById(txId)).map(_._1)
+  }
 
-    def takeAfterTx(s: SeqView[ByteStr, Seq[_]], fromId: Option[ByteStr]): SeqView[ByteStr, Seq[_]] =
-      fromId match {
-        case None => s
-        case Some(id) =>
-          s.dropWhile(_ != id)
-            .drop(1)
+  override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
+    readOnly { db =>
+      def takeTypes(s: Stream[(Height, Type, TxNum)], maybeTypes: Set[Type]) = {
+        if (maybeTypes.nonEmpty) {
+          s.filter { case (_, tp, _) => maybeTypes.contains(tp) }
+        } else s
       }
 
-    readOnly { db =>
-      def transactions: Seq[(Int, Transaction)] = {
-        db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { addressId =>
-          val txIds = for {
-            seqNr          <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).view
-            (txType, txId) <- db.get(Keys.addressTransactionIds(addressId, seqNr))
-            if types.isEmpty || types.contains(txType.toByte)
-          } yield txId
+      def takeAfter(s: Stream[(Height, Type, TxNum)], maybeAfter: Option[(Height, TxNum)]): Stream[(Height, Type, TxNum)] = {
+        maybeAfter match {
+          case None => s
+          case Some((h, num)) =>
+            s.dropWhile {
+                case (s_h, _, s_n) => s_h != h ^ s_n != num
+              }
+              .drop(1)
 
-          takeAfterTx(txIds, fromId)
-            .flatMap(id => db.get(Keys.transactionInfo(id)))
-            .take(count)
-            .force
         }
       }
 
+      val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
+
+      lazy val transactions: Seq[(Int, Transaction)] =
+        db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { id =>
+          val addressId = AddressId(id)
+
+          val hnSeq =
+            (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toStream
+              .flatMap { seqNr =>
+                val maybeHNSeq = db.get(Keys.addressTransactionHN(addressId, seqNr))
+
+                maybeHNSeq match {
+                  case Some((h, seq)) =>
+                    seq.map { case (tp, num) => (h, tp, num) }.toStream
+                  case None => Stream.empty
+                }
+              }
+
+          takeAfter(takeTypes(hnSeq, types), maybeAfter)
+            .flatMap {
+              case (h, _, num) =>
+                db.get(Keys.transactionAt(h, num))
+                  .map((h, _))
+            }
+            .take(count)
+            .toList
+        }
+
       fromId match {
         case None => Right(transactions)
-        case Some(fId) =>
-          db.get(Keys.transactionInfo(fId)) match {
-            case None    => Left(s"Transaction $fId does not exist")
-            case Some(_) => Right(transactions)
+        case Some(id) =>
+          db.get(Keys.transactionHNById(TransactionId(id))) match {
+            case None => Left(s"Transaction $id does not exist")
+            case _    => Right(transactions)
           }
       }
-    }
 
-  }
+    }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
     if (db.get(Keys.aliasIsDisabled(alias))) Left(AliasIsDisabled(alias))
@@ -591,7 +652,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
-    db.get(Keys.transactionInfo(leaseId)) match {
+    transactionInfo(leaseId, db) match {
       case Some((h, lt: LeaseTransaction)) =>
         Some(LeaseDetails(lt.sender, lt.recipient, h, lt.amount, loadLeaseStatus(db, leaseId)))
       case _ => None
@@ -658,14 +719,27 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override def allActiveLeases: Set[LeaseTransaction] = readOnly { db =>
-    val txs = for {
-      h  <- 1 to db.get(Keys.height)
-      id <- db.get(Keys.transactionIdsAtHeight(h))
-      if loadLeaseStatus(db, id)
-      (_, tx) <- db.get(Keys.transactionInfo(id))
-    } yield tx
+    val txs = new ListBuffer[LeaseTransaction]()
 
-    txs.collect { case lt: LeaseTransaction => lt }.toSet
+    db.iterateOver(Keys.TransactionHeightNumByIdPrefix) { kv =>
+      val txId = TransactionId(ByteStr(kv.getKey.drop(2)))
+
+      if (loadLeaseStatus(db, txId)) {
+        val heightNumBytes = kv.getValue
+
+        val height = Height(Ints.fromByteArray(heightNumBytes.take(4)))
+        val txNum  = TxNum(Shorts.fromByteArray(heightNumBytes.takeRight(2)))
+
+        val tx = db
+          .get(Keys.transactionAt(height, txNum))
+          .collect { case lt: LeaseTransaction => lt }
+          .get
+
+        txs.append(tx)
+      }
+    }
+
+    txs.toSet
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]) = readOnly { db =>
@@ -682,19 +756,81 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
   }
 
   override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
-    readOnly(_.get(Keys.blockHeader(height)))
+    writableDB.get(Keys.blockHeaderAndSizeAt(Height(height)))
+  }
+
+  def loadBlockHeaderAndSize(height: Int, db: ReadOnlyDB): Option[(BlockHeader, Int)] = {
+    db.get(Keys.blockHeaderAndSizeAt(Height(height)))
   }
 
   override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
-    readOnly(db => db.get(Keys.heightOf(blockId)).flatMap(h => db.get(Keys.blockHeader(h))))
+    writableDB
+      .get(Keys.heightOf(blockId))
+      .flatMap(loadBlockHeaderAndSize)
   }
 
-  override def loadBlockBytes(height: Int): Option[Array[Byte]] = {
-    readOnly(_.get(Keys.blockBytes(height)))
+  def loadBlockHeaderAndSize(blockId: ByteStr, db: ReadOnlyDB): Option[(BlockHeader, Int)] = {
+    db.get(Keys.heightOf(blockId))
+      .flatMap(loadBlockHeaderAndSize(_, db))
+  }
+
+  override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
+    import com.wavesplatform.crypto._
+
+    val height = Height(h)
+
+    val consensuDataOffset = 1 + 8 + SignatureLength
+
+    // version + timestamp + reference + baseTarget + genSig
+    val txCountOffset = consensuDataOffset + 8 + Block.GeneratorSignatureLength
+
+    val headerKey = Keys.blockHeaderBytesAt(height)
+
+    def readTransactionBytes(count: Int) = {
+      (0 until count).toArray.flatMap { n =>
+        db.get(Keys.transactionBytesAt(height, TxNum(n.toShort)))
+          .map { txBytes =>
+            Ints.toByteArray(txBytes.length) ++ txBytes
+          }
+          .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
+      }
+    }
+
+    db.get(headerKey)
+      .map { headerBytes =>
+        val bytesBeforeCData   = headerBytes.take(consensuDataOffset)
+        val consensusDataBytes = headerBytes.slice(consensuDataOffset, consensuDataOffset + 40)
+        val version            = headerBytes.head
+        val (txCount, txCountBytes) = if (version == 1 || version == 2) {
+          val byte = headerBytes(txCountOffset)
+          (byte.toInt, Array[Byte](byte))
+        } else {
+          val bytes = headerBytes.slice(txCountOffset, txCountOffset + 4)
+          (Ints.fromByteArray(bytes), bytes)
+        }
+
+        val bytesAfterTxs =
+          if (version > 2) {
+            headerBytes.drop(txCountOffset + txCountBytes.length)
+          } else {
+            headerBytes.takeRight(SignatureLength + KeyLength)
+          }
+
+        val txBytes = txCountBytes ++ readTransactionBytes(txCount)
+
+        val bytes = bytesBeforeCData ++
+          Ints.toByteArray(consensusDataBytes.length) ++
+          consensusDataBytes ++
+          Ints.toByteArray(txBytes.length) ++
+          txBytes ++
+          bytesAfterTxs
+
+        bytes
+      }
   }
 
   override def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]] = {
-    readOnly(db => db.get(Keys.heightOf(blockId)).flatMap(h => db.get(Keys.blockBytes(h))))
+    readOnly(db => db.get(Keys.heightOf(blockId))).flatMap(h => loadBlockBytes(h))
   }
 
   override def loadHeightOf(blockId: ByteStr): Option[Int] = {
@@ -705,29 +841,46 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     // since this is called from outside of the main blockchain updater thread, instead of using cached height,
     // explicitly read height from storage to make this operation atomic.
     val currentHeight = db.get(Keys.height)
+
     (currentHeight until (currentHeight - howMany).max(0) by -1)
-      .map(h => db.get(Keys.blockHeader(h)).get._1.signerData.signature)
+      .map { h =>
+        val height = Height(h)
+        db.get(Keys.blockHeaderAndSizeAt(height))
+      }
+      .collect {
+        case Some((header, _)) => header.signerData.signature
+      }
   }
 
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = readOnly { db =>
     db.get(Keys.heightOf(parentSignature)).map { parentHeight =>
       (parentHeight until (parentHeight + howMany))
-        .flatMap { h =>
-          db.get(Keys.blockHeader(h))
+        .map { h =>
+          val height = Height(h)
+          db.get(Keys.blockHeaderAndSizeAt(height))
         }
-        .map { b =>
-          b._1.signerData.signature
+        .collect {
+          case Some((header, _)) => header.signerData.signature
         }
     }
   }
 
   override def parent(block: Block, back: Int): Option[Block] = readOnly { db =>
-    db.get(Keys.heightOf(block.reference)).flatMap(h => db.get(Keys.blockAt(h - back + 1)))
+    for {
+      h <- db.get(Keys.heightOf(block.reference))
+      height = Height(h - back + 1)
+      block <- loadBlock(height, db)
+    } yield block
   }
 
   override def featureVotes(height: Int): Map[Short, Int] = readOnly { db =>
     fs.activationWindow(height)
-      .flatMap(h => db.get(Keys.blockHeader(h)).fold(Seq.empty[Short])(_._1.featureVotes.toSeq))
+      .flatMap { h =>
+        val height = Height(h)
+        db.get(Keys.blockHeaderAndSizeAt(height))
+          .map(_._1.featureVotes.toSeq)
+          .getOrElse(Seq.empty)
+      }
       .groupBy(identity)
       .mapValues(_.size)
   }
@@ -811,5 +964,43 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+  }
+
+  private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
+    loadBlock(height, db)
+  }
+
+  private[database] def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
+    val headerKey = Keys.blockHeaderAndSizeAt(height)
+
+    for {
+      (header, _) <- db.get(headerKey)
+      txs = (0 until header.transactionCount).toList.flatMap { n =>
+        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
+      }
+      block <- Block.fromHeaderAndTransactions(header, txs).toOption
+    } yield block
+  }
+
+  private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] = readOnly { db =>
+    val txs = new ListBuffer[(TxNum, Transaction)]()
+
+    val prefix = ByteBuffer
+      .allocate(6)
+      .putShort(Keys.TransactionInfoPrefix)
+      .putInt(h)
+      .array()
+
+    db.iterateOver(prefix) { entry =>
+      val k = entry.getKey
+      val v = entry.getValue
+
+      for {
+        idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
+        tx  <- TransactionParsers.parseBytes(v)
+      } txs.append((TxNum(idx), tx))
+    }
+
+    txs.toList
   }
 }

@@ -106,7 +106,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
 
         txs.length shouldBe 9
-        txs.sorted(ordering) shouldBe txs
+        txs.sorted(ordering) shouldEqual txs
       }
     }
 

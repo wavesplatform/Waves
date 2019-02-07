@@ -7,11 +7,11 @@ import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state._
-import com.wavesplatform.transaction.{AssetId, Transaction}
-import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.metrics.LevelDBStats
+import com.wavesplatform.state._
+import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{AssetId, Transaction}
+import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -189,18 +189,17 @@ trait Caches extends Blockchain with ScorexLogging {
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   protected def doAppend(block: Block,
-                         carryFee: Long,
-                         addresses: Map[Address, BigInt],
+                         carry: Long,
+                         newAddresses: Map[Address, BigInt],
                          wavesBalances: Map[BigInt, Long],
                          assetBalances: Map[BigInt, Map[ByteStr, Long]],
                          leaseBalances: Map[BigInt, LeaseBalance],
+                         addressTransactions: Map[AddressId, List[TransactionId]],
                          leaseStates: Map[ByteStr, Boolean],
-                         transactions: Map[ByteStr, (Transaction, Set[BigInt])],
-                         addressTransactions: Map[BigInt, List[(Int, ByteStr)]],
                          reissuedAssets: Map[ByteStr, AssetInfo],
                          filledQuantity: Map[ByteStr, VolumeAndFee],
                          scripts: Map[BigInt, Option[Script]],
-                         assetScripts: Map[ByteStr, Option[Script]],
+                         assetScripts: Map[AssetId, Option[Script]],
                          data: Map[BigInt, AccountDataInfo],
                          aliases: Map[Alias, BigInt],
                          sponsorship: Map[AssetId, Sponsorship]): Unit
@@ -265,11 +264,21 @@ trait Caches extends Blockchain with ScorexLogging {
       (orderId, fillInfo) <- diff.orderFills
     } yield orderId -> volumeAndFeeCache.get(orderId).combine(fillInfo)
 
-    val newTransactions = Map.newBuilder[ByteStr, (Transaction, Set[BigInt])]
-    for ((id, (_, tx, addresses)) <- diff.transactions) {
-      transactionIds.put(id, newHeight)
-      newTransactions += id -> ((tx, addresses.map(addressId)))
-    }
+    val addressTransactions: Map[AddressId, List[TransactionId]] =
+      diff.transactions.toList
+        .flatMap {
+          case (_, (h, tx, addrs)) =>
+            addrs.map { addr =>
+              val addrId = AddressId(addressId(addr))
+              val htx    = (h, tx)
+              addrId -> htx
+            }
+        }
+        .groupBy(_._1)
+        .mapValues { txs =>
+          val sorted = txs.sortBy { case (_, (h, tx)) => (-h, -tx.timestamp) }
+          sorted.map { case (_, (_, tx)) => TransactionId(tx.id()) }
+        }
 
     current = (newHeight, (current._2 + block.blockScore()), Some(block))
 
@@ -280,9 +289,8 @@ trait Caches extends Blockchain with ScorexLogging {
       wavesBalances.result(),
       assetBalances.result(),
       leaseBalances.result(),
+      addressTransactions,
       diff.leaseState,
-      newTransactions.result(),
-      diff.accountTransactionIds.map({ case (addr, txs) => addressId(addr) -> txs }),
       diff.issuedAssets,
       newFills,
       diff.scripts.map { case (address, s) => addressId(address) -> s },
