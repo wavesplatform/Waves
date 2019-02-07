@@ -43,8 +43,7 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
       val pk     = PrivateKeyAccount.fromSeed(nodes(i).seed(addresses(i))).right.get
       val setScriptTransaction = SetScriptTransaction
         .selfSigned(pk, Some(script), 0.01.waves, System.currentTimeMillis())
-        .right
-        .get
+        .explicitGet()
 
       matcherNode
         .signedBroadcast(setScriptTransaction.json(), waitForTx = true)
@@ -58,8 +57,7 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
     }
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(acc, script, 0.014.waves, System.currentTimeMillis())
-      .right
-      .get
+      .explicitGet()
 
     matcherNode
       .signedBroadcast(setScriptTransaction.json(), waitForTx = true)

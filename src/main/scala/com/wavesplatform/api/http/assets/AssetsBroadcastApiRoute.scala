@@ -53,19 +53,17 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, utx: UtxPool, allC
           }
         }
         .map { xs: List[Either[ValidationError, Transaction]] =>
-          utx.batched { ops =>
-            xs.map {
+          xs.view
+            .map {
               case Left(e)   => Left(e)
-              case Right(tx) => ops.putIfNew(tx).map { case (isNew, _) => (tx, isNew) }
+              case Right(tx) => utx.putIfNew(tx).map { case (isNew, _) => (tx, isNew) }
             }
-          }
-        }
-        .map { xs =>
-          xs.map {
-            case Left(TransactionValidationError(_: ValidationError.AlreadyInTheState, tx)) => Right(tx -> false)
-            case Left(e)                                                                    => Left(ApiError.fromValidationError(e))
-            case Right(x)                                                                   => Right(x)
-          }
+            .map {
+              case Left(TransactionValidationError(_: ValidationError.AlreadyInTheState, tx)) => Right(tx -> false)
+              case Left(e)                                                                    => Left(ApiError.fromValidationError(e))
+              case Right(x)                                                                   => Right(x)
+            }
+            .toList
         }
 
       r.foreach { xs =>

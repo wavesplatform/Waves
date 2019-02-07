@@ -262,7 +262,7 @@ case class ScriptExecutionError(tx: Transaction, error: String, scriptSrc: Strin
 }
 
 case class TransactionNotAllowedByAccountScript(tx: Transaction, log: Log, scriptSrc: String) extends ApiError {
-  override val id: Int             = 307
+  override val id: Int             = TransactionNotAllowedByScript.ErrorCode
   override val code: StatusCode    = StatusCodes.BadRequest
   override val message: String     = s"Transaction is not allowed by account-script"
   override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
@@ -273,6 +273,10 @@ case class TransactionNotAllowedByAssetScript(tx: Transaction, log: Log, scriptS
   override val code: StatusCode    = StatusCodes.BadRequest
   override val message: String     = s"Transaction is not allowed by token-script"
   override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
+}
+
+object TransactionNotAllowedByScript {
+  val ErrorCode = 307
 }
 
 case class SignatureError(error: String) extends ApiError {

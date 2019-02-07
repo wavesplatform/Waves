@@ -15,6 +15,8 @@ import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{Height, TxNum}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
+import monix.execution.UncaughtExceptionReporter
+import monix.reactive.Observer
 import org.slf4j.bridge.SLF4JBridgeHandler
 
 import scala.collection.JavaConverters._
@@ -95,9 +97,11 @@ object Explorer extends ScorexLogging {
 
     log.info(s"Data directory: ${settings.dataDirectory}")
 
-    val db = openDB(settings.dataDirectory)
+    val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
+    val db               = openDB(settings.dataDirectory)
     val reader = new LevelDBWriter(
       db,
+      portfolioChanges,
       settings.blockchainSettings.functionalitySettings,
       maxCacheSize = settings.maxCacheSize,
       maxRollbackDepth = settings.maxRollbackDepth,
