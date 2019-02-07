@@ -15,7 +15,6 @@ import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.transaction._
 
 import scala.concurrent._
-import scala.util.Try
 
 @Path("/blocks")
 @Api(value = "/blocks")
@@ -92,14 +91,12 @@ case class BlocksApiRoute(settings: RestAPISettings,
     ))
   def delay: Route = (path("delay" / Segment / IntNumber) & get) { (encodedSignature, count) =>
     withBlock(blockchain, encodedSignature) { block =>
-      val averageDelay = Try {
-        (block.timestamp - blockchain.parent(block, count).get.timestamp) / count
-      }
-
-      complete(
-        averageDelay
-          .map(d => Json.obj("delay" -> d))
-          .getOrElse[JsObject](Json.obj("status" -> "error", "details" -> "Internal error")))
+      if (count <= 0) complete(CustomValidationError("Block count should be positive"))
+      else
+        blockchain
+          .parent(block, count)
+          .map(parent => complete(Json.obj("delay" -> (block.timestamp - parent.timestamp) / count)))
+          .getOrElse(complete(CustomValidationError(s"Cannot go $count blocks back")))
     }
   }
 

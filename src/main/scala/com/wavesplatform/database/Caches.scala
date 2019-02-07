@@ -124,6 +124,11 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
     transactionIds.entrySet().removeIf(_.getValue < oldestBlock)
   }
 
+  private val leaseBalanceCache: LoadingCache[Address, LeaseBalance] = cache(maxCacheSize, loadLeaseBalance)
+  protected def loadLeaseBalance(address: Address): LeaseBalance
+  protected def discardLeaseBalance(address: Address): Unit = leaseBalanceCache.invalidate(address)
+  override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
+
   private val portfolioCache: LoadingCache[Address, Portfolio] = observedCache(maxCacheSize, portfolioChanged, loadPortfolio)
   protected def loadPortfolio(address: Address): Portfolio
   protected def discardPortfolio(address: Address): Unit = portfolioCache.invalidate(address)
@@ -214,10 +219,11 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
     log.trace(s"CACHE newAddressIds = $newAddressIds")
     log.trace(s"CACHE lastAddressId = $lastAddressId")
 
-    val wavesBalances = Map.newBuilder[BigInt, Long]
-    val assetBalances = Map.newBuilder[BigInt, Map[ByteStr, Long]]
-    val leaseBalances = Map.newBuilder[BigInt, LeaseBalance]
-    val newPortfolios = Map.newBuilder[Address, Portfolio]
+    val wavesBalances        = Map.newBuilder[BigInt, Long]
+    val assetBalances        = Map.newBuilder[BigInt, Map[ByteStr, Long]]
+    val leaseBalances        = Map.newBuilder[BigInt, LeaseBalance]
+    val updatedLeaseBalances = Map.newBuilder[Address, LeaseBalance]
+    val newPortfolios        = Map.newBuilder[Address, Portfolio]
 
     for ((address, portfolioDiff) <- diff.portfolios) {
       val newPortfolio = portfolioCache.get(address).combine(portfolioDiff)
@@ -227,6 +233,7 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
 
       if (portfolioDiff.lease != LeaseBalance.empty) {
         leaseBalances += addressId(address) -> newPortfolio.lease
+        updatedLeaseBalances += address     -> newPortfolio.lease
       }
 
       if (portfolioDiff.assets.nonEmpty) {
@@ -274,6 +281,7 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     for ((address, portfolio)    <- newPortfolios.result()) portfolioCache.put(address, portfolio)
     for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
+    leaseBalanceCache.putAll(updatedLeaseBalances.result().asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
     blocksTs.put(newHeight, block.timestamp)

@@ -9,7 +9,7 @@ import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Req
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
-import com.wavesplatform.state.DataEntry
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
@@ -127,11 +127,11 @@ object SyncHttpApi extends Assertions {
     def assetsBalance(address: String): FullAssetsInfo =
       sync(async(n).assetsBalance(address))
 
-    def assetDistribution(asset: String,
-                          initialHeight: Option[Int] = None,
-                          limit: Option[Int] = None,
-                          after: Option[String] = None): Map[String, Long] =
-      sync(async(n).assetDistribution(asset, initialHeight, limit, after))
+    def assetDistributionAtHeight(asset: String, height: Int, limit: Int, maybeAfter: Option[String] = None): AssetDistributionPage =
+      sync(async(n).assetDistributionAtHeight(asset, height, limit, maybeAfter))
+
+    def assetDistribution(asset: String): AssetDistribution =
+      sync(async(n).assetDistribution(asset))
 
     def issue(sourceAddress: String,
               name: String,
@@ -161,19 +161,10 @@ object SyncHttpApi extends Assertions {
     def scriptCompile(code: String): CompiledScript =
       sync(async(n).scriptCompile(code))
 
-    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, waitForTx: Boolean = false): Transaction = {
-      maybeWaitForTransaction(sync(async(n).burn(sourceAddress, assetId, quantity, fee)), waitForTx)
-    }
-
     def getAddresses: Seq[String] = sync(async(n).getAddresses)
 
-    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: String): Transaction =
-      if (Option(version).nonEmpty) burnV2(sourceAddress, assetId, quantity, fee, version) else burn(sourceAddress, assetId, quantity, fee)
-
-    def burnV2(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: String): Transaction = {
-      signAndBroadcast(
-        Json.obj("type" -> 6, "quantity" -> quantity, "assetId" -> assetId, "sender" -> sourceAddress, "fee" -> fee, "version" -> version))
-    }
+    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: Byte = 1, waitForTx: Boolean = false): Transaction =
+      maybeWaitForTransaction(sync(async(n).burn(sourceAddress, assetId, quantity, fee, version)), waitForTx)
 
     def sponsorAsset(sourceAddress: String, assetId: String, baseFee: Long, fee: Long, waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).sponsorAsset(sourceAddress, assetId, baseFee, fee)), waitForTx)
@@ -210,8 +201,13 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).massTransfer(sourceAddress, transfers, fee, assetId)), waitForTx)
     }
 
-    def lease(sourceAddress: String, recipient: String, leasingAmount: Long, leasingFee: Long, version: Byte = 1): Transaction =
-      sync(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee))
+    def lease(sourceAddress: String,
+              recipient: String,
+              leasingAmount: Long,
+              leasingFee: Long,
+              version: Byte = 1,
+              waitForTx: Boolean = false): Transaction =
+      maybeWaitForTransaction(sync(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee, version)), waitForTx)
 
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Transaction =
       sync(async(n).putData(sourceAddress, data, fee))

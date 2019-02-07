@@ -30,9 +30,16 @@ object Importer extends ScorexLogging {
     SLF4JBridgeHandler.removeHandlersForRootLogger()
     SLF4JBridgeHandler.install()
 
-    val configFilename     = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
-    val blockchainFilename = Try(args(1))
-    val importHeight       = Try(args(2)).map(_.toInt).getOrElse(Int.MaxValue)
+    val argi = args.iterator
+    val (verifyTransactions, configOpt) = {
+      Try(argi.next) match {
+        case Success("-n") | Success("-no-verify") => (false, Try(argi.next))
+        case conf                                  => (true, conf)
+      }
+    }
+    val configFilename     = configOpt.toOption.getOrElse("waves-testnet.conf")
+    val blockchainFilename = Try(argi.next)
+    val importHeight       = Try(argi.next).map(_.toInt).getOrElse(Int.MaxValue)
 
     val config   = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
     val settings = WavesSettings.fromConfig(config)
@@ -64,7 +71,7 @@ object Importer extends ScorexLogging {
             val blockchainUpdater = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr))
             val pos               = new PoSSelector(blockchainUpdater, settings.blockchainSettings)
             val checkpoint        = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-            val extAppender       = BlockAppender(checkpoint, blockchainUpdater, time, utxPoolStub, pos, settings, scheduler) _
+            val extAppender       = BlockAppender(checkpoint, blockchainUpdater, time, utxPoolStub, pos, settings, scheduler, verifyTransactions) _
             checkGenesis(settings, blockchainUpdater)
             val bis           = new BufferedInputStream(inputStream)
             var quit          = false
@@ -112,7 +119,7 @@ object Importer extends ScorexLogging {
             log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
           case Failure(_) => log.error(s"Failed to open file '$filename")
         }
-      case Failure(_) => log.error("Usage: Importer <config file> <blockchain file> [height]")
+      case Failure(_) => log.error("Usage: Importer [-n | -no-verify] <config file> <blockchain file> [height]")
     }
 
     time.close()

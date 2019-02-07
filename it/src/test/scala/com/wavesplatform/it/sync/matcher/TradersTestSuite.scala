@@ -22,7 +22,7 @@ class TradersTestSuite extends MatcherSuiteBase {
   "Verifications of tricky ordering cases" - {
     // Alice issues new asset
     val aliceAsset =
-      aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, issueFee, 2).id
+      aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, smartIssueFee, 2).id
     matcherNode.waitForTransaction(aliceAsset)
 
     // Wait for balance on Alice's account
@@ -32,7 +32,7 @@ class TradersTestSuite extends MatcherSuiteBase {
 
     // Bob issues a new asset
     val bobAssetQuantity = 10000
-    val bobNewAsset      = bobNode.issue(bobAcc.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, reissuable = false, issueFee, 2).id
+    val bobNewAsset      = bobNode.issue(bobAcc.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, reissuable = false, smartIssueFee, 2).id
     matcherNode.waitForTransaction(bobNewAsset)
 
     val bobAssetId   = ByteStr.decodeBase58(bobNewAsset).get

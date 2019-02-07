@@ -52,5 +52,4 @@ package object assets {
       }
     }
   }
-
 }

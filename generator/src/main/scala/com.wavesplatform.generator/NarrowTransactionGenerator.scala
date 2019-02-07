@@ -163,7 +163,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
           case CreateAliasTransactionV1 =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransactionV1.selfSigned(sender, Alias.buildWithCurrentNetworkByte(aliasString).explicitGet(), 100000, ts))
+            logOption(CreateAliasTransactionV1.selfSigned(sender, Alias.buildWithCurrentChainId(aliasString).explicitGet(), 100000, ts))
           case MassTransferTransaction =>
             val transferCount = r.nextInt(MassTransferTransaction.MaxTransferCount)
             val transfers = for (i <- 0 to transferCount) yield {

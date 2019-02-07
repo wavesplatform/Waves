@@ -16,7 +16,7 @@ import com.wavesplatform.http.{DebugMessage, RollbackParams, api_key}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.{DataEntry, EitherExt2, Portfolio}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EitherExt2, Portfolio}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
@@ -188,17 +188,16 @@ object AsyncHttpApi extends Assertions {
     def transactionsByAddress(address: String, limit: Int): Future[Seq[Seq[TransactionInfo]]] =
       get(s"/transactions/address/$address/limit/$limit").as[Seq[Seq[TransactionInfo]]]
 
-    def assetDistribution(asset: String,
-                          initialHeight: Option[Int],
-                          limit: Option[Int] = None,
-                          after: Option[String] = None): Future[Map[String, Long]] = {
-      val h   = if (initialHeight.isDefined) s"/${initialHeight.get}" else ""
-      val l   = if (limit.isDefined) s"/limit/${limit.get}" else ""
-      val a   = if (after.isDefined) s"?after=${after.get}" else ""
-      val req = s"/assets/$asset/distribution" + h + l + a
-      println(req)
+    def assetDistributionAtHeight(asset: String, height: Int, limit: Int, maybeAfter: Option[String] = None): Future[AssetDistributionPage] = {
+      val after = maybeAfter.fold("")(a => s"?after=$a")
+      val url   = s"/assets/$asset/distribution/$height/limit/$limit$after"
 
-      get(req).as[Map[String, Long]]
+      get(url).as[AssetDistributionPage]
+    }
+
+    def assetDistribution(asset: String): Future[AssetDistribution] = {
+      val req = s"/assets/$asset/distribution"
+      get(req).as[AssetDistribution]
     }
 
     def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
@@ -302,8 +301,14 @@ object AsyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
       postJson("/assets/reissue", ReissueV1Request(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
-    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Future[Transaction] =
-      postJson("/assets/burn", BurnV1Request(sourceAddress, assetId, quantity, fee)).as[Transaction]
+    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: Byte = 2): Future[Transaction] = {
+      version match {
+        case 2 =>
+          signAndBroadcast(
+            Json.obj("type" -> 6, "quantity" -> quantity, "assetId" -> assetId, "sender" -> sourceAddress, "fee" -> fee, "version" -> version))
+        case _ => postJson("/assets/burn", BurnV1Request(sourceAddress, assetId, quantity, fee)).as[Transaction]
+      }
+    }
 
     def assetBalance(address: String, asset: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]

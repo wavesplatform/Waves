@@ -49,7 +49,7 @@ object JsAPI {
     version,
     new Environment {
       override def height: Long                                                                                    = 0
-      override def networkByte: Byte                                                                               = 1: Byte
+      override def chainId: Byte                                                                                   = 1: Byte
       override def inputEntity: Tx :+: Ord :+: CNil                                                                = null
       override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
       override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???

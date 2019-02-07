@@ -10,8 +10,13 @@ import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
 import monix.execution.{CancelableFuture, Scheduler}
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.utils.ScorexLogging
 
-object UtxPoolSynchronizer {
+import scala.util.{Failure, Success}
+import scala.util.control.NonFatal
+
+object UtxPoolSynchronizer extends ScorexLogging {
+
   def start(utx: UtxPool,
             settings: UtxSynchronizerSettings,
             allChannels: ChannelGroup,
@@ -25,7 +30,7 @@ object UtxPoolSynchronizer {
       .expireAfterWrite(settings.networkTxCacheTime.toMillis, TimeUnit.MILLISECONDS)
       .build[ByteStr, Object]
 
-    txSource
+    val synchronizerFuture = txSource
       .observeOn(scheduler)
       .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
       .foreach { txBuffer =>
@@ -53,5 +58,11 @@ object UtxPoolSynchronizer {
           allChannels.flush()
         }
       }
+
+    synchronizerFuture.onComplete {
+      case Success(_)            => log.error("UtxPoolSynschronizer stops")
+      case Failure(NonFatal(th)) => log.error("Error in utx pool synchronizer", th)
+    }
+    synchronizerFuture
   }
 }

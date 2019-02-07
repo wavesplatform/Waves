@@ -10,8 +10,8 @@ import scala.scalajs.{js => platform}
 @platform.native
 @JSGlobalScope
 object Environment extends scalajs.js.Object {
-  def height: Long      = platform.native
-  def networkByte: Byte = platform.native
+  def height: Long  = platform.native
+  def chainId: Byte = platform.native
 
   def inputEntity: Tx :+: Ord :+: CNil                     = platform.native
   def transactionById(id: Array[Byte]): Option[Tx]         = platform.native

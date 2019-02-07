@@ -27,6 +27,7 @@ case class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], 
                                                                                                "Content-Type",
                                                                                                "X-Requested-With",
                                                                                                "Timestamp",
+                                                                                               "x-api-key",
                                                                                                "Signature") ++
     (if (settings.apiKeyDifferentHost) Seq("api_key", "X-API-Key") else Seq.empty[String])
 

@@ -7,7 +7,7 @@ import shapeless.{:+:, CNil}
 object WavesContext {
   val env = new Environment {
     override def height: Long                                         = impl.Environment.height
-    override def networkByte: Byte                                    = impl.Environment.networkByte
+    override def chainId: Byte                                        = impl.Environment.chainId
     override def inputEntity: Tx :+: Ord :+: CNil                     = impl.Environment.inputEntity
     override def transactionById(id: Array[Byte]): Option[Tx]         = impl.Environment.transactionById(id)
     override def transactionHeightById(id: Array[Byte]): Option[Long] = impl.Environment.transactionHeightById(id)

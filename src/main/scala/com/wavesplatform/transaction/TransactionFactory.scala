@@ -429,7 +429,7 @@ object TransactionFactory {
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      alias  <- Alias.buildWithCurrentNetworkByte(request.alias)
+      alias  <- Alias.buildWithCurrentChainId(request.alias)
       tx <- CreateAliasTransactionV1.signed(
         sender,
         alias,
@@ -441,7 +441,7 @@ object TransactionFactory {
 
   def aliasV1(request: CreateAliasV1Request, sender: PublicKeyAccount): Either[ValidationError, CreateAliasTransactionV1] =
     for {
-      alias <- Alias.buildWithCurrentNetworkByte(request.alias)
+      alias <- Alias.buildWithCurrentChainId(request.alias)
       tx <- CreateAliasTransactionV1.create(
         sender,
         alias,
@@ -458,7 +458,7 @@ object TransactionFactory {
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      alias  <- Alias.buildWithCurrentNetworkByte(request.alias)
+      alias  <- Alias.buildWithCurrentChainId(request.alias)
       tx <- CreateAliasTransactionV2.signed(
         sender,
         request.version,
@@ -471,7 +471,7 @@ object TransactionFactory {
 
   def aliasV2(request: CreateAliasV2Request, sender: PublicKeyAccount): Either[ValidationError, CreateAliasTransactionV2] =
     for {
-      alias <- Alias.buildWithCurrentNetworkByte(request.alias)
+      alias <- Alias.buildWithCurrentChainId(request.alias)
       tx <- CreateAliasTransactionV2.create(
         request.version,
         sender,

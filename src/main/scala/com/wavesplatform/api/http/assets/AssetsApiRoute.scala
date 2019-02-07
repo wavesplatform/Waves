@@ -4,7 +4,6 @@ import java.util.concurrent._
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import cats.implicits._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
@@ -27,7 +26,10 @@ import javax.ws.rs.Path
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json._
-
+import cats.syntax.either._
+import cats.syntax.traverse._
+import cats.instances.option.catsStdInstancesForOption
+import cats.instances.either.catsStdInstancesForEither
 import scala.concurrent.Future
 import scala.util.Success
 
@@ -68,7 +70,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     )
 
     distributionTask.map {
-      case Right(dst) => AssetsApiRoute.distributionToJson(dst): ToResponseMarshallable
+      case Right(dst) => Json.toJson(dst): ToResponseMarshallable
       case Left(err)  => ApiError.fromValidationError(err)
     }
   }
@@ -90,7 +92,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         case Right(assetId) =>
           Task
             .eval(blockchain.assetDistribution(assetId))
-            .map(dst => AssetsApiRoute.distributionToJson(dst): ToResponseMarshallable)
+            .map(dst => Json.toJson(dst): ToResponseMarshallable)
       }
 
       complete {
@@ -316,7 +318,13 @@ object AssetsApiRoute {
   }
 
   def validateHeight(blockchain: Blockchain, height: Int): Either[ValidationError, Int] = {
-    Either.cond(height > 0 && height <= blockchain.height, height, GenericError(s"Height should be in range (1 - ${blockchain.height})"))
+    for {
+      _ <- Either
+        .cond(height > 0, (), GenericError(s"Height should be greater than zero"))
+      _ <- Either
+        .cond(height < blockchain.height, (), GenericError(s"Using 'assetDistributionAtHeight' on current height can lead to inconsistent result"))
+    } yield height
+
   }
 
   def validateLimit(limit: Int, maxLimit: Int): Either[ValidationError, Int] = {
@@ -326,9 +334,5 @@ object AssetsApiRoute {
       _ <- Either
         .cond(limit < maxLimit, (), GenericError(s"Limit should be less than $maxLimit"))
     } yield limit
-  }
-
-  def distributionToJson(dst: Map[Address, Long]) = {
-    Json.toJson(dst.map { case (a, b) => a.stringRepr -> b })
   }
 }
