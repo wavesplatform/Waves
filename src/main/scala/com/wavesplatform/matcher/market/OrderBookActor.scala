@@ -16,10 +16,11 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{AccountBalanceError, HasScriptType, NegativeAmount, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
+import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
 import scala.annotation.tailrec
@@ -37,6 +38,8 @@ class OrderBookActor(parent: ActorRef,
     extends PersistentActor
     with ScorexLogging {
 
+  override protected def log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[$assetPair]"))
+
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private val matchTimer         = Kamon.timer("matcher.orderbook.match").refine("pair" -> assetPair.toString)
@@ -45,6 +48,7 @@ class OrderBookActor(parent: ActorRef,
 
   private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
   private var orderBook          = OrderBook.empty
+  private var hasStartEvents     = false
 
   private var lastTrade = Option.empty[LastTrade]
 
@@ -270,13 +274,14 @@ class OrderBookActor(parent: ActorRef,
 
   override def receiveRecover: Receive = {
     case evt: Event =>
+      hasStartEvents = true
       applyEvent(evt)
       if (settings.recoverOrderHistory) context.system.eventStream.publish(evt)
 
     case RecoveryCompleted =>
       updateSnapshot(orderBook)
       log.debug(s"Recovery completed: $orderBook")
-      if (settings.makeSnapshotsAtStart) self ! SaveSnapshot
+      if (settings.makeSnapshotsAtStart && hasStartEvents) self ! SaveSnapshot
 
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook
