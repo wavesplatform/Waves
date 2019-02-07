@@ -176,7 +176,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) should produce("Annotation not recognized")
   }
 
-  property("Verifier function must have 0 arguments") {
+  property("verifier function must have 0 arguments") {
     val ctx = compilerContext
     val expr = {
       val script =
@@ -299,5 +299,85 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     compiler.ContractCompiler(ctx, expr) should produce("Contract functions must have unique names")
+  }
+
+  property("contract compilation fails if declaration and annotation bindings has the same name") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          |let x = 42
+          |
+          |@Callable(x)
+          |func some(i: Int) = {
+          |    WriteSet(List(DataEntry("a", "a")))
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("already defined")
+  }
+
+  property("contract compilation fails if annotation bindings and func args has the same name") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          |@Callable(i)
+          |func some(i: Int) = {
+          |   if (i.contractAddress == "abc") then
+          |      WriteSet(List(DataEntry("a", "a")))
+          |   else
+          |      WriteSet(List(DataEntry("a", "b")))
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce("override annotation bindings")
+  }
+
+  property("contract compiles if annotation bindings and another func args has the same name") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          |@Callable(x)
+          |func foo(i: Int) = {
+          |    WriteSet(List(DataEntry("a", "a")))
+          |}
+          |
+          |@Callable(i)
+          |func bar(x: Int) = {
+          |    WriteSet(List(DataEntry("a", "a")))
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+  }
+
+  property("contract compiles if declaration vars and func args has the same name") {
+    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val expr = {
+      val script =
+        """
+          |
+          |let x = 42
+          |
+          |@Callable(i)
+          |func some(x: Int) = {
+          |    WriteSet(List(DataEntry("a", "a")))
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
 }
