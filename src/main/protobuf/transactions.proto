@@ -1,0 +1,49 @@
+// Transactions
+syntax = "proto3";
+option java_package = "com.wavesplatform.transaction.protobuf";
+import "scalapb/scalapb.proto";
+
+option (scalapb.options) = {
+  import: "com.wavesplatform.serialization.protobuf.utils._"
+  flat_package: true
+};
+
+message Transaction {
+    option (scalapb.message).extends = "com.wavesplatform.transaction.protobuf.BaseTransaction";
+
+    message Attachments {
+        message Attachment {
+            bytes data = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+        };
+        repeated Attachment attachments = 1;
+    };
+
+    message Proofs {
+        message Proof {
+            bytes data = 1;
+        }
+
+        repeated Proof proofs = 1;
+    };
+
+    bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"];
+    bytes sender = 2 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
+    uint64 timestamp = 3;
+    uint64 fee = 4;
+    bytes feeAssetId = 5 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"];
+    Attachments attachment = 6;
+    Proofs proofs = 7;
+
+    oneof transaction {
+      MassTransferTransaction massTransfer = 1011;
+    };
+};
+
+message MassTransferTransaction {
+    message Transfer {
+        bytes address = 1;
+        uint64 amount = 2;
+    };
+
+    repeated Transfer transfers = 3;
+};

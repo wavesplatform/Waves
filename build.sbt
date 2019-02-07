@@ -240,6 +240,23 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
+/* lazy val protobufModel = crossProject(JSPlatform, JVMPlatform)
+  .withoutSuffixFor(JVMPlatform)
+  .crossType(CrossType.Pure)
+  .settings(
+    libraryDependencies ++= Dependencies.scalatest.map(_ % Test) ++ Dependencies.protobuf.value,
+    PB.targets in Compile := Seq(
+      scalapb.gen() → (sourceManaged in Compile).value
+    ),
+    PB.protoSources in Compile := Seq(
+      (baseDirectory in Compile).value.getParentFile / "src" / "main" / "protobuf"
+    )
+  )
+  .dependsOn(common)
+
+lazy val protobufModelJS  = protobufModel.js
+lazy val protobufModelJVM = protobufModel.jvm */
+
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
@@ -317,16 +334,20 @@ lazy val node = project
         Dependencies.ficus ++
         Dependencies.scorex ++
         Dependencies.commons_net ++
-        Dependencies.monix.value,
+        Dependencies.monix.value ++
+        Dependencies.protobuf.value,
     dependencyOverrides ++= Seq(
       Dependencies.AkkaActor,
       Dependencies.AkkaStream,
       Dependencies.AkkaHTTP
+    ),
+    PB.targets in Compile := Seq(
+      scalapb.gen() → (sourceManaged in Compile).value
     )
   )
   .dependsOn(langJVM, commonJVM)
 
-lazy val discovery = project
+///lazy val discovery = project
 
 lazy val it = project
   .dependsOn(node)

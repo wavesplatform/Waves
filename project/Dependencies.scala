@@ -114,4 +114,12 @@ object Dependencies {
   )
   lazy val kindProjector = "org.spire-math" %% "kind-projector"     % "0.9.6"
   lazy val betterFor     = "com.olegpy"     %% "better-monadic-for" % "0.3.0-M4"
+  lazy val protobuf = Def.setting {
+    val version = com.trueaccord.scalapb.compiler.Version.scalapbVersion
+    Seq(
+      // "com.google.protobuf" % "protobuf-java" % "3.4.0",
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf"
+    )
+  }
 }
