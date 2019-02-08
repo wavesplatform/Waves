@@ -160,6 +160,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 }
 
 object Order {
+
   type Id = ByteStr
 
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
@@ -176,12 +177,12 @@ object Order {
             expiration: Long,
             matcherFee: Long,
             proofs: Proofs,
-            version: Byte = 1): Order = {
-    if (version == 1) {
-      OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
-    } else {
-      OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
-    }
+            version: Byte = 1,
+            matcherFeeAssetId: Option[AssetId] = None): Order = version match {
+    case 1 => OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
+    case 2 => OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
+    case 3 =>
+      OrderV3(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, proofs)
   }
 
   def apply(senderPublicKey: PublicKeyAccount,
@@ -221,8 +222,10 @@ object Order {
           timestamp: Long,
           expiration: Long,
           matcherFee: Long,
-          version: Byte = 1): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+          version: Byte = 1,
+          matcherFeeAssetId: Option[AssetId] = None): Order = {
+    val unsigned =
+      Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
     sign(unsigned, sender)
   }
 
@@ -234,8 +237,10 @@ object Order {
            timestamp: Long,
            expiration: Long,
            matcherFee: Long,
-           version: Byte = 1): Order = {
-    val unsigned = Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+           version: Byte = 1,
+           matcherFeeAssetId: Option[AssetId] = None): Order = {
+    val unsigned =
+      Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
     sign(unsigned, sender)
   }
 
@@ -248,19 +253,22 @@ object Order {
             timestamp: Long,
             expiration: Long,
             matcherFee: Long,
-            version: Byte): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+            version: Byte,
+            matcherFeeAssetId: Option[AssetId] = None): Order = {
+    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
     sign(unsigned, sender)
   }
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
+
     require(unsigned.senderPublicKey == sender)
+
     val sig = crypto.sign(sender, unsigned.bodyBytes())
+
     unsigned match {
-      case o @ OrderV2(_, _, _, _, _, _, _, _, _, _) =>
-        o.copy(proofs = Proofs(Seq(ByteStr(sig))))
-      case o @ OrderV1(_, _, _, _, _, _, _, _, _, _) =>
-        o.copy(proofs = Proofs(Seq(ByteStr(sig))))
+      case o: OrderV1 => o.copy(proofs = Proofs(Seq(ByteStr(sig))))
+      case o: OrderV2 => o.copy(proofs = Proofs(Seq(ByteStr(sig))))
+      case o: OrderV3 => o.copy(proofs = Proofs(Seq(ByteStr(sig))))
     }
   }
 

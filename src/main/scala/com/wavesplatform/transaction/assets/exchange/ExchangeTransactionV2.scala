@@ -96,6 +96,7 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
   }
 
   override def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
+
     def back(off: Int): State[Int, Unit] = State { from =>
       (from - off, ())
     }
@@ -110,22 +111,28 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
       (from, f(bytes.drop(from)))
     }
 
+    def appropriateOrderParser(version: Byte): Array[Byte] => Try[Order] = version match {
+      case 1 => OrderV1.parseBytes
+      case 2 => OrderV2.parseBytes
+      case 3 => OrderV3.parseBytes
+    }
+
     Try {
       val makeTransaction = for {
-        o1Size         <- read(Ints.fromByteArray _, 4)
+        o1Size         <- read(Ints.fromByteArray, 4)
         o1Ver          <- readByte
         _              <- back(if (o1Ver != 1) { 1 } else { 0 })
-        o1             <- read(if (o1Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o1Size).map(_.get)
-        o2Size         <- read(Ints.fromByteArray _, 4)
+        o1             <- read(appropriateOrderParser(o1Ver), o1Size).map(_.get)
+        o2Size         <- read(Ints.fromByteArray, 4)
         o2Ver          <- readByte
         _              <- back(if (o2Ver != 1) { 1 } else { 0 })
-        o2             <- read(if (o2Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o2Size).map(_.get)
-        price          <- read(Longs.fromByteArray _, 8)
-        amount         <- read(Longs.fromByteArray _, 8)
-        buyMatcherFee  <- read(Longs.fromByteArray _, 8)
-        sellMatcherFee <- read(Longs.fromByteArray _, 8)
-        fee            <- read(Longs.fromByteArray _, 8)
-        timestamp      <- read(Longs.fromByteArray _, 8)
+        o2             <- read(appropriateOrderParser(o2Ver), o2Size).map(_.get)
+        price          <- read(Longs.fromByteArray, 8)
+        amount         <- read(Longs.fromByteArray, 8)
+        buyMatcherFee  <- read(Longs.fromByteArray, 8)
+        sellMatcherFee <- read(Longs.fromByteArray, 8)
+        fee            <- read(Longs.fromByteArray, 8)
+        timestamp      <- read(Longs.fromByteArray, 8)
         proofs         <- readEnd(Proofs.fromBytes)
       } yield {
         create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs.right.get)

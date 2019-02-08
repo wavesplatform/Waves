@@ -4,11 +4,14 @@ import cats.data.State
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.{AssetId, Proofs}
+import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
+import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
@@ -46,6 +49,30 @@ case class OrderV3(senderPublicKey: PublicKeyAccount,
     )
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ proofs.bytes())
+
+  override val json: Coeval[JsObject] =
+    Coeval.evalOnce(
+      {
+        val sig = Base58.encode(signature)
+        Json.obj(
+          "version"           -> version,
+          "id"                -> idStr(),
+          "sender"            -> senderPublicKey.address,
+          "senderPublicKey"   -> Base58.encode(senderPublicKey.publicKey),
+          "matcherPublicKey"  -> Base58.encode(matcherPublicKey.publicKey),
+          "assetPair"         -> assetPair.json,
+          "orderType"         -> orderType.toString,
+          "amount"            -> amount,
+          "price"             -> price,
+          "timestamp"         -> timestamp,
+          "expiration"        -> expiration,
+          "matcherFee"        -> matcherFee,
+          "matcherFeeAssetId" -> matcherFeeAssetId.map(_.base58),
+          "signature"         -> sig,
+          "proofs"            -> proofs.proofs
+        )
+      }
+    )
 }
 
 object OrderV3 {

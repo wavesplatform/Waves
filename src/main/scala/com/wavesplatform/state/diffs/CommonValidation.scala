@@ -135,19 +135,19 @@ object CommonValidation {
     }
 
     tx match {
-      case _: BurnTransactionV1        => Right(tx)
-      case _: PaymentTransaction       => Right(tx)
-      case _: GenesisTransaction       => Right(tx)
-      case _: TransferTransactionV1    => Right(tx)
-      case _: IssueTransactionV1       => Right(tx)
-      case _: ReissueTransactionV1     => Right(tx)
-      case _: ExchangeTransactionV1    => Right(tx)
-      case _: ExchangeTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccountTrading)
+      case _: BurnTransactionV1     => Right(tx)
+      case _: PaymentTransaction    => Right(tx)
+      case _: GenesisTransaction    => Right(tx)
+      case _: TransferTransactionV1 => Right(tx)
+      case _: IssueTransactionV1    => Right(tx)
+      case _: ReissueTransactionV1  => Right(tx)
+      case _: ExchangeTransactionV1 => Right(tx)
+      case _: ExchangeTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccountTrading)
 
       case ExchangeTransactionV2(buyOrder, sellOrder, _, _, _, _, _, _, _) =>
         (buyOrder, sellOrder) match {
           case (_: OrderV3, _: Order) | (_: Order, _: OrderV3) => activationBarrier(BlockchainFeatures.OrderV3, Some("Order Version 3"))
-          case _ => Right(tx)
+          case _                                               => Right(tx)
         }
 
       case _: LeaseTransactionV1       => Right(tx)

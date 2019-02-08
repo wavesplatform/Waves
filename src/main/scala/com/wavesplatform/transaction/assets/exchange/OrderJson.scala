@@ -53,7 +53,8 @@ object OrderJson {
                 matcherFee: Long,
                 signature: Option[Array[Byte]],
                 proofs: Option[Array[Array[Byte]]],
-                version: Option[Byte]): Order = {
+                version: Option[Byte],
+                matcherFeeAssetId: Option[Option[Array[Byte]]]): Order = {
     val eproofs = proofs.map(p => Proofs(p.map(ByteStr.apply))).orElse(signature.map(s => Proofs(Seq(ByteStr(s))))).getOrElse(Proofs.empty)
     Order(
       sender,
@@ -66,7 +67,8 @@ object OrderJson {
       expiration,
       matcherFee,
       eproofs,
-      version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs(0).arr.size == SignatureLength) { 1 } else { 2 })
+      version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs(0).arr.size == SignatureLength) { 1 } else { 2 }),
+      matcherFeeAssetId.flatten.map(ByteStr.apply)
     )
   }
 
@@ -95,7 +97,8 @@ object OrderJson {
       (JsPath \ "matcherFee").read[Long] and
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
-      (JsPath \ "version").readNullable[Byte]
+      (JsPath \ "version").readNullable[Byte] and
+      (JsPath \ "matcherFeeAssetId").readNullable[Option[Array[Byte]]]
     r(readOrder _)
   }
 
