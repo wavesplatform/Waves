@@ -67,6 +67,7 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
       .message
       .id
 
+    matcherNode.cancelOrder(aliceAcc, aliceSecondWavesPair, aliceOrderToCancelId) // TODO: remove this line in DEX-160
     matcherNode.waitOrderStatus(aliceSecondWavesPair, aliceOrderToCancelId, "Cancelled", 2.minutes)
 
     //Bob orders should partially fill one Alice order and fill another

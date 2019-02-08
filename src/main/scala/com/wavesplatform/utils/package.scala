@@ -180,6 +180,8 @@ package object utils extends ScorexLogging {
     obj.instance.asInstanceOf[T]
   }
 
+  @tailrec def doWhile[T](z: T)(cond: T => Boolean)(f: T => T): T = if (cond(z)) doWhile(f(z))(cond)(f) else z
+
   implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
 
     override def writes(o: ByteStr): JsValue = JsString(o.base58)

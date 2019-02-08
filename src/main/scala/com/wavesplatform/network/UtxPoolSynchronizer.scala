@@ -5,15 +5,15 @@ import java.util.concurrent.TimeUnit
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSettings
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
 import monix.execution.{CancelableFuture, Scheduler}
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.ScorexLogging
 
-import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 object UtxPoolSynchronizer extends ScorexLogging {
 
@@ -42,21 +42,19 @@ object UtxPoolSynchronizer extends ScorexLogging {
         }
 
         if (toAdd.nonEmpty) {
-          utx.batched { ops =>
-            toAdd
-              .groupBy { case (channel, _) => channel }
-              .foreach {
-                case (sender, xs) =>
-                  val channelMatcher: ChannelMatcher = { (_: Channel) != sender }
-                  xs.foreach {
-                    case (_, tx) =>
-                      ops.putIfNew(tx) match {
-                        case Right((true, _)) => allChannels.write(RawBytes.from(tx), channelMatcher)
-                        case _                =>
-                      }
-                  }
-              }
-          }
+          toAdd
+            .groupBy { case (channel, _) => channel }
+            .foreach {
+              case (sender, xs) =>
+                val channelMatcher: ChannelMatcher = { (_: Channel) != sender }
+                xs.foreach {
+                  case (_, tx) =>
+                    utx.putIfNew(tx) match {
+                      case Right((true, _)) => allChannels.write(RawBytes.from(tx), channelMatcher)
+                      case _                =>
+                    }
+                }
+            }
           allChannels.flush()
         }
       }

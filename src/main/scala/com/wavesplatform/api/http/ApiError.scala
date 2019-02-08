@@ -258,21 +258,28 @@ case class ScriptExecutionError(tx: Transaction, error: String, scriptSrc: Strin
   override val code: StatusCode    = StatusCodes.BadRequest
   override val message: String     = s"Error while executing ${if (isTokenScript) "token" else "account"}-script: $error"
   override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
-
 }
 
 case class TransactionNotAllowedByAccountScript(tx: Transaction, log: Log, scriptSrc: String) extends ApiError {
-  override val id: Int             = 307
+  override val id: Int             = TransactionNotAllowedByAccountScript.ErrorCode
   override val code: StatusCode    = StatusCodes.BadRequest
   override val message: String     = s"Transaction is not allowed by account-script"
   override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
 }
 
+object TransactionNotAllowedByAccountScript {
+  val ErrorCode = 307
+}
+
 case class TransactionNotAllowedByAssetScript(tx: Transaction, log: Log, scriptSrc: String) extends ApiError {
-  override val id: Int             = 308
+  override val id: Int             = TransactionNotAllowedByAssetScript.ErrorCode
   override val code: StatusCode    = StatusCodes.BadRequest
   override val message: String     = s"Transaction is not allowed by token-script"
   override lazy val json: JsObject = ScriptErrorJson(id, tx, message, scriptSrc, log)
+}
+
+object TransactionNotAllowedByAssetScript {
+  val ErrorCode = 308
 }
 
 case class SignatureError(error: String) extends ApiError {

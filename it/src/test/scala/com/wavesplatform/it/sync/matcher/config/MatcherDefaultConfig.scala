@@ -30,7 +30,6 @@ object MatcherDefaultConfig {
                                      |  account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
                                      |  bind-address = "0.0.0.0"
                                      |  order-match-tx-fee = 300000
-                                     |  order-cleanup-interval = 20s
                                      |  blacklisted-assets = ["$ForbiddenAssetId"]
                                      |  balance-watching.enable = yes
                                      |  rest-order-limit=$orderLimit

@@ -11,7 +11,7 @@ ExecStart=/usr/share/${{app_name}}/bin/${{exec}} \
   -- /etc/${{app_name}}/waves.conf
 Restart=always
 RestartSec=${{retryTimeout}}
-RestartPreventExitStatus=38 61
+RestartPreventExitStatus=10 38 61
 SuccessExitStatus=143
 User=${{daemon_user}}
 PermissionsStartOnly=true

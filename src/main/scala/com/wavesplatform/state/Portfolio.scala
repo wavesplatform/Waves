@@ -12,21 +12,7 @@ case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[ByteStr, Lo
 
   lazy val isEmpty: Boolean = this == Portfolio.empty
 
-  def balanceOf(assetId: Option[AssetId]): Long = assetId.fold(balance)(assets.getOrElse(_, 0))
-  def remove(assetId: Option[AssetId], amount: Long): Option[Portfolio] = {
-    val origAmount = assetId match {
-      case None    => balance
-      case Some(x) => assets.getOrElse(x, 0L)
-    }
-
-    val updatedAmount = origAmount - amount
-    if (updatedAmount < 0) None
-    else
-      Some(assetId match {
-        case None    => copy(balance = updatedAmount)
-        case Some(x) => copy(assets = this.assets.updated(x, updatedAmount))
-      })
-  }
+  def balanceOf(assetId: Option[AssetId]): Long = assetId.fold(balance)(assets.getOrElse(_, 0L))
 }
 
 object Portfolio {

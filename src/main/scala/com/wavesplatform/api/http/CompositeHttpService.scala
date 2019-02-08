@@ -9,11 +9,11 @@ import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import akka.http.scaladsl.server.{Directive0, Route, RouteResult}
 import akka.stream.ActorMaterializer
-import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.api.http.swagger.SwaggerDocService
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
 
-case class CompositeHttpService(system: ActorSystem, apiTypes: Set[Class[_]], routes: Seq[ApiRoute], settings: RestAPISettings)
+case class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], settings: RestAPISettings)(implicit system: ActorSystem)
     extends ScorexLogging {
 
   val swaggerService = new SwaggerDocService(system, ActorMaterializer()(system), apiTypes, settings)
