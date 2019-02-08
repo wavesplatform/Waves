@@ -44,8 +44,7 @@ case class OrderV3(senderPublicKey: PublicKeyAccount,
         Longs.toByteArray(timestamp) ++
         Longs.toByteArray(expiration) ++
         Longs.toByteArray(matcherFee) ++
-        Deser.serializeOption(matcherFeeAssetId)(_.arr) ++
-        matcherFeeAssetId.map(asset => (1: Byte) +: asset.arr).getOrElse(Array[Byte](0))
+        Order.assetIdBytes(matcherFeeAssetId)
     )
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ proofs.bytes())
