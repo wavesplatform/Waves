@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import scalapb.TypeMapper
 
 package object utils {
+  // TODO: Remove byte arrays copying with reflection
   implicit val byteStringMapper = TypeMapper[PBByteString, ByteStr] { bs ⇒
     if (bs.isEmpty) ByteStr.empty else ByteStr(bs.toByteArray)
   } { bs ⇒
@@ -19,7 +20,7 @@ package object utils {
 
   implicit val addressOrAliasMapper = TypeMapper[PBByteString, AddressOrAlias] { bs =>
     AddressOrAlias.fromBytes(bs.toByteArray, 0).right.get._1
-  } { pka =>
-    PBByteString.copyFrom(pka.bytes)
+  } { addressOrAlias =>
+    PBByteString.copyFrom(addressOrAlias.bytes.arr)
   }
 }
