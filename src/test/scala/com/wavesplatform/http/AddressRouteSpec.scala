@@ -4,10 +4,15 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.Contract.{VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.v1.compiler.{Decompiler, DecompilerContext}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.smart.script.ContractScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
@@ -153,7 +158,7 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
       (response \ "script").as[String] shouldBe "base64:AQa3b8tH"
-      (response \ "scriptText").as[String] shouldBe "TRUE"
+      (response \ "scriptText").as[String] shouldBe "true"
       (response \ "complexity").as[Long] shouldBe 1
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
@@ -166,6 +171,19 @@ class AddressRouteSpec
       (response \ "scriptText").asOpt[String] shouldBe None
       (response \ "complexity").as[Long] shouldBe 0
       (response \ "extraFee").as[Long] shouldBe 0
+    }
+
+    val testContract = Contract(List(), List(), Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
+    (blockchain.accountScript _)
+      .when(allAccounts(3).toAddress)
+      .onCall((_: Address) => Some(ContractScript(StdLibVersion.V3, testContract).explicitGet()))
+    Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      (response \ "address").as[String] shouldBe allAddresses(3)
+      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AAAABnZlcmlmeQAAAAAAAAABBt/lCgQ="
+      (response \ "scriptText").as[String] shouldBe Decompiler(testContract, DecompilerContext(Map.empty[Short, String]))
+      (response \ "complexity").as[Long] shouldBe 11
+      (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
   }
 }

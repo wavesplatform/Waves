@@ -72,6 +72,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
+
     acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
 
     val json = Json.parse(sender.get(s"/transactions/info/$setScriptId").getResponseBody)

@@ -14,6 +14,7 @@ case class CompilerContext(predefTypes: Map[String, DefinedType], varDefs: Varia
   } ++ functionDefs
 
   def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = allFuncDefs.getOrElse(name, List.empty)
+
 }
 
 object CompilerContext {
