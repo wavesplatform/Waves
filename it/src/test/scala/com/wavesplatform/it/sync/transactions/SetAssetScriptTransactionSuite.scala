@@ -131,7 +131,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val (balance, eff) = notMiner.accountBalances(firstAddress)
     val details        = notMiner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
     assert(details.scriptComplexity == 1)
-    assert(details.scriptText == "TRUE")
+    assert(details.scriptText == "true")
     assert(details.script == scriptBase64)
 
     val txId = sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(script2)).id
