@@ -6,9 +6,9 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{AssetId, Proofs => VanillaProofs, Transaction => VanillaTransaction}
 
-trait PBTxImplicits {
+trait PBTransactionImplicits {
   private[this] val WavesAssetId = ByteStr.empty
-  private[this] val FeeAssetId = ByteStr.empty
+  private[this] val FeeAssetId = WavesAssetId
 
   implicit class VanillaTransactionImplicitConversionOps(tx: VanillaTransaction) {
     def toPBTransaction: Transaction = tx match {
@@ -55,4 +55,4 @@ trait PBTxImplicits {
     Some(Transaction.Data(txData))
 }
 
-object PBTxImplicits extends PBTxImplicits
+object PBTransactionImplicits extends PBTransactionImplicits
