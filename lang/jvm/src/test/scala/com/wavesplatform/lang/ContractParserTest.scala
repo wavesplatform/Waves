@@ -129,4 +129,60 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
     )
   }
 
+  property("contract script with comment in the beginning") {
+    val code =
+      """
+        | # comment1
+        | # comment2
+        | func foo() = {
+        |    true # comment3
+        | }
+        | # comment4
+        | # comment5
+        | @Ann(foo)
+        | func bar(arg:Baz) = {
+        |    3  # comment6
+        | }
+        |
+        |""".stripMargin
+    parse(code) shouldBe CONTRACT(
+      AnyPos,
+      List(
+        FUNC(
+          AnyPos,
+          PART.VALID(AnyPos, "foo"),
+          List.empty,
+          TRUE(AnyPos)
+        )
+      ),
+      List(
+        ANNOTATEDFUNC(
+          AnyPos,
+          List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
+          Expressions.FUNC(
+            AnyPos,
+            PART.VALID(AnyPos, "bar"),
+            List((PART.VALID(AnyPos, "arg"), List(PART.VALID(AnyPos, "Baz")))),
+            CONST_LONG(AnyPos, 3)
+          )
+        )
+      )
+    )
+  }
+
+  property("functions without body brackets with comments") {
+    val code =
+      """
+        | # comment
+        | func foo() = 42 + 42 - 1
+        |
+        | @Ann(x)
+        | func bar(arg:ArgType) = foo() # comment
+        | # comment
+        | @Ann(y)
+        | func baz(arg:ArgType) = if (10 < 15) then true else false
+        |
+        |""".stripMargin
+    parse(code)
+  }
 }
