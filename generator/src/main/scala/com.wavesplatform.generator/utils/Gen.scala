@@ -101,7 +101,7 @@ object Gen {
 
     val (script, _) = ScriptCompiler(src, isAssetScript = false)
       .explicitGet()
-    
+
     script
   }
 

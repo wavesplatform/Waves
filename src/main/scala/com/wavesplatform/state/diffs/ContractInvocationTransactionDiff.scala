@@ -181,15 +181,15 @@ object ContractInvocationTransactionDiff {
         script,
         true
       ) match {
-        case (log, Left(execError)) => Left(ScriptExecutionError(execError, script.text, log, true))
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, true))
         case (log, Right(FALSE)) =>
-          Left(TransactionNotAllowedByScript(log, script.text, isTokenScript = true))
+          Left(TransactionNotAllowedByScript(log, isTokenScript = true))
         case (_, Right(TRUE)) => Right(nextDiff)
         case (_, Right(x))    => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
     } match {
       case Failure(e) =>
-        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", script.text, List.empty, true))
+        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, true))
       case Success(s) => s
 
     }
