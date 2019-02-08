@@ -3,6 +3,8 @@ package com.wavesplatform.serialization.protobuf
 import com.google.protobuf.{ByteString => PBByteString}
 import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.protobuf.Transaction.WrappedProofs
 import scalapb.TypeMapper
 
 //noinspection TypeAnnotation
@@ -25,4 +27,11 @@ package object utils {
   } { addressOrAlias =>
     PBByteString.copyFrom(addressOrAlias.bytes.arr)
   }
+
+  implicit val proofsMapper = TypeMapper[WrappedProofs, Proofs] { ps =>
+    Proofs(ps.proofs)
+  } { ps =>
+    WrappedProofs(ps.proofs)
+  }
+
 }

@@ -12,33 +12,18 @@ message Transaction {
     option (scalapb.message).extends = "com.wavesplatform.transaction.protobuf.PBTransaction";
     option (scalapb.message).companion_extends = "com.wavesplatform.transaction.protobuf.PBTransactionCompanion";
 
-    Body body = 1;
-    Proofs wrappedProofs = 2;
+    bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"];
+    bytes sender = 2 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
+    uint64 timestamp = 3;
+    uint64 fee = 4;
+    bytes feeAssetId = 5 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"];
+    bytes attachment = 6 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    Data data = 7;
+    WrappedProofs proofs = 8 [(scalapb.field).type = "com.wavesplatform.transaction.Proofs"];
 
-    message Body {
-        bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"];
-        bytes sender = 2 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
-        uint64 timestamp = 3;
-        uint64 fee = 4;
-        bytes feeAssetId = 5 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"];
-        Attachments attachment = 6;
-        Data data = 7;
-    };
-
-    message Attachments {
-        message Attachment {
-            bytes data = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
-        };
-        repeated Attachment attachments = 1;
-    };
-
-    message Proofs {
-        message Proof {
-            bytes data = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
-        }
-
-        repeated Proof proofs = 1;
-    };
+    message WrappedProofs {
+        repeated bytes proofs = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    }
 
     message Data {
         oneof data {
