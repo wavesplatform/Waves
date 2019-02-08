@@ -1,6 +1,6 @@
 package com.wavesplatform.serialization.protobuf
 import com.google.protobuf.{ByteString => PBByteString}
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import scalapb.TypeMapper
 
@@ -15,5 +15,11 @@ package object utils {
     PublicKeyAccount(bs.toByteArray)
   } { pka =>
     PBByteString.copyFrom(pka.publicKey)
+  }
+
+  implicit val addressOrAliasMapper = TypeMapper[PBByteString, AddressOrAlias] { bs =>
+    AddressOrAlias.fromBytes(bs.toByteArray, 0).right.get._1
+  } { pka =>
+    PBByteString.copyFrom(pka.bytes)
   }
 }

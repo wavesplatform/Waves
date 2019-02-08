@@ -42,14 +42,14 @@ message Transaction {
 
     message Data {
         oneof data {
-            MassTransferTransaction massTransfer = 11;
+            MassTransferData massTransfer = 11;
         }
     };
 };
 
-message MassTransferTransaction {
+message MassTransferData {
     message Transfer {
-        bytes address = 1;
+        bytes address = 1 [(scalapb.field).type = "com.wavesplatform.account.AddressOrAlias"];
         uint64 amount = 2;
     };
 
