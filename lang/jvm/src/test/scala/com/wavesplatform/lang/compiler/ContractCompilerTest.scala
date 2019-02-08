@@ -140,7 +140,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) should produce(FieldNames.Error)
   }
 
-  property("annotation biding can have the same name as annotated function") {
+  property("annotation binding can have the same name as annotated function") {
     val ctx = compilerContext
     val expr = {
       val script =
