@@ -13,7 +13,7 @@ message Transaction {
     option (scalapb.message).companion_extends = "com.wavesplatform.transaction.protobuf.PBTransactionCompanion";
 
     Body body = 1;
-    Proofs proofs = 2;
+    Proofs wrappedProofs = 2;
 
     message Body {
         bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"];
