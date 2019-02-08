@@ -2,16 +2,16 @@ package com.wavesplatform.api.http
 
 import java.security.SecureRandom
 
-import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.utils.Time
 import io.swagger.annotations._
+import javax.ws.rs.Path
 import play.api.libs.json._
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
@@ -64,6 +64,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
       }
     }
   }
+
   @Path("/script/compileContract")
   @ApiOperation(value = "Compile Contract", notes = "Compiles string code to base64 contract representation", httpMethod = "POST")
   @ApiImplicitParams(
@@ -131,7 +132,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
               case (script, complexity) =>
                 Json.obj(
                   "script"     -> code,
-                  "scriptText" -> script.text,
+                  "scriptText" -> Script.decompile(script),
                   "complexity" -> complexity,
                   "extraFee"   -> CommonValidation.ScriptExtraFee
                 )

@@ -50,9 +50,9 @@ object ValidationError {
     def isTokenScript: Boolean
   }
 
-  case class ScriptExecutionError(error: String, scriptSrc: String, log: Log, isTokenScript: Boolean) extends ValidationError with HasScriptType
+  case class ScriptExecutionError(error: String, log: Log, isTokenScript: Boolean) extends ValidationError with HasScriptType
 
-  case class TransactionNotAllowedByScript(log: Log, scriptSrc: String, isTokenScript: Boolean) extends ValidationError with HasScriptType
+  case class TransactionNotAllowedByScript(log: Log, isTokenScript: Boolean) extends ValidationError with HasScriptType
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"

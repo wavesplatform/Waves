@@ -27,7 +27,8 @@ object GeneratingBalanceProvider {
 
   def balance(blockchain: Blockchain, fs: FunctionalitySettings, account: Address, blockId: BlockId = ByteStr.empty): Long = {
     val height =
-      if (blockId.isEmpty) blockchain.height else blockchain.heightOf(blockId).getOrElse(throw new IllegalArgumentException(s"Invalid block ref: $blockId"))
+      if (blockId.isEmpty) blockchain.height
+      else blockchain.heightOf(blockId).getOrElse(throw new IllegalArgumentException(s"Invalid block ref: $blockId"))
     val depth = if (height >= fs.generationBalanceDepthFrom50To1000AfterHeight) SecondDepth else FirstDepth
     blockchain.effectiveBalance(account, depth, blockId)
   }
