@@ -1,9 +1,9 @@
 package com.wavesplatform.transaction.protobuf
+import com.wavesplatform.serialization.protobuf.json.PBWavesJsonFormat
 import org.json4s.JValue
 import org.json4s.JsonAST._
 import play.api.libs.json._
 import scalapb.GeneratedMessageCompanion
-import scalapb.json4s.JsonFormat
 
 //noinspection TypeAnnotation
 trait PBTransactionJson {
@@ -18,7 +18,7 @@ trait PBTransactionJson {
         case obj: JsObject   => JObject(obj.fields.map(kv => (kv._1, toJson4s(kv._2))): _*)
       }
 
-      JsSuccess(JsonFormat.fromJson[T](toJson4s(js)))
+      JsSuccess(PBWavesJsonFormat.fromJson[T](toJson4s(js)))
     },
     Writes { tx =>
       def toPlay(js: JValue): JsValue = js match {
@@ -28,14 +28,13 @@ trait PBTransactionJson {
         case JDecimal(num)    => JsNumber(num)
         case JDouble(num)     => JsNumber(num)
         case JLong(num)       => JsNumber(num)
-        case JInt(num)        => JsNumber(BigDecimal(num))
         case JBool(num)       => JsBoolean(num)
         case JArray(arr)      => JsArray(arr.map(toPlay))
-        case JSet(arr)      => JsArray(arr.toVector.map(toPlay))
+        case JSet(arr)        => JsArray(arr.toVector.map(toPlay))
         case JObject(obj)     => JsObject(obj.map(kv => (kv._1, toPlay(kv._2))))
       }
 
-      toPlay(JsonFormat.toJson(tx))
+      toPlay(PBWavesJsonFormat.toJson(tx))
     }
   )
 }

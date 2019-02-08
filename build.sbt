@@ -343,7 +343,8 @@ lazy val node = project
     ),
     PB.targets in Compile := Seq(
       scalapb.gen() → (sourceManaged in Compile).value
-    )
+    ),
+    sourceGenerators in Compile += versionSource
   )
   .dependsOn(langJVM, commonJVM)
 

@@ -18,18 +18,11 @@ message Transaction {
     uint64 fee = 4;
     bytes feeAssetId = 5 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"];
     bytes attachment = 6 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
-    Data data = 7;
-    WrappedProofs proofs = 8 [(scalapb.field).type = "com.wavesplatform.transaction.Proofs"];
+    repeated bytes proofs = 8 [(scalapb.field).scala_name = "proofsArray", (scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
 
-    message WrappedProofs {
-        repeated bytes proofs = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    oneof data {
+        MassTransferData massTransfer = 1011;
     }
-
-    message Data {
-        oneof data {
-            MassTransferData massTransfer = 11;
-        }
-    };
 };
 
 message MassTransferData {
