@@ -124,22 +124,31 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 scripts: Map[Address, Option[Script]],
                 assetScripts: Map[AssetId, Option[Script]],
                 accountData: Map[Address, AccountDataInfo],
-                sponsorship: Map[AssetId, Sponsorship]) {
-
-  lazy val accountTransactionIds: Map[Address, List[(Int, ByteStr)]] = {
-    val map: List[(Address, Set[(Int, Byte, Long, ByteStr)])] = transactions.toList
-      .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> Set((h, tx.builder.typeId, tx.timestamp, id))) }
-    val groupedByAcc = map.foldLeft(Map.empty[Address, Set[(Int, Byte, Long, ByteStr)]]) {
-      case (m, (acc, set)) =>
-        m.combine(Map(acc -> set))
-    }
-    groupedByAcc
-      .mapValues(l => l.toList.sortBy { case (h, _, t, _) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
-      .mapValues(_.map({ case (_, typ, _, id) => (typ.toInt, id) }))
-  }
-}
+                sponsorship: Map[AssetId, Sponsorship])
 
 object Diff {
+
+  def stateOps(portfolios: Map[Address, Portfolio] = Map.empty,
+               assetInfos: Map[AssetId, AssetInfo] = Map.empty,
+               aliases: Map[Alias, Address] = Map.empty,
+               orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
+               leaseState: Map[ByteStr, Boolean] = Map.empty,
+               scripts: Map[Address, Option[Script]] = Map.empty,
+               assetScripts: Map[AssetId, Option[Script]] = Map.empty,
+               accountData: Map[Address, AccountDataInfo] = Map.empty,
+               sponsorship: Map[AssetId, Sponsorship] = Map.empty): Diff =
+    Diff(
+      transactions = Map(),
+      portfolios = portfolios,
+      issuedAssets = assetInfos,
+      aliases = aliases,
+      orderFills = orderFills,
+      leaseState = leaseState,
+      scripts = scripts,
+      assetScripts = assetScripts,
+      accountData = accountData,
+      sponsorship = sponsorship
+    )
 
   def apply(height: Int,
             tx: Transaction,

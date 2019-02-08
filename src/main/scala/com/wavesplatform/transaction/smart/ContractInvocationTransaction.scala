@@ -61,6 +61,8 @@ case class ContractInvocationTransaction private (chainId: Byte,
         )
     )
 
+  override def checkedAssets(): Seq[AssetId] = payment.toSeq.flatMap(_.assetId)
+
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
   override def version: Byte = 1

@@ -12,7 +12,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
 import com.wavesplatform.utils.ScorexLogging
-import shapeless.{:+:, CNil, Coproduct}
+import shapeless.Coproduct
 
 import scala.util.{Failure, Success, Try}
 
@@ -22,7 +22,6 @@ object Verifier extends Instrumented with ScorexLogging {
 
   import stats.TxTimerExt
 
-  private type TxOrd       = Transaction :+: Order :+: CNil
   type ValidationResult[T] = Either[ValidationError, T]
 
   def apply(blockchain: Blockchain, currentBlockHeight: Int)(tx: Transaction): ValidationResult[Transaction] =
@@ -58,7 +57,7 @@ object Verifier extends Instrumented with ScorexLogging {
     Try {
       logged(
         s"transaction ${transaction.id()}",
-        ScriptRunner(height, Coproduct[TxOrd](transaction), blockchain, script, isTokenScript)
+        ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](transaction), blockchain, script, isTokenScript)
       ) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isTokenScript))
         case (log, Right(FALSE)) =>
@@ -74,7 +73,7 @@ object Verifier extends Instrumented with ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
     Try {
-      logged(s"order ${order.idStr()}", ScriptRunner(height, Coproduct[TxOrd](order), blockchain, script, isTokenScript = false)) match {
+      logged(s"order ${order.idStr()}", ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isTokenScript = false)) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isTokenScript = false))
         case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isTokenScript = false))
         case (_, Right(TRUE))       => Right(order)

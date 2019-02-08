@@ -1,27 +1,38 @@
 package com.wavesplatform.matcher.market
-import java.io.File
-import java.nio.file.Files
 
 import akka.actor.ActorSystem
-import akka.testkit.TestKitBase
+import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
+import akka.testkit.{TestKitBase, TestProbe}
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.TestHelpers.deleteRecursively
 import com.wavesplatform.settings.loadConfig
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
+import com.wavesplatform.utils.ScorexLogging
+import org.scalatest._
 
-abstract class MatcherSpec(actorSystemName: String) extends TestKitBase with WordSpecLike with Matchers with BeforeAndAfterAll {
-  import MatcherSpec._
-  implicit lazy val system: ActorSystem = ActorSystem(
+abstract class MatcherSpec(_actorSystemName: String) extends WordSpecLike with MatcherSpecLike {
+  protected def actorSystemName: String = _actorSystemName
+}
+
+trait MatcherSpecLike extends TestKitBase with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with ScorexLogging {
+  this: Suite =>
+
+  protected def actorSystemName: String
+
+  implicit override lazy val system: ActorSystem = ActorSystem(
     actorSystemName,
-    loadConfig(ConfigFactory.parseString(s"$SnapshotStorePath = ${Files.createTempDirectory(actorSystemName)}"))
+    loadConfig(ConfigFactory.empty())
   )
+
+  override protected def beforeEach(): Unit = {
+    val p = TestProbe()
+    p.send(StorageExtension(system).journalStorage, InMemoryJournalStorage.ClearJournal)
+    p.expectMsg(akka.actor.Status.Success(""))
+    p.send(StorageExtension(system).snapshotStorage, InMemorySnapshotStorage.ClearSnapshots)
+    p.expectMsg(akka.actor.Status.Success(""))
+    super.beforeEach()
+  }
+
   override protected def afterAll(): Unit = {
     super.afterAll()
     shutdown(system)
-    deleteRecursively(new File(system.settings.config.getString(SnapshotStorePath)).toPath)
   }
-}
-
-object MatcherSpec {
-  private[MatcherSpec] val SnapshotStorePath = "akka.persistence.snapshot-store.local.dir"
 }

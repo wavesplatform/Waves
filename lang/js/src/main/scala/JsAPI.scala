@@ -8,11 +8,10 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, Ex
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{CTX, Serde}
 import fastparse.core.Parsed.{Failure, Success}
-import shapeless.{:+:, CNil}
 
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
@@ -54,7 +53,7 @@ object JsAPI {
     new Environment {
       override def height: Long                                                                                    = 0
       override def chainId: Byte                                                                                   = 1: Byte
-      override def inputEntity: Tx :+: Ord :+: CNil                                                                = null
+      override def inputEntity: Environment.InputEntity                                                            = null
       override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
       override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
       override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???

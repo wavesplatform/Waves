@@ -1,6 +1,7 @@
 package com.wavesplatform.database
 
 import java.util
+import java.util.Map.Entry
 
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
@@ -22,6 +23,10 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
   }
 
   def iterator: DBIterator = db.iterator(readOptions)
+
+  def iterateOver(prefix: Short)(f: Entry[Array[Byte], Array[Byte]] => Unit) = db.iterateOver(prefix)(f)
+
+  def iterateOver(prefix: Array[Byte])(f: Entry[Array[Byte], Array[Byte]] => Unit) = db.iterateOver(prefix)(f)
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: ReadOnlyDB.Entry => T): Vector[T] = {
     val iter = iterator

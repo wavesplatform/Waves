@@ -170,9 +170,7 @@ case class DebugApiRoute(ws: WavesSettings,
       case Right(blocks) =>
         allChannels.broadcast(LocalScoreChanged(ng.score))
         if (returnTransactionsToUtx) {
-          utxStorage.batched { ops =>
-            blocks.flatMap(_.transactionData).foreach(ops.putIfNew)
-          }
+          blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
         }
         miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
@@ -243,7 +241,9 @@ case class DebugApiRoute(ws: WavesSettings,
           case (address, Right(offset)) =>
             AccountMiningInfo(
               address.stringRepr,
-              ng.effectiveBalance(address, ng.height, ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height)),
+              ng.effectiveBalance(address,
+                                  ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height),
+                                  ng.microblockIds.lastOption.getOrElse(ByteStr.empty)),
               System.currentTimeMillis() + offset.toMillis
             )
         }

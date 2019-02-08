@@ -33,7 +33,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
           val miner1 = miners.head
           val miner2 = miners.tail.head
 
-          val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, blockchain.height, 0)
+          val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, 0)
 
           val fork1 = mkFork(10, miner1, blockchain)
           val fork2 = mkFork(10, miner2, blockchain)
@@ -69,7 +69,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
         case Env(pos, blockchain, miners) =>
           val miner        = miners.head
           val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+          val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
           val lastBlock    = blockchain.lastBlock.get
           val block        = forgeBlock(miner, blockchain, pos)()
 
@@ -84,7 +84,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
         case Env(pos, blockchain, miners) =>
           val miner        = miners.head
           val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+          val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
           val lastBlock    = blockchain.lastBlock.get
           val block        = forgeBlock(miner, blockchain, pos)(updateDelay = _ - 1)
 
@@ -203,10 +203,10 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   }
 
   def withEnv(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: Env => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
+    val defaultWriter = new LevelDBWriter(db, ignorePortfolioChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignorePortfolioChanged, settings, ntpTime)
     val pos           = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
@@ -289,7 +289,7 @@ object FPPoSSelectorTest {
     val height       = blockchain.height
     val lastBlock    = blockchain.lastBlock.get
     val ggParentTS   = blockchain.blockAt(height - 2).map(_.timestamp)
-    val minerBalance = blockchain.effectiveBalance(miner.toAddress, height, 0)
+    val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
     val delay = updateDelay(
       pos
         .getValidBlockDelay(
