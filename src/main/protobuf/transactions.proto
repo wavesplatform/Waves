@@ -41,7 +41,9 @@ message Transaction {
     };
 
     message Data {
-        MassTransferTransaction massTransfer = 11;
+        oneof data {
+            MassTransferTransaction massTransfer = 11;
+        }
     };
 };
 
