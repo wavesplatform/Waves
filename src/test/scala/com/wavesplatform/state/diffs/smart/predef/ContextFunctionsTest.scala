@@ -3,14 +3,13 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
-//import com.wavesplatform.state.diffs.smart.smartEnabledFS
-//import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
-import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.smart.smartEnabledFS
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -58,16 +57,16 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
   } yield (Seq(genesis1, genesis2), setScriptTransaction, dataTransaction, transfer)
 
-//  property("validation of all functions from contexts") {
-//    forAll(preconditionsAndPayments) {
-//      case (genesis, setScriptTransaction, dataTransaction, transfer) =>
-//        assertDiffAndState(smartEnabledFS) { append =>
-//          append(genesis).explicitGet()
-//          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
-//          append(Seq(transfer)).explicitGet()
-//        }
-//    }
-//  }
+  property("validation of all functions from contexts") {
+    forAll(preconditionsAndPayments) {
+      case (genesis, setScriptTransaction, dataTransaction, transfer) =>
+        assertDiffAndState(smartEnabledFS) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          append(Seq(transfer)).explicitGet()
+        }
+    }
+  }
 
   property("reading from data transaction array by key") {
     forAll(preconditionsAndPayments) {
