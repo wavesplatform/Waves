@@ -142,12 +142,13 @@ object CommonValidation {
       case _: IssueTransactionV1    => Right(tx)
       case _: ReissueTransactionV1  => Right(tx)
       case _: ExchangeTransactionV1 => Right(tx)
-      case _: ExchangeTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccountTrading)
 
-      case ExchangeTransactionV2(buyOrder, sellOrder, _, _, _, _, _, _, _) =>
-        (buyOrder, sellOrder) match {
-          case (_: OrderV3, _: Order) | (_: Order, _: OrderV3) => activationBarrier(BlockchainFeatures.OrderV3, Some("Order Version 3"))
-          case _                                               => Right(tx)
+      case exv2: ExchangeTransactionV2 =>
+        activationBarrier(BlockchainFeatures.SmartAccountTrading).flatMap { tx =>
+          (exv2.buyOrder, exv2.sellOrder) match {
+            case (_: OrderV3, _: Order) | (_: Order, _: OrderV3) => activationBarrier(BlockchainFeatures.OrderV3, Some("Order Version 3"))
+            case _                                               => Right(tx)
+          }
         }
 
       case _: LeaseTransactionV1       => Right(tx)
