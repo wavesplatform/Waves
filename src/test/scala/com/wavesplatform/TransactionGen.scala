@@ -562,7 +562,12 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
     (sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee) <- orderParamGen
   } yield Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, 2: Byte)
 
-  val orderGen: Gen[Order] = Gen.oneOf(orderV1Gen, orderV2Gen)
+  val orderV3Gen: Gen[Order] = for {
+    (sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee) <- orderParamGen
+    matcherFeeAssetId                                                                    <- assetIdGen
+  } yield Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, 3: Byte, matcherFeeAssetId)
+
+  val orderGen: Gen[Order] = Gen.oneOf(orderV1Gen, orderV2Gen, orderV3Gen)
 
   val arbitraryOrderGen: Gen[Order] = for {
     (sender, matcher, pair, orderType, _, _, _, _, _) <- orderParamGen

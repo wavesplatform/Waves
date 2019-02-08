@@ -12,36 +12,44 @@ import org.scalatest.prop.PropertyChecks
 
 class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher with NTPTime {
 
+  private def checkFieldsEquality(left: Order, right: Order): Assertion = {
+
+    def defaultChecks: Assertion = {
+      left.bytes() shouldEqual right.bytes()
+      left.idStr() shouldBe right.idStr()
+      left.senderPublicKey.publicKey shouldBe right.senderPublicKey.publicKey
+      left.matcherPublicKey shouldBe right.matcherPublicKey
+      left.assetPair shouldBe right.assetPair
+      left.orderType shouldBe right.orderType
+      left.price shouldBe right.price
+      left.amount shouldBe right.amount
+      left.timestamp shouldBe right.timestamp
+      left.expiration shouldBe right.expiration
+      left.matcherFee shouldBe right.matcherFee
+      left.signature shouldBe right.signature
+    }
+
+    (left, right) match {
+      case (l: OrderV3, r: OrderV3) => defaultChecks; l.matcherFeeAssetId shouldBe r.matcherFeeAssetId
+      case _                        => defaultChecks
+    }
+  }
+
   property("Order transaction serialization roundtrip") {
+
     forAll(orderV1Gen) { order =>
       val recovered = OrderV1.parseBytes(order.bytes()).get
-      recovered.bytes() shouldEqual order.bytes()
-      recovered.idStr() shouldBe order.idStr()
-      recovered.senderPublicKey.publicKey shouldBe order.senderPublicKey.publicKey
-      recovered.matcherPublicKey shouldBe order.matcherPublicKey
-      recovered.assetPair shouldBe order.assetPair
-      recovered.orderType shouldBe order.orderType
-      recovered.price shouldBe order.price
-      recovered.amount shouldBe order.amount
-      recovered.timestamp shouldBe order.timestamp
-      recovered.expiration shouldBe order.expiration
-      recovered.matcherFee shouldBe order.matcherFee
-      recovered.signature shouldBe order.signature
+      checkFieldsEquality(recovered, order)
     }
+
     forAll(orderV2Gen) { order =>
       val recovered = OrderV2.parseBytes(order.bytes()).get
-      recovered.bytes() shouldEqual order.bytes()
-      recovered.idStr() shouldBe order.idStr()
-      recovered.senderPublicKey.publicKey shouldBe order.senderPublicKey.publicKey
-      recovered.matcherPublicKey shouldBe order.matcherPublicKey
-      recovered.assetPair shouldBe order.assetPair
-      recovered.orderType shouldBe order.orderType
-      recovered.price shouldBe order.price
-      recovered.amount shouldBe order.amount
-      recovered.timestamp shouldBe order.timestamp
-      recovered.expiration shouldBe order.expiration
-      recovered.matcherFee shouldBe order.matcherFee
-      recovered.signature shouldBe order.signature
+      checkFieldsEquality(recovered, order)
+    }
+
+    forAll(orderV3Gen) { order =>
+      val recovered = OrderV3.parseBytes(order.bytes()).get
+      checkFieldsEquality(recovered, order)
     }
   }
 
