@@ -15,12 +15,15 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
+import com.wavesplatform.transaction.protobuf.PBTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.JsValue
+
+import scala.util.Try
 
 object TransactionFactory {
 
@@ -748,6 +751,7 @@ object TransactionFactory {
           case SponsorFeeTransaction         => jsv.as[SignedSponsorFeeRequest].toTx
           case ExchangeTransactionV1         => jsv.as[SignedExchangeRequest].toTx
           case ExchangeTransactionV2         => jsv.as[SignedExchangeRequestV2].toTx
+          case PBTransaction.TX => Try(jsv.as[PBTransaction.TX]).toEither.left.map(e => GenericError(e))
         }
     }
   }
