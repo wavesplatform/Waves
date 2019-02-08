@@ -325,7 +325,7 @@ lazy val node = project
         Dependencies.http ++
         Dependencies.akka ++
         Dependencies.serialization ++
-        Dependencies.testKit.map(_ % "test") ++
+        Dependencies.testKit.map(_ % Test) ++
         Dependencies.logging ++
         Dependencies.matcher ++
         Dependencies.metrics ++
@@ -344,7 +344,7 @@ lazy val node = project
     PB.targets in Compile := Seq(
       scalapb.gen() → (sourceManaged in Compile).value
     ),
-    sourceGenerators in Compile += versionSource
+    sourceGenerators in Compile := versionSource.taskValue +: (sourceGenerators in Compile).value
   )
   .dependsOn(langJVM, commonJVM)
 
