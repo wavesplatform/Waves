@@ -21,8 +21,8 @@ message Transaction {
     repeated bytes proofs = 7 [(scalapb.field).scala_name = "proofsArray", (scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
 
     oneof data {
-        MassTransferData massTransfer = 1011;
-    }
+        MassTransferData massTransfer = 111;
+    };
 };
 
 message MassTransferData {
