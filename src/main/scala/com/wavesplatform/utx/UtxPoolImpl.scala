@@ -29,7 +29,7 @@ import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong
-import scala.util.{Left, Right}
+import scala.util.{Left, Right, Try}
 
 class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer[Address], fs: FunctionalitySettings, utxSettings: UtxSettings)
     extends ScorexLogging
@@ -195,6 +195,11 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer
         for {
           _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
 
+          _ <- tx match {
+            case tr: TransferTransaction => UtxPoolImpl.validateOverflow(tr, b.activatedFeatures.keySet)
+            case _                       => Right(())
+          }
+
           transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
             .map(_.bytes().size)
             .sum
@@ -264,6 +269,18 @@ object UtxPoolImpl {
         }
       }
     }
+
+  }
+
+  def validateOverflow(tx: TransferTransaction, fs: Set[Short]): Either[ValidationError, Unit] = {
+    if (fs(12: Short))
+      Right(()) // lets transaction validates itself
+    else
+      Try(Math.addExact(tx.fee, tx.amount))
+        .fold(
+          _ => ValidationError.OverflowError.asLeft[Unit],
+          _ => ().asRight[ValidationError]
+        )
   }
 
 }
