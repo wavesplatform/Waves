@@ -53,28 +53,29 @@ object ExchangeTransactionDiff {
 
       def wavesPortfolio(amt: Long) = Portfolio(amt, LeaseBalance.empty, Map.empty)
 
-      def matcherOrderFeePortfolio(order: Order): Portfolio = {
+      /*** Calculates portfolio for matcher from the orders (taking into account that fee can be paid in asset != Waves) */
+      def matcherOrdersFeePortfolio(buyOrder: Order, sellOrder: Order): Portfolio = {
 
-        lazy val default = wavesPortfolio(order.matcherFee) // in case of Order V1/V2/V3 (matcherFeeAssetId = None - Waves) fee is in Waves
-
-        order match {
-          case ov3: OrderV3 => ov3.matcherFeeAssetId.fold(default)(assetId => Portfolio(0, LeaseBalance.empty, Map(assetId -> ov3.matcherFee)))
-          case _            => default
+        def getOrderPortfolio(order: Order, fee: Long): Portfolio = {
+          lazy val default = wavesPortfolio(fee)
+          order match {
+            case ov3: OrderV3 => ov3.matcherFeeAssetId.fold(default)(assetId => Portfolio(0, LeaseBalance.empty, Map(assetId -> fee)))
+            case _            => default
+          }
         }
-      }
 
-      val matcherFeePortfolio =
         Monoid.combineAll(
           Seq(
+            getOrderPortfolio(buyOrder, t.buyMatcherFee),
+            getOrderPortfolio(sellOrder, t.sellMatcherFee),
             wavesPortfolio(-t.fee),
-            matcherOrderFeePortfolio(t.buyOrder),
-            matcherOrderFeePortfolio(t.sellOrder)
           )
         )
+      }
 
       val feeDiff = Monoid.combineAll(
         Seq(
-          Map(matcher -> matcherFeePortfolio),
+          Map(matcher -> matcherOrdersFeePortfolio(t.buyOrder, t.sellOrder)),
           Map(buyer   -> wavesPortfolio(-t.buyMatcherFee)),
           Map(seller  -> wavesPortfolio(-t.sellMatcherFee))
         ))
