@@ -106,7 +106,7 @@ object ContractInvocationTransactionDiff {
                       val minWaves = (tx.checkedAssets().count(blockchain.hasAssetScript) +
                         ps.count(_._3.fold(false)(blockchain.hasAssetScript))) * ScriptExtraFee + FeeConstants(ContractInvocationTransaction.typeId) * FeeUnit
                       Either.cond(
-                        minWaves < wavesFee,
+                        minWaves <= wavesFee,
                         (),
                         GenericError(s"Fee in ${tx.assetFee._1
                           .fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
