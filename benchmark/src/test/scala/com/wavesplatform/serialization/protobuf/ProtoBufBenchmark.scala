@@ -21,7 +21,7 @@ import org.openjdk.jmh.infra.Blackhole
 class ProtoBufBenchmark {
 
   @Benchmark
-  def serializeMassTransferPB_test(bh: Blackhole): Unit = bh.consume {
+  def serializeMassTransferPB_test(bh: Blackhole): Unit = {
     val vanillaTx = {
       val transfers = MassTransferTransaction
         .parseTransfersList(
@@ -44,11 +44,11 @@ class ProtoBufBenchmark {
     }
 
     val tx = vanillaTx.toPB
-    tx.toByteArray
+    bh.consume(tx.toByteArray)
   }
 
   @Benchmark
-  def serializeMassTransferVanilla_test(bh: Blackhole): Unit = bh.consume {
+  def serializeMassTransferVanilla_test(bh: Blackhole): Unit = {
     val vanillaTx = {
       val transfers = MassTransferTransaction
         .parseTransfersList(
@@ -70,6 +70,6 @@ class ProtoBufBenchmark {
         .get
     }
 
-    vanillaTx.bytes()
+    bh.consume(vanillaTx.bytes())
   }
 }
