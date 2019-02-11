@@ -9,6 +9,7 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
@@ -272,8 +273,8 @@ object UtxPoolImpl {
 
   }
 
-  def validateOverflow(tx: TransferTransaction, fs: Set[Short]): Either[ValidationError, Unit] = {
-    if (fs(12: Short))
+  def validateOverflow(tx: TransferTransaction, activatedFeatures: Set[Short]): Either[ValidationError, Unit] = {
+    if (activatedFeatures(BlockchainFeatures.DummyFeature.id))
       Right(()) // lets transaction validates itself
     else
       Try(Math.addExact(tx.fee, tx.amount))

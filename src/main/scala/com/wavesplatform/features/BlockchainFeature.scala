@@ -16,6 +16,9 @@ object BlockchainFeatures {
   val SmartAccountTrading             = BlockchainFeature(10, "Smart Account Trading")
   val Ride4DApps                      = BlockchainFeature(11, "RIDE 4 DAPPS")
 
+  // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
+  val DummyFeature = BlockchainFeature(-1, "Non Votable!")
+
   private val dict = Seq(
     SmallerMinimalGeneratingBalance,
     NG,
