@@ -7,7 +7,7 @@ import scalapb.GeneratedMessageCompanion
 
 //noinspection TypeAnnotation
 trait PBTransactionJson {
-  implicit def generatedMessageJsonFormat[T <: scalapb.GeneratedMessage with scalapb.Message[T]: GeneratedMessageCompanion] = Format[T](
+  implicit def generatedMessageJsonFormat[T <: scalapb.GeneratedMessage with scalapb.Message[T]: GeneratedMessageCompanion]: Format[T] = Format[T](
     Reads { js =>
       def toJson4s(js: JsValue): JValue = js match {
         case JsNull          => JNull
