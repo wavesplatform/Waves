@@ -13,8 +13,9 @@ import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import kamon.Kamon
+import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
 class OrderBookActor(owner: ActorRef,
@@ -29,6 +30,8 @@ class OrderBookActor(owner: ActorRef,
     with ScorexLogging {
 
   override def persistenceId: String = OrderBookActor.name(assetPair)
+
+  protected override val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[${assetPair.key}]"))
 
   private var savingSnapshot: Option[QueueEventWithMeta.Offset] = None
   private var lastProcessedOffset: Long                         = -1L
