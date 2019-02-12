@@ -63,7 +63,7 @@ message DataTransactionData {
         oneof value {
             int64 intValue = 10;
             bool boolValue = 11;
-            bytes binaryValue = 12;
+            bytes binaryValue = 12 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
             string stringValue = 13;
         };
     };

@@ -13,7 +13,7 @@ trait PBBlockImplicits {
         vb.SignerData(block.getSignerData.generator, block.getSignerData.signature),
         com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.getConsensusData.baseTarget, block.getConsensusData.generationSignature),
         block.transactions.map(_.toVanilla),
-        block.featureVotes.map(_.toShort)
+        block.featureVotes.map(toShortWithCheck)
       )
     }
   }
@@ -30,6 +30,11 @@ trait PBBlockImplicits {
         block.version
       )
     }
+  }
+
+  private[this] def toShortWithCheck(int: Int): Short = {
+    require(int > 0 && int < 65535, s"Short overflow: $int")
+    int.toShort
   }
 }
 
