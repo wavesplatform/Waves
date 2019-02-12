@@ -30,7 +30,6 @@ object ContractScript {
   case class ContractScriptImpl(stdLibVersion: StdLibVersion, expr: Contract, maxComplexity: Long) extends Script {
     override val complexity: Long = maxComplexity
     override type Expr = Contract
-    override val text: String = expr.toString
     override val bytes: Coeval[ByteStr] =
       Coeval.evalOnce {
         val s = Array(0: Byte, ScriptType.Contract.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(expr)

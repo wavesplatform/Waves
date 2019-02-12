@@ -19,9 +19,9 @@ import org.scalatest.{FreeSpec, Matchers}
 class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings {
 
   def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])])(f: (BlockchainUpdaterImpl, PrivateKeyAccount) => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
+    val defaultWriter = new LevelDBWriter(db, ignorePortfolioChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
     val settings      = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignorePortfolioChanged, settings, ntpTime)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 

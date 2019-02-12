@@ -73,7 +73,7 @@ object StateSyntheticBenchmark {
     override def init(): Unit = {
       super.init()
 
-      val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
+      val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPublicKey)"
       val untypedScript = Parser.parseExpr(textScript).get.value
       val typedScript   = ExpressionCompiler(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
 

@@ -15,7 +15,7 @@
 
     <logger name="org.aspectj" level="INFO"/>
 
-    <root level="TRACE">
+    <root level="OFF">
         <appender-ref ref="STDOUT"/>
     </root>
 </configuration>

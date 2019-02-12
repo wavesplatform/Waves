@@ -15,12 +15,13 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{AssetId, GenesisTransaction}
+import com.wavesplatform.transaction.{AssetId, GenesisTransaction, ValidationError}
 import com.wavesplatform.transaction.smart.script.ContractScript
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -181,7 +182,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     }
   }
 
-  property("asset script ban nvoking contract with payment") {
+  property("asset script ban invoking contract with payment") {
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
@@ -239,6 +240,43 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi should produce("TransactionNotAllowedByScript")
         }
+    }
+  }
+
+  property("Contract payment should be positive") {
+    forAll(for {
+      a <- accountGen
+      quantity = 1000000
+      am     <- Gen.choose[Long](1L, quantity)
+      master <- accountGen
+      ts     <- timestampGen
+      asset = IssueTransactionV2
+        .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetAllowed), enoughFee, ts)
+        .explicitGet()
+      contractGen = (paymentContractGen(a, -1, Some(asset.id())) _)
+      r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)))
+    } yield (a, am, r._1, r._2, r._3, asset, master, ts)) {
+      case (acc, amount, genesis, setScript, ci, asset, master, ts) =>
+        val t = TransferTransactionV2.selfSigned(Some(asset.id()), master, acc, asset.quantity / 10, ts, None, enoughFee, Array[Byte]()).explicitGet()
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
+          blockDiffEi should produce("NegativeAmount")
+        }
+    }
+  }
+
+  property("payment should be positive") {
+    forAll(for {
+      invoker     <- accountGen
+      master      <- accountGen
+      ts          <- timestampGen
+      arg         <- genBoundedString(1, 32)
+      funcBinding <- validAliasStringGen
+      fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
+      ci = ContractInvocationTransaction.selfSigned(invoker, master, fc, Some(Payment(-1, None)), enoughFee, ts)
+    } yield (ci)) { ci =>
+      ci shouldBe 'left
+      ci.left.get.isInstanceOf[ValidationError.NegativeAmount] should be(true)
+
     }
   }
 

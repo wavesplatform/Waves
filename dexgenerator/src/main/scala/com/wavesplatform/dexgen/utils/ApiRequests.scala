@@ -8,17 +8,7 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest, SignedTransferV1Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.it.api.{
-  AssetBalance,
-  Balance,
-  MatcherResponse,
-  MatcherStatusResponse,
-  OrderBookResponse,
-  OrderbookHistory,
-  ResponseFutureExt,
-  Transaction,
-  UnexpectedStatusCodeException
-}
+import com.wavesplatform.it.api.{AssetBalance, Balance, MatcherResponse, MatcherStatusResponse, OrderBookResponse, OrderbookHistory, ResponseFutureExt, Transaction, UnexpectedStatusCodeException}
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
@@ -57,7 +47,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
                 response
               } else {
                 log.info(s"[$tag] Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
-                throw UnexpectedStatusCodeException(r.getUrl, response.getStatusCode, response.getResponseBody)
+                throw UnexpectedStatusCodeException(r.getMethod, r.getUrl, response.getStatusCode, response.getResponseBody)
               }
             }
           }
@@ -91,7 +81,6 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
 
   def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
     SignedMassTransferRequest(
-      MassTransferTransaction.version,
       Base58.encode(tx.sender.publicKey),
       tx.assetId.map(_.base58),
       tx.transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },
@@ -202,9 +191,9 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     def unconfirmedTxInfo(txId: String)(implicit tag: String): Future[Transaction] = get(s"/transactions/unconfirmed/info/$txId").as[Transaction]
 
     def findTransactionInfo(txId: String)(implicit tag: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
-      case Success(tx)                                       => Success(Some(tx))
-      case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
-      case Failure(ex)                                       => Failure(ex)
+      case Success(tx)                                          => Success(Some(tx))
+      case Failure(UnexpectedStatusCodeException(_, _, 404, _)) => Success(None)
+      case Failure(ex)                                          => Failure(ex)
     }
 
     def ensureTxDoesntExist(txId: String)(implicit tag: String): Future[Unit] =

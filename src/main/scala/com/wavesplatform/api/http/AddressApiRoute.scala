@@ -13,6 +13,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.TransactionFactory
+import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -365,13 +366,13 @@ case class AddressApiRoute(settings: RestAPISettings,
   }
 
   private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
-    val script = blockchain
+    val script: Option[Script] = blockchain
       .accountScript(account)
 
     AddressScriptInfo(
       address = account.address,
       script = script.map(_.bytes().base64),
-      scriptText = script.map(_.text),
+      scriptText = script.map(Script.decompile),
       complexity = script.map(_.complexity).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
     )

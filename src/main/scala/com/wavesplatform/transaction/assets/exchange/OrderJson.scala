@@ -66,7 +66,7 @@ object OrderJson {
       expiration,
       matcherFee,
       eproofs,
-      version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs(0).arr.size == SignatureLength) { 1 } else { 2 })
+      version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
     )
   }
 
