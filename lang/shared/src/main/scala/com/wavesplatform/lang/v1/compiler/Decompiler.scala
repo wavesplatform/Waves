@@ -14,9 +14,11 @@ object Decompiler {
     e match {
       case Terms.FUNC(name, args, body) =>
         out("func " + name + " (" + args.map(_.toString).mkString(","), ident) + ") = {\n" +
-          out(Decompiler(body, ctx) + "\n", 1 + ident) +
-          out("}", ident)
-      case Terms.LET(name, value) => out("let " + name + " =\n" + expr(value, 1 + ident, ctx), ident)
+        expr(body, 1 + ident, ctx) + "\n" +
+        out("}\n", ident)
+      case Terms.LET(name, value) =>
+        out("let " + name + " =\n", 0 + ident) +
+        expr(value, 1 + ident, ctx)
     }
 
   private def expr(e: EXPR, ident: Int, ctx: DecompilerContext): String =
@@ -25,14 +27,15 @@ object Decompiler {
       case Terms.FALSE            => out("false", ident)
       case Terms.CONST_BOOLEAN(b) => out(b.toString.toLowerCase(), ident)
       case Terms.IF(cond, it, iff) =>
-        out("{ if (\n", ident) +
-          expr(cond, 1 + ident, ctx) + "\n" +
+          out("{\n", 0 + ident) +
+          out("if (\n", 1 + ident) +
+          expr(cond, 2 + ident, ctx) + "\n" +
           out(")\n", 1 + ident) +
-          out("then\n", ident) +
-          expr(it, 1 + ident, ctx) + "\n" +
-          out("else\n", ident) +
-          expr(iff, 1 + ident, ctx) + "\n" +
-          out("}", ident)
+          out("then\n", 1 + ident) +
+          expr(it, 2 + ident, ctx) + "\n" +
+          out("else\n", 1 + ident) +
+          expr(iff, 2 + ident, ctx) + "\n" +
+          out("}", 0 + ident)
       case Terms.CONST_LONG(t)   => out(t.toLong.toString, ident)
       case Terms.CONST_STRING(s) => out('"' + s + '"', ident)
       case Terms.LET_BLOCK(let, exprPar) =>
@@ -47,14 +50,22 @@ object Decompiler {
       case Terms.CONST_BYTESTR(bs) => out("base58'" + bs.base58 + "'", ident)
       case Terms.FUNCTION_CALL(func, args) =>
         func match {
-          case FunctionHeader.Native(name) =>
-            out(ctx.opCodes.getOrElse(name, "<Native_" + name + ">") +
-                  "(" + args.map(expr(_, 0, ctx)).mkString(",") + ")",
-                ident)
           case FunctionHeader.User(name) => out(name + "(" + args.map(expr(_, 0, ctx)).mkString(",") + ")", ident)
+          case FunctionHeader.Native(name) =>
+            val binOp: Option[String] = ctx.binaryOps.get(name)
+            binOp match {
+              case Some(binOp) => out(args.map(expr(_, 0, ctx)).mkString(" " + binOp + " "), ident)
+              case None =>
+                val opCode = ctx.opCodes.get(name)
+                opCode match {
+                  case None =>
+                    out("Decompile Error: Wrong opcode: <" + name + "> with args:" + "(" + args.map(expr(_, 0, ctx)).mkString(",") + ")", ident)
+                  case Some(opCode) => out(opCode + "(" + args.map(expr(_, 0, ctx)).mkString(",") + ")", ident)
+                }
+            }
         }
       case Terms.REF(ref)              => out(ref, ident)
-      case Terms.GETTER(get_expr, fld) => out(expr(get_expr, ident, ctx) + "." + fld, ident)
+      case Terms.GETTER(get_expr, fld) => out(expr(get_expr, ident, ctx) + "." + fld, 0)
       case Terms.ARR(_)                => ??? // never happens
       case _: Terms.CaseObj            => ??? // never happens
     }
@@ -72,7 +83,7 @@ object Decompiler {
             .mkString("\n") +
           (vf match {
             case Some(VerifierFunction(annotation, u)) =>
-              out("@Verifier(" + annotation.txArgName + ")\n", 0) +
+              out("\n@Verifier(" + annotation.txArgName + ")\n", 0) +
                 Decompiler.decl(u, 0, ctx)
             case None => ""
           })
