@@ -2,6 +2,7 @@
 syntax = "proto3";
 option java_package = "com.wavesplatform.transaction.protobuf";
 import "scalapb/scalapb.proto";
+import "scripts.proto";
 
 option (scalapb.options) = {
     import: "com.wavesplatform.serialization.protobuf.utils._"
@@ -23,11 +24,54 @@ message Transaction {
     repeated bytes proofs = 9 [(scalapb.field).scala_name = "proofsArray", (scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
 
     oneof data {
-        MassTransferData massTransfer = 111;
+        GenesisTransactionData genesis = 101;
+        // 102 = payment
+        IssueTransactionData issue = 103;
+        TransferTransactionData transfer = 104;
+        ReissueTransactionData reissue = 105;
+        BurnTransactionData burn = 106;
+        ExchangeTransactionData exchange = 107;
+        LeaseTransactionData lease = 108;
+        LeaseCancelTransactionData leaseCancel = 109;
+        CreateAliasTransactionData createAlias = 110;
+        MassTransferTransactionData massTransfer = 111;
+        DataTransactionData dataTransaction = 112;
+        SetScriptTransactionData setScript = 113;
+        // 114 = sponsor fee
+        SetAssetScriptTransactionData setAssetScript = 115;
+        // 116 = contract invocation
     };
 };
 
-message MassTransferData {
+message GenesisTransactionData {
+    bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.Address"];
+    uint64 amount = 2;
+};
+
+message TransferTransactionData {
+    bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.AddressOrAlias"];
+    uint64 amount = 2;
+};
+
+message CreateAliasTransactionData {
+    bytes alias = 1 [(scalapb.field).type = "com.wavesplatform.account.Alias"];
+};
+
+message DataTransactionData {
+    message DataEntry {
+        string key = 1;
+        oneof value {
+            int64 intValue = 10;
+            bool boolValue = 11;
+            bytes binaryValue = 12;
+            string stringValue = 13;
+        };
+    };
+
+    repeated DataEntry data = 1;
+};
+
+message MassTransferTransactionData {
     message Transfer {
         bytes address = 1 [(scalapb.field).type = "com.wavesplatform.account.AddressOrAlias"];
         uint64 amount = 2;
@@ -35,3 +79,98 @@ message MassTransferData {
 
     repeated Transfer transfers = 3;
 };
+
+message LeaseTransactionData {
+    bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.AddressOrAlias"];
+    uint64 amount = 2;
+};
+
+message LeaseCancelTransactionData {
+    bytes leaseId = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+};
+
+message BurnTransactionData {
+    uint64 amount = 1;
+};
+
+message IssueTransactionData {
+    string name = 1;
+    string description = 2;
+    uint64 quantity = 3;
+    uint32 decimals = 4;
+    bool reissuable = 5;
+    Script script = 6;
+};
+
+
+message ReissueTransactionData {
+    uint64 quantity = 3;
+    bool reissuable = 5;
+};
+
+message SetAssetScriptTransactionData {
+    Script script = 6;
+};
+
+message SetScriptTransactionData {
+    Script script = 6;
+};
+
+message ExchangeTransactionData {
+    message Order {
+        enum Type {
+            BUY = 0;
+            SELL = 1;
+        };
+
+        message AssetPair {
+            bytes amountAssetId = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+            bytes priceAssetId = 2 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+        };
+
+        bytes senderPublicKey = 1 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
+        bytes matcherPublicKey = 2 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
+        AssetPair assetPair = 3;
+        Type orderType = 4;
+        uint64 amount = 5;
+        uint64 price = 6;
+        uint64 timestamp = 7;
+        uint64 expiration = 8;
+        uint64 matcherFee = 9;
+        repeated bytes proofs = 10;
+        uint32 version = 11;
+    };
+
+    Order buyOrder = 1;
+    Order sellOrder = 2;
+    uint64 price = 3;
+    uint64 buyMatcherFee = 4;
+    uint64 sellMatcherFee = 5;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -12,7 +12,7 @@ trait PBBlockImplicits {
         block.reference,
         vb.SignerData(block.getSignerData.generator, block.getSignerData.signature),
         com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.getConsensusData.baseTarget, block.getConsensusData.generationSignature),
-        block.transactions.map(_.toVanillaTransaction),
+        block.transactions.map(_.toVanilla),
         block.featureVotes.map(_.toShort)
       )
     }
