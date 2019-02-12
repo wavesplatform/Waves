@@ -48,24 +48,6 @@ object ContractSerDe {
     } yield Contract(decs, cfs, vf)
   }
 
-  /*private[lang] def deserializeAnnotation(bb: ByteBuffer): Either[String, Annotation] = {
-    for {
-      annType <- tryEi(bb.getInt)
-      ann <- annType match {
-        case CALL_ANNO => deserializeCallAnnotation(bb)
-        case VER_ANNO  => deserializeVerifiableAnnotation(bb)
-        case t         => Left(s"Unknown annotation type: $t")
-      }
-    } yield ann
-  }*/
-
-  /*private[lang] def serializeCallAnnotation(out: ByteArrayOutputStream, a: CallableAnnotation): Unit =
-    out.writeString(a.invocationArgName)
-
-  private[lang] def serializeVerifiableAnnotation(out: ByteArrayOutputStream, v: VerifierAnnotation): Unit = {
-    out.writeString(v.txArgName)
-  }*/
-
   private def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
     Serde.serializeDeclaration(out, dec, Serde.serAux(out, Coeval.now(()), _)).value
   }
@@ -84,11 +66,6 @@ object ContractSerDe {
     serializeDeclaration(out, func)
   }
 
-  /*private[lang] def serializeContractFunction(out: ByteArrayOutputStream, cf: CallableFunction): Unit = {
-    serializeAnnotation(out, cf.annotation.invocationArgName)
-    serializeDeclaration(out, cf.u)
-  }*/
-
   private[lang] def deserializeCallableAnnotation(bb: ByteBuffer): Either[String, CallableAnnotation] =
     tryEi(CallableAnnotation(bb.getString))
 
@@ -98,11 +75,6 @@ object ContractSerDe {
       cf <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
     } yield CallableFunction(ca, cf)
   }
-
-  /*def serializeVerifierFunction(out: ByteArrayOutputStream, vf: VerifierFunction): Unit = {
-    serializeAnnotation(out, vf.annotation.invocationArgName)
-    serializeDeclaration(out, vf.u)
-  }*/
 
   private[lang] def deserializeVerifiableAnnotation(bb: ByteBuffer): Either[String, VerifierAnnotation] =
     tryEi(VerifierAnnotation(bb.getString))
