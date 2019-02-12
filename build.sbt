@@ -49,7 +49,7 @@ inThisBuild(
     scalaVersion := "2.12.8",
     organization := "com.wavesplatform",
     crossPaths := false,
-    scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
+    scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Ywarn-unused-import", "-Xlint")
   ))
 
 resolvers ++= Seq(
@@ -110,7 +110,9 @@ inConfig(Compile)(
     mainClass := Some("com.wavesplatform.Application"),
     publishArtifact in packageDoc := false,
     publishArtifact in packageSrc := false,
-    sourceGenerators += versionSource
+    sourceGenerators += versionSource,
+    PB.targets += scalapb.gen() → (sourceManaged in Compile).value,
+    PB.deleteTargetDirectory := false
   ))
 
 inConfig(Test)(
@@ -233,6 +235,7 @@ checkPRRaw in Global := {
 
 lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
+  .disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.scalatest
   )
@@ -240,26 +243,10 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
 lazy val commonJS  = common.js
 lazy val commonJVM = common.jvm
 
-/* lazy val protobufModel = crossProject(JSPlatform, JVMPlatform)
-  .withoutSuffixFor(JVMPlatform)
-  .crossType(CrossType.Pure)
-  .settings(
-    libraryDependencies ++= Dependencies.scalatest.map(_ % Test) ++ Dependencies.protobuf.value,
-    PB.targets in Compile := Seq(
-      scalapb.gen() → (sourceManaged in Compile).value
-    ),
-    PB.protoSources in Compile := Seq(
-      (baseDirectory in Compile).value.getParentFile / "src" / "main" / "protobuf"
-    )
-  )
-  .dependsOn(common)
-
-lazy val protobufModelJS  = protobufModel.js
-lazy val protobufModelJVM = protobufModel.jvm */
-
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
+    .disablePlugins(ProtocPlugin)
     .settings(
       version := "1.0.0",
       coverageExcludedPackages := ".*",
@@ -340,11 +327,7 @@ lazy val node = project
       Dependencies.AkkaActor,
       Dependencies.AkkaStream,
       Dependencies.AkkaHTTP
-    ),
-    PB.targets in Compile := Seq(
-      scalapb.gen() → (sourceManaged in Compile).value
-    ),
-    sourceGenerators in Compile := versionSource.taskValue +: (sourceGenerators in Compile).value
+    )
   )
   .dependsOn(langJVM, commonJVM)
 
