@@ -9,5 +9,5 @@ option (scalapb.options) = {
 };
 
 message Script {
-    bytes script = 1 [(scalapb.field).type = "com.wavesplatform.transaction.smart.script.Script"];
+    bytes bytes = 1;
 };

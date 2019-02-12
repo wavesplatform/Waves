@@ -99,7 +99,7 @@ message IssueTransactionData {
     uint64 quantity = 3;
     uint32 decimals = 4;
     bool reissuable = 5;
-    Script script = 6;
+    Script script = 6 [(scalapb.field).type = "com.wavesplatform.transaction.smart.script.Script"];
 };
 
 
@@ -109,11 +109,11 @@ message ReissueTransactionData {
 };
 
 message SetAssetScriptTransactionData {
-    Script script = 6;
+    Script script = 6 [(scalapb.field).type = "com.wavesplatform.transaction.smart.script.Script"];
 };
 
 message SetScriptTransactionData {
-    Script script = 6;
+    Script script = 6 [(scalapb.field).type = "com.wavesplatform.transaction.smart.script.Script"];
 };
 
 message ExchangeTransactionData {
