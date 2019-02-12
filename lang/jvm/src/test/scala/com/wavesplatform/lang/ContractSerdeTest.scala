@@ -30,7 +30,38 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 //
 //    }
 
-    "non-empty" in roundTrip(
+    "one-declaration" in roundTrip(
+      Contract(
+        List(
+          LET("letName", CONST_BOOLEAN(true))
+        ),
+        List.empty,
+        None
+      ))
+
+    "two-declarations" in roundTrip(
+      Contract(
+        List(
+          LET("letName", CONST_BOOLEAN(true)),
+          FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
+        ),
+        List.empty,
+        None
+      ))
+
+    "callable function" in roundTrip(
+      Contract(
+        List(),
+        List(
+          CallableFunction(
+            CallableAnnotation("sender"),
+            FUNC("foo", List("a"), REF("a"))
+          )
+        ),
+        None
+      ))
+
+    "full contract" in roundTrip(
       Contract(
         List(
           LET("letName", CONST_BOOLEAN(true)),
@@ -49,18 +80,5 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           )
         )
       ))
-
-    "simple" in roundTrip(
-      Contract(
-        List(),
-        List(
-          CallableFunction(
-            CallableAnnotation("sender"),
-            FUNC("foo", List("a"), REF("a"))
-          )
-        ),
-        None
-      ))
   }
-
 }
