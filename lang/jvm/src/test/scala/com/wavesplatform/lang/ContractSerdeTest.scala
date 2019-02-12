@@ -3,7 +3,7 @@ package com.wavesplatform.lang
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.Contract._
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNC, LET, REF}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertion, FreeSpec, Matchers}
 
@@ -60,6 +60,14 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
         ),
         None
       ))
+
+    "verifier function" in roundTrip(
+      Contract(
+        List(),
+        List(),
+        Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
+      )
+    )
 
     "full contract" in roundTrip(
       Contract(
