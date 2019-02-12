@@ -13,7 +13,7 @@ import com.wavesplatform.{transaction => vt}
 trait PBTransactionImplicits {
   private[this] val WavesAssetId = ByteStr.empty
   private[this] val FeeAssetId   = WavesAssetId
-  private[this] lazy val ChainId = 0 // AddressScheme.current.chainId
+  private[this] lazy val NoChainId = 0 // AddressScheme.current.chainId
 
   implicit class VanillaOrderImplicitConversionOps(order: vt.assets.exchange.Order) {
     def toPB: ExchangeTransactionData.Order = {
@@ -62,32 +62,32 @@ trait PBTransactionImplicits {
       // Uses version "2" for "modern" transactions with single version and proofs field
       case MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
         val data = MassTransferTransactionData(transfers.map(pt => MassTransferTransactionData.Transfer(pt.address, pt.amount)))
-        Transaction(assetId, sender, ChainId, fee, FeeAssetId, ByteStr(attachment), timestamp, 2, proofs.proofs, Data.MassTransfer(data))
+        Transaction(assetId, sender, NoChainId, fee, FeeAssetId, ByteStr(attachment), timestamp, 2, proofs.proofs, Data.MassTransfer(data))
 
       case vt.transfer.TransferTransactionV1(assetId, sender, recipient, amount, timestamp, feeAssetId, fee, attachment, signature) =>
         val data = TransferTransactionData(recipient, amount)
-        Transaction(assetId, sender, ChainId, fee, feeAssetId, ByteStr(attachment), timestamp, 1, Seq(signature), Data.Transfer(data))
+        Transaction(assetId, sender, NoChainId, fee, feeAssetId, ByteStr(attachment), timestamp, 1, Seq(signature), Data.Transfer(data))
 
       case vt.transfer.TransferTransactionV2(sender, recipient, assetId, amount, timestamp, feeAssetId, fee, attachment, proofs) =>
         val data = TransferTransactionData(recipient, amount)
-        Transaction(assetId, sender, ChainId, fee, feeAssetId, ByteStr(attachment), timestamp, 2, proofs.proofs, Data.Transfer(data))
+        Transaction(assetId, sender, NoChainId, fee, feeAssetId, ByteStr(attachment), timestamp, 2, proofs.proofs, Data.Transfer(data))
 
       case tx @ vt.CreateAliasTransactionV1(sender, alias, fee, timestamp, signature) =>
         val data = CreateAliasTransactionData(alias)
-        Transaction(None, sender, ChainId, fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.CreateAlias(data))
+        Transaction(None, sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.CreateAlias(data))
 
       case tx @ vt.CreateAliasTransactionV2(sender, alias, fee, timestamp, proofs) =>
         val data = CreateAliasTransactionData(alias)
-        Transaction(None, sender, ChainId, fee, tx.assetFee._1, None, timestamp, 2, proofs.proofs, Data.CreateAlias(data))
+        Transaction(None, sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 2, proofs.proofs, Data.CreateAlias(data))
 
       case tx @ vt.assets.exchange
             .ExchangeTransactionV1(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, signature) =>
         val data = ExchangeTransactionData(Some(buyOrder.toPB), Some(sellOrder.toPB), amount, price, buyMatcherFee, sellMatcherFee)
-        Transaction(None, tx.sender, ChainId, fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Exchange(data))
+        Transaction(None, tx.sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Exchange(data))
 
       case tx @ vt.assets.exchange.ExchangeTransactionV2(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs) =>
         val data = ExchangeTransactionData(Some(buyOrder.toPB), Some(sellOrder.toPB), amount, price, buyMatcherFee, sellMatcherFee)
-        Transaction(None, tx.sender, ChainId, fee, tx.assetFee._1, None, timestamp, 2, proofs.proofs, Data.Exchange(data))
+        Transaction(None, tx.sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 2, proofs.proofs, Data.Exchange(data))
 
       case vt.assets.IssueTransactionV1(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature) =>
         val data = IssueTransactionData(new String(name, StandardCharsets.UTF_8),
@@ -96,7 +96,7 @@ trait PBTransactionImplicits {
                                         decimals,
                                         reissuable,
                                         None)
-        Transaction(None, sender, ChainId, fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Issue(data))
+        Transaction(None, sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Issue(data))
 
       case vt.assets.IssueTransactionV2(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs) =>
         val data = IssueTransactionData(new String(name, StandardCharsets.UTF_8),
@@ -109,7 +109,7 @@ trait PBTransactionImplicits {
 
       case tx @ vt.assets.ReissueTransactionV1(sender, assetId, quantity, reissuable, fee, timestamp, signature) =>
         val data = ReissueTransactionData(quantity, reissuable)
-        Transaction(assetId, sender, tx.chainByte.getOrElse(ChainId), fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Reissue(data))
+        Transaction(assetId, sender, tx.chainByte.getOrElse(NoChainId), fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Reissue(data))
 
       case tx @ vt.assets.ReissueTransactionV2(chainId, sender, assetId, quantity, reissuable, fee, timestamp, proofs) =>
         val data = ReissueTransactionData(quantity, reissuable)
@@ -117,7 +117,7 @@ trait PBTransactionImplicits {
 
       case tx @ vt.assets.BurnTransactionV1(sender, assetId, quantity, fee, timestamp, signature) =>
         val data = BurnTransactionData(quantity)
-        Transaction(assetId, sender, tx.chainByte.getOrElse(ChainId), fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Burn(data))
+        Transaction(assetId, sender, tx.chainByte.getOrElse(NoChainId), fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Burn(data))
 
       case tx @ vt.assets.BurnTransactionV2(chainId, sender, assetId, quantity, fee, timestamp, proofs) =>
         val data = BurnTransactionData(quantity)
@@ -133,11 +133,19 @@ trait PBTransactionImplicits {
 
       case tx @ vt.lease.LeaseTransactionV1(sender, amount, fee, timestamp, recipient, signature) =>
         val data = LeaseTransactionData(recipient, amount)
-        Transaction(None, sender, ChainId, fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Lease(data))
+        Transaction(None, sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Lease(data))
 
       case tx @ vt.lease.LeaseTransactionV2(sender, amount, fee, timestamp, recipient, proofs) =>
         val data = LeaseTransactionData(recipient, amount)
-        Transaction(None, sender, ChainId, fee, tx.assetFee._1, None, timestamp, 2, proofs.proofs, Data.Lease(data))
+        Transaction(None, sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 2, proofs.proofs, Data.Lease(data))
+
+      case tx @ vt.lease.LeaseCancelTransactionV1(sender, leaseId, fee, timestamp, signature) =>
+        val data = LeaseCancelTransactionData(leaseId)
+        Transaction(None, sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.LeaseCancel(data))
+
+      case tx @ vt.lease.LeaseCancelTransactionV2(chainId, sender, leaseId, fee, timestamp, proofs) =>
+        val data = LeaseCancelTransactionData(leaseId)
+        Transaction(None, sender, chainId, fee, tx.assetFee._1, None, timestamp, 2, proofs.proofs, Data.LeaseCancel(data))
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
