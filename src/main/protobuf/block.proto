@@ -12,13 +12,13 @@ option (scalapb.options) = {
 message Block {
     option (scalapb.message).companion_extends = "com.wavesplatform.block.protobuf.PBBlockCompanion";
 
-    uint32 version = 1;
-    uint64 timestamp = 2;
-    bytes reference = 3 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
-    SignerData signerData = 4;
-    ConsensusData consensusData = 5;
-    repeated Transaction transactions = 6;
-    repeated uint32 featureVotes = 7 [(scalapb.field).collection_type = "scala.collection.immutable.Set"];
+    bytes reference = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    SignerData signerData = 2;
+    ConsensusData consensusData = 3;
+    repeated Transaction transactions = 4;
+    repeated uint32 featureVotes = 5 [(scalapb.field).collection_type = "scala.collection.immutable.Set"];
+    uint64 timestamp = 6;
+    uint32 version = 7;
 
     message SignerData {
         bytes generator = 1 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];

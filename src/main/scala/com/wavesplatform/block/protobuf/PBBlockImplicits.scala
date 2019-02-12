@@ -12,7 +12,7 @@ trait PBBlockImplicits {
         block.reference,
         vb.SignerData(block.getSignerData.generator, block.getSignerData.signature),
         com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.getConsensusData.baseTarget, block.getConsensusData.generationSignature),
-        block.transactions.map(_.toVanillaTransaction()),
+        block.transactions.map(_.toVanillaTransaction),
         block.featureVotes.map(_.toShort)
       )
     }
@@ -21,13 +21,13 @@ trait PBBlockImplicits {
   implicit class VanillaBlockConversions(block: vb.Block) {
     def toPB: Block = {
       Block(
-        block.version,
-        block.timestamp,
         block.reference,
         Some(Block.SignerData(block.signerData.generator, block.signerData.signature)),
         Some(Block.ConsensusData(block.consensusData.baseTarget, block.consensusData.generationSignature)),
         block.transactionData.map(_.toPB),
-        block.featureVotes.map(_.toInt)
+        block.featureVotes.map(_.toInt),
+        block.timestamp,
+        block.version
       )
     }
   }

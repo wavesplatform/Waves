@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.protobuf
 
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.protobuf.Transaction.Data.MassTransfer
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
@@ -9,12 +10,13 @@ import com.wavesplatform.transaction.{AssetId, Transaction => VanillaTransaction
 trait PBTransactionImplicits {
   private[this] val WavesAssetId = ByteStr.empty
   private[this] val FeeAssetId   = WavesAssetId
+  private[this] lazy val ChainId = AddressScheme.current.chainId
 
   implicit class VanillaTransactionImplicitConversionOps(tx: VanillaTransaction) {
     def toPB: Transaction = tx match {
       case MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
         val data = MassTransferData(transfers.map(pt => MassTransferData.Transfer(pt.address, pt.amount)))
-        Transaction(assetId, sender, timestamp, fee, FeeAssetId, ByteStr(attachment), proofs.proofs, MassTransfer(data))
+        Transaction(assetId, sender, ChainId, fee, FeeAssetId, ByteStr(attachment), timestamp, 1, proofs.proofs, MassTransfer(data))
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
@@ -22,7 +24,7 @@ trait PBTransactionImplicits {
   }
 
   implicit class PBTransactionImplicitConversionOps(tx: Transaction) {
-    def toVanillaTransaction(version: Int = 2): VanillaTransaction = tx.data match {
+    def toVanillaTransaction: VanillaTransaction = tx.data match {
       case MassTransfer(MassTransferData(transfers)) =>
         MassTransferTransaction(
           tx.assetId,
