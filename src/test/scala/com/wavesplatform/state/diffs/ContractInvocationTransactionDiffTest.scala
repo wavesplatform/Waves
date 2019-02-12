@@ -314,4 +314,26 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     }
   }
 
+  property("contract with payment of smart asser require extra fee") {
+    forAll(for {
+      a  <- accountGen
+      am <- smallFeeGen
+      contractGen = (paymentContractGen(a, am) _)
+      invoker <- accountGen
+      ts      <- timestampGen
+      asset = IssueTransactionV2
+        .selfSigned(chainId, invoker, "Asset#1".getBytes, "".getBytes, 1000000, 8, false, Some(assetAllowed), enoughFee, ts)
+        .explicitGet()
+      r <- preconditionsAndSetContract(contractGen,
+                                       invokerGen = Gen.oneOf(Seq(invoker)),
+                                       payment = Some(Payment(1, Some(asset.id()))),
+                                       feeGen = ciFee(0))
+    } yield (a, am, r._1, r._2, r._3, asset, invoker)) {
+      case (acc, amount, genesis, setScript, ci, asset, invoker) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
+          blockDiffEi should produce("does not exceed minimal value")
+        }
+    }
+  }
+
 }
