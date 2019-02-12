@@ -4,7 +4,7 @@ import com.wavesplatform.transaction.protobuf.PBTransactionImplicits._
 import com.wavesplatform.{block => vb}
 
 trait PBBlockImplicits {
-  implicit class PBBlockConversions(block: Block) {
+  implicit class PBBlockImplicitConversionOps(block: Block) {
     def toVanilla: vb.Block = {
       vb.Block(
         block.timestamp,
