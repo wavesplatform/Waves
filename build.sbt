@@ -49,7 +49,13 @@ inThisBuild(
     scalaVersion := "2.12.8",
     organization := "com.wavesplatform",
     crossPaths := false,
-    scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Ywarn-unused-import", "-Xlint")
+    scalacOptions ++= Seq("-feature",
+                          "-deprecation",
+                          "-language:higherKinds",
+                          "-language:implicitConversions",
+                          "-Ywarn-unused:-implicits",
+                          "-Xlint",
+                          "-Ywarn-unused-import")
   ))
 
 resolvers ++= Seq(
@@ -215,8 +221,8 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
 
 addCommandAlias(
   "checkPR",
+  // set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
   """;
-    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
     |Global / checkPRRaw;
     |set scalacOptions in ThisBuild -= "-Xfatal-warnings";
   """.stripMargin

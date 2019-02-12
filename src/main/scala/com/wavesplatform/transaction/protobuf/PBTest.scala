@@ -1,36 +1,58 @@
 package com.wavesplatform.transaction.protobuf
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.transfer.MassTransferTransaction
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.json.Json
 
-object PBTest extends App {
+// TODO: Remove test object
+private[protobuf] object PBTest extends App {
   import PBTransactionImplicits._
 
-  val vanillaTx = {
-    val transfers = MassTransferTransaction
-      .parseTransfersList(
-        List(Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 100000000L), Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000L)))
-      .right
-      .get
+  val buy = OrderV2(
+    PublicKeyAccount.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
+    PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
+    AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
+    OrderType.BUY,
+    2,
+    6000000000L,
+    1526992336241L,
+    1529584336241L,
+    1,
+    Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
+  )
 
-    MassTransferTransaction
-      .create(
-        None,
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-        transfers,
-        1518091313964L,
-        200000,
-        Base58.decode("59QuUcqP6p").get,
-        Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
-      )
-      .right
-      .get
-  }
+  val sell = OrderV1(
+    PublicKeyAccount.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet(),
+    PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
+    AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
+    OrderType.SELL,
+    3,
+    5000000000L,
+    1526992336241L,
+    1529584336241L,
+    2,
+    Base58.decode("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
+  )
+
+  val vanillaTx = ExchangeTransactionV2
+    .create(
+      buy,
+      sell,
+      2,
+      5000000000L,
+      1,
+      1,
+      1,
+      1526992336241L,
+      Proofs(Seq(ByteStr.decodeBase58("5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa").get))
+    )
+    .explicitGet()
 
   val tx = vanillaTx.toPB
   println(Json.toJson(tx))
+
+  println(s"Original size: ${vanillaTx.bytes().length}")
+  println(s"Protobuf size: ${tx.toByteArray.length}")
 }
