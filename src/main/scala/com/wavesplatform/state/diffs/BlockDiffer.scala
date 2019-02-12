@@ -19,12 +19,17 @@ import com.wavesplatform.transaction.{Transaction, ValidationError}
 
 object BlockDiffer extends ScorexLogging with Instrumented {
 
+  /**
+    * Block/microblock diff with a sequence of transactions diffs
+    */
+  type DetailedDiff = (Diff, Seq[Diff])
+
   def fromBlock[Constraint <: MiningConstraint](settings: FunctionalitySettings,
                                                 blockchain: Blockchain,
                                                 maybePrevBlock: Option[Block],
                                                 block: Block,
                                                 constraint: Constraint,
-                                                verify: Boolean = true): Either[ValidationError, (Diff, Long, Constraint)] = {
+                                                verify: Boolean = true): Either[ValidationError, (Diff, Long, Constraint, DetailedDiff)] = {
     val stateHeight = blockchain.height
 
     // height switch is next after activation
@@ -68,7 +73,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
                                                      micro: MicroBlock,
                                                      timestamp: Long,
                                                      constraint: Constraint,
-                                                     verify: Boolean = true): Either[ValidationError, (Diff, Long, Constraint)] = {
+                                                     verify: Boolean = true): Either[ValidationError, (Diff, Long, Constraint, DetailedDiff)] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(blockchain.activatedFeatures.contains(BlockchainFeatures.NG.id), (), ActivationError(s"MicroBlocks are not yet activated"))
@@ -99,7 +104,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
                                                     timestamp: Long,
                                                     txs: Seq[Transaction],
                                                     currentBlockHeight: Int,
-                                                    verify: Boolean): Either[ValidationError, (Diff, Long, Constraint)] = {
+                                                    verify: Boolean): Either[ValidationError, (Diff, Long, Constraint, DetailedDiff)] = {
     def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction): Constraint =
       constraint.put(blockchain, tx).asInstanceOf[Constraint]
 
@@ -163,7 +168,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
               Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(blockchain, diffWithLeasePatches)))
             else diffWithLeasePatches
 
-          (diffWithCancelledLeaseIns, carry, constraint)
+          (diffWithCancelledLeaseIns, carry, constraint, (Diff.empty, Seq.empty))
       }
   }
 }

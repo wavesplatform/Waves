@@ -110,7 +110,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")
       )
       .flatMap(_ =>
-        (ngState match {
+        ngState match {
           case None =>
             blockchain.lastBlockId match {
               case Some(uniqueId) if uniqueId != block.reference =>
@@ -120,9 +120,13 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
               case lastBlockId =>
                 val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
                 val miningConstraints = MiningConstraints(blockchain, height)
+
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
-                  .map(r => Some((r, Seq.empty[Transaction])))
+                  .map {
+                    case (d, c, c1, _) =>
+                      Some(((d, c, c1), Seq.empty[Transaction]))
+                  }
             }
           case Some(ng) =>
             if (ng.base.reference == block.reference) {
@@ -132,10 +136,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
-                  .map { r =>
-                    log.trace(
-                      s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
-                    Some((r, ng.transactions))
+                  .map {
+                    case (d, c, c1, _) =>
+                      log.trace(
+                        s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
+                      Some(((d, c, c1), ng.transactions))
                   }
               } else if (areVersionsOfSameBlock(block, ng.base)) {
                 if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
@@ -148,7 +153,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
 
                   BlockDiffer
                     .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
-                    .map(r => Some((r, Seq.empty[Transaction])))
+                    .map {
+                      case (d, c, c1, _) =>
+                        Some(((d, c, c1), Seq.empty[Transaction]))
+                    }
                 }
               } else
                 Left(BlockAppendError(
@@ -170,7 +178,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                       miningConstraints.total
                     }
 
-                    val diff = BlockDiffer
+                    BlockDiffer
                       .fromBlock(
                         functionalitySettings,
                         CompositeBlockchain.composite(blockchain, referencedLiquidDiff, carry),
@@ -179,32 +187,33 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                         constraint,
                         verify
                       )
-
-                    diff.map { hardenedDiff =>
-                      blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
-                      TxsInBlockchainStats.record(ng.transactions.size)
-                      Some((hardenedDiff, discarded.flatMap(_.transactionData)))
-                    }
+                      .map {
+                        case (d, c, c1, _) =>
+                          blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
+                          TxsInBlockchainStats.record(ng.transactions.size)
+                          Some(((d, c, c1), discarded.flatMap(_.transactionData)))
+                      }
                   } else {
                     val errorText = s"Forged block has invalid signature: base: ${ng.base}, requested reference: ${block.reference}"
                     log.error(errorText)
                     Left(BlockAppendError(errorText, block))
                   }
               }
-        }).map {
-          _ map {
-            case ((newBlockDiff, carry, updatedTotalConstraint), discarded) =>
-              val height = blockchain.height + 1
-              restTotalConstraint = updatedTotalConstraint
-              ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
-              lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
-              if ((block.timestamp > time
-                    .getTimestamp() - settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
-                log.info(s"New height: $height")
-              }
-              discarded
-          }
       })
+      .map {
+        _ map {
+          case ((newBlockDiff, carry, updatedTotalConstraint), discarded) =>
+            val height = blockchain.height + 1
+            restTotalConstraint = updatedTotalConstraint
+            ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
+            lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
+            if ((block.timestamp > time
+                  .getTimestamp() - settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
+              log.info(s"New height: $height")
+            }
+            discarded
+        }
+      }
   }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = {
@@ -253,7 +262,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                                            verify)
               }
             } yield {
-              val (diff, carry, updatedMdConstraint) = r
+              val (diff, carry, updatedMdConstraint, _) = r
               restTotalConstraint = updatedMdConstraint.constraints.head
               ng.append(microBlock, diff, carry, System.currentTimeMillis)
               log.info(s"$microBlock appended")

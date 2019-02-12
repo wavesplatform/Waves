@@ -47,7 +47,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val (preconditionDiff, preconditionFees, _) =
+          val (preconditionDiff, preconditionFees, _, _) =
             BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, genesisBlock)
 
@@ -70,7 +70,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val (preconditionDiff, preconditionFees, _) =
+          val (preconditionDiff, preconditionFees, _, _) =
             BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, genesisBlock)
 
@@ -188,7 +188,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(gen) {
       case (genesisBlock, transferTx) =>
         withStateAndHistory(settings) { blockchain =>
-          val (preconditionDiff, preconditionFees, _) =
+          val (preconditionDiff, preconditionFees, _, _) =
             BlockDiffer.fromBlock(settings, blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
           blockchain.append(preconditionDiff, preconditionFees, genesisBlock)
 

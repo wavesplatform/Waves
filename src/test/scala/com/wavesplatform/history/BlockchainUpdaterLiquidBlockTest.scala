@@ -11,7 +11,13 @@ import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 
-class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen with BlocksTransactionsHelpers {
+class BlockchainUpdaterLiquidBlockTest
+    extends PropSpec
+    with PropertyChecks
+    with DomainScenarioDrivenPropertyCheck
+    with Matchers
+    with TransactionGen
+    with BlocksTransactionsHelpers {
   import QuickTX._
   import UnsafeBlocks._
 
