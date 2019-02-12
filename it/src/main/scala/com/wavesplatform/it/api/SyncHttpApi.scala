@@ -6,7 +6,7 @@ import java.util.concurrent.TimeoutException
 import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
-import com.wavesplatform.features.api.ActivationStatus
+import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
@@ -19,7 +19,7 @@ import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Awaitable, Future}
+import scala.concurrent.{Await, Awaitable, ExecutionContext, Future}
 import scala.util._
 import scala.util.control.NonFatal
 
@@ -318,6 +318,9 @@ object SyncHttpApi extends Assertions {
     }
 
     def waitForUtxIncreased(fromSize: Int): Int = sync(async(n).waitForUtxIncreased(fromSize))
+
+    def featureActivationStatus(featureNum: Short): FeatureActivationStatus =
+      activationStatus.features.find(_.id == featureNum).get
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
