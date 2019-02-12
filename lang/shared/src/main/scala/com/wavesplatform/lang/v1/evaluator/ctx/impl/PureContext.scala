@@ -217,6 +217,12 @@ object PureContext {
       case xs                                            => notImplemented("take(xs: String, number: Long)", xs)
     }
 
+  lazy val listConstructor =
+    NativeFunction("cons", 2, CREATE_LIST, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]", ("head", TYPEPARAM('T'), "head"), ("tail", PARAMETERIZEDLIST(TYPEPARAM('T')), "tail")) {
+      case h :: ARR(t) :: Nil => Right(ARR(h +: t))
+      case xs                 => notImplemented("cons(head: T, tail: LIST[T]", xs)
+    }
+
   lazy val listConstructor1 =
     NativeFunction("List", 1, CREATE_LIST1, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]", ("arg1", TYPEPARAM('T'), "arg1"))(xs =>
       Right(ARR(xs.toIndexedSeq)))
@@ -392,7 +398,7 @@ object PureContext {
   def build(version: StdLibVersion): CTX =
     version match {
       case V1 | V2 => ctx
-      case V3       => Monoid.combine(ctx, CTX(Seq.empty, Map.empty, Array(listConstructor1, listConstructor2, listConstructor3)))
+      case V3       => Monoid.combine(ctx, CTX(Seq.empty, Map.empty, Array(listConstructor, listConstructor1, listConstructor2, listConstructor3)))
     }
 
 }

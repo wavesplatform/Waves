@@ -62,6 +62,7 @@ object FunctionIds {
   val ADDRESSFROMRECIPIENT: Short = 1060
 
 
+  val CREATE_LIST:  Short       = 1099
   val CREATE_LIST0: Short       = 1100
   val CREATE_LIST1: Short       = 1101
   val CREATE_LIST2: Short       = 1102
