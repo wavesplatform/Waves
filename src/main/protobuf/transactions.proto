@@ -137,15 +137,16 @@ message ExchangeTransactionData {
         uint64 timestamp = 7;
         uint64 expiration = 8;
         uint64 matcherFee = 9;
-        repeated bytes proofs = 10;
+        repeated bytes proofs = 10 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
         uint32 version = 11;
     };
 
     Order buyOrder = 1;
     Order sellOrder = 2;
-    uint64 price = 3;
-    uint64 buyMatcherFee = 4;
-    uint64 sellMatcherFee = 5;
+    uint64 amount = 3;
+    uint64 price = 4;
+    uint64 buyMatcherFee = 5;
+    uint64 sellMatcherFee = 6;
 };
 
 
