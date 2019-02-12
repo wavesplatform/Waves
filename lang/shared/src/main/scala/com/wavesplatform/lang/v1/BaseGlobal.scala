@@ -3,8 +3,6 @@ package com.wavesplatform.lang.v1
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import fastparse.core.Parsed.{Failure, Success}
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
@@ -41,11 +39,9 @@ trait BaseGlobal {
       Right(s ++ checksum(s))
     }
 
-    (Parser.parseExpr(input) match {
-      case Success(value, _)    => Right[String, Expressions.EXPR](value)
-      case Failure(_, _, extra) => Left[String, Expressions.EXPR](extra.traced.trace)
-    }).flatMap(ExpressionCompiler(context, _))
-      .flatMap(ast => serialize(ast._1).map(x => (x, ast._1)))
+    ExpressionCompiler
+      .compile(input, context)
+      .flatMap(ast => serialize(ast).map(x => (x, ast)))
   }
 
   def compileContract(input: String, ctx: CompilerContext): Either[String, (Array[Byte], Contract)] = {
@@ -55,10 +51,8 @@ trait BaseGlobal {
       Right(s ++ checksum(s))
     }
 
-    (Parser.parseContract(input) match {
-      case Success(value, _)    => Right[String, Expressions.CONTRACT](value)
-      case Failure(_, _, extra) => Left[String, Expressions.CONTRACT](extra.traced.trace)
-    }).flatMap(ContractCompiler(ctx, _))
+    ContractCompiler
+      .compile(input, ctx)
       .flatMap(ast => serialize(ast).map(x => (x, ast)))
   }
 }
