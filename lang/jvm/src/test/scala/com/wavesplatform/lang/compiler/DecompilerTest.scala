@@ -71,7 +71,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.Native(254),
       args = List(CONST_LONG(1), CONST_LONG(2))
     )
-    Decompiler(expr, decompilerContext) shouldBe "Decompile Error: Wrong opcode: <254> with args:(1,2)"
+    Decompiler(expr, decompilerContext) shouldBe "Decompile Error: Wrong opcode: <254> with args:(1, 2)"
   }
 
   property("user function call with one args") {
@@ -319,9 +319,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |                foo()
         |            )
         |            then
-        |                WriteSet(List(DataEntry("b",1),DataEntry("sender",x)))
+        |                WriteSet(List(DataEntry("b", 1), DataEntry("sender", x)))
         |            else
-        |                WriteSet(List(DataEntry("a",a),DataEntry("sender",x)))
+        |                WriteSet(List(DataEntry("a", a), DataEntry("sender", x)))
         |        }
         |    }
         |}
@@ -376,7 +376,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |            then
         |                throw("impossible")
         |            else
-        |                ContractResult(WriteSet(List(DataEntry("1","1"))),TransferSet(List(ContractTransfer(i.caller,amount,unit))))
+        |                ContractResult(WriteSet(List(DataEntry("1", "1"))), TransferSet(List(ContractTransfer(i.caller, amount, unit))))
         |        }
         |    }
         |}
