@@ -4,8 +4,8 @@ option java_package = "com.wavesplatform.transaction.protobuf";
 import "scalapb/scalapb.proto";
 
 option (scalapb.options) = {
-  import: "com.wavesplatform.serialization.protobuf.utils._"
-  flat_package: true
+    import: "com.wavesplatform.serialization.protobuf.utils._"
+    flat_package: true
 };
 
 message Transaction {

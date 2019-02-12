@@ -1,0 +1,30 @@
+// Transactions
+syntax = "proto3";
+option java_package = "com.wavesplatform.block.protobuf";
+import "scalapb/scalapb.proto";
+import "transactions.proto";
+
+option (scalapb.options) = {
+    import: "com.wavesplatform.serialization.protobuf.utils._"
+    flat_package: true
+};
+
+message Block {
+    uint32 version = 1;
+    uint64 timestamp = 2;
+    bytes reference = 3 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    SignerData signerData = 4;
+    ConsensusData consensusData = 5;
+    repeated Transaction transactions = 6;
+    repeated uint32 featureVotes = 7 [(scalapb.field).collection_type = "scala.collection.Set"];
+
+    message SignerData {
+        bytes generator = 1 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
+        bytes signature = 2 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    };
+
+    message ConsensusData {
+        uint64 baseTarget = 1;
+        bytes generationSignature = 2 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    };
+};
