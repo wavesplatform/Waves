@@ -27,7 +27,7 @@ object BlockchainFeatures {
     FairPoS,
     SmartAccountTrading,
     SmartAssets,
-    Ride4DApps
+//    Ride4DApps  // disabled in v0.16
   ).map(f => f.id -> f).toMap
 
   val implemented: Set[Short] = dict.keySet
