@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{AssetId, AssetIdStringLength, TransactionFactory, ValidationError}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.utx.UtxPool
