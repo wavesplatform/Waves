@@ -370,7 +370,7 @@ trait PBTransactionImplicits {
   }
 
   private[this] implicit def implicitIntToByte(int: Int): Byte = {
-    require(int > 0 && int <= 0xFF, s"Byte overflow: $int")
+    require(int >= 0 && int <= 0xFF, s"Byte overflow: $int")
     int.toByte
   }
 

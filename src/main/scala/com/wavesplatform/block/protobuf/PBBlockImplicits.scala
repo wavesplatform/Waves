@@ -13,7 +13,7 @@ trait PBBlockImplicits {
         vb.SignerData(block.getSignerData.generator, block.getSignerData.signature),
         com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.getConsensusData.baseTarget, block.getConsensusData.generationSignature),
         block.transactions.map(_.toVanilla),
-        block.featureVotes.map(toShortWithCheck)
+        block.featureVotes.map(intToShort)
       )
     }
   }
@@ -25,15 +25,19 @@ trait PBBlockImplicits {
         Some(Block.SignerData(block.signerData.generator, block.signerData.signature)),
         Some(Block.ConsensusData(block.consensusData.baseTarget, block.consensusData.generationSignature)),
         block.transactionData.map(_.toPB),
-        block.featureVotes.map(_.toInt),
+        block.featureVotes.map(shortToInt),
         block.timestamp,
         block.version
       )
     }
   }
 
-  private[this] def toShortWithCheck(int: Int): Short = {
-    require(int > 0 && int < 65535, s"Short overflow: $int")
+  private[this] implicit def shortToInt(s: Short): Int = {
+    java.lang.Short.toUnsignedInt(s)
+  }
+
+  private[this] def intToShort(int: Int): Short = {
+    require(int >= 0 && int <= 65535, s"Short overflow: $int")
     int.toShort
   }
 }
