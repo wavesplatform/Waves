@@ -210,7 +210,7 @@ case class Block private[block] (override val timestamp: Long,
       Json.obj("fee" -> transactionData.filter(_.assetFee._1.isEmpty).map(_.assetFee._2).sum) ++
       transactionField.json())
 
-  val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
+  val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(if (signerData.signature.isEmpty) bytes() else bytes().dropRight(SignatureLength))
 
   val blockScore: Coeval[BigInt] = Coeval.evalOnce(Block.calculateScore(consensusData.baseTarget))
 
