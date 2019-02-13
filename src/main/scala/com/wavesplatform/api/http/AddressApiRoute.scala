@@ -372,7 +372,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     AddressScriptInfo(
       address = account.address,
       script = script.map(_.bytes().base64),
-      scriptText = script.map(Script.decompile),
+      scriptText = Option(script.toString), // [WAIT] script.map(Script.decompile),
       complexity = script.map(_.complexity).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
     )

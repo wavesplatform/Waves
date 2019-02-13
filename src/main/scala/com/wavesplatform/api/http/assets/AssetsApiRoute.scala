@@ -279,7 +279,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
           "scriptDetails" -> Json.obj(
             "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
             "script"           -> JsString(script.bytes().base64),
-            "scriptText"       -> JsString(Script.decompile(script))
+            "scriptText"       -> JsString(script.toString) // [WAIT] JsString(Script.decompile(script))
           )
         }
       )
