@@ -37,7 +37,7 @@ message Transaction {
         MassTransferTransactionData massTransfer = 111;
         DataTransactionData dataTransaction = 112;
         SetScriptTransactionData setScript = 113;
-        // 114 = sponsor fee
+        SponsorFeeTransactionData sponsorFee = 114;
         SetAssetScriptTransactionData setAssetScript = 115;
         // 116 = contract invocation
     };
@@ -147,4 +147,8 @@ message ExchangeTransactionData {
     uint64 price = 4;
     uint64 buyMatcherFee = 5;
     uint64 sellMatcherFee = 6;
+};
+
+message SponsorFeeTransactionData {
+    uint64 minSponsoredAssetFee = 1;
 };
