@@ -15,6 +15,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction._
@@ -788,58 +789,30 @@ class LevelDBWriter(writableDB: DB,
   }
 
   override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
-    import com.wavesplatform.crypto._
-
-    val height = Height(h)
-
-    val consensuDataOffset = 1 + 8 + SignatureLength
-
-    // version + timestamp + reference + baseTarget + genSig
-    val txCountOffset = consensuDataOffset + 8 + Block.GeneratorSignatureLength
-
+    val height    = Height(h)
     val headerKey = Keys.blockHeaderBytesAt(height)
 
     def readTransactionBytes(count: Int) = {
-      (0 until count).toArray.flatMap { n =>
+      (0 until count).map { n =>
         db.get(Keys.transactionBytesAt(height, TxNum(n.toShort)))
-          .map { txBytes =>
-            Ints.toByteArray(txBytes.length) ++ txBytes
-          }
+          .map(transaction.protobuf.PBTransaction.parseFrom(_).toVanilla)
           .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
       }
     }
 
-    db.get(headerKey)
-      .map { headerBytes =>
-        val bytesBeforeCData   = headerBytes.take(consensuDataOffset)
-        val consensusDataBytes = headerBytes.slice(consensuDataOffset, consensuDataOffset + 40)
-        val version            = headerBytes.head
-        val (txCount, txCountBytes) = if (version == 1 || version == 2) {
-          val byte = headerBytes(txCountOffset)
-          (byte.toInt, Array[Byte](byte))
-        } else {
-          val bytes = headerBytes.slice(txCountOffset, txCountOffset + 4)
-          (Ints.fromByteArray(bytes), bytes)
-        }
-
-        val bytesAfterTxs =
-          if (version > 2) {
-            headerBytes.drop(txCountOffset + txCountBytes.length)
-          } else {
-            headerBytes.takeRight(SignatureLength + KeyLength)
-          }
-
-        val txBytes = txCountBytes ++ readTransactionBytes(txCount)
-
-        val bytes = bytesBeforeCData ++
-          Ints.toByteArray(consensusDataBytes.length) ++
-          consensusDataBytes ++
-          Ints.toByteArray(txBytes.length) ++
-          txBytes ++
-          bytesAfterTxs
-
-        bytes
+    val block = db
+      .get(headerKey)
+      .flatMap(bs =>
+        for {
+          txCount <- if (bs.length >= 4) Some(Ints.fromBytes(bs(0), bs(1), bs(2), bs(3))) else None
+          header  <- Block.parseBytesLegacy(bs.drop(Ints.BYTES)).toOption
+        } yield (txCount, header))
+      .map {
+        case (txCount, header) =>
+          header.copy(transactionData = readTransactionBytes(txCount))
       }
+
+    block.map(_.bytes())
   }
 
   override def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]] = {

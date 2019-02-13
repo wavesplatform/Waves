@@ -19,13 +19,13 @@ trait PBTransactionImplicits {
   private[this] val WavesAssetId    = ByteStr.empty
   private[this] val NoChainId: Byte = 0 // AddressScheme.current.chainId
 
-  implicit class PBTransactionVanillaAdapter(tx: Transaction) extends VanillaTransaction with SignedTransaction with FastHashId {
+  implicit class PBTransactionVanillaAdapter(tx: PBTransaction) extends VanillaTransaction with SignedTransaction with FastHashId {
     def underlying: Transaction = tx
 
     override def timestamp: Long                   = tx.timestamp
     override val sender: PublicKeyAccount          = tx.sender
     override val proofs                            = Proofs(tx.proofsArray)
-    override val signature: ByteStr                = tx.proofs.toSignature
+    override val signature: ByteStr                = proofs.toSignature
     override def builder: TransactionParser        = Transaction
     override def assetFee: (Option[AssetId], Long) = (Some(tx.feeAssetId).filterNot(_.isEmpty), tx.fee)
     override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(tx.version match {
@@ -34,6 +34,7 @@ trait PBTransactionImplicits {
     })
     override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBUtils.encodeDeterministic(tx))
     override val json: Coeval[JsObject]     = Coeval.evalOnce(Json.toJson(tx).as[JsObject])
+    override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(if (tx.data.isGenesis) true else this.verifySignature())
   }
 
   implicit class VanillaOrderImplicitConversionOps(order: vt.assets.exchange.Order) {

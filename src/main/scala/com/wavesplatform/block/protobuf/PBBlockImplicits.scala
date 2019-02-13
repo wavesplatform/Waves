@@ -1,6 +1,7 @@
 package com.wavesplatform.block.protobuf
 
 import com.wavesplatform.serialization.protobuf.utils.PBUtils
+import com.wavesplatform.transaction.Signed
 import com.wavesplatform.transaction.protobuf.Transaction._
 import com.wavesplatform.{block => vb}
 import monix.eval.Coeval
@@ -14,7 +15,7 @@ trait PBBlockImplicits {
         block.reference,
         vb.SignerData(block.getSignerData.generator, block.getSignerData.signature),
         com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.getConsensusData.baseTarget, block.getConsensusData.generationSignature),
-        block.transactions.map(_.toVanillaAdapter),
+        block.transactions.map(tx => if (block.version <= 3) tx.toVanilla else tx.toVanillaAdapter),
         block.featureVotes.map(intToShort)
       ) {
 
@@ -27,8 +28,8 @@ trait PBBlockImplicits {
     })
 
     override val headerJson: Coeval[JsObject] = Coeval.evalOnce(block.version match {
-      case 1 | 2 | 3 =>
-        block.toVanilla.headerJson()
+      // case 1 | 2 | 3 =>
+      //  block.toVanilla.headerJson()
 
       case _ =>
         val baseJson = Json.toJson(block.withTransactions(Nil)).as[JsObject]
@@ -36,9 +37,11 @@ trait PBBlockImplicits {
 
     })
     override val json: Coeval[JsObject] = Coeval.evalOnce(block.version match {
-      case 1 | 2 | 3 => block.toVanilla.json()
-      case _         => Json.toJson(block).as[JsObject]
+      // case 1 | 2 | 3 => block.toVanilla.json()
+      case _ => Json.toJson(block).as[JsObject]
     })
+
+    protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(block.transactions.map(_.toVanillaAdapter))
 
     override def toString: String = s"PBBlock(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes)"
     override def hashCode(): Int  = block.hashCode()
@@ -48,10 +51,10 @@ trait PBBlockImplicits {
     }
   }
 
-  implicit class PBBlockImplicitConversionOps(block: Block) {
+  implicit class PBBlockImplicitConversionOps(block: PBBlock) {
     def toVanillaAdapter = PBBlockVanillaAdapter(block)
 
-    def toVanilla: vb.Block = {
+    def toVanilla: VanillaBlock = {
       vb.Block.createLegacy(
         block.timestamp,
         block.version.toByte,
@@ -64,17 +67,21 @@ trait PBBlockImplicits {
     }
   }
 
-  implicit class VanillaBlockConversions(block: vb.Block) {
-    def toPB: Block = {
-      Block(
-        block.reference,
-        Some(Block.SignerData(block.signerData.generator, block.signerData.signature)),
-        Some(Block.ConsensusData(block.consensusData.baseTarget, block.consensusData.generationSignature)),
-        block.transactionData.map(_.toPB),
-        block.featureVotes.map(shortToInt),
-        block.timestamp,
-        block.version
-      )
+  implicit class VanillaBlockConversions(block: VanillaBlock) {
+    def toPB: PBBlock = block match {
+      case a: PBBlockVanillaAdapter =>
+        a.underlying
+
+      case _ =>
+        PBBlock(
+          block.reference,
+          Some(Block.SignerData(block.signerData.generator, block.signerData.signature)),
+          Some(Block.ConsensusData(block.consensusData.baseTarget, block.consensusData.generationSignature)),
+          block.transactionData.map(_.toPB),
+          block.featureVotes.map(shortToInt),
+          block.timestamp,
+          block.version
+        )
     }
   }
 

@@ -231,11 +231,22 @@ case class Block private[block] (override val timestamp: Long,
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
   protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
-    import signerData.generator.publicKey
-    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signerData.signature.arr, bytesWithoutSignature(), publicKey)
+    val publicKey = signerData.generator.publicKey
+    val signature = signerData.signature
+    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytesWithoutSignature(), publicKey)
   }
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
+
+  def copy(timestamp: Long = timestamp,
+           version: Byte = version,
+           reference: BlockId = reference,
+           signerData: SignerData = signerData,
+           consensusData: NxtLikeConsensusBlockData = consensusData,
+           transactionData: Seq[Transaction] = transactionData,
+           featureVotes: Set[Short] = featureVotes): Block = {
+    Block.apply(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
+  }
 
   override def toString: String =
     s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes)"
@@ -243,7 +254,7 @@ case class Block private[block] (override val timestamp: Long,
 }
 
 object Block extends ScorexLogging {
-  val useLegacyBlock: Boolean = Try(ConfigFactory.load().getBoolean("waves.use-legacy-block")).getOrElse(false)
+  lazy val useLegacyBlock: Boolean = Try(ConfigFactory.load().getBoolean("waves.use-legacy-block")).getOrElse(false)
 
   def createLegacy(timestamp: Long,
                    version: Byte,

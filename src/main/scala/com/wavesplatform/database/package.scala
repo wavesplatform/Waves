@@ -8,10 +8,9 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.block.{Block, BlockHeader, SignerData}
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
@@ -252,22 +251,8 @@ package object database {
     val ndo = newDataOutput()
 
     ndo.writeInt(size)
-
-    ndo.writeByte(bh.version)
-    ndo.writeLong(bh.timestamp)
-    ndo.writeByteStr(bh.reference)
-    ndo.writeLong(bh.consensusData.baseTarget)
-    ndo.writeByteStr(bh.consensusData.generationSignature)
-
-    if (bh.version == 1 | bh.version == 2)
-      ndo.writeByte(bh.transactionCount)
-    else
-      ndo.writeInt(bh.transactionCount)
-
-    ndo.writeInt(bh.featureVotes.size)
-    bh.featureVotes.foreach(s => ndo.writeShort(s))
-    ndo.write(bh.signerData.generator.publicKey)
-    ndo.writeByteStr(bh.signerData.signature)
+    ndo.writeInt(bh.transactionCount)
+    ndo.write(Block(bh.timestamp, bh.version, bh.reference, bh.signerData, bh.consensusData, Nil, bh.featureVotes).bytes())
 
     ndo.toByteArray
   }
@@ -275,29 +260,13 @@ package object database {
   def readBlockHeaderAndSize(bs: Array[Byte]): (BlockHeader, Int) = {
     val ndi = newDataInput(bs)
 
-    val size = ndi.readInt()
+    val size    = ndi.readInt()
+    val txCount = ndi.readInt()
 
-    val version    = ndi.readByte()
-    val timestamp  = ndi.readLong()
-    val reference  = ndi.readSignature
-    val baseTarget = ndi.readLong()
-    val genSig     = ndi.readByteStr(Block.GeneratorSignatureLength)
-    val transactionCount = {
-      if (version == 1 || version == 2) ndi.readByte()
-      else ndi.readInt()
-    }
-    val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
-    val generator         = ndi.readPublicKey
-    val signature         = ndi.readSignature
-
-    val header = new BlockHeader(timestamp,
-                                 version,
-                                 reference,
-                                 SignerData(generator, signature),
-                                 NxtLikeConsensusBlockData(baseTarget, genSig),
-                                 transactionCount,
-                                 featureVotes)
+    val bytes = new Array[Byte](bs.length - (Ints.BYTES * 2))
+    ndi.readFully(bytes)
+    val block  = Block.parseBytes(bytes).get
+    val header = new BlockHeader(block.timestamp, block.version, block.reference, block.signerData, block.consensusData, txCount, block.featureVotes)
 
     (header, size)
   }

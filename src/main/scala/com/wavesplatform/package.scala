@@ -23,10 +23,19 @@ package object wavesplatform extends ScorexLogging {
   }
 
   def checkGenesis(settings: WavesSettings, blockchainUpdater: BlockchainUpdater with NG): Unit = {
-    Block.genesis(settings.blockchainSettings.genesisSettings).flatMap(b => checkOrAppend(b, blockchainUpdater)).left.foreach { e =>
-      log.error("INCORRECT NODE CONFIGURATION!!! NODE STOPPED BECAUSE OF THE FOLLOWING ERROR:")
-      log.error(e.toString)
-      com.wavesplatform.utils.forceStopApplication()
-    }
+    Block
+      .genesis(settings.blockchainSettings.genesisSettings)
+      .flatMap { genesis =>
+        import com.wavesplatform.block.protobuf.PBBlock._
+        log.info("Genesis block: {}", genesis)
+        log.info("Genesis block json: {}", genesis.toPB.toVanilla.json())
+        checkOrAppend(genesis, blockchainUpdater)
+      }
+      .left
+      .foreach { e =>
+        log.error("INCORRECT NODE CONFIGURATION!!! NODE STOPPED BECAUSE OF THE FOLLOWING ERROR:")
+        log.error(e.toString)
+        com.wavesplatform.utils.forceStopApplication()
+      }
   }
 }
