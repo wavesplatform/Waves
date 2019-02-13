@@ -10,13 +10,13 @@ import com.wavesplatform.block.fields.FeaturesBlockField
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
-import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.{block, crypto}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -169,12 +169,12 @@ trait BlockFields
     with Signed
 
 case class Block private (override val timestamp: Long,
-                              override val version: Byte,
-                              override val reference: ByteStr,
-                              override val signerData: SignerData,
-                              override val consensusData: NxtLikeConsensusBlockData,
-                              override val transactionData: Seq[Transaction],
-                              override val featureVotes: Set[Short])
+                          override val version: Byte,
+                          override val reference: ByteStr,
+                          override val signerData: SignerData,
+                          override val consensusData: NxtLikeConsensusBlockData,
+                          override val transactionData: Seq[Transaction],
+                          override val featureVotes: Set[Short])
     extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
     with Signed
     with BlockFields {
@@ -242,6 +242,28 @@ case class Block private (override val timestamp: Long,
 }
 
 object Block extends ScorexLogging {
+  def createLegacy(timestamp: Long,
+            version: Byte,
+            reference: BlockId,
+            signerData: SignerData,
+            consensusData: NxtLikeConsensusBlockData,
+            transactionData: Seq[Transaction],
+            featureVotes: Set[Short]): Block = {
+    new Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
+  }
+
+  def apply(timestamp: Long,
+            version: Byte,
+            reference: BlockId,
+            signerData: SignerData,
+            consensusData: NxtLikeConsensusBlockData,
+            transactionData: Seq[Transaction],
+            featureVotes: Set[Short]): Block = {
+    import com.wavesplatform.block.protobuf.PBBlock._
+    val vanillaBlock = createLegacy(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
+    vanillaBlock.toPB.toVanillaAdapter
+  }
+
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
   }
@@ -287,7 +309,7 @@ object Block extends ScorexLogging {
     }
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[Block] =
+  def parseBytesLegacy(bytes: Array[Byte]): Try[Block] =
     for {
       (blockHeader, transactionBytes) <- BlockHeader.parseBytes(bytes)
       transactionsData                <- transParseBytes(blockHeader.version, transactionBytes)
@@ -301,6 +323,14 @@ object Block extends ScorexLogging {
         blockHeader.featureVotes
       ).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
     } yield block
+
+  def parseBytesPB(bytes: Array[Byte]): Try[Block] = Try {
+    block.protobuf.PBBlock.parseFrom(bytes)
+  }
+
+  def parseBytes(bytes: Array[Byte]): Try[Block] = {
+    parseBytesPB(bytes).orElse(parseBytesLegacy(bytes))
+  }
 
   def areTxsFitInBlock(blockVersion: Byte, txsCount: Int): Boolean = {
     (blockVersion == 3 && txsCount <= MaxTransactionsPerBlockVer3) || (blockVersion <= 2 || txsCount <= MaxTransactionsPerBlockVer1Ver2)

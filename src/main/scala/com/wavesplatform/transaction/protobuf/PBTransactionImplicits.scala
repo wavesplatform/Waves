@@ -217,7 +217,7 @@ trait PBTransactionImplicits {
   }
 
   implicit class PBTransactionImplicitConversionOps(tx: Transaction) {
-    def toAdapter = PBTransactionVanillaAdapter(tx)
+    def toVanillaAdapter = PBTransactionVanillaAdapter(tx)
 
     def toVanilla: VanillaTransaction = tx.data match {
       case Data.MassTransfer(MassTransferTransactionData(transfers)) =>
