@@ -168,7 +168,7 @@ trait BlockFields
     with HasBlockId
     with Signed
 
-case class Block private (override val timestamp: Long,
+case class Block private[block] (override val timestamp: Long,
                           override val version: Byte,
                           override val reference: ByteStr,
                           override val signerData: SignerData,
