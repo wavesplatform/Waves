@@ -185,9 +185,9 @@ class AddressRouteSpec
       (response \ "address").as[String] shouldBe allAddresses(3)
       (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AAAABnZlcmlmeQAAAAAAAAABBt/lCgQ="
       (response \ "scriptText").as[String] shouldBe "Contract(List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
-// [WAIT] Decompiler(
-//        testContract,
-//        Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
+// [WAIT]                                           Decompiler(
+//      testContract,
+//      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
