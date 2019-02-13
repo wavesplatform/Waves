@@ -19,7 +19,7 @@ import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Awaitable, ExecutionContext, Future}
+import scala.concurrent.{Await, Awaitable, Future}
 import scala.util._
 import scala.util.control.NonFatal
 
