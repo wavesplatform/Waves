@@ -1,6 +1,6 @@
 package com.wavesplatform.http
 
-import cats.kernel.Monoid
+// [WAIT] import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -8,9 +8,9 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.v1.compiler.Decompiler
+// [WAIT] import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+// [WAIT] import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
