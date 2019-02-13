@@ -1,0 +1,3 @@
+package com.wavesplatform.transaction.protobuf
+
+trait PBTransactionCompanionBase extends PBTransactionImplicits with PBTransactionJson with PBTransactionParser

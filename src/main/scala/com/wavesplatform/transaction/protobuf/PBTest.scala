@@ -8,8 +8,6 @@ import play.api.libs.json.Json
 
 // TODO: Remove test object
 private[protobuf] object PBTest extends App {
-  import PBTransactionImplicits._
-
   val buy = OrderV2(
     PublicKeyAccount.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
     PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
@@ -50,6 +48,7 @@ private[protobuf] object PBTest extends App {
     )
     .explicitGet()
 
+  import PBTransaction._
   val tx = vanillaTx.toPB
   println(Json.toJson(tx))
 

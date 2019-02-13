@@ -10,7 +10,7 @@ option (scalapb.options) = {
 };
 
 message Block {
-    option (scalapb.message).companion_extends = "com.wavesplatform.block.protobuf.PBBlockCompanion";
+    option (scalapb.message).companion_extends = "com.wavesplatform.block.protobuf.PBBlockCompanionBase";
 
     bytes reference = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
     SignerData signerData = 2;

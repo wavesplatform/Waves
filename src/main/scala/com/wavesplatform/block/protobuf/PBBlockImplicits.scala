@@ -1,6 +1,6 @@
 package com.wavesplatform.block.protobuf
 
-import com.wavesplatform.transaction.protobuf.PBTransactionImplicits._
+import com.wavesplatform.transaction.protobuf.Transaction._
 import com.wavesplatform.{block => vb}
 
 trait PBBlockImplicits {
@@ -38,4 +38,4 @@ trait PBBlockImplicits {
   }
 }
 
-object PBBlockImplicits extends PBBlockImplicits
+// object PBBlockImplicits extends PBBlockImplicits

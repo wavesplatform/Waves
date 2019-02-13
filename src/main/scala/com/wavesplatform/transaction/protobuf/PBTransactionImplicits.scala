@@ -2,19 +2,40 @@ package com.wavesplatform.transaction.protobuf
 
 import java.nio.charset.StandardCharsets
 
+import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.serialization.protobuf.utils.PBUtils
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.assets.exchange.OrderV1
 import com.wavesplatform.transaction.protobuf.Transaction.Data
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{AssetId, Transaction => VanillaTransaction}
+import com.wavesplatform.transaction._
 import com.wavesplatform.{transaction => vt}
+import monix.eval.Coeval
+import play.api.libs.json.{JsObject, Json}
 
 trait PBTransactionImplicits {
   private[this] val WavesAssetId    = ByteStr.empty
   private[this] val NoFeeAssetId    = WavesAssetId
   private[this] val NoChainId: Byte = 0 // AddressScheme.current.chainId
+
+  implicit class PBTransactionVanillaAdapter(tx: Transaction) extends VanillaTransaction with SignedTransaction with FastHashId {
+    def underlying: Transaction = tx
+
+    override def timestamp: Long                   = tx.timestamp
+    override val sender: PublicKeyAccount          = tx.sender
+    override val proofs                            = Proofs(tx.proofsArray)
+    override val signature: ByteStr                = tx.proofs.proofs.headOption.getOrElse(ByteStr.empty)
+    override def builder: TransactionParser        = Transaction
+    override def assetFee: (Option[AssetId], Long) = (Some(tx.feeAssetId).filterNot(_.isEmpty), tx.fee)
+    override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(tx.version match {
+      case 1 | 2 => tx.toVanilla.bodyBytes()
+      case _     => PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
+    })
+    override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(tx.toByteArray)
+    override val json: Coeval[JsObject]     = Coeval.evalOnce(Json.toJson(tx).as[JsObject])
+  }
 
   implicit class VanillaOrderImplicitConversionOps(order: vt.assets.exchange.Order) {
     def toPB: ExchangeTransactionData.Order = {
@@ -354,4 +375,4 @@ trait PBTransactionImplicits {
     assetId.getOrElse(WavesAssetId)
 }
 
-object PBTransactionImplicits extends PBTransactionImplicits
+// object PBTransactionImplicits extends PBTransactionImplicits

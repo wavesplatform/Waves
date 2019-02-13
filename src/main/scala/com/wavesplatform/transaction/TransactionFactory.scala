@@ -751,7 +751,7 @@ object TransactionFactory {
           case SponsorFeeTransaction         => jsv.as[SignedSponsorFeeRequest].toTx
           case ExchangeTransactionV1         => jsv.as[SignedExchangeRequest].toTx
           case ExchangeTransactionV2         => jsv.as[SignedExchangeRequestV2].toTx
-          case PBTransaction.TX              => Try(jsv.as[PBTransaction.TX]).toEither.left.map(e => GenericError(e))
+          case PBTransaction                 => Try(jsv.as[PBTransaction].toVanilla).toEither.left.map(e => GenericError(e))
         }
     }
   }

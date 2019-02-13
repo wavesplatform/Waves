@@ -3,5 +3,5 @@ import com.wavesplatform.serialization.protobuf.json.ProtobufJsonFormats
 
 //noinspection TypeAnnotation
 trait PBTransactionJson {
-  implicit val PBTransactionJsonFormat = ProtobufJsonFormats.generatedMessageJsonFormat[Transaction]
+  implicit val PBTransactionJsonFormat = ProtobufJsonFormats.generatedMessageJsonFormat[PBTransaction]
 }
