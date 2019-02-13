@@ -16,6 +16,8 @@ import com.wavesplatform.lang.{Common, Global, StdLibVersion}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
+import scala.collection.script.Script
+
 class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   val CTX: CTX =

@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import com.google.common.base.Utf8
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.consensus.GeneratingBalanceProvider
@@ -372,7 +373,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     AddressScriptInfo(
       address = account.address,
       script = script.map(_.bytes().base64),
-      scriptText = Option(script.toString), // [WAIT] script.map(Script.decompile),
+      scriptText = script.map(_.bytes().toString), // [WAIT] script.map(Script.decompile),
       complexity = script.map(_.complexity).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
     )
