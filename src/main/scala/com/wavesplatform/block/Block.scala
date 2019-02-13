@@ -5,8 +5,8 @@ import java.nio.ByteBuffer
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.fields.FeaturesBlockField
-import com.wavesplatform.block.traits.HasBlockHeaderJson
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
@@ -22,13 +22,35 @@ import play.api.libs.json.{JsObject, Json}
 
 import scala.util.{Failure, Try}
 
+object BlockJsonFields {
+  trait HasBlockHeaderJson {
+    def headerJson: Coeval[JsObject]
+  }
+
+  trait HasBlockJson {
+    def json: Coeval[JsObject]
+  }
+}
+
+trait BlockHeaderFields {
+  def timestamp: Long
+  def version: Byte
+  def reference: ByteStr
+  def signerData: SignerData
+  def consensusData: NxtLikeConsensusBlockData
+  def transactionCount: Int
+  def featureVotes: Set[Short]
+}
+
 class BlockHeader(val timestamp: Long,
                   val version: Byte,
                   val reference: ByteStr,
                   val signerData: SignerData,
                   val consensusData: NxtLikeConsensusBlockData,
                   val transactionCount: Int,
-                  val featureVotes: Set[Short]) extends HasBlockHeaderJson {
+                  val featureVotes: Set[Short])
+    extends BlockHeaderFields
+    with BlockJsonFields.HasBlockHeaderJson {
   protected val versionField: ByteBlockField      = ByteBlockField("version", version)
   protected val timestampField: LongBlockField    = LongBlockField("timestamp", timestamp)
   protected val referenceField: BlockIdField      = BlockIdField("reference", reference.arr)
@@ -114,16 +136,48 @@ object BlockHeader extends ScorexLogging {
 
 }
 
+object BlockFields {
+  trait HasBlockScore {
+    def blockScore: Coeval[BigInt]
+  }
+
+  trait HasBlockId {
+    def uniqueId: BlockId
+  }
+
+  trait HasBlockBytes {
+    def bytes: Coeval[Array[Byte]]
+    def bytesWithoutSignature: Coeval[Array[Byte]]
+  }
+}
+
+trait BlockBodyFields {
+  def transactionData: Seq[Transaction]
+}
+
+import com.wavesplatform.block.BlockFields._
+import com.wavesplatform.block.BlockJsonFields._
+
+trait BlockFields
+    extends BlockHeaderFields
+    with HasBlockHeaderJson
+    with BlockBodyFields
+    with HasBlockJson
+    with HasBlockScore
+    with HasBlockBytes
+    with HasBlockId
+    with Signed
+
 case class Block private (override val timestamp: Long,
-                          override val version: Byte,
-                          override val reference: ByteStr,
-                          override val signerData: SignerData,
-                          override val consensusData: NxtLikeConsensusBlockData,
-                          transactionData: Seq[Transaction],
-                          override val featureVotes: Set[Short])
+                              override val version: Byte,
+                              override val reference: ByteStr,
+                              override val signerData: SignerData,
+                              override val consensusData: NxtLikeConsensusBlockData,
+                              override val transactionData: Seq[Transaction],
+                              override val featureVotes: Set[Short])
     extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
     with Signed
-    with traits.BaseBlock {
+    with BlockFields {
 
   import Block._
 
@@ -188,7 +242,6 @@ case class Block private (override val timestamp: Long,
 }
 
 object Block extends ScorexLogging {
-
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
   }
