@@ -205,7 +205,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     Table(
       ("num", "name"),
       (1, "1 of N"),
-      (nodes.size - 1, "N-1 of N")
+      (nodes.size, "N of N")
     )) { (num, name) =>
     test(s"generate more blocks and resynchronise after rollback ${name}") {
       val baseHeight = nodes.map(_.height).max + 5
