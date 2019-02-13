@@ -160,7 +160,7 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
       (response \ "script").as[String] shouldBe "base64:AQa3b8tH"
-      (response \ "scriptText").as[String] shouldBe "true"
+      (response \ "scriptText").as[String] shouldBe "TRUE" // [WAIT] "true"
       (response \ "complexity").as[Long] shouldBe 1
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
