@@ -148,30 +148,3 @@ message ExchangeTransactionData {
     uint64 buyMatcherFee = 5;
     uint64 sellMatcherFee = 6;
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
