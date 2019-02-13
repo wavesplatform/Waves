@@ -23,9 +23,8 @@ trait PBBlockImplicits {
     override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBUtils.encodeDeterministic(block))
     override val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(block.version match {
       case 1 | 2 | 3 => block.toVanilla.bytesWithoutSignature()
-      case _     => PBUtils.encodeDeterministic(block.copy(signerData = None))
+      case _         => PBUtils.encodeDeterministic(block.copy(signerData = None))
     })
-
 
     override val headerJson: Coeval[JsObject] = Coeval.evalOnce(block.version match {
       case 1 | 2 | 3 =>
@@ -38,14 +37,14 @@ trait PBBlockImplicits {
     })
     override val json: Coeval[JsObject] = Coeval.evalOnce(block.version match {
       case 1 | 2 | 3 => block.toVanilla.json()
-      case _ => Json.toJson(block).as[JsObject]
+      case _         => Json.toJson(block).as[JsObject]
     })
 
     override def toString: String = s"PBBlock(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes)"
-    override def hashCode(): Int           = block.hashCode()
+    override def hashCode(): Int  = block.hashCode()
     override def equals(obj: Any): Boolean = obj match {
       case a: PBBlockVanillaAdapter => block.equals(a.underlying)
-      case _ => block.equals(obj)
+      case _                        => block.equals(obj)
     }
   }
 

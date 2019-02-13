@@ -169,12 +169,12 @@ trait BlockFields
     with Signed
 
 case class Block private[block] (override val timestamp: Long,
-                          override val version: Byte,
-                          override val reference: ByteStr,
-                          override val signerData: SignerData,
-                          override val consensusData: NxtLikeConsensusBlockData,
-                          override val transactionData: Seq[Transaction],
-                          override val featureVotes: Set[Short])
+                                 override val version: Byte,
+                                 override val reference: ByteStr,
+                                 override val signerData: SignerData,
+                                 override val consensusData: NxtLikeConsensusBlockData,
+                                 override val transactionData: Seq[Transaction],
+                                 override val featureVotes: Set[Short])
     extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
     with Signed
     with BlockFields {
@@ -243,12 +243,12 @@ case class Block private[block] (override val timestamp: Long,
 
 object Block extends ScorexLogging {
   def createLegacy(timestamp: Long,
-            version: Byte,
-            reference: BlockId,
-            signerData: SignerData,
-            consensusData: NxtLikeConsensusBlockData,
-            transactionData: Seq[Transaction],
-            featureVotes: Set[Short]): Block = {
+                   version: Byte,
+                   reference: BlockId,
+                   signerData: SignerData,
+                   consensusData: NxtLikeConsensusBlockData,
+                   transactionData: Seq[Transaction],
+                   featureVotes: Set[Short]): Block = {
     new Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
   }
 
