@@ -407,7 +407,7 @@ object Block extends ScorexLogging {
                    signer: PrivateKeyAccount,
                    featureVotes: Set[Short]): Either[GenericError, Block] =
     build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes).right.map(unsigned =>
-      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
+      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytesWithoutSignature())))))
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
