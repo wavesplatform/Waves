@@ -94,7 +94,12 @@ object Decompiler {
             val binOp: Option[String] = ctx.binaryOps.get(name)
             binOp match {
               case Some(binOp) =>
-                Delay(Seq(Right(_ => expr(args.head, ident, ctx)), Left(out(" " + binOp + " ", 0)), Right(_ => expr(args.tail.head, 0, ctx))))
+                Delay(Seq(
+                  Left(out("(", ident)),
+                  Right(_ => expr(args.head, 0, ctx)),
+                  Left(out(" " + binOp + " ", 0)),
+                  Right(_ => expr(args.tail.head, 0, ctx)),
+                  Left(out(")", 0))))
               case None =>
                 val opCode = ctx.opCodes.get(name)
                 opCode match {
