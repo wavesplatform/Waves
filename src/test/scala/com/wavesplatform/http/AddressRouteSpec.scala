@@ -5,7 +5,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.{Global, StdLibVersion}
+// [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
+import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{VerifierAnnotation, VerifierFunction}
 // [WAIT] import com.wavesplatform.lang.v1.compiler.Decompiler
