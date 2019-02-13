@@ -32,7 +32,7 @@ trait PBTransactionImplicits {
       case 1 | 2 => tx.toVanilla.bodyBytes()
       case _     => PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
     })
-    override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(tx.toByteArray)
+    override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBUtils.encodeDeterministic(tx))
     override val json: Coeval[JsObject]     = Coeval.evalOnce(Json.toJson(tx).as[JsObject])
   }
 

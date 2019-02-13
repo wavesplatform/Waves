@@ -6,6 +6,7 @@ import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.fields.FeaturesBlockField
+import com.wavesplatform.block.traits.HasBlockHeaderJson
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
@@ -27,7 +28,7 @@ class BlockHeader(val timestamp: Long,
                   val signerData: SignerData,
                   val consensusData: NxtLikeConsensusBlockData,
                   val transactionCount: Int,
-                  val featureVotes: Set[Short]) {
+                  val featureVotes: Set[Short]) extends HasBlockHeaderJson {
   protected val versionField: ByteBlockField      = ByteBlockField("version", version)
   protected val timestampField: LongBlockField    = LongBlockField("timestamp", timestamp)
   protected val referenceField: BlockIdField      = BlockIdField("reference", reference.arr)
@@ -121,7 +122,8 @@ case class Block private (override val timestamp: Long,
                           transactionData: Seq[Transaction],
                           override val featureVotes: Set[Short])
     extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
-    with Signed {
+    with Signed
+    with traits.BaseBlock {
 
   import Block._
 
@@ -154,7 +156,7 @@ case class Block private (override val timestamp: Long,
 
   val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
-  val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / consensusData.baseTarget).ensuring(_ > 0))
+  val blockScore: Coeval[BigInt] = Coeval.evalOnce(Block.calculateScore(consensusData.baseTarget))
 
   val feesPortfolio: Coeval[Portfolio] = Coeval.evalOnce(Monoid[Portfolio].combineAll({
     val assetFees: Seq[(Option[AssetId], Long)] = transactionData.map(_.assetFee)
@@ -342,6 +344,14 @@ object Block extends ScorexLogging {
         transactionData = transactionGenesisData,
         featureVotes = Set.empty
       )
+  }
+
+  private[this] val scoreConstant = BigInt("18446744073709551616")
+
+  def calculateScore(baseTarget: BigInt): BigInt = {
+    val result = scoreConstant / baseTarget
+    require(result > 0, "Invalid score")
+    result
   }
 
   val GenesisBlockVersion: Byte = 1
