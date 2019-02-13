@@ -103,7 +103,6 @@ class AddressActor(
             case Right(_) =>
               updateTimestamp(o.timestamp)
               reserve(LimitOrder(o))
-              latestOrderTs = latestOrderTs.max(o.timestamp)
               storePlaced(o)
           }
         }(_.future) pipeTo sender()
