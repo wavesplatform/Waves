@@ -51,34 +51,22 @@ object ExchangeTransactionDiff {
       sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.amount, t.price).liftValidationError(tx).map(-_)
     } yield {
 
-      def wavesPortfolio(amt: Long) = Portfolio(amt, LeaseBalance.empty, Map.empty)
-
-      /*** Calculates portfolio for matcher from the orders (taking into account that fee can be paid in asset != Waves) */
-      def matcherOrdersFeePortfolio(buyOrder: Order, sellOrder: Order): Portfolio = {
-
-        def getOrderPortfolio(order: Order, fee: Long): Portfolio = {
-          lazy val default = wavesPortfolio(fee)
-          order match {
-            case ov3: OrderV3 => ov3.matcherFeeAssetId.fold(default)(assetId => Portfolio(0, LeaseBalance.empty, Map(assetId -> fee)))
-            case _            => default
-          }
-        }
-
+      val matcherPortfolio =
         Monoid.combineAll(
           Seq(
-            getOrderPortfolio(buyOrder, t.buyMatcherFee),
-            getOrderPortfolio(sellOrder, t.sellMatcherFee),
+            getOrderFeePortfolio(t.buyOrder, t.buyMatcherFee),
+            getOrderFeePortfolio(t.sellOrder, t.sellMatcherFee),
             wavesPortfolio(-t.fee),
           )
         )
-      }
 
       val feeDiff = Monoid.combineAll(
         Seq(
-          Map(matcher -> matcherOrdersFeePortfolio(t.buyOrder, t.sellOrder)),
-          Map(buyer   -> wavesPortfolio(-t.buyMatcherFee)),
-          Map(seller  -> wavesPortfolio(-t.sellMatcherFee))
-        ))
+          Map(matcher -> matcherPortfolio),
+          Map(buyer   -> getOrderFeePortfolio(t.buyOrder, -t.buyMatcherFee)),
+          Map(seller  -> getOrderFeePortfolio(t.sellOrder, -t.sellMatcherFee))
+        )
+      )
 
       val priceDiff = t.buyOrder.assetPair.priceAsset match {
         case Some(assetId) =>
@@ -158,5 +146,16 @@ object ExchangeTransactionDiff {
     else if (!buyFeeValid) Left(OrderValidationError(exTrans.buyOrder, s"Insufficient buy fee"))
     else if (!sellFeeValid) Left(OrderValidationError(exTrans.sellOrder, s"Insufficient sell fee"))
     else Right(exTrans)
+  }
+
+  def wavesPortfolio(amt: Long) = Portfolio(amt, LeaseBalance.empty, Map.empty)
+
+  /*** Calculates fee portfolio from the order (taking into account that in OrderV3 fee can be paid in asset != Waves) */
+  def getOrderFeePortfolio(order: Order, fee: Long): Portfolio = {
+    lazy val default = wavesPortfolio(fee)
+    order match {
+      case ov3: OrderV3 => ov3.matcherFeeAssetId.fold(default)(assetId => Portfolio(0, LeaseBalance.empty, Map(assetId -> fee)))
+      case _            => default
+    }
   }
 }

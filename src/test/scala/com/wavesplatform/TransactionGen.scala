@@ -638,23 +638,38 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
                            amountAssetId: Option[ByteStr],
                            priceAssetId: Option[ByteStr],
                            fixedMatcherFee: Option[Long] = None,
-                           orderVersions: Set[Byte] = Set(1, 2)): Gen[ExchangeTransactionV2] = {
-    def mkBuyOrder(version: Byte): OrderConstructor  = if (version == 1) OrderV1.buy else OrderV2.buy
-    def mkSellOrder(version: Byte): OrderConstructor = if (version == 1) OrderV1.sell else OrderV2.sell
+                           orderVersions: Set[Byte] = Set(1, 2, 3),
+                           buyMatcherFeeAssetId: Option[ByteStr] = None,
+                           sellMatcherFeeAssetId: Option[ByteStr] = None,
+                           fixedMatcher: Option[PrivateKeyAccount] = None): Gen[ExchangeTransactionV2] = {
+
+    def mkBuyOrder(version: Byte): OrderConstructor = version match {
+      case 1 => OrderV1.buy
+      case 2 => OrderV2.buy
+      case 3 => OrderV3.buy(_, _, _, _, _, _, _, _, buyMatcherFeeAssetId)
+    }
+
+    def mkSellOrder(version: Byte): OrderConstructor = version match {
+      case 1 => OrderV1.sell
+      case 2 => OrderV2.sell
+      case 3 => OrderV3.sell(_, _, _, _, _, _, _, _, sellMatcherFeeAssetId)
+    }
 
     for {
-      (_, matcher, _, _, price, amount1, timestamp, expiration, genMatcherFee) <- orderParamGen
-      amount2: Long                                                            <- matcherAmountGen
-      matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
+      (_, generatedMatcher, _, _, amount1, price, timestamp, expiration, generatedMatcherFee) <- orderParamGen
+      amount2: Long                                                                           <- matcherAmountGen
+      matcher    = fixedMatcher.getOrElse(generatedMatcher)
+      matcherFee = fixedMatcherFee.getOrElse(generatedMatcherFee)
       matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
       assetPair = AssetPair(amountAssetId, priceAssetId)
       mkO1 <- Gen.oneOf(orderVersions.map(mkBuyOrder).toSeq)
       mkO2 <- Gen.oneOf(orderVersions.map(mkSellOrder).toSeq)
     } yield {
+
       val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
       val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
 
-      val o1 = mkO1(seller, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee)
+      val o1 = mkO1(buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee)
       val o2 = mkO2(seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee)
 
       ExchangeTransactionV2
