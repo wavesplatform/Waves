@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.fields.FeaturesBlockField
@@ -242,6 +243,8 @@ case class Block private[block] (override val timestamp: Long,
 }
 
 object Block extends ScorexLogging {
+  val useLegacyBlock: Boolean = Try(ConfigFactory.load().getBoolean("waves.use-legacy-block")).getOrElse(false)
+
   def createLegacy(timestamp: Long,
                    version: Byte,
                    reference: BlockId,
@@ -261,7 +264,11 @@ object Block extends ScorexLogging {
             featureVotes: Set[Short]): Block = {
     import com.wavesplatform.block.protobuf.PBBlock._
     val vanillaBlock = createLegacy(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
-    vanillaBlock.toPB.toVanillaAdapter
+    if (useLegacyBlock) {
+      vanillaBlock
+    } else {
+      vanillaBlock.toPB.toVanillaAdapter
+    }
   }
 
   case class Fraction(dividend: Int, divider: Int) {
