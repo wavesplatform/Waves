@@ -3,7 +3,7 @@ package com.wavesplatform.lang
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.Contract._
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNC, LET, REF}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertion, FreeSpec, Matchers}
 
@@ -30,7 +30,46 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 //
 //    }
 
-    "non-empty" in roundTrip(
+    "one-declaration" in roundTrip(
+      Contract(
+        List(
+          LET("letName", CONST_BOOLEAN(true))
+        ),
+        List.empty,
+        None
+      ))
+
+    "two-declarations" in roundTrip(
+      Contract(
+        List(
+          LET("letName", CONST_BOOLEAN(true)),
+          FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
+        ),
+        List.empty,
+        None
+      ))
+
+    "callable function" in roundTrip(
+      Contract(
+        List(),
+        List(
+          CallableFunction(
+            CallableAnnotation("sender"),
+            FUNC("foo", List("a"), REF("a"))
+          )
+        ),
+        None
+      ))
+
+    "verifier function" in roundTrip(
+      Contract(
+        List(),
+        List(),
+        Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
+      )
+    )
+
+    "full contract" in roundTrip(
       Contract(
         List(
           LET("letName", CONST_BOOLEAN(true)),
@@ -49,18 +88,5 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           )
         )
       ))
-
-    "simple" in roundTrip(
-      Contract(
-        List(),
-        List(
-          CallableFunction(
-            CallableAnnotation("sender"),
-            FUNC("foo", List("a"), REF("a"))
-          )
-        ),
-        None
-      ))
   }
-
 }

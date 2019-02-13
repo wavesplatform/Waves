@@ -83,7 +83,7 @@ object Decompiler {
             .mkString("\n") +
           (vf match {
             case Some(VerifierFunction(annotation, u)) =>
-              out("\n@Verifier(" + annotation.txArgName + ")\n", 0) +
+              out("\n@Verifier(" + annotation.invocationArgName + ")\n", 0) +
                 Decompiler.decl(u, 0, ctx)
             case None => ""
           })
