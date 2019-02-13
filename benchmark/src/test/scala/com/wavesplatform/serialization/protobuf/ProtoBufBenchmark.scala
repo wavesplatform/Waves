@@ -6,7 +6,7 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.protobuf.PBTransactionImplicits._
+import com.wavesplatform.transaction.protobuf.PBTransaction._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.openjdk.jmh.annotations._
