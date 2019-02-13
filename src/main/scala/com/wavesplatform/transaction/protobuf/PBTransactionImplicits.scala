@@ -210,7 +210,7 @@ trait PBTransactionImplicits {
 
       case tx @ vt.assets.SponsorFeeTransaction(sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs) =>
         val data = SponsorFeeTransactionData(minSponsoredAssetFee.getOrElse(0L))
-        Transaction(assetId, sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 2, proofs)
+        Transaction(assetId, sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 2, proofs, Data.SponsorFee(data))
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
