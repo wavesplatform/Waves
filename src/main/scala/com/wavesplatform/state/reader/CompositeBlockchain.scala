@@ -201,9 +201,9 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def carryFee: Long = carry
 
-  override def blockBytes(height: Int): Option[Array[Type]] = inner.blockBytes(height)
+  override def blockAtBytes(height: Int, legacy: Boolean): Option[Array[Type]] = inner.blockAtBytes(height, legacy)
 
-  override def blockBytes(blockId: ByteStr): Option[Array[Type]] = inner.blockBytes(blockId)
+  override def blockBytes(blockId: AssetId, legacy: Boolean): Option[Array[Type]] = inner.blockBytes(blockId, legacy)
 
   override def heightOf(blockId: ByteStr): Option[Int] = inner.heightOf(blockId)
 

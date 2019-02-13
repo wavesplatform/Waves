@@ -68,20 +68,20 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
   }
 
   def loadBlockBytes(height: Int): Option[Array[Byte]]
-  override def blockBytes(height: Int): Option[Array[Byte]] = {
+  override def blockAtBytes(height: Int, legacy: Boolean): Option[Array[Byte]] = {
     val c = current
     if (height == c._1) {
-      c._3.map(_.bytes())
+      c._3.map(Block.toBytes(_, legacy))
     } else {
       loadBlockBytes(height)
     }
   }
 
   def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]]
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = {
+  override def blockBytes(blockId: AssetId, legacy: Boolean): Option[Array[Byte]] = {
     val c = current
     if (c._3.exists(_.uniqueId == blockId)) {
-      c._3.map(_.bytes())
+      c._3.map(Block.toBytes(_, legacy))
     } else {
       loadBlockBytes(blockId)
     }

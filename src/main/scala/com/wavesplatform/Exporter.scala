@@ -69,7 +69,7 @@ object Exporter extends ScorexLogging {
     }
 
   private def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int): Int = {
-    val maybeBlockBytes = blockchain.blockBytes(height)
+    val maybeBlockBytes = blockchain.blockAtBytes(height)
     maybeBlockBytes
       .map { bytes =>
         val len = bytes.length

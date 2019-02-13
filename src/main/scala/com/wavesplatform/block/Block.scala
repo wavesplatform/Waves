@@ -282,6 +282,13 @@ object Block extends ScorexLogging {
     }
   }
 
+  def toBytes(block: Block, legacy: Boolean = false): Array[Byte] = {
+    import com.wavesplatform.block.protobuf.PBBlock._
+    if (legacy) block.toPB.toVanilla.bytes()
+    else if (useLegacyBlock) block.bytes()
+    else block.toPB.bytes()
+  }
+
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
   }

@@ -305,10 +305,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
 
   override def height: Int = blockchain.height + ngState.fold(0)(_ => 1)
 
-  override def blockBytes(height: Int): Option[Array[Byte]] =
+  override def blockAtBytes(height: Int, legacy: Boolean): Option[Array[Byte]] =
     blockchain
-      .blockBytes(height)
-      .orElse(ngState.collect { case ng if height == blockchain.height + 1 => ng.bestLiquidBlock.bytes() })
+      .blockAtBytes(height)
+      .orElse(ngState.collect { case ng if height == blockchain.height + 1 => Block.toBytes(ng.bestLiquidBlock, legacy) })
 
   override def scoreOf(blockId: BlockId): Option[BigInt] =
     blockchain
@@ -357,11 +357,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
 
   override def carryFee: Long = ngState.map(_.carryFee).getOrElse(blockchain.carryFee)
 
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] =
+  override def blockBytes(blockId: AssetId, legacy: Boolean): Option[Array[Byte]] =
     (for {
       ng               <- ngState
       (block, _, _, _) <- ng.totalDiffOf(blockId)
-    } yield block.bytes()).orElse(blockchain.blockBytes(blockId))
+    } yield Block.toBytes(block, legacy)).orElse(blockchain.blockBytes(blockId, legacy))
 
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = {
     ngState match {
