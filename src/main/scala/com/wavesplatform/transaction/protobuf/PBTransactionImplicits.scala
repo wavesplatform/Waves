@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.protobuf
 
 import java.nio.charset.StandardCharsets
 
+import com.google.common.primitives.Bytes
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.protobuf.utils.PBUtils
@@ -26,13 +27,16 @@ trait PBTransactionImplicits {
     override val sender: PublicKeyAccount          = tx.sender
     override val proofs                            = Proofs(tx.proofsArray)
     override val signature: ByteStr                = proofs.toSignature
-    override def builder: TransactionParser        = Transaction
+    override def builder        = Transaction
     override def assetFee: (Option[AssetId], Long) = (Some(tx.feeAssetId).filterNot(_.isEmpty), tx.fee)
     override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(tx.version match {
       case 1 | 2 => tx.toVanilla.bodyBytes()
       case _     => PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
     })
-    override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBUtils.encodeDeterministic(tx))
+    override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+      val encoded = PBUtils.encodeDeterministic(tx)
+      Bytes.concat(Array[Byte](builder.typeId, builder.version), encoded)
+    }
     override val json: Coeval[JsObject]     = Coeval.evalOnce(Json.toJson(tx).as[JsObject])
     override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(if (tx.data.isGenesis) true else this.verifySignature())
   }

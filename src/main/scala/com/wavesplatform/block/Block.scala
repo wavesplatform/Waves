@@ -16,6 +16,7 @@ import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.protobuf.PBTransaction
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.{block, crypto}
 import monix.eval.Coeval
@@ -274,18 +275,27 @@ object Block extends ScorexLogging {
             transactionData: Seq[Transaction],
             featureVotes: Set[Short]): Block = {
     import com.wavesplatform.block.protobuf.PBBlock._
-    val vanillaBlock = createLegacy(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
+
     if (useLegacyBlock) {
-      vanillaBlock
+      val transactions = transactionData.collect {
+        case a: PBTransaction.PBTransactionVanillaAdapter => a.underlying.toVanilla
+        case tx => tx
+      }
+      createLegacy(timestamp, version, reference, signerData, consensusData, transactions, featureVotes)
     } else {
+      val vanillaBlock = createLegacy(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
       vanillaBlock.toPB.toVanillaAdapter
     }
   }
 
+  def toLegacy(b: Block): Block = b match {
+    case a: block.protobuf.PBBlock.PBBlockVanillaAdapter => a.underlying.toVanilla
+    case _ => b
+  }
+
   def toBytes(block: Block, legacy: Boolean = false): Array[Byte] = {
     import com.wavesplatform.block.protobuf.PBBlock._
-    if (legacy) block.toPB.toVanilla.bytes()
-    else if (useLegacyBlock) block.bytes()
+    if (legacy || useLegacyBlock) toLegacy(block).bytes()
     else block.toPB.bytes()
   }
 

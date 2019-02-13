@@ -15,7 +15,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction._
@@ -788,14 +787,14 @@ class LevelDBWriter(writableDB: DB,
       .flatMap(loadBlockHeaderAndSize(_, db))
   }
 
-  override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
+  override def loadBlockAtBytes(h: Int, legacy: Boolean): Option[Array[Byte]] = readOnly { db =>
     val height    = Height(h)
     val headerKey = Keys.blockHeaderBytesAt(height)
 
     def readTransactionBytes(count: Int) = {
       (0 until count).map { n =>
         db.get(Keys.transactionBytesAt(height, TxNum(n.toShort)))
-          .map(transaction.protobuf.PBTransaction.parseFrom(_).toVanilla)
+          .flatMap(TransactionParsers.parseBytes(_).toOption)
           .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
       }
     }
@@ -805,18 +804,19 @@ class LevelDBWriter(writableDB: DB,
       .flatMap(bs =>
         for {
           txCount <- if (bs.length >= 4) Some(Ints.fromBytes(bs(0), bs(1), bs(2), bs(3))) else None
-          header  <- Block.parseBytesLegacy(bs.drop(Ints.BYTES)).toOption
+          header  <- Block.parseBytes(bs.drop(Ints.BYTES)).toOption
         } yield (txCount, header))
       .map {
         case (txCount, header) =>
           header.copy(transactionData = readTransactionBytes(txCount))
       }
 
-    block.map(_.bytes())
+    block.map(Block.toBytes(_, legacy))
   }
 
-  override def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]] = {
-    readOnly(db => db.get(Keys.heightOf(blockId))).flatMap(h => loadBlockBytes(h))
+
+  override def loadBlockBytes(blockId: AssetId, legacy: Boolean): Option[Array[Byte]] = {
+    readOnly(db => db.get(Keys.heightOf(blockId))).flatMap(h => loadBlockAtBytes(h, legacy))
   }
 
   override def loadHeightOf(blockId: ByteStr): Option[Int] = {
