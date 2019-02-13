@@ -16,8 +16,6 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 trait PBTransactionImplicits {
-  private[this] val WavesAssetId    = ByteStr.empty
-  private[this] val NoFeeAssetId    = WavesAssetId
   private[this] val NoChainId: Byte = 0 // AddressScheme.current.chainId
 
   implicit class PBTransactionVanillaAdapter(tx: Transaction) extends VanillaTransaction with SignedTransaction with FastHashId {
@@ -85,9 +83,9 @@ trait PBTransactionImplicits {
   implicit class VanillaTransactionImplicitConversionOps(tx: VanillaTransaction) {
     def toPB: Transaction = tx match {
       // Uses version "2" for "modern" transactions with single version and proofs field
-      case MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
+      case tx @ MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
         val data = MassTransferTransactionData(transfers.map(pt => MassTransferTransactionData.Transfer(pt.address, pt.amount)))
-        Transaction(assetId, sender, NoChainId, fee, NoFeeAssetId, ByteStr(attachment), timestamp, 2, proofs, Data.MassTransfer(data))
+        Transaction(assetId, sender, NoChainId, fee, tx.assetFee._1, ByteStr(attachment), timestamp, 2, proofs, Data.MassTransfer(data))
 
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(recipient, amount)
