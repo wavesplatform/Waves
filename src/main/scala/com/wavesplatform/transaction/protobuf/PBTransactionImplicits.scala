@@ -16,6 +16,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 trait PBTransactionImplicits {
+  private[this] val WavesAssetId    = ByteStr.empty
   private[this] val NoChainId: Byte = 0 // AddressScheme.current.chainId
 
   implicit class PBTransactionVanillaAdapter(tx: Transaction) extends VanillaTransaction with SignedTransaction with FastHashId {
