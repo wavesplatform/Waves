@@ -8,6 +8,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.fields.FeaturesBlockField
+import com.wavesplatform.block.protobuf.PBBlock
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
@@ -363,12 +364,14 @@ object Block extends ScorexLogging {
       ).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
     } yield block
 
-  def parseBytesPB(bytes: Array[Byte]): Try[Block] = Try {
-    block.protobuf.PBBlock.parseFrom(bytes).toVanillaAdapter
+  def parseBytesPB(bytes: Array[Byte]): Try[PBBlock] = Try {
+    block.protobuf.PBBlock.parseFrom(bytes)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[Block] = {
-    parseBytesPB(bytes).orElse(parseBytesLegacy(bytes))
+    parseBytesPB(bytes)
+      .map(pb => if (useLegacyBlock) pb.toVanilla else pb.toVanillaAdapter)
+      .orElse(parseBytesLegacy(bytes))
   }
 
   def areTxsFitInBlock(blockVersion: Byte, txsCount: Int): Boolean = {
