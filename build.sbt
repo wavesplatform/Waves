@@ -317,7 +317,12 @@ lazy val node = project
         Dependencies.ficus ++
         Dependencies.scorex ++
         Dependencies.commons_net ++
-        Dependencies.monix.value
+        Dependencies.monix.value,
+    dependencyOverrides ++= Seq(
+      Dependencies.AkkaActor,
+      Dependencies.AkkaStream,
+      Dependencies.AkkaHTTP
+    )
   )
   .dependsOn(langJVM, commonJVM)
 
