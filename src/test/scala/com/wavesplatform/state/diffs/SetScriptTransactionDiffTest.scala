@@ -85,18 +85,26 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
       master <- accountGen
       ts     <- positiveLongGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      expr    = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
-      script  = ExprScript(V1, expr, checkSize = false).explicitGet()
-      tx      = SetScriptTransaction.selfSigned(master, Some(script), 100000, ts + 1).explicitGet()
-    } yield (genesis, tx)
+      blocks  = Seq(BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true)), BLOCK(FUNC("f", List(), CONST_LONG(3)), CONST_BOOLEAN(true)))
+      scripts = blocks map { block =>
+        ExprScript(V1, block, checkSize = false).explicitGet()
+      }
+      txs = scripts map { script =>
+        SetScriptTransaction.selfSigned(master, Some(script), 100000, ts + 1).explicitGet()
+      }
+    } yield (genesis, txs)
 
     forAll(setup) {
-      case (genesis, tx) =>
-        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsUnactivated) { blockDiffEi =>
+      case (genesis, Seq(compatTx, blockV2Tx)) =>
+        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(compatTx)), settingsUnactivated) { blockDiffEi =>
+          blockDiffEi shouldBe 'right
+        }
+
+        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(blockV2Tx)), settingsUnactivated) { blockDiffEi =>
           blockDiffEi should produce("Ride4DApps has not been activated yet")
         }
 
-        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsActivated) { blockDiffEi =>
+        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(blockV2Tx)), settingsActivated) { blockDiffEi =>
           blockDiffEi shouldBe 'right
         }
     }

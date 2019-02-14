@@ -114,7 +114,7 @@ object CommonValidation {
       )
 
     def scriptActivation(sc: Script) = {
-      val ab = activationBarrier(BlockchainFeatures.Ride4DApps, Some("Ride4DApps has not been activated yet"))
+      val ab = activationBarrier(BlockchainFeatures.Ride4DApps, Some("Ride4DApps"))
       def scriptVersionActivation(sc: Script) = sc.stdLibVersion match {
         case V1 | V2 if sc.containsBlockV2.value => ab
         case V1 | V2                             => Right(tx)

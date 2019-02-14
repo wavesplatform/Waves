@@ -48,11 +48,12 @@ object ExprScript {
       queue.headOption match {
         case Some(expr) =>
           expr match {
-            case BLOCK(_, _)                => true
             case GETTER(expr1, _)           => horTraversal(queue.tail += expr1)
             case LET_BLOCK(let, body)       => horTraversal(queue.tail ++ MutableList(let.value, body))
             case IF(expr1, expr2, expr3)    => horTraversal(queue.tail ++ MutableList(expr1, expr2, expr3))
             case FUNCTION_CALL(_, exprList) => horTraversal(queue.tail ++ exprList)
+            case BLOCK(LET(_, let), body)   => horTraversal(queue.tail ++ MutableList(let, body))
+            case BLOCK(_, _)                => true
             case _                          => false
           }
         case None => false
