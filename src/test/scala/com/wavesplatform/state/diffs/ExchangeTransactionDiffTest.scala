@@ -37,7 +37,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
   val fsWithOrderV3Feature: FunctionalitySettings = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.OrderV3.id -> 0))
 
-  property("validation fails when OrderV3 feature is not activation yet") {
+  property("Validation fails when OrderV3 feature is not activation yet") {
 
     val preconditionsAndExchange
       : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
@@ -69,7 +69,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  property("preserves waves invariant, stores match info, rewards matcher") {
+  property("Preserves waves invariant, stores match info, rewards matcher") {
 
     val preconditionsAndExchange: Gen[(GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
       buyer  <- accountGen
@@ -98,7 +98,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  property("preserves assets invariant (matcher's fee in one of the assets of the pair or in Waves), stores match info, rewards matcher") {
+  property("Preserves assets invariant (matcher's fee in one of the assets of the pair or in Waves), stores match info, rewards matcher") {
 
     val preconditionsAndExchange
       : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
@@ -151,7 +151,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  property("preserves assets invariant (matcher's fee in separately issued asset), stores match info, rewards matcher") {
+  property("Preserves assets invariant (matcher's fee in separately issued asset), stores match info, rewards matcher") {
 
     val preconditionsAndExchange: Gen[(GenesisTransaction,
                                        GenesisTransaction,
@@ -183,8 +183,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         priceAssetId = maybeAsset1,
         buyMatcherFeeAssetId = buyMatcherFeeAssetId,
         sellMatcherFeeAssetId = sellMatcherFeeAssetId,
-        fixedMatcher = Some(matcher),
-        orderVersions = Set(3)
+        fixedMatcher = Some(matcher)
       )
     } yield (gen1, gen2, gen3, issue1, issue2, issue3, issue4, exchange)
 
@@ -211,6 +210,91 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
               )
 
             matcherPortfolio shouldBe restoredMatcherPortfolio
+        }
+    }
+  }
+
+  property("Validation fails in case of attempt to pay fee in unissued asset") {
+
+    val preconditionsAndExchange
+      : Gen[(GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction, IssueTransaction, ExchangeTransaction)] = for {
+      buyer   <- accountGen
+      seller  <- accountGen
+      matcher <- accountGen
+      ts      <- timestampGen
+      gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).explicitGet()
+      gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
+      gen3: GenesisTransaction = GenesisTransaction.create(matcher, ENOUGH_AMT, ts).explicitGet()
+      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
+      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
+      maybeAsset1              <- Gen.option(issue1.id())
+      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
+      matcherFeeAssetId        <- assetIdGen retryUntil (_.nonEmpty)
+      exchange <- exchangeV2GeneratorP(
+        buyer = buyer,
+        seller = seller,
+        amountAssetId = maybeAsset2,
+        priceAssetId = maybeAsset1,
+        buyMatcherFeeAssetId = matcherFeeAssetId,
+        sellMatcherFeeAssetId = matcherFeeAssetId,
+        fixedMatcher = Some(matcher),
+        orderVersions = Set(3)
+      )
+    } yield (gen1, gen2, gen3, issue1, issue2, exchange)
+
+    forAll(preconditionsAndExchange) {
+      case (gen1, gen2, gen3, issue1, issue2, exchange) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange)), fsWithOrderV3Feature) {
+          blockDiffEi =>
+            blockDiffEi should produce("negative asset balance")
+        }
+    }
+  }
+
+  property("Validation fails when asset balance is less than fee in that asset") {
+
+    val preconditionsAndExchange: Gen[(GenesisTransaction,
+                                       GenesisTransaction,
+                                       GenesisTransaction,
+                                       IssueTransaction,
+                                       IssueTransaction,
+                                       IssueTransaction,
+                                       IssueTransaction,
+                                       ExchangeTransaction)] = for {
+      buyer   <- accountGen
+      seller  <- accountGen
+      matcher <- accountGen
+      ts      <- timestampGen
+      gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).explicitGet()
+      gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
+      gen3: GenesisTransaction = GenesisTransaction.create(matcher, ENOUGH_AMT, ts).explicitGet()
+      issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
+      issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
+      issue3: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT / 1000000, buyer).map(_._1).retryUntil(_.script.isEmpty)
+      issue4: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT / 1000000, seller).map(_._1).retryUntil(_.script.isEmpty)
+      maybeAsset1              <- Gen.option(issue1.id())
+      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
+      buyMatcherFeeAssetId     <- Gen.option(issue3.id())
+      sellMatcherFeeAssetId    <- Gen.option(issue4.id()) suchThat (x => x != buyMatcherFeeAssetId)
+      exchange <- exchangeV2GeneratorP(
+        buyer = buyer,
+        seller = seller,
+        amountAssetId = maybeAsset2,
+        priceAssetId = maybeAsset1,
+        fixedMatcherFee = Some(ENOUGH_AMT / 10),
+        buyMatcherFeeAssetId = buyMatcherFeeAssetId,
+        sellMatcherFeeAssetId = sellMatcherFeeAssetId,
+        fixedMatcher = Some(matcher),
+        orderVersions = Set(3)
+      )
+    } yield (gen1, gen2, gen3, issue1, issue2, issue3, issue4, exchange)
+
+    forAll(preconditionsAndExchange) {
+      case (gen1, gen2, gen3, issue1, issue2, issue3, issue4, exchange) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2, issue3, issue4))),
+                     TestBlock.create(Seq(exchange)),
+                     fsWithOrderV3Feature) { blockDiffEi =>
+          blockDiffEi should produce("negative asset balance")
         }
     }
   }
