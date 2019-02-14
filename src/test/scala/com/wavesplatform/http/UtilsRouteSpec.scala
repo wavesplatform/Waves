@@ -13,6 +13,7 @@ import play.api.libs.json.{JsObject, JsValue}
 import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 
@@ -29,6 +30,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     function = PureContext.eq.header,
     args = List(CONST_LONG(1), CONST_LONG(2))
   )
+
+
+  routePath("/script/decompile") in {
+    val base64 = ExprScript(script).explicitGet().bytes().base64
+    Post(routePath("/script/decompile"), base64) ~> route ~> check {
+      val json           = responseAs[JsValue]
+      (json \ "script").as[String] shouldBe "(1 == 2)"
+    }
+  }
 
   routePath("/script/compile") in {
     Post(routePath("/script/compile"), "(1 == 2)") ~> route ~> check {

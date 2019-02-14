@@ -9,7 +9,7 @@ object Decompiler {
 
   case class Delay(seq: Seq[Either[String, Function[Unit, Delay]]])
 
-  def show(d: Delay): String = {
+  private def show(d: Delay): String = {
     var w = d.seq
     val s = new StringBuffer()
     while (w.nonEmpty) {

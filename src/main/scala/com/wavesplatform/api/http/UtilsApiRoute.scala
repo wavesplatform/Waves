@@ -3,8 +3,13 @@ package com.wavesplatform.api.http
 import java.security.SecureRandom
 
 import akka.http.scaladsl.server.Route
+import cats.kernel.Monoid
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.compiler.Decompiler
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
@@ -26,7 +31,42 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   }
 
   override val route: Route = pathPrefix("utils") {
-    compile ~ compileContract ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    decompile ~ compile ~ compileContract ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+  }
+
+  @Path("/script/decompile")
+  @ApiOperation(value = "Decompile", notes = "Decompiles base64 script representation to string code", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "code",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        value = "Script code",
+        example = "true"
+      )
+    ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "string or error")
+    ))
+  def decompile: Route = path("script" / "decompile") {
+    (post & entity(as[String])) { code =>
+      parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
+        val CTX: CTX          = Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.StdLibVersion.V3), CryptoContext.build(Global)))
+        val decompilerContext = CTX.decompilerContext
+        val ret = Script.fromBase64String(code) match {
+          case Left(err)     => "Wrong input"
+          case Right(script) => Script.decompile(script)
+        }
+        complete(
+          Json.obj(
+            "script" -> ret.toString,
+          )
+        )
+      }
+    }
   }
 
   @Path("/script/compile")
@@ -100,6 +140,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
       )
     }
   }
+
   @Path("/script/estimate")
   @ApiOperation(value = "Estimate", notes = "Estimates compiled code in Base64 representation", httpMethod = "POST")
   @ApiImplicitParams(

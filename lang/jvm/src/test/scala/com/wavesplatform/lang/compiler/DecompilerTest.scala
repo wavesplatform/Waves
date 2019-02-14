@@ -46,6 +46,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |(102,>)""".stripMargin
   }
 
+  property("wefewf") {
+    val expr = FUNCTION_CALL(
+      function = PureContext.eq.header,
+      args = List(CONST_LONG(1), CONST_LONG(2))
+    )
+    Decompiler(expr, decompilerContext) shouldBe "{ let a = 1; true }"
+  }
+
   property("simple let") {
     val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), TRUE)
     Decompiler(expr, decompilerContext) shouldBe "{ let a = 1; true }"
