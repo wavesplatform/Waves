@@ -33,7 +33,7 @@ object ExprScript {
 
   case class ExprScriprImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends Script {
     override type Expr = EXPR
-    override val text: String = expr.toString
+
     override val bytes: Coeval[ByteStr] =
       Coeval.evalOnce {
         val s = Array(stdLibVersion.toByte) ++ Serde.serialize(expr)

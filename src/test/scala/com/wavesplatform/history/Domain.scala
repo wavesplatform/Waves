@@ -8,7 +8,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.BlockchainUpdater
 
 case class Domain(blockchainUpdater: BlockchainUpdater with NG) {
-  def effBalance(a: Address): Long          = blockchainUpdater.effectiveBalance(a, blockchainUpdater.height, 1000)
+  def effBalance(a: Address): Long          = blockchainUpdater.effectiveBalance(a, 1000)
   def appendBlock(b: Block)                 = blockchainUpdater.processBlock(b).explicitGet()
   def removeAfter(blockId: ByteStr)         = blockchainUpdater.removeAfter(blockId).explicitGet()
   def lastBlockId                           = blockchainUpdater.lastBlockId.get

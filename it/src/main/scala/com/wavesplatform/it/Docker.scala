@@ -224,10 +224,16 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
       val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
       val configOverrides: String = {
-        val ntpServer = Option(System.getenv("NTP_SERVER")).fold("")(x => s"-Dwaves.ntp-server=$x ")
+        val ntpServer    = Option(System.getenv("NTP_SERVER")).fold("")(x => s"-Dwaves.ntp-server=$x ")
+        val maxCacheSize = Option(System.getenv("MAX_CACHE_SIZE")).fold("")(x => s"-Dwaves.max-cache-size=$x ")
+        val kafkaServer = Option(System.getenv("KAFKA_SERVER")).fold("") { x =>
+          val prefix = "-Dwaves.matcher.events-queue"
+          val topic  = s"dex-$networkSeed-${System.currentTimeMillis() / 1000 / 60}"
+          s"$prefix.type=kafka $prefix.kafka.topic=$topic -Dakka.kafka.consumer.kafka-clients.bootstrap.servers=$x "
+        }
 
         var config = s"$javaOptions ${renderProperties(asProperties(overrides))} " +
-          s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort $ntpServer"
+          s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort $ntpServer $maxCacheSize $kafkaServer"
 
         if (enableProfiling) {
           config += s"-agentpath:/usr/local/YourKit-JavaProfiler-2018.04/bin/linux-x86-64/libyjpagent.so=port=$ProfilerPort,listen=all," +

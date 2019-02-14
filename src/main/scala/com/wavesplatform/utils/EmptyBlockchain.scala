@@ -1,16 +1,16 @@
 package com.wavesplatform.utils
 
+import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
-import cats.kernel.Monoid
-import com.wavesplatform.common.state.ByteStr
 
 object EmptyBlockchain extends Blockchain {
   override def height: Int = 0
@@ -68,7 +68,7 @@ object EmptyBlockchain extends Blockchain {
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = VolumeAndFee(0, 0)
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot] = Seq.empty
+  override def balanceSnapshots(address: Address, from: Int, to: ByteStr): Seq[BalanceSnapshot] = Seq.empty
 
   override def accountScript(address: Address): Option[Script] = None
 

@@ -267,6 +267,7 @@ object Types {
     buildExchangeTransactionType(proofsEnabled),
     buildTransferTransactionType(proofsEnabled),
     buildSetAssetScriptTransactionType(proofsEnabled),
+    buildContractInvokationTransactionType(proofsEnabled),
   )
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CaseType] = {

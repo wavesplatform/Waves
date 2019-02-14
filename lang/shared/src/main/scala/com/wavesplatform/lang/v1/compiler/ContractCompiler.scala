@@ -87,6 +87,7 @@ object ContractCompiler {
   private def compileContract(contract: Expressions.CONTRACT): CompileM[Contract] = {
     for {
       ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
+      _  <- validateDuplicateVarsInContract(contract)
       l  <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
       _ <- Either
         .cond(
@@ -110,6 +111,29 @@ object ContractCompiler {
       }
       fs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
     } yield Contract(ds, fs, v)
+  }
+
+  private def validateDuplicateVarsInContract(contract: Expressions.CONTRACT): CompileM[Any] = {
+    for {
+      ctx <- get[CompilerContext, CompilationError]
+      annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, String](handlePart)
+      annotatedFuncArgs: Seq[(Seq[Expressions.PART[String]], Seq[Expressions.PART[String]])] = contract.fs.map(af =>
+        (af.anns.flatMap(_.args), af.f.args.map(_._1)))
+      annAndFuncArgsIntersection = annotatedFuncArgs.toVector.traverse[CompileM, Boolean] {
+        case (annSeq, argSeq) =>
+          for {
+            anns <- annSeq.toList.traverse[CompileM, String](handlePart)
+            args <- argSeq.toList.traverse[CompileM, String](handlePart)
+          } yield anns.forall(a => args.contains(a))
+      }
+      _ <- annotationVars
+        .ensure(Generic(contract.position.start, contract.position.start, "Annotation bindings overrides already defined var"))(aVs =>
+          aVs.forall(!ctx.varDefs.contains(_)))
+      _ <- annAndFuncArgsIntersection
+        .ensure(Generic(contract.position.start, contract.position.start, "Contract func args override annotation bindings")) { is =>
+          !(is contains true)
+        }
+    } yield ()
   }
 
   def apply(c: CompilerContext, contract: Expressions.CONTRACT): Either[String, Contract] =

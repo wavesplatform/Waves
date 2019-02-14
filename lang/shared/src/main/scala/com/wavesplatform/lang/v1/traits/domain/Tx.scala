@@ -7,6 +7,12 @@ case class TransferItem(recipient: Recipient, amount: Long)
 trait Tx
 
 object Tx {
+  case class ContractTransfer(assetId: Option[ByteStr],
+                              sender: Recipient.Address,
+                              recipient: Recipient.Address,
+                              amount: Long,
+                              timestamp: Long,
+                              id: ByteStr)
 
   case class Header(id: ByteStr, fee: Long, timestamp: Long, version: Long)
   case class Proven(h: Header, sender: Recipient.Address, bodyBytes: ByteStr, senderPk: ByteStr, proofs: IndexedSeq[ByteStr])
@@ -15,24 +21,13 @@ object Tx {
 
   case class Genesis(header: Header, amount: Long, recipient: Recipient) extends Tx
   case class Payment(p: Proven, amount: Long, recipient: Recipient)      extends Tx
-  case class Transfer(p: Proven,
-                      feeAssetId: Option[ByteStr],
-                      assetId: Option[ByteStr],
-                      amount: Long,
-                      recipient: Recipient,
-                      attachment: ByteStr)
+  case class Transfer(p: Proven, feeAssetId: Option[ByteStr], assetId: Option[ByteStr], amount: Long, recipient: Recipient, attachment: ByteStr)
       extends Tx
-  case class Issue(p: Proven,
-                   quantity: Long,
-                   name: ByteStr,
-                   description: ByteStr,
-                   reissuable: Boolean,
-                   decimals: Long,
-                   script: Option[ByteStr])
+  case class Issue(p: Proven, quantity: Long, name: ByteStr, description: ByteStr, reissuable: Boolean, decimals: Long, script: Option[ByteStr])
       extends Tx
   case class ReIssue(p: Proven, quantity: Long, assetId: ByteStr, reissuable: Boolean) extends Tx
   case class Burn(p: Proven, quantity: Long, assetId: ByteStr)                         extends Tx
-  case class CI(p: Proven, contractAddress: Recipient, maybePayment: Option[Pmt])         extends Tx
+  case class CI(p: Proven, contractAddress: Recipient, maybePayment: Option[Pmt])      extends Tx
   case class Lease(p: Proven, amount: Long, recipient: Recipient)                      extends Tx
   case class LeaseCancel(p: Proven, leaseId: ByteStr)                                  extends Tx
   case class CreateAlias(p: Proven, alias: String)                                     extends Tx

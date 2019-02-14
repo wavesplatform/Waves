@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.{AssetId, AssetIdStringLength, TransactionFactory, ValidationError}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.utx.UtxPool
@@ -275,13 +275,13 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
           })
-        ) ++ (script.toSeq.map { script =>
+        ) ++ script.toSeq.map { script =>
           "scriptDetails" -> Json.obj(
             "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
             "script"           -> JsString(script.bytes().base64),
-            "scriptText"       -> JsString(script.text)
+            "scriptText"       -> JsString(Script.decompile(script))
           )
-        })
+        }
       )
     }).left.map(m => CustomValidationError(m))
 

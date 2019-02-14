@@ -237,8 +237,7 @@ object ExpressionCompiler {
       key <- handlePart(keyPart)
       ctx <- get[CompilerContext, CompilationError]
       result <- ctx.varDefs
-        .get(key)
-        .fold(raiseError[CompilerContext, CompilationError, (EXPR, FINAL)](DefNotFound(p.start, p.end, key)))(t =>
+        .get(key).fold(raiseError[CompilerContext, CompilationError, (EXPR, FINAL)](DefNotFound(p.start, p.end, key)))(t =>
           (REF(key): EXPR, t._1: FINAL).pure[CompileM])
     } yield result
   }

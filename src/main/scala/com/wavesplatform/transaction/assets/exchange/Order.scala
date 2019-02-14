@@ -159,6 +159,11 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 
   @ApiModelProperty(hidden = true)
   override def hashCode(): Int = idStr.hashCode()
+
+  @ApiModelProperty(hidden = true)
+  override def toString: String = {
+    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee, proofs=$proofs)"
+  }
 }
 
 object Order {
@@ -292,6 +297,12 @@ object Order {
 
   def assetIdBytes(assetId: Option[AssetId]): Array[Byte] = {
     assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+  }
+
+  def fromBytes(version: Byte, xs: Array[Byte]): Order = version match {
+    case 1     => OrderV1.parseBytes(xs).get
+    case 2     => OrderV2.parseBytes(xs).get
+    case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
   }
 
 }

@@ -15,7 +15,7 @@ val versionSource = Def.task {
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 15, 0)
+  val FallbackVersion = (0, 15, 5)
 
   val versionFile      = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
@@ -58,18 +58,19 @@ resolvers ++= Seq(
   Resolver.sbtPluginRepo("releases")
 )
 
-fork in run := true
-javaOptions in run ++= Seq(
-  "-XX:+IgnoreUnrecognizedVMOptions",
-  "--add-modules=java.xml.bind"
-)
-
-Test / fork := true
-Test / javaOptions ++= Seq(
+val java9Options = Seq(
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
   "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
 )
+
+fork in run := true
+javaOptions in run ++= java9Options
+
+Test / fork := true
+Test / javaOptions ++= java9Options
+
+Jmh / javaOptions ++= java9Options
 
 val aopMerge: MergeStrategy = new MergeStrategy {
   val name = "aopMerge"
@@ -116,6 +117,7 @@ inConfig(Test)(
   Seq(
     logBuffered := false,
     parallelExecution := false,
+    testListeners := Seq.empty, // Fix for doubled test reports
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true")
   ))

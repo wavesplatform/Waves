@@ -30,7 +30,6 @@ object ContractScript {
   case class ContractScriptImpl(stdLibVersion: StdLibVersion, expr: Contract, maxComplexity: Long) extends Script {
     override val complexity: Long = maxComplexity
     override type Expr = Contract
-    override val text: String = expr.toString
     override val bytes: Coeval[ByteStr] =
       Coeval.evalOnce {
         val s = Array(0: Byte, ScriptType.Contract.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(expr)
@@ -43,7 +42,7 @@ object ContractScript {
     import cats.implicits._
     type E[A] = Either[String, A]
     val funcsWithComplexity: Seq[E[(String, Long)]] =
-      (contract.cfs.map(func => (func.annotation.invocationArgName, func.u)) ++ contract.vf.map(func => (func.annotation.txArgName, func.u)))
+      (contract.cfs.map(func => (func.annotation.invocationArgName, func.u)) ++ contract.vf.map(func => (func.annotation.invocationArgName, func.u)))
         .map {
           case (annotationArgName, funcExpr) =>
             ScriptEstimator(varNames(version), functionCosts(version), constructExprFromFuncAndContex(contract.dec, annotationArgName, funcExpr))

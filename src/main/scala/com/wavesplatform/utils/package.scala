@@ -11,7 +11,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.lang.v1.compiler.CompilerContext
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -150,6 +150,8 @@ package object utils extends ScorexLogging {
     if (isAssetScript) lazyAssetContexts(version)().compilerContext
     else lazyContexts(version)().compilerContext
 
+  val defaultDecompilerContext: DecompilerContext = lazyContexts(V3)().decompilerContext
+
   def varNames(version: StdLibVersion): Set[String] = compilerContext(version, isAssetScript = false).varDefs.keySet
 
   @tailrec
@@ -179,6 +181,8 @@ package object utils extends ScorexLogging {
     val obj           = runtimeMirror.reflectModule(module)
     obj.instance.asInstanceOf[T]
   }
+
+  @tailrec def doWhile[T](z: T)(cond: T => Boolean)(f: T => T): T = if (cond(z)) doWhile(f(z))(cond)(f) else z
 
   implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
 

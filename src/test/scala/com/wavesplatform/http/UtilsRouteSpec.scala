@@ -3,7 +3,6 @@ package com.wavesplatform.http
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.diffs.CommonValidation
@@ -48,7 +47,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/estimate"), base64) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "script").as[String] shouldBe base64
-      (json \ "scriptText").as[String] shouldBe s"FUNCTION_CALL(Native($EQ),List(CONST_LONG(1), CONST_LONG(2)))"
+      (json \ "scriptText").as[String] shouldBe s"1 == 2"
       (json \ "complexity").as[Long] shouldBe 3
       (json \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }

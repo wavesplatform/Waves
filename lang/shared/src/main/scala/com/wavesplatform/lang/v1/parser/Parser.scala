@@ -170,7 +170,7 @@ object Parser {
     val funcname    = anyVarName
     val argWithType = anyVarName ~ ":" ~ typesP
     val args        = "(" ~ argWithType.rep(sep = ",") ~ ")"
-    val funcHeader  = "func" ~ funcname ~ args ~ "=" ~ "{" ~ baseExpr ~ "}"
+    val funcHeader  = "func" ~ funcname ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}"))
     funcHeader.map {
       case (name, args, expr) => FUNC(AnyPos, name, args, expr)
     }
@@ -311,6 +311,14 @@ object Parser {
 
   lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
 
+
+  val singleBaseAtom = comment ~
+    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | maybeAccessP) ~
+    comment
+
+  lazy val singleBaseExpr = P(binaryOp(singleBaseAtom, opsByPriority) | singleBaseAtom)
+
+
   lazy val declaration = P(letP | funcP)
 
   def binaryOp(atom: P[EXPR], rest: List[List[BinaryOperation]]): P[EXPR] = rest match {
@@ -334,7 +342,7 @@ object Parser {
   def parseExpr(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
 
   def parseContract(str: String): core.Parsed[CONTRACT, Char, String] =
-    P(Start ~ (declaration.rep) ~ (annotatedFunc.rep) ~ End)
+    P(Start ~ comment.? ~ (declaration.rep) ~ comment.? ~ (annotatedFunc.rep) ~ End)
       .map {
         case (ds, fs) => CONTRACT(AnyPos, ds.toList, fs.toList)
       }
