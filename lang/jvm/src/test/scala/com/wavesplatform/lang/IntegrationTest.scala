@@ -359,6 +359,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     ev[CONST_LONG](context, expr) shouldBe evaluated(8)
   }
 
+  property("listN constructor primitive") {
+    val src =
+      """
+        |cons(1, cons(2, cons(3, cons(4, List(5)))))
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
+  }
+
   property("list constructor primitive") {
     val src =
       """
