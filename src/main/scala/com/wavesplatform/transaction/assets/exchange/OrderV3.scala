@@ -24,7 +24,7 @@ case class OrderV3(senderPublicKey: PublicKeyAccount,
                    timestamp: Long,
                    expiration: Long,
                    matcherFee: Long,
-                   matcherFeeAssetId: Option[AssetId],
+                   override val matcherFeeAssetId: Option[AssetId],
                    proofs: Proofs)
     extends Order {
 

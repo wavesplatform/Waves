@@ -152,10 +152,6 @@ object ExchangeTransactionDiff {
 
   /*** Calculates fee portfolio from the order (taking into account that in OrderV3 fee can be paid in asset != Waves) */
   def getOrderFeePortfolio(order: Order, fee: Long): Portfolio = {
-    lazy val default = wavesPortfolio(fee)
-    order match {
-      case ov3: OrderV3 => ov3.matcherFeeAssetId.fold(default)(assetId => Portfolio(0, LeaseBalance.empty, Map(assetId -> fee)))
-      case _            => default
-    }
+    order.matcherFeeAssetId.fold(wavesPortfolio(fee))(assetId => Portfolio(0, LeaseBalance.empty, Map(assetId -> fee)))
   }
 }
