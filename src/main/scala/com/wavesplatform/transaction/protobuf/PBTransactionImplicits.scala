@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction.protobuf
 
-import java.nio.charset.StandardCharsets
-
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
@@ -25,10 +23,11 @@ trait PBTransactionImplicits {
 
     override def timestamp: Long                   = tx.timestamp
     override val sender: PublicKeyAccount          = tx.sender
-    override val proofs                            = Proofs(tx.proofsArray)
+    override val proofs: Proofs                    = Proofs(tx.proofsArray)
     override val signature: ByteStr                = proofs.toSignature
-    override def builder        = Transaction
+    override def builder: PBTransaction.type       = PBTransaction
     override def assetFee: (Option[AssetId], Long) = (Some(tx.feeAssetId).filterNot(_.isEmpty), tx.fee)
+
     override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(tx.version match {
       case 1 | 2 => tx.toVanilla.bodyBytes()
       case _     => PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
@@ -37,8 +36,17 @@ trait PBTransactionImplicits {
       val encoded = PBUtils.encodeDeterministic(tx)
       Bytes.concat(Array[Byte](builder.typeId, builder.version), encoded)
     }
-    override val json: Coeval[JsObject]     = Coeval.evalOnce(Json.toJson(tx).as[JsObject])
-    override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(if (tx.data.isGenesis) true else this.verifySignature())
+
+    override val json: Coeval[JsObject] = Coeval.evalOnce(tx.version match {
+      case 1 | 2 => tx.toVanilla.json()
+      case _ => Json.toJson(tx).as[JsObject]
+    })
+
+    override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
+      if (tx.data.isGenesis) true
+      else if (tx.version > 1) true
+      else this.verifySignature()
+    }
   }
 
   implicit class VanillaOrderImplicitConversionOps(order: vt.assets.exchange.Order) {
@@ -123,21 +131,11 @@ trait PBTransactionImplicits {
         Transaction(None, tx.sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 2, proofs, Data.Exchange(data))
 
       case vt.assets.IssueTransactionV1(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature) =>
-        val data = IssueTransactionData(new String(name, StandardCharsets.UTF_8),
-                                        new String(description, StandardCharsets.UTF_8),
-                                        quantity,
-                                        decimals,
-                                        reissuable,
-                                        None)
+        val data = IssueTransactionData(ByteStr(name), ByteStr(description), quantity, decimals, reissuable, None)
         Transaction(None, sender, NoChainId, fee, tx.assetFee._1, None, timestamp, 1, Seq(signature), Data.Issue(data))
 
       case vt.assets.IssueTransactionV2(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs) =>
-        val data = IssueTransactionData(new String(name, StandardCharsets.UTF_8),
-                                        new String(description, StandardCharsets.UTF_8),
-                                        quantity,
-                                        decimals,
-                                        reissuable,
-                                        script)
+        val data = IssueTransactionData(ByteStr(name), ByteStr(description), quantity, decimals, reissuable, script)
         Transaction(None, sender, chainId, fee, tx.assetFee._1, None, timestamp, 2, proofs, Data.Issue(data))
 
       case tx @ vt.assets.ReissueTransactionV1(sender, assetId, quantity, reissuable, fee, timestamp, signature) =>
@@ -229,7 +227,7 @@ trait PBTransactionImplicits {
         vt.transfer.MassTransferTransaction(
           tx.assetId,
           tx.sender,
-          transfers.map(t => ParsedTransfer(t.address, t.amount)).toList,
+          transfers.map(t => ParsedTransfer(t.address.toAddressOrAlias, t.amount)).toList,
           tx.timestamp,
           tx.fee,
           tx.attachment.arr,
@@ -237,23 +235,39 @@ trait PBTransactionImplicits {
         )
 
       case Data.Genesis(GenesisTransactionData(recipient, amount)) =>
-        vt.GenesisTransaction(recipient, amount, tx.timestamp, tx.signature)
+        vt.GenesisTransaction(recipient.toAddress, amount, tx.timestamp, tx.signature)
 
       case Data.Transfer(TransferTransactionData(recipient, amount)) =>
         tx.version match {
           case 1 =>
             vt.transfer
-              .TransferTransactionV1(tx.assetId, tx.sender, recipient, amount, tx.timestamp, tx.feeAssetId, tx.fee, tx.attachment.arr, tx.signature)
+              .TransferTransactionV1(tx.assetId,
+                                     tx.sender,
+                                     recipient.toAddressOrAlias,
+                                     amount,
+                                     tx.timestamp,
+                                     tx.feeAssetId,
+                                     tx.fee,
+                                     tx.attachment.arr,
+                                     tx.signature)
           case 2 =>
             vt.transfer
-              .TransferTransactionV2(tx.sender, recipient, tx.assetId, amount, tx.timestamp, tx.feeAssetId, tx.fee, tx.attachment.arr, tx.proofs)
+              .TransferTransactionV2(tx.sender,
+                                     recipient.toAddressOrAlias,
+                                     tx.assetId,
+                                     amount,
+                                     tx.timestamp,
+                                     tx.feeAssetId,
+                                     tx.fee,
+                                     tx.attachment.arr,
+                                     tx.proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
         tx.version match {
-          case 1 => vt.CreateAliasTransactionV1(tx.sender, alias, tx.fee, tx.timestamp, tx.signature)
-          case 2 => vt.CreateAliasTransactionV2(tx.sender, alias, tx.fee, tx.timestamp, tx.proofs)
+          case 1 => vt.CreateAliasTransactionV1(tx.sender, alias.toAlias, tx.fee, tx.timestamp, tx.signature)
+          case 2 => vt.CreateAliasTransactionV2(tx.sender, alias.toAlias, tx.fee, tx.timestamp, tx.proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
@@ -262,8 +276,8 @@ trait PBTransactionImplicits {
           case 1 =>
             vt.assets.IssueTransactionV1(
               tx.sender,
-              name.getBytes(StandardCharsets.UTF_8),
-              description.getBytes(StandardCharsets.UTF_8),
+              name,
+              description,
               quantity,
               decimals,
               reissuable,
@@ -275,8 +289,8 @@ trait PBTransactionImplicits {
             vt.assets.IssueTransactionV2(
               tx.chainId,
               tx.sender,
-              name.getBytes(StandardCharsets.UTF_8),
-              description.getBytes(StandardCharsets.UTF_8),
+              name,
+              description,
               quantity,
               decimals,
               reissuable,
@@ -310,8 +324,8 @@ trait PBTransactionImplicits {
 
       case Data.Lease(LeaseTransactionData(recipient, amount)) =>
         tx.version match {
-          case 1 => vt.lease.LeaseTransactionV1(tx.sender, amount, tx.fee, tx.timestamp, recipient, tx.signature)
-          case 2 => vt.lease.LeaseTransactionV2(tx.sender, amount, tx.fee, tx.timestamp, recipient, tx.proofs)
+          case 1 => vt.lease.LeaseTransactionV1(tx.sender, amount, tx.fee, tx.timestamp, recipient.toAddressOrAlias, tx.signature)
+          case 2 => vt.lease.LeaseTransactionV2(tx.sender, amount, tx.fee, tx.timestamp, recipient.toAddressOrAlias, tx.proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 

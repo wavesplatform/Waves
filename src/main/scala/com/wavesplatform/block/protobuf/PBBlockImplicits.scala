@@ -28,8 +28,8 @@ trait PBBlockImplicits {
     })
 
     override val headerJson: Coeval[JsObject] = Coeval.evalOnce(block.version match {
-      // case 1 | 2 | 3 =>
-      //  block.toVanilla.headerJson()
+      case 1 | 2 | 3 =>
+        block.toVanilla.headerJson()
 
       case _ =>
         val baseJson = Json.toJson(block.withTransactions(Nil)).as[JsObject]
@@ -37,7 +37,7 @@ trait PBBlockImplicits {
 
     })
     override val json: Coeval[JsObject] = Coeval.evalOnce(block.version match {
-      // case 1 | 2 | 3 => block.toVanilla.json()
+      case 1 | 2 | 3 => block.toVanilla.json()
       case _ => Json.toJson(block).as[JsObject]
     })
 

@@ -1,8 +1,9 @@
 package com.wavesplatform.serialization.protobuf
 
 import com.google.protobuf.{ByteString => PBByteString}
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKeyAccount}
+import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils._
 import com.wavesplatform.transaction.smart.script.protobuf.{Script => PBScript}
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import scalapb.TypeMapper
@@ -17,31 +18,19 @@ package object utils {
   }
 
   implicit val publicKeyAccountMapper = TypeMapper[PBByteString, PublicKeyAccount] { bs =>
-    PublicKeyAccount(bs.toByteArray)
+    if (bs.isEmpty) PublicKeyAccount(Array.emptyByteArray) else PublicKeyAccount(bs.toByteArray)
   } { pka =>
     PBByteString.copyFrom(pka.publicKey)
   }
 
-  implicit val addressOrAliasMapper = TypeMapper[PBByteString, AddressOrAlias] { bs =>
-    AddressOrAlias.fromBytes(bs.toByteArray, 0).right.get._1
-  } { addressOrAlias =>
-    PBByteString.copyFrom(addressOrAlias.bytes.arr)
-  }
-
-  implicit val aliasMapper = TypeMapper[PBByteString, Alias] { bs =>
-    Alias.fromBytes(bs.toByteArray).right.get
-  } { alias =>
-    PBByteString.copyFrom(alias.bytes.arr)
-  }
-
-  implicit val addressMapper = TypeMapper[PBByteString, Address] { bs =>
-    Address.fromBytes(bs.toByteArray).right.get
+  implicit val addressMapper = TypeMapper[PBByteString, OptionalAddress] { bs =>
+    if (bs.isEmpty) OptionalAddress.empty else OptionalAddress(bs.toByteArray)
   } { address =>
-    PBByteString.copyFrom(address.bytes.arr)
+    PBByteString.copyFrom(address.bytes)
   }
 
   implicit val scriptMapper = TypeMapper[PBScript, Script] { bs =>
-    ScriptReader.fromBytes(bs.bytes.toByteArray).right.get
+    ScriptReader.fromBytes(bs.bytes.toByteArray).explicitGet()
   } { script =>
     PBScript(PBByteString.copyFrom(script.bytes().arr))
   }

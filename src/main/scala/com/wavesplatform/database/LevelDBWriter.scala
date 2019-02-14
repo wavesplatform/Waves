@@ -814,7 +814,6 @@ class LevelDBWriter(writableDB: DB,
     block.map(Block.toBytes(_, legacy))
   }
 
-
   override def loadBlockBytes(blockId: AssetId, legacy: Boolean): Option[Array[Byte]] = {
     readOnly(db => db.get(Keys.heightOf(blockId))).flatMap(h => loadBlockAtBytes(h, legacy))
   }

@@ -68,7 +68,8 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
   property("simple oracle value required to transfer") {
     forAll(preconditions) {
       case (genesis, genesis2, createAlias, setScript, dataTransaction, transferFromScripted) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript, dataTransaction))),
+        val testBlock = TestBlock.create(Seq(genesis, genesis2, createAlias, setScript, dataTransaction))
+        assertDiffAndState(Seq(testBlock),
                            TestBlock.create(Seq(transferFromScripted)),
                            smartEnabledFS) { case _ => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript))),

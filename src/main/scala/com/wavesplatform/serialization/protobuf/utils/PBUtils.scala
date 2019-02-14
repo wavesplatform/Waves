@@ -4,11 +4,11 @@ import scalapb.GeneratedMessage
 
 object PBUtils {
   def encodeDeterministic(msg: GeneratedMessage): Array[Byte] = {
-    val a            = new Array[Byte](msg.serializedSize)
-    val outputStream = CodedOutputStream.newInstance(a)
+    val outArray     = new Array[Byte](msg.serializedSize)
+    val outputStream = CodedOutputStream.newInstance(outArray)
     outputStream.useDeterministicSerialization() // Adds this
     msg.writeTo(outputStream)
     outputStream.checkNoSpaceLeft()
-    a
+    outArray
   }
 }

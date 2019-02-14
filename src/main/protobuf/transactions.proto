@@ -44,17 +44,17 @@ message Transaction {
 };
 
 message GenesisTransactionData {
-    bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.Address"];
+    bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.OptionalAddress"];
     uint64 amount = 2;
 };
 
 message TransferTransactionData {
-    bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.AddressOrAlias"];
+    bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.OptionalAddress"];
     uint64 amount = 2;
 };
 
 message CreateAliasTransactionData {
-    bytes alias = 1 [(scalapb.field).type = "com.wavesplatform.account.Alias"];
+    bytes alias = 1 [(scalapb.field).type = "com.wavesplatform.account.OptionalAddress"];
 };
 
 message DataTransactionData {
@@ -73,7 +73,7 @@ message DataTransactionData {
 
 message MassTransferTransactionData {
     message Transfer {
-        bytes address = 1 [(scalapb.field).type = "com.wavesplatform.account.AddressOrAlias"];
+        bytes address = 1 [(scalapb.field).type = "com.wavesplatform.account.OptionalAddress"];
         uint64 amount = 2;
     };
 
@@ -81,7 +81,7 @@ message MassTransferTransactionData {
 };
 
 message LeaseTransactionData {
-    bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.AddressOrAlias"];
+    bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.OptionalAddress"];
     uint64 amount = 2;
 };
 
@@ -94,8 +94,8 @@ message BurnTransactionData {
 };
 
 message IssueTransactionData {
-    string name = 1;
-    string description = 2;
+    bytes name = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    bytes description = 2 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
     uint64 quantity = 3;
     uint32 decimals = 4;
     bool reissuable = 5;

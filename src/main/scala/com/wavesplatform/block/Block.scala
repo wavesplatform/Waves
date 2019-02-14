@@ -234,7 +234,11 @@ case class Block private[block] (override val timestamp: Long,
   protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = signerData.generator.publicKey
     val signature = signerData.signature
-    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytesWithoutSignature(), publicKey)
+    val valid     = !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytesWithoutSignature(), publicKey)
+    if (!valid) { // TODO: Remove
+      println("INVALID")
+    }
+    valid
   }
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
@@ -279,7 +283,7 @@ object Block extends ScorexLogging {
     if (useLegacyBlock) {
       val transactions = transactionData.collect {
         case a: PBTransaction.PBTransactionVanillaAdapter => a.underlying.toVanilla
-        case tx => tx
+        case tx                                           => tx
       }
       createLegacy(timestamp, version, reference, signerData, consensusData, transactions, featureVotes)
     } else {
@@ -290,7 +294,7 @@ object Block extends ScorexLogging {
 
   def toLegacy(b: Block): Block = b match {
     case a: block.protobuf.PBBlock.PBBlockVanillaAdapter => a.underlying.toVanilla
-    case _ => b
+    case _                                               => b
   }
 
   def toBytes(block: Block, legacy: Boolean = false): Array[Byte] = {
@@ -360,7 +364,7 @@ object Block extends ScorexLogging {
     } yield block
 
   def parseBytesPB(bytes: Array[Byte]): Try[Block] = Try {
-    block.protobuf.PBBlock.parseFrom(bytes)
+    block.protobuf.PBBlock.parseFrom(bytes).toVanillaAdapter
   }
 
   def parseBytes(bytes: Array[Byte]): Try[Block] = {
