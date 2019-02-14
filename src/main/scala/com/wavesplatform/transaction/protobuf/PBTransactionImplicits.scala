@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.protobuf
 import com.google.protobuf.CodedOutputStream
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.serialization.protobuf.utils.PBUtils
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderV1
@@ -29,8 +28,12 @@ trait PBTransactionImplicits {
     override def assetFee: (Option[AssetId], Long) = (Some(tx.feeAssetId).filterNot(_.isEmpty), tx.fee)
 
     override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(tx.version match {
-      case 1 | 2 => tx.toVanilla.bodyBytes()
-      case _     => PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
+      case 1 | 2 => // Legacy
+        tx.toVanilla.bodyBytes()
+
+      case _     =>
+        // PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
+        encodePBTXWithPrefix(tx)
     })
 
     override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
@@ -410,6 +413,19 @@ trait PBTransactionImplicits {
       case data =>
         throw new IllegalArgumentException(s"Unsupported transaction data: $data")
     }
+  }
+
+  private[wavesplatform] def encodePBTXWithPrefix(tx: PBTransaction): Array[Byte] = {
+    val prefixLength = 3
+    val outArray     = new Array[Byte](tx.serializedSize + prefixLength)
+    val outputStream = CodedOutputStream.newInstance(outArray)
+    outputStream.useDeterministicSerialization() // Do not remove
+    outputStream.write('W'.toByte)
+    outputStream.write('T'.toByte)
+    outputStream.write(tx.chainId: Byte)
+    tx.withProofsArray(Nil).writeTo(outputStream)
+    outputStream.checkNoSpaceLeft()
+    outArray
   }
 
   private[this] implicit def implicitIntToByte(int: Int): Byte = {

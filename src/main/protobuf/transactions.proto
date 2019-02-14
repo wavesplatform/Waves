@@ -13,12 +13,12 @@ message Transaction {
     option (scalapb.message).extends = "com.wavesplatform.transaction.protobuf.PBTransactionBase";
     option (scalapb.message).companion_extends = "com.wavesplatform.transaction.protobuf.PBTransactionCompanionBase";
 
-    bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"];
+    bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"]; // TODO: Consider move to data
     bytes sender = 2 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
     uint32 chainId = 3;
     uint64 fee = 4;
     bytes feeAssetId = 5 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"];
-    bytes attachment = 6 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    bytes attachment = 6 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"]; // TODO: Consider move to data
     uint64 timestamp = 7;
     uint32 version = 8;
     repeated bytes proofs = 9 [(scalapb.field).scala_name = "proofsArray", (scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
