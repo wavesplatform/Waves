@@ -39,7 +39,7 @@ trait PBTransactionImplicits {
 
     override val json: Coeval[JsObject] = Coeval.evalOnce(tx.version match {
       case 1 | 2 => tx.toVanilla.json()
-      case _ => Json.toJson(tx).as[JsObject]
+      case _     => Json.toJson(tx).as[JsObject]
     })
 
     override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
@@ -47,6 +47,15 @@ trait PBTransactionImplicits {
       else if (tx.version > 1) true
       else this.verifySignature()
     }
+
+    override def equals(other: Any): Boolean = other match {
+      case a: PBTransactionVanillaAdapter => tx.equals(a.underlying)
+      case a: VanillaTransaction          => tx.equals(a.toPB)
+      case _                              => tx.equals(other)
+    }
+
+    private[this] lazy val _hashCode = if (tx.version > 2) tx.hashCode() else tx.toVanilla.hashCode()
+    override def hashCode(): Int     = _hashCode
   }
 
   implicit class VanillaOrderImplicitConversionOps(order: vt.assets.exchange.Order) {
@@ -97,13 +106,13 @@ trait PBTransactionImplicits {
   implicit class VanillaTransactionImplicitConversionOps(tx: VanillaTransaction) {
     def toPB: Transaction = tx match {
       // Uses version "2" for "modern" transactions with single version and proofs field
-      case tx @ MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
-        val data = MassTransferTransactionData(transfers.map(pt => MassTransferTransactionData.Transfer(pt.address, pt.amount)))
-        Transaction(assetId, sender, NoChainId, fee, tx.assetFee._1, ByteStr(attachment), timestamp, 2, proofs, Data.MassTransfer(data))
-
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(recipient, amount)
         Transaction(timestamp = timestamp, proofsArray = Seq(signature), data = Data.Genesis(data))
+
+      case vt.PaymentTransaction(sender, recipient, amount, fee, timestamp, signature) =>
+        val data = PaymentTransactionData(recipient, amount)
+        Transaction(None, sender, NoChainId, fee, None, None, timestamp, 1, Seq(signature), Data.Payment(data))
 
       case vt.transfer.TransferTransactionV1(assetId, sender, recipient, amount, timestamp, feeAssetId, fee, attachment, signature) =>
         val data = TransferTransactionData(recipient, amount)
@@ -196,6 +205,10 @@ trait PBTransactionImplicits {
         val data = LeaseCancelTransactionData(leaseId)
         Transaction(None, sender, chainId, fee, tx.assetFee._1, None, timestamp, 2, proofs, Data.LeaseCancel(data))
 
+      case tx @ MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
+        val data = MassTransferTransactionData(transfers.map(pt => MassTransferTransactionData.Transfer(pt.address, pt.amount)))
+        Transaction(assetId, sender, NoChainId, fee, tx.assetFee._1, ByteStr(attachment), timestamp, 2, proofs, Data.MassTransfer(data))
+
       case tx @ vt.DataTransaction(sender, data, fee, timestamp, proofs) =>
         val txData = DataTransactionData(
           data.map(de =>
@@ -223,19 +236,11 @@ trait PBTransactionImplicits {
     def toVanillaAdapter = PBTransactionVanillaAdapter(tx)
 
     def toVanilla: VanillaTransaction = tx.data match {
-      case Data.MassTransfer(MassTransferTransactionData(transfers)) =>
-        vt.transfer.MassTransferTransaction(
-          tx.assetId,
-          tx.sender,
-          transfers.map(t => ParsedTransfer(t.address.toAddressOrAlias, t.amount)).toList,
-          tx.timestamp,
-          tx.fee,
-          tx.attachment.arr,
-          tx.proofs
-        )
-
       case Data.Genesis(GenesisTransactionData(recipient, amount)) =>
         vt.GenesisTransaction(recipient.toAddress, amount, tx.timestamp, tx.signature)
+
+      case Data.Payment(PaymentTransactionData(recipient, amount)) =>
+        vt.PaymentTransaction(tx.sender, recipient.toAddress, amount, tx.fee, tx.timestamp, tx.signature)
 
       case Data.Transfer(TransferTransactionData(recipient, amount)) =>
         tx.version match {
@@ -379,6 +384,17 @@ trait PBTransactionImplicits {
           entries,
           tx.fee,
           tx.timestamp,
+          tx.proofs
+        )
+
+      case Data.MassTransfer(MassTransferTransactionData(transfers)) =>
+        vt.transfer.MassTransferTransaction(
+          tx.assetId,
+          tx.sender,
+          transfers.map(t => ParsedTransfer(t.address.toAddressOrAlias, t.amount)).toList,
+          tx.timestamp,
+          tx.fee,
+          tx.attachment.arr,
           tx.proofs
         )
 

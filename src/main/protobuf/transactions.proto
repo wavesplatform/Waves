@@ -25,7 +25,7 @@ message Transaction {
 
     oneof data {
         GenesisTransactionData genesis = 101;
-        // 102 = payment
+        PaymentTransactionData payment = 102;
         IssueTransactionData issue = 103;
         TransferTransactionData transfer = 104;
         ReissueTransactionData reissue = 105;
@@ -44,6 +44,11 @@ message Transaction {
 };
 
 message GenesisTransactionData {
+    bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.OptionalAddress"];
+    uint64 amount = 2;
+};
+
+message PaymentTransactionData {
     bytes recipient = 1 [(scalapb.field).type = "com.wavesplatform.account.OptionalAddress"];
     uint64 amount = 2;
 };
