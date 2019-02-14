@@ -67,15 +67,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val mf2                  = 2
         val (o1ver, o2ver, tver) = versions
 
-        val buy =
-          if (o1ver == 3) {
-            Order.buy(sender1, matcher, pair, buyAmount, buyPrice, time, expirationTimestamp, mf1, o1ver, buyerMatcherFeeAssetId)
-          } else Order.buy(sender1, matcher, pair, buyAmount, buyPrice, time, expirationTimestamp, mf1, o1ver)
-
-        val sell =
-          if (o2ver == 3) {
-            Order.sell(sender2, matcher, pair, sellAmount, sellPrice, time, expirationTimestamp, mf2, o2ver, sellerMatcherFeeAssetId)
-          } else Order.sell(sender2, matcher, pair, sellAmount, sellPrice, time, expirationTimestamp, mf2, o2ver)
+        val buy  = Order.buy(sender1, matcher, pair, buyAmount, buyPrice, time, expirationTimestamp, mf1, o1ver, buyerMatcherFeeAssetId)
+        val sell = Order.sell(sender2, matcher, pair, sellAmount, sellPrice, time, expirationTimestamp, mf2, o2ver, sellerMatcherFeeAssetId)
 
         def create(matcher: PrivateKeyAccount = sender1,
                    buyOrder: Order = buy,
@@ -200,15 +193,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val mf                   = 300000L
         val (o1ver, o2ver, tver) = versions
 
-        val sell =
-          if (o1ver == 3) {
-            Order.sell(sender2, matcher, pair, 2, sellPrice, time, expirationTimestamp, mf, o1ver, sellerMatcherFeeAssetId)
-          } else Order.sell(sender2, matcher, pair, 2, sellPrice, time, expirationTimestamp, mf, o1ver)
-
-        val buy =
-          if (o2ver == 3) {
-            Order.buy(sender1, matcher, pair, 1, buyPrice, time, expirationTimestamp, mf, o2ver, buyerMatcherFeeAssetId)
-          } else Order.buy(sender1, matcher, pair, 1, buyPrice, time, expirationTimestamp, mf, o2ver)
+        val sell = Order.sell(sender2, matcher, pair, 2, sellPrice, time, expirationTimestamp, mf, o1ver, sellerMatcherFeeAssetId)
+        val buy  = Order.buy(sender1, matcher, pair, 1, buyPrice, time, expirationTimestamp, mf, o2ver, buyerMatcherFeeAssetId)
 
         createExTx(buy, sell, sellPrice, matcher, tver) shouldBe an[Right[_, _]]
 
