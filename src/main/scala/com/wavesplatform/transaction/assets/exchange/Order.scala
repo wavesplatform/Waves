@@ -217,6 +217,21 @@ object Order {
     sign(unsigned, sender)
   }
 
+  def buy(sender: PrivateKeyAccount,
+          matcher: PublicKeyAccount,
+          pair: AssetPair,
+          amount: Long,
+          price: Long,
+          timestamp: Long,
+          expiration: Long,
+          matcherFee: Long,
+          version: Byte,
+          matcherFeeAssetId: Option[AssetId]): Order = {
+    val unsigned =
+      Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
+    sign(unsigned, sender)
+  }
+
   def sell(sender: PrivateKeyAccount,
            matcher: PublicKeyAccount,
            pair: AssetPair,
@@ -227,6 +242,21 @@ object Order {
            matcherFee: Long,
            version: Byte = 1): Order = {
     val unsigned = Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+    sign(unsigned, sender)
+  }
+
+  def sell(sender: PrivateKeyAccount,
+           matcher: PublicKeyAccount,
+           pair: AssetPair,
+           amount: Long,
+           price: Long,
+           timestamp: Long,
+           expiration: Long,
+           matcherFee: Long,
+           version: Byte,
+           matcherFeeAssetId: Option[AssetId]): Order = {
+    val unsigned =
+      Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
     sign(unsigned, sender)
   }
 
