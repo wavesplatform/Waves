@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.protobuf
 
-import com.google.common.primitives.Bytes
+import com.google.protobuf.CodedOutputStream
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.protobuf.utils.PBUtils
@@ -32,9 +32,15 @@ trait PBTransactionImplicits {
       case 1 | 2 => tx.toVanilla.bodyBytes()
       case _     => PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
     })
+
     override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-      val encoded = PBUtils.encodeDeterministic(tx)
-      Bytes.concat(Array[Byte](builder.typeId, builder.version), encoded)
+      val outArray     = new Array[Byte](tx.serializedSize + 2)
+      val outputStream = CodedOutputStream.newInstance(outArray)
+      outputStream.write(builder.typeId)
+      outputStream.write(builder.version)
+      tx.writeTo(outputStream)
+      outputStream.checkNoSpaceLeft()
+      outArray
     }
 
     override val json: Coeval[JsObject] = Coeval.evalOnce(tx.version match {
@@ -54,8 +60,8 @@ trait PBTransactionImplicits {
       case _                              => tx.equals(other)
     }
 
-    private[this] lazy val _hashCode = if (tx.version > 2) tx.hashCode() else tx.toVanilla.hashCode()
-    override def hashCode(): Int     = _hashCode
+    // private[this] lazy val _hashCode = if (tx.version > 2) tx.hashCode() else tx.toVanilla.hashCode()
+    override def hashCode(): Int     = tx.hashCode() // _hashCode
   }
 
   implicit class VanillaOrderImplicitConversionOps(order: vt.assets.exchange.Order) {

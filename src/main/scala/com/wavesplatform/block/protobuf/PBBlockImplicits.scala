@@ -21,7 +21,7 @@ trait PBBlockImplicits {
 
     def underlying = block
 
-    override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBUtils.encodeDeterministic(block))
+    override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(block.toByteArray)
     override val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(block.version match {
       case 1 | 2 | 3 => block.toVanilla.bytesWithoutSignature()
       case _         => PBUtils.encodeDeterministic(block.copy(signerData = None))
