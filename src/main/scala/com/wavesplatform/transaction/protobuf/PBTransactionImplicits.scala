@@ -19,7 +19,7 @@ trait PBTransactionImplicits {
   private[this] val WavesAssetId    = ByteStr.empty
   private[this] val NoChainId: Byte = 0 // AddressScheme.current.chainId
 
-  implicit class PBTransactionVanillaAdapter(tx: PBTransaction) extends VanillaTransaction with SignedTransaction with FastHashId {
+  implicit class PBTransactionVanillaAdapter(tx: PBTransaction) extends VanillaTransaction with SignedTransaction {
     def underlying: Transaction = tx
 
     override def timestamp: Long                   = tx.timestamp
@@ -33,7 +33,7 @@ trait PBTransactionImplicits {
       case 1 | 2 => // Legacy
         tx.toVanilla.bodyBytes()
 
-      case _     =>
+      case _ =>
         // PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
         encodePBTXWithPrefix(tx)
     })
@@ -53,6 +53,15 @@ trait PBTransactionImplicits {
       case _     => Json.toJson(tx).as[JsObject]
     })
 
+    override val id: Coeval[AssetId] = Coeval.evalOnce((tx.version: @switch) match {
+      case 1 | 2 => // Legacy
+        tx.toVanilla.id()
+
+      case _ =>
+        // PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
+        FastHashId.create(bodyBytes())
+    })
+
     override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
       (tx.data.isGenesis || tx.version > 1) || this.verifySignature()
     }
@@ -64,7 +73,7 @@ trait PBTransactionImplicits {
     }
 
     // private[this] lazy val _hashCode = if (tx.version > 2) tx.hashCode() else tx.toVanilla.hashCode()
-    override def hashCode(): Int     = tx.hashCode() // _hashCode
+    override def hashCode(): Int = tx.hashCode() // _hashCode
   }
 
   implicit class VanillaOrderImplicitConversionOps(order: vt.assets.exchange.Order) {

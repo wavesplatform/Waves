@@ -55,7 +55,7 @@ trait PBBlockImplicits {
       s"PBBlock(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes)"
     }
 
-    override def hashCode(): Int  = {
+    override def hashCode(): Int = {
       block.hashCode()
     }
 
