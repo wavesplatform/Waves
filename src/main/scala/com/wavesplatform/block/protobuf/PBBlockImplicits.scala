@@ -1,33 +1,37 @@
 package com.wavesplatform.block.protobuf
 
 import com.wavesplatform.serialization.protobuf.utils.PBUtils
-import com.wavesplatform.transaction.Signed
 import com.wavesplatform.transaction.protobuf.Transaction._
 import com.wavesplatform.{block => vb}
 import monix.eval.Coeval
 import play.api.libs.json.{JsNumber, JsObject, Json}
 
+import scala.annotation.switch
+
 trait PBBlockImplicits {
-  implicit class PBBlockVanillaAdapter(block: Block)
+  implicit class PBBlockVanillaAdapter(block: PBBlock)
       extends VanillaBlock(
         block.timestamp,
         block.version.toByte,
         block.reference,
         vb.SignerData(block.getSignerData.generator, block.getSignerData.signature),
         com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.getConsensusData.baseTarget, block.getConsensusData.generationSignature),
-        block.transactions.map(tx => if (block.version <= 3) tx.toVanilla else tx.toVanillaAdapter),
+        block.transactions.map(_.toVanillaOrAdapter),
         block.featureVotes.map(intToShort)
       ) {
 
-    def underlying = block
+    def underlying: PBBlock = block
 
-    override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(block.toByteArray)
-    override val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(block.version match {
+    override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+      block.toByteArray
+    }
+
+    override val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce((block.version: @switch) match {
       case 1 | 2 | 3 => block.toVanilla.bytesWithoutSignature()
       case _         => PBUtils.encodeDeterministic(block.copy(signerData = None))
     })
 
-    override val headerJson: Coeval[JsObject] = Coeval.evalOnce(block.version match {
+    override val headerJson: Coeval[JsObject] = Coeval.evalOnce((block.version: @switch) match {
       case 1 | 2 | 3 =>
         block.toVanilla.headerJson()
 
@@ -36,15 +40,25 @@ trait PBBlockImplicits {
         baseJson + ("transactionCount" -> JsNumber(block.transactions.length))
 
     })
-    override val json: Coeval[JsObject] = Coeval.evalOnce(block.version match {
+
+    override val json: Coeval[JsObject] = Coeval.evalOnce((block.version: @switch) match {
       case 1 | 2 | 3 => block.toVanilla.json()
       case _         => Json.toJson(block).as[JsObject]
     })
 
-    protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(block.transactions.map(_.toVanillaAdapter))
+    /* protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce {
+      block.transactions
+        .map(_.toVanillaAdapter)
+    } */
 
-    override def toString: String = s"PBBlock(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes)"
-    override def hashCode(): Int  = block.hashCode()
+    override def toString: String = {
+      s"PBBlock(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes)"
+    }
+
+    override def hashCode(): Int  = {
+      block.hashCode()
+    }
+
     override def equals(obj: Any): Boolean = obj match {
       case a: PBBlockVanillaAdapter => block.equals(a.underlying)
       case _                        => block.equals(obj)
@@ -52,6 +66,8 @@ trait PBBlockImplicits {
   }
 
   implicit class PBBlockImplicitConversionOps(block: PBBlock) {
+    def isLegacy: Boolean = block.version <= 3
+
     def toVanillaAdapter = PBBlockVanillaAdapter(block)
 
     def toVanilla: VanillaBlock = {

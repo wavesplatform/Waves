@@ -13,6 +13,8 @@ import com.wavesplatform.{transaction => vt}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
+import scala.annotation.switch
+
 trait PBTransactionImplicits {
   private[this] val WavesAssetId    = ByteStr.empty
   private[this] val NoChainId: Byte = 0 // AddressScheme.current.chainId
@@ -27,7 +29,7 @@ trait PBTransactionImplicits {
     override def builder: PBTransaction.type       = PBTransaction
     override def assetFee: (Option[AssetId], Long) = (Some(tx.feeAssetId).filterNot(_.isEmpty), tx.fee)
 
-    override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(tx.version match {
+    override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce((tx.version: @switch) match {
       case 1 | 2 => // Legacy
         tx.toVanilla.bodyBytes()
 
@@ -46,15 +48,13 @@ trait PBTransactionImplicits {
       outArray
     }
 
-    override val json: Coeval[JsObject] = Coeval.evalOnce(tx.version match {
+    override val json: Coeval[JsObject] = Coeval.evalOnce((tx.version: @switch) match {
       case 1 | 2 => tx.toVanilla.json()
       case _     => Json.toJson(tx).as[JsObject]
     })
 
     override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
-      if (tx.data.isGenesis) true
-      else if (tx.version > 1) true
-      else this.verifySignature()
+      (tx.data.isGenesis || tx.version > 1) || this.verifySignature()
     }
 
     override def equals(other: Any): Boolean = other match {
@@ -115,9 +115,12 @@ trait PBTransactionImplicits {
   implicit class VanillaTransactionImplicitConversionOps(tx: VanillaTransaction) {
     def toPB: Transaction = tx match {
       // Uses version "2" for "modern" transactions with single version and proofs field
+      case a: PBTransactionVanillaAdapter =>
+        a.underlying
+
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
         val data = GenesisTransactionData(recipient, amount)
-        Transaction(timestamp = timestamp, proofsArray = Seq(signature), data = Data.Genesis(data))
+        Transaction(version = 1, timestamp = timestamp, proofsArray = Seq(signature), data = Data.Genesis(data))
 
       case vt.PaymentTransaction(sender, recipient, amount, fee, timestamp, signature) =>
         val data = PaymentTransactionData(recipient, amount)
@@ -242,6 +245,10 @@ trait PBTransactionImplicits {
   }
 
   implicit class PBTransactionImplicitConversionOps(tx: Transaction) {
+    def isLegacy: Boolean = tx.version == 1 || tx.version == 2
+
+    def toVanillaOrAdapter: VanillaTransaction = if (this.isLegacy) toVanilla else toVanillaAdapter
+
     def toVanillaAdapter = PBTransactionVanillaAdapter(tx)
 
     def toVanilla: VanillaTransaction = tx.data match {

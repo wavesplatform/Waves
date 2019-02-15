@@ -13,7 +13,7 @@ message Transaction {
     option (scalapb.message).extends = "com.wavesplatform.transaction.protobuf.PBTransactionBase";
     option (scalapb.message).companion_extends = "com.wavesplatform.transaction.protobuf.PBTransactionCompanionBase";
 
-    bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"]; // TODO: Consider move to data
+    bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.AssetId"]; // TODO: Consider move to data, consider more explicit type
     bytes sender = 2 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
     uint32 chainId = 3;
     uint64 fee = 4;
@@ -39,7 +39,7 @@ message Transaction {
         SetScriptTransactionData setScript = 113;
         SponsorFeeTransactionData sponsorFee = 114;
         SetAssetScriptTransactionData setAssetScript = 115;
-        // 116 = contract invocation
+        // TODO: 116 = contract invocation
     };
 };
 
