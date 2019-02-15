@@ -54,6 +54,7 @@ object NativeFunction {
 @JSExportTopLevel("UserFunction")
 case class UserFunction(@(JSExport @field) name: String,
                         @(JSExport @field) internalName: String,
+                        @(JSExport @field) cost: Long,
                         @(JSExport @field) signature: FunctionTypeSignature,
                         ev: EXPR,
                         @(JSExport @field) docString: String,
@@ -62,13 +63,15 @@ case class UserFunction(@(JSExport @field) name: String,
 
 object UserFunction {
 
-  def apply(name: String, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(ev: EXPR): UserFunction =
-    UserFunction(name, name, resultType, docString, args: _*)(ev)
+  def apply(name: String, cost: Long, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(ev: EXPR): UserFunction =
+    UserFunction(name, name, cost, resultType, docString, args: _*)(ev)
 
-  def apply(name: String, internalName: String, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(ev: EXPR): UserFunction =
+  def apply(name: String, internalName: String, cost: Long, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(
+      ev: EXPR): UserFunction =
     new UserFunction(
       name = name,
       internalName = internalName,
+      cost = cost,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.User(internalName)),
       ev = ev,
       docString = docString,
