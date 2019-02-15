@@ -11,6 +11,7 @@ import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction}
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, _}
@@ -343,12 +344,22 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
       version = 1
     )
 
-    for ((o1ver, o2ver, tver) <- Seq(
-           (1: Byte, 1: Byte, 1: Byte),
-           (1: Byte, 1: Byte, 2: Byte),
-           (1: Byte, 2: Byte, 2: Byte),
-           (2: Byte, 1: Byte, 2: Byte),
-           (2: Byte, 2: Byte, 2: Byte)
+    val assetId = extractAssetId(issueTx).get
+
+    for ((o1ver, o2ver, tver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
+           (1: Byte, 1: Byte, 1: Byte, None, None),
+           (1: Byte, 1: Byte, 2: Byte, None, None),
+           (1: Byte, 2: Byte, 2: Byte, None, None),
+           (2: Byte, 1: Byte, 2: Byte, None, None),
+           (2: Byte, 2: Byte, 2: Byte, None, None),
+           (3: Byte, 1: Byte, 2: Byte, None, None),
+           (3: Byte, 1: Byte, 2: Byte, assetId, None),
+           (3: Byte, 2: Byte, 2: Byte, None, None),
+           (3: Byte, 2: Byte, 2: Byte, assetId, None),
+           (1: Byte, 3: Byte, 2: Byte, None, None),
+           (2: Byte, 3: Byte, 2: Byte, None, None),
+           (3: Byte, 3: Byte, 2: Byte, None, None),
+           (3: Byte, 3: Byte, 2: Byte, assetId, None),
          )) {
       val buyer               = pkByAddress(firstAddress)
       val seller              = pkByAddress(secondAddress)
@@ -361,8 +372,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
       val buyAmount           = 2
       val sellAmount          = 3
       val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
-      val buy                 = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, mf, o1ver)
-      val sell                = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, mf, o2ver)
+      val buy                 = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, mf, o1ver, matcherFeeOrder1)
+      val sell                = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, mf, o2ver, matcherFeeOrder2)
 
       val amount = math.min(buy.amount, sell.amount)
       val tx =
