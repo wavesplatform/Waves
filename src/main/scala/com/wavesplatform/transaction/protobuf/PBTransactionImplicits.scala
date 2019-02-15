@@ -436,7 +436,9 @@ trait PBTransactionImplicits {
   }
 
   private[this] implicit def implicitAssetIdToOption(assetId: PBAssetId): Option[VanillaAssetId] =
-    Option(assetId).filterNot(_.isEmpty).map(_.bytes)
+    Option(assetId)
+      .map(_.bytes)
+      .filterNot(_.isEmpty)
 
   private[this] implicit def implicitAssetIdOptionToAssetId(assetId: Option[VanillaAssetId]): PBAssetId =
     assetId.fold(PBAssetId.Waves)(PBAssetId.fromBytes)
