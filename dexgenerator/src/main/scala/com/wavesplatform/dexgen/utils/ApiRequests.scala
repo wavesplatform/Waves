@@ -5,15 +5,25 @@ import java.util.concurrent.TimeoutException
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest, SignedTransferV1Request}
+import com.wavesplatform.api.http.assets.{SignedIssueV2Request, SignedMassTransferRequest, SignedTransferV1Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.it.api.{AssetBalance, Balance, MatcherResponse, MatcherStatusResponse, OrderBookResponse, OrderbookHistory, ResponseFutureExt, Transaction, UnexpectedStatusCodeException}
+import com.wavesplatform.it.api.{
+  AssetBalance,
+  Balance,
+  MatcherResponse,
+  MatcherStatusResponse,
+  OrderBookResponse,
+  OrderbookHistory,
+  ResponseFutureExt,
+  Transaction,
+  UnexpectedStatusCodeException
+}
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1}
@@ -64,9 +74,9 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     executeRequest
   }
 
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
+  def createSignedIssueRequest(tx: IssueTransactionV2): SignedIssueV2Request = {
     import tx._
-    SignedIssueV1Request(
+    SignedIssueV2Request(
       Base58.encode(tx.sender.publicKey),
       new String(name),
       new String(description),
@@ -75,7 +85,8 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
       reissuable,
       fee,
       timestamp,
-      signature.base58
+      proofs.proofs.map(_.base58),
+      script.map(_.toString)
     )
   }
 
@@ -145,9 +156,6 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
       case None => to(endpoint).balance(address).map(_.balance)
       case _    => to(endpoint).assetBalance(address, asset.map(_.base58).get).map(_.balance)
     }
-
-    def signedIssue(issue: SignedIssueV1Request)(implicit tag: String): Future[Transaction] =
-      postJson("/assets/broadcast/issue", issue).as[Transaction]
 
     def orderbookByPublicKey(publicKey: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity)(
         implicit tag: String): Future[Seq[OrderbookHistory]] =
