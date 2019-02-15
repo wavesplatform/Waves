@@ -56,11 +56,11 @@ case class ByteStr(arr: Array[Byte]) {
 object ByteStr {
   val empty: ByteStr = ByteStr(Array.emptyByteArray)
 
-  implicit def apply(arr: Array[Byte]): ByteStr = {
+  implicit def fromByteArray(arr: Array[Byte]): ByteStr = {
     new ByteStr(arr)
   }
 
-  implicit def toByteArray(bs: ByteStr): Array[Byte] = {
+  implicit def toBytes(bs: ByteStr): Array[Byte] = {
     bs.arr
   }
 

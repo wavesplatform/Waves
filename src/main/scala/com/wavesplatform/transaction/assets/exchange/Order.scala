@@ -81,13 +81,13 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   val bytes: Coeval[Array[Byte]]
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAssetId: Option[AssetId] = orderType match {
+  def getReceiveAssetId: Option[ByteStr] = orderType match {
     case OrderType.BUY  => assetPair.amountAsset
     case OrderType.SELL => assetPair.priceAsset
   }
 
   @ApiModelProperty(hidden = true)
-  def getSpendAssetId: Option[AssetId] = orderType match {
+  def getSpendAssetId: Option[ByteStr] = orderType match {
     case OrderType.BUY  => assetPair.priceAsset
     case OrderType.SELL => assetPair.amountAsset
   }

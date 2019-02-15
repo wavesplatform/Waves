@@ -29,7 +29,7 @@ object Alias {
   private def validAliasChar(c: Char): Boolean =
     ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
-  private def buildAlias(chainId: Byte, name: String): Either[ValidationError, Alias] = {
+  private[wavesplatform] def buildAlias(chainId: Byte, name: String): Either[ValidationError, Alias] = {
 
     case class AliasImpl(chainId: Byte, name: String) extends Alias
 

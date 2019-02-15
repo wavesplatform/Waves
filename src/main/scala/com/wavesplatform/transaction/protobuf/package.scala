@@ -7,4 +7,9 @@ package object protobuf {
 
   type VanillaTransaction = com.wavesplatform.transaction.Transaction
   val VanillaTransaction = com.wavesplatform.transaction.Transaction
+
+  type VanillaAssetId = com.wavesplatform.transaction.AssetId
+
+  type PBAssetId = com.wavesplatform.transaction.protobuf.AssetId
+  val PBAssetId = com.wavesplatform.transaction.protobuf.AssetId
 }

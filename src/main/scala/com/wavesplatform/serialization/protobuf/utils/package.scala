@@ -4,6 +4,7 @@ import com.google.protobuf.{ByteString => PBByteString}
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.transaction.protobuf.PBAssetId
 import com.wavesplatform.transaction.smart.script.protobuf.{Script => PBScript}
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import scalapb.TypeMapper
@@ -23,10 +24,10 @@ package object utils {
     PBByteString.copyFrom(pka.publicKey)
   }
 
-  implicit val addressMapper = TypeMapper[PBByteString, OptionalAddress] { bs =>
-    if (bs.isEmpty) OptionalAddress.empty else OptionalAddress(bs.toByteArray)
-  } { address =>
-    PBByteString.copyFrom(address.bytes)
+  implicit val assetIdMapper = TypeMapper[PBByteString, PBAssetId] { bs =>
+    if (bs.isEmpty) PBAssetId.Waves else PBAssetId(bs.toByteArray)
+  } { assetId =>
+    PBByteString.copyFrom(assetId.bytes)
   }
 
   implicit val scriptMapper = TypeMapper[PBScript, Script] { bs =>
