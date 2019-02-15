@@ -59,6 +59,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   private val aliceOrders = mkOrders(aliceAcc)
   private val bobOrders   = mkOrders(aliceAcc)
   private val orders      = aliceOrders ++ bobOrders
+  private val lastOrder   = orderGen(matcherPublicKey, aliceAcc, assetPairs).sample.get
 
   "Place, fill and cancel a lot of orders" in {
     val alicePlaces = aliceOrders.map(MatcherCommand.Place(matcher1Node, _))
@@ -70,11 +71,17 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     val cancels      = Random.shuffle(aliceCancels ++ bobCancels)
 
     executeCommands(places ++ cancels)
+    executeCommands(List(MatcherCommand.Place(matcher1Node, lastOrder)))
   }
 
   "Wait until all requests are processed" in {
-    matcher1Node.waitForStableOffset(10, 100, 200.millis)
-    matcher2Node.waitForStableOffset(10, 100, 200.millis)
+    val offset1 = matcher1Node.waitForStableOffset(10, 100, 200.millis)
+    matcher2Node.waitFor[Long](s"Offset is $offset1")(_.getCurrentOffset, _ == offset1, 2.seconds)
+
+    withClue("Last command processed") {
+      matcher1Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
+      matcher2Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
+    }
   }
 
   "States on both matcher should be equal" in {
