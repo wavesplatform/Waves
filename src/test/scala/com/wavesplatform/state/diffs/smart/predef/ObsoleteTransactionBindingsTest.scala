@@ -84,7 +84,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
   } yield (genesis, payment, setScriptTransaction, nextTransfer)
 
   val settings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 100)
-  ignore("Obsolete transaction bindings") { // ignored in v0.16
+  property("Obsolete transaction bindings") {
     forAll(preconditionsAndPayments) {
       case ((genesis, payment, setScriptTransaction, nextTransfer)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, payment, setScriptTransaction))), TestBlock.create(Seq(nextTransfer)), settings) {

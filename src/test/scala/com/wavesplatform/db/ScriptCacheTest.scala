@@ -72,7 +72,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
       }
   }
 
-  "ScriptCache" ignore { // ignored in v0.16
+  "ScriptCache" - {
     "return correct script after overflow" in {
       val scripts = mkScripts(CACHE_SIZE * 10)
 

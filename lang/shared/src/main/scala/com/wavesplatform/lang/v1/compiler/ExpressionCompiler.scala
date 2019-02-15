@@ -185,7 +185,7 @@ object ExpressionCompiler {
         updateCtx(letName, letType, p)
           .flatMap(_ => compileExpr(body))
       }
-    } yield (BLOCK(LET(letName, letExpr), compiledBody._1), compiledBody._2)
+    } yield (LET_BLOCK(LET(letName, letExpr), compiledBody._1), compiledBody._2)
   }
 
   private def compileFuncBlock(p: Pos, func: Expressions.FUNC, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
