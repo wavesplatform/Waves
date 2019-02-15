@@ -12,7 +12,7 @@ import com.wavesplatform.matcher.queue.KafkaMatcherQueue.Settings
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.serialization.{Deserializer, Serializer, StringDeserializer, StringSerializer}
+import org.apache.kafka.common.serialization._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Await, ExecutionContextExecutor, Future, Promise}
@@ -37,7 +37,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
   private val producerControl = new AtomicReference[() => Unit](() => ())
   private val producerSettings = {
     val config = mat.system.settings.config.getConfig("akka.kafka.producer")
-    ProducerSettings(config, new StringSerializer, serializer)
+    ProducerSettings(config, new ByteArraySerializer, serializer)
   }
 
   private def newProducer =
@@ -49,7 +49,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
       }
       .map {
         case (payload, p) =>
-          ProducerMessage.single(new ProducerRecord[String, QueueEvent](settings.topic, null, payload), passThrough = p)
+          ProducerMessage.single(new ProducerRecord[Array[Byte], QueueEvent](settings.topic, payload.assetPair.bytes, payload), passThrough = p)
       }
       .via(Producer.flexiFlow(producerSettings))
       .map {
@@ -76,7 +76,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
   private val consumerControl = new AtomicReference[Consumer.Control](Consumer.NoopControl)
   private val consumerSettings = {
     val config = mat.system.settings.config.getConfig("akka.kafka.consumer")
-    ConsumerSettings(config, new StringDeserializer, deserializer)
+    ConsumerSettings(config, new ByteArrayDeserializer, deserializer)
   }
 
   private val metadataConsumer = mat.system.actorOf(KafkaConsumerActor.props(consumerSettings))
