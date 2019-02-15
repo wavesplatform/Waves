@@ -1,5 +1,7 @@
 package com.wavesplatform.block.protobuf
 
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.protobuf.Transaction._
 import com.wavesplatform.{block => vb}
@@ -14,13 +16,15 @@ trait PBBlockImplicits {
         block.timestamp,
         block.version.toByte,
         block.reference,
-        vb.SignerData(block.getSignerData.generator, block.getSignerData.signature),
-        com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.getConsensusData.baseTarget, block.getConsensusData.generationSignature),
+        vb.SignerData(block.generator, block.signature),
+        com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.baseTarget, block.generationSignature),
         block.transactions.map(_.toVanillaOrAdapter),
         block.featureVotes.map(intToShort)
       ) {
 
     def underlying: PBBlock = block
+
+    def signature: ByteStr = this.signerData.signature
 
     override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
       block.toByteArray
@@ -28,7 +32,7 @@ trait PBBlockImplicits {
 
     override val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce((block.version: @switch) match {
       case 1 | 2 | 3 => block.toVanilla.bytesWithoutSignature()
-      case _         => PBUtils.encodeDeterministic(block.copy(signerData = None))
+      case _         => PBUtils.encodeDeterministic(block.copy(generator = PublicKeyAccount.empty, signature = ByteStr.empty))
     })
 
     override val headerJson: Coeval[JsObject] = Coeval.evalOnce((block.version: @switch) match {
@@ -75,8 +79,8 @@ trait PBBlockImplicits {
         block.timestamp,
         block.version.toByte,
         block.reference,
-        vb.SignerData(block.getSignerData.generator, block.getSignerData.signature),
-        com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.getConsensusData.baseTarget, block.getConsensusData.generationSignature),
+        vb.SignerData(block.generator, block.signature),
+        com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.baseTarget, block.generationSignature),
         block.transactions.map(_.toVanilla),
         block.featureVotes.map(intToShort)
       )
@@ -91,12 +95,14 @@ trait PBBlockImplicits {
       case _ =>
         PBBlock(
           block.reference,
-          Some(Block.SignerData(block.signerData.generator, block.signerData.signature)),
-          Some(Block.ConsensusData(block.consensusData.baseTarget, block.consensusData.generationSignature)),
-          block.transactionData.map(_.toPB),
+          block.consensusData.baseTarget,
+          block.consensusData.generationSignature,
           block.featureVotes.map(shortToInt),
           block.timestamp,
-          block.version
+          block.version,
+          block.transactionData.map(_.toPB),
+          block.signerData.generator,
+          block.signerData.signature
         )
     }
   }

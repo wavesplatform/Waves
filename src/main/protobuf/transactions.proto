@@ -14,37 +14,34 @@ message Transaction {
     option (scalapb.message).extends = "com.wavesplatform.transaction.protobuf.PBTransactionBase";
     option (scalapb.message).companion_extends = "com.wavesplatform.transaction.protobuf.PBTransactionCompanionBase";
 
-    message Body {
-        bytes sender = 1 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
-        uint32 chainId = 2;
-        uint64 fee = 3;
-        bytes feeAssetId = 4 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
+    bytes sender = 1 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
+    uint32 chainId = 2;
+    uint64 fee = 3;
+    bytes feeAssetId = 4 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
 
-        uint64 timestamp = 7;
-        uint32 version = 8;
+    uint64 timestamp = 7;
+    uint32 version = 8;
 
-        oneof data {
-            GenesisTransactionData genesis = 101;
-            PaymentTransactionData payment = 102;
-            IssueTransactionData issue = 103;
-            TransferTransactionData transfer = 104;
-            ReissueTransactionData reissue = 105;
-            BurnTransactionData burn = 106;
-            ExchangeTransactionData exchange = 107;
-            LeaseTransactionData lease = 108;
-            LeaseCancelTransactionData leaseCancel = 109;
-            CreateAliasTransactionData createAlias = 110;
-            MassTransferTransactionData massTransfer = 111;
-            DataTransactionData dataTransaction = 112;
-            SetScriptTransactionData setScript = 113;
-            SponsorFeeTransactionData sponsorFee = 114;
-            SetAssetScriptTransactionData setAssetScript = 115;
-            // TODO: 116 = contract invocation
-        };
+    oneof data {
+        GenesisTransactionData genesis = 101;
+        PaymentTransactionData payment = 102;
+        IssueTransactionData issue = 103;
+        TransferTransactionData transfer = 104;
+        ReissueTransactionData reissue = 105;
+        BurnTransactionData burn = 106;
+        ExchangeTransactionData exchange = 107;
+        LeaseTransactionData lease = 108;
+        LeaseCancelTransactionData leaseCancel = 109;
+        CreateAliasTransactionData createAlias = 110;
+        MassTransferTransactionData massTransfer = 111;
+        DataTransactionData dataTransaction = 112;
+        SetScriptTransactionData setScript = 113;
+        SponsorFeeTransactionData sponsorFee = 114;
+        SetAssetScriptTransactionData setAssetScript = 115;
+        // TODO: 116 = contract invocation
     };
 
-    Body body = 1;
-    repeated bytes proofs = 2 [(scalapb.field).scala_name = "proofsArray", (scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    repeated bytes proofs = 1000 [(scalapb.field).scala_name = "proofsArray", (scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
 };
 
 message GenesisTransactionData {
