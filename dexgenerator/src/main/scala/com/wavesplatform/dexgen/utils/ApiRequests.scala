@@ -8,7 +8,17 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.{SignedIssueV2Request, SignedMassTransferRequest, SignedTransferV1Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.it.api.{AssetBalance, Balance, MatcherResponse, MatcherStatusResponse, OrderBookResponse, OrderbookHistory, ResponseFutureExt, Transaction, UnexpectedStatusCodeException}
+import com.wavesplatform.it.api.{
+  AssetBalance,
+  Balance,
+  MatcherResponse,
+  MatcherStatusResponse,
+  OrderBookResponse,
+  OrderbookHistory,
+  ResponseFutureExt,
+  Transaction,
+  UnexpectedStatusCodeException
+}
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest

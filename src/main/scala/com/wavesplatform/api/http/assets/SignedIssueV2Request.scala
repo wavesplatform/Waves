@@ -27,8 +27,12 @@ object SignedIssueV2Request {
     )(SignedIssueV2Request.apply _)
   }
   implicit val writes: Writes[SignedIssueV2Request] =
-    Json.writes[SignedIssueV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2))
-      + ("type" -> JsNumber(IssueTransaction.typeId.toInt)))
+    Json
+      .writes[SignedIssueV2Request]
+      .transform(
+        (request: JsObject) =>
+          request + ("version" -> JsNumber(2))
+            + ("type"          -> JsNumber(IssueTransaction.typeId.toInt)))
 }
 
 @ApiModel(value = "Signed Smart issue transaction")

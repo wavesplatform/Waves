@@ -66,8 +66,8 @@ class Worker(workerSettings: Settings,
         case Failure(e) => log.error(s"[$tag] Can't place buy order ${order.id()}: $e")
       }
       orderHistory <- to(matcherSettings.endpoint).orderHistory(buyer)
-      orderbook <- to(matcherSettings.endpoint).orderBook(pair)
-      orderStatus <- to(matcherSettings.endpoint).orderStatus(order.id().base58, pair)
+      orderbook    <- to(matcherSettings.endpoint).orderBook(pair)
+      orderStatus  <- to(matcherSettings.endpoint).orderStatus(order.id().base58, pair)
     } yield placeOrder
     (order, response)
   }
@@ -82,8 +82,8 @@ class Worker(workerSettings: Settings,
         case Failure(e) => log.error(s"[$tag] Can't place sell order ${order.id()}: $e")
       }
       orderHistory <- to(matcherSettings.endpoint).orderHistory(seller)
-      orderbook <- to(matcherSettings.endpoint).orderBook(pair)
-      orderStatus <- to(matcherSettings.endpoint).orderStatus(order.id().base58, pair)
+      orderbook    <- to(matcherSettings.endpoint).orderBook(pair)
+      orderStatus  <- to(matcherSettings.endpoint).orderStatus(order.id().base58, pair)
     } yield placeOrder
     (order, response)
   }

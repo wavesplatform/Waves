@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.utils.LoggerFacade
+import com.wavesplatform.common.utils.EitherExt2
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
@@ -68,9 +69,12 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
   }
 
   implicit val signedMassTransferRequestWrites: Writes[SignedMassTransferRequest] =
-    Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("version" -> JsNumber(1)) + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
+    Json
+      .writes[SignedMassTransferRequest]
+      .transform((jsobj: JsObject) => jsobj + ("version" -> JsNumber(1)) + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
 
   val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
+  AddressScheme.current = new AddressScheme { override val chainId: Byte = defaultConfig.chainId.head.toByte }
 
   def issueAssets(endpoint: String, richAddressSeed: String, n: Int)(implicit tag: String): Seq[AssetId] = {
     val node = api.to(endpoint)
@@ -78,7 +82,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
     val assetsTx: Seq[IssueTransactionV2] = (1 to n).map { i =>
       IssueTransactionV2
         .selfSigned(
-          chainId = 'M'.toByte,
+          chainId = AddressScheme.current.chainId,
           name = s"asset$i".getBytes(),
           description = s"asset description - $i".getBytes(),
           quantity = 999999999999999L,
@@ -86,11 +90,10 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
           reissuable = false,
           fee = 100000000,
           timestamp = System.currentTimeMillis(),
-          sender = PrivateKeyAccount.fromSeed(richAddressSeed).right.get,
+          sender = PrivateKeyAccount.fromSeed(richAddressSeed).explicitGet(),
           script = None
         )
-        .right
-        .get
+        .explicitGet()
     }
 
     val tradingAssets: Seq[AssetId]                    = assetsTx.map(tx => tx.id())
