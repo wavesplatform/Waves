@@ -13,7 +13,6 @@ import play.api.libs.json.{JsObject, JsValue}
 import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.StdLibVersion
-import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 
