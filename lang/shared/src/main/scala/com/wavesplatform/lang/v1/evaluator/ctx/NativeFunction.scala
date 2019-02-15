@@ -13,6 +13,7 @@ import scala.scalajs.js.annotation._
 sealed trait BaseFunction {
   @JSExport def signature: FunctionTypeSignature
   @JSExport def header: FunctionHeader = signature.header
+  @JSExport def cost: Long
   @JSExport def name: String
   @JSExport def docString: String
   @JSExport def argsDoc: Array[(String, String)]
