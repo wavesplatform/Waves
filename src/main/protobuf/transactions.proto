@@ -19,8 +19,8 @@ message Transaction {
     uint64 fee = 3;
     bytes feeAssetId = 4 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
 
-    uint64 timestamp = 7;
-    uint32 version = 8;
+    uint64 timestamp = 5;
+    uint32 version = 6;
 
     oneof data {
         GenesisTransactionData genesis = 101;
