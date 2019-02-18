@@ -18,7 +18,6 @@ message Transaction {
     uint32 chainId = 2;
     uint64 fee = 3;
     bytes feeAssetId = 4 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
-
     uint64 timestamp = 5;
     uint32 version = 6;
 
