@@ -124,9 +124,6 @@ object Decompiler {
       case _: Terms.CaseObj => ??? // never happens
     }
 
-  private def apply(e0: DECLARATION, ctx: DecompilerContext): String =
-    decl(e0, 0, ctx)
-
   def apply(e: Contract, ctx: DecompilerContext): String = {
     e match {
       case Contract(dec, cfs, vf) =>
