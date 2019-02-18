@@ -134,9 +134,9 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     }
 
     txs
-      .foldLeft((initDiff, 0L, initConstraint).asRight[ValidationError]) {
+      .foldLeft((initDiff, 0L, initConstraint, (initDiff, Seq.empty[Diff])).asRight[ValidationError]) {
         case (r @ Left(_), _) => r
-        case (Right((currDiff, carryFee, currConstraint)), tx) =>
+        case (Right((currDiff, carryFee, currConstraint, (blockDiff, txDiffs))), tx) =>
           val updatedBlockchain = composite(blockchain, currDiff)
           val updatedConstraint = updateConstraint(currConstraint, updatedBlockchain, tx)
           if (updatedConstraint.isOverfilled)
@@ -146,29 +146,33 @@ object BlockDiffer extends ScorexLogging with Instrumented {
               val updatedDiff = currDiff.combine(newDiff)
               if (hasNg) {
                 val (curBlockFees, nextBlockFee) = clearSponsorship(updatedBlockchain, tx.feeDiff())
-                val diff                         = updatedDiff.combine(Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees)))
-                (diff, carryFee + nextBlockFee, updatedConstraint)
-              } else (updatedDiff, 0L, updatedConstraint)
+                val minerDiff                    = Diff.empty.copy(portfolios = Map(blockGenerator -> curBlockFees))
+                (updatedDiff.combine(minerDiff), carryFee + nextBlockFee, updatedConstraint, (blockDiff.combine(minerDiff), txDiffs :+ newDiff))
+              } else (updatedDiff, 0L, updatedConstraint, (blockDiff, txDiffs :+ newDiff))
             }
       }
       .map {
-        case (d, carry, constraint) =>
-          val diffWithCancelledLeases =
-            if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
-              Monoid.combine(d, CancelAllLeases(composite(blockchain, d)))
-            else d
+        case (d, carry, constraint, (blockDiff, txDiffs)) =>
+          def withPatches(d: Diff): Diff = {
+            val diffWithCancelledLeases =
+              if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
+                Monoid.combine(d, CancelAllLeases(composite(blockchain, d)))
+              else d
 
-          val diffWithLeasePatches =
-            if (currentBlockHeight == settings.blockVersion3AfterHeight)
-              Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(blockchain, diffWithCancelledLeases)))
-            else diffWithCancelledLeases
+            val diffWithLeasePatches =
+              if (currentBlockHeight == settings.blockVersion3AfterHeight)
+                Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(blockchain, diffWithCancelledLeases)))
+              else diffWithCancelledLeases
 
-          val diffWithCancelledLeaseIns =
-            if (blockchain.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight))
-              Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(blockchain, diffWithLeasePatches)))
-            else diffWithLeasePatches
+            val diffWithCancelledLeaseIns =
+              if (blockchain.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight))
+                Monoid.combine(diffWithLeasePatches, CancelInvalidLeaseIn(composite(blockchain, diffWithLeasePatches)))
+              else diffWithLeasePatches
 
-          (diffWithCancelledLeaseIns, carry, constraint, (Diff.empty, Seq.empty))
+            diffWithCancelledLeaseIns
+          }
+
+          (withPatches(d), carry, constraint, (withPatches(blockDiff), txDiffs))
       }
   }
 }
