@@ -48,15 +48,15 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     ))
   def decompile: Route = path("script" / "decompile") {
     (post & entity(as[String])) { code =>
-        val ret = Script.fromBase64String(code) match {
-          case Left(err)     => "Wrong input"
-          case Right(script) => Script.decompile(script)
+        Script.fromBase64String(code) match {
+          case Left(err)     => complete(err)
+          case Right(script) => val ret = Script.decompile(script)
+            complete(
+              Json.obj(
+                "script" -> ret.toString,
+              )
+            )
         }
-        complete(
-          Json.obj(
-            "script" -> ret.toString,
-          )
-        )
     }
   }
 
