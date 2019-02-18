@@ -26,7 +26,38 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   }
 
   override val route: Route = pathPrefix("utils") {
-    compile ~ compileContract ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    decompile ~ compile ~ compileContract ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+  }
+
+  @Path("/script/decompile")
+  @ApiOperation(value = "Decompile", notes = "Decompiles base64 script representation to string code", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "code",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        value = "Script code",
+        example = "true"
+      )
+    ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "string or error")
+    ))
+  def decompile: Route = path("script" / "decompile") {
+    (post & entity(as[String])) { code =>
+        Script.fromBase64String(code) match {
+          case Left(err)     => complete(err)
+          case Right(script) => val ret = Script.decompile(script)
+            complete(
+              Json.obj(
+                "script" -> ret.toString,
+              )
+            )
+        }
+    }
   }
 
   @Path("/script/compile")
@@ -100,6 +131,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
       )
     }
   }
+
   @Path("/script/estimate")
   @ApiOperation(value = "Estimate", notes = "Estimates compiled code in Base64 representation", httpMethod = "POST")
   @ApiImplicitParams(
@@ -132,7 +164,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
               case (script, complexity) =>
                 Json.obj(
                   "script"     -> code,
-                  "scriptText" -> Script.decompile(script),
+                  "scriptText" -> script.expr.toString, // [WAIT] Script.decompile(script),
                   "complexity" -> complexity,
                   "extraFee"   -> CommonValidation.ScriptExtraFee
                 )
