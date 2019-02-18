@@ -46,6 +46,15 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |(102,>)""".stripMargin
   }
 
+  property("successful on very deep expressions (stack overflow check)") {
+    val expr = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
+      FUNCTION_CALL(
+        function = FunctionHeader.Native(100),
+        List(CONST_LONG(1), acc))
+    }
+    Decompiler(expr, decompilerContext) should startWith ("(1 + (1 + (1 + (1 + (1 + (1 + ")
+  }
+
   property("simple let") {
     val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), TRUE)
     Decompiler(expr, decompilerContext) shouldBe "{ let a = 1; true }"
