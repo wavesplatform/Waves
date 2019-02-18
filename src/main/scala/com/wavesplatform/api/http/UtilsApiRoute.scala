@@ -48,7 +48,6 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     ))
   def decompile: Route = path("script" / "decompile") {
     (post & entity(as[String])) { code =>
-      parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
         val ret = Script.fromBase64String(code) match {
           case Left(err)     => "Wrong input"
           case Right(script) => Script.decompile(script)
@@ -58,7 +57,6 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
             "script" -> ret.toString,
           )
         )
-      }
     }
   }
 
