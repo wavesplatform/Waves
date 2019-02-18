@@ -344,11 +344,12 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("Invoke contract decompilation") {
     val contract = Contract(
-      List(),
+      List(
+        Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))),
       List(
         CallableFunction(
           CallableAnnotation("i"),
-          FUNC(
+          Terms.FUNC(
             "testfunc",
             List("amount"),
             BLOCK(
@@ -365,7 +366,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                     FUNCTION_CALL(
                       User("TransferSet"),
                       List(FUNCTION_CALL(Native(1101),
-                                         List(FUNCTION_CALL(User("ContractTransfer"), List(GETTER(REF("i"), "caller"), REF("amount"), REF("unit"))))))
+                        List(FUNCTION_CALL(User("ContractTransfer"), List(GETTER(REF("i"), "caller"), REF("amount"), REF("unit"))))))
                     )
                   )
                 )
@@ -376,7 +377,10 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       None
     )
     Decompiler(contract: Contract, decompilerContext) shouldBe
-      """
+      """func foo (bar,buz) = {
+        |    true
+        |}
+        |
         |@Callable(i)
         |func testfunc (amount) = {
         |    {
