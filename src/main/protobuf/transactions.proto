@@ -45,24 +45,24 @@ message Transaction {
 };
 
 message GenesisTransactionData {
-    Recipient recipient = 1;
+    Recipient recipient = 1 [(scalapb.field).no_box = true];
     uint64 amount = 2;
 };
 
 message PaymentTransactionData {
-    Recipient recipient = 1;
+    Recipient recipient = 1 [(scalapb.field).no_box = true];
     uint64 amount = 2;
 };
 
 message TransferTransactionData {
     bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
-    Recipient recipient = 2;
+    Recipient recipient = 2 [(scalapb.field).no_box = true];
     uint64 amount = 3;
     bytes attachment = 4 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
 };
 
 message CreateAliasTransactionData {
-    Recipient alias = 1;
+    Recipient alias = 1 [(scalapb.field).no_box = true];
 };
 
 message DataTransactionData {
@@ -81,7 +81,7 @@ message DataTransactionData {
 
 message MassTransferTransactionData {
     message Transfer {
-        Recipient address = 1;
+        Recipient address = 1 [(scalapb.field).no_box = true];
         uint64 amount = 2;
     };
 
@@ -91,7 +91,7 @@ message MassTransferTransactionData {
 };
 
 message LeaseTransactionData {
-    Recipient recipient = 1;
+    Recipient recipient = 1 [(scalapb.field).no_box = true];
     uint64 amount = 2;
 };
 

@@ -4,21 +4,19 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.utils._
 
 trait PBRecipientCompanionBase {
-  implicit def apply(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
+  def empty = Recipient.defaultInstance
+
+  implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
     case a: Address => a
     case al: Alias  => al
   }
 
-  implicit def apply(address: Address): Recipient = {
+  implicit def fromAddress(address: Address): Recipient = {
     Recipient(address.bytes(1), Recipient.Recipient.Address(Recipient.Address(address.bytes.drop(2))))
   }
 
-  implicit def apply(alias: Alias): Recipient = {
+  implicit def fromAlias(alias: Alias): Recipient = {
     Recipient(alias.chainId, Recipient.Recipient.Alias(Recipient.Alias(alias.name)))
-  }
-
-  implicit def toOption[A](address: A)(implicit ev: A => Recipient): Option[Recipient] = {
-    Option(ev(address))
   }
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {

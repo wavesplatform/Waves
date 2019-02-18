@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.protobuf
 
 import com.google.protobuf.CodedOutputStream
 import com.wavesplatform.account.protobuf.Recipient
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction._
@@ -35,7 +35,7 @@ trait PBTransactionImplicits {
 
       case _ =>
         // PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
-        encodePBTXWithPrefix(tx)
+        encodeUnsignedPBTXWithPrefix(tx)
     })
 
     override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
@@ -240,6 +240,8 @@ trait PBTransactionImplicits {
   }
 
   implicit class PBTransactionImplicitConversionOps(tx: Transaction) {
+    def withCurrentChainId: Transaction = tx.withChainId(AddressScheme.current.chainId)
+
     def isLegacy: Boolean = tx.version == 1 || tx.version == 2
 
     def toVanillaOrAdapter: VanillaTransaction = if (this.isLegacy) toVanilla else toVanillaAdapter
@@ -247,13 +249,13 @@ trait PBTransactionImplicits {
     def toVanillaAdapter = PBTransactionVanillaAdapter(tx)
 
     def toVanilla: VanillaTransaction = tx.data match {
-      case Data.Genesis(GenesisTransactionData(Some(recipient), amount)) =>
+      case Data.Genesis(GenesisTransactionData(recipient, amount)) =>
         vt.GenesisTransaction(recipient.toAddress, amount, tx.timestamp, tx.signature)
 
-      case Data.Payment(PaymentTransactionData(Some(recipient), amount)) =>
+      case Data.Payment(PaymentTransactionData(recipient, amount)) =>
         vt.PaymentTransaction(tx.sender, recipient.toAddress, amount, tx.fee, tx.timestamp, tx.signature)
 
-      case Data.Transfer(TransferTransactionData(assetId, Some(recipient), amount, attachment)) =>
+      case Data.Transfer(TransferTransactionData(assetId, recipient, amount, attachment)) =>
         tx.version match {
           case 1 =>
             vt.transfer
@@ -280,7 +282,7 @@ trait PBTransactionImplicits {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.CreateAlias(CreateAliasTransactionData(Some(alias))) =>
+      case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
         tx.version match {
           case 1 => vt.CreateAliasTransactionV1(tx.sender, alias.toAlias, tx.fee, tx.timestamp, tx.signature)
           case 2 => vt.CreateAliasTransactionV2(tx.sender, alias.toAlias, tx.fee, tx.timestamp, tx.proofs)
@@ -338,7 +340,7 @@ trait PBTransactionImplicits {
       case Data.SetScript(SetScriptTransactionData(script)) =>
         vt.smart.SetScriptTransaction(tx.chainId, tx.sender, script, tx.fee, tx.timestamp, tx.proofs)
 
-      case Data.Lease(LeaseTransactionData(Some(recipient), amount)) =>
+      case Data.Lease(LeaseTransactionData(recipient, amount)) =>
         tx.version match {
           case 1 => vt.lease.LeaseTransactionV1(tx.sender, amount, tx.fee, tx.timestamp, recipient.toAddressOrAlias, tx.signature)
           case 2 => vt.lease.LeaseTransactionV2(tx.sender, amount, tx.fee, tx.timestamp, recipient.toAddressOrAlias, tx.proofs)
@@ -402,7 +404,7 @@ trait PBTransactionImplicits {
         vt.transfer.MassTransferTransaction(
           assetId,
           tx.sender,
-          transfers.map(t => ParsedTransfer(t.getAddress.toAddressOrAlias, t.amount)).toList,
+          transfers.map(t => ParsedTransfer(t.address.toAddressOrAlias, t.amount)).toList,
           tx.timestamp,
           tx.fee,
           attachment,
@@ -417,15 +419,15 @@ trait PBTransactionImplicits {
     }
   }
 
-  private[wavesplatform] def encodePBTXWithPrefix(tx: PBTransaction): Array[Byte] = {
-    val prefixLength = 3
+  private[wavesplatform] def encodeUnsignedPBTXWithPrefix(tx: PBTransaction): Array[Byte] = {
+    val prefixLength = 3 // "WTX"
     val outArray     = new Array[Byte](tx.serializedSize + prefixLength)
     val outputStream = CodedOutputStream.newInstance(outArray)
     outputStream.useDeterministicSerialization() // Do not remove
     outputStream.write('W'.toByte)
     outputStream.write('T'.toByte)
     outputStream.write(tx.chainId: Byte)
-    tx.withProofsArray(Nil).writeTo(outputStream)
+    tx.clearProofsArray.writeTo(outputStream)
     outputStream.checkNoSpaceLeft()
     outArray
   }
