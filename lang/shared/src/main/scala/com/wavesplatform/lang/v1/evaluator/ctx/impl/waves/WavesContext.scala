@@ -90,6 +90,7 @@ object WavesContext {
     def getDataByIndexF(name: String, dataType: DataType): BaseFunction =
       UserFunction(
         name,
+        30,
         UNION(dataType.innerType, UNIT),
         "Extract data by index",
         ("@data", LIST(dataEntryType.typeRef), "DataEntry vector, usally tx.data"),
@@ -117,7 +118,7 @@ object WavesContext {
     )
 
     lazy val addressFromPublicKeyF: BaseFunction =
-      UserFunction("addressFromPublicKey", addressType.typeRef, "Convert public key to account address", ("@publicKey", BYTESTR, "public key")) {
+      UserFunction("addressFromPublicKey", 82, addressType.typeRef, "Convert public key to account address", ("@publicKey", BYTESTR, "public key")) {
 
         FUNCTION_CALL(
           FunctionHeader.User("Address"),
@@ -188,7 +189,7 @@ object WavesContext {
     )
 
     lazy val addressFromStringF: BaseFunction =
-      UserFunction("addressFromString", optionAddress, "Decode account address", ("@string", STRING, "string address represntation")) {
+      UserFunction("addressFromString", 124, optionAddress, "Decode account address", ("@string", STRING, "string address represntation")) {
 
         LET_BLOCK(
           LET("@afs_addrBytes",
@@ -309,7 +310,7 @@ object WavesContext {
       }
 
     val wavesBalanceF: UserFunction =
-      UserFunction("wavesBalance", LONG, "get WAVES balanse for account", ("@addressOrAlias", addressOrAliasType, "account")) {
+      UserFunction("wavesBalance", 109, LONG, "get WAVES balanse for account", ("@addressOrAlias", addressOrAliasType, "account")) {
         FUNCTION_CALL(assetBalanceF.header, List(REF("@addressOrAlias"), REF("unit")))
 
       }
