@@ -105,7 +105,7 @@ object Decompiler {
                 opCode match {
                   case None =>
                     Delay(
-                      Seq(Left(out("Decompile Error: Wrong opcode: <" + name + "> with args:", ident))) ++
+                      Seq(Left(out("Native<" + name + ">", ident))) ++
                         Seq(Left(out("(", 0))) ++ argso(args, ctx) ++ Seq(Left(")")))
                   case Some(opCode) =>
                     Delay(Seq(Left(out(opCode.toString + "(", ident))) ++ argso(args, ctx) ++ Seq(Left(")")))

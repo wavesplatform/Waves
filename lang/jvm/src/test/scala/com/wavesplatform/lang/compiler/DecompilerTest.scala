@@ -90,7 +90,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.Native(254),
       args = List(CONST_LONG(1), CONST_LONG(2))
     )
-    Decompiler(expr, decompilerContext) shouldBe "Decompile Error: Wrong opcode: <254> with args:(1, 2)"
+    Decompiler(expr, decompilerContext) shouldBe "Native<254>(1, 2)"
   }
 
   property("user function call with one args") {
