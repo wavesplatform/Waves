@@ -20,9 +20,16 @@ trait PBRecipientCompanionBase {
   }
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {
-    def toAddress =
-      Address.fromBytes(Bytes.concat(Array(Address.AddressVersion, recipient.chainId.toByte), recipient.getAddress.address.arr)).explicitGet()
-    def toAlias = Alias.buildAlias(recipient.chainId.toByte, recipient.getAlias.name).explicitGet()
+    def toAddress: Address = {
+      Address.fromBytes(Bytes.concat(Array(Address.AddressVersion, recipient.chainId.toByte), recipient.getAddress.address.arr), recipient.chainId.toByte)
+        .explicitGet()
+    }
+
+    def toAlias: Alias = {
+      Alias.buildAlias(recipient.chainId.toByte, recipient.getAlias.name)
+        .explicitGet()
+    }
+
     def toAddressOrAlias = recipient.recipient match {
       case Recipient.Recipient.Alias(alias)     => toAlias
       case Recipient.Recipient.Address(address) => toAddress
