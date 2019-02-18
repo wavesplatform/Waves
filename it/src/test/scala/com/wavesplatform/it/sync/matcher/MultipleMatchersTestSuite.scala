@@ -21,11 +21,12 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
       |  snapshots-interval = 51
       |}""".stripMargin)
 
+  private def matcher1NodeConfig = Default.last
   private def matcher2NodeConfig = ConfigFactory.parseString("""waves.network.node-name = node11
-      |akka.kafka.consumer.kafka-clients.group.id = 1""".stripMargin).withFallback(Default.last)
+      |akka.kafka.consumer.kafka-clients.group.id = 1""".stripMargin).withFallback(matcher1NodeConfig)
 
   override protected def nodeConfigs: Seq[Config] =
-    List(Default.last, matcher2NodeConfig, Default(2 + Random.nextInt(Default.size - 2)))
+    (List(matcher1NodeConfig, matcher2NodeConfig) ++ Random.shuffle(Default.init).take(1))
       .zip(Seq(matcherConfig, matcherConfig, minerEnabled))
       .map { case (n, o) => o.withFallback(n) }
       .map(configOverrides.withFallback)
