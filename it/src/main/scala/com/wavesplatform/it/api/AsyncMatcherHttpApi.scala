@@ -274,10 +274,10 @@ object AsyncMatcherHttpApi extends Assertions {
     def getAllSnapshotOffsets: Future[Map[String, QueueEventWithMeta.Offset]] =
       matcherGetWithApiKey("/matcher/debug/allSnapshotOffsets").as[Map[String, QueueEventWithMeta.Offset]]
 
-    def waitForStableOffset(confirmations: Int, maxTries: Int, interval: FiniteDuration): Future[Either[Unit, QueueEventWithMeta.Offset]] = {
-      def loop(n: Int, currConfirmations: Int, currOffset: QueueEventWithMeta.Offset): Future[Either[Unit, QueueEventWithMeta.Offset]] =
-        if (currConfirmations >= confirmations) Future.successful(Right(currOffset))
-        else if (n > maxTries) Future.successful(Left(()))
+    def waitForStableOffset(confirmations: Int, maxTries: Int, interval: FiniteDuration): Future[QueueEventWithMeta.Offset] = {
+      def loop(n: Int, currConfirmations: Int, currOffset: QueueEventWithMeta.Offset): Future[QueueEventWithMeta.Offset] =
+        if (currConfirmations >= confirmations) Future.successful(currOffset)
+        else if (n > maxTries) Future.failed(new IllegalStateException(s"Offset is not stable: $maxTries tries is out"))
         else
           GlobalTimer.instance
             .sleep(interval)
