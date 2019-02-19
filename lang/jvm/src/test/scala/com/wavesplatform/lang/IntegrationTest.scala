@@ -399,4 +399,22 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       )))
   }
 
+  property("ensure user function: success") {
+    val src =
+      """
+        |let x = true
+        |ensure(x, "test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(TRUE)
+  }
+
+  property("ensure user function: fail") {
+    val src =
+      """
+        |let x = false
+        |ensure(x, "test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Left("test fail")
+  }
+
 }
