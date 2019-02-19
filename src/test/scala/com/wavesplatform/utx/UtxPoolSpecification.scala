@@ -20,7 +20,7 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.ValidationError.{OverflowError, SenderIsBlacklisted}
+import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -89,17 +89,6 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransactionV1.selfSigned(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).explicitGet())
-      .label("transferTransaction")
-
-  private def overflowedTransfer(sender: PrivateKeyAccount, time: Time) =
-    (for {
-      recipient  <- accountGen
-      assetId    <- assetIdGen
-      feeAssetId <- assetIdGen.suchThat(_ != assetId)
-      amount = Long.MaxValue - 1000
-      fee    = 10000
-    } yield
-      TransferTransactionV1.selfSigned(assetId, sender, recipient, amount, time.getTimestamp(), feeAssetId, fee, Array.empty[Byte]).explicitGet())
       .label("transferTransaction")
 
   private def transferWithRecipient(sender: PrivateKeyAccount, recipient: PublicKeyAccount, maxAmount: Long, time: Time) =
@@ -293,21 +282,6 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
   }
 
   "UTX Pool" - {
-    "rejects overflowed transfer" in {
-      forAll(stateGen) {
-        case (sender, _, bcu) =>
-          val time = new TestTime()
-
-          val utxSettings = UtxSettings(1, PoolDefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)
-
-          forAll(overflowedTransfer(sender, time)) { tx =>
-            val utx = new UtxPoolImpl(time, bcu, ignorePortfolioChanged, FunctionalitySettings.TESTNET, utxSettings)
-
-            utx.putIfNew(tx) shouldBe Left(OverflowError)
-          }
-      }
-    }
-
     "does not add new transactions when full" in utxTest(
       UtxSettings(1, PoolDefaultMaxBytes, Set.empty, Set.empty, 5.minutes, allowTransactionsFromSmartAccounts = true)) { (txs, utx, _) =>
       utx.putIfNew(txs.head) shouldBe 'right

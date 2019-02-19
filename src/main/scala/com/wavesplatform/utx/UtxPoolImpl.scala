@@ -9,7 +9,6 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
@@ -30,7 +29,7 @@ import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong
-import scala.util.{Left, Right, Try}
+import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer[Address], fs: FunctionalitySettings, utxSettings: UtxSettings)
     extends ScorexLogging
@@ -196,11 +195,6 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer
         for {
           _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
 
-          _ <- tx match {
-            case tr: TransferTransaction => UtxPoolImpl.validateOverflow(tr, b.activatedFeatures.keySet)
-            case _                       => Right(())
-          }
-
           transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
             .map(_.bytes().size)
             .sum
@@ -271,17 +265,6 @@ object UtxPoolImpl {
       }
     }
 
-  }
-
-  def validateOverflow(tx: TransferTransaction, activatedFeatures: Set[Short]): Either[ValidationError, Unit] = {
-    if (activatedFeatures(BlockchainFeatures.DummyFeature.id))
-      Right(()) // lets transaction validates itself
-    else
-      Try(Math.addExact(tx.fee, tx.amount))
-        .fold(
-          _ => ValidationError.OverflowError.asLeft[Unit],
-          _ => ().asRight[ValidationError]
-        )
   }
 
 }
