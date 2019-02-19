@@ -76,10 +76,13 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
   private val consumerControl = new AtomicReference[Consumer.Control](Consumer.NoopControl)
   private val consumerSettings = {
     val config = mat.system.settings.config.getConfig("akka.kafka.consumer")
-    ConsumerSettings(config, new ByteArrayDeserializer, deserializer)
+    ConsumerSettings(config, new ByteArrayDeserializer, deserializer).withClientId("consumer")
   }
 
-  private val metadataConsumer = mat.system.actorOf(KafkaConsumerActor.props(consumerSettings))
+  private val metadataConsumer = mat.system.actorOf(
+    KafkaConsumerActor.props(consumerSettings.withClientId("meta-consumer")),
+    "meta-consumer"
+  )
 
   override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Unit): Unit = {
     log.info(s"Start consuming from $fromOffset")

@@ -335,6 +335,10 @@ object PureContext {
     IF(FUNCTION_CALL(eq, List(REF("@p"), FALSE)), TRUE, FALSE)
   }
 
+  lazy val ensure: BaseFunction = UserFunction("ensure", 16, BOOLEAN, "Ensure parameter is true", ("@b", BOOLEAN, "condition"), ("@msg", STRING, "error message")) {
+      IF(REF("@b"), TRUE, FUNCTION_CALL(throwWithMessage, List(REF("@msg"))))
+  }
+
   private lazy val operators: Array[BaseFunction] = Array(
     mulLong,
     divLong,
@@ -393,7 +397,7 @@ object PureContext {
   def build(version: StdLibVersion): CTX =
     version match {
       case V1 | V2 => ctx
-      case V3      => Monoid.combine(ctx, CTX(Seq.empty, Map.empty, Array(listConstructor1, listConstructor2, listConstructor3)))
+      case V3      => Monoid.combine(ctx, CTX(Seq.empty, Map.empty, Array(listConstructor1, listConstructor2, listConstructor3, ensure)))
     }
 
 }
