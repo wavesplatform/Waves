@@ -82,10 +82,10 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].name),
       "args" -> JsArray(
         fc.args.map {
-          case Terms.CONST_LONG(l)    => Json.obj("key" -> "", "type" -> "integer", "value" -> l)
-          case Terms.CONST_BOOLEAN(l) => Json.obj("key" -> "", "type" -> "boolean", "value" -> l)
-          case Terms.CONST_BYTESTR(l) => Json.obj("key" -> "", "type" -> "binary", "value" -> l.base64)
-          case Terms.CONST_STRING(l)  => Json.obj("key" -> "", "type" -> "string", "value" -> l)
+          case Terms.CONST_LONG(l)    => Json.obj("type" -> "integer", "value" -> l)
+          case Terms.CONST_BOOLEAN(l) => Json.obj("type" -> "boolean", "value" -> l)
+          case Terms.CONST_BYTESTR(l) => Json.obj("type" -> "binary", "value" -> l.base64)
+          case Terms.CONST_STRING(l)  => Json.obj("type" -> "string", "value" -> l)
           case _                      => ???
         }
       )

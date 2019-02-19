@@ -16,7 +16,7 @@ object ContractInvocationRequest {
 
   case class FunctionCallPart(function: String, args: List[EVALUATED])
 
-  implicit val EVALUATED_Reads = new Reads[EVALUATED] {
+  implicit val EvaluatedReads = new Reads[EVALUATED] {
     def reads(jv: JsValue): JsResult[EVALUATED] = {
       jv \ "type" match {
         case JsDefined(JsString("integer")) =>

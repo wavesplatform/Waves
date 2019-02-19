@@ -47,8 +47,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
                          "call": {
                             "function" : "foo",
                              "args" : [
-                             { "key" : "",
-                               "type" : "binary",
+                             { "type" : "binary",
                                "value" : "base64:YWxpY2U="
                              }
                             ]
