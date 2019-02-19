@@ -14,6 +14,7 @@ sealed abstract class BinaryOperation {
 object BinaryOperation {
 
   val opsByPriority: List[List[BinaryOperation]] = List(
+    List(CONS_OP),
     List(OR_OP, AND_OP),
     List(EQ_OP, NE_OP),
     List(GT_OP, GE_OP, LT_OP, LE_OP),
@@ -69,6 +70,13 @@ object BinaryOperation {
     override val parser = P("<" ~ !P("=")).map(_ => this)
     override def expr(start: Int, end: Int, op1: EXPR, op2: EXPR): EXPR = {
       BINARY_OP(Pos(start, end), op2, LT_OP, op1)
+    }
+  }
+  case object CONS_OP extends BinaryOperation {
+    override val func: String = "::"
+    override def expr(start: Int, end: Int, op1: EXPR, op2: EXPR): EXPR = {
+      val pos = Pos(start, end)
+      FUNCTION_CALL(Pos(start, end), PART.VALID(pos, "cons"), List(op1, op2))
     }
   }
 
