@@ -3,16 +3,14 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Decompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.parser.BinaryOperation
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader, compiler}
-import com.wavesplatform.lang.{Common, Global, StdLibVersion}
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
@@ -23,28 +21,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   val decompilerContext = CTX.decompilerContext
 
-  property("ctx debug test") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
-    val defs = ctx.functionDefs
-      .filterKeys(BinaryOperation.opsByPriority.flatten.map(x => BinaryOperation.opsToFunctions(x) -> x).toMap.keys.toList.contains(_))
-      .mapValues(_.map(_.header)
-        .filter(_.isInstanceOf[Native])
-        .map(_.asInstanceOf[Native].name))
-      .toList
-      .flatMap { case (name, codes) => codes.map((_, name)) }
-    defs.mkString("\n").toString shouldBe
-      """(104,*)
-        |(106,%)
-        |(103,>=)
-        |(101,-)
-        |(0,==)
-        |(100,+)
-        |(300,+)
-        |(203,+)
-        |(105,/)
-        |(102,>)""".stripMargin
-  }
-
   property("successful on very deep expressions (stack overflow check)") {
     val expr = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
       FUNCTION_CALL(function = FunctionHeader.Native(100), List(CONST_LONG(1), acc))
@@ -54,7 +30,12 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("simple let") {
     val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), TRUE)
-    Decompiler(expr, decompilerContext) shouldBe "{ let a = 1; true }"
+    Decompiler(expr, decompilerContext) shouldBe
+      """{
+        |    let a =
+        |        1;
+        |    true
+        |}""".stripMargin
   }
 
   property("native function call with one arg") {
@@ -113,6 +94,19 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |        p;
         |    true
         |}""".stripMargin
+  }
+
+  property("identation in block") {
+    val expr = Terms.BLOCK(
+      LET("vari", REF("p")),
+      TRUE
+    )
+    Decompiler.expr(Decompiler.pure(expr), 2, decompilerContext).apply() shouldBe
+      """        {
+        |            let vari =
+        |                p;
+        |            true
+        |        }""".stripMargin
   }
 
   property("let and function call in block") {
@@ -230,34 +224,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |}""".stripMargin
   }
 
-  property("Invoke contract compilation") {
-    val scriptText =
-      """
-        |	@Callable(i)
-        |	func testfunc(amount: Int) = {
-        |   let pmt = 1
-        |
-        |   if (false)
-        |   then
-        |     throw("impossible")
-        |   else {
-        |	  	ContractResult(
-        |        WriteSet(List(DataEntry("1", "1"))),
-        |        TransferSet(List(ContractTransfer(i.caller, amount, unit)))
-        |     )
-        |   }
-        |	}
-      """.stripMargin
-    val parsedScript = com.wavesplatform.lang.v1.parser.Parser.parseContract(scriptText).get.value
-
-    val ctx             = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
-    val compledContract = compiler.ContractCompiler(ctx, parsedScript)
-
-    compledContract.getOrElse("error").toString shouldBe
-      """Contract(List(),List(CallableFunction(CallableAnnotation(i),FUNC(testfunc,List(amount),LET_BLOCK(LET(pmt,CONST_LONG(1)),IF(FALSE,FUNCTION_CALL(Native(2),List(CONST_STRING(impossible))),FUNCTION_CALL(User(ContractResult),List(FUNCTION_CALL(User(WriteSet),List(FUNCTION_CALL(Native(1101),List(FUNCTION_CALL(User(DataEntry),List(CONST_STRING(1), CONST_STRING(1))))))), FUNCTION_CALL(User(TransferSet),List(FUNCTION_CALL(Native(1101),List(FUNCTION_CALL(User(ContractTransfer),List(GETTER(REF(i),caller), REF(amount), REF(unit)))))))))))))),None)"""
-
-  }
-
   property("Invoke contract with verifier decompilation") {
     val contract = Contract(
       List(FUNC("foo", List(), FALSE), FUNC("bar", List(), IF(FUNCTION_CALL(User("foo"), List()), TRUE, FALSE))),
@@ -298,7 +264,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |    false
         |}
         |
-        |
         |func bar () = {
         |    {
         |        if (
@@ -331,8 +296,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |@Verifier(t)
         |func verify () = {
         |    true
-        |}
-        |""".stripMargin
+        |}""".stripMargin
   }
 
   property("Invoke contract decompilation") {
@@ -346,50 +310,27 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
             List("amount"),
             BLOCK(
               LET("pmt", CONST_LONG(1)),
-              IF(
-                FALSE,
-                FUNCTION_CALL(Native(2), List(CONST_STRING("impossible"))),
-                FUNCTION_CALL(
-                  User("ContractResult"),
-                  List(
-                    FUNCTION_CALL(
-                      User("WriteSet"),
-                      List(FUNCTION_CALL(Native(1101), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("1"), CONST_STRING("1"))))))),
-                    FUNCTION_CALL(
-                      User("TransferSet"),
-                      List(FUNCTION_CALL(Native(1101),
-                                         List(FUNCTION_CALL(User("ContractTransfer"), List(GETTER(REF("i"), "caller"), REF("amount"), REF("unit"))))))
-                    )
-                  )
-                )
-              )
+              TRUE
             )
           )
         )),
       None
     )
-    Decompiler(contract: Contract, decompilerContext) shouldBe
-      """func foo (bar,buz) = {
-        |    true
-        |}
-        |
-        |@Callable(i)
-        |func testfunc (amount) = {
-        |    {
-        |        let pmt =
-        |            1;
-        |        {
-        |            if (
-        |                false
-        |            )
-        |            then
-        |                throw("impossible")
-        |            else
-        |                ContractResult(WriteSet(List(DataEntry("1", "1"))), TransferSet(List(ContractTransfer(i.caller, amount, unit))))
-        |        }
-        |    }
-        |}
-        |""".stripMargin
+    val str    = Decompiler(contract: Contract, decompilerContext)
+    val margin = """|func foo (bar,buz) = {
+                    |    true
+                    |}
+                    |
+                    |@Callable(i)
+                    |func testfunc (amount) = {
+                    |    {
+                    |        let pmt =
+                    |            1;
+                    |        true
+                    |    }
+                    |}
+                    |""".stripMargin
+    str shouldBe margin
   }
 
   property("bytestring") {
