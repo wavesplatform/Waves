@@ -15,6 +15,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.ContractInvocationTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1, TransferTransactionV2}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -349,6 +350,19 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
+  private val contractInvocation = ContractInvocationTransaction
+    .create(
+      None,
+      publicKey,
+      where_i_can_function_for_this_call?,
+      how_i_can_create_payment?,
+      smartMinFee,
+      ts,
+      need_proofs?
+    )
+    .right
+    .get
+
   forAll(
     Table(
       ("tx", "name"),
@@ -373,6 +387,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       (sponsor, "sponsor"),
       (transferV1, "transferV1"),
       (transferV2, "transferV2"),
+      (contractInvocation, "contractInvocation")
     )) { (tx, name) =>
     test(s"Serialize check of $name transaction") {
       val r = sender.transactionSerializer(tx.json()).bytes.map(_.toByte)
