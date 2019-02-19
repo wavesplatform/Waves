@@ -15,7 +15,7 @@ object Decompiler {
 
   private def pureOut(in: String, ident: Int): Coeval[String] = pure(out(in, ident))
 
-  private val NEWLINE = "\n"
+  private val NEWLINE = scala.util.Properties.lineSeparator
 
   private def decl(e: Coeval[DECLARATION], ident: Int, ctx: DecompilerContext): Coeval[String] =
     e flatMap {
@@ -29,9 +29,14 @@ object Decompiler {
 
   private def expr(e: Coeval[EXPR], ident: Int, ctx: DecompilerContext): Coeval[String] =
     e flatMap {
-      case Terms.TRUE             => pureOut("true", ident)
-      case Terms.FALSE            => pureOut("false", ident)
-      case Terms.CONST_BOOLEAN(b) => pureOut(b.toString.toLowerCase(), ident)
+      case Terms.TRUE                 => pureOut("true", ident)
+      case Terms.FALSE                => pureOut("false", ident)
+      case Terms.CONST_BOOLEAN(b)     => pureOut(b.toString.toLowerCase(), ident)
+      case Terms.CONST_LONG(t)        => pureOut(t.toLong.toString, ident)
+      case Terms.CONST_STRING(s)      => pureOut('"' + s + '"', ident)
+      case Terms.CONST_BYTESTR(bs)    => pureOut("base58'" + bs.base58 + "'", ident)
+      case Terms.REF(ref)             => pureOut(ref, ident)
+      case Terms.GETTER(getExpr, fld) => expr(pure(getExpr), ident, ctx).map(a => a + "." + fld)
       case Terms.IF(cond, it, iff) =>
         for {
           c   <- expr(pure(cond), 2 + ident, ctx)
@@ -40,36 +45,23 @@ object Decompiler {
         } yield
           out("{" + NEWLINE, ident) +
             out("if (" + NEWLINE, 1 + ident) +
-            out(c, 0) +
-            out(NEWLINE, 0) +
+            out(c + NEWLINE, 0) +
             out(")" + NEWLINE, 1 + ident) +
             out("then" + NEWLINE, 1 + ident) +
-            out(it, 0) +
-            out(NEWLINE, 0) +
+            out(it + NEWLINE, 0) +
             out("else" + NEWLINE, 1 + ident) +
-            out(iff, 0) +
-            out(NEWLINE, 0) +
+            out(iff + NEWLINE, 0) +
             out("}", ident)
-      case Terms.CONST_LONG(t)   => pureOut(t.toLong.toString, ident)
-      case Terms.CONST_STRING(s) => pureOut('"' + s + '"', ident)
-      case Terms.LET_BLOCK(let, exprPar) =>
-        for {
-          letValue <- expr(pure(let.value), 0, ctx)
-          body     <- expr(pure(exprPar), 0, ctx)
-        } yield
-          out("{ let " + let.name + " = " +
-                letValue + "; " + body + " }",
-              ident)
       case Terms.BLOCK(declPar, body) =>
         for {
           d <- decl(pure(declPar), 1 + ident, ctx)
           b <- expr(pure(body), 1 + ident, ctx)
         } yield
           out("{" + NEWLINE, ident) +
-            d + ";" + NEWLINE +
-            b + NEWLINE +
+            out(d + ";" + NEWLINE, 0) +
+            out(b + NEWLINE, 0) +
             out("}", ident)
-      case Terms.CONST_BYTESTR(bs) => pureOut("base58'" + bs.base58 + "'", ident)
+      case Terms.LET_BLOCK(let, exprPar) => expr(pure(Terms.BLOCK(let, exprPar)), ident, ctx)
       case Terms.FUNCTION_CALL(func, args) =>
         val argsCoeval = args
           .map(a => expr(pure(a), 0, ctx))
@@ -91,10 +83,6 @@ object Decompiler {
 
           case FunctionHeader.User(name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", ident))
         }
-      case Terms.REF(ref) =>
-        pureOut(ref, ident)
-      case Terms.GETTER(getExpr, fld) =>
-        expr(pure(getExpr), ident, ctx).map(a => a + "." + fld)
       case _: Terms.ARR     => ??? // never happens
       case _: Terms.CaseObj => ??? // never happens
     }
@@ -121,7 +109,7 @@ object Decompiler {
       d <- intersperse(decls)
       c <- intersperse(callables)
       v <- intersperse(verifier)
-    } yield d + NEWLINE  + c + NEWLINE + v
+    } yield d + NEWLINE + c + NEWLINE + v
 
     result()
   }

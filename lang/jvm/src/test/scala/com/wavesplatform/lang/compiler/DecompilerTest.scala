@@ -16,35 +16,12 @@ import com.wavesplatform.lang.{Common, Global, StdLibVersion}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
-
 class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   val CTX: CTX =
     Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.StdLibVersion.V3), CryptoContext.build(Global)))
 
   val decompilerContext = CTX.decompilerContext
-
-  property("ctx debug test") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
-    val defs = ctx.functionDefs
-      .filterKeys(BinaryOperation.opsByPriority.flatten.map(x => BinaryOperation.opsToFunctions(x) -> x).toMap.keys.toList.contains(_))
-      .mapValues(_.map(_.header)
-        .filter(_.isInstanceOf[Native])
-        .map(_.asInstanceOf[Native].name))
-      .toList
-      .flatMap { case (name, codes) => codes.map((_, name)) }
-    defs.mkString("\n").toString shouldBe
-      """(104,*)
-        |(106,%)
-        |(103,>=)
-        |(101,-)
-        |(0,==)
-        |(100,+)
-        |(300,+)
-        |(203,+)
-        |(105,/)
-        |(102,>)""".stripMargin
-  }
 
   property("successful on very deep expressions (stack overflow check)") {
     val expr = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
@@ -57,7 +34,12 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("simple let") {
     val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), TRUE)
-    Decompiler(expr, decompilerContext) shouldBe "{ let a = 1; true }"
+    Decompiler(expr, decompilerContext) shouldBe
+      """{
+        |    let a =
+        |        1;
+        |    true
+        |}""".stripMargin
   }
 
   property("native function call with one arg") {
@@ -376,28 +358,29 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         )),
       None
     )
-    Decompiler(contract: Contract, decompilerContext) shouldBe
-      """func foo (bar,buz) = {
-        |    true
-        |}
-        |
-        |@Callable(i)
-        |func testfunc (amount) = {
-        |    {
-        |        let pmt =
-        |            1;
-        |        {
-        |            if (
-        |                false
-        |            )
-        |            then
-        |                throw("impossible")
-        |            else
-        |                ContractResult(WriteSet(List(DataEntry("1", "1"))), TransferSet(List(ContractTransfer(i.caller, amount, unit))))
-        |        }
-        |    }
-        |}
-        |""".stripMargin
+    val str = Decompiler(contract: Contract, decompilerContext)
+    val margin = """func foo (bar,buz) = {
+    true
+}
+
+@Callable(i)
+func testfunc (amount) = {
+    {
+        let pmt =
+            1;
+        {
+            if (
+                false
+            )
+            then
+                throw("impossible")
+            else
+                ContractResult(WriteSet(List(DataEntry("1", "1"))), TransferSet(List(ContractTransfer(i.caller, amount, unit))))
+        }
+    }
+}
+""".stripMargin
+    str shouldBe       margin
   }
 
   property("bytestring") {
