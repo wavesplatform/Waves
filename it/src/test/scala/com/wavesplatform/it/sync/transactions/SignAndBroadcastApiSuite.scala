@@ -357,12 +357,9 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
            (3: Byte, 2: Byte, 2: Byte, None, None),
            (3: Byte, 2: Byte, 2: Byte, assetId, None),
            (1: Byte, 3: Byte, 2: Byte, None, None),
-//           (1: Byte, 3: Byte, 2: Byte, None, assetId),
            (2: Byte, 3: Byte, 2: Byte, None, None),
-//           (2: Byte, 3: Byte, 2: Byte, None, assetId),
            (3: Byte, 3: Byte, 2: Byte, None, None),
            (3: Byte, 3: Byte, 2: Byte, assetId, None),
-           // (3: Byte, 3: Byte, 2: Byte, None, assetId),
          )) {
       val buyer               = pkByAddress(firstAddress)
       val seller              = pkByAddress(secondAddress)
