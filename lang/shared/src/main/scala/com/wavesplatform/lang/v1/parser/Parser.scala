@@ -321,14 +321,26 @@ object Parser {
 
   lazy val declaration = P(letP | funcP)
 
-  def binaryOp(atom: P[EXPR], rest: List[List[BinaryOperation]]): P[EXPR] = rest match {
+  def revp[A,B](l:A, s:Seq[(B,A)], o:Seq[(A,B)]=Seq.empty) : (Seq[(A,B)], A) = {
+    s.foldLeft((o,l)) { (acc, op) => (acc, op) match { case ((o,l),(b,a)) => ((l,b) +: o) -> a } }
+  }
+
+  def binaryOp(atom: P[EXPR], rest: List[Either[List[BinaryOperation], List[BinaryOperation]]]): P[EXPR] = rest match {
     case Nil => unaryOp(atom, unaryOps)
-    case kinds :: restOps =>
+    case Left(kinds) :: restOps =>
       val operand = binaryOp(atom, restOps)
       val kind    = kinds.map(_.parser).reduce((pl, pr) => P(pl | pr))
       P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
         case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
           r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end, acc, currOperand) }
+      }
+    case Right(kinds) :: restOps =>
+      val operand = binaryOp(atom, restOps)
+      val kind    = kinds.map(_.parser).reduce((pl, pr) => P(pl | pr))
+      P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
+        case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
+          val (ops,s) = revp(left, r)
+          ops.foldLeft(s) { case (acc, (currOperand, currKind)) => currKind.expr(start, currOperand.position.end, currOperand, acc) }
       }
   }
 

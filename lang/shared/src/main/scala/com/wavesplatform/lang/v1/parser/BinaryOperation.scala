@@ -13,13 +13,13 @@ sealed abstract class BinaryOperation {
 
 object BinaryOperation {
 
-  val opsByPriority: List[List[BinaryOperation]] = List(
-    List(CONS_OP),
-    List(OR_OP, AND_OP),
-    List(EQ_OP, NE_OP),
-    List(GT_OP, GE_OP, LT_OP, LE_OP),
-    List(SUM_OP, SUB_OP),
-    List(MUL_OP, DIV_OP, MOD_OP)
+  val opsByPriority: List[Either[List[BinaryOperation], List[BinaryOperation]]] = List(
+    Right(List(CONS_OP)),
+    Left(List(OR_OP, AND_OP)),
+    Left(List(EQ_OP, NE_OP)),
+    Left(List(GT_OP, GE_OP, LT_OP, LE_OP)),
+    Left(List(SUM_OP, SUB_OP)),
+    Left(List(MUL_OP, DIV_OP, MOD_OP))
   )
 
   def opsToFunctions(op: BinaryOperation): String = op.func
