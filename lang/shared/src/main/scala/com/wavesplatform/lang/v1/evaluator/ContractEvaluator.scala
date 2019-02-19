@@ -11,8 +11,6 @@ import com.wavesplatform.lang.v1.task.imports.{raiseError, _}
 import com.wavesplatform.lang.v1.traits.domain.Tx.{ContractTransfer, Pmt}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 
-import scala.collection.mutable.ListBuffer
-
 object ContractEvaluator {
   case class Invocation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
 
@@ -60,11 +58,6 @@ object ContractEvaluator {
     EvaluatorV1.evalExpr(expr)
   }
 
-
-  def apply(ctx: EvaluationContext, c: Contract, i: Invocation): Either[ExecutionError, ContractResult] = {
-    val log = ListBuffer[LogItem]()
-    val llc = (str: String) => (v: LetExecResult) => log.append((str, v))
-    val lec = LoggedEvaluationContext(llc, ctx)
-    eval(c, i).run(lec).value._2.flatMap(ContractResult.fromObj)
-  }
+  def apply(ctx: EvaluationContext, c: Contract, i: Invocation): Either[ExecutionError, ContractResult] =
+    EvaluatorV1.evalWithLogging(ctx, eval(c, i))._2.flatMap(ContractResult.fromObj)
 }
