@@ -160,6 +160,11 @@ object Parser {
     case (_, id, None, _)                                     => id
   }
 
+  val list: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map { case (s,e,f) =>
+    val pos = Pos(s, f)
+    e.foldRight(REF(pos, PART.VALID(pos,"nil")):EXPR) { (v,l) => FUNCTION_CALL(pos, PART.VALID(pos, "cons"), List(v,l)) }
+  }
+
   val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | maybeFunctionCallP)
 
   abstract class Accessor
@@ -306,7 +311,7 @@ object Parser {
   }
 
   val baseAtom = comment ~
-    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP) ~
+    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | list | block | maybeAccessP) ~
     comment
 
   lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
