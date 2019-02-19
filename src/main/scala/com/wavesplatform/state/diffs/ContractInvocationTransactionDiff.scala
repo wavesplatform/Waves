@@ -103,13 +103,14 @@ object ContractInvocationTransactionDiff {
                     _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - sum doesn't overflow
                     _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - whatever else tranfser/massTransfer ensures
                     _ <- {
-                      val minWaves = (tx.checkedAssets().count(blockchain.hasAssetScript) +
-                        ps.count(_._3.fold(false)(blockchain.hasAssetScript))) * ScriptExtraFee + FeeConstants(ContractInvocationTransaction.typeId) * FeeUnit
+                      val totalScriptsInvoked = tx.checkedAssets().count(blockchain.hasAssetScript) +
+      ps.count(_._3.fold(false)(blockchain.hasAssetScript))
+                      val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(ContractInvocationTransaction.typeId) * FeeUnit
                       Either.cond(
                         minWaves <= wavesFee,
                         (),
                         GenericError(s"Fee in ${tx.assetFee._1
-                          .fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+                          .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
                       )
                     }
                     _ <- foldContractTransfers(blockchain, tx)(ps, dataAndPaymentDiff)
