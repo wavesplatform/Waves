@@ -21,11 +21,12 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
       |  snapshots-interval = 51
       |}""".stripMargin)
 
+  private def matcher1NodeConfig = Default.last
   private def matcher2NodeConfig = ConfigFactory.parseString("""waves.network.node-name = node11
-      |akka.kafka.consumer.kafka-clients.group.id = 1""".stripMargin).withFallback(Default.last)
+      |akka.kafka.consumer.kafka-clients.group.id = 1""".stripMargin).withFallback(matcher1NodeConfig)
 
   override protected def nodeConfigs: Seq[Config] =
-    List(Default.last, matcher2NodeConfig, Default(2 + Random.nextInt(Default.size - 2)))
+    (List(matcher1NodeConfig, matcher2NodeConfig) ++ Random.shuffle(Default.init).take(1))
       .zip(Seq(matcherConfig, matcherConfig, minerEnabled))
       .map { case (n, o) => o.withFallback(n) }
       .map(configOverrides.withFallback)
@@ -59,6 +60,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   private val aliceOrders = mkOrders(aliceAcc)
   private val bobOrders   = mkOrders(aliceAcc)
   private val orders      = aliceOrders ++ bobOrders
+  private val lastOrder   = orderGen(matcherPublicKey, aliceAcc, assetPairs).sample.get
 
   "Place, fill and cancel a lot of orders" in {
     val alicePlaces = aliceOrders.map(MatcherCommand.Place(matcher1Node, _))
@@ -70,11 +72,17 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     val cancels      = Random.shuffle(aliceCancels ++ bobCancels)
 
     executeCommands(places ++ cancels)
+    executeCommands(List(MatcherCommand.Place(matcher1Node, lastOrder)))
   }
 
   "Wait until all requests are processed" in {
-    matcher1Node.waitForStableOffset(10, 100, 200.millis)
-    matcher2Node.waitForStableOffset(10, 100, 200.millis)
+    val offset1 = matcher1Node.waitForStableOffset(10, 100, 200.millis)
+    matcher2Node.waitFor[Long](s"Offset is $offset1")(_.getCurrentOffset, _ == offset1, 2.seconds)
+
+    withClue("Last command processed") {
+      matcher1Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
+      matcher2Node.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
+    }
   }
 
   "States on both matcher should be equal" in {

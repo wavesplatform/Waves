@@ -106,6 +106,29 @@ object SyncMatcherHttpApi extends Assertions {
                                  waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       sync(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
 
+    def waitOrderProcessed(assetPair: AssetPair, orderId: String, checkTimes: Int = 5, retryInterval: FiniteDuration = 1.second): Unit = {
+      val fixedStatus = sync {
+        async(m).waitFor[MatcherStatusResponse](s"$orderId processed")(
+          _.orderStatus(orderId, assetPair),
+          _.status != "NotFound",
+          retryInterval
+        )
+      }
+
+      // Wait until something changed or not :)
+      def loop(n: Int): Unit =
+        if (n == 0) m.log.debug(s"$orderId wasn't changed (tried $checkTimes times)")
+        else {
+          val currStatus = orderStatus(orderId, assetPair)
+          if (currStatus == fixedStatus) {
+            Thread.sleep(retryInterval.toMillis)
+            loop(n - 1)
+          } else m.log.debug(s"$orderId was changed on ${checkTimes - n} step")
+        }
+
+      loop(checkTimes)
+    }
+
     def waitOrderInBlockchain(orderId: String,
                               retryInterval: FiniteDuration = 1.second,
                               waitTime: Duration = OrderRequestAwaitTime): Seq[TransactionInfo] =
@@ -213,7 +236,7 @@ object SyncMatcherHttpApi extends Assertions {
     def waitForStableOffset(confirmations: Int,
                             maxTries: Int,
                             interval: FiniteDuration,
-                            waitTime: Duration = RequestAwaitTime): Either[Unit, QueueEventWithMeta.Offset] =
+                            waitTime: Duration = RequestAwaitTime): QueueEventWithMeta.Offset =
       sync(async(m).waitForStableOffset(confirmations, maxTries, interval), (maxTries + 1) * interval)
 
     def matcherState(assetPairs: Seq[AssetPair],
