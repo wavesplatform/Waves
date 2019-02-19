@@ -67,17 +67,10 @@ object TransferTransaction {
                feeAmt: Long,
                maybeFeeAsset: Option[AssetId],
                attachment: Array[Byte]): Either[ValidationError, Unit] = {
-
-    val sumValid: validation.Validated[Long] =
-      if (maybeAmtAsset == maybeFeeAsset)
-        validateSum(Seq(amt, feeAmt))
-      else (amt + feeAmt).valid
-
     (
       validateAmount(amt, maybeAmtAsset.map(_.base58).getOrElse("waves")),
       validateFee(feeAmt),
-      validateAttachment(attachment),
-      sumValid
+      validateAttachment(attachment)
     ).mapN { case _ => () }
       .toEither
       .leftMap(_.head)
