@@ -99,8 +99,10 @@ class MatcherActorSpecification
         actor ! wrap(order1)
         actor ! wrap(order2)
 
-        ob.get()(pair1) shouldBe 'right
-        ob.get()(pair2) shouldBe 'right
+        eventually {
+          ob.get()(pair1) shouldBe 'right
+          ob.get()(pair2) shouldBe 'right
+        }
 
         val toKill = actor.getChild(List(OrderBookActor.name(pair1)).iterator)
 

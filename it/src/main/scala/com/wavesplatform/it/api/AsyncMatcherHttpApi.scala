@@ -216,12 +216,12 @@ object AsyncMatcherHttpApi extends Assertions {
                      price: Long,
                      fee: Long,
                      version: Byte,
+                     timestamp: Long = System.currentTimeMillis(),
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
-      val creationTime        = System.currentTimeMillis()
-      val timeToLiveTimestamp = creationTime + timeToLive.toMillis
+      val timeToLiveTimestamp = timestamp + timeToLive.toMillis
       val matcherPublicKey    = matcherNode.publicKey
       val unsigned =
-        Order(sender, matcherPublicKey, pair, orderType, amount, price, creationTime, timeToLiveTimestamp, fee, Proofs.empty, version)
+        Order(sender, matcherPublicKey, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
       Order.sign(unsigned, sender)
     }
 
@@ -236,7 +236,7 @@ object AsyncMatcherHttpApi extends Assertions {
                    fee: Long,
                    version: Byte,
                    timeToLive: Duration = 30.days - 1.seconds): Future[MatcherResponse] = {
-      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive)
+      val order = prepareOrder(sender, pair, orderType, amount, price, fee, version, timeToLive = timeToLive)
       matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
     }
 
@@ -274,10 +274,10 @@ object AsyncMatcherHttpApi extends Assertions {
     def getAllSnapshotOffsets: Future[Map[String, QueueEventWithMeta.Offset]] =
       matcherGetWithApiKey("/matcher/debug/allSnapshotOffsets").as[Map[String, QueueEventWithMeta.Offset]]
 
-    def waitForStableOffset(confirmations: Int, maxTries: Int, interval: FiniteDuration): Future[Either[Unit, QueueEventWithMeta.Offset]] = {
-      def loop(n: Int, currConfirmations: Int, currOffset: QueueEventWithMeta.Offset): Future[Either[Unit, QueueEventWithMeta.Offset]] =
-        if (currConfirmations >= confirmations) Future.successful(Right(currOffset))
-        else if (n > maxTries) Future.successful(Left(()))
+    def waitForStableOffset(confirmations: Int, maxTries: Int, interval: FiniteDuration): Future[QueueEventWithMeta.Offset] = {
+      def loop(n: Int, currConfirmations: Int, currOffset: QueueEventWithMeta.Offset): Future[QueueEventWithMeta.Offset] =
+        if (currConfirmations >= confirmations) Future.successful(currOffset)
+        else if (n > maxTries) Future.failed(new IllegalStateException(s"Offset is not stable: $maxTries tries is out"))
         else
           GlobalTimer.instance
             .sleep(interval)

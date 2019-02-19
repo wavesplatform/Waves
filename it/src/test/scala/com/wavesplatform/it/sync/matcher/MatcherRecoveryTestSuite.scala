@@ -31,12 +31,14 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
 
   Seq(issue1, issue2).map(matcherNode.signedIssue).map(x => nodes.waitForTransaction(x.id))
 
-  private val orders = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcherNode.publicKey, aliceAcc, assetPairs)).sample.get
+  private val orders    = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcherNode.publicKey, aliceAcc, assetPairs)).sample.get
+  private val lastOrder = orderGen(matcherNode.publicKey, aliceAcc, assetPairs).sample.get
 
   "Place, fill and cancel a lot of orders" in {
     val cancels  = (1 to cancelsNumber).map(_ => choose(orders))
     val commands = Random.shuffle(orders.map(MatcherCommand.Place(matcherNode, _))) ++ cancels.map(MatcherCommand.Cancel(matcherNode, aliceAcc, _))
     executeCommands(commands)
+    executeCommands(List(MatcherCommand.Place(matcherNode, lastOrder)))
   }
 
   "Wait until all requests are processed - 1" in matcherNode.waitForStableOffset(10, 100, 200.millis)
@@ -56,7 +58,10 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
   "Restart the matcher" in docker.restartContainer(matcherNode.asInstanceOf[DockerNode])
 
   "Wait until all requests are processed - 2" in {
-    matcherNode.waitFor[QueueEventWithMeta.Offset]("all requests are processed")(_.getCurrentOffset, _ == stateBefore.offset, 300.millis)
+    matcherNode.waitFor[QueueEventWithMeta.Offset]("all events are consumed")(_.getCurrentOffset, _ == stateBefore.offset, 300.millis)
+    withClue("Last command processed") {
+      matcherNode.waitOrderProcessed(lastOrder.assetPair, lastOrder.idStr())
+    }
   }
 
   "Verify the state" in {
