@@ -257,7 +257,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
       )
     ))
-  def cancel: Route = path("orderbook" / AssetPairPM / "cancel") { p =>
+  def cancel: Route = (path("orderbook" / AssetPairPM / "cancel") & post) { p =>
     withAssetPair(p) { pair =>
       handleCancelRequest(Some(pair))
     }
@@ -280,7 +280,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
       )
     ))
-  def cancelAll: Route = path("orderbook" / "cancel") {
+  def cancelAll: Route = (path("orderbook" / "cancel") & post) {
     handleCancelRequest(None)
   }
 

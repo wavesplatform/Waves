@@ -95,10 +95,7 @@ object DocExport {
                 ((f.argsDoc zip f.signature.args) map { arg =>
                   VarDoc(arg._1._1, extType(arg._2._2), arg._1._2)
                 }).toList.asJava,
-                f match {
-                  case NativeFunction(_, cost, _, _, _, _) => cost.toString
-                  case _                                   => ""
-                }
+                f.cost.toString
             ))
 
       case class TransactionDoc(name: String, fields: java.util.List[TransactionField])

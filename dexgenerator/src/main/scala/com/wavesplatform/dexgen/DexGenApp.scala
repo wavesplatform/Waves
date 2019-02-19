@@ -3,9 +3,10 @@ package com.wavesplatform.dexgen
 import java.util.concurrent.Executors
 
 import cats.implicits.showInterpolator
+import cats.instances.byte
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
-import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest}
+import com.wavesplatform.api.http.assets.{SignedIssueV2Request, SignedMassTransferRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.dexgen.cli.ScoptImplicits
 import com.wavesplatform.dexgen.config.FicusImplicits
@@ -14,10 +15,11 @@ import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.utils.LoggerFacade
+import com.wavesplatform.common.utils.EitherExt2
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
@@ -67,35 +69,39 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
   }
 
   implicit val signedMassTransferRequestWrites: Writes[SignedMassTransferRequest] =
-    Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
+    Json
+      .writes[SignedMassTransferRequest]
+      .transform((jsobj: JsObject) => jsobj + ("version" -> JsNumber(1)) + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
 
   val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
+  AddressScheme.current = new AddressScheme { override val chainId: Byte = defaultConfig.chainId.head.toByte }
 
   def issueAssets(endpoint: String, richAddressSeed: String, n: Int)(implicit tag: String): Seq[AssetId] = {
     val node = api.to(endpoint)
 
-    val assetsTx: Seq[IssueTransactionV1] = (1 to n).map { i =>
-      IssueTransactionV1
+    val assetsTx: Seq[IssueTransactionV2] = (1 to n).map { i =>
+      IssueTransactionV2
         .selfSigned(
-          PrivateKeyAccount.fromSeed(richAddressSeed).right.get,
+          chainId = AddressScheme.current.chainId,
           name = s"asset$i".getBytes(),
           description = s"asset description - $i".getBytes(),
-          quantity = 99999999999999999L,
+          quantity = 999999999999999L,
           decimals = 2,
           reissuable = false,
           fee = 100000000,
-          timestamp = System.currentTimeMillis()
+          timestamp = System.currentTimeMillis(),
+          sender = PrivateKeyAccount.fromSeed(richAddressSeed).explicitGet(),
+          script = None
         )
-        .right
-        .get
+        .explicitGet()
     }
 
     val tradingAssets: Seq[AssetId]                    = assetsTx.map(tx => tx.id())
-    val signedIssueRequests: Seq[SignedIssueV1Request] = assetsTx.map(tx => api.createSignedIssueRequest(tx))
+    val signedIssueRequests: Seq[SignedIssueV2Request] = assetsTx.map(tx => api.createSignedIssueRequest(tx))
 
     val issued: Seq[Future[Transaction]] = signedIssueRequests
       .map { txReq =>
-        node.signedIssue(txReq).flatMap { tx =>
+        node.broadcastRequest(txReq).flatMap { tx =>
           node.waitForTransaction(tx.id)
         }
       }

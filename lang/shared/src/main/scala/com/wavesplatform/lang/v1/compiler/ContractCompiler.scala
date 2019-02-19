@@ -11,7 +11,6 @@ import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.parser.Expressions.FUNC
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
@@ -31,7 +30,7 @@ object ContractCompiler {
       compiledBody <- local {
         for {
           _ <- modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))
-          r <- compiler.ExpressionCompiler.compileFunc(AnyPos, af.f)
+          r <- compiler.ExpressionCompiler.compileFunc(af.f.position, af.f)
         } yield r
       }
     } yield (annotations, compiledBody)

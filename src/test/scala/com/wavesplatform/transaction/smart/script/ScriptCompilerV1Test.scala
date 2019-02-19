@@ -33,7 +33,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
     ScriptCompiler(script, isAssetScript = false) shouldBe Left("Can't parse language version")
   }
 
-  private val expectedExpr = BLOCK(
+  private val expectedExpr = LET_BLOCK(
     LET("x", CONST_LONG(10)),
     FUNCTION_CALL(
       PureContext.eq.header,

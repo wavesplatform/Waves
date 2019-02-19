@@ -49,7 +49,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           Terms.FUNC(
             "foo",
             List("a"),
-            BLOCK(
+            LET_BLOCK(
               LET("sender0", GETTER(GETTER(REF("invocation"), "caller"), "bytes")),
               FUNCTION_CALL(
                 User(FieldNames.WriteSet),
