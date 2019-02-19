@@ -84,7 +84,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
           FUNCTION_CALL(
             User(FieldNames.TransferSet),
             List(FUNCTION_CALL(
-              Native(1102),
+              Native(1100),
               List(
                 FUNCTION_CALL(
                   User(FieldNames.ContractTransfer),
@@ -93,7 +93,8 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
                     CONST_LONG(recipientAmount),
                     assetId.fold(REF("unit"): EXPR)(id => CONST_BYTESTR(id))
                   )
-                )
+                ),
+                REF("nil")
               )
             ))
           )
