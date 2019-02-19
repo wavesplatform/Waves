@@ -359,7 +359,10 @@ object PureContext {
     uNot
   )
 
-  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))))
+  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))),
+    ("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))
+    )
   private lazy val functions = Array(
     fraction,
     sizeBytes,
