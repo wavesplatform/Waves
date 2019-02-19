@@ -355,8 +355,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val contractInvocation = ContractInvocationTransaction
     .create(
-      None,
-      publicKey,
+      PublicKeyAccount.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
+      PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
       Terms.FUNCTION_CALL(
         function = FunctionHeader.User("testfunc"),
         args = List(TRUE)
