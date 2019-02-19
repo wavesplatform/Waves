@@ -269,6 +269,9 @@ object SyncHttpApi extends Assertions {
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
+    def blacklist(address: InetSocketAddress): Unit =
+      sync(async(n).blacklist(address))
+
     def debugMinerInfo(): Seq[State] =
       sync(async(n).debugMinerInfo())
 

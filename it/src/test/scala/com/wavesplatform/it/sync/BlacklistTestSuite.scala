@@ -6,10 +6,6 @@ import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
 import org.scalatest._
-
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure with ReportingTestName with NodesFromDocker {
