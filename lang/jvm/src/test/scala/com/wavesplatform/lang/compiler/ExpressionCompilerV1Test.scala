@@ -140,7 +140,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Right(
-      (BLOCK(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))), BOOLEAN))
+      (LET_BLOCK(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))), BOOLEAN))
   )
 
   treeTypeTest("idOptionLong(())")(
@@ -174,7 +174,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Right(
-      (BLOCK(
+      (LET_BLOCK(
          LET("$match0", REF("p")),
          IF(
            IF(
@@ -188,7 +188,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
                List(REF("$match0"), CONST_STRING("PointA"))
              )
            ),
-           BLOCK(LET("p", REF("$match0")), TRUE),
+           LET_BLOCK(LET("p", REF("$match0")), TRUE),
            FALSE
          )
        ),
@@ -215,9 +215,10 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     },
     expectedResult = {
       Right(
-        (BLOCK(
-           LET("a", BLOCK(LET("$match0", REF("p")), BLOCK(LET("$match1", REF("p")), CONST_LONG(1)))),
-           BLOCK(LET("b", BLOCK(LET("$match0", REF("p")), CONST_LONG(2))), FUNCTION_CALL(FunctionHeader.Native(100), List(REF("a"), REF("b"))))
+        (LET_BLOCK(
+           LET("a", LET_BLOCK(LET("$match0", REF("p")), LET_BLOCK(LET("$match1", REF("p")), CONST_LONG(1)))),
+           LET_BLOCK(LET("b", LET_BLOCK(LET("$match0", REF("p")), CONST_LONG(2))),
+                     FUNCTION_CALL(FunctionHeader.Native(100), List(REF("a"), REF("b"))))
          ),
          LONG))
 
