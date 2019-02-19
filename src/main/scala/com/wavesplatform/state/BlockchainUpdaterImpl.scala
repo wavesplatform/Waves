@@ -440,7 +440,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = {
-    val blockchainBlock = blockchain.blockById(to)
+    val blockchainBlock = blockchain.heightOf(to)
     if (blockchainBlock.nonEmpty || ngState.isEmpty) {
       blockchain.balanceSnapshots(address, from, to)
     } else {

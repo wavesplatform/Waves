@@ -42,7 +42,7 @@ object ContractScript {
     import cats.implicits._
     type E[A] = Either[String, A]
     val funcsWithComplexity: Seq[E[(String, Long)]] =
-      (contract.cfs.map(func => (func.annotation.invocationArgName, func.u)) ++ contract.vf.map(func => (func.annotation.txArgName, func.u)))
+      (contract.cfs.map(func => (func.annotation.invocationArgName, func.u)) ++ contract.vf.map(func => (func.annotation.invocationArgName, func.u)))
         .map {
           case (annotationArgName, funcExpr) =>
             ScriptEstimator(varNames(version), functionCosts(version), constructExprFromFuncAndContex(contract.dec, annotationArgName, funcExpr))

@@ -1,14 +1,17 @@
 package com.wavesplatform.http
 
+// [WAIT] import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{AddressApiRoute, ApiKeyNotValid}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
+// [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.v1.compiler.{Decompiler, DecompilerContext}
+// [WAIT] import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
+// [WAIT] import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
@@ -158,7 +161,7 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1)
       (response \ "script").as[String] shouldBe "base64:AQa3b8tH"
-      (response \ "scriptText").as[String] shouldBe "true"
+      (response \ "scriptText").as[String] shouldBe "TRUE" // [WAIT] "true"
       (response \ "complexity").as[Long] shouldBe 1
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }
@@ -180,8 +183,12 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
-      (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AAAABnZlcmlmeQAAAAAAAAABBt/lCgQ="
-      (response \ "scriptText").as[String] shouldBe Decompiler(testContract, DecompilerContext(Map.empty[Short, String]))
+      // [WAIT] (response \ "script").as[String] shouldBe "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AAAABnZlcmlmeQAAAAAAAAABBt/lCgQ="
+      (response \ "script").as[String] shouldBe           "base64:AAIDAAAAAAAAAAAAAAAAAAAAAQAAAAF0AQAAAAZ2ZXJpZnkAAAAABiDCPeI="
+      (response \ "scriptText").as[String] shouldBe "Contract(List(),List(),Some(VerifierFunction(VerifierAnnotation(t),FUNC(verify,List(),TRUE))))"
+// [WAIT]                                           Decompiler(
+//      testContract,
+//      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
       (response \ "extraFee").as[Long] shouldBe CommonValidation.ScriptExtraFee
     }

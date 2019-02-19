@@ -13,8 +13,9 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
 import kamon.Kamon
+import org.slf4j.LoggerFactory
 import play.api.libs.json._
 
 class OrderBookActor(owner: ActorRef,
@@ -30,8 +31,11 @@ class OrderBookActor(owner: ActorRef,
 
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
-  private var savingSnapshot: Option[QueueEventWithMeta.Offset] = None
-  private var lastProcessedOffset: Long                         = -1L
+  protected override val log = LoggerFacade(LoggerFactory.getLogger(s"OrderBookActor[${assetPair.key}]"))
+
+  private var savingSnapshot: Option[QueueEventWithMeta.Offset]  = None
+  private var lastSavedSnapshotOffset: QueueEventWithMeta.Offset = -1L
+  private var lastProcessedOffset: QueueEventWithMeta.Offset     = -1L
 
   private val addTimer    = Kamon.timer("matcher.orderbook.add").refine("pair" -> assetPair.toString)
   private val cancelTimer = Kamon.timer("matcher.orderbook.cancel").refine("pair" -> assetPair.toString)
@@ -63,6 +67,7 @@ class OrderBookActor(owner: ActorRef,
       val snapshotOffsetId = savingSnapshot.getOrElse(throw new IllegalStateException("Impossible"))
       log.info(s"Snapshot has been saved at offset $snapshotOffsetId: $metadata")
       owner ! OrderBookSnapshotUpdated(assetPair, snapshotOffsetId)
+      lastSavedSnapshotOffset = snapshotOffsetId
       savingSnapshot = None
 
     case SaveSnapshotFailure(metadata, reason) =>
@@ -70,7 +75,7 @@ class OrderBookActor(owner: ActorRef,
       log.error(s"Failed to save snapshot: $metadata", reason)
 
     case SaveSnapshot(globalEventNr) =>
-      if (savingSnapshot.isEmpty) {
+      if (savingSnapshot.isEmpty && lastSavedSnapshotOffset < globalEventNr) {
         log.debug(s"About to save snapshot $orderBook")
         saveSnapshotAt(globalEventNr)
         savingSnapshot = Some(globalEventNr)
@@ -131,8 +136,8 @@ class OrderBookActor(owner: ActorRef,
       log.debug(s"Recovering $persistenceId from $snapshot")
       orderBook = OrderBook(snapshot.orderBook)
       lastProcessedOffset = snapshot.eventNr
+      lastSavedSnapshotOffset = lastProcessedOffset
       processEvents(orderBook.allOrders.map(OrderAdded).toSeq)
-
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
