@@ -362,7 +362,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("listN constructor primitive") {
     val src =
       """
-        |cons(1, cons(2, cons(3, cons(4, List(5)))))
+        |cons(1, cons(2, cons(3, cons(4, cons(5, nil)))))
       """.stripMargin
     eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
   }
@@ -383,21 +383,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
   }
 
-  property("list constructor primitive") {
-    val src =
-      """
-        |List(1,2)
-      """.stripMargin
-    eval[EVALUATED](src) shouldBe evaluated(List(1, 2))
-  }
-
   property("list constructor for different data entries") {
     val src =
       """
         |let x = DataEntry("foo",1)
         |let y = DataEntry("bar","2")
         |let z = DataEntry("baz","2")
-        |List(x,y,z)
+        |[x,y,z]
       """.stripMargin
     eval[EVALUATED](src) shouldBe Right(
       ARR(Vector(
