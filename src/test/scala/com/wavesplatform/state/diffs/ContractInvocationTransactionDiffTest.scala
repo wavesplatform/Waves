@@ -53,10 +53,13 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
           FUNCTION_CALL(
             User(FieldNames.WriteSet),
             List(FUNCTION_CALL(
-              Native(1102),
+              Native(1100),
               List(
                 FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("argument"), REF(argName))),
-                FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), GETTER(GETTER(REF(senderBinding), "caller"), "bytes")))
+                FUNCTION_CALL(Native(1100),
+                              List(FUNCTION_CALL(User("DataEntry"),
+                                                 List(CONST_STRING("sender"), GETTER(GETTER(REF(senderBinding), "caller"), "bytes"))),
+                                   REF("nil")))
               )
             ))
           )
