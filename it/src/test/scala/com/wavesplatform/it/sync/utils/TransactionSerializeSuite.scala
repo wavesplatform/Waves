@@ -14,6 +14,9 @@ import scorex.crypto.encode.Base64
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction
 import com.wavesplatform.transaction.smart.script.Script
@@ -354,11 +357,14 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       None,
       publicKey,
-      where_i_can_function_for_this_call?,
-      how_i_can_create_payment?,
+      Terms.FUNCTION_CALL(
+        function = FunctionHeader.User("testfunc"),
+        args = List(TRUE)
+      ),
+      Some(ContractInvocationTransaction.Payment(7, Some(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
       smartMinFee,
       ts,
-      need_proofs?
+      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
     )
     .right
     .get
