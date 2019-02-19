@@ -362,13 +362,15 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                 FUNCTION_CALL(
                   User("ContractResult"),
                   List(
-                    FUNCTION_CALL(
-                      User("WriteSet"),
-                      List(FUNCTION_CALL(Native(1101), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("1"), CONST_STRING("1"))))))),
+                    FUNCTION_CALL(User("WriteSet"),
+                                  List(
+                                    FUNCTION_CALL(Native(1100),
+                                                  List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("1"), CONST_STRING("1"))), REF("nil"))))),
                     FUNCTION_CALL(
                       User("TransferSet"),
-                      List(FUNCTION_CALL(Native(1101),
-                                         List(FUNCTION_CALL(User("ContractTransfer"), List(GETTER(REF("i"), "caller"), REF("amount"), REF("unit"))))))
+                      List(FUNCTION_CALL(Native(1100),
+                                         List(FUNCTION_CALL(User("ContractTransfer"), List(GETTER(REF("i"), "caller"), REF("amount"), REF("unit"))),
+                                              REF("nil"))))
                     )
                   )
                 )
@@ -395,7 +397,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |            then
         |                throw("impossible")
         |            else
-        |                ContractResult(WriteSet(List(DataEntry("1", "1"))), TransferSet(List(ContractTransfer(i.caller, amount, unit))))
+        |                ContractResult(WriteSet(cons(DataEntry("1", "1"), nil)), TransferSet(cons(ContractTransfer(i.caller, amount, unit), nil)))
         |        }
         |    }
         |}
