@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
 
 object Decompiler {
-  private def pure[A](a: A) = Coeval.evalOnce(a)
+  private[lang] def pure[A](a: A) = Coeval.evalOnce(a)
 
   private def out(in: String, ident: Int): String =
     Array.fill(4 * ident)(" ").mkString("") + in
@@ -20,14 +20,15 @@ object Decompiler {
   private def decl(e: Coeval[DECLARATION], ident: Int, ctx: DecompilerContext): Coeval[String] =
     e flatMap {
       case Terms.FUNC(name, args, body) =>
-        pure(
-          out("func " + name + " (" + args.mkString(","), ident) + ") = {" + NEWLINE +
-            out(Decompiler(body, ctx) + NEWLINE, 1 + ident) +
-            out("}", ident))
+        expr(pure(body), 1, ctx).map(
+          fb =>
+            out("func " + name + " (" + args.mkString(",") + ") = {" + NEWLINE, ident) +
+              out(fb + NEWLINE, ident) +
+              out("}", ident))
       case Terms.LET(name, value) => expr(pure(value), 1 + ident, ctx).map(e => out("let " + name + " =" + NEWLINE + e, ident))
     }
 
-  private def expr(e: Coeval[EXPR], ident: Int, ctx: DecompilerContext): Coeval[String] =
+  private[lang] def expr(e: Coeval[EXPR], ident: Int, ctx: DecompilerContext): Coeval[String] =
     e flatMap {
       case Terms.TRUE                 => pureOut("true", ident)
       case Terms.FALSE                => pureOut("false", ident)
@@ -61,6 +62,7 @@ object Decompiler {
             out(d + ";" + NEWLINE, 0) +
             out(b + NEWLINE, 0) +
             out("}", ident)
+
       case Terms.LET_BLOCK(let, exprPar) => expr(pure(Terms.BLOCK(let, exprPar)), ident, ctx)
       case Terms.FUNCTION_CALL(func, args) =>
         val argsCoeval = args
