@@ -335,7 +335,7 @@ object PureContext {
     IF(FUNCTION_CALL(eq, List(REF("@p"), FALSE)), TRUE, FALSE)
   }
 
-  lazy val ensure: BaseFunction = UserFunction("ensure", 10, BOOLEAN, "Ensure parameter is true", ("@b", BOOLEAN, "boolean"), ("@msg", STRING, "string")) {
+  lazy val ensure: BaseFunction = UserFunction("ensure", 16, BOOLEAN, "Ensure parameter is true", ("@b", BOOLEAN, "ensure value"), ("@msg", STRING, "error message")) {
       IF(REF("@b"), TRUE, FUNCTION_CALL(throwWithMessage, List(REF("@msg"))))
   }
 
