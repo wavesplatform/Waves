@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.UnaryOperation._
 import fastparse.{WhitespaceApi, core}
@@ -170,18 +169,18 @@ object Parser {
     val funcname    = anyVarName
     val argWithType = anyVarName ~ ":" ~ typesP
     val args        = "(" ~ argWithType.rep(sep = ",") ~ ")"
-    val funcHeader  = "func" ~ funcname ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}"))
+    val funcHeader  = Index ~~ "func" ~ funcname ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}")) ~~ Index
     funcHeader.map {
-      case (name, args, expr) => FUNC(AnyPos, name, args, expr)
+      case (start, name, args, expr, end) => FUNC(Pos(start, end), name, args, expr)
     }
   }
 
-  val annotationP: P[ANNOTATION] = ("@" ~ anyVarName ~ "(" ~ anyVarName.rep(sep = ",") ~ ")").map {
-    case (name: PART[String], args: Seq[PART[String]]) => ANNOTATION(AnyPos, name, args)
+  val annotationP: P[ANNOTATION] = (Index ~~ "@" ~ anyVarName ~ "(" ~ anyVarName.rep(sep = ",") ~ ")" ~~ Index).map {
+    case (start, name: PART[String], args: Seq[PART[String]], end) => ANNOTATION(Pos(start, end), name, args)
   }
 
-  val annotatedFunc: P[ANNOTATEDFUNC] = (annotationP.rep ~ funcP).map {
-    case (as, f) => ANNOTATEDFUNC(AnyPos, as, f)
+  val annotatedFunc: P[ANNOTATEDFUNC] = (Index ~~ annotationP.rep ~ funcP ~~ Index).map {
+    case (start, as, f, end) => ANNOTATEDFUNC(Pos(start, end), as, f)
   }
 
   val matchCaseP: P[MATCH_CASE] = {
@@ -342,9 +341,9 @@ object Parser {
   def parseExpr(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
 
   def parseContract(str: String): core.Parsed[CONTRACT, Char, String] =
-    P(Start ~ comment.? ~ (declaration.rep) ~ comment.? ~ (annotatedFunc.rep) ~ End)
+    P(Start ~ comment.? ~ (declaration.rep) ~ comment.? ~ (annotatedFunc.rep) ~ End ~~ Index)
       .map {
-        case (ds, fs) => CONTRACT(AnyPos, ds.toList, fs.toList)
+        case (ds, fs, end) => CONTRACT(Pos(0, end), ds.toList, fs.toList)
       }
       .parse(str)
 }

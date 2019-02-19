@@ -10,7 +10,6 @@ import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
@@ -91,9 +90,9 @@ object ExpressionCompiler {
         case _      => None
       }
       ifCases <- inspectFlat[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx => {
-        mkIfCases(updatedCtx, cases, Expressions.REF(p, PART.VALID(AnyPos, refTmpKey)), allowShadowVarName).toCompileM
+        mkIfCases(updatedCtx, cases, Expressions.REF(p, PART.VALID(p, refTmpKey)), allowShadowVarName).toCompileM
       })
-      compiledMatch <- compileLetBlock(p, Expressions.LET(AnyPos, PART.VALID(AnyPos, refTmpKey), expr, Seq.empty), ifCases)
+      compiledMatch <- compileLetBlock(p, Expressions.LET(p, PART.VALID(p, refTmpKey), expr, Seq.empty), ifCases)
       _ <- cases
         .flatMap(_.types)
         .traverse[CompileM, String](handlePart)
@@ -305,7 +304,8 @@ object ExpressionCompiler {
       }
     }
 
-    val default: Either[CompilationError, Expressions.EXPR] = Right(Expressions.FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "throw"), List.empty))
+    val default: Either[CompilationError, Expressions.EXPR] = Right(Expressions.FUNCTION_CALL(cases.head.position, PART.VALID(cases.head.position, "throw"), List.empty))
+
     cases.foldRight(default) {
       case (mc, furtherEi) =>
         furtherEi match {
@@ -313,7 +313,6 @@ object ExpressionCompiler {
           case Left(e)        => Left(e)
         }
     }
-
   }
 
   private def mkGetter(p: Pos, ctx: CompilerContext, types: List[FINAL], fieldName: String, expr: EXPR): Either[CompilationError, (GETTER, FINAL)] = {
