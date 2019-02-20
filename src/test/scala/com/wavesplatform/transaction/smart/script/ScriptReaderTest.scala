@@ -1,14 +1,15 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.common.utils._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.{NoShrink, TransactionGen, crypto}
+import com.wavesplatform.{NoShrink, crypto}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
 
-class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
+class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with TypedScriptGen with Inside with NoShrink {
   val checksumLength = 4
 
   property("should parse all bytes for V1") {

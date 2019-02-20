@@ -1,12 +1,6 @@
 package com.wavesplatform.lang.v1.testing
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.StdLibVersion.V3
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -18,45 +12,6 @@ import scorex.crypto.encode.Base58
 import scala.reflect.ClassTag
 
 trait ScriptGen {
-
-  def exprGen = BOOLgen(100).map {
-    case (expr, _) => ExpressionCompiler(PureContext.build(V3).compilerContext, expr).explicitGet()._1
-  }
-  def letGen =
-    for {
-      name <- Gen.alphaStr
-      expr <- exprGen
-    } yield Terms.LET(name, expr)
-
-  def funcGen =
-    for {
-      name <- Gen.alphaStr
-      arg0 <- Gen.alphaStr
-      args <- Gen.listOf(Gen.alphaStr)
-      allArgs = arg0 +: args
-      returned <- Gen.oneOf(allArgs)
-    } yield Terms.FUNC(name, allArgs, Terms.REF(returned))
-
-  def callableGen =
-    for {
-      binding <- Gen.alphaStr
-      fnc     <- funcGen
-    } yield CallableFunction(CallableAnnotation(binding), fnc)
-
-  def verifierGen =
-    for {
-      binding <- Gen.alphaStr
-      name    <- Gen.alphaStr
-      expr    <- exprGen
-    } yield VerifierFunction(VerifierAnnotation(binding), Terms.FUNC(name, List.empty, expr))
-
-  def contractGen =
-    for {
-      lets      <- Gen.listOf(letGen)
-      funcs     <- Gen.listOf(funcGen)
-      callables <- Gen.listOf(callableGen)
-      verifier  <- Gen.option(verifierGen)
-    } yield Contract(lets ++ funcs, callables, verifier)
 
   def CONST_LONGgen: Gen[(EXPR, Long)] = Gen.choose(Long.MinValue, Long.MaxValue).map(v => (CONST_LONG(AnyPos, v), v))
 

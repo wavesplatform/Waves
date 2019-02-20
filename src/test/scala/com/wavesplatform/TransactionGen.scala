@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.testing.{ScriptGen, TypedScriptGen}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -30,7 +30,7 @@ trait TransactionGen extends TransactionGenBase { _: Suite =>
 
 }
 
-trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
+trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _: Suite =>
 
   val ScriptExtraFee                  = 400000L
   protected def waves(n: Float): Long = (n * 100000000L).toLong
@@ -106,14 +106,14 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
 
   val scriptGen: Gen[Script]         = exprGen.map(e => ExprScript(e).explicitGet())
   val contractScriptGen: Gen[Script] = contractGen.map(e => ContractScript(V3, e).explicitGet())
-
+  val contractOrExpr = Gen.oneOf(scriptGen,contractScriptGen)
   val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = for {
     version                                                                  <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
     (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
     fee                                                                      <- smallFeeGen
     timestamp                                                                <- timestampGen
     proofs                                                                   <- proofsGen
-    script                                                                   <- Gen.option(Gen.oneOf(scriptGen, contractScriptGen))
+    script                                                                   <- Gen.option(contractOrExpr)
     issue = IssueTransactionV2
       .selfSigned(AddressScheme.current.chainId, sender, assetName, description, quantity, decimals, reissuable = true, script, iFee, timestamp)
       .explicitGet()
@@ -128,7 +128,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
     fee                       <- smallFeeGen
     timestamp                 <- timestampGen
     proofs                    <- proofsGen
-    script                    <- Gen.option(Gen.oneOf(scriptGen, contractScriptGen))
+    script                    <- Gen.option(contractOrExpr)
   } yield SetScriptTransaction.create(sender, script, fee, timestamp, proofs).explicitGet()
 
   def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] =

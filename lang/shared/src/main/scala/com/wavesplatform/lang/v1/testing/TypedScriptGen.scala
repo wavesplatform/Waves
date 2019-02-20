@@ -1,7 +1,9 @@
 package com.wavesplatform.lang.v1.testing
 
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -9,50 +11,81 @@ import org.scalacheck._
 
 trait TypedScriptGen {
 
+  def exprGen = BOOLEANgen(100)
+  private def letGen =
+    for {
+      name <- Gen.alphaStr
+      expr <- exprGen
+    } yield Terms.LET(name, expr)
+
+  private def funcGen =
+    for {
+      name <- Gen.alphaStr
+      arg0 <- Gen.alphaStr
+      args <- Gen.listOf(Gen.alphaStr)
+      allArgs = arg0 +: args
+      returned <- Gen.oneOf(allArgs)
+    } yield Terms.FUNC(name, allArgs, Terms.REF(returned))
+
+  private def callableGen =
+    for {
+      binding <- Gen.alphaStr
+      fnc     <- funcGen
+    } yield CallableFunction(CallableAnnotation(binding), fnc)
+
+  private def verifierGen =
+    for {
+      binding <- Gen.alphaStr
+      name    <- Gen.alphaStr
+      expr    <- exprGen
+    } yield VerifierFunction(VerifierAnnotation(binding), Terms.FUNC(name, List.empty, expr))
+
+  def contractGen =
+    for {
+      lets      <- Gen.listOf(letGen)
+      funcs     <- Gen.listOf(funcGen)
+      callables <- Gen.listOf(callableGen)
+      verifier  <- Gen.option(verifierGen)
+    } yield Contract(lets ++ funcs, callables, verifier)
+
   def BOOLEANgen(gas: Int): Gen[EXPR] =
     if (gas > 0) Gen.oneOf(CONST_BOOLEANgen, BLOCK_BOOLEANgen(gas - 1), IF_BOOLEANgen(gas - 1), FUNCTION_CALLgen(BOOLEAN))
     else Gen.const(TRUE)
 
-  def CONST_BOOLEANgen: Gen[EXPR] = Gen.oneOf(FALSE, TRUE)
+  private def CONST_BOOLEANgen: Gen[EXPR] = Gen.oneOf(FALSE, TRUE)
 
-  def BLOCK_BOOLEANgen(gas: Int): Gen[EXPR] =
+  private def BLOCK_BOOLEANgen(gas: Int): Gen[EXPR] =
     for {
       let  <- LETgen((gas - 3) / 3)
       body <- Gen.oneOf(BOOLEANgen((gas - 3) / 3), BLOCK_BOOLEANgen((gas - 3) / 3))
     } yield BLOCK(let, body)
 
-  def IF_BOOLEANgen(gas: Int): Gen[EXPR] =
+  private def IF_BOOLEANgen(gas: Int): Gen[EXPR] =
     for {
       cnd <- BOOLEANgen((gas - 3) / 3)
       t   <- BOOLEANgen((gas - 3) / 3)
       f   <- BOOLEANgen((gas - 3) / 3)
     } yield IF(cnd, t, f)
 
-  def LONGgen(gas: Int): Gen[EXPR] =
+  private def LONGgen(gas: Int): Gen[EXPR] =
     if (gas > 0) Gen.oneOf(CONST_LONGgen, BLOCK_LONGgen(gas - 1), IF_LONGgen(gas - 1), FUNCTION_CALLgen(LONG)) else CONST_LONGgen
 
-  def CONST_LONGgen: Gen[EXPR] = Gen.choose(Long.MinValue, Long.MaxValue).map(CONST_LONG)
+  private def CONST_LONGgen: Gen[EXPR] = Gen.choose(Long.MinValue, Long.MaxValue).map(CONST_LONG)
 
-  def BLOCK_LONGgen(gas: Int): Gen[EXPR] =
+  private def BLOCK_LONGgen(gas: Int): Gen[EXPR] =
     for {
       let  <- LETgen((gas - 3) / 3)
       body <- Gen.oneOf(LONGgen((gas - 3) / 3), BLOCK_LONGgen((gas - 3) / 3))
     } yield LET_BLOCK(let, body)
 
-  def IF_LONGgen(gas: Int): Gen[EXPR] =
+  private def IF_LONGgen(gas: Int): Gen[EXPR] =
     for {
       cnd <- BOOLEANgen((gas - 3) / 3)
       t   <- LONGgen((gas - 3) / 3)
       f   <- LONGgen((gas - 3) / 3)
     } yield IF(cnd, t, f)
 
-  def STRINGgen: Gen[EXPR] = Gen.identifier.map(CONST_STRING)
-
-  def BYTESTRgen: Gen[EXPR] = Gen.identifier.map(x => CONST_BYTESTR(ByteStr(x.getBytes)))
-
-  def REFgen(tpe: TYPE): Gen[EXPR] = Gen.identifier.map(REF)
-
-  def FUNCTION_CALLgen(resultType: TYPE): Gen[EXPR] =
+  private def FUNCTION_CALLgen(resultType: TYPE): Gen[EXPR] =
     Gen.const(
       FUNCTION_CALL(
         function = FunctionHeader.Native(SUM_LONG),
@@ -60,7 +93,7 @@ trait TypedScriptGen {
       )
     )
 
-  def LETgen(gas: Int): Gen[LET] =
+  private def LETgen(gas: Int): Gen[LET] =
     for {
       name  <- Gen.identifier
       value <- BOOLEANgen((gas - 3) / 3)
