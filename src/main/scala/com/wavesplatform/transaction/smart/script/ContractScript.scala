@@ -45,7 +45,7 @@ object ContractScript {
       (contract.cfs.map(func => (func.annotation.invocationArgName, func.u)) ++ contract.vf.map(func => (func.annotation.invocationArgName, func.u)))
         .map {
           case (annotationArgName, funcExpr) =>
-            ScriptEstimator(varNames(version), functionCosts(version), constructExprFromFuncAndContex(contract.dec, annotationArgName, funcExpr))
+            ScriptEstimator(varNames(version), functionCosts(version), constructExprFromFuncAndContext(contract.dec, annotationArgName, funcExpr))
               .map(complexity => (funcExpr.name, complexity))
         }
     val funcsWithComplexityEi: E[Vector[(String, Long)]] = funcsWithComplexity.toVector.sequence
@@ -53,7 +53,7 @@ object ContractScript {
     funcsWithComplexityEi.map(namesAndComp => (("",0L) +: namesAndComp).maxBy(_._2))
   }
 
-  private def constructExprFromFuncAndContex(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
+  private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
     val funcWithAnnotationContext =
       BLOCK(
         LET(annotationArgName, TRUE),
