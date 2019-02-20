@@ -8,6 +8,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
@@ -70,7 +71,11 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
              fee: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
+
     for {
+      _ <- Either.cond(script.fold(true)(_.expr.isInstanceOf[EXPR]),
+                       (),
+                       ValidationError.GenericError(s"Error: This is Contract, not EXPR"))
       _ <- Either.cond(chainId == currentChainId,
                        (),
                        ValidationError.GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
