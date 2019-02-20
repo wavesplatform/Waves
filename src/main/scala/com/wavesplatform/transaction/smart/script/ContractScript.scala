@@ -50,7 +50,7 @@ object ContractScript {
         }
     val funcsWithComplexityEi: E[Vector[(String, Long)]] = funcsWithComplexity.toVector.sequence
 
-    funcsWithComplexityEi.map(namesAndComp => namesAndComp.maxBy(_._2))
+    funcsWithComplexityEi.map(namesAndComp => (("",0L) +: namesAndComp).maxBy(_._2))
   }
 
   private def constructExprFromFuncAndContex(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
