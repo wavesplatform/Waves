@@ -104,7 +104,7 @@ object ContractInvocationTransactionDiff {
                     _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - whatever else tranfser/massTransfer ensures
                     _ <- {
                       val totalScriptsInvoked = tx.checkedAssets().count(blockchain.hasAssetScript) +
-      ps.count(_._3.fold(false)(blockchain.hasAssetScript))
+                        ps.count(_._3.fold(false)(blockchain.hasAssetScript))
                       val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(ContractInvocationTransaction.typeId) * FeeUnit
                       Either.cond(
                         minWaves <= wavesFee,
