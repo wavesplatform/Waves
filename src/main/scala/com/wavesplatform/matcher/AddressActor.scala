@@ -26,7 +26,7 @@ import scala.util.{Failure, Success}
 
 class AddressActor(
     owner: Address,
-    portfolio: => Portfolio,
+    spendableBalance: Option[AssetId] => Long,
     maxTimestampDrift: FiniteDuration,
     cancelTimeout: FiniteDuration,
     time: Time,
@@ -70,10 +70,7 @@ class AddressActor(
     latestOrderTs = newTimestamp
   }
 
-  private def tradableBalance(assetId: Option[AssetId]): Long = {
-    val p = portfolio
-    assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L)) - openVolume(assetId)
-  }
+  private def tradableBalance(assetId: Option[AssetId]): Long = spendableBalance(assetId) - openVolume(assetId)
 
   private val validator =
     OrderValidator.accountStateAware(owner,
@@ -83,8 +80,8 @@ class AddressActor(
                                      id => activeOrders.contains(id) || orderDB.contains(id)) _
 
   private def handleCommands: Receive = {
-    case BalanceUpdated =>
-      val newPortfolio = portfolio
+    case BalanceUpdated(xxxx) =>
+      val newPortfolio = spendableBalance
       val toCancel     = ordersToDelete(toSpendable(newPortfolio))
       if (toCancel.nonEmpty) {
         log.debug(s"Canceling: $toCancel")
@@ -309,7 +306,7 @@ object AddressActor {
   }
   case class CancelOrder(orderId: ByteStr)                             extends Command
   case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
-  case object BalanceUpdated                                           extends Command
+  case class BalanceUpdated(changedAssets: Set[Option[AssetId]])       extends Command
 
   private case class CancelExpiredOrder(orderId: ByteStr)
 }

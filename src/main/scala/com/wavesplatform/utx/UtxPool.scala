@@ -3,7 +3,7 @@ package com.wavesplatform.utx
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
-import com.wavesplatform.state.{Diff, Portfolio}
+import com.wavesplatform.state.Diff
 import com.wavesplatform.transaction._
 
 trait UtxPool extends AutoCloseable {
@@ -13,9 +13,7 @@ trait UtxPool extends AutoCloseable {
 
   def removeAll(txs: Traversable[Transaction]): Unit
 
-  def accountPortfolio(addr: Address): Portfolio
-
-  def portfolio(addr: Address): Portfolio
+  def spendableBalance(addr: Address, assetId: Option[AssetId]): Long
 
   def all: Seq[Transaction]
 

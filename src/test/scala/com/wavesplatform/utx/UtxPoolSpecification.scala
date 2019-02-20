@@ -354,7 +354,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
           val basePortfolio = state.portfolio(sender)
 
           utxPool.size shouldBe 0
-          val utxPortfolio = utxPool.portfolio(sender)
+          val utxPortfolio = utxPool.spendableBalance(sender)
 
           basePortfolio shouldBe utxPortfolio
       }
@@ -364,7 +364,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
           val basePortfolio = state.portfolio(sender)
 
           utxPool.size should be > 0
-          val utxPortfolio = utxPool.portfolio(sender)
+          val utxPortfolio = utxPool.spendableBalance(sender)
 
           utxPortfolio.balance should be <= basePortfolio.balance
           utxPortfolio.lease.out should be <= basePortfolio.lease.out
@@ -378,14 +378,14 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
 
       "is changed after transactions with these assets are removed" in forAll(withValidPayments) {
         case (sender, _, utxPool, time, settings) =>
-          val utxPortfolioBefore = utxPool.portfolio(sender)
+          val utxPortfolioBefore = utxPool.spendableBalance(sender)
           val poolSizeBefore     = utxPool.size
 
           time.advance(maxAge * 2)
           utxPool.packUnconfirmed(limitByNumber(100))
 
           poolSizeBefore should be > utxPool.size
-          val utxPortfolioAfter = utxPool.portfolio(sender)
+          val utxPortfolioAfter = utxPool.spendableBalance(sender)
 
           utxPortfolioAfter.balance should be >= utxPortfolioBefore.balance
           utxPortfolioAfter.lease.out should be >= utxPortfolioBefore.lease.out

@@ -165,8 +165,10 @@ class Matcher(actorSystem: ActorSystem,
 
   private lazy val addressActors =
     actorSystem.actorOf(
-      Props(new AddressDirectory(portfoliosChanged, utx.portfolio, matcherQueue.storeEvent, matcherSettings, time, OrderDB(matcherSettings, db))),
-      "addresses")
+      Props(
+        new AddressDirectory(portfoliosChanged, utx.spendableBalance, matcherQueue.storeEvent, matcherSettings, time, OrderDB(matcherSettings, db))),
+      "addresses"
+    )
 
   private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
   private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)

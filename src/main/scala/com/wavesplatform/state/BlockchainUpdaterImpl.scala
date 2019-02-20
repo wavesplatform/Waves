@@ -23,7 +23,7 @@ import kamon.metric.MeasurementUnit
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[Address], settings: WavesSettings, time: Time)
+class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Observer[(Address, Option[AssetId])], settings: WavesSettings, time: Time)
     extends BlockchainUpdater
     with NG
     with ScorexLogging
@@ -199,7 +199,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
               val prevNgState = ngState
               ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
 
-              prevNgState.toIterable.flatMap(_.bestLiquidDiff.portfolios.keys).foreach(portfolioChanged.onNext)
+              prevNgState.toIterable.flatMap(_.bestLiquidDiff.portfolios.keys).foreach(spendableBalanceChanged.onNext)
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
 
               if ((block.timestamp > time
@@ -227,7 +227,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
         .leftMap(err => GenericError(err))
     }
 
-    prevNgState.toIterable.flatMap(_.bestLiquidDiff.portfolios.keys).foreach(portfolioChanged.onNext)
+    prevNgState.toIterable.flatMap(_.bestLiquidDiff.portfolios.keys).foreach(spendableBalanceChanged.onNext)
     r
   }
 
@@ -265,7 +265,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
               ng.append(microBlock, diff, carry, System.currentTimeMillis)
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
-              diff.portfolios.keys.foreach(portfolioChanged.onNext)
+              diff.portfolios.keys.foreach(spendableBalanceChanged.onNext)
             }
         }
     }

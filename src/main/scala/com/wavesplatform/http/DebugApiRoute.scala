@@ -140,7 +140,7 @@ case class DebugApiRoute(ws: WavesSettings,
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
-          val portfolio = if (considerUnspent.getOrElse(true)) utxStorage.portfolio(address) else ng.portfolio(address)
+          val portfolio = if (considerUnspent.getOrElse(true)) utxStorage.spendableBalance(address) else ng.portfolio(address)
           complete(Json.toJson(portfolio))
       }
     }
