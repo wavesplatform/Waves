@@ -12,7 +12,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, _}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -346,21 +346,23 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
 
     val assetId = extractAssetId(issueTx).get
 
-    for ((o1ver, o2ver, tver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
-           (1: Byte, 1: Byte, 1: Byte, None, None),
-           (1: Byte, 1: Byte, 2: Byte, None, None),
-           (1: Byte, 2: Byte, 2: Byte, None, None),
-           (2: Byte, 1: Byte, 2: Byte, None, None),
-           (2: Byte, 2: Byte, 2: Byte, None, None),
-           (3: Byte, 1: Byte, 2: Byte, None, None),
-           (3: Byte, 1: Byte, 2: Byte, assetId, None),
-           (3: Byte, 2: Byte, 2: Byte, None, None),
-           (3: Byte, 2: Byte, 2: Byte, assetId, None),
-           (1: Byte, 3: Byte, 2: Byte, None, None),
-           (2: Byte, 3: Byte, 2: Byte, None, None),
-           (3: Byte, 3: Byte, 2: Byte, None, None),
-           (3: Byte, 3: Byte, 2: Byte, assetId, None),
-         )) {
+    val transactionV1versions = (1: Byte, 1: Byte, 1: Byte) // in ExchangeTransactionV1 only orders V1 are supported
+    val transactionV2versions = for {
+      o1ver <- 1 to 3
+      o2ver <- 1 to 3
+    } yield (o1ver.toByte, o2ver.toByte, 2.toByte)
+
+    val versionsWithWavesFee =
+      (transactionV1versions +: transactionV2versions)
+        .map { case (o1ver, o2ver, tver) => (o1ver, o2ver, tver, Option.empty[AssetId], Option.empty[AssetId]) }
+
+    val versionsWithAssetFee = for {
+      o2ver <- 1 to 3
+      buyMatcherFeeAssetId  = assetId
+      sellMatcherFeeAssetId = Option.empty[AssetId]
+    } yield (3.toByte, o2ver.toByte, 2.toByte, buyMatcherFeeAssetId, sellMatcherFeeAssetId)
+
+    for ((o1ver, o2ver, tver, matcherFeeOrder1, matcherFeeOrder2) <- versionsWithWavesFee ++ versionsWithAssetFee) {
       val buyer               = pkByAddress(firstAddress)
       val seller              = pkByAddress(secondAddress)
       val matcher             = pkByAddress(thirdAddress)

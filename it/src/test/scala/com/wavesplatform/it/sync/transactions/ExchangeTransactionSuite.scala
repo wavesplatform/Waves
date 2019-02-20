@@ -31,17 +31,16 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   private val acc1 = pkByAddress(secondAddress)
   private val acc2 = pkByAddress(thirdAddress)
 
+  val transactionV1versions = (1: Byte, 1: Byte, 1: Byte) // in ExchangeTransactionV1 only orders V1 are supported
+  val transactionV2versions = for {
+    o1ver <- 1 to 3
+    o2ver <- 1 to 3
+  } yield (o1ver.toByte, o2ver.toByte, 2.toByte)
+
+  val versions = transactionV1versions +: transactionV2versions
+
   test("cannot exchange non-issued assets") {
-    for ((o1ver, o2ver, tver) <- Seq(
-           (1: Byte, 1: Byte, 1: Byte),
-           (1: Byte, 1: Byte, 2: Byte),
-           (1: Byte, 2: Byte, 2: Byte),
-           (2: Byte, 1: Byte, 2: Byte),
-           (2: Byte, 2: Byte, 2: Byte),
-           (3: Byte, 1: Byte, 2: Byte),
-           (2: Byte, 3: Byte, 2: Byte),
-           (3: Byte, 3: Byte, 2: Byte)
-         )) {
+    for ((o1ver, o2ver, tver) <- versions) {
 
       val assetId = exchAsset.id().base58
 
@@ -147,10 +146,10 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
            (1: Byte, 3: Byte, None, Some(assetId)),
-           (2: Byte, 3: Byte, None, Some(assetId)),
            (1: Byte, 3: Byte, None, None),
-           (3: Byte, 1: Byte, Some(assetId), None),
+           (2: Byte, 3: Byte, None, Some(assetId)),
            (2: Byte, 3: Byte, None, None),
+           (3: Byte, 1: Byte, Some(assetId), None),
            (3: Byte, 2: Byte, Some(assetId), None),
          )) {
 

@@ -17,19 +17,14 @@ import scala.math.pow
 
 class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with NTPTime {
 
-  val versionsGen: Gen[(Byte, Byte, Byte)] =
-    Gen.oneOf(
-      (1: Byte, 1: Byte, 1: Byte),
-      (1: Byte, 1: Byte, 2: Byte),
-      (1: Byte, 2: Byte, 2: Byte),
-      (1: Byte, 3: Byte, 2: Byte),
-      (2: Byte, 1: Byte, 2: Byte),
-      (2: Byte, 2: Byte, 2: Byte),
-      (2: Byte, 3: Byte, 2: Byte),
-      (3: Byte, 1: Byte, 2: Byte),
-      (3: Byte, 2: Byte, 2: Byte),
-      (3: Byte, 3: Byte, 2: Byte)
-    )
+  val transactionV1versions = (1: Byte, 1: Byte, 1: Byte) // in ExchangeTransactionV1 only orders V1 are supported
+  val transactionV2versions = for {
+    o1ver <- 1 to 3
+    o2ver <- 1 to 3
+  } yield (o1ver.toByte, o2ver.toByte, 2.toByte)
+
+  val versions                             = transactionV1versions +: transactionV2versions
+  val versionsGen: Gen[(Byte, Byte, Byte)] = Gen.oneOf(versions)
 
   val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, AssetPair, Option[AssetId], Option[AssetId], (Byte, Byte, Byte))] =
     for {
