@@ -591,8 +591,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
   def exchangeGeneratorP(buyer: PrivateKeyAccount,
                          seller: PrivateKeyAccount,
                          amountAssetId: Option[ByteStr],
-                         priceAssetId: Option[ByteStr],
-                         fixedMatcherFee: Option[Long] = None): Gen[ExchangeTransaction] = {
+                         priceAssetId: Option[ByteStr]): Gen[ExchangeTransaction] = {
     Gen.oneOf(
       exchangeV1GeneratorP(buyer, seller, amountAssetId, priceAssetId),
       exchangeV2GeneratorP(buyer, seller, amountAssetId, priceAssetId)
