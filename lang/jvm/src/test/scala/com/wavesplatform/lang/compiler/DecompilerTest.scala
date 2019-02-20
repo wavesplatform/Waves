@@ -12,8 +12,8 @@ import com.wavesplatform.lang.v1.compiler.{Decompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 

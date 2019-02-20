@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.{NTPTime, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
 import scala.math.pow

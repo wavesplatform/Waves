@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderTyp
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.{NTPTime, TransactionGen}
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher with NTPTime {
 

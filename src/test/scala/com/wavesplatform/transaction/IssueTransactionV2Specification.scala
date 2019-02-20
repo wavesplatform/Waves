@@ -6,8 +6,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.{TransactionGen, WithDB}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
 class IssueTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithDB with HistoryTest {

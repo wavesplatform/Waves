@@ -9,7 +9,7 @@ import com.wavesplatform.{NTPTime, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class VerifierSpecification extends PropSpec with PropertyChecks with Matchers with MockFactory with TransactionGen with NTPTime {
 

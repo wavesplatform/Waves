@@ -22,7 +22,7 @@ import com.wavesplatform.{NoShrink, TestTime, WithDB}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class OrderValidatorSpecification
     extends WordSpec

@@ -4,8 +4,8 @@ import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.Contract._
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertion, FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with NoShrink {
 
