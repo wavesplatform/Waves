@@ -5,6 +5,7 @@ import java.security.SecureRandom
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.directives.DirectiveParser
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
@@ -48,18 +49,20 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     ))
   def decompile: Route = path("script" / "decompile") {
     (post & entity(as[String])) { code =>
-        Script.fromBase64String(code) match {
-          case Left(err)     => complete(err)
-          case Right(script) => val ret = Script.decompile(script)
-            complete(
-              Json.obj(
-                "script" -> ret.toString,
-              )
+      Script.fromBase64String(code) match {
+        case Left(err) => complete(err)
+        case Right(script) =>
+          val ret = Script.decompile(script)
+          complete(
+            Json.obj(
+              "script" -> ret.toString,
             )
-        }
+          )
+      }
     }
   }
 
+  @Deprecated
   @Path("/script/compile")
   @ApiOperation(value = "Compile", notes = "Compiles string code to base64 script representation", httpMethod = "POST")
   @ApiImplicitParams(
@@ -96,6 +99,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     }
   }
 
+  @Deprecated
   @Path("/script/compileContract")
   @ApiOperation(value = "Compile Contract", notes = "Compiles string code to base64 contract representation", httpMethod = "POST")
   @ApiImplicitParams(
@@ -124,6 +128,42 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
                 Json.obj(
                   "script"     -> contract.bytes().base64,
                   "complexity" -> 0,
+                  "extraFee"   -> CommonValidation.ScriptExtraFee
+                )
+            }
+          )
+      )
+    }
+  }
+
+  @Path("/script/compileCode")
+  @ApiOperation(value = "Compile script", notes = "Compiles string code to base64 script representation", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "code",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        value = "Script code",
+        example = "true"
+      )
+    ))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "base64 or error")
+    ))
+  def compileCode: Route = path("script" / "compileCode") {
+    (post & entity(as[String])) { code =>
+      complete(
+        ScriptCompiler
+          .compile(code)
+          .fold(
+            e => ScriptCompilerError(e), {
+              case (script, complexity) =>
+                Json.obj(
+                  "script"     -> script.bytes().base64,
+                  "complexity" -> complexity,
                   "extraFee"   -> CommonValidation.ScriptExtraFee
                 )
             }

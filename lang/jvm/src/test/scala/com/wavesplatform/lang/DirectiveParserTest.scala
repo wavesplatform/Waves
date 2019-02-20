@@ -20,6 +20,6 @@ class DirectiveParserTest extends PropSpec with PropertyChecks with Matchers {
             |
             |{-# SCRIPT_TYPE FOO #-}
             |
-      """.stripMargin) shouldBe List(Directive(SCRIPT_TYPE, "FOO"))
+      """.stripMargin) shouldBe List(Directive(CONTENT_TYPE, "FOO"))
   }
 }

@@ -1,13 +1,13 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.lang.ScriptType.ScriptType
+import com.wavesplatform.lang.ContentType.ContentType
 import com.wavesplatform.lang.StdLibVersion.StdLibVersion
 import com.wavesplatform.lang.directives.DirectiveParser
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.{ScriptType, StdLibVersion}
+import com.wavesplatform.lang.{ContentType, ScriptType, StdLibVersion}
 import com.wavesplatform.transaction.smart.script.ContractScript._
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
@@ -15,12 +15,14 @@ import com.wavesplatform.utils._
 
 object ScriptCompiler extends ScorexLogging {
 
+  @Deprecated
   def contract(scriptText: String): Either[String, Script] = {
     val ctx = compilerContext(StdLibVersion.V3, isAssetScript = false)
     ContractCompiler(ctx, Parser.parseContract(scriptText).get.value)
       .flatMap(s => ContractScript(StdLibVersion.V3, s))
   }
 
+  @Deprecated
   def apply(scriptText: String, isAssetScript: Boolean): Either[String, (Script, Long)] = {
     val directives = DirectiveParser(scriptText)
 
@@ -31,17 +33,33 @@ object ScriptCompiler extends ScorexLogging {
 
     for {
       ver    <- extractStdLibVersion(directives)
-      tpe    <- extractScriptType(directives)
+      tpe    <- extractContentType(directives)
       script <- tryCompile(scriptWithoutDirectives, tpe, ver, isAssetScript)
     } yield (script, script.complexity)
   }
 
-  def tryCompile(src: String, tpe: ScriptType, version: StdLibVersion, isAssetScript: Boolean): Either[String, Script] = {
+  def compile(scriptText: String): Either[String, (Script, Long)] = {
+    val directives = DirectiveParser(scriptText)
+
+    val scriptWithoutDirectives =
+      scriptText.linesIterator
+        .filter(str => !str.contains("{-#"))
+        .mkString("\n")
+
+    for {
+      ver         <- extractStdLibVersion(directives)
+      contentType <- extractContentType(directives)
+      scriptType  <- extractScriptType(directives)
+      script      <- tryCompile(scriptWithoutDirectives, contentType, ver, scriptType == ScriptType.Asset)
+    } yield (script, script.complexity)
+  }
+
+  private def tryCompile(src: String, tpe: ContentType, version: StdLibVersion, isAssetScript: Boolean): Either[String, Script] = {
     val ctx = compilerContext(version, isAssetScript)
     try {
       tpe match {
-        case ScriptType.Expression => ExpressionCompiler.compile(src, ctx).flatMap(expr => ExprScript.apply(version, expr))
-        case ScriptType.Contract   => ContractCompiler.compile(src, ctx).flatMap(expr => ContractScript.apply(version, expr))
+        case ContentType.Expression => ExpressionCompiler.compile(src, ctx).flatMap(expr => ExprScript.apply(version, expr))
+        case ContentType.Contract   => ContractCompiler.compile(src, ctx).flatMap(expr => ContractScript.apply(version, expr))
       }
     } catch {
       case ex: Throwable =>

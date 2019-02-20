@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart.script
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.ScriptType
+import com.wavesplatform.lang.ContentType
 import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, V1}
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -32,7 +32,7 @@ object ContractScript {
     override type Expr = Contract
     override val bytes: Coeval[ByteStr] =
       Coeval.evalOnce {
-        val s = Array(0: Byte, ScriptType.Contract.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(expr)
+        val s = Array(0: Byte, ContentType.Contract.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(expr)
         ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
       }
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
