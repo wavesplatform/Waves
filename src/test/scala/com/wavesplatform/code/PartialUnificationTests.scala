@@ -9,6 +9,7 @@ class PartialUnificationTests extends FlatSpec with Matchers {
     val result = foo { x: Int =>
       x * 2
     }
-    result should contain("Lambda")
+
+    assert(result contains "Lambda")
   }
 }

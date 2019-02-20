@@ -105,7 +105,7 @@ object Dependencies {
       ExclusionRule("com.google.guava", "guava")
     ))
   lazy val commons_net = Seq("commons-net"   % "commons-net" % "3.+")
-  lazy val scalatest   = Seq("org.scalatest" %% "scalatest"  % "3.0.5")
+  lazy val scalatest   = Seq("org.scalatest" %% "scalatest"  % "3.0.6-SNAP6")
   lazy val scalactic   = Seq("org.scalactic" %% "scalactic"  % "3.0.5")
   lazy val cats        = Seq("org.typelevel" %% "cats-core"  % "1.1.0")
   lazy val scalacheck = Seq(
