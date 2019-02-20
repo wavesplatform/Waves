@@ -219,7 +219,7 @@ object PureContext {
     }
 
   lazy val listConstructor =
-    NativeFunction("cons", 2, CREATE_LIST, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]", ("head", TYPEPARAM('T'), "head"), ("tail", PARAMETERIZEDLIST(TYPEPARAM('T')), "tail")) {
+    NativeFunction("cons", 2, CREATE_LIST, PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))), "Construct a new List[T]", ("head", TYPEPARAM('A'), "head"), ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')), "tail")) {
       case h :: ARR(t) :: Nil => Right(ARR(h +: t))
       case xs                 => notImplemented("cons(head: T, tail: LIST[T]", xs)
     }

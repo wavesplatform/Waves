@@ -13,6 +13,7 @@ sealed abstract class BinaryOperation {
 
 object BinaryOperation {
 
+  // No monadic notion here, Left and Right mean `left-assosiative and `right-assosiative`
   val opsByPriority: List[Either[List[BinaryOperation], List[BinaryOperation]]] = List(
     Right(List(CONS_OP)),
     Left(List(OR_OP, AND_OP)),

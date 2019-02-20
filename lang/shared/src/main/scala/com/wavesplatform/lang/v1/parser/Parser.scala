@@ -313,17 +313,17 @@ object Parser {
     P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | list | block | maybeAccessP) ~
     comment
 
-  lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
+  lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority))
 
 
   val singleBaseAtom = comment ~
     P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | maybeAccessP) ~
     comment
 
-  lazy val singleBaseExpr = P(binaryOp(singleBaseAtom, opsByPriority) | singleBaseAtom)
+  val singleBaseExpr = P(binaryOp(singleBaseAtom, opsByPriority))
 
 
-  lazy val declaration = P(letP | funcP)
+  val declaration = P(letP | funcP)
 
   def revp[A,B](l:A, s:Seq[(B,A)], o:Seq[(A,B)]=Seq.empty) : (Seq[(A,B)], A) = {
     s.foldLeft((o,l)) { (acc, op) => (acc, op) match { case ((o,l),(b,a)) => ((l,b) +: o) -> a } }
