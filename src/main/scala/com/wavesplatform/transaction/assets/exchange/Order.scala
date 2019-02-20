@@ -7,6 +7,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.utils.byteStrWrites
 import io.swagger.annotations.ApiModelProperty
@@ -277,16 +278,9 @@ object Order {
   }
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
-
     require(unsigned.senderPublicKey == sender)
-
     val sig = crypto.sign(sender, unsigned.bodyBytes())
-
-    unsigned match {
-      case o: OrderV1 => o.copy(proofs = Proofs(Seq(ByteStr(sig))))
-      case o: OrderV2 => o.copy(proofs = Proofs(Seq(ByteStr(sig))))
-      case o: OrderV3 => o.copy(proofs = Proofs(Seq(ByteStr(sig))))
-    }
+    unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }
 
   def splitByType(o1: Order, o2: Order): (Order, Order) = {

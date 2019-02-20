@@ -1,11 +1,11 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.transaction.ValidationError.OrderValidationError
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
+import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.{NTPTime, TransactionGen}
 import org.scalacheck.Gen

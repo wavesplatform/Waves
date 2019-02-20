@@ -1,8 +1,7 @@
-package com.wavesplatform
+package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.exchange._
 
 class OrderOps(val o: Order) extends AnyVal {
   @inline def copy(withV1: OrderV1 => OrderV1, withV2: OrderV2 => OrderV2, withV3: OrderV3 => OrderV3): Order = {

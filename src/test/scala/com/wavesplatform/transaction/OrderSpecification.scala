@@ -1,9 +1,9 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.OrderOps._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.ValidationMatcher
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, _}
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.{NTPTime, TransactionGen}

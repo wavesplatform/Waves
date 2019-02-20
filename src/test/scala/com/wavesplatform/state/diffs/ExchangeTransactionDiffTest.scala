@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats.{Order => _, _}
-import com.wavesplatform.OrderOps._
+import cats.{Order ⇒ _, _}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -13,6 +12,7 @@ import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfoli
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
