@@ -1,17 +1,13 @@
-package com.wavesplatform.it.async.activation
+package com.wavesplatform.it.sync.activation
 
 import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{FeatureActivationStatus, NodeFeatureStatus}
-import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.BlockHeaders
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
-
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 
 class NotActivateFeatureTestSuite
     extends FreeSpec
@@ -41,22 +37,24 @@ class NotActivateFeatureTestSuite
          |    }
          |  }
          |  features.supported=[$nonVotingFeatureNum]
-         |  miner.quorum = 3
+         |  miner.quorum = 1
          |}""".stripMargin
         ))
-      .withDefault(4)
+      .withDefault(2)
       .buildNonConflicting()
 
-  private var activationStatusInfoBefore = Option.empty[FeatureActivationStatus]
-  private var activationStatusInfoAfter  = Option.empty[FeatureActivationStatus]
+  private var activationStatusInfoBefore = Seq.empty[FeatureActivationStatus]
+  private var activationStatusInfoAfter  = Seq.empty[FeatureActivationStatus]
 
   "get activation status info" in {
-    activationStatusInfoBefore = Some(activationStatus(nodes, votingInterval - 1, votingFeatureNum, 4.minute))
-    activationStatusInfoAfter = Some(activationStatus(nodes, votingInterval + 1, votingFeatureNum, 4.minute))
+    nodes.waitForHeight(votingInterval - 1)
+    activationStatusInfoBefore = nodes.map(_.featureActivationStatus(votingFeatureNum))
+    nodes.waitForHeight(votingInterval + 1)
+    activationStatusInfoAfter = nodes.map(_.featureActivationStatus(votingFeatureNum))
   }
 
   "supported blocks is not increased when nobody votes for feature" in {
-    val generatedBlocks: Seq[BlockHeaders] = Await.result(nodes.head.blockHeadersSeq(1, votingInterval - 1), 2.minute)
+    val generatedBlocks: Seq[BlockHeaders] = nodes.head.blockHeadersSeq(1, votingInterval - 1)
     val featuresMapInGeneratedBlocks       = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1                   = featuresMapInGeneratedBlocks.getOrElse(votingFeatureNum, Seq.empty).length
 

@@ -319,7 +319,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("context won't change after execution of a user function") {
-    val doubleFst = UserFunction("ID", LONG, "D", ("x", LONG, "X")) {
+    val doubleFst = UserFunction("ID", 0, LONG, "D", ("x", LONG, "X")) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
     }
 
@@ -381,6 +381,24 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("bar"), "value" -> CONST_STRING("2"))),
         CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("baz"), "value" -> CONST_STRING("2")))
       )))
+  }
+
+  property("ensure user function: success") {
+    val src =
+      """
+        |let x = true
+        |ensure(x, "test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(TRUE)
+  }
+
+  property("ensure user function: fail") {
+    val src =
+      """
+        |let x = false
+        |ensure(x, "test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Left("test fail")
   }
 
 }

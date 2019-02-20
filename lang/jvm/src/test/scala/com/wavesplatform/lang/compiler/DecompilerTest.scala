@@ -3,16 +3,14 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Decompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.parser.BinaryOperation
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader, compiler}
-import com.wavesplatform.lang.{Common, Global, StdLibVersion}
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
@@ -23,31 +21,21 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   val decompilerContext = CTX.decompilerContext
 
-  property("ctx debug test") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
-    val defs = ctx.functionDefs
-      .filterKeys(BinaryOperation.opsByPriority.flatten.map(x => BinaryOperation.opsToFunctions(x) -> x).toMap.keys.toList.contains(_))
-      .mapValues(_.map(_.header)
-        .filter(_.isInstanceOf[Native])
-        .map(_.asInstanceOf[Native].name))
-      .toList
-      .flatMap { case (name, codes) => codes.map((_, name)) }
-    defs.mkString("\n").toString shouldBe
-      """(104,*)
-        |(106,%)
-        |(103,>=)
-        |(101,-)
-        |(0,==)
-        |(100,+)
-        |(300,+)
-        |(203,+)
-        |(105,/)
-        |(102,>)""".stripMargin
+  property("successful on very deep expressions (stack overflow check)") {
+    val expr = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
+      FUNCTION_CALL(function = FunctionHeader.Native(100), List(CONST_LONG(1), acc))
+    }
+    Decompiler(expr, decompilerContext) should startWith("(1 + (1 + (1 + (1 + (1 + (1 + ")
   }
 
   property("simple let") {
     val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), TRUE)
-    Decompiler(expr, decompilerContext) shouldBe "{ let a = 1; true }"
+    Decompiler(expr, decompilerContext) shouldBe
+      """{
+        |    let a =
+        |        1;
+        |    true
+        |}""".stripMargin
   }
 
   property("native function call with one arg") {
@@ -63,7 +51,12 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.Native(100),
       args = List(CONST_LONG(1), CONST_LONG(2))
     )
-    Decompiler(expr, decompilerContext) shouldBe "1 + 2"
+    Decompiler(expr, decompilerContext) shouldBe "(1 + 2)"
+  }
+
+  property("nested binary operations") {
+    val expr = FUNCTION_CALL(Native(105), List(FUNCTION_CALL(Native(101), List(REF("height"), REF("startHeight"))), REF("interval")))
+    Decompiler(expr, decompilerContext) shouldBe "((height - startHeight) / interval)"
   }
 
   property("unknown native function call") {
@@ -71,7 +64,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.Native(254),
       args = List(CONST_LONG(1), CONST_LONG(2))
     )
-    Decompiler(expr, decompilerContext) shouldBe "Decompile Error: Wrong opcode: <254> with args:(1,2)"
+    Decompiler(expr, decompilerContext) shouldBe "Native<254>(1, 2)"
   }
 
   property("user function call with one args") {
@@ -90,15 +83,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     Decompiler(expr, decompilerContext) shouldBe "foo()"
   }
 
-  property("definition of user function") {
-    val expr = Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))
-    Decompiler(expr, decompilerContext) shouldBe
-      """func foo (bar,buz) = {
-        |    true
-        |}
-        |""".stripMargin
-  }
-
   property("v2 with LET in BLOCK") {
     val expr = Terms.BLOCK(
       LET("vari", REF("p")),
@@ -112,6 +96,19 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |}""".stripMargin
   }
 
+  property("identation in block") {
+    val expr = Terms.BLOCK(
+      LET("vari", REF("p")),
+      TRUE
+    )
+    Decompiler.expr(Decompiler.pure(expr), 2, decompilerContext).apply() shouldBe
+      """        {
+        |            let vari =
+        |                p;
+        |            true
+        |        }""".stripMargin
+  }
+
   property("let and function call in block") {
     val expr = Terms.BLOCK(Terms.LET("v", CONST_LONG(1)),
                            Terms.FUNCTION_CALL(
@@ -122,7 +119,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       """{
         |    let v =
         |        1;
-        |    v + 2
+        |    (v + 2)
         |}""".stripMargin
   }
 
@@ -139,9 +136,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |        {
         |            let v =
         |                1;
-        |            v + 2
+        |            (v + 2)
         |        };
-        |    p + 3
+        |    (p + 3)
         |}""".stripMargin
   }
 
@@ -166,12 +163,12 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |        if (
         |            {
         |                if (
-        |                    v + 2
+        |                    (v + 2)
         |                )
         |                then
         |                    true
         |                else
-        |                    v + 3
+        |                    (v + 3)
         |            }
         |        )
         |        then
@@ -207,12 +204,12 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |        if (
         |            {
         |                if (
-        |                    v + 2
+        |                    (v + 2)
         |                )
         |                then
         |                    true
         |                else
-        |                    v + 3
+        |                    (v + 3)
         |            }
         |        )
         |        then
@@ -225,34 +222,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |            false
         |    }
         |}""".stripMargin
-  }
-
-  property("Invoke contract compilation") {
-    val scriptText =
-      """
-        |	@Callable(i)
-        |	func testfunc(amount: Int) = {
-        |   let pmt = 1
-        |
-        |   if (false)
-        |   then
-        |     throw("impossible")
-        |   else {
-        |	  	ContractResult(
-        |        WriteSet(List(DataEntry("1", "1"))),
-        |        TransferSet(List(ContractTransfer(i.caller, amount, unit)))
-        |     )
-        |   }
-        |	}
-      """.stripMargin
-    val parsedScript = com.wavesplatform.lang.v1.parser.Parser.parseContract(scriptText).get.value
-
-    val ctx             = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
-    val compledContract = compiler.ContractCompiler(ctx, parsedScript)
-
-    compledContract.getOrElse("error").toString shouldBe
-      """Contract(List(),List(CallableFunction(CallableAnnotation(i),FUNC(testfunc,List(amount),LET_BLOCK(LET(pmt,CONST_LONG(1)),IF(FALSE,FUNCTION_CALL(Native(2),List(CONST_STRING(impossible))),FUNCTION_CALL(User(ContractResult),List(FUNCTION_CALL(User(WriteSet),List(FUNCTION_CALL(Native(1101),List(FUNCTION_CALL(User(DataEntry),List(CONST_STRING(1), CONST_STRING(1))))))), FUNCTION_CALL(User(TransferSet),List(FUNCTION_CALL(Native(1101),List(FUNCTION_CALL(User(ContractTransfer),List(GETTER(REF(i),caller), REF(amount), REF(unit)))))))))))))),None)"""
-
   }
 
   property("Invoke contract with verifier decompilation") {
@@ -295,7 +264,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |    false
         |}
         |
-        |
         |func bar () = {
         |    {
         |        if (
@@ -318,9 +286,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |                foo()
         |            )
         |            then
-        |                WriteSet(List(DataEntry("b",1),DataEntry("sender",x)))
+        |                WriteSet(List(DataEntry("b", 1), DataEntry("sender", x)))
         |            else
-        |                WriteSet(List(DataEntry("a",a),DataEntry("sender",x)))
+        |                WriteSet(List(DataEntry("a", a), DataEntry("sender", x)))
         |        }
         |    }
         |}
@@ -328,62 +296,41 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |@Verifier(t)
         |func verify () = {
         |    true
-        |}
-        |""".stripMargin
+        |}""".stripMargin
   }
 
   property("Invoke contract decompilation") {
     val contract = Contract(
-      List(),
+      List(Terms.FUNC("foo", List("bar", "buz"), CONST_BOOLEAN(true))),
       List(
         CallableFunction(
           CallableAnnotation("i"),
-          FUNC(
+          Terms.FUNC(
             "testfunc",
             List("amount"),
             BLOCK(
               LET("pmt", CONST_LONG(1)),
-              IF(
-                FALSE,
-                FUNCTION_CALL(Native(2), List(CONST_STRING("impossible"))),
-                FUNCTION_CALL(
-                  User("ContractResult"),
-                  List(
-                    FUNCTION_CALL(
-                      User("WriteSet"),
-                      List(FUNCTION_CALL(Native(1101), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("1"), CONST_STRING("1"))))))),
-                    FUNCTION_CALL(
-                      User("TransferSet"),
-                      List(FUNCTION_CALL(Native(1101),
-                                         List(FUNCTION_CALL(User("ContractTransfer"), List(GETTER(REF("i"), "caller"), REF("amount"), REF("unit"))))))
-                    )
-                  )
-                )
-              )
+              TRUE
             )
           )
         )),
       None
     )
-    Decompiler(contract: Contract, decompilerContext) shouldBe
-      """
-        |@Callable(i)
-        |func testfunc (amount) = {
-        |    {
-        |        let pmt =
-        |            1;
-        |        {
-        |            if (
-        |                false
-        |            )
-        |            then
-        |                throw("impossible")
-        |            else
-        |                ContractResult(WriteSet(List(DataEntry("1","1"))),TransferSet(List(ContractTransfer(i.caller,amount,unit))))
-        |        }
-        |    }
-        |}
-        |""".stripMargin
+    val str    = Decompiler(contract: Contract, decompilerContext)
+    val margin = """|func foo (bar,buz) = {
+                    |    true
+                    |}
+                    |
+                    |@Callable(i)
+                    |func testfunc (amount) = {
+                    |    {
+                    |        let pmt =
+                    |            1;
+                    |        true
+                    |    }
+                    |}
+                    |""".stripMargin
+    str shouldBe margin
   }
 
   property("bytestring") {
@@ -463,6 +410,145 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |        }
         |    else
         |        1
+        |}""".stripMargin
+  }
+
+  property("Surge smart accet") {
+    val expr = BLOCK(
+      LET("startHeight", CONST_LONG(1375557)),
+      BLOCK(
+        LET("startPrice", CONST_LONG(100000)),
+        BLOCK(
+          LET("interval", FUNCTION_CALL(Native(104), List(CONST_LONG(24), CONST_LONG(60)))),
+          BLOCK(
+            LET("exp", FUNCTION_CALL(Native(104), List(FUNCTION_CALL(Native(104), List(CONST_LONG(100), CONST_LONG(60))), CONST_LONG(1000)))),
+            BLOCK(
+              LET("$match0", REF("tx")),
+              IF(
+                FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("ExchangeTransaction"))),
+                BLOCK(
+                  LET("e", REF("$match0")),
+                  BLOCK(
+                    LET("days",
+                        FUNCTION_CALL(Native(105), List(FUNCTION_CALL(Native(101), List(REF("height"), REF("startHeight"))), REF("interval")))),
+                    IF(
+                      IF(
+                        IF(
+                          FUNCTION_CALL(
+                            Native(103),
+                            List(
+                              GETTER(REF("e"), "price"),
+                              FUNCTION_CALL(Native(104),
+                                            List(REF("startPrice"),
+                                                 FUNCTION_CALL(Native(100),
+                                                               List(CONST_LONG(1), FUNCTION_CALL(Native(104), List(REF("days"), REF("days")))))))
+                            )
+                          ),
+                          FUNCTION_CALL(User("!"),
+                                        List(FUNCTION_CALL(User("isDefined"),
+                                                           List(GETTER(GETTER(GETTER(REF("e"), "sellOrder"), "assetPair"), "priceAsset"))))),
+                          FALSE
+                        ),
+                        FUNCTION_CALL(
+                          Native(103),
+                          List(REF("exp"),
+                               FUNCTION_CALL(Native(101),
+                                             List(GETTER(GETTER(REF("e"), "sellOrder"), "expiration"),
+                                                  GETTER(GETTER(REF("e"), "sellOrder"), "timestamp"))))
+                        ),
+                        FALSE
+                      ),
+                      FUNCTION_CALL(
+                        Native(103),
+                        List(REF("exp"),
+                             FUNCTION_CALL(Native(101),
+                                           List(GETTER(GETTER(REF("e"), "buyOrder"), "expiration"),
+                                                GETTER(GETTER(REF("e"), "buyOrder"), "timestamp"))))
+                      ),
+                      FALSE
+                    )
+                  )
+                ),
+                IF(FUNCTION_CALL(Native(1), List(REF("$match0"), CONST_STRING("BurnTransaction"))), BLOCK(LET("tx", REF("$match0")), TRUE), FALSE)
+              )
+            )
+          )
+        )
+      )
+    )
+    Decompiler(expr, decompilerContext) shouldBe
+      """{
+        |    let startHeight =
+        |        1375557;
+        |    {
+        |        let startPrice =
+        |            100000;
+        |        {
+        |            let interval =
+        |                (24 * 60);
+        |            {
+        |                let exp =
+        |                    ((100 * 60) * 1000);
+        |                {
+        |                    let $match0 =
+        |                        tx;
+        |                    {
+        |                        if (
+        |                            _isInstanceOf($match0, "ExchangeTransaction")
+        |                        )
+        |                        then
+        |                            {
+        |                                let e =
+        |                                    $match0;
+        |                                {
+        |                                    let days =
+        |                                        ((height - startHeight) / interval);
+        |                                    {
+        |                                        if (
+        |                                            {
+        |                                                if (
+        |                                                    {
+        |                                                        if (
+        |                                                            (e.price >= (startPrice * (1 + (days * days))))
+        |                                                        )
+        |                                                        then
+        |                                                            !(isDefined(e.sellOrder.assetPair.priceAsset))
+        |                                                        else
+        |                                                            false
+        |                                                    }
+        |                                                )
+        |                                                then
+        |                                                    (exp >= (e.sellOrder.expiration - e.sellOrder.timestamp))
+        |                                                else
+        |                                                    false
+        |                                            }
+        |                                        )
+        |                                        then
+        |                                            (exp >= (e.buyOrder.expiration - e.buyOrder.timestamp))
+        |                                        else
+        |                                            false
+        |                                    }
+        |                                }
+        |                            }
+        |                        else
+        |                            {
+        |                                if (
+        |                                    _isInstanceOf($match0, "BurnTransaction")
+        |                                )
+        |                                then
+        |                                    {
+        |                                        let tx =
+        |                                            $match0;
+        |                                        true
+        |                                    }
+        |                                else
+        |                                    false
+        |                            }
+        |                    }
+        |                }
+        |            }
+        |        }
+        |    }
         |}""".stripMargin
   }
 

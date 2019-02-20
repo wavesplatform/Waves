@@ -11,8 +11,6 @@ import com.wavesplatform.lang.v1.task.imports.{raiseError, _}
 import com.wavesplatform.lang.v1.traits.domain.Tx.{ContractTransfer, Pmt}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 
-import scala.collection.mutable.ListBuffer
-
 object ContractEvaluator {
   case class Invocation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
 
@@ -42,29 +40,24 @@ object ContractEvaluator {
   def verify(v: VerifierFunction, tx: Tx): EvalM[EVALUATED] = {
     val t = Bindings.transactionObject(tx, proofsEnabled = true)
     val expr =
-      BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+      BLOCK(LET(v.annotation.invocationArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 
   def verify(v: VerifierFunction, ord: Ord): EvalM[EVALUATED] = {
     val t = Bindings.orderObject(ord, proofsEnabled = true)
     val expr =
-      BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+      BLOCK(LET(v.annotation.invocationArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 
   def verify(v: VerifierFunction, ct: ContractTransfer): EvalM[EVALUATED] = {
     val t = Bindings.contractTransfer(ct)
     val expr =
-      BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+      BLOCK(LET(v.annotation.invocationArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 
-
-  def apply(ctx: EvaluationContext, c: Contract, i: Invocation): Either[ExecutionError, ContractResult] = {
-    val log = ListBuffer[LogItem]()
-    val llc = (str: String) => (v: LetExecResult) => log.append((str, v))
-    val lec = LoggedEvaluationContext(llc, ctx)
-    eval(c, i).run(lec).value._2.flatMap(ContractResult.fromObj)
-  }
+  def apply(ctx: EvaluationContext, c: Contract, i: Invocation): Either[ExecutionError, ContractResult] =
+    EvaluatorV1.evalWithLogging(ctx, eval(c, i))._2.flatMap(ContractResult.fromObj)
 }

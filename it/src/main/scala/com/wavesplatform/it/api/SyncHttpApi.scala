@@ -6,7 +6,7 @@ import java.util.concurrent.TimeoutException
 import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
-import com.wavesplatform.features.api.ActivationStatus
+import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
@@ -269,6 +269,9 @@ object SyncHttpApi extends Assertions {
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
+    def blacklist(address: InetSocketAddress): Unit =
+      sync(async(n).blacklist(address))
+
     def debugMinerInfo(): Seq[State] =
       sync(async(n).debugMinerInfo())
 
@@ -318,6 +321,9 @@ object SyncHttpApi extends Assertions {
     }
 
     def waitForUtxIncreased(fromSize: Int): Int = sync(async(n).waitForUtxIncreased(fromSize))
+
+    def featureActivationStatus(featureNum: Short): FeatureActivationStatus =
+      activationStatus.features.find(_.id == featureNum).get
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
