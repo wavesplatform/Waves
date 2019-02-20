@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.{Proofs, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
-import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
