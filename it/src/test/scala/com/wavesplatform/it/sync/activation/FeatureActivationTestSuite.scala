@@ -25,7 +25,7 @@ class FeatureActivationTestSuite
     NodeConfigs.newBuilder
       .overrideBase(_.raw(s"""waves {
                                |  blockchain.custom.functionality {
-                               |    pre-activated-features = null
+                               |    pre-activated-features = {}
                                |    feature-check-blocks-period = $votingInterval
                                |    blocks-for-feature-activation = $blocksForActivation
                                |  }
