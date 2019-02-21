@@ -390,6 +390,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                           .getOrElse(ByteStr.empty)
                           .base58}'
            |   else isDefined(t.${oType}Order.assetPair.priceAsset) == false
+           |   let ${oType}MatcherFeeAssetId = if (${ord.matcherFeeAssetId.isDefined}) then extract(t.${oType}Order.matcherFeeAssetId) == base58'${ord.matcherFeeAssetId
+                          .getOrElse(ByteStr.empty)
+                          .base58}'
+           |   else isDefined(t.${oType}Order.matcherFeeAssetId) == false
          """.stripMargin
 
         val lets = List(
@@ -405,7 +409,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           "BodyBytes",
           "AssetPairAmount",
           "AssetPairPrice",
-          "Proofs"
+          "Proofs",
+          "MatcherFeeAssetId"
         ).map(i => s"$oType$i")
           .mkString(" && ")
 
@@ -451,7 +456,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |   let matcherFee = t.matcherFee == ${t.matcherFee}
                  |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
                  |   ${Range(0, 8).map(letProof(t.proofs, "t")).mkString("\n")}
-                 |  let assetPairAmount = if (${t.assetPair.amountAsset.isDefined}) then extract(t.assetPair.amountAsset) == base58'${t.assetPair.amountAsset
+                 |   let assetPairAmount = if (${t.assetPair.amountAsset.isDefined}) then extract(t.assetPair.amountAsset) == base58'${t.assetPair.amountAsset
                    .getOrElse(ByteStr.empty)
                    .base58}'
                  |   else isDefined(t.assetPair.amountAsset) == false
@@ -459,8 +464,12 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                    .getOrElse(ByteStr.empty)
                    .base58}'
                  |   else isDefined(t.assetPair.priceAsset) == false
-                 | id && sender && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee && bodyBytes && ${assertProofs(
-                   "t")} && assetPairAmount && assetPairPrice
+                 |   let matcherFeeAssetId = if (${t.matcherFeeAssetId.isDefined}) then extract(t.matcherFeeAssetId) == base58'${t.matcherFeeAssetId
+                   .getOrElse(ByteStr.empty)
+                   .base58}'
+                 |   else isDefined(t.matcherFeeAssetId) == false
+                 |   id && sender && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee && bodyBytes && ${assertProofs(
+                   "t")} && assetPairAmount && assetPairPrice && matcherFeeAssetId
                  | case other => throw()
                  | }
                  |""".stripMargin

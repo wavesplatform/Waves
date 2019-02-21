@@ -582,9 +582,20 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
     sender1: PrivateKeyAccount <- accountGen
     sender2: PrivateKeyAccount <- accountGen
     assetPair                  <- assetPairGen
+    buyerAnotherAsset          <- assetIdGen
+    sellerAnotherAsset         <- assetIdGen
+    buyerMatcherFeeAssetId     <- Gen.oneOf(assetPair.amountAsset, assetPair.priceAsset, buyerAnotherAsset, None)
+    sellerMatcherFeeAssetId    <- Gen.oneOf(assetPair.amountAsset, assetPair.priceAsset, sellerAnotherAsset, None)
     r <- Gen.oneOf(
       exchangeV1GeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset),
-      exchangeV2GeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset)
+      exchangeV2GeneratorP(
+        buyer = sender1,
+        seller = sender2,
+        amountAssetId = assetPair.amountAsset,
+        priceAssetId = assetPair.priceAsset,
+        buyMatcherFeeAssetId = buyerMatcherFeeAssetId,
+        sellMatcherFeeAssetId = sellerMatcherFeeAssetId
+      )
     )
   } yield r
 
