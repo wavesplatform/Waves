@@ -64,6 +64,8 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("set contract to contract account") {
     val scriptText =
       """
+        |{-# STDLIB_VERSION 3 #-}
+        |{-# CONTENT_TYPE CONTRACT #-}
         |
         |	@Callable(i)
         |	func deposit() = {

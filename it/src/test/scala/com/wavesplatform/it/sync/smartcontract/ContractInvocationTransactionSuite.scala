@@ -66,6 +66,8 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
   test("set contract to contract account") {
     val scriptText =
       """
+        |{-# STDLIB_VERSION 3 #-}
+        |{-# CONTENT_TYPE CONTRACT #-}
         |
         | @Callable(inv)
         | func foo(a:ByteStr) = {
