@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
-import com.wavesplatform.transaction.smart.script.{ContractScript, Script, ScriptCompiler}
+import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import org.scalacheck.Gen
 import play.api.libs.json._
 
