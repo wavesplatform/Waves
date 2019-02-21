@@ -270,6 +270,8 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
       diff.transactions.toList
         .flatMap {
           case (_, (h, tx, addrs)) =>
+            transactionIds.put(tx.id(), newHeight) // be careful here!
+
             addrs.map { addr =>
               val addrId = AddressId(addressId(addr))
               val htx    = (h, tx)
