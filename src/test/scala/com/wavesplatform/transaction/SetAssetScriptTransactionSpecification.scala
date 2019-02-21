@@ -7,7 +7,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
-import com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script, ScriptCompiler}
 import org.scalacheck.Gen
 import play.api.libs.json._
@@ -53,14 +52,6 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
 
   property("issuer can`t make SetAssetScript tx when Script is Contract") {
     val accountA = PublicKeyAccount.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet()
-
-    val contract = ScriptCompiler.contract(
-      """|@Verifier(t)
-         |func verify () = {
-         |    true
-         |}
-         |""".stripMargin
-    )
 
     SetAssetScriptTransaction
       .create(
