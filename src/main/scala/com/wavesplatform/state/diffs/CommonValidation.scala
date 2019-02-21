@@ -9,10 +9,9 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError._
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.script.ContractScript
-import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
@@ -106,51 +105,67 @@ object CommonValidation {
 
   def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, height: Int, tx: T): Either[ValidationError, T] = {
 
-    def activationBarrier(b: BlockchainFeature, msg: Option[String] = None) =
+    def activationBarrier(b: BlockchainFeature, msg: Option[String] = None): Either[ActivationError, T] =
       Either.cond(
         blockchain.isFeatureActivated(b, height),
         tx,
         ValidationError.ActivationError(msg.getOrElse(tx.getClass.getSimpleName) + " has not been activated yet")
       )
 
-    def scriptActivation(sc: Script) = {
+    def scriptActivation(sc: Script): Either[ActivationError, T] = {
+
       val ab = activationBarrier(BlockchainFeatures.Ride4DApps, Some("Ride4DApps has not been activated yet"))
-      def scriptVersionActivation(sc: Script) = sc.stdLibVersion match {
+
+      def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
         case V1 | V2 if sc.containsBlockV2.value => ab
         case V1 | V2                             => Right(tx)
         case V3                                  => ab
       }
-      def scriptTypeActivation(sc: Script) = sc match {
+
+      def scriptTypeActivation(sc: Script): Either[ActivationError, T] = sc match {
         case e: ExprScriprImpl                    => Right(tx)
         case c: ContractScript.ContractScriptImpl => ab
       }
+
       for {
         _ <- scriptVersionActivation(sc)
         _ <- scriptTypeActivation(sc)
       } yield tx
 
     }
+
     tx match {
-      case _: BurnTransactionV1        => Right(tx)
-      case _: PaymentTransaction       => Right(tx)
-      case _: GenesisTransaction       => Right(tx)
-      case _: TransferTransactionV1    => Right(tx)
-      case _: IssueTransactionV1       => Right(tx)
-      case _: ReissueTransactionV1     => Right(tx)
-      case _: ExchangeTransactionV1    => Right(tx)
-      case _: ExchangeTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccountTrading)
+      case _: BurnTransactionV1     => Right(tx)
+      case _: PaymentTransaction    => Right(tx)
+      case _: GenesisTransaction    => Right(tx)
+      case _: TransferTransactionV1 => Right(tx)
+      case _: IssueTransactionV1    => Right(tx)
+      case _: ReissueTransactionV1  => Right(tx)
+      case _: ExchangeTransactionV1 => Right(tx)
+
+      case exv2: ExchangeTransactionV2 =>
+        activationBarrier(BlockchainFeatures.SmartAccountTrading).flatMap { tx =>
+          (exv2.buyOrder, exv2.sellOrder) match {
+            case (_: OrderV3, _: Order) | (_: Order, _: OrderV3) => activationBarrier(BlockchainFeatures.OrderV3, Some("Order Version 3"))
+            case _                                               => Right(tx)
+          }
+        }
+
       case _: LeaseTransactionV1       => Right(tx)
       case _: LeaseCancelTransactionV1 => Right(tx)
       case _: CreateAliasTransactionV1 => Right(tx)
       case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
+
       case sst: SetScriptTransaction =>
         sst.script match {
           case None     => Right(tx)
           case Some(sc) => scriptActivation(sc)
         }
+
       case _: TransferTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
+
       case it: SetAssetScriptTransaction =>
         it.script match {
           case None     => Left(GenericError("Cannot set empty script"))
