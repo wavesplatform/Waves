@@ -123,4 +123,8 @@ object Dependencies {
       "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0"
     )
   }
+  
+  lazy val capnp = Def.setting {
+    Seq("org.capnproto" % "runtime" % "0.1.3")
+  }
 }
