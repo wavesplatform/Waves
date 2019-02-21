@@ -341,8 +341,7 @@ object PureContext {
   )
 
   private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
-    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))),
-    ("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))
+    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit))))
     )
   private lazy val functions = Array(
     fraction,
@@ -383,7 +382,7 @@ object PureContext {
   def build(version: StdLibVersion): CTX =
     version match {
       case V1 | V2 => ctx
-      case V3       => Monoid.combine(ctx, CTX(Seq.empty, Map.empty, Array(listConstructor, ensure)))
+      case V3       => Monoid.combine(ctx, CTX(Seq.empty, Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))), Array(listConstructor, ensure)))
     }
 
 }
