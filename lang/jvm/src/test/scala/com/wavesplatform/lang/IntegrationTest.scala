@@ -399,6 +399,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       )))
   }
 
+  property("allow 'throw' in '==' arguments") {
+    val src =
+      """true == throw("test passed")"""
+    eval[EVALUATED](src) shouldBe Left("test passed")
+  }
+
+  property("ban to compare different types") {
+    val src =
+      """true == "test passed" """
+    eval[EVALUATED](src) should produce("Compilation failed: Can't match inferred types")
+  }
+
   property("ensure user function: success") {
     val src =
       """
