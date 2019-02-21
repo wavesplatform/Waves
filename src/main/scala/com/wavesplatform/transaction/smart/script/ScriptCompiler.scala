@@ -26,8 +26,8 @@ object ScriptCompiler extends ScorexLogging {
 
   def compile(scriptText: String): Either[String, (Script, Long)] = {
     for {
-      scriptType  <- extractScriptType(DirectiveParser(scriptText))
-      result      <- apply(scriptText, scriptType == ScriptType.Asset)
+      scriptType <- extractScriptType(DirectiveParser(scriptText))
+      result     <- apply(scriptText, scriptType == ScriptType.Asset)
     } yield result
   }
 

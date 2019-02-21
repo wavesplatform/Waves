@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, utils}
+import com.wavesplatform.lang.{ContentType, Global, ScriptType}
 
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
