@@ -13,6 +13,7 @@ import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo, OrderStatus, Orde
 import com.wavesplatform.matcher.queue.QueueEvent
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
@@ -44,7 +45,7 @@ class AddressActor(
   private val pendingPlacement    = MutableMap.empty[ByteStr, Promise[Resp]]
 
   private val activeOrders  = MutableMap.empty[Order.Id, LimitOrder]
-  private val openVolume    = MutableMap.empty[Option[AssetId], Long].withDefaultValue(0L)
+  private val openVolume    = MutableMap.empty[AssetId, Long].withDefaultValue(0L)
   private val expiration    = MutableMap.empty[ByteStr, Cancellable]
   private var latestOrderTs = 0L
 
@@ -70,9 +71,15 @@ class AddressActor(
     latestOrderTs = newTimestamp
   }
 
-  private def tradableBalance(assetId: Option[AssetId]): Long = {
+  private def tradableBalance(assetId: AssetId): Long = {
     val p = portfolio
-    assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L)) - openVolume(assetId)
+
+    val bal = assetId match {
+      case Waves            => p.spendableBalance
+      case asset @ Asset(_) => p.assets.getOrElse(asset, 0L)
+    }
+
+    bal - openVolume(assetId)
   }
 
   private val validator =
@@ -250,7 +257,7 @@ class AddressActor(
 
   def receive: Receive = handleCommands orElse handleExecutionEvents orElse handleStatusRequests
 
-  private type SpendableBalance = Map[Option[AssetId], Long]
+  private type SpendableBalance = Map[AssetId, Long]
 
   private def ordersToDelete(initBalance: SpendableBalance): Queue[QueueEvent.Canceled] = {
     // Probably, we need to check orders with changed assets only.
@@ -275,8 +282,8 @@ class AddressActor(
 
   private def toSpendable(p: Portfolio): SpendableBalance =
     p.assets
-      .map { case (k, v) => (Some(k): Option[AssetId]) -> v }
-      .updated(None, p.spendableBalance)
+      .map { case (k, v) => (k: AssetId) -> v }
+      .updated(Waves, p.spendableBalance)
       .withDefaultValue(0)
 
   private def remove(from: SpendableBalance, xs: SpendableBalance): Option[SpendableBalance] =

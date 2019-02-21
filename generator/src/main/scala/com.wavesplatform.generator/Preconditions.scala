@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.lease.LeaseTransactionV1
@@ -50,7 +51,7 @@ object Preconditions {
                 .fromSeed(seed)
                 .explicitGet()
               val tx = TransferTransactionV1
-                .selfSigned(None, settings.faucet, acc, balance, time.correctedTime(), None, FEE, "Generator".getBytes())
+                .selfSigned(Waves, settings.faucet, acc, balance, time.correctedTime(), Waves, FEE, "Generator".getBytes())
                 .explicitGet()
               (uni.copy(accountsWithBalances = (acc, balance) :: uni.accountsWithBalances), tx :: txs)
           }

@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import org.scalamock.scalatest.MockFactory
@@ -25,9 +26,9 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
   test("MicroBlock with txs bytes/parse roundtrip") {
 
     val ts                         = System.currentTimeMillis() - 5000
-    val tr: TransferTransactionV1  = TransferTransactionV1.selfSigned(None, sender, gen, 5, ts + 1, None, 2, Array()).explicitGet()
-    val assetId                    = Some(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
-    val tr2: TransferTransactionV1 = TransferTransactionV1.selfSigned(assetId, sender, gen, 5, ts + 2, None, 2, Array()).explicitGet()
+    val tr: TransferTransactionV1  = TransferTransactionV1.selfSigned(Waves, sender, gen, 5, ts + 1, Waves, 2, Array()).explicitGet()
+    val assetId                    = Asset(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
+    val tr2: TransferTransactionV1 = TransferTransactionV1.selfSigned(assetId, sender, gen, 5, ts + 2, Waves, 2, Array()).explicitGet()
 
     val transactions = Seq(tr, tr2)
 
@@ -55,7 +56,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
 
   test("MicroBlock cannot contain more than Miner.MaxTransactionsPerMicroblock") {
 
-    val transaction  = TransferTransactionV1.selfSigned(None, sender, gen, 5, System.currentTimeMillis(), None, 1000, Array()).explicitGet()
+    val transaction  = TransferTransactionV1.selfSigned(Waves, sender, gen, 5, System.currentTimeMillis(), Waves, 1000, Array()).explicitGet()
     val transactions = Seq.fill(Miner.MaxTransactionsPerMicroblock + 1)(transaction)
 
     val eitherBlockOrError = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig)

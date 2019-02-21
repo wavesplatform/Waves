@@ -7,6 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -26,12 +27,12 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          assetId = None,
+          assetId = Waves,
           sender = sender.privateKey,
           recipient = acc0,
           amount = 3 * transferAmount + 3 * (0.00001.waves + 0.00002.waves), // Script fee
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = minFee,
           attachment = Array.emptyByteArray
         )
@@ -83,12 +84,12 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          assetId = None,
+          assetId = Waves,
           sender = acc0,
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = minFee + 0.00001.waves + 0.00002.waves,
           attachment = Array.emptyByteArray
         )
@@ -100,12 +101,12 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val unsigned =
       TransferTransactionV2
         .create(
-          assetId = None,
+          assetId = Waves,
           sender = acc0,
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = minFee + 0.004.waves,
           attachment = Array.emptyByteArray,
           proofs = Proofs.empty
@@ -145,12 +146,12 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          assetId = None,
+          assetId = Waves,
           sender = acc0,
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = minFee,
           attachment = Array.emptyByteArray
         )
@@ -163,12 +164,12 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val tx =
       TransferTransactionV2
         .selfSigned(
-          assetId = None,
+          assetId = Waves,
           sender = acc0,
           recipient = acc3,
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = minFee + 0.004.waves,
           attachment = Array.emptyByteArray
         )

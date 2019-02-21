@@ -15,6 +15,7 @@ import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.EmptyBlockchain
 import org.scalamock.scalatest.PathMockFactory
@@ -37,7 +38,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
     Random.nextBytes(b.arr)
 
     val tp   = TestProbe()
-    val pair = AssetPair(Some(b), None)
+    val pair = AssetPair(Asset(b), Waves)
     val actor = system.actorOf(
       Props(
         new OrderBookActor(

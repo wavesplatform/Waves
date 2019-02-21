@@ -89,12 +89,12 @@ package object http {
   )
 
   implicit val transferTransactionFormat: Format[TransferTransactionV1] = (
-    (JsPath \ "assetId").formatNullable[AssetId] and
+    (JsPath \ "assetId").format[AssetId] and
       (JsPath \ "sender").format[PublicKeyAccount] and
       (JsPath \ "recipient").format[AddressOrAlias] and
       (JsPath \ "amount").format[Long] and
       (JsPath \ "timestamp").format[Long] and
-      (JsPath \ "feeAsset").formatNullable[AssetId] and
+      (JsPath \ "feeAsset").format[AssetId] and
       (JsPath \ "fee").format[Long] and
       (JsPath \ "attachment")
         .format[String]
@@ -108,10 +108,10 @@ package object http {
   implicit val versionedTransferTransactionFormat: Format[TransferTransactionV2] = (
     (JsPath \ "sender").format[PublicKeyAccount] and
       (JsPath \ "recipient").format[AddressOrAlias] and
-      (JsPath \ "assetId").formatNullable[AssetId] and
+      (JsPath \ "assetId").format[AssetId] and
       (JsPath \ "amount").format[Long] and
       (JsPath \ "timestamp").format[Long] and
-      (JsPath \ "feeAssetId").formatNullable[AssetId] and
+      (JsPath \ "feeAssetId").format[AssetId] and
       (JsPath \ "fee").format[Long] and
       (JsPath \ "attachment")
         .format[String]

@@ -30,7 +30,7 @@ object RealTransactionWrapper {
       tx.proofs.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
     )
 
-  implicit def assetPair(a: AssetPair): APair = APair(a.amountAsset, a.priceAsset)
+  implicit def assetPair(a: AssetPair): APair = APair(a.amountAsset.compatId, a.priceAsset.compatId)
   implicit def ord(o: Order): Ord =
     Ord(
       id = ByteStr(o.id.value.arr),
@@ -62,33 +62,33 @@ object RealTransactionWrapper {
       case t: TransferTransaction =>
         Tx.Transfer(
           proven(t),
-          feeAssetId = t.feeAssetId,
-          assetId = t.assetId,
+          feeAssetId = t.feeAssetId.compatId,
+          assetId = t.assetId.compatId,
           amount = t.amount,
           recipient = t.recipient,
           attachment = ByteStr(t.attachment)
         )
       case i: IssueTransaction =>
         Tx.Issue(proven(i), i.quantity, ByteStr(i.name), ByteStr(i.description), i.reissuable, i.decimals, i.script.map(_.bytes()))
-      case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.assetId, r.reissuable)
-      case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.assetId)
+      case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable)
+      case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id)
       case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient)
       case b: LeaseCancelTransaction => Tx.LeaseCancel(proven(b), b.leaseId)
       case b: CreateAliasTransaction => Tx.CreateAlias(proven(b), b.alias.name)
       case ms: MassTransferTransaction =>
         Tx.MassTransfer(
           proven(ms),
-          assetId = ms.assetId.map(a => ByteStr(a.arr)),
+          assetId = ms.assetId.compatId,
           transferCount = ms.transfers.length,
           totalAmount = ms.transfers.map(_.amount).sum,
           transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
           attachment = ByteStr(ms.attachment)
         )
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes()))
-      case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.assetId, ss.script.map(_.bytes()))
+      case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.asset.id, ss.script.map(_.bytes()))
       case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, p.recipient)
       case e: ExchangeTransaction        => Tx.Exchange(proven(e), e.amount, e.price, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder)
-      case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.assetId, s.minSponsoredAssetFee)
+      case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee)
       case d: DataTransaction =>
         Tx.Data(
           proven(d),

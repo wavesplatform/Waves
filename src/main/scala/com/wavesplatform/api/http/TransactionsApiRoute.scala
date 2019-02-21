@@ -20,7 +20,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{Time, byteStrWrites}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup

@@ -1,11 +1,11 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.Bytes
-import com.wavesplatform.crypto
-import monix.eval.Coeval
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
+import monix.eval.Coeval
 
 import scala.util.{Failure, Success, Try}
 
@@ -16,7 +16,7 @@ case class CreateAliasTransactionV1 private (sender: PublicKeyAccount, alias: Al
   override def version: Byte = 1
 
   override val builder: TransactionParser     = CreateAliasTransactionV1
-  override val id: Coeval[AssetId]            = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))
+  override val id: Coeval[ByteStr]            = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))
   override val bodyBytes: Coeval[Array[Byte]] = baseBytes.map(base => Bytes.concat(Array(builder.typeId), base))
   override val bytes: Coeval[Array[Byte]]     = bodyBytes.map(body => Bytes.concat(body, signature.arr))
 }

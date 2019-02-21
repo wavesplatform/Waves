@@ -5,6 +5,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.AssetId.Asset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
@@ -49,7 +50,7 @@ trait Blockchain {
 
   def containsTransaction(tx: Transaction): Boolean
 
-  def assetDescription(id: ByteStr): Option[AssetDescription]
+  def assetDescription(id: Asset): Option[AssetDescription]
 
   def resolveAlias(a: Alias): Either[ValidationError, Address]
 
@@ -63,21 +64,18 @@ trait Blockchain {
   def accountScript(address: Address): Option[Script]
   def hasScript(address: Address): Boolean
 
-  def assetScript(id: ByteStr): Option[Script]
-  def hasAssetScript(id: ByteStr): Boolean
+  def assetScript(id: Asset): Option[Script]
+  def hasAssetScript(id: Asset): Boolean
 
   def accountData(acc: Address): AccountDataInfo
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
 
   def leaseBalance(address: Address): LeaseBalance
 
-  def balance(address: Address, mayBeAssetId: Option[AssetId]): Long
+  def balance(address: Address, mayBeAssetId: AssetId): Long
 
-  def assetDistribution(assetId: ByteStr): AssetDistribution
-  def assetDistributionAtHeight(assetId: AssetId,
-                                height: Int,
-                                count: Int,
-                                fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage]
+  def assetDistribution(asset: Asset): AssetDistribution
+  def assetDistributionAtHeight(asset: Asset, height: Int, count: Int, fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage]
   def wavesDistribution(height: Int): Map[Address, Long]
 
   // the following methods are used exclusively by patches

@@ -6,6 +6,7 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.AssetId.Asset
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -59,7 +60,7 @@ object EmptyBlockchain extends Blockchain {
 
   override def containsTransaction(tx: Transaction): Boolean = false
 
-  override def assetDescription(id: ByteStr): Option[AssetDescription] = None
+  override def assetDescription(id: Asset): Option[AssetDescription] = None
 
   override def resolveAlias(a: Alias): Either[ValidationError, Address] = Left(GenericError("Empty blockchain"))
 
@@ -74,25 +75,25 @@ object EmptyBlockchain extends Blockchain {
 
   override def hasScript(address: Address): Boolean = false
 
-  override def assetScript(asset: AssetId): Option[Script] = None
+  override def assetScript(asset: Asset): Option[Script] = None
 
-  override def hasAssetScript(asset: AssetId): Boolean = false
+  override def hasAssetScript(asset: Asset): Boolean = false
 
   override def accountData(acc: Address): AccountDataInfo = AccountDataInfo(Map.empty)
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
 
-  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = 0
+  override def balance(address: Address, mayBeAssetId: AssetId): Long = 0
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
-  override def assetDistribution(assetId: ByteStr): AssetDistribution = Monoid.empty[AssetDistribution]
+  override def assetDistribution(assetId: Asset): AssetDistribution = Monoid.empty[AssetDistribution]
 
   override def wavesDistribution(height: Int): Map[Address, Long] = Map.empty
 
   override def allActiveLeases: Set[LeaseTransaction] = Set.empty
 
-  override def assetDistributionAtHeight(assetId: AssetId,
+  override def assetDistributionAtHeight(assetId: Asset,
                                          height: Int,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] =

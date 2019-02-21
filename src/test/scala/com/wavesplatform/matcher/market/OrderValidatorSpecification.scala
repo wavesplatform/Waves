@@ -13,6 +13,7 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -34,8 +35,8 @@ class OrderValidatorSpecification
     with PropertyChecks
     with NoShrink {
 
-  private val wbtc         = mkAssetId("WBTC").get
-  private val pairWavesBtc = AssetPair(None, Some(wbtc))
+  private val wbtc         = mkAssetId("WBTC")
+  private val pairWavesBtc = AssetPair(Waves, wbtc)
   private val defaultTs    = 1000
 
   private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
@@ -141,7 +142,7 @@ class OrderValidatorSpecification
       }
 
       "order price has invalid non-zero trailing decimals" in forAll(assetIdGen(1), accountGen, Gen.choose(1, 7)) {
-        case (Some(amountAsset), sender, amountDecimals) =>
+        case (amountAsset, sender, amountDecimals) =>
           portfolioTest(Portfolio(11 * Constants.UnitsInWave, LeaseBalance.empty, Map.empty)) { (ov, bc) =>
             (bc.hasScript _).when(sender.toAddress).returns(false)
             (bc.assetDescription _).when(amountAsset).returns(mkAssetDescription(amountDecimals))
@@ -149,7 +150,7 @@ class OrderValidatorSpecification
             val price = BigDecimal(10).pow(-amountDecimals - 1)
             ov(
               buy(
-                AssetPair(Some(amountAsset), None),
+                AssetPair(amountAsset, Waves),
                 10 * Constants.UnitsInWave,
                 price,
                 matcherFee = Some((0.003 * Constants.UnitsInWave).toLong)
@@ -173,9 +174,9 @@ class OrderValidatorSpecification
     }
 
     "validate order with smart token" when {
-      val asset1 = mkAssetId("asset1").get
-      val asset2 = mkAssetId("asset2").get
-      val pair   = AssetPair(Some(asset1), Some(asset2))
+      val asset1 = mkAssetId("asset1")
+      val asset2 = mkAssetId("asset2")
+      val pair   = AssetPair(asset1, asset2)
       val portfolio = Portfolio(10 * Constants.UnitsInWave,
                                 LeaseBalance.empty,
                                 Map(
@@ -322,7 +323,7 @@ class OrderValidatorSpecification
   private def mkOrderValidator(bc: Blockchain, tc: ExchangeTransactionCreator) =
     OrderValidator.blockchainAware(bc, tc.createTransaction, (0.003 * Constants.UnitsInWave).toLong, MatcherAccount, ntpTime)(_)
 
-  private def tradableBalance(p: Portfolio)(assetId: Option[AssetId]): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
+  private def tradableBalance(p: Portfolio)(assetId: AssetId): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
   private def exchangeTransactionCreator(blockchain: Blockchain) =
     new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings)

@@ -12,6 +12,7 @@ import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.transaction.AssetId.Asset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.utx.UtxPool
@@ -139,13 +140,13 @@ class TransactionsRouteSpec
       }
 
       "with sponsorship" in {
-        val assetId: ByteStr         = issueGen.sample.get.assetId()
+        val assetId: Asset           = Asset(issueGen.sample.get.assetId())
         val sender: PublicKeyAccount = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
-          "feeAssetId"      -> assetId.base58,
+          "feeAssetId"      -> assetId.id.base58,
           "senderPublicKey" -> Base58.encode(sender.publicKey),
           "recipient"       -> accountGen.sample.get.toAddress
         )
@@ -175,19 +176,19 @@ class TransactionsRouteSpec
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.base58
+          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.base58
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 5
         }
       }
 
       "with sponsorship, smart token and smart account" in {
-        val assetId: ByteStr         = issueGen.sample.get.assetId()
+        val assetId: Asset           = Asset(issueGen.sample.get.assetId())
         val sender: PublicKeyAccount = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
-          "feeAssetId"      -> assetId.base58,
+          "feeAssetId"      -> assetId.id.base58,
           "senderPublicKey" -> Base58.encode(sender.publicKey),
           "recipient"       -> accountGen.sample.get.toAddress
         )
@@ -218,7 +219,7 @@ class TransactionsRouteSpec
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.base58
+          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.base58
           (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 45
         }
       }

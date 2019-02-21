@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.BurnTransactionV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -71,12 +72,12 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
 
     val incorrectTrTx = TransferTransactionV2
       .create(
-        Some(ByteStr.decodeBase58(assetWProofs).get),
+        Asset(ByteStr.decodeBase58(assetWProofs).get),
         pkByAddress(firstAddress),
         pkByAddress(thirdAddress),
         1,
         System.currentTimeMillis + 10.minutes.toMillis,
-        None,
+        Waves,
         smartMinFee,
         Array.emptyByteArray,
         Proofs(Seq(ByteStr("assetWProofs".getBytes())))
@@ -93,7 +94,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       .create(
         AddressScheme.current.chainId,
         pkByAddress(firstAddress),
-        ByteStr.decodeBase58(assetWProofs).get,
+        Asset(ByteStr.decodeBase58(assetWProofs).get),
         1,
         smartMinFee,
         System.currentTimeMillis + 10.minutes.toMillis,

@@ -12,6 +12,7 @@ import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimen
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
+import com.wavesplatform.transaction.AssetId.Asset
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
@@ -331,7 +332,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
 
   def lastBlockTimestamp: Option[Long] = ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp)
 
-  def lastBlockId: Option[AssetId] = ngState.map(_.bestLiquidBlockId).orElse(blockchain.lastBlockId)
+  def lastBlockId: Option[ByteStr] = ngState.map(_.bestLiquidBlockId).orElse(blockchain.lastBlockId)
 
   def blockAt(height: Int): Option[Block] =
     if (height == this.height)
@@ -399,7 +400,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
     blockchain.portfolio(a).combine(p)
   }
 
-  override def transactionInfo(id: AssetId): Option[(Int, Transaction)] =
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
     ngState
       .fold(Diff.empty)(_.bestLiquidDiff)
       .transactions
@@ -414,7 +415,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
     ng.bestLiquidDiff.transactions.contains(tx.id()) || blockchain.containsTransaction(tx)
   }
 
-  override def assetDescription(id: AssetId): Option[AssetDescription] = ngState.fold(blockchain.assetDescription(id)) { ng =>
+  override def assetDescription(id: Asset): Option[AssetDescription] = ngState.fold(blockchain.assetDescription(id)) { ng =>
     val diff = ng.bestLiquidDiff
     CompositeBlockchain.composite(blockchain, diff).assetDescription(id)
   }
@@ -423,7 +424,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
     CompositeBlockchain.composite(blockchain, ng.bestLiquidDiff).resolveAlias(alias)
   }
 
-  override def leaseDetails(leaseId: AssetId): Option[LeaseDetails] = ngState match {
+  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = ngState match {
     case Some(ng) =>
       blockchain.leaseDetails(leaseId).map(ld => ld.copy(isActive = ng.bestLiquidDiff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
         ng.bestLiquidDiff.transactions.get(leaseId).collect {
@@ -434,7 +435,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
       blockchain.leaseDetails(leaseId)
   }
 
-  override def filledVolumeAndFee(orderId: AssetId): VolumeAndFee =
+  override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     ngState.fold(blockchain.filledVolumeAndFee(orderId))(
       _.bestLiquidDiff.orderFills.get(orderId).orEmpty.combine(blockchain.filledVolumeAndFee(orderId)))
 
@@ -465,14 +466,14 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
       )
       .getOrElse(blockchain.hasScript(address))
 
-  override def assetScript(asset: AssetId): Option[Script] = ngState.fold(blockchain.assetScript(asset)) { ng =>
+  override def assetScript(asset: Asset): Option[Script] = ngState.fold(blockchain.assetScript(asset)) { ng =>
     ng.bestLiquidDiff.assetScripts.get(asset) match {
       case None      => blockchain.assetScript(asset)
       case Some(scr) => scr
     }
   }
 
-  override def hasAssetScript(asset: AssetId): Boolean = ngState.fold(blockchain.hasAssetScript(asset)) { ng =>
+  override def hasAssetScript(asset: Asset): Boolean = ngState.fold(blockchain.hasAssetScript(asset)) { ng =>
     ng.bestLiquidDiff.assetScripts.get(asset) match {
       case None    => blockchain.hasAssetScript(asset)
       case Some(x) => x.nonEmpty
@@ -499,21 +500,21 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
         } yield address -> f(address)
       }
 
-  override def assetDistribution(assetId: AssetId): AssetDistribution = {
+  override def assetDistribution(assetId: Asset): AssetDistribution = {
     val fromInner = blockchain.assetDistribution(assetId)
     val fromNg    = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L)))
 
     fromInner |+| fromNg
   }
 
-  override def assetDistributionAtHeight(assetId: AssetId,
+  override def assetDistributionAtHeight(assetId: Asset,
                                          height: Int,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = {
     blockchain.assetDistributionAtHeight(assetId, height, count, fromAddress)
   }
 
-  override def wavesDistribution(height: Int): Map[Address, Long] = ngState.fold(blockchain.wavesDistribution(height)) { ng =>
+  override def wavesDistribution(height: Int): Map[Address, Long] = ngState.fold(blockchain.wavesDistribution(height)) { _ =>
     val innerDistribution = blockchain.wavesDistribution(height)
     if (height < this.height) innerDistribution
     else {
@@ -548,14 +549,14 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
 
   override def append(diff: Diff, carry: Long, block: Block): Unit = blockchain.append(diff, carry, block)
 
-  override def rollbackTo(targetBlockId: AssetId): Either[String, Seq[Block]] = blockchain.rollbackTo(targetBlockId)
+  override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = blockchain.rollbackTo(targetBlockId)
 
-  override def transactionHeight(id: AssetId): Option[Int] =
+  override def transactionHeight(id: ByteStr): Option[Int] =
     ngState flatMap { ng =>
       ng.bestLiquidDiff.transactions.get(id).map(_._1)
     } orElse blockchain.transactionHeight(id)
 
-  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = ngState match {
+  override def balance(address: Address, mayBeAssetId: AssetId): Long = ngState match {
     case Some(ng) =>
       blockchain.balance(address, mayBeAssetId) + ng.bestLiquidDiff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(mayBeAssetId)
     case None =>

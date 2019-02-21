@@ -4,6 +4,7 @@ import com.wavesplatform.OrderOps._
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.ValidationError.OrderValidationError
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.{NTPTime, TransactionGen}
@@ -122,8 +123,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(sellOrder = sell.updateMatcher(sender2)) shouldBe an[Left[_, _]]
 
         create(
-          buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = None)),
-          sellOrder = sell.updatePair(sell.assetPair.copy(priceAsset = Some(ByteStr(Array(1: Byte)))))
+          buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = Waves)),
+          sellOrder = sell.updatePair(sell.assetPair.copy(priceAsset = Asset(ByteStr(Array(1: Byte)))))
         ) shouldBe an[Left[_, _]]
     }
   }

@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -57,7 +58,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
   } yield {
     val unsigned =
       TransferTransactionV2
-        .create(None, master, recepient, amount, timestamp, None, fee, Array.emptyByteArray, proofs = Proofs.empty)
+        .create(Waves, master, recepient, amount, timestamp, Waves, fee, Array.emptyByteArray, proofs = Proofs.empty)
         .explicitGet()
     val sig0 = ByteStr(crypto.sign(s0, unsigned.bodyBytes()))
     val sig1 = ByteStr(crypto.sign(s1, unsigned.bodyBytes()))

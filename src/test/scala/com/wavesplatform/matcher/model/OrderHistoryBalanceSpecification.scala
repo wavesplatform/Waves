@@ -10,6 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.{AddressActor, MatcherTestData}
 import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._
 
@@ -28,7 +29,7 @@ class OrderHistoryBalanceSpecification
   import OrderHistoryBalanceSpecification._
 
   private val WctBtc   = AssetPair(mkAssetId("WCT"), mkAssetId("BTC"))
-  private val WavesBtc = AssetPair(None, mkAssetId("BTC"))
+  private val WavesBtc = AssetPair(Waves, mkAssetId("BTC"))
 
   private var oh = new OrderHistoryStub(system, ntpTime)
   override def beforeEach(): Unit = {
@@ -36,7 +37,7 @@ class OrderHistoryBalanceSpecification
     oh = new OrderHistoryStub(system, ntpTime)
   }
 
-  def openVolume(address: Address, asset: Option[AssetId]): Long = oh.ref(address).openVolume(asset)
+  def openVolume(address: Address, asset: AssetId): Long = oh.ref(address).openVolume(asset)
 
   def activeOrderIds(sender: Address): Seq[ByteStr]                        = oh.ref(sender).activeOrderIds
   def allOrderIds(sender: Address): Seq[ByteStr]                           = oh.ref(sender).allOrderIds
@@ -57,7 +58,7 @@ class OrderHistoryBalanceSpecification
     withClue("reserved assets") {
       openVolume(ord.senderPublicKey, WctBtc.amountAsset) shouldBe 0L
       openVolume(ord.senderPublicKey, WctBtc.priceAsset) shouldBe 7L
-      openVolume(ord.senderPublicKey, None) shouldBe ord.matcherFee
+      openVolume(ord.senderPublicKey, Waves) shouldBe ord.matcherFee
     }
 
     withClue("orders list") {
@@ -83,7 +84,7 @@ class OrderHistoryBalanceSpecification
     withClue("reserved assets") {
       openVolume(ord.senderPublicKey, WctBtc.amountAsset) shouldBe 10000L
       openVolume(ord.senderPublicKey, WctBtc.priceAsset) shouldBe 0L
-      openVolume(ord.senderPublicKey, None) shouldBe ord.matcherFee
+      openVolume(ord.senderPublicKey, Waves) shouldBe ord.matcherFee
     }
 
     withClue("orders list") {
@@ -128,7 +129,7 @@ class OrderHistoryBalanceSpecification
   }
 
   property("Should not reserve fee, if seller receives more WAVES than total fee in sell order") {
-    val pair = AssetPair(mkAssetId("BTC"), None)
+    val pair = AssetPair(mkAssetId("BTC"), Waves)
     val ord  = sell(pair, 100000, 0.01, matcherFee = Some(1000L))
 
     oh.process(OrderAdded(LimitOrder(ord)))
@@ -373,15 +374,15 @@ class OrderHistoryBalanceSpecification
     withClue(s"account checks, counter.senderPublicKey: ${counter.senderPublicKey}, counter.order.id=${counter.id()}") {
       openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 205L
       openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0L
-      openVolume(counter.senderPublicKey, None) shouldBe counter.matcherFee - LimitOrder.partialFee(counter.matcherFee,
-                                                                                                    counter.amount,
-                                                                                                    exec.executedAmount)
+      openVolume(counter.senderPublicKey, Waves) shouldBe counter.matcherFee - LimitOrder.partialFee(counter.matcherFee,
+                                                                                                     counter.amount,
+                                                                                                     exec.executedAmount)
     }
 
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
       openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
       openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
-      openVolume(submitted.senderPublicKey, None) shouldBe 0L
+      openVolume(submitted.senderPublicKey, Waves) shouldBe 0L
     }
   }
 
@@ -397,12 +398,12 @@ class OrderHistoryBalanceSpecification
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
       openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
       openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
-      openVolume(submitted.senderPublicKey, None) shouldBe 0L
+      openVolume(submitted.senderPublicKey, Waves) shouldBe 0L
     }
   }
 
   property("Sell ETH twice (filled, partial), buy WAVES order - filled") {
-    val pair      = AssetPair(mkAssetId("ETH"), None)
+    val pair      = AssetPair(mkAssetId("ETH"), Waves)
     val counter1  = sell(pair, 2864310, 0.003, matcherFee = Some(300000L))
     val counter2  = sell(pair, 7237977, 0.003, matcherFee = Some(300000L))
     val submitted = buy(pair, 4373667, 0.003, matcherFee = Some(300000L))
@@ -438,12 +439,12 @@ class OrderHistoryBalanceSpecification
     withClue(s"account checks, submitted.senderPublicKey: ${submitted.senderPublicKey}, submitted.order.id=${submitted.id()}") {
       openVolume(submitted.senderPublicKey, pair.amountAsset) shouldBe 0L
       openVolume(submitted.senderPublicKey, pair.priceAsset) shouldBe 0L
-      openVolume(submitted.senderPublicKey, None) shouldBe 0L
+      openVolume(submitted.senderPublicKey, Waves) shouldBe 0L
     }
   }
 
   property("Total execution of two counter orders and the one submitted") {
-    val pair = AssetPair(mkAssetId("Alice"), None)
+    val pair = AssetPair(mkAssetId("Alice"), Waves)
 
     val counter1  = buy(pair, 150, 190000000L, matcherFee = Some(300000))
     val counter2  = buy(pair, 200, 200000000L, matcherFee = Some(300000))
@@ -692,7 +693,7 @@ class OrderHistoryBalanceSpecification
   property("History by pair contains more elements than in common") {
     val pk    = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair1 = WavesBtc
-    val pair2 = AssetPair(None, mkAssetId("ETH"))
+    val pair2 = AssetPair(Waves, mkAssetId("ETH"))
 
     // 1. Place and cancel active.MaxElements orders
 
@@ -799,7 +800,7 @@ class OrderHistoryBalanceSpecification
     withClue("reserved assets") {
       openVolume(ord.senderPublicKey, WctBtc.amountAsset) shouldBe 0L
       openVolume(ord.senderPublicKey, WctBtc.priceAsset) shouldBe 7L
-      openVolume(ord.senderPublicKey, None) shouldBe ord.matcherFee
+      openVolume(ord.senderPublicKey, Waves) shouldBe ord.matcherFee
     }
 
     withClue("orders list") {
@@ -896,8 +897,8 @@ private object OrderHistoryBalanceSpecification {
 
     def allOrderIdsByPair(pair: AssetPair): Seq[Order.Id] = orderIds(Some(pair), false)
 
-    def openVolume(asset: Option[AssetId]): Long =
-      askAddressActor[Map[Option[AssetId], Long]](ref, AddressActor.GetReservedBalance).getOrElse(asset, 0L)
+    def openVolume(asset: AssetId): Long =
+      askAddressActor[Map[AssetId, Long]](ref, AddressActor.GetReservedBalance).getOrElse(asset, 0L)
 
     def orderStatus(orderId: ByteStr): OrderStatus =
       askAddressActor[OrderStatus](ref, AddressActor.GetOrderStatus(orderId))

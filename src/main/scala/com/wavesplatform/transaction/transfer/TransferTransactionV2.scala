@@ -12,10 +12,10 @@ import scala.util.{Failure, Success, Try}
 
 case class TransferTransactionV2 private (sender: PublicKeyAccount,
                                           recipient: AddressOrAlias,
-                                          assetId: Option[AssetId],
+                                          assetId: AssetId,
                                           amount: Long,
                                           timestamp: Long,
-                                          feeAssetId: Option[AssetId],
+                                          feeAssetId: AssetId,
                                           fee: Long,
                                           attachment: Array[Byte],
                                           proofs: Proofs)
@@ -38,27 +38,19 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
     Try {
       (for {
         parsed <- TransferTransaction.parseBase(bytes, 0)
-        (sender, assetIdOpt, feeAssetIdOpt, timestamp, amount, feeAmount, recipient, attachment, end) = parsed
+        (sender, assetId, feeAssetId, timestamp, amount, feeAmount, recipient, attachment, end) = parsed
         proofs <- Proofs.fromBytes(bytes.drop(end))
-        tt <- TransferTransactionV2.create(assetIdOpt.map(ByteStr(_)),
-                                           sender,
-                                           recipient,
-                                           amount,
-                                           timestamp,
-                                           feeAssetIdOpt.map(ByteStr(_)),
-                                           feeAmount,
-                                           attachment,
-                                           proofs)
+        tt     <- TransferTransactionV2.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, proofs)
       } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
   }
 
-  def create(assetId: Option[AssetId],
+  def create(assetId: AssetId,
              sender: PublicKeyAccount,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
-             feeAssetId: Option[AssetId],
+             feeAssetId: AssetId,
              feeAmount: Long,
              attachment: Array[Byte],
              proofs: Proofs): Either[ValidationError, TransactionT] = {
@@ -67,12 +59,12 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
     } yield TransferTransactionV2(sender, recipient, assetId, amount, timestamp, feeAssetId, feeAmount, attachment, proofs)
   }
 
-  def signed(assetId: Option[AssetId],
+  def signed(assetId: AssetId,
              sender: PublicKeyAccount,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
-             feeAssetId: Option[AssetId],
+             feeAssetId: AssetId,
              feeAmount: Long,
              attachment: Array[Byte],
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
@@ -81,12 +73,12 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
     }
   }
 
-  def selfSigned(assetId: Option[AssetId],
+  def selfSigned(assetId: AssetId,
                  sender: PrivateKeyAccount,
                  recipient: AddressOrAlias,
                  amount: Long,
                  timestamp: Long,
-                 feeAssetId: Option[AssetId],
+                 feeAssetId: AssetId,
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
     signed(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, sender)

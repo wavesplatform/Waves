@@ -4,6 +4,7 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.Proofs
 import play.api.libs.json._
 
@@ -54,7 +55,7 @@ object OrderJson {
                 signature: Option[Array[Byte]],
                 proofs: Option[Array[Array[Byte]]],
                 version: Option[Byte]): Order = {
-    val eproofs = proofs.map(p => Proofs(p.map(ByteStr.apply))).orElse(signature.map(s => Proofs(Seq(ByteStr(s))))).getOrElse(Proofs.empty)
+    val eproofs = proofs.map(p => Proofs(p.map(ByteStr.apply).toList)).orElse(signature.map(s => Proofs(List(ByteStr(s))))).getOrElse(Proofs.empty)
     Order(
       sender,
       matcher,
@@ -71,7 +72,10 @@ object OrderJson {
   }
 
   def readAssetPair(amountAsset: Option[Option[Array[Byte]]], priceAsset: Option[Option[Array[Byte]]]): AssetPair = {
-    AssetPair(amountAsset.flatten.map(ByteStr(_)), priceAsset.flatten.map(ByteStr(_)))
+    AssetPair(
+      amountAsset.flatten.map(arr => Asset(ByteStr(arr))).getOrElse(Waves),
+      priceAsset.flatten.map(arr => Asset(ByteStr(arr))).getOrElse(Waves)
+    )
   }
 
   implicit val assetPairReads: Reads[AssetPair] = {

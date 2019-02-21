@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.assets.BurnTransactionV2
-import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -26,7 +26,7 @@ case class SignedBurnV2Request(@ApiModelProperty(value = "Base58 encoded Issuer 
   def toTx: Either[ValidationError, BurnTransactionV2] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _assetId    <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
+      _assetId    <- parseBase58ToAsset(assetId)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       chainId = AddressScheme.current.chainId

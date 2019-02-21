@@ -9,7 +9,6 @@ import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.ActivationStatus
-import com.wavesplatform.http.DebugApiRoute._
 import com.wavesplatform.http.DebugMessage._
 import com.wavesplatform.http.{DebugMessage, RollbackParams, api_key}
 import com.wavesplatform.it.Node

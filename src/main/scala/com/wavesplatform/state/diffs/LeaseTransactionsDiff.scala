@@ -2,9 +2,10 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import cats.implicits._
+import com.wavesplatform.account.Address
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.account.Address
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.lease._
@@ -20,7 +21,7 @@ object LeaseTransactionsDiff {
         Left(GenericError("Cannot lease to self"))
       else {
         val lease   = blockchain.leaseBalance(tx.sender)
-        val balance = blockchain.balance(tx.sender, None)
+        val balance = blockchain.balance(tx.sender, Waves)
         if (balance - lease.out < tx.amount) {
           Left(GenericError(s"Cannot lease more than own: Balance:${balance}, already leased: ${lease.out}"))
         } else {

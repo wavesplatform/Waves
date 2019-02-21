@@ -4,6 +4,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -44,8 +45,8 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         val setupBlocks   = setupTxs.map(TestBlock.create)
         val transferBlock = TestBlock.create(Seq(transfer))
 
-        val Some(assetId) = transfer.feeAssetId
-        val contract      = transfer.sender
+        val Asset(assetId) = transfer.feeAssetId
+        val contract       = transfer.sender
 
         val contractSpent: Long = ENOUGH_FEE + 1
         val sponsorSpent: Long  = ENOUGH_FEE * 3 - 1 + ENOUGH_FEE * CommonValidation.FeeUnit
@@ -56,11 +57,11 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
           val contractPortfolio = blck.portfolio(contract)
           val sponsorPortfolio  = blck.portfolio(sponsor)
 
-          contractPortfolio.balanceOf(Some(assetId)) shouldEqual ENOUGH_FEE * 2
-          contractPortfolio.balanceOf(None) shouldEqual ENOUGH_AMT - contractSpent
+          contractPortfolio.balanceOf(Asset(assetId)) shouldEqual ENOUGH_FEE * 2
+          contractPortfolio.balanceOf(Waves) shouldEqual ENOUGH_AMT - contractSpent
 
-          sponsorPortfolio.balanceOf(Some(assetId)) shouldEqual Long.MaxValue - ENOUGH_FEE * 2
-          sponsorPortfolio.balanceOf(None) shouldEqual ENOUGH_AMT - sponsorSpent
+          sponsorPortfolio.balanceOf(Asset(assetId)) shouldEqual Long.MaxValue - ENOUGH_FEE * 2
+          sponsorPortfolio.balanceOf(Waves) shouldEqual ENOUGH_AMT - sponsorSpent
         }
     }
   }
@@ -71,9 +72,9 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         val setupBlocks   = setupTxs.map(TestBlock.create)
         val transferBlock = TestBlock.create(Seq(transfer))
 
-        val Some(assetId) = transfer.feeAssetId
-        val contract      = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
-        val recipient     = transfer.sender
+        val Asset(assetId) = transfer.feeAssetId
+        val contract       = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
+        val recipient      = transfer.sender
 
         val contractSpent: Long  = ENOUGH_FEE * 4 + ENOUGH_FEE * CommonValidation.FeeUnit
         val recipientSpent: Long = 1
@@ -82,11 +83,11 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
           val contractPortfolio  = blck.portfolio(contract)
           val recipientPortfolio = blck.portfolio(recipient)
 
-          contractPortfolio.balanceOf(Some(assetId)) shouldEqual Long.MaxValue - ENOUGH_FEE * 2
-          contractPortfolio.balanceOf(None) shouldEqual ENOUGH_AMT - contractSpent
+          contractPortfolio.balanceOf(Asset(assetId)) shouldEqual Long.MaxValue - ENOUGH_FEE * 2
+          contractPortfolio.balanceOf(Waves) shouldEqual ENOUGH_AMT - contractSpent
 
-          recipientPortfolio.balanceOf(Some(assetId)) shouldEqual ENOUGH_FEE * 2
-          recipientPortfolio.balanceOf(None) shouldEqual ENOUGH_AMT - recipientSpent
+          recipientPortfolio.balanceOf(Asset(assetId)) shouldEqual ENOUGH_FEE * 2
+          recipientPortfolio.balanceOf(Waves) shouldEqual ENOUGH_AMT - recipientSpent
         }
     }
   }
@@ -118,7 +119,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       sponsorTx = SponsorFeeTransaction
         .selfSigned(
           contract,
-          issueTx.id(),
+          Asset(issueTx.id()),
           Some(1),
           ENOUGH_FEE,
           timestamp + 4
@@ -126,12 +127,12 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       transferToRecipient = TransferTransactionV2
         .selfSigned(
-          Some(issueTx.id()),
+          Asset(issueTx.id()),
           contract,
           recipient,
           ENOUGH_FEE * 3,
           System.currentTimeMillis() + 4,
-          None,
+          Waves,
           ENOUGH_FEE,
           Array.emptyByteArray
         )
@@ -146,12 +147,12 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       transferTx = TransferTransactionV2
         .selfSigned(
-          None,
+          Waves,
           recipient,
           accountGen.sample.get,
           1,
           System.currentTimeMillis() + 8,
-          Some(issueTx.id()),
+          Asset(issueTx.id()),
           ENOUGH_FEE,
           Array.emptyByteArray
         )
@@ -186,7 +187,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
       sponsorTx = SponsorFeeTransaction
         .selfSigned(
           sponsor,
-          issueTx.id(),
+          Asset(issueTx.id()),
           Some(1),
           ENOUGH_FEE,
           timestamp + 4
@@ -194,12 +195,12 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       transferToContract = TransferTransactionV2
         .selfSigned(
-          Some(issueTx.id()),
+          Asset(issueTx.id()),
           sponsor,
           contract,
           ENOUGH_FEE * 3,
           System.currentTimeMillis() + 4,
-          None,
+          Waves,
           ENOUGH_FEE,
           Array.emptyByteArray
         )
@@ -214,12 +215,12 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       transferTx = TransferTransactionV2
         .selfSigned(
-          None,
+          Waves,
           contract,
           sponsor,
           1,
           System.currentTimeMillis() + 8,
-          Some(issueTx.id()),
+          Asset(issueTx.id()),
           ENOUGH_FEE,
           Array.emptyByteArray
         )

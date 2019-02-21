@@ -9,6 +9,7 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{AssetId, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
@@ -137,15 +138,15 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
     portfolioCache.get(a)
   }
 
-  private val balancesCache: LoadingCache[(Address, Option[AssetId]), java.lang.Long] = cache(maxCacheSize * 16, loadBalance)
-  protected def discardBalance(key: (Address, Option[AssetId]))                       = balancesCache.invalidate(key)
-  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long         = balancesCache.get(address -> mayBeAssetId)
-  protected def loadBalance(req: (Address, Option[AssetId])): Long
+  private val balancesCache: LoadingCache[(Address, AssetId), java.lang.Long] = cache(maxCacheSize * 16, loadBalance)
+  protected def discardBalance(key: (Address, AssetId)): Unit                 = balancesCache.invalidate(key)
+  override def balance(address: Address, mayBeAssetId: AssetId): Long         = balancesCache.get(address -> mayBeAssetId)
+  protected def loadBalance(req: (Address, AssetId)): Long
 
-  private val assetDescriptionCache: LoadingCache[AssetId, Option[AssetDescription]] = cache(maxCacheSize, loadAssetDescription)
-  protected def loadAssetDescription(assetId: AssetId): Option[AssetDescription]
-  protected def discardAssetDescription(assetId: AssetId): Unit             = assetDescriptionCache.invalidate(assetId)
-  override def assetDescription(assetId: AssetId): Option[AssetDescription] = assetDescriptionCache.get(assetId)
+  private val assetDescriptionCache: LoadingCache[Asset, Option[AssetDescription]] = cache(maxCacheSize, loadAssetDescription)
+  protected def loadAssetDescription(asset: Asset): Option[AssetDescription]
+  protected def discardAssetDescription(asset: Asset): Unit             = assetDescriptionCache.invalidate(asset)
+  override def assetDescription(asset: Asset): Option[AssetDescription] = assetDescriptionCache.get(asset)
 
   private val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(maxCacheSize, loadVolumeAndFee)
   protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee
@@ -161,13 +162,13 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
   override def hasScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
-  private val assetScriptCache: LoadingCache[AssetId, Option[Script]] = cache(maxCacheSize, loadAssetScript)
-  protected def loadAssetScript(asset: AssetId): Option[Script]
-  protected def hasAssetScriptBytes(asset: AssetId): Boolean
-  protected def discardAssetScript(asset: AssetId): Unit = assetScriptCache.invalidate(asset)
+  private val assetScriptCache: LoadingCache[Asset, Option[Script]] = cache(maxCacheSize, loadAssetScript)
+  protected def loadAssetScript(asset: Asset): Option[Script]
+  protected def hasAssetScriptBytes(asset: Asset): Boolean
+  protected def discardAssetScript(asset: Asset): Unit = assetScriptCache.invalidate(asset)
 
-  override def assetScript(asset: AssetId): Option[Script] = assetScriptCache.get(asset)
-  override def hasAssetScript(asset: AssetId): Boolean =
+  override def assetScript(asset: Asset): Option[Script] = assetScriptCache.get(asset)
+  override def hasAssetScript(asset: Asset): Boolean =
     assetScriptCache.getIfPresent(asset) match {
       case null => hasAssetScriptBytes(asset)
       case x    => x.nonEmpty
@@ -194,17 +195,17 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
                          carry: Long,
                          newAddresses: Map[Address, BigInt],
                          wavesBalances: Map[BigInt, Long],
-                         assetBalances: Map[BigInt, Map[ByteStr, Long]],
+                         assetBalances: Map[BigInt, Map[Asset, Long]],
                          leaseBalances: Map[BigInt, LeaseBalance],
                          addressTransactions: Map[AddressId, List[TransactionId]],
                          leaseStates: Map[ByteStr, Boolean],
-                         reissuedAssets: Map[ByteStr, AssetInfo],
+                         reissuedAssets: Map[Asset, AssetInfo],
                          filledQuantity: Map[ByteStr, VolumeAndFee],
                          scripts: Map[BigInt, Option[Script]],
-                         assetScripts: Map[AssetId, Option[Script]],
+                         assetScripts: Map[Asset, Option[Script]],
                          data: Map[BigInt, AccountDataInfo],
                          aliases: Map[Alias, BigInt],
-                         sponsorship: Map[AssetId, Sponsorship]): Unit
+                         sponsorship: Map[Asset, Sponsorship]): Unit
 
   override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
     val newHeight = current._1 + 1
@@ -227,18 +228,18 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
     log.trace(s"CACHE lastAddressId = $lastAddressId")
 
     val wavesBalances        = Map.newBuilder[BigInt, Long]
-    val assetBalances        = Map.newBuilder[BigInt, Map[ByteStr, Long]]
+    val assetBalances        = Map.newBuilder[BigInt, Map[Asset, Long]]
     val leaseBalances        = Map.newBuilder[BigInt, LeaseBalance]
     val updatedLeaseBalances = Map.newBuilder[Address, LeaseBalance]
     val newPortfolios        = Seq.newBuilder[Address]
-    val newBalances          = Map.newBuilder[(Address, Option[AssetId]), java.lang.Long]
+    val newBalances          = Map.newBuilder[(Address, AssetId), java.lang.Long]
 
     for ((address, portfolioDiff) <- diff.portfolios) {
       val aid = addressId(address)
       if (portfolioDiff.balance != 0) {
-        val wbalance = (portfolioDiff.balance + balance(address, None))
-        wavesBalances += aid           -> wbalance
-        newBalances += (address, None) -> wbalance
+        val wbalance = portfolioDiff.balance + balance(address, Waves)
+        wavesBalances += aid            -> wbalance
+        newBalances += (address, Waves) -> wbalance
       }
 
       if (portfolioDiff.lease != LeaseBalance.empty) {
@@ -249,9 +250,8 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
 
       if (portfolioDiff.assets.nonEmpty) {
         val newAssetBalances = for { (k, v) <- portfolioDiff.assets if v != 0 } yield {
-          val b        = Some(k)
-          val abalance = v + balance(address, b)
-          newBalances += (address, b) -> abalance
+          val abalance = v + balance(address, k)
+          newBalances += (address, k) -> abalance
           k                           -> abalance
         }
         if (newAssetBalances.nonEmpty) {

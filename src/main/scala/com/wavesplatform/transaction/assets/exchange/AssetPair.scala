@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Order.assetIdBytes
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
@@ -16,12 +17,12 @@ case class AssetPair(@(ApiModelProperty @field)(
                        value = "Base58 encoded amount asset id",
                        dataType = "string",
                        example = "WAVES"
-                     ) amountAsset: Option[AssetId],
+                     ) amountAsset: AssetId,
                      @(ApiModelProperty @field)(
                        value = "Base58 encoded amount price id",
                        dataType = "string",
                        example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
-                     ) priceAsset: Option[AssetId]) {
+                     ) priceAsset: AssetId) {
   import AssetPair._
 
   @ApiModelProperty(hidden = true)
@@ -33,22 +34,25 @@ case class AssetPair(@(ApiModelProperty @field)(
   def isValid: Validation         = (amountAsset != priceAsset) :| "Invalid AssetPair"
   def bytes: Array[Byte]          = assetIdBytes(amountAsset) ++ assetIdBytes(priceAsset)
   def json: JsObject = Json.obj(
-    "amountAsset" -> amountAsset.map(_.base58),
-    "priceAsset"  -> priceAsset.map(_.base58)
+    "amountAsset" -> amountAsset.maybeBase58Repr,
+    "priceAsset"  -> priceAsset.maybeBase58Repr
   )
   def reverse = AssetPair(priceAsset, amountAsset)
 
-  def assets: Set[Option[AssetId]] = Set(amountAsset, priceAsset)
+  def assets: Set[AssetId] = Set(amountAsset, priceAsset)
 }
 
 object AssetPair {
   val WavesName = "WAVES"
 
-  def assetIdStr(aid: Option[AssetId]): String = aid.fold(WavesName)(_.base58)
+  def assetIdStr(aid: AssetId): String = aid match {
+    case Waves     => WavesName
+    case Asset(id) => id.base58
+  }
 
-  def extractAssetId(a: String): Try[Option[AssetId]] = a match {
-    case `WavesName` => Success(None)
-    case other       => ByteStr.decodeBase58(other).map(Option(_))
+  def extractAssetId(a: String): Try[AssetId] = a match {
+    case `WavesName` => Success(Waves)
+    case other       => ByteStr.decodeBase58(other).map(Asset)
   }
 
   def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =
@@ -60,6 +64,9 @@ object AssetPair {
   def fromBytes(xs: Array[Byte]): AssetPair = {
     val (amount, offset) = Deser.parseByteArrayOption(xs, 0, AssetIdLength)
     val (price, _)       = Deser.parseByteArrayOption(xs, offset, AssetIdLength)
-    AssetPair(amount.map(ByteStr(_)), price.map(ByteStr(_)))
+    AssetPair(
+      AssetId.fromCompatId(amount.map(ByteStr(_))),
+      AssetId.fromCompatId(price.map(ByteStr(_)))
+    )
   }
 }

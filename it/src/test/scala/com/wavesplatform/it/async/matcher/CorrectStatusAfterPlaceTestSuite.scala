@@ -10,6 +10,7 @@ import com.wavesplatform.it.async.matcher.CorrectStatusAfterPlaceTestSuite._
 import com.wavesplatform.it.sync.createSignedIssueRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
@@ -50,9 +51,9 @@ class CorrectStatusAfterPlaceTestSuite extends FreeSpec with Matchers with Nodes
   )
 
   private val pairs = Seq(
-    AssetPair(None, Some(Asset1.id())),
-    AssetPair(None, Some(Asset2.id())),
-    AssetPair(Some(Asset2.id()), Some(Asset1.id())),
+    AssetPair(Waves, Asset(Asset1.id())),
+    AssetPair(Waves, Asset(Asset2.id())),
+    AssetPair(Asset(Asset2.id()), Asset(Asset1.id())),
   )
 
   override protected val nodeConfigs: Seq[Config] =
@@ -81,7 +82,7 @@ class CorrectStatusAfterPlaceTestSuite extends FreeSpec with Matchers with Nodes
           val transferTx = MassTransferTransaction
             .selfSigned(
               sender = Issuer,
-              assetId = Some(issueTx.id()),
+              assetId = Asset(issueTx.id()),
               transfers = traders.map(x => MassTransferTransaction.ParsedTransfer(x.toAddress, sendAmount)).toList,
               timestamp = startTs,
               feeAmount = 0.006.waves,

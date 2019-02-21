@@ -11,9 +11,11 @@ import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.transaction.transfer._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
+
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -29,7 +31,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
 
   test("valid tx send by network to node should be in blockchain") {
     val tx = TransferTransactionV1
-      .selfSigned(None, node.privateKey, Address.fromString(node.address).explicitGet(), 1L, System.currentTimeMillis(), None, 100000L, Array())
+      .selfSigned(Waves, node.privateKey, Address.fromString(node.address).explicitGet(), 1L, System.currentTimeMillis(), Waves, 100000L, Array())
       .right
       .get
 
@@ -40,12 +42,12 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
     val tx = TransferTransactionV1
-      .selfSigned(None,
+      .selfSigned(Waves,
                   node.privateKey,
                   Address.fromString(node.address).explicitGet(),
                   1L,
                   System.currentTimeMillis() + (1 days).toMillis,
-                  None,
+                  Waves,
                   100000L,
                   Array())
       .right

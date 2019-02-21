@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.transaction.AssetId.Asset
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.{NTPTime, TransactionGen}
@@ -16,10 +17,12 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   property("ExchangeTransaction - blockchain's functions should be allowed during an order's verification") {
     forAll(exchangeTransactionV2Gen) { tx: ExchangeTransaction =>
       val bc = stub[Blockchain]
-      Seq(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset).flatten.foreach { assetId =>
-        (bc.assetDescription _).when(assetId).returns(mkAssetDescription(tx.sender, 8))
-        (bc.assetScript _).when(assetId).returns(None)
-      }
+      Seq(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset)
+        .collect { case asset @ Asset(_) => asset }
+        .foreach { asset =>
+          (bc.assetDescription _).when(asset).returns(mkAssetDescription(tx.sender, 8))
+          (bc.assetScript _).when(asset).returns(None)
+        }
 
       val scriptText =
         """match tx {

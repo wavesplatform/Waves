@@ -11,6 +11,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import org.scalatest._
@@ -55,8 +56,8 @@ class MatcherTickerTestSuite
 
     "try to work with incorrect pair" in {
       val usdWavesPair = AssetPair(
-        amountAsset = Some(UsdId),
-        priceAsset = None
+        amountAsset = UsdId,
+        priceAsset = Waves
       )
 
       assert(
@@ -215,22 +216,22 @@ object MatcherTickerTestSuite {
     .right
     .get
 
-  val UsdId: AssetId    = IssueUsdTx.id()
-  val EightDigitAssetId = IssueEightDigitAssetTx.id()
+  val UsdId: AssetId             = Asset(IssueUsdTx.id())
+  val EightDigitAssetId: AssetId = Asset(IssueEightDigitAssetTx.id())
 
   val edUsdPair = AssetPair(
-    amountAsset = Some(EightDigitAssetId),
-    priceAsset = Some(UsdId)
+    amountAsset = EightDigitAssetId,
+    priceAsset = UsdId
   )
 
   val wctWavesPair = AssetPair(
-    amountAsset = Some(EightDigitAssetId),
-    priceAsset = None
+    amountAsset = EightDigitAssetId,
+    priceAsset = Waves
   )
 
   val wavesUsdPair = AssetPair(
-    amountAsset = None,
-    priceAsset = Some(UsdId)
+    amountAsset = Waves,
+    priceAsset = UsdId
   )
 
   private val updatedMatcherConfig = parseString(s"""

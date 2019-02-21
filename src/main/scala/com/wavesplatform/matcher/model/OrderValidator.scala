@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier
@@ -50,23 +51,23 @@ object OrderValidator {
         }
     }
 
-  private def verifySmartToken(blockchain: Blockchain, assetId: AssetId, tx: ExchangeTransaction) =
-    blockchain.assetScript(assetId).fold[Either[String, Unit]](Right(())) { script =>
+  private def verifySmartToken(blockchain: Blockchain, asset: Asset, tx: ExchangeTransaction) =
+    blockchain.assetScript(asset).fold[Either[String, Unit]](Right(())) { script =>
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
         Left("Trading of scripted asset isn't allowed yet")
       else {
         try ScriptRunner(blockchain.height, Coproduct(tx), blockchain, script, isTokenScript = true) match {
-          case (_, Left(execError)) => Left(s"Error executing script of asset $assetId: $execError")
-          case (_, Right(FALSE))    => Left(s"Order rejected by script of asset $assetId")
+          case (_, Left(execError)) => Left(s"Error executing script of asset $asset: $execError")
+          case (_, Right(FALSE))    => Left(s"Order rejected by script of asset $asset")
           case (_, Right(TRUE))     => Right(())
           case (_, Right(x))        => Left(s"Script returned not a boolean result, but $x")
         } catch {
-          case NonFatal(e) => Left(s"Caught ${e.getClass.getCanonicalName} while executing script of asset $assetId: ${e.getMessage}")
+          case NonFatal(e) => Left(s"Caught ${e.getClass.getCanonicalName} while executing script of asset $asset: ${e.getMessage}")
         }
       }.left.map(_.toString)
     }
 
-  @inline private def decimals(blockchain: Blockchain, assetId: Option[AssetId]) = assetId.fold[Either[String, Int]](Right(8)) { aid =>
+  @inline private def decimals(blockchain: Blockchain, assetId: AssetId) = assetId.fold[Either[String, Int]](Right(8)) { aid =>
     blockchain.assetDescription(aid).map(_.decimals).toRight(s"Invalid asset id $aid")
   }
 
@@ -95,8 +96,12 @@ object OrderValidator {
       transactionCreator(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime()).left.map(_.toString)
     }
 
-    def verifyAssetScript(assetId: Option[AssetId]) = assetId.fold[ValidationResult](Right(order)) { assetId =>
-      exchangeTx.flatMap(verifySmartToken(blockchain, assetId, _)).right.map(_ => order)
+    def verifyAssetScript(assetId: AssetId) = {
+      assetId match {
+        case Waves => Right(order)
+        case asset @ Asset(_) =>
+          exchangeTx.flatMap(verifySmartToken(blockchain, asset, _)).right.map(_ => order)
+      }
     }
 
     for {
@@ -113,10 +118,10 @@ object OrderValidator {
     } yield order
   }
 
-  private def formatBalance(b: Map[Option[AssetId], Long]): String =
+  private def formatBalance(b: Map[AssetId, Long]): String =
     b.map { case (k, v) => s"${AssetPair.assetIdStr(k)}:$v" } mkString ("{", ", ", "}")
 
-  private def validateBalance(order: Order, tradableBalance: Option[AssetId] => Long): ValidationResult = {
+  private def validateBalance(order: Order, tradableBalance: AssetId => Long): ValidationResult = {
     val lo               = LimitOrder(order)
     val requiredForOrder = lo.requiredBalance
 
@@ -136,7 +141,7 @@ object OrderValidator {
   def matcherSettingsAware(
       matcherPublicKey: PublicKeyAccount,
       blacklistedAddresses: Set[Address],
-      blacklistedAssets: Set[Option[AssetId]],
+      blacklistedAssets: Set[AssetId],
   )(order: Order): ValidationResult = {
     for {
       _ <- (Right(order): ValidationResult)
@@ -157,7 +162,7 @@ object OrderValidator {
 
   def accountStateAware(
       sender: Address,
-      tradableBalance: Option[AssetId] => Long,
+      tradableBalance: AssetId => Long,
       activeOrderCount: => Int,
       lowestOrderTimestamp: => Long,
       orderExists: ByteStr => Boolean,

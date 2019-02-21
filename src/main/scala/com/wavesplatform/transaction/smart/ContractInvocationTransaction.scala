@@ -10,12 +10,13 @@ import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL, REF}
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.AssetId._
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
-import play.api.libs.json.{Format, JsObject}
+import play.api.libs.json.JsObject
 
 import scala.util.{Failure, Success, Try}
 
@@ -43,13 +44,13 @@ case class ContractInvocationTransaction private (chainId: Byte,
         sender.publicKey,
         contractAddress.bytes.arr,
         Serde.serialize(fc),
-        Deser.serializeOption(payment)(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId)(_.arr)),
+        Deser.serializeOption(payment)(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId.compatId)(_.arr)),
         Longs.toByteArray(fee),
         Longs.toByteArray(timestamp)
       )
     )
 
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val assetFee: (AssetId, Long) = (Waves, fee)
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
       jsonBase()
@@ -61,7 +62,7 @@ case class ContractInvocationTransaction private (chainId: Byte,
         )
     )
 
-  override def checkedAssets(): Seq[AssetId] = payment.toSeq.flatMap(_.assetId)
+  override def checkedAssets(): Seq[AssetId] = payment.toSeq.map(_.assetId)
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
@@ -70,10 +71,9 @@ case class ContractInvocationTransaction private (chainId: Byte,
 
 object ContractInvocationTransaction extends TransactionParserFor[ContractInvocationTransaction] with TransactionParser.MultipleVersions {
 
-  import play.api.libs.json._
-  import play.api.libs.json.Json
+  import play.api.libs.json.{Json, _}
 
-  case class Payment(amount: Long, assetId: Option[AssetId])
+  case class Payment(amount: Long, assetId: AssetId)
 
   implicit val paymentPartFormat: Format[ContractInvocationTransaction.Payment] = Json.format
 
@@ -106,10 +106,10 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       val rest               = bytes.drop(fcStart)
       val (fc, remaining)    = Serde.deserialize(rest, all = false).explicitGet()
       val paymentFeeTsProofs = rest.takeRight(remaining)
-      val (payment: Option[(Option[AssetId], Long)], offset) = Deser.parseOption(paymentFeeTsProofs, 0)(arr => {
-        val amt: Long                             = Longs.fromByteArray(arr.take(8))
-        val (maybeAsset: Option[AssetId], offset) = Deser.parseOption(arr, 8)(ByteStr(_))
-        (maybeAsset, amt)
+      val (payment: Option[(AssetId, Long)], offset) = Deser.parseOption(paymentFeeTsProofs, 0)(arr => {
+        val amt: Long                          = Longs.fromByteArray(arr.take(8))
+        val (maybeAssetId: Option[ByteStr], _) = Deser.parseOption(arr, 8)(ByteStr(_))
+        (AssetId.fromCompatId(maybeAssetId), amt)
       })
       val feeTsProofs = paymentFeeTsProofs.drop(offset)
       val fee         = Longs.fromByteArray(feeTsProofs.slice(0, 8))

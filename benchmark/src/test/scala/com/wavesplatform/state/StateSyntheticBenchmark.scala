@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.StateSyntheticBenchmark._
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -41,7 +42,7 @@ object StateSyntheticBenchmark {
       for {
         amount    <- Gen.choose(1, waves(1))
         recipient <- accountGen
-      } yield TransferTransactionV1.selfSigned(None, sender, recipient, amount, ts, None, 100000, Array.emptyByteArray).explicitGet()
+      } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, ts, Waves, 100000, Array.emptyByteArray).explicitGet()
   }
 
   @State(Scope.Benchmark)
@@ -58,12 +59,12 @@ object StateSyntheticBenchmark {
       } yield
         TransferTransactionV2
           .selfSigned(
-            None,
+            Waves,
             sender,
             recipient.toAddress,
             amount,
             ts,
-            None,
+            Waves,
             1000000,
             Array.emptyByteArray
           )

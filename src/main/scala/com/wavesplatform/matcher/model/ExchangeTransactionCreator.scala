@@ -7,6 +7,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.{AssetId, ValidationError}
 
@@ -51,7 +52,14 @@ object ExchangeTransactionCreator {
     * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
   def minFee(blockchain: Blockchain, orderMatchTxFee: Long, matcherAddress: Address, assetPair: AssetPair): Long = {
-    def assetFee(assetId: AssetId): Long   = if (blockchain.hasAssetScript(assetId)) CommonValidation.ScriptExtraFee else 0L
+    def assetFee(assetId: AssetId): Long = {
+      assetId match {
+        case Waves => 0L
+        case asset @ Asset(_) =>
+          if (blockchain.hasAssetScript(asset)) CommonValidation.ScriptExtraFee
+          else 0L
+      }
+    }
     def accountFee(address: Address): Long = if (blockchain.hasScript(address)) CommonValidation.ScriptExtraFee else 0L
 
     orderMatchTxFee +

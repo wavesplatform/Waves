@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.transaction.AssetId.Asset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import org.scalacheck.Gen
@@ -19,7 +20,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
     first.timestamp shouldEqual second.timestamp
     first.fee shouldEqual second.fee
     first.version shouldEqual second.version
-    first.assetId shouldEqual second.assetId
+    first.asset shouldEqual second.asset
     first.proofs shouldEqual second.proofs
     first.bytes() shouldEqual second.bytes()
     first.script shouldEqual second.script
@@ -32,7 +33,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
          .create(
            AddressScheme.current.chainId,
            PublicKeyAccount.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet(),
-           ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get,
+           Asset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
            Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()),
            78311891L,
            1868142423132802425L,

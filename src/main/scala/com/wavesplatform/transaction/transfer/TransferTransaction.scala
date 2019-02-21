@@ -3,41 +3,43 @@ package com.wavesplatform.transaction.transfer
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import com.wavesplatform.crypto._
 
 trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
-  def assetId: Option[AssetId]
+  def assetId: AssetId
   def recipient: AddressOrAlias
   def amount: Long
-  def feeAssetId: Option[AssetId]
+  def feeAssetId: AssetId
   def fee: Long
   def attachment: Array[Byte]
   def version: Byte
 
-  override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
+  override val assetFee: (AssetId, Long) = (feeAssetId, fee)
 
   override final val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
       "version"    -> version,
       "recipient"  -> recipient.stringRepr,
-      "assetId"    -> assetId.map(_.base58),
-      "feeAssetId" -> feeAssetId.map(_.base58),
-      "feeAsset"   -> feeAssetId.map(_.base58), // legacy v0.11.1 compat
+      "assetId"    -> assetId.maybeBase58Repr,
+      "feeAssetId" -> feeAssetId.maybeBase58Repr,
+      "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
       "attachment" -> Base58.encode(attachment)
     ))
 
   final protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes  = Longs.toByteArray(timestamp)
-    val assetIdBytes    = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
-    val feeAssetIdBytes = feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+    val assetIdBytes    = assetId.byteRepr
+    val feeAssetIdBytes = feeAssetId.byteRepr
     val amountBytes     = Longs.toByteArray(amount)
     val feeBytes        = Longs.toByteArray(fee)
 
@@ -52,7 +54,7 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
       Deser.serializeArray(attachment)
     )
   }
-  override def checkedAssets(): Seq[AssetId] = assetId.toSeq
+  override def checkedAssets(): Seq[AssetId] = Seq(assetId)
 }
 
 object TransferTransaction {
@@ -74,17 +76,29 @@ object TransferTransaction {
   }
 
   def parseBase(bytes: Array[Byte], start: Int) = {
-    val sender              = PublicKeyAccount(bytes.slice(start, start + KeyLength))
-    val (assetIdOpt, s0)    = Deser.parseByteArrayOption(bytes, start + KeyLength, AssetIdLength)
+    val sender           = PublicKeyAccount(bytes.slice(start, start + KeyLength))
+    val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, start + KeyLength, AssetIdLength)
+
+    val assetId = assetIdOpt match {
+      case Some(arr) => Asset(ByteStr(arr))
+      case None      => Waves
+    }
+
     val (feeAssetIdOpt, s1) = Deser.parseByteArrayOption(bytes, s0, AssetIdLength)
-    val timestamp           = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
-    val amount              = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
-    val feeAmount           = Longs.fromByteArray(bytes.slice(s1 + 16, s1 + 24))
+
+    val feeAssetId = feeAssetIdOpt match {
+      case Some(arr) => Asset(ByteStr(arr))
+      case None      => Waves
+    }
+
+    val timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
+    val amount    = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
+    val feeAmount = Longs.fromByteArray(bytes.slice(s1 + 16, s1 + 24))
     for {
       recRes <- AddressOrAlias.fromBytes(bytes, s1 + 24)
       (recipient, recipientEnd) = recRes
       (attachment, end)         = Deser.parseArraySize(bytes, recipientEnd)
-    } yield (sender, assetIdOpt, feeAssetIdOpt, timestamp, amount, feeAmount, recipient, attachment, end)
+    } yield (sender, assetId, feeAssetId, timestamp, amount, feeAmount, recipient, attachment, end)
 
   }
 

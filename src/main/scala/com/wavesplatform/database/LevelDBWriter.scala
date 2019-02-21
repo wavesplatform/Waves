@@ -15,6 +15,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction._
@@ -113,11 +114,11 @@ class LevelDBWriter(writableDB: DB,
     }
   }
 
-  override protected def loadAssetScript(asset: AssetId): Option[Script] = readOnly { db =>
+  override protected def loadAssetScript(asset: Asset): Option[Script] = readOnly { db =>
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
   }
 
-  override protected def hasAssetScriptBytes(asset: AssetId): Boolean = readOnly { db =>
+  override protected def hasAssetScriptBytes(asset: Asset): Boolean = readOnly { db =>
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScriptPresent(asset)).flatten.nonEmpty
   }
 
@@ -139,11 +140,11 @@ class LevelDBWriter(writableDB: DB,
     }
   }
 
-  protected override def loadBalance(req: (Address, Option[AssetId])): Long = readOnly { db =>
+  protected override def loadBalance(req: (Address, AssetId)): Long = readOnly { db =>
     addressId(req._1).fold(0L) { addressId =>
       req._2 match {
-        case Some(assetId) => db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId)).getOrElse(0L)
-        case None          => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
+        case asset @ Asset(_) => db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)
+        case Waves            => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
       }
     }
   }
@@ -165,20 +166,20 @@ class LevelDBWriter(writableDB: DB,
 
   private def loadPortfolio(db: ReadOnlyDB, addressId: BigInt) = loadLposPortfolio(db, addressId).copy(
     assets = (for {
-      assetId <- db.get(Keys.assetList(addressId))
-    } yield assetId -> db.fromHistory(Keys.assetBalanceHistory(addressId, assetId), Keys.assetBalance(addressId, assetId)).getOrElse(0L)).toMap
+      asset <- db.get(Keys.assetList(addressId))
+    } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
   )
 
   override protected def loadPortfolio(address: Address): Portfolio = readOnly { db =>
     addressId(address).fold(Portfolio.empty)(loadPortfolio(db, _))
   }
 
-  override protected def loadAssetDescription(assetId: ByteStr): Option[AssetDescription] = readOnly { db =>
-    transactionInfo(assetId, db) match {
+  override protected def loadAssetDescription(asset: Asset): Option[AssetDescription] = readOnly { db =>
+    transactionInfo(asset.id, db) match {
       case Some((_, i: IssueTransaction)) =>
-        val ai          = db.fromHistory(Keys.assetInfoHistory(assetId), Keys.assetInfo(assetId)).getOrElse(AssetInfo(i.reissuable, i.quantity))
-        val sponsorship = db.fromHistory(Keys.sponsorshipHistory(assetId), Keys.sponsorship(assetId)).fold(0L)(_.minFee)
-        val script      = db.fromHistory(Keys.assetScriptHistory(assetId), Keys.assetScript(assetId)).flatten
+        val ai          = db.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).getOrElse(AssetInfo(i.reissuable, i.quantity))
+        val sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
+        val script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
         Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship))
       case _ => None
     }
@@ -210,17 +211,17 @@ class LevelDBWriter(writableDB: DB,
                                   carry: Long,
                                   newAddresses: Map[Address, BigInt],
                                   wavesBalances: Map[BigInt, Long],
-                                  assetBalances: Map[BigInt, Map[ByteStr, Long]],
+                                  assetBalances: Map[BigInt, Map[Asset, Long]],
                                   leaseBalances: Map[BigInt, LeaseBalance],
                                   addressTransactions: Map[AddressId, List[TransactionId]],
                                   leaseStates: Map[ByteStr, Boolean],
-                                  reissuedAssets: Map[ByteStr, AssetInfo],
+                                  reissuedAssets: Map[Asset, AssetInfo],
                                   filledQuantity: Map[ByteStr, VolumeAndFee],
                                   scripts: Map[BigInt, Option[Script]],
-                                  assetScripts: Map[AssetId, Option[Script]],
+                                  assetScripts: Map[Asset, Option[Script]],
                                   data: Map[BigInt, AccountDataInfo],
                                   aliases: Map[Alias, BigInt],
-                                  sponsorship: Map[AssetId, Sponsorship]): Unit = readWrite { rw =>
+                                  sponsorship: Map[Asset, Sponsorship]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -282,12 +283,12 @@ class LevelDBWriter(writableDB: DB,
       expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
     }
 
-    val newAddressesForAsset = mutable.AnyRefMap.empty[ByteStr, Set[BigInt]]
+    val newAddressesForAsset = mutable.AnyRefMap.empty[Asset, Set[BigInt]]
     for ((addressId, assets) <- assetBalances) {
       val prevAssets = rw.get(Keys.assetList(addressId))
       val newAssets  = assets.keySet.diff(prevAssets)
-      for (assetId <- newAssets) {
-        newAddressesForAsset += assetId -> (newAddressesForAsset.getOrElse(assetId, Set.empty) + addressId)
+      for (asset <- newAssets) {
+        newAddressesForAsset += asset -> (newAddressesForAsset.getOrElse(asset, Set.empty) + addressId)
       }
       rw.put(Keys.assetList(addressId), prevAssets ++ assets.keySet)
       for ((assetId, balance) <- assets) {
@@ -296,10 +297,10 @@ class LevelDBWriter(writableDB: DB,
       }
     }
 
-    for ((assetId, newAddressIds) <- newAddressesForAsset) {
-      val seqNrKey  = Keys.addressesForAssetSeqNr(assetId)
+    for ((asset, newAddressIds) <- newAddressesForAsset) {
+      val seqNrKey  = Keys.addressesForAssetSeqNr(asset)
       val nextSeqNr = rw.get(seqNrKey) + 1
-      val key       = Keys.addressesForAsset(assetId, nextSeqNr)
+      val key       = Keys.addressesForAsset(asset, nextSeqNr)
 
       rw.put(seqNrKey, nextSeqNr)
       rw.put(key, newAddressIds.toSeq)
@@ -312,12 +313,12 @@ class LevelDBWriter(writableDB: DB,
       expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(orderId))
     }
 
-    for ((assetId, assetInfo) <- reissuedAssets) {
-      val combinedAssetInfo = rw.fromHistory(Keys.assetInfoHistory(assetId), Keys.assetInfo(assetId)).fold(assetInfo) { p =>
+    for ((asset, assetInfo) <- reissuedAssets) {
+      val combinedAssetInfo = rw.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).fold(assetInfo) { p =>
         Monoid.combine(p, assetInfo)
       }
-      rw.put(Keys.assetInfo(assetId)(height), combinedAssetInfo)
-      expiredKeys ++= updateHistory(rw, Keys.assetInfoHistory(assetId), threshold, Keys.assetInfo(assetId))
+      rw.put(Keys.assetInfo(asset)(height), combinedAssetInfo)
+      expiredKeys ++= updateHistory(rw, Keys.assetInfoHistory(asset), threshold, Keys.assetInfo(asset))
     }
 
     for ((leaseId, state) <- leaseStates) {
@@ -395,9 +396,9 @@ class LevelDBWriter(writableDB: DB,
       }
     }
 
-    for ((assetId, sp: SponsorshipValue) <- sponsorship) {
-      rw.put(Keys.sponsorship(assetId)(height), sp)
-      expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(assetId), threshold, Keys.sponsorship(assetId))
+    for ((asset, sp: SponsorshipValue) <- sponsorship) {
+      rw.put(Keys.sponsorship(asset)(height), sp)
+      expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
     }
 
     rw.put(Keys.carryFee(height), carry)
@@ -415,12 +416,12 @@ class LevelDBWriter(writableDB: DB,
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
       val discardedBlocks: Seq[Block] = for (currentHeight <- height until targetHeight by -1) yield {
-        val balancesToInvalidate   = Seq.newBuilder[(Address, Option[AssetId])]
+        val balancesToInvalidate   = Seq.newBuilder[(Address, AssetId)]
         val portfoliosToInvalidate = Seq.newBuilder[Address]
-        val assetInfoToInvalidate  = Seq.newBuilder[ByteStr]
+        val assetInfoToInvalidate  = Seq.newBuilder[Asset]
         val ordersToInvalidate     = Seq.newBuilder[ByteStr]
         val scriptsToDiscard       = Seq.newBuilder[Address]
-        val assetScriptsToDiscard  = Seq.newBuilder[ByteStr]
+        val assetScriptsToDiscard  = Seq.newBuilder[Asset]
 
         val h = Height(currentHeight)
 
@@ -435,10 +436,10 @@ class LevelDBWriter(writableDB: DB,
           for (aId <- rw.get(Keys.changedAddresses(currentHeight))) {
             val addressId = AddressId(aId)
             val address   = rw.get(Keys.idToAddress(addressId))
-            balancesToInvalidate += (address -> None)
+            balancesToInvalidate += (address -> Waves)
 
             for (assetId <- rw.get(Keys.assetList(addressId))) {
-              balancesToInvalidate += (address -> Some(assetId))
+              balancesToInvalidate += (address -> assetId)
               rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
               rw.filterHistory(Keys.assetBalanceHistory(addressId, assetId), currentHeight)
             }
@@ -485,13 +486,13 @@ class LevelDBWriter(writableDB: DB,
                 // balances already restored
 
                 case tx: IssueTransaction =>
-                  assetInfoToInvalidate += rollbackAssetInfo(rw, tx.id(), currentHeight)
+                  assetInfoToInvalidate += rollbackAssetInfo(rw, Asset(tx.id()), currentHeight)
                 case tx: ReissueTransaction =>
-                  assetInfoToInvalidate += rollbackAssetInfo(rw, tx.assetId, currentHeight)
+                  assetInfoToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
                 case tx: BurnTransaction =>
-                  assetInfoToInvalidate += rollbackAssetInfo(rw, tx.assetId, currentHeight)
+                  assetInfoToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
                 case tx: SponsorFeeTransaction =>
-                  assetInfoToInvalidate += rollbackSponsorship(rw, tx.assetId, currentHeight)
+                  assetInfoToInvalidate += rollbackSponsorship(rw, tx.asset, currentHeight)
                 case tx: LeaseTransaction =>
                   rollbackLeaseStatus(rw, tx.id(), currentHeight)
                 case tx: LeaseCancelTransaction =>
@@ -506,7 +507,7 @@ class LevelDBWriter(writableDB: DB,
                   }
 
                 case tx: SetAssetScriptTransaction =>
-                  val asset = tx.assetId
+                  val asset = tx.asset
                   assetScriptsToDiscard += asset
                   rw.delete(Keys.assetScript(asset)(currentHeight))
                   rw.filterHistory(Keys.assetScriptHistory(asset), currentHeight)
@@ -558,10 +559,10 @@ class LevelDBWriter(writableDB: DB,
     }
   }
 
-  private def rollbackAssetInfo(rw: RW, assetId: ByteStr, currentHeight: Int): ByteStr = {
-    rw.delete(Keys.assetInfo(assetId)(currentHeight))
-    rw.filterHistory(Keys.assetInfoHistory(assetId), currentHeight)
-    assetId
+  private def rollbackAssetInfo(rw: RW, asset: Asset, currentHeight: Int): Asset = {
+    rw.delete(Keys.assetInfo(asset)(currentHeight))
+    rw.filterHistory(Keys.assetInfoHistory(asset), currentHeight)
+    asset
   }
 
   private def rollbackOrderFill(rw: RW, orderId: ByteStr, currentHeight: Int): ByteStr = {
@@ -575,10 +576,10 @@ class LevelDBWriter(writableDB: DB,
     rw.filterHistory(Keys.leaseStatusHistory(leaseId), currentHeight)
   }
 
-  private def rollbackSponsorship(rw: RW, assetId: ByteStr, currentHeight: Int): ByteStr = {
-    rw.delete(Keys.sponsorship(assetId)(currentHeight))
-    rw.filterHistory(Keys.sponsorshipHistory(assetId), currentHeight)
-    assetId
+  private def rollbackSponsorship(rw: RW, asset: Asset, currentHeight: Int): Asset = {
+    rw.delete(Keys.sponsorship(asset)(currentHeight))
+    rw.filterHistory(Keys.sponsorshipHistory(asset), currentHeight)
+    asset
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
@@ -755,7 +756,7 @@ class LevelDBWriter(writableDB: DB,
     txs.toSet
   }
 
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]) = readOnly { db =>
+  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
     val b = Map.newBuilder[Address, A]
     for (id <- BigInt(1) to db.get(Keys.lastAddressId).getOrElse(BigInt(0))) {
       val address = db.get(Keys.idToAddress(id))
@@ -898,22 +899,22 @@ class LevelDBWriter(writableDB: DB,
       .mapValues(_.size)
   }
 
-  override def assetDistribution(assetId: ByteStr): AssetDistribution = readOnly { db =>
+  override def assetDistribution(asset: Asset): AssetDistribution = readOnly { db =>
     val dst = (for {
-      seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(assetId))).par
-      addressId <- db.get(Keys.addressesForAsset(assetId, seqNr)).par
+      seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(asset))).par
+      addressId <- db.get(Keys.addressesForAsset(asset, seqNr)).par
       actualHeight <- db
-        .get(Keys.assetBalanceHistory(addressId, assetId))
+        .get(Keys.assetBalanceHistory(addressId, asset))
         .filterNot(_ > height)
         .headOption
-      balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
+      balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
 
     AssetDistribution(dst)
   }
 
-  override def assetDistributionAtHeight(assetId: AssetId,
+  override def assetDistributionAtHeight(asset: Asset,
                                          height: Int,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readOnly { db =>
@@ -930,9 +931,9 @@ class LevelDBWriter(writableDB: DB,
 
     lazy val addressIds: Seq[BigInt] = {
       val all = for {
-        seqNr <- 1 to db.get(Keys.addressesForAssetSeqNr(assetId))
+        seqNr <- 1 to db.get(Keys.addressesForAssetSeqNr(asset))
         addressId <- db
-          .get(Keys.addressesForAsset(assetId, seqNr))
+          .get(Keys.addressesForAsset(asset, seqNr))
       } yield addressId
 
       takeAfter(all, maybeAddressId)
@@ -941,9 +942,9 @@ class LevelDBWriter(writableDB: DB,
     lazy val distribution: Stream[(Address, Long)] =
       for {
         addressId <- addressIds.toStream
-        history = db.get(Keys.assetBalanceHistory(addressId, assetId))
+        history = db.get(Keys.assetBalanceHistory(addressId, asset))
         actualHeight <- history.filterNot(_ > height).headOption
-        balance = db.get(Keys.assetBalance(addressId, assetId)(actualHeight))
+        balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
         if balance > 0
       } yield db.get(Keys.idToAddress(addressId)) -> balance
 

@@ -1,27 +1,27 @@
 package com.wavesplatform.it.sync.utils
 
 import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKeyAccount}
-import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
-import com.wavesplatform.transaction.{CreateAliasTransactionV1, CreateAliasTransactionV2, DataTransaction, Proofs}
-import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.common.state.ByteStr
-import org.scalatest.prop.TableDrivenPropertyChecks
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
-import scorex.crypto.encode.Base64
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.ContractInvocationTransaction
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1, TransferTransactionV2}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1, TransferTransactionV2}
+import com.wavesplatform.transaction.{CreateAliasTransactionV1, CreateAliasTransactionV2, DataTransaction, Proofs}
+import org.scalatest.prop.TableDrivenPropertyChecks
+import scorex.crypto.encode.Base64
 
 class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
   private val publicKey         = PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get
@@ -102,7 +102,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private val burnV1 = BurnTransactionV1
     .create(
       publicKey,
-      ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+      Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       10000000000L,
       burnFee,
       ts,
@@ -115,7 +115,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       chainId,
       publicKey,
-      ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+      Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       10000000000L,
       burnFee,
       ts,
@@ -243,7 +243,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   val mass = MassTransferTransaction
     .create(
-      None,
+      Waves,
       publicKey,
       transfers,
       ts,
@@ -257,7 +257,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private val reissueV1 = ReissueTransactionV1
     .create(
       publicKey,
-      ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+      Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       100000000L,
       true,
       1.waves,
@@ -271,7 +271,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       chainId,
       publicKey,
-      ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+      Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       100000000L,
       true,
       1.waves,
@@ -285,7 +285,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       chainId,
       publicKey,
-      ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get,
+      Asset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
       Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").right.get),
       1.waves,
       ts,
@@ -314,7 +314,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private val sponsor = SponsorFeeTransaction
     .create(
       publicKey,
-      ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+      Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       Some(100000),
       1.waves,
       ts,
@@ -325,12 +325,12 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val transferV1 = TransferTransactionV1
     .create(
-      None,
+      Waves,
       publicKey,
       Address.fromString(sender.address).right.get,
       1900000,
       ts,
-      None,
+      Waves,
       minFee,
       Base58.decode("").get,
       ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get
@@ -340,12 +340,12 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private val transferV2 = TransferTransactionV2
     .create(
-      None,
+      Waves,
       publicKey,
       Address.fromString(sender.address).right.get,
       100000000,
       ts,
-      None,
+      Waves,
       minFee,
       Base58.decode("").get,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
@@ -361,7 +361,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
         function = FunctionHeader.User("testfunc"),
         args = List(TRUE)
       ),
-      Some(ContractInvocationTransaction.Payment(7, Some(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
+      Some(ContractInvocationTransaction.Payment(7, Asset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
       smartMinFee,
       ts,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))

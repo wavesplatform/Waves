@@ -7,7 +7,7 @@ object TransactionsOrdering {
     def txTimestampOrder(ts: Long): Long
     private def orderBy(t: Transaction): (Double, Long, Long) = {
       val size        = t.bytes().size
-      val byFee       = if (t.assetFee._1.nonEmpty) 0 else -t.assetFee._2
+      val byFee       = if (t.assetFee._1.isAsset) 0 else -t.assetFee._2
       val byTimestamp = txTimestampOrder(t.timestamp)
 
       (byFee.toDouble / size.toDouble, byFee, byTimestamp)

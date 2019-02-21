@@ -4,11 +4,12 @@ import java.nio.charset.StandardCharsets
 
 import cats._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.AssetId.Asset
 import org.scalatest.{FunSuite, Matchers}
 
 class PortfolioTest extends FunSuite with Matchers {
   test("pessimistic - should return only withdraws") {
-    val Seq(fooKey, barKey, bazKey) = Seq("foo", "bar", "baz").map(x => ByteStr(x.getBytes(StandardCharsets.UTF_8)))
+    val Seq(fooKey, barKey, bazKey) = Seq("foo", "bar", "baz").map(x => Asset(ByteStr(x.getBytes(StandardCharsets.UTF_8))))
 
     val orig = Portfolio(
       balance = -10,
@@ -44,7 +45,7 @@ class PortfolioTest extends FunSuite with Matchers {
   }
 
   test("prevents overflow of assets") {
-    val assetId = ByteStr(Array.empty)
+    val assetId = Asset(ByteStr(Array.empty))
     val arg1    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 1L)))
     val arg2    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 2L)))
     Monoid.combine(arg1, arg2).assets(assetId) shouldBe Long.MinValue

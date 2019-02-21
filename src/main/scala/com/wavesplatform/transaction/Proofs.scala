@@ -17,7 +17,7 @@ case class Proofs(proofs: List[ByteStr]) {
 
 object Proofs {
 
-  def apply(proofs: Seq[AssetId]): Proofs = new Proofs(proofs.toList)
+  def apply(proofs: Seq[ByteStr]): Proofs = new Proofs(proofs.toList)
 
   val Version            = 1: Byte
   val MaxProofs          = 8

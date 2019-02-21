@@ -4,22 +4,32 @@ import cats._
 import cats.kernel.instances.map._
 import com.wavesplatform.block.Block.Fraction
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.AssetId._
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
-case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[ByteStr, Long]) {
+import scala.collection.Seq
+import scala.collection.immutable.Map
+
+case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[Asset, Long]) {
   lazy val effectiveBalance: Long = safeSum(balance, lease.in) - lease.out
   lazy val spendableBalance: Long = balance - lease.out
 
   lazy val isEmpty: Boolean = this == Portfolio.empty
 
-  def balanceOf(assetId: Option[AssetId]): Long = assetId.fold(balance)(assets.getOrElse(_, 0L))
+  def balanceOf(assetId: AssetId): Long = assetId match {
+    case Waves            => balance
+    case asset @ Asset(_) => assets.getOrElse(asset, 0L)
+  }
 }
 
 object Portfolio {
 
-  def build(a: Option[AssetId], amount: Long): Portfolio = a match {
-    case None    => Portfolio(amount, LeaseBalance.empty, Map.empty)
-    case Some(t) => Portfolio(0L, LeaseBalance.empty, Map(t -> amount))
+  def build(a: AssetId, amount: Long): Portfolio = a match {
+    case Waves        => Portfolio(amount, LeaseBalance.empty, Map.empty)
+    case t @ Asset(_) => Portfolio(0L, LeaseBalance.empty, Map(t -> amount))
   }
 
   val empty = Portfolio(0L, Monoid[LeaseBalance].empty, Map.empty)
@@ -55,4 +65,64 @@ object Portfolio {
     def negate = Portfolio.empty minus self
   }
 
+  implicit val assetMapReads: Reads[Map[Asset, Long]] = Reads {
+    case JsObject(fields) => {
+      val keyReads = implicitly[Reads[Long]]
+      val valueReads: String => JsResult[Asset] = (s: String) =>
+        Base58
+          .decode(s)
+          .fold(
+            _ => JsError("Expected base58-encoded string"),
+            arr => JsSuccess(Asset(ByteStr(arr)))
+        )
+
+      type Errors = Seq[(JsPath, Seq[JsonValidationError])]
+      def locate(e: Errors, key: String) = e.map {
+        case (p, valerr) => (JsPath \ key) ++ p -> valerr
+      }
+
+      fields
+        .foldLeft(Right(Map.empty): Either[Errors, Map[Asset, Long]]) {
+          case (acc, (key, value)) =>
+            val result = for {
+              rv <- keyReads.reads(value)
+              rk <- valueReads(key)
+            } yield rk -> rv
+
+            (acc, result) match {
+              case (Right(vs), JsSuccess(v, _)) => Right(vs + v)
+              case (Right(_), JsError(e))       => Left(locate(e, key))
+              case (Left(e), _: JsSuccess[_])   => Left(e)
+              case (Left(e1), JsError(e2))      => Left(e1 ++ locate(e2, key))
+            }
+        }
+        .fold(JsError.apply, res => JsSuccess(res))
+    }
+
+    case _ => JsError("error.expected.jsobject")
+  }
+
+  implicit val assetMapWrites: Writes[Map[Asset, Long]] = Writes { m =>
+    Json.toJson(m.map {
+      case (asset, balance) => asset.id.base58 -> JsNumber(balance)
+    })
+  }
+
+  implicit val portfolioJsonReads: Reads[Portfolio] = (
+    (JsPath \ "balance").read[Long] and
+      (JsPath \ "lease").read[LeaseBalance] and
+      (JsPath \ "assets").read[Map[Asset, Long]]
+  )(Portfolio.apply _)
+
+  implicit val portfolioJsonWrites: Writes[Portfolio] = Writes { pf =>
+    JsObject(
+      Map(
+        "balance" -> JsNumber(pf.balance),
+        "lease"   -> Json.toJson(pf.lease),
+        "assets"  -> Json.toJson(pf.assets)
+      )
+    )
+  }
+
+  implicit val portfolioJsonFormat: Format[Portfolio] = Format(portfolioJsonReads, portfolioJsonWrites)
 }

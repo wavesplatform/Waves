@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
@@ -103,7 +104,7 @@ object OrderV1 {
             timestamp,
             expiration,
             matcherFee,
-            Proofs(Seq(ByteStr(signature))))
+            Proofs(List(ByteStr(signature))))
   }
 
   def buy(sender: PrivateKeyAccount,
@@ -116,7 +117,7 @@ object OrderV1 {
           matcherFee: Long): OrderV1 = {
     val unsigned = OrderV1(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
-    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
+    unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
   def sell(sender: PrivateKeyAccount,
@@ -129,7 +130,7 @@ object OrderV1 {
            matcherFee: Long): OrderV1 = {
     val unsigned = OrderV1(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
-    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
+    unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
   def apply(sender: PrivateKeyAccount,
@@ -143,7 +144,7 @@ object OrderV1 {
             matcherFee: Long): OrderV1 = {
     val unsigned = OrderV1(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
-    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
+    unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
   def parseBytes(bytes: Array[Byte]): Try[OrderV1] = Try {
@@ -159,22 +160,30 @@ object OrderV1 {
       (off, res)
     }
     val makeOrder = for {
-      sender        <- read(PublicKeyAccount.apply, KeyLength)
-      matcher       <- read(PublicKeyAccount.apply, KeyLength)
+      sender  <- read(PublicKeyAccount.apply, KeyLength)
+      matcher <- read(PublicKeyAccount.apply, KeyLength)
       amountAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
-      priceAssetId  <- parse(Deser.parseByteArrayOption, AssetIdLength)
-      orderType     <- readByte
-      price         <- read(Longs.fromByteArray _, 8)
-      amount        <- read(Longs.fromByteArray _, 8)
-      timestamp     <- read(Longs.fromByteArray _, 8)
-      expiration    <- read(Longs.fromByteArray _, 8)
-      matcherFee    <- read(Longs.fromByteArray _, 8)
-      signature     <- read(identity, SignatureLength)
+        .map {
+          case Some(arr) => Asset(ByteStr(arr))
+          case None      => Waves
+        }
+      priceAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
+        .map {
+          case Some(arr) => Asset(ByteStr(arr))
+          case None      => Waves
+        }
+      orderType  <- readByte
+      price      <- read(Longs.fromByteArray _, 8)
+      amount     <- read(Longs.fromByteArray _, 8)
+      timestamp  <- read(Longs.fromByteArray _, 8)
+      expiration <- read(Longs.fromByteArray _, 8)
+      matcherFee <- read(Longs.fromByteArray _, 8)
+      signature  <- read(identity, SignatureLength)
     } yield {
       OrderV1(
         sender,
         matcher,
-        AssetPair(amountAssetId.map(ByteStr(_)), priceAssetId.map(ByteStr(_))),
+        AssetPair(amountAssetId, priceAssetId),
         OrderType(orderType),
         amount,
         price,

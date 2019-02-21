@@ -8,8 +8,10 @@ import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.AssetPairBuilder
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+
 import scala.util.Random
 
 // TODO: Make it trait
@@ -101,38 +103,38 @@ object MatcherPriceAssetConfig {
   val WctId = IssueWctTx.id()
 
   val wctUsdPair = AssetPair(
-    amountAsset = Some(WctId),
-    priceAsset = Some(UsdId)
+    amountAsset = Asset(WctId),
+    priceAsset = Asset(UsdId)
   )
 
   val wctWavesPair = AssetPair(
-    amountAsset = Some(WctId),
-    priceAsset = None
+    amountAsset = Asset(WctId),
+    priceAsset = Waves
   )
 
   val ethWavesPair = AssetPair(
-    amountAsset = Some(EthId),
-    priceAsset = None
+    amountAsset = Asset(EthId),
+    priceAsset = Waves
   )
 
   val ethBtcPair = AssetPair(
-    amountAsset = Some(EthId),
-    priceAsset = Some(BtcId)
+    amountAsset = Asset(EthId),
+    priceAsset = Asset(BtcId)
   )
 
   val wavesUsdPair = AssetPair(
-    amountAsset = None,
-    priceAsset = Some(UsdId)
+    amountAsset = Waves,
+    priceAsset = Asset(UsdId)
   )
 
   val ethUsdPair = AssetPair(
-    amountAsset = Some(EthId),
-    priceAsset = Some(UsdId)
+    amountAsset = Asset(EthId),
+    priceAsset = Asset(UsdId)
   )
 
   val wavesBtcPair = AssetPair(
-    amountAsset = None,
-    priceAsset = Some(BtcId)
+    amountAsset = Waves,
+    priceAsset = Asset(BtcId)
   )
 
   val orderLimit = 10
@@ -146,7 +148,7 @@ object MatcherPriceAssetConfig {
 
   def createAssetPair(asset1: String, asset2: String): AssetPair = {
     val (a1, a2) = (AssetPair.extractAssetId(asset1).get, AssetPair.extractAssetId(asset2).get)
-    if (AssetPairBuilder.assetIdOrdering.compare(a1, a2) > 0)
+    if (AssetPairBuilder.assetIdOrdering.compare(a1.compatId, a2.compatId) > 0)
       AssetPair(a1, a2)
     else
       AssetPair(a2, a1)

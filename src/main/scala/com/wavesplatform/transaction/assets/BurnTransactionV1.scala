@@ -7,10 +7,11 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.AssetId.Asset
 
 import scala.util.{Failure, Success, Try}
 
-case class BurnTransactionV1 private (sender: PublicKeyAccount, assetId: ByteStr, quantity: Long, fee: Long, timestamp: Long, signature: ByteStr)
+case class BurnTransactionV1 private (sender: PublicKeyAccount, asset: Asset, quantity: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends BurnTransaction
     with SignedTransaction
     with FastHashId {
@@ -29,37 +30,37 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
-      val (sender, assetId, quantity, fee, timestamp, end) = BurnTransaction.parseBase(0, bytes)
-      val signature                                        = ByteStr(bytes.slice(end, end + SignatureLength))
+      val (sender, asset, quantity, fee, timestamp, end) = BurnTransaction.parseBase(0, bytes)
+      val signature                                      = ByteStr(bytes.slice(end, end + SignatureLength))
       BurnTransactionV1
-        .create(sender, assetId, quantity, fee, timestamp, signature)
+        .create(sender, asset, quantity, fee, timestamp, signature)
         .fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
   }
 
   def create(sender: PublicKeyAccount,
-             assetId: ByteStr,
+             asset: Asset,
              quantity: Long,
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, TransactionT] = {
     BurnTransaction
       .validateBurnParams(quantity, fee)
-      .map(_ => BurnTransactionV1(sender, assetId, quantity, fee, timestamp, signature))
+      .map(_ => BurnTransactionV1(sender, asset, quantity, fee, timestamp, signature))
   }
 
   def signed(sender: PublicKeyAccount,
-             assetId: ByteStr,
+             asset: Asset,
              quantity: Long,
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(sender, assetId, quantity, fee, timestamp, ByteStr.empty).right.map { unverified =>
+    create(sender, asset, quantity, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount, assetId: ByteStr, quantity: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
-    signed(sender, assetId, quantity, fee, timestamp, sender)
+  def selfSigned(sender: PrivateKeyAccount, asset: Asset, quantity: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+    signed(sender, asset, quantity, fee, timestamp, sender)
   }
 }

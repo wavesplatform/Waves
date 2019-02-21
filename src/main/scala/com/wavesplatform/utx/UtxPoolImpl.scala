@@ -172,8 +172,8 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer
   }
 
   private def canReissue(b: Blockchain, tx: Transaction) = tx match {
-    case r: ReissueTransaction if b.assetDescription(r.assetId).exists(!_.reissuable) => Left(GenericError(s"Asset is not reissuable"))
-    case _                                                                            => Right(())
+    case r: ReissueTransaction if b.assetDescription(r.asset).exists(!_.reissuable) => Left(GenericError(s"Asset is not reissuable"))
+    case _                                                                          => Right(())
   }
 
   private def checkAlias(b: Blockchain, tx: Transaction) = tx match {

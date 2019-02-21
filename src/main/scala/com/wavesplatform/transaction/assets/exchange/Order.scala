@@ -81,13 +81,13 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   val bytes: Coeval[Array[Byte]]
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAssetId: Option[AssetId] = orderType match {
+  def getReceiveAssetId: AssetId = orderType match {
     case OrderType.BUY  => assetPair.amountAsset
     case OrderType.SELL => assetPair.priceAsset
   }
 
   @ApiModelProperty(hidden = true)
-  def getSpendAssetId: Option[AssetId] = orderType match {
+  def getSpendAssetId: AssetId = orderType match {
     case OrderType.BUY  => assetPair.priceAsset
     case OrderType.SELL => assetPair.amountAsset
   }
@@ -99,7 +99,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
       if (orderType == OrderType.SELL) matchAmount
       else {
         val spend = BigInt(matchAmount) * matchPrice / PriceConstant
-        if (getSpendAssetId.isEmpty && !(spend + matcherFee).isValidLong) {
+        if (getSpendAssetId.isWaves && !(spend + matcherFee).isValidLong) {
           throw new ArithmeticException("BigInteger out of long range")
         } else spend.bigInteger.longValueExact()
       }
@@ -208,7 +208,7 @@ object Order {
             timestamp,
             expiration,
             matcherFee,
-            Proofs(Seq(ByteStr(signature))))
+            Proofs(List(ByteStr(signature))))
   }
 
   def correctAmount(a: Long, price: Long): Long = {
@@ -263,9 +263,9 @@ object Order {
     val sig = crypto.sign(sender, unsigned.bodyBytes())
     unsigned match {
       case o @ OrderV2(_, _, _, _, _, _, _, _, _, _) =>
-        o.copy(proofs = Proofs(Seq(ByteStr(sig))))
+        o.copy(proofs = Proofs(List(ByteStr(sig))))
       case o @ OrderV1(_, _, _, _, _, _, _, _, _, _) =>
-        o.copy(proofs = Proofs(Seq(ByteStr(sig))))
+        o.copy(proofs = Proofs(List(ByteStr(sig))))
     }
   }
 
@@ -275,8 +275,8 @@ object Order {
     else (o2, o1)
   }
 
-  def assetIdBytes(assetId: Option[AssetId]): Array[Byte] = {
-    assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+  def assetIdBytes(assetId: AssetId): Array[Byte] = {
+    assetId.byteRepr
   }
 
   def fromBytes(version: Byte, xs: Array[Byte]): Order = version match {

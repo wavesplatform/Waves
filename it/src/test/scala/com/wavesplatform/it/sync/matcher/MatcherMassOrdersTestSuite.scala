@@ -8,6 +8,7 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
@@ -28,8 +29,8 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
       .id
     Seq(aliceAsset, aliceSecondAsset).foreach(matcherNode.waitForTransaction(_))
 
-    val aliceWavesPair       = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
-    val aliceSecondWavesPair = AssetPair(ByteStr.decodeBase58(aliceSecondAsset).toOption, None)
+    val aliceWavesPair       = AssetPair(Asset(ByteStr.decodeBase58(aliceAsset).get), Waves)
+    val aliceSecondWavesPair = AssetPair(Asset(ByteStr.decodeBase58(aliceSecondAsset).get), Waves)
 
     // Check balances on Alice's account
     aliceNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)

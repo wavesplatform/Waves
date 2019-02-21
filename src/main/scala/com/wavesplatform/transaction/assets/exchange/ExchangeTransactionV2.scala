@@ -5,6 +5,7 @@ import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
 import io.swagger.annotations.ApiModelProperty
@@ -27,8 +28,8 @@ case class ExchangeTransactionV2(buyOrder: Order,
 
   override def version: Byte = 2
 
-  override val builder                           = ExchangeTransactionV2
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val builder                   = ExchangeTransactionV2
+  override val assetFee: (AssetId, Long) = (Waves, fee)
 
   @ApiModelProperty(hidden = true)
   override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
@@ -68,7 +69,7 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] = {
     create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
-      unverified.copy(proofs = Proofs(Seq(ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))))
+      unverified.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))))
     }
   }
 

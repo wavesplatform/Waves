@@ -8,6 +8,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.smartcontract.{cryptoContextScript, pureContextScript, wavesContextScript, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -52,7 +53,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
       .issue(firstAddress, "SmartAsset", "TestCoin", someAssetAmount, 0, reissuable = false, issueFee, 2, s, waitForTx = true)
       .id
 
-    val smartPair = AssetPair(ByteStr.decodeBase58(sAsset).toOption, None)
+    val smartPair = AssetPair(Asset(ByteStr.decodeBase58(sAsset).get), Waves)
 
     for ((contr1, contr2, mcontr) <- Seq(
            (sc1, sc1, sc1),
@@ -112,8 +113,8 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     sender.setAssetScript(assetB, secondAddress, setAssetScriptFee, script, waitForTx = true)
 
     val smartAssetPair = AssetPair(
-      amountAsset = Some(ByteStr.decodeBase58(assetA).get),
-      priceAsset = Some(ByteStr.decodeBase58(assetB).get)
+      amountAsset = Asset(ByteStr.decodeBase58(assetA).get),
+      priceAsset = Asset(ByteStr.decodeBase58(assetB).get)
     )
 
     sender.signedBroadcast(exchangeTx(smartAssetPair, matcherFee + 2 * smartFee, matcherFee + 2 * smartFee, ntpTime, acc1, acc0, acc2),
@@ -134,8 +135,8 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
 
     withClue("try to use incorrect assetPair") {
       val incorrectSmartAssetPair = AssetPair(
-        amountAsset = Some(ByteStr.decodeBase58(assetA).get),
-        priceAsset = None
+        amountAsset = Asset(ByteStr.decodeBase58(assetA).get),
+        priceAsset = Waves
       )
       assertBadRequestAndMessage(
         sender.signedBroadcast(exchangeTx(incorrectSmartAssetPair, smartMatcherFee, smartMatcherFee, ntpTime, acc1, acc0, acc2)),
@@ -155,7 +156,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
           .issue(firstAddress, "assetA", "TestCoin", someAssetAmount, 0, reissuable = false, issueFee, 2, i, waitForTx = true)
           .id
 
-        val smartPair = AssetPair(ByteStr.decodeBase58(asset).toOption, None)
+        val smartPair = AssetPair(Asset(ByteStr.decodeBase58(asset).get), Waves)
 
         sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee, smartMatcherFee, ntpTime, acc1, acc0, acc2), waitForTx = true)
       }

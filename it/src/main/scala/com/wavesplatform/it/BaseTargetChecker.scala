@@ -9,6 +9,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings._
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.utils.NTP
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
@@ -35,7 +36,7 @@ object BaseTargetChecker {
         case cfg if cfg.as[Boolean]("waves.miner.enable") =>
           val account   = PublicKeyAccount(cfg.as[ByteStr]("public-key").arr)
           val address   = account.toAddress
-          val balance   = bu.balance(address, None)
+          val balance   = bu.balance(address, Waves)
           val consensus = genesisBlock.consensusData
           val timeDelay = pos
             .getValidBlockDelay(bu.height, account.publicKey, consensus.baseTarget, balance)

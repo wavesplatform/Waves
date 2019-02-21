@@ -7,6 +7,7 @@ import com.wavesplatform.generator.OracleTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.AssetId.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
@@ -36,7 +37,7 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
       List
         .fill(settings.transactions) {
           TransferTransactionV2
-            .selfSigned(None, scriptedAccount, oracle, 1.waves, System.currentTimeMillis(), None, enoughFee, Array.emptyByteArray)
+            .selfSigned(Waves, scriptedAccount, oracle, 1.waves, System.currentTimeMillis(), Waves, enoughFee, Array.emptyByteArray)
             .explicitGet()
         }
 

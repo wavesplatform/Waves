@@ -4,19 +4,20 @@ import cats.data.State
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
-import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
+import monix.eval.Coeval
+import play.api.libs.json.{JsObject, Json}
 
 import scala.util.{Failure, Success, Try}
 
 case class SetAssetScriptTransaction private (chainId: Byte,
                                               sender: PublicKeyAccount,
-                                              assetId: ByteStr,
+                                              asset: Asset,
                                               script: Option[Script],
                                               fee: Long,
                                               timestamp: Long,
@@ -25,15 +26,15 @@ case class SetAssetScriptTransaction private (chainId: Byte,
     with VersionedTransaction
     with ChainSpecific {
 
-  override val builder: TransactionParser        = SetAssetScriptTransaction
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val builder: TransactionParser = SetAssetScriptTransaction
+  override val assetFee: (AssetId, Long)  = (Waves, fee)
 
   override final val json: Coeval[JsObject] =
     Coeval.evalOnce(
       jsonBase() ++ Json.obj(
         "version" -> version,
         "chainId" -> chainId,
-        "assetId" -> assetId.base58,
+        "assetId" -> asset.id.base58,
         "script"  -> script.map(_.bytes().base64)
       )
     )
@@ -43,7 +44,7 @@ case class SetAssetScriptTransaction private (chainId: Byte,
       Bytes.concat(
         Array(builder.typeId, version, chainId),
         sender.publicKey,
-        assetId.arr,
+        asset.id.arr,
         Longs.toByteArray(fee),
         Longs.toByteArray(timestamp),
         Deser.serializeOption(script)(s => s.bytes().arr)
@@ -52,7 +53,7 @@ case class SetAssetScriptTransaction private (chainId: Byte,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override def checkedAssets(): Seq[AssetId] = Seq(assetId)
+  override def checkedAssets(): Seq[AssetId] = Seq(asset)
   override def version: Byte                 = 1
 }
 
@@ -65,7 +66,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
 
   def create(chainId: Byte,
              sender: PublicKeyAccount,
-             assetId: ByteStr,
+             assetId: Asset,
              script: Option[Script],
              fee: Long,
              timestamp: Long,
@@ -80,12 +81,12 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
 
   def signed(chainId: Byte,
              sender: PublicKeyAccount,
-             assetId: ByteStr,
+             asset: Asset,
              script: Option[Script],
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(chainId, sender, assetId, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
+    create(chainId, sender, asset, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
@@ -109,7 +110,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
       val makeTransaction = for {
         chainId   <- readByte
         sender    <- read(PublicKeyAccount.apply, KeyLength)
-        assetId   <- read(ByteStr.apply, AssetIdLength)
+        asset     <- read(ByteStr.apply, AssetIdLength).map(Asset)
         fee       <- read(Longs.fromByteArray _, 8)
         timestamp <- read(Longs.fromByteArray _, 8)
         scriptOrE <- readUnsized((b: Array[Byte], p: Int) => Deser.parseOption(b, p)(ScriptReader.fromBytes))
@@ -119,7 +120,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
           case Some(Left(err)) => Left(err)
           case Some(Right(s))  => Right(Some(s))
           case None            => Right(None)
-        }).flatMap(script => create(chainId, sender, assetId, script, fee, timestamp, proofs.right.get))
+        }).flatMap(script => create(chainId, sender, asset, script, fee, timestamp, proofs.right.get))
           .fold(left => Failure(new Exception(left.toString)), right => Success(right))
       }
       makeTransaction.run(0).value._2

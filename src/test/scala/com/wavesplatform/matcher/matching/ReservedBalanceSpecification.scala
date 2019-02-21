@@ -92,10 +92,10 @@ class ReservedBalanceSpecification
       )
     ))
 
-  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]): Long =
+  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: AssetId): Long =
     Await
       .result(
-        (addressDir ? AddressDirectory.Envelope(senderPublicKey, AddressActor.GetReservedBalance)).mapTo[Map[Option[AssetId], Long]],
+        (addressDir ? AddressDirectory.Envelope(senderPublicKey, AddressActor.GetReservedBalance)).mapTo[Map[AssetId, Long]],
         Duration.Inf
       )
       .getOrElse(assetId, 0L)

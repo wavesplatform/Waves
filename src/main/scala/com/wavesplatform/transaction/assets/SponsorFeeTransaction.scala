@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -13,7 +14,7 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.{Failure, Success, Try}
 
 case class SponsorFeeTransaction private (sender: PublicKeyAccount,
-                                          assetId: ByteStr,
+                                          asset: Asset,
                                           minSponsoredAssetFee: Option[Long],
                                           fee: Long,
                                           timestamp: Long,
@@ -30,7 +31,7 @@ case class SponsorFeeTransaction private (sender: PublicKeyAccount,
         Array(builder.typeId),
         Array(version),
         sender.publicKey,
-        assetId.arr,
+        asset.id.arr,
         Longs.toByteArray(minSponsoredAssetFee.getOrElse(0)),
         Longs.toByteArray(fee),
         Longs.toByteArray(timestamp)
@@ -41,15 +42,15 @@ case class SponsorFeeTransaction private (sender: PublicKeyAccount,
     Coeval.evalOnce(
       jsonBase() ++ Json.obj(
         "version"              -> version,
-        "assetId"              -> assetId.base58,
+        "assetId"              -> asset.id.base58,
         "minSponsoredAssetFee" -> minSponsoredAssetFee
       )
     )
 
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val bytes: Coeval[Array[Byte]]        = Coeval.evalOnce(Bytes.concat(Array(0: Byte, builder.typeId, version), bodyBytes(), proofs.bytes()))
+  override val assetFee: (AssetId, Long)  = (Waves, fee)
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte, builder.typeId, version), bodyBytes(), proofs.bytes()))
 
-  override def checkedAssets(): Seq[AssetId] = Seq(assetId)
+  override def checkedAssets(): Seq[AssetId] = Seq(asset)
   override def version: Byte                 = SponsorFeeTransaction.version
 }
 
@@ -66,7 +67,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
       val bodyVersion = bytes(1)
       require(bodyVersion == version, s"versions are not match ($version, $bodyVersion)")
       val sender      = PublicKeyAccount(bytes.slice(2, KeyLength + 2))
-      val assetId     = ByteStr(bytes.slice(KeyLength + 2, KeyLength + AssetIdLength + 2))
+      val asset       = Asset(ByteStr(bytes.slice(KeyLength + 2, KeyLength + AssetIdLength + 2)))
       val minFeeStart = KeyLength + AssetIdLength + 2
 
       val minFee    = Longs.fromByteArray(bytes.slice(minFeeStart, minFeeStart + 8))
@@ -74,7 +75,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
       val timestamp = Longs.fromByteArray(bytes.slice(minFeeStart + 16, minFeeStart + 24))
       val tx = for {
         proofs <- Proofs.fromBytes(bytes.drop(minFeeStart + 24))
-        tx     <- SponsorFeeTransaction.create(sender, assetId, Some(minFee).filter(_ != 0), fee, timestamp, proofs)
+        tx     <- SponsorFeeTransaction.create(sender, asset, Some(minFee).filter(_ != 0), fee, timestamp, proofs)
       } yield {
         tx
       }
@@ -83,7 +84,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
   }
 
   def create(sender: PublicKeyAccount,
-             assetId: ByteStr,
+             asset: Asset,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
              timestamp: Long,
@@ -93,26 +94,26 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
-      Right(SponsorFeeTransaction(sender, assetId, minSponsoredAssetFee.filter(_ != 0), fee, timestamp, proofs))
+      Right(SponsorFeeTransaction(sender, asset, minSponsoredAssetFee.filter(_ != 0), fee, timestamp, proofs))
     }
   }
 
   def signed(sender: PublicKeyAccount,
-             assetId: ByteStr,
+             asset: Asset,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(sender, assetId, minSponsoredAssetFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
+    create(sender, asset, minSponsoredAssetFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
   def selfSigned(sender: PrivateKeyAccount,
-                 assetId: ByteStr,
+                 asset: Asset,
                  minSponsoredAssetFee: Option[Long],
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
-    signed(sender, assetId, minSponsoredAssetFee, fee, timestamp, sender)
+    signed(sender, asset, minSponsoredAssetFee, fee, timestamp, sender)
   }
 }

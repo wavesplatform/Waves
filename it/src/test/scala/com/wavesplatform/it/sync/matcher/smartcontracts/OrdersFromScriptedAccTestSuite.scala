@@ -9,6 +9,7 @@ import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
@@ -29,7 +30,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     val aliceAsset =
       aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, smartIssueFee, 2).id
     matcherNode.waitForTransaction(aliceAsset)
-    val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
+    val aliceWavesPair = AssetPair(Asset(ByteStr.decodeBase58(aliceAsset).get), Waves)
 
     "setScript at account" in {
       // check assets's balances

@@ -11,6 +11,7 @@ import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.settings.loadConfig
+import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.{Arbitrary, Gen}
@@ -26,26 +27,28 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long]         = Gen.choose(1, Long.MaxValue)
 
-  val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
-
   private val seqNr = new AtomicLong(-1)
 
   def wrap(x: Order): QueueEventWithMeta                           = wrap(seqNr.incrementAndGet(), x)
   def wrap(n: Long, x: Order): QueueEventWithMeta                  = wrap(n, QueueEvent.Placed(x))
   private def wrap(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
 
-  def assetIdGen(prefix: Byte) = Gen.listOfN(signatureSize - 1, Arbitrary.arbitrary[Byte]).map(xs => Some(ByteStr(Array(prefix, xs: _*))))
+  def assetIdGen(prefix: Byte): Gen[Asset] =
+    Gen
+      .listOfN(signatureSize - 1, Arbitrary.arbitrary[Byte])
+      .map(xs => Asset(ByteStr(Array(prefix, xs: _*))))
+
   val distinctPairGen: Gen[AssetPair] = for {
     a1 <- assetIdGen(1.toByte)
     a2 <- assetIdGen(2.toByte)
   } yield AssetPair(a1, a2)
 
-  protected def mkAssetId(prefix: String): Option[ByteStr] = {
+  protected def mkAssetId(prefix: String): Asset = {
     val prefixBytes = prefix.getBytes(Charsets.UTF_8)
-    Some(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
+    Asset(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
   }
 
-  val assetPairGen = Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, None))), (1, assetIdGen(2).map(AssetPair(None, _))))
+  val assetPairGen = Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, Waves))), (1, assetIdGen(2).map(AssetPair(Waves, _))))
 
   val maxTimeGen: Gen[Long]     = Gen.choose(10000L, Order.MaxLiveTime).map(_ + System.currentTimeMillis())
   val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(System.currentTimeMillis() - _)
