@@ -52,7 +52,14 @@ object PBUtils extends App {
             outputStream.writeFixed32NoTag(value.as[EnumValueDescriptor].index)
 
           case Type.TYPE_MESSAGE =>
-            value.asInstanceOf[PMessage].value.toIndexedSeq.sortBy(_._1.number).foreach(kv => writeValue(kv._1, kv._2))
+            (value: @unchecked) match {
+              case PEmpty =>
+                outputStream.write(0: Byte)
+
+              case PMessage(fields) =>
+                outputStream.write(1: Byte)
+                fields.toIndexedSeq.sortBy(_._1.number).foreach(kv => writeValue(kv._1, kv._2))
+            }
         }
       }
 
