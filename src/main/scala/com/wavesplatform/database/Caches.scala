@@ -266,17 +266,12 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
       (orderId, fillInfo) <- diff.orderFills
     } yield orderId -> volumeAndFeeCache.get(orderId).combine(fillInfo)
 
-    val transactionList = diff.transactions.toList
-
-    transactionList.foreach {
-      case (_, (_, tx, _)) =>
-        transactionIds.put(tx.id(), newHeight)
-    }
-
     val addressTransactions: Map[AddressId, List[TransactionId]] =
-      transactionList
+      diff.transactions.toList
         .flatMap {
           case (_, (h, tx, addrs)) =>
+            transactionIds.put(tx.id(), newHeight) // be careful here!
+
             addrs.map { addr =>
               val addrId = AddressId(addressId(addr))
               val htx    = (h, tx)
