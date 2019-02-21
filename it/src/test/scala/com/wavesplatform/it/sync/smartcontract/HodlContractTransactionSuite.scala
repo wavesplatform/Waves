@@ -76,7 +76,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |	  		case _ => 0
         |	  	}
         |	  	let newAmount = currentAmount + pmt.amount
-        |	  	WriteSet(List(DataEntry(currentKey, newAmount)))
+        |	  	WriteSet([DataEntry(currentKey, newAmount)])
         |
         |   }
         |	}
@@ -94,8 +94,8 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |  else if (newAmount < 0)
         |			then throw("Not enough balance")
         |			else ContractResult(
-        |					WriteSet(List(DataEntry(currentKey, newAmount))),
-        |					TransferSet(List(ContractTransfer(i.caller, amount, unit)))
+        |					WriteSet([DataEntry(currentKey, newAmount)]),
+        |					TransferSet([ContractTransfer(i.caller, amount, unit)])
         |				)
         |	}
         |
