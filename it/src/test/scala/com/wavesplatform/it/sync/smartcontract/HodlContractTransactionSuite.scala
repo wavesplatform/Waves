@@ -103,7 +103,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |
         """.stripMargin
 
-    val script = ScriptCompiler.contract(scriptText).explicitGet()
+    val script = ScriptCompiler.compile(scriptText).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(contract, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
