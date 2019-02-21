@@ -184,7 +184,7 @@ class AddressActorSpecification
       Props(
         new AddressActor(
           address,
-          currentPortfolio.get(),
+          currentPortfolio.get().balanceOf,
           1.day,
           1.day,
           ntpTime,

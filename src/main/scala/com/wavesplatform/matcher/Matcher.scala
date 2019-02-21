@@ -22,6 +22,7 @@ import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, Time, forceStopApplication}
 import com.wavesplatform.utx.UtxPool
@@ -39,7 +40,7 @@ class Matcher(actorSystem: ActorSystem,
               utx: UtxPool,
               allChannels: ChannelGroup,
               blockchain: Blockchain,
-              portfoliosChanged: Observable[Address],
+              spendableBalanceChanged: Observable[(Address, Option[AssetId])],
               settings: WavesSettings,
               matcherPrivateKey: PrivateKeyAccount)
     extends ScorexLogging {
@@ -166,7 +167,12 @@ class Matcher(actorSystem: ActorSystem,
   private lazy val addressActors =
     actorSystem.actorOf(
       Props(
-        new AddressDirectory(portfoliosChanged, utx.spendableBalance, matcherQueue.storeEvent, matcherSettings, time, OrderDB(matcherSettings, db))),
+        new AddressDirectory(spendableBalanceChanged,
+                             utx.spendableBalance,
+                             matcherQueue.storeEvent,
+                             matcherSettings,
+                             time,
+                             OrderDB(matcherSettings, db))),
       "addresses"
     )
 
@@ -277,7 +283,7 @@ object Matcher extends ScorexLogging {
             utx: UtxPool,
             allChannels: ChannelGroup,
             blockchain: Blockchain,
-            portfoliosChanged: Observable[Address],
+            spendableBalanceChanged: Observable[(Address, Option[AssetId])],
             settings: WavesSettings): Option[Matcher] =
     try {
       val privateKey = (for {
@@ -285,7 +291,7 @@ object Matcher extends ScorexLogging {
         pk      <- wallet.privateKeyAccount(address)
       } yield pk).explicitGet()
 
-      val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, portfoliosChanged, settings, privateKey)
+      val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, spendableBalanceChanged, settings, privateKey)
       matcher.runMatcher()
       Some(matcher)
     } catch {

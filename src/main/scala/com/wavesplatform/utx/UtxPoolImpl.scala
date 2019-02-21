@@ -136,6 +136,8 @@ class UtxPoolImpl(time: Time,
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
     blockchain.balance(addr, assetId) + pessimisticPortfolios.getAggregated(addr).balanceOf(assetId)
 
+  override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
+
   override def all: Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
 
   override def size: Int = transactions.size
@@ -198,9 +200,9 @@ class UtxPoolImpl(time: Time,
           _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
 
           transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
-            .map(_.bytes().size)
+            .map(_.bytes().length)
             .sum
-          _ <- Either.cond((transactionsBytes + tx.bytes().size) <= utxSettings.maxBytesSize,
+          _ <- Either.cond((transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
                            (),
                            GenericError("Transaction pool bytes size limit is reached"))
 
@@ -246,7 +248,7 @@ object UtxPoolImpl {
 
       // Because we need to notify about balance changes when they are applied
       pessimisticPortfolios.foreach {
-        case (addr, p) => p.nonEmptyAssetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
+        case (addr, p) => p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
       }
     }
 
@@ -266,7 +268,7 @@ object UtxPoolImpl {
           txPortfolios.foreach {
             case (addr, p) =>
               transactions.computeIfPresent(addr, (_, prevTxs) => prevTxs - txId)
-              p.nonEmptyAssetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
+              p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
           }
         case None =>
       }

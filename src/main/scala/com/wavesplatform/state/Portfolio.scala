@@ -54,13 +54,9 @@ object Portfolio {
 
     def negate: Portfolio = Portfolio.empty minus self
 
-    def nonEmptyAssetIds: Set[Option[AssetId]] = {
-      val r = Set.newBuilder[Option[AssetId]]
-      if (self.balance != 0 || self.lease != LeaseBalance.empty) r += None
-      self.assets.foreach {
-        case (assetId, b) if b != 0 => r += Some(assetId)
-      }
-      r.result()
+    def assetIds: Set[Option[AssetId]] = {
+      val r: Set[Option[AssetId]] = self.assets.keySet.map(Some(_))
+      r + None
     }
   }
 

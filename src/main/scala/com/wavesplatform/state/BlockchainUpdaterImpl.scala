@@ -23,7 +23,10 @@ import kamon.metric.MeasurementUnit
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Observer[(Address, Option[AssetId])], settings: WavesSettings, time: Time)
+class BlockchainUpdaterImpl(blockchain: Blockchain,
+                            spendableBalanceChanged: Observer[(Address, Option[AssetId])],
+                            settings: WavesSettings,
+                            time: Time)
     extends BlockchainUpdater
     with NG
     with ScorexLogging
@@ -198,8 +201,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
               restTotalConstraint = updatedTotalConstraint
               val prevNgState = ngState
               ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
-
-              prevNgState.toIterable.flatMap(_.bestLiquidDiff.portfolios.keys).foreach(spendableBalanceChanged.onNext)
+              notifyChangedSpendable(prevNgState, ngState)
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
 
               if ((block.timestamp > time
@@ -227,9 +229,20 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
         .leftMap(err => GenericError(err))
     }
 
-    prevNgState.toIterable.flatMap(_.bestLiquidDiff.portfolios.keys).foreach(spendableBalanceChanged.onNext)
+    notifyChangedSpendable(prevNgState, ngState)
     r
   }
+
+  private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
+    // TODO
+    prevNgState.toIterable.foreach(x => notifyChangedSpendable(x.bestLiquidDiff))
+  }
+
+  private def notifyChangedSpendable(diff: Diff): Unit =
+    for {
+      (addr, p) <- diff.portfolios
+      assetId   <- p.assetIds
+    } spendableBalanceChanged.onNext(addr -> assetId)
 
   override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, Unit] = {
     ngState match {
@@ -265,7 +278,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
               ng.append(microBlock, diff, carry, System.currentTimeMillis)
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
-              diff.portfolios.keys.foreach(spendableBalanceChanged.onNext)
+
+              for {
+                (addr, p) <- diff.portfolios
+                assetId   <- p.assetIds
+              } spendableBalanceChanged.onNext(addr -> assetId)
             }
         }
     }

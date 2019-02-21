@@ -5,7 +5,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.matcher.{AddressActor, TestOrderDB}
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.utils.Time
 
 import scala.collection.mutable
@@ -23,7 +22,7 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
         Props(
           new AddressActor(
             lo.order.sender,
-            Portfolio.empty,
+            _ => 0L,
             5.seconds,
             5.seconds,
             time,
