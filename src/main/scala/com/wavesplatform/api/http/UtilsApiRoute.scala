@@ -26,7 +26,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileContract ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
   }
 
   @Path("/script/decompile")
@@ -61,6 +61,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     }
   }
 
+  @Deprecated
   @Path("/script/compile")
   @ApiOperation(value = "Compile", notes = "Compiles string code to base64 script representation", httpMethod = "POST")
   @ApiImplicitParams(
@@ -97,8 +98,8 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     }
   }
 
-  @Path("/script/compileContract")
-  @ApiOperation(value = "Compile Contract", notes = "Compiles string code to base64 contract representation", httpMethod = "POST")
+  @Path("/script/compileCode")
+  @ApiOperation(value = "Compile script", notes = "Compiles string code to base64 script representation", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(
@@ -106,7 +107,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         required = true,
         dataType = "string",
         paramType = "body",
-        value = "Contract code",
+        value = "Script code",
         example = "true"
       )
     ))
@@ -114,17 +115,17 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     Array(
       new ApiResponse(code = 200, message = "base64 or error")
     ))
-  def compileContract: Route = path("script" / "compileContract") {
+  def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
       complete(
         ScriptCompiler
-          .contract(code)
+          .compile(code)
           .fold(
             e => ScriptCompilerError(e), {
-              case (contract) =>
+              case (script, complexity) =>
                 Json.obj(
-                  "script"     -> contract.bytes().base64,
-                  "complexity" -> 0,
+                  "script"     -> script.bytes().base64,
+                  "complexity" -> complexity,
                   "extraFee"   -> CommonValidation.ScriptExtraFee
                 )
             }

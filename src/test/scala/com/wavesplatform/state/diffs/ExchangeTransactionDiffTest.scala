@@ -461,7 +461,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     lazy val contract = s"""
        |
        |{-# STDLIB_VERSION 3 #-}
-       |{-# SCRIPT_TYPE CONTRACT #-}
+       |{-# CONTENT_TYPE CONTRACT #-}
        |
        | @Verifier(tx)
        | func verify() = {
