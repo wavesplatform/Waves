@@ -36,6 +36,7 @@ object Portfolio {
   }
 
   implicit class PortfolioExt(self: Portfolio) {
+    def spendableBalanceOf(assetId: Option[AssetId]): Long = assetId.fold(self.spendableBalance)(self.assets.getOrElse(_, 0L))
 
     def pessimistic: Portfolio = Portfolio(
       balance = Math.min(self.balance, 0),

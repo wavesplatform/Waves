@@ -247,24 +247,21 @@ class AddressActor(
 
   private type SpendableBalance = Map[Option[AssetId], Long]
 
-  // TODO TESTS
   /**
     * @param initBalance Only changed spendable balance by assets
     */
   private def ordersToDelete(initBalance: SpendableBalance): Queue[QueueEvent.Canceled] = {
-    // Probably, we need to check orders with changed assets only.
-    // Now a user can have 100 active transaction maximum - easy to traverse.
-    def shouldCheck(requiredBalance: Map[Option[AssetId], Long]): Boolean = requiredBalance.exists {
+    def keepChanged(requiredBalance: Map[Option[AssetId], Long]): Map[Option[AssetId], Long] = requiredBalance.filter {
       case (requiredAssetId, _) => initBalance.contains(requiredAssetId)
     }
 
+    // Now a user can have 100 active transaction maximum - easy to traverse.
     val (_, r) = activeOrders.values.toSeq
       .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
       .view
       .map { lo =>
-        (lo.order.id(), lo.order.assetPair, lo.requiredBalance)
+        (lo.order.id(), lo.order.assetPair, keepChanged(lo.requiredBalance))
       }
-      .filter { case (_, _, requiredBalance) => shouldCheck(requiredBalance) }
       .foldLeft((initBalance, Queue.empty[QueueEvent.Canceled])) {
         case ((restBalance, toDelete), (id, assetPair, requiredBalance)) =>
           remove(restBalance, requiredBalance) match {

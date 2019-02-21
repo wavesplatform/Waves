@@ -12,6 +12,7 @@ import com.wavesplatform.matcher.AddressActor.{BalanceUpdated, PlaceOrder}
 import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV1}
 import com.wavesplatform.wallet.Wallet
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
@@ -184,7 +185,7 @@ class AddressActorSpecification
       Props(
         new AddressActor(
           address,
-          currentPortfolio.get().balanceOf,
+          x => currentPortfolio.get().spendableBalanceOf(x),
           1.day,
           1.day,
           ntpTime,
@@ -194,11 +195,21 @@ class AddressActorSpecification
             Future.successful(QueueEventWithMeta(0, 0, event))
           }
         )))
-    f(addressActor, eventsProbe, (updatedPortfolio, notify) => {
-      currentPortfolio.set(updatedPortfolio)
-      if (notify) addressActor ! BalanceUpdated
-    })
+    f(
+      addressActor,
+      eventsProbe,
+      (updatedPortfolio, notify) => {
+        val prevPortfolio = currentPortfolio.getAndSet(updatedPortfolio)
+        if (notify) addressActor ! BalanceUpdated(changedAssetIds(prevPortfolio, updatedPortfolio))
+      }
+    )
     addressActor ! PoisonPill
+  }
+
+  private def changedAssetIds(p1: Portfolio, p2: Portfolio): Set[Option[AssetId]] = {
+    (p1.assetIds | p2.assetIds).filter { x =>
+      p1.spendableBalanceOf(x) != p2.spendableBalanceOf(x)
+    }
   }
 
   private def requiredPortfolio(order: Order): Portfolio = {

@@ -134,7 +134,11 @@ class UtxPoolImpl(time: Time,
   }
 
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
-    blockchain.balance(addr, assetId) + pessimisticPortfolios.getAggregated(addr).balanceOf(assetId)
+    blockchain.balance(addr, assetId) -
+      assetId.fold(blockchain.leaseBalance(addr).out)(_ => 0L) +
+      pessimisticPortfolios
+        .getAggregated(addr)
+        .spendableBalanceOf(assetId)
 
   override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
 
