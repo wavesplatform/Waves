@@ -64,8 +64,11 @@ object PBUtils extends App {
       }
 
       msg.companion.scalaDescriptor.fields.foreach { field =>
+        outputStream.writeFixed32NoTag(field.number)
+
         if (field.isRepeated) {
           val seq = msg.getField(field).asInstanceOf[PRepeated].value
+          outputStream.writeFixed32NoTag(seq.length)
           seq.foreach(writeValue(field, _))
         } else {
           writeValue(field, msg.getField(field))
