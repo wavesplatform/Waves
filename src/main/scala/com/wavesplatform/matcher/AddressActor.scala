@@ -248,10 +248,10 @@ class AddressActor(
   private type SpendableBalance = Map[Option[AssetId], Long]
 
   /**
-    * @param initBalance Only changed spendable balance by assets
+    * @param initBalance Contains only changed assets
     */
   private def ordersToDelete(initBalance: SpendableBalance): Queue[QueueEvent.Canceled] = {
-    def keepChanged(requiredBalance: Map[Option[AssetId], Long]): Map[Option[AssetId], Long] = requiredBalance.filter {
+    def keepChanged(requiredBalance: Map[Option[AssetId], Long]) = requiredBalance.filter {
       case (requiredAssetId, _) => initBalance.contains(requiredAssetId)
     }
 

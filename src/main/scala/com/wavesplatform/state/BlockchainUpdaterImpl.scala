@@ -1,6 +1,7 @@
 package com.wavesplatform.state
 
 import cats.implicits._
+import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
@@ -234,15 +235,22 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
   }
 
   private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
-    // TODO
-    prevNgState.toIterable.foreach(x => notifyChangedSpendable(x.bestLiquidDiff))
+    val changedPortfolios = (prevNgState, newNgState) match {
+      case (Some(p), Some(n)) => diff(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios)
+      case (Some(x), _)       => x.bestLiquidDiff.portfolios
+      case (_, Some(x))       => x.bestLiquidDiff.portfolios
+      case _                  => Map.empty
+    }
+
+    changedPortfolios.foreach {
+      case (addr, p) =>
+        p.assetIds.view
+          .filter(x => p.spendableBalanceOf(x) != 0)
+          .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
+    }
   }
 
-  private def notifyChangedSpendable(diff: Diff): Unit =
-    for {
-      (addr, p) <- diff.portfolios
-      assetId   <- p.assetIds
-    } spendableBalanceChanged.onNext(addr -> assetId)
+  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) = Monoid.combine(p1, p2.map { case (k, v) => k -> v.negate })
 
   override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, Unit] = {
     ngState match {

@@ -59,6 +59,15 @@ object Portfolio {
       val r: Set[Option[AssetId]] = self.assets.keySet.map(Some(_))
       r + None
     }
+
+    def changedAssetIds(that: Portfolio): Set[Option[AssetId]] = {
+      val a1 = assetIds
+      val a2 = that.assetIds
+
+      val intersection = a1 & a2
+      val sureChanged  = (a1 | a2) -- intersection
+      intersection.filter(x => spendableBalanceOf(x) != that.spendableBalanceOf(x)) ++ sureChanged
+    }
   }
 
 }

@@ -246,7 +246,6 @@ object UtxPoolImpl {
           Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
         nonEmptyPessimisticPortfolios.keys.foreach { address =>
           transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
-        // spendableBalanceChanged.onNext(address)
         }
       }
 
