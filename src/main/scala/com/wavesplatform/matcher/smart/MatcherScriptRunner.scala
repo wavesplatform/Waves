@@ -9,13 +9,13 @@ import com.wavesplatform.transaction.{Authorized, Proven}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.{RealTransactionWrapper, Verifier}
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
-import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
+import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriptImpl
 import monix.eval.Coeval
 
 object MatcherScriptRunner {
 
   def apply(script: Script, order: Order, isTokenScript: Boolean): (Log, Either[String, EVALUATED]) = script match {
-    case s: ExprScriprImpl =>
+    case s: ExprScriptImpl =>
       val ctx = MatcherContext.build(script.stdLibVersion, AddressScheme.current.chainId, Coeval.evalOnce(order), !isTokenScript)
       EvaluatorV1.applywithLogging(ctx, s.expr)
 

@@ -312,33 +312,6 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     )
   }
 
-
-  test("issuer can`t make SetAssetScript tx when Script is Contract") {
-    val accountA = pkByAddress(firstAddress)
-
-    val contract = ScriptCompiler.contract(
-      """|@Verifier(t)
-         |func verify () = {
-         |    true
-         |}
-         |""".stripMargin
-    )
-
-    val setScriptTransaction = SetAssetScriptTransaction
-      .signed(
-        AddressScheme.current.chainId,
-        accountA,
-        ByteStr.decodeBase58(assetWScript).get,
-        Some(contract.explicitGet()),
-        setAssetScriptFee,
-        System.currentTimeMillis(),
-        accountB
-      )
-      .left
-      .get
-  }
-
-  
   test("try to make SetAssetScript for asset v1") {
     val assetV1 = sender
       .issue(thirdAddress, "AssetV1", "Test coin for V1", someAssetAmount, 0, reissuable = false, issueFee)
