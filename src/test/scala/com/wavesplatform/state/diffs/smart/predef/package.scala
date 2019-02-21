@@ -1,8 +1,8 @@
 package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.Version._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1
+import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
@@ -19,10 +19,10 @@ import shapeless.Coproduct
 package object predef {
   val chainId: Byte = 'u'
 
-  def runScript[T <: EVALUATED](script: String, version: Version, t: In, blockchain: Blockchain, chainId: Byte): Either[String, T] = {
-    val Success(expr, _) = Parser.parseScript(script)
+  def runScript[T <: EVALUATED](script: String, version: StdLibVersion, t: In, blockchain: Blockchain, chainId: Byte): Either[String, T] = {
+    val Success(expr, _) = Parser.parseExpr(script)
     for {
-      compileResult <- ExpressionCompilerV1(compilerContext(version, isAssetScript = false), expr)
+      compileResult <- ExpressionCompiler(compilerContext(version, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
       evalContext = BlockchainContext.build(version,
                                             chainId,
@@ -35,13 +35,13 @@ package object predef {
   }
 
   def runScript[T <: EVALUATED](script: String, t: In = null): Either[String, T] =
-    runScript[T](script, ExprV1, t, EmptyBlockchain, chainId)
+    runScript[T](script, V1, t, EmptyBlockchain, chainId)
 
   def runScript[T <: EVALUATED](script: String, t: In, chainId: Byte): Either[String, T] =
-    runScript[T](script, ExprV1, t, EmptyBlockchain, chainId)
+    runScript[T](script, V1, t, EmptyBlockchain, chainId)
 
   def runScript[T <: EVALUATED](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] =
-    runScript[T](script, ExprV1, Coproduct(tx), blockchain, chainId)
+    runScript[T](script, V1, Coproduct(tx), blockchain, chainId)
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 

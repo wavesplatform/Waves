@@ -5,10 +5,9 @@ import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext, _}
-import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.{Global, Version}
-import shapeless.{:+:, CNil}
+import com.wavesplatform.lang.{Global, StdLibVersion}
 
 import scala.collection.JavaConverters._
 
@@ -17,13 +16,13 @@ object DocExport {
     if (args.size != 4 || args(0) != "--gen-doc") {
       System.err.println("Expected args: --gen-doc <version> <template> <output>")
     } else {
-      val version = Version(args(1).toInt)
+      val version = StdLibVersion(args(1).toInt)
       val wavesContext = WavesContext.build(
         version,
         new Environment {
           override def height: Long                                                                                    = ???
           override def chainId: Byte                                                                                   = 66
-          override def inputEntity: Tx :+: Ord :+: CNil                                                                = ???
+          override def inputEntity: Environment.InputEntity                                                            = ???
           override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
           override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
           override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
@@ -96,10 +95,7 @@ object DocExport {
                 ((f.argsDoc zip f.signature.args) map { arg =>
                   VarDoc(arg._1._1, extType(arg._2._2), arg._1._2)
                 }).toList.asJava,
-                f match {
-                  case NativeFunction(_, cost, _, _, _, _) => cost.toString
-                  case _                                   => ""
-                }
+                f.cost.toString
             ))
 
       case class TransactionDoc(name: String, fields: java.util.List[TransactionField])

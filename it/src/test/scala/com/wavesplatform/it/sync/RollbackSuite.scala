@@ -1,16 +1,21 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{NodeConfigs, TransferSending}
-import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry}
+import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
+import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.Random
 
-class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSending with NodesFromDocker with Matchers {
+class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSending with NodesFromDocker with Matchers with TableDrivenPropertyChecks {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
@@ -18,9 +23,9 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
       .withSpecial(1, _.nonMiner)
       .buildNonConflicting()
 
-  private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
-  private def sender        = nodes.last
-  private def firstAddress  = sender.address
+  private val nodeAddresses        = nodeConfigs.map(_.getString("address")).toSet
+  private def sender: Node         = nodes.last
+  private def firstAddress: String = sender.address
 
   test("Apply the same transfer transactions twice with return to UTX") {
 
@@ -146,7 +151,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     val sponsorSecondId = sender.sponsorAsset(sender.address, sponsorAssetId, baseFee = 2 * 100L, fee = issueFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorSecondId)
 
-    nodes.rollback(height, false)
+    nodes.rollback(height, returnToUTX = false)
 
     nodes.waitForHeightArise()
 
@@ -154,5 +159,61 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
 
     assert(assetDetailsAfter.minSponsoredAssetFee == assetDetailsBefore.minSponsoredAssetFee)
     sender.transactionsByAddress(sender.address, 10) should contain theSameElementsAs txsBefore1
+  }
+
+  test("transfer depends from data tx") {
+    val scriptText = s"""
+    match tx {
+      case tx: TransferTransaction =>
+        let oracle = addressFromRecipient(tx.recipient)
+        extract(getString(oracle,"oracle")) == "yes"
+      case tx: SetScriptTransaction | DataTransaction => true
+      case other => false
+    }""".stripMargin
+
+    val pkSwapBC1 = PrivateKeyAccount.fromSeed(sender.seed(firstAddress)).right.get
+    val script    = ScriptCompiler(scriptText, isAssetScript = false).right.get._1
+    val sc1SetTx = SetScriptTransaction
+      .selfSigned(sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
+      .right
+      .get
+
+    val setScriptId = sender.signedBroadcast(sc1SetTx.json()).id
+    nodes.waitForHeightAriseAndTxPresent(setScriptId)
+
+    nodes.waitForHeightArise()
+    val height = sender.height
+
+    nodes.waitForHeightArise()
+    val entry1 = StringDataEntry("oracle", "yes")
+    val dtx    = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1)) + smartFee).id
+    nodes.waitForHeightAriseAndTxPresent(dtx)
+
+    val tx = sender.transfer(firstAddress, firstAddress, transferAmount, smartMinFee, version = 2, waitForTx = true).id
+
+    nodes.rollback(height)
+    nodes.waitForSameBlockHeadesAt(height)
+
+    nodes.waitForHeightArise()
+
+    assert(sender.findTransactionInfo(dtx).isDefined)
+    assert(sender.findTransactionInfo(tx).isEmpty)
+
+  }
+
+  forAll(
+    Table(
+      ("num", "name"),
+      (1, "1 of N"),
+      (nodes.size, "N of N")
+    )) { (num, name) =>
+    test(s"generate more blocks and resynchronise after rollback ${name}") {
+      val baseHeight = nodes.map(_.height).max + 5
+      nodes.waitForHeight(baseHeight)
+      val rollbackNodes = Random.shuffle(nodes).take(num)
+      rollbackNodes.foreach(_.rollback(baseHeight - 1))
+      nodes.waitForHeightArise()
+      nodes.waitForSameBlockHeadesAt(baseHeight)
+    }
   }
 }

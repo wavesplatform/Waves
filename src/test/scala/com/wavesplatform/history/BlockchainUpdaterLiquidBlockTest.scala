@@ -1,28 +1,32 @@
 package com.wavesplatform.history
 
 import com.wavesplatform._
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.block.{Block, MicroBlock, SignerData}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 
-class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
+class BlockchainUpdaterLiquidBlockTest
+    extends PropSpec
+    with PropertyChecks
+    with DomainScenarioDrivenPropertyCheck
+    with Matchers
+    with TransactionGen
+    with BlocksTransactionsHelpers {
+  import QuickTX._
+  import UnsafeBlocks._
 
   private def preconditionsAndPayments(minTx: Int, maxTx: Int): Gen[(Block, Block, Seq[MicroBlock])] =
     for {
       richAccount        <- accountGen
       totalTxNumber      <- Gen.chooseNum(minTx, maxTx)
       txNumberInKeyBlock <- Gen.chooseNum(0, Block.MaxTransactionsPerBlockVer3)
-      allTxs             <- Gen.listOfN(totalTxNumber, validTransferGen(richAccount))
+      allTxs             <- Gen.listOfN(totalTxNumber, transfer(richAccount))
     } yield {
       val (keyBlockTxs, microTxs) = allTxs.splitAt(txNumberInKeyBlock)
       val txNumberInMicros        = totalTxNumber - txNumberInKeyBlock
@@ -94,68 +98,4 @@ class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with
         }
     }
   }
-
-  private def validTransferGen(from: PrivateKeyAccount): Gen[Transaction] =
-    for {
-      amount    <- smallFeeGen
-      feeAmount <- smallFeeGen
-      timestamp <- timestampGen
-      recipient <- accountGen
-    } yield TransferTransactionV1.selfSigned(None, from, recipient, amount, timestamp, None, feeAmount, Array.empty).explicitGet()
-
-  private def unsafeChainBaseAndMicro(totalRefTo: ByteStr,
-                                      base: Seq[Transaction],
-                                      micros: Seq[Seq[Transaction]],
-                                      signer: PrivateKeyAccount,
-                                      version: Byte,
-                                      timestamp: Long): (Block, Seq[MicroBlock]) = {
-    val block = unsafeBlock(totalRefTo, base, signer, version, timestamp)
-    val microBlocks = micros
-      .foldLeft((block, Seq.empty[MicroBlock])) {
-        case ((lastTotal, allMicros), txs) =>
-          val (newTotal, micro) = unsafeMicro(totalRefTo, lastTotal, txs, signer, version, timestamp)
-          (newTotal, allMicros :+ micro)
-      }
-      ._2
-    (block, microBlocks)
-  }
-
-  private def unsafeMicro(totalRefTo: ByteStr,
-                          prevTotal: Block,
-                          txs: Seq[Transaction],
-                          signer: PrivateKeyAccount,
-                          version: Byte,
-                          ts: Long): (Block, MicroBlock) = {
-    val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-    val unsigned      = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.uniqueId, ByteStr.empty)
-    val signature     = crypto.sign(signer, unsigned.bytes())
-    val signed        = unsigned.copy(signature = ByteStr(signature))
-    (newTotalBlock, signed)
-  }
-
-  private def unsafeBlock(reference: ByteStr,
-                          txs: Seq[Transaction],
-                          signer: PrivateKeyAccount,
-                          version: Byte,
-                          timestamp: Long,
-                          bTarget: Long = DefaultBaseTarget): Block = {
-    val unsigned = Block(
-      version = version,
-      timestamp = timestamp,
-      reference = reference,
-      consensusData = NxtLikeConsensusBlockData(
-        baseTarget = bTarget,
-        generationSignature = generationSignature
-      ),
-      transactionData = txs,
-      signerData = SignerData(
-        generator = signer,
-        signature = ByteStr.empty
-      ),
-      featureVotes = Set.empty
-    )
-
-    unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes()))))
-  }
-
 }

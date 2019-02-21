@@ -131,7 +131,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val (balance, eff) = notMiner.accountBalances(firstAddress)
     val details        = notMiner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
     assert(details.scriptComplexity == 1)
-    assert(details.scriptText == "TRUE")
+    assert(details.scriptText == "TRUE") // [WAIT] true
     assert(details.script == scriptBase64)
 
     val txId = sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(script2)).id
@@ -159,9 +159,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
-    def sastx(fee: Long = setAssetScriptFee,
-              timestamp: Long = System.currentTimeMillis,
-              assetId: ByteStr = ByteStr.decodeBase58(assetWScript).get,
+    def sastx(fee: Long = setAssetScriptFee, timestamp: Long = System.currentTimeMillis, assetId: ByteStr = ByteStr.decodeBase58(assetWScript).get,
     ): SetAssetScriptTransaction =
       SetAssetScriptTransaction
         .signed(AddressScheme.current.chainId, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)

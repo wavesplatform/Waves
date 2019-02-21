@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.UnaryOperation._
 import fastparse.{WhitespaceApi, core}
@@ -160,6 +159,11 @@ object Parser {
     case (_, id, None, _)                                     => id
   }
 
+  val list: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map { case (s,e,f) =>
+    val pos = Pos(s, f)
+    e.foldRight(REF(pos, PART.VALID(pos,"nil")):EXPR) { (v,l) => FUNCTION_CALL(pos, PART.VALID(pos, "cons"), List(v,l)) }
+  }
+
   val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | maybeFunctionCallP)
 
   abstract class Accessor
@@ -170,18 +174,18 @@ object Parser {
     val funcname    = anyVarName
     val argWithType = anyVarName ~ ":" ~ typesP
     val args        = "(" ~ argWithType.rep(sep = ",") ~ ")"
-    val funcHeader  = "func" ~ funcname ~ args ~ "=" ~ "{" ~ baseExpr ~ "}"
+    val funcHeader  = Index ~~ "func" ~ funcname ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}")) ~~ Index
     funcHeader.map {
-      case (name, args, expr) => FUNC(AnyPos, name, args, expr)
+      case (start, name, args, expr, end) => FUNC(Pos(start, end), name, args, expr)
     }
   }
 
-  val annotationP: P[ANNOTATION] = ("@" ~ anyVarName ~ "(" ~ anyVarName.rep(sep = ",") ~ ")").map {
-    case (name: PART[String], args: Seq[PART[String]]) => ANNOTATION(AnyPos, name, args)
+  val annotationP: P[ANNOTATION] = (Index ~~ "@" ~ anyVarName ~ "(" ~ anyVarName.rep(sep = ",") ~ ")" ~~ Index).map {
+    case (start, name: PART[String], args: Seq[PART[String]], end) => ANNOTATION(Pos(start, end), name, args)
   }
 
-  val annotatedFunc: P[ANNOTATEDFUNC] = (annotationP.rep ~ funcP).map {
-    case (as, f) => ANNOTATEDFUNC(AnyPos, as, f)
+  val annotatedFunc: P[ANNOTATEDFUNC] = (Index ~~ annotationP.rep ~ funcP ~~ Index).map {
+    case (start, as, f, end) => ANNOTATEDFUNC(Pos(start, end), as, f)
   }
 
   val matchCaseP: P[MATCH_CASE] = {
@@ -306,21 +310,41 @@ object Parser {
   }
 
   val baseAtom = comment ~
-    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP) ~
+    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | list | block | maybeAccessP) ~
     comment
 
-  lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
+  lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority))
 
-  lazy val declaration = P(letP | funcP)
 
-  def binaryOp(atom: P[EXPR], rest: List[List[BinaryOperation]]): P[EXPR] = rest match {
+  val singleBaseAtom = comment ~
+    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | maybeAccessP) ~
+    comment
+
+  val singleBaseExpr = P(binaryOp(singleBaseAtom, opsByPriority))
+
+
+  val declaration = P(letP | funcP)
+
+  def revp[A,B](l:A, s:Seq[(B,A)], o:Seq[(A,B)]=Seq.empty) : (Seq[(A,B)], A) = {
+    s.foldLeft((o,l)) { (acc, op) => (acc, op) match { case ((o,l),(b,a)) => ((l,b) +: o) -> a } }
+  }
+
+  def binaryOp(atom: P[EXPR], rest: List[Either[List[BinaryOperation], List[BinaryOperation]]]): P[EXPR] = rest match {
     case Nil => unaryOp(atom, unaryOps)
-    case kinds :: restOps =>
+    case Left(kinds) :: restOps =>
       val operand = binaryOp(atom, restOps)
       val kind    = kinds.map(_.parser).reduce((pl, pr) => P(pl | pr))
       P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
         case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
           r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end, acc, currOperand) }
+      }
+    case Right(kinds) :: restOps =>
+      val operand = binaryOp(atom, restOps)
+      val kind    = kinds.map(_.parser).reduce((pl, pr) => P(pl | pr))
+      P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
+        case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
+          val (ops,s) = revp(left, r)
+          ops.foldLeft(s) { case (acc, (currOperand, currKind)) => currKind.expr(start, currOperand.position.end, currOperand, acc) }
       }
   }
 
@@ -331,12 +355,12 @@ object Parser {
       } | acc
   }
 
-  def parseScript(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
+  def parseExpr(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
 
   def parseContract(str: String): core.Parsed[CONTRACT, Char, String] =
-    P(Start ~ (declaration.rep) ~ (annotatedFunc.rep) ~ End)
+    P(Start ~ comment.? ~ (declaration.rep) ~ comment.? ~ (annotatedFunc.rep) ~ End ~~ Index)
       .map {
-        case (ds, fs) => CONTRACT(AnyPos, ds.toList, fs.toList)
+        case (ds, fs, end) => CONTRACT(Pos(0, end), ds.toList, fs.toList)
       }
       .parse(str)
 }

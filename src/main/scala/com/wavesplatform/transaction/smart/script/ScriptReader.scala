@@ -1,10 +1,9 @@
 package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Version
-import com.wavesplatform.lang.Version._
 import com.wavesplatform.lang.contract.ContractSerDe
 import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.{ContentType, StdLibVersion}
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
 import com.wavesplatform.transaction.smart.script.v1._
 
@@ -13,31 +12,30 @@ object ScriptReader {
   val checksumLength = 4
 
   def fromBytes(bytes: Array[Byte]): Either[ScriptParseError, Script] = {
-    val checkSum         = bytes.takeRight(checksumLength)
-    val computedCheckSum = crypto.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
-    val version          = bytes.head
-    val scriptBytes      = bytes.drop(1).dropRight(checksumLength)
+    val checkSum          = bytes.takeRight(checksumLength)
+    val computedCheckSum  = crypto.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
+    val versionByte: Byte = bytes.head
+    val (scriptType, stdLibVersion, offset) =
+      if (versionByte == 0)
+        (ContentType.parseId(bytes(1)), StdLibVersion.parseVersion(bytes(2)), 3)
+      else if (versionByte == StdLibVersion.V1.toByte || versionByte == StdLibVersion.V2.toByte)
+        (ContentType.Expression, StdLibVersion(versionByte.toInt), 1)
+      else ???
+    val scriptBytes = bytes.drop(offset).dropRight(checksumLength)
 
     (for {
       _ <- Either.cond(checkSum.sameElements(computedCheckSum), (), ScriptParseError("Invalid checksum"))
-      ver = Version(version.toInt)
-      sv <- Either
-        .cond(
-          SupportedVersions(ver),
-          ver,
-          ScriptParseError(s"Invalid version: $version")
-        )
-      s <- sv match {
-        case ExprV1 | ExprV2 =>
+      s <- scriptType match {
+        case ContentType.Expression =>
           for {
             _     <- ExprScript.validateBytes(scriptBytes)
             bytes <- Serde.deserialize(scriptBytes).map(_._1)
-            s     <- ExprScript(sv, bytes, checkSize = false)
+            s     <- ExprScript(stdLibVersion, bytes, checkSize = false)
           } yield s
-        case ContractV =>
+        case ContentType.Contract =>
           for {
             bytes <- ContractSerDe.deserialize(scriptBytes)
-            s     <- ContractScript(sv, bytes)
+            s     <- ContractScript(stdLibVersion, bytes)
           } yield s
       }
     } yield s).left

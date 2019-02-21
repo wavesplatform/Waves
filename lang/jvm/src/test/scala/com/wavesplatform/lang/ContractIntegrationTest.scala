@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, sampleTypes}
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invokation
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
@@ -20,9 +20,9 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
 
   property("Simple test") {
     val ctx: CTX =
-      PureContext.build(Version.ContractV) |+|
+      PureContext.build(StdLibVersion.V3) |+|
         CTX(sampleTypes, Map.empty, Array.empty) |+|
-        WavesContext.build(Version.ContractV, Common.emptyBlockchainEnvironment(), false)
+        WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false)
 
     val src =
       """
@@ -39,8 +39,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |func foo(a:ByteStr) = {
         |  let x = invocation.caller.bytes
         |  if (fooHelper())
-        |    then WriteSet(List(DataEntry("b", 1), DataEntry("sender", x)))
-        |    else WriteSet(List(DataEntry("a", a), DataEntry("sender", x)))
+        |    then WriteSet([DataEntry("b", 1), DataEntry("sender", x)])
+        |    else WriteSet([DataEntry("a", a), DataEntry("sender", x)])
         |}
         |
         |@Verifier(t)
@@ -65,7 +65,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     val result = ContractEvaluator(
       ctx.evaluationContext,
       compiled,
-      Invokation(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr.empty))), ByteStr.empty, None, ByteStr.empty)
+      Invocation(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr.empty))), ByteStr.empty, None, ByteStr.empty)
     ).explicitGet()
 
     result shouldBe expectedResult

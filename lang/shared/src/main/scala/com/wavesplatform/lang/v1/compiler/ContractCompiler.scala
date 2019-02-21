@@ -5,17 +5,15 @@ import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract._
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
-import com.wavesplatform.lang.v1.compiler.ExpressionCompilerV1.handlePart
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.parser.Expressions
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, LET}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
+import com.wavesplatform.lang.v1.parser.Expressions.FUNC
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-
 object ContractCompiler {
 
   def compileAnnotatedFunc(af: Expressions.ANNOTATEDFUNC): CompileM[AnnotatedFunction] = {
@@ -32,7 +30,7 @@ object ContractCompiler {
       compiledBody <- local {
         for {
           _ <- modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))
-          r <- compiler.ExpressionCompilerV1.compileFunc(AnyPos, af.f)
+          r <- compiler.ExpressionCompiler.compileFunc(af.f.position, af.f)
         } yield r
       }
     } yield (annotations, compiledBody)
@@ -51,7 +49,7 @@ object ContractCompiler {
                 case _ => false
               },
               (),
-              Generic(0, 0, s"ContractFunction must return WriteSet/TransferSet/ContractResult or it super type, but got '$tpe'")
+              Generic(0, 0, s"${FieldNames.Error}, but got '$tpe'")
             )
             .toCompileM
         } yield CallableFunction(c, func)
@@ -59,35 +57,28 @@ object ContractCompiler {
         for {
           _ <- Either
             .cond(tpe match {
-              case _ if (tpe <= BOOLEAN) => true
-              case _                     => false
+              case _ if tpe <= BOOLEAN => true
+              case _                   => false
             }, (), Generic(0, 0, s"VerifierFunction must return BOOLEAN or it super type, but got '$tpe'"))
             .toCompileM
         } yield VerifierFunction(c, func)
     }
   }
 
-  // TODO: Check scope leak!
   def compileDeclaration(dec: Expressions.Declaration): CompileM[DECLARATION] = {
     dec match {
-      case let @ LET(pos, _, _, _, _) =>
+      case l: Expressions.LET =>
         for {
-          (name, tpe, expr) <- compiler.ExpressionCompilerV1.compileLet(pos, let)
-          _ <- modify[CompilerContext, CompilationError] { ctx =>
-            CompilerContext.vars.modify(ctx)(_ + (name -> (tpe -> s"Defined at ${pos.start}")))
-          }
-        } yield Terms.LET(name, expr)
-      case func @ FUNC(pos, _, _, _) =>
+          compiledLet <- compileLet(dec.position, l)
+          (letName, letType, letExpr) = compiledLet
+          _ <- updateCtx(letName, letType, dec.position)
+        } yield Terms.LET(letName, letExpr)
+      case f: FUNC =>
         for {
-          (func, tpe, argTps) <- compiler.ExpressionCompilerV1.compileFunc(pos, func)
-          _ <- modify[CompilerContext, CompilationError] { ctx =>
-            CompilerContext.functions.modify(ctx) { funDefs =>
-              val fts      = FunctionTypeSignature(tpe, argTps, FunctionHeader.User(func.name))
-              val knownFts = funDefs.getOrElse(func.name, Nil)
-
-              funDefs.updated(func.name, fts :: knownFts)
-            }
-          }
+          cf <- compileFunc(dec.position, f)
+          (func, compiledFuncBodyType, argTypes) = cf
+          typeSig                                = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(func.name))
+          _ <- updateCtx(func.name, typeSig)
         } yield func
     }
   }
@@ -95,10 +86,53 @@ object ContractCompiler {
   private def compileContract(contract: Expressions.CONTRACT): CompileM[Contract] = {
     for {
       ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
-      l  <- contract.fs.traverse[CompileM, AnnotatedFunction](compileAnnotatedFunc)
-      v  = l.find(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
+      _  <- validateDuplicateVarsInContract(contract)
+      l  <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
+      _ <- Either
+        .cond(
+          l.map(_.u.name).toSet.size == l.size,
+          (),
+          Generic(contract.position.start, contract.position.start, "Contract functions must have unique names")
+        )
+        .toCompileM
+      verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
+      v <- verifierFunctions match {
+        case Nil => Option.empty[VerifierFunction].pure[CompileM]
+        case vf :: Nil =>
+          if (vf.u.args.isEmpty)
+            Option.apply(vf).pure[CompileM]
+          else
+            raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
+              Generic(contract.position.start, contract.position.start, "Verifier function must have 0 arguments"))
+        case _ =>
+          raiseError[CompilerContext, CompilationError, Option[VerifierFunction]](
+            Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
+      }
       fs = l.filter(_.isInstanceOf[CallableFunction]).map(_.asInstanceOf[CallableFunction])
     } yield Contract(ds, fs, v)
+  }
+
+  private def validateDuplicateVarsInContract(contract: Expressions.CONTRACT): CompileM[Any] = {
+    for {
+      ctx <- get[CompilerContext, CompilationError]
+      annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, String](handlePart)
+      annotatedFuncArgs: Seq[(Seq[Expressions.PART[String]], Seq[Expressions.PART[String]])] = contract.fs.map(af =>
+        (af.anns.flatMap(_.args), af.f.args.map(_._1)))
+      annAndFuncArgsIntersection = annotatedFuncArgs.toVector.traverse[CompileM, Boolean] {
+        case (annSeq, argSeq) =>
+          for {
+            anns <- annSeq.toList.traverse[CompileM, String](handlePart)
+            args <- argSeq.toList.traverse[CompileM, String](handlePart)
+          } yield anns.forall(a => args.contains(a))
+      }
+      _ <- annotationVars
+        .ensure(Generic(contract.position.start, contract.position.start, "Annotation bindings overrides already defined var"))(aVs =>
+          aVs.forall(!ctx.varDefs.contains(_)))
+      _ <- annAndFuncArgsIntersection
+        .ensure(Generic(contract.position.start, contract.position.start, "Contract func args override annotation bindings")) { is =>
+          !(is contains true)
+        }
+    } yield ()
   }
 
   def apply(c: CompilerContext, contract: Expressions.CONTRACT): Either[String, Contract] =
@@ -106,4 +140,15 @@ object ContractCompiler {
       .run(c)
       .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
       .value
+
+  def compile(input: String, ctx: CompilerContext): Either[String, Contract] = {
+    Parser.parseContract(input) match {
+      case fastparse.core.Parsed.Success(xs, _) =>
+        ContractCompiler(ctx, xs) match {
+          case Left(err) => Left(err.toString)
+          case Right(c)  => Right(c)
+        }
+      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+    }
+  }
 }

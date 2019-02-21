@@ -7,8 +7,12 @@ import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
+import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.block.{Block, BlockHeader, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.crypto._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
@@ -16,6 +20,10 @@ import org.iq80.leveldb.{DB, ReadOptions}
 
 package object database {
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
+    def writeByteStr(s: ByteStr) = {
+      output.write(s.arr)
+    }
+
     def writeBigInt(v: BigInt): Unit = {
       val b = v.toByteArray
       require(b.length <= Byte.MaxValue)
@@ -49,6 +57,19 @@ package object database {
         Some(ScriptReader.fromBytes(b).explicitGet())
       } else None
     }
+
+    def readBytes(len: Int): Array[Byte] = {
+      val arr = new Array[Byte](len)
+      input.readFully(arr)
+      arr
+    }
+
+    def readByteStr(len: Int): ByteStr = {
+      ByteStr(readBytes(len))
+    }
+
+    def readSignature: ByteStr          = readByteStr(SignatureLength)
+    def readPublicKey: PublicKeyAccount = PublicKeyAccount(readBytes(KeyLength))
   }
 
   def writeIntSeq(values: Seq[Int]): Array[Byte] = {
@@ -222,6 +243,111 @@ package object database {
     val ndo = newDataOutput()
     ndo.writeBoolean(ai.isReissuable)
     ndo.writeBigInt(ai.volume)
+    ndo.toByteArray
+  }
+
+  def writeBlockHeaderAndSize(data: (BlockHeader, Int)): Array[Byte] = {
+    val (bh, size) = data
+
+    val ndo = newDataOutput()
+
+    ndo.writeInt(size)
+
+    ndo.writeByte(bh.version)
+    ndo.writeLong(bh.timestamp)
+    ndo.writeByteStr(bh.reference)
+    ndo.writeLong(bh.consensusData.baseTarget)
+    ndo.writeByteStr(bh.consensusData.generationSignature)
+
+    if (bh.version == 1 | bh.version == 2)
+      ndo.writeByte(bh.transactionCount)
+    else
+      ndo.writeInt(bh.transactionCount)
+
+    ndo.writeInt(bh.featureVotes.size)
+    bh.featureVotes.foreach(s => ndo.writeShort(s))
+    ndo.write(bh.signerData.generator.publicKey)
+    ndo.writeByteStr(bh.signerData.signature)
+
+    ndo.toByteArray
+  }
+
+  def readBlockHeaderAndSize(bs: Array[Byte]): (BlockHeader, Int) = {
+    val ndi = newDataInput(bs)
+
+    val size = ndi.readInt()
+
+    val version    = ndi.readByte()
+    val timestamp  = ndi.readLong()
+    val reference  = ndi.readSignature
+    val baseTarget = ndi.readLong()
+    val genSig     = ndi.readByteStr(Block.GeneratorSignatureLength)
+    val transactionCount = {
+      if (version == 1 || version == 2) ndi.readByte()
+      else ndi.readInt()
+    }
+    val featureVotesCount = ndi.readInt()
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+    val generator         = ndi.readPublicKey
+    val signature         = ndi.readSignature
+
+    val header = new BlockHeader(timestamp,
+                                 version,
+                                 reference,
+                                 SignerData(generator, signature),
+                                 NxtLikeConsensusBlockData(baseTarget, genSig),
+                                 transactionCount,
+                                 featureVotes)
+
+    (header, size)
+  }
+
+  def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
+    val ndi          = newDataInput(bs)
+    val height       = Height(ndi.readInt())
+    val numSeqLength = ndi.readInt()
+
+    (height, List.fill(numSeqLength) {
+      val tp  = ndi.readByte()
+      val num = TxNum(ndi.readShort())
+      (tp, num)
+    })
+  }
+
+  def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
+    val (height, numSeq) = v
+    val numSeqLength     = numSeq.length
+
+    val outputLength = 4 + 4 + numSeqLength * (4 + 1)
+    val ndo          = newDataOutput(outputLength)
+
+    ndo.writeInt(height)
+    ndo.writeInt(numSeqLength)
+    numSeq.foreach {
+      case (tp, num) =>
+        ndo.writeByte(tp)
+        ndo.writeShort(num)
+    }
+
+    ndo.toByteArray
+  }
+
+  def readTransactionHN(bs: Array[Byte]): (Height, TxNum) = {
+    val ndi = newDataInput(bs)
+    val h   = Height(ndi.readInt())
+    val num = TxNum(ndi.readShort())
+
+    (h, num)
+  }
+
+  def writeTransactionHN(v: (Height, TxNum)): Array[Byte] = {
+    val ndo = newDataOutput(8)
+
+    val (h, num) = v
+
+    ndo.writeInt(h)
+    ndo.writeShort(num)
+
     ndo.toByteArray
   }
 

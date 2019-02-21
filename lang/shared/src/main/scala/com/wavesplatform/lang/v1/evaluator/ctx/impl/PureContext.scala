@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -59,7 +59,7 @@ object PureContext {
     }
 
   lazy val ne: BaseFunction =
-    UserFunction(NE_OP.func, BOOLEAN, "Inequality", ("@a", TYPEPARAM('T'), "value"), ("@b", TYPEPARAM('T'), "value")) {
+    UserFunction(NE_OP.func, 26, BOOLEAN, "Inequality", ("@a", TYPEPARAM('T'), "value"), ("@b", TYPEPARAM('T'), "value")) {
       FUNCTION_CALL(uNot, List(FUNCTION_CALL(eq, List(REF("@a"), REF("@b")))))
     }
 
@@ -68,12 +68,13 @@ object PureContext {
     case _                              => Left(defaultThrowMessage)
   }
 
-  lazy val throwNoMessage: BaseFunction = UserFunction("throw", NOTHING, "Fail script") {
+  lazy val throwNoMessage: BaseFunction = UserFunction("throw", 2, NOTHING, "Fail script") {
     FUNCTION_CALL(throwWithMessage, List(CONST_STRING(defaultThrowMessage)))
   }
 
   lazy val extract: BaseFunction =
     UserFunction("extract",
+                 13,
                  TYPEPARAM('T'),
                  "Extract value from option or fail",
                  ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value")) {
@@ -85,7 +86,7 @@ object PureContext {
     }
 
   lazy val isDefined: BaseFunction =
-    UserFunction("isDefined", BOOLEAN, "Check the value is defined", ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Option value")) {
+    UserFunction("isDefined", 35, BOOLEAN, "Check the value is defined", ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Option value")) {
       FUNCTION_CALL(ne, List(REF("@a"), REF("unit")))
     }
 
@@ -176,7 +177,7 @@ object PureContext {
     }
 
   lazy val dropRightBytes: BaseFunction =
-    UserFunction("dropRight", "dropRightBytes", BYTESTR, "Cut vectors tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "cuting size")) {
+    UserFunction("dropRight", "dropRightBytes", 19, BYTESTR, "Cut vectors tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "cuting size")) {
       FUNCTION_CALL(
         takeBytes,
         List(
@@ -193,7 +194,7 @@ object PureContext {
     }
 
   lazy val takeRightBytes: BaseFunction =
-    UserFunction("takeRight", "takeRightBytes", BYTESTR, "Take vector tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "taking size")) {
+    UserFunction("takeRight", "takeRightBytes", 19, BYTESTR, "Take vector tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "taking size")) {
       FUNCTION_CALL(
         dropBytes,
         List(
@@ -217,28 +218,11 @@ object PureContext {
       case xs                                            => notImplemented("take(xs: String, number: Long)", xs)
     }
 
-  lazy val listConstructor1 =
-    NativeFunction("List", 1, CREATE_LIST1, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]", ("arg1", TYPEPARAM('T'), "arg1"))(xs =>
-      Right(ARR(xs.toIndexedSeq)))
-
-  lazy val listConstructor2 = NativeFunction("List",
-                                             1,
-                                             CREATE_LIST2,
-                                             PARAMETERIZEDLIST(TYPEPARAM('T')),
-                                             "Construct a new List[T]",
-                                             ("arg1", TYPEPARAM('T'), "arg1"),
-                                             ("arg2", TYPEPARAM('T'), "arg2"))(xs => Right(ARR(xs.toIndexedSeq)))
-
-  lazy val listConstructor3 = NativeFunction(
-    "List",
-    1,
-    CREATE_LIST3,
-    PARAMETERIZEDLIST(TYPEPARAM('T')),
-    "Construct a new List[T]",
-    ("arg1", TYPEPARAM('T'), "arg1"),
-    ("arg2", TYPEPARAM('T'), "arg2"),
-    ("arg3", TYPEPARAM('T'), "arg3")
-  )(xs => Right(ARR(xs.toIndexedSeq)))
+  lazy val listConstructor =
+    NativeFunction("cons", 2, CREATE_LIST, PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))), "Construct a new List[T]", ("head", TYPEPARAM('A'), "head"), ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')), "tail")) {
+      case h :: ARR(t) :: Nil => Right(ARR(h +: t))
+      case xs                 => notImplemented("cons(head: T, tail: LIST[T]", xs)
+    }
 
   lazy val dropString: BaseFunction =
     NativeFunction("drop", 1, DROP_STRING, STRING, "Remmove sring prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
@@ -247,7 +231,7 @@ object PureContext {
     }
 
   lazy val takeRightString: BaseFunction =
-    UserFunction("takeRight", STRING, "Take string suffix", ("@xs", STRING, "String"), ("@number", LONG, "suffix size in characters")) {
+    UserFunction("takeRight", 19, STRING, "Take string suffix", ("@xs", STRING, "String"), ("@number", LONG, "suffix size in characters")) {
       FUNCTION_CALL(
         dropString,
         List(
@@ -264,7 +248,7 @@ object PureContext {
     }
 
   lazy val dropRightString: BaseFunction =
-    UserFunction("dropRight", STRING, "Remove string suffix", ("@xs", STRING, "string"), ("@number", LONG, "suffix size in characters")) {
+    UserFunction("dropRight", 19, STRING, "Remove string suffix", ("@xs", STRING, "string"), ("@number", LONG, "suffix size in characters")) {
       FUNCTION_CALL(
         takeString,
         List(
@@ -326,12 +310,16 @@ object PureContext {
       case _               => ???
     }
 
-  lazy val uMinus: BaseFunction = UserFunction("-", LONG, "Change integer sign", ("@n", LONG, "value")) {
+  lazy val uMinus: BaseFunction = UserFunction("-", 9, LONG, "Change integer sign", ("@n", LONG, "value")) {
     FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
   }
 
-  lazy val uNot: BaseFunction = UserFunction("!", BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
+  lazy val uNot: BaseFunction = UserFunction("!", 11, BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
     IF(FUNCTION_CALL(eq, List(REF("@p"), FALSE)), TRUE, FALSE)
+  }
+
+  lazy val ensure: BaseFunction = UserFunction("ensure", 16, BOOLEAN, "Ensure parameter is true", ("@b", BOOLEAN, "condition"), ("@msg", STRING, "error message")) {
+      IF(REF("@b"), TRUE, FUNCTION_CALL(throwWithMessage, List(REF("@msg"))))
   }
 
   private lazy val operators: Array[BaseFunction] = Array(
@@ -352,7 +340,9 @@ object PureContext {
     uNot
   )
 
-  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))))
+  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit))))
+    )
   private lazy val functions = Array(
     fraction,
     sizeBytes,
@@ -389,10 +379,10 @@ object PureContext {
     functions
   )
 
-  def build(version: Version): CTX =
+  def build(version: StdLibVersion): CTX =
     version match {
-      case ExprV1 | ExprV2 => ctx
-      case ContractV       => Monoid.combine(ctx, CTX(Seq.empty, Map.empty, Array(listConstructor1, listConstructor2, listConstructor3)))
+      case V1 | V2 => ctx
+      case V3       => Monoid.combine(ctx, CTX(Seq.empty, Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))), Array(listConstructor, ensure)))
     }
 
 }

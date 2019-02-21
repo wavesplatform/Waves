@@ -4,11 +4,11 @@ import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.Version._
+import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LONG}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompilerV1, Terms}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
@@ -120,12 +120,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   private def eval[T <: EVALUATED](code: String, pointInstance: Option[CaseObj] = None, pointType: FINAL = AorBorC): Either[String, T] = {
-    val untyped                                                = Parser.parseScript(code).get.value
+    val untyped                                                = Parser.parseExpr(code).get.value
     val lazyVal                                                = LazyVal(EitherT.pure(pointInstance.orNull))
     val stringToTuple: Map[String, ((FINAL, String), LazyVal)] = Map(("p", ((pointType, "Test variable"), lazyVal)))
     val ctx: CTX =
-      Monoid.combineAll(Seq(PureContext.build(ContractV), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
-    val typed = ExpressionCompilerV1(ctx.compilerContext, untyped)
+      Monoid.combineAll(Seq(PureContext.build(V3), CTX(sampleTypes, stringToTuple, Array.empty), addCtx))
+    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV1[T](ctx.evaluationContext, v._1))
   }
 
@@ -184,10 +184,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED]("fraction(9223372036854775807, -2, -4)") shouldBe evaluated(Long.MaxValue / 2)
   }
 
-  def compile(script: String): Either[String, Terms.EXPR] = {
-    val compiler = new ExpressionCompilerV1(CTX.empty.compilerContext)
-    compiler.compile(script, List.empty)
-  }
+  def compile(script: String): Either[String, Terms.EXPR] =
+    ExpressionCompiler.compile(script, CTX.empty.compilerContext)
 
   property("wrong script return type") {
     compile("1") should produce("should return boolean")
@@ -224,7 +222,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |let a = if (true) then 1 else ""
         |
         |match a {
-        | case x: Int => x 
+        | case x: Int => x
         | case y: String => 2
         |}""".stripMargin) shouldBe evaluated(1)
   }
@@ -297,6 +295,19 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(11)
   }
 
+  property("function overload is denied") {
+    eval[EVALUATED](
+      """
+                      |
+                      |func extract(x:Int, y: Int) = {
+                      |   4
+                      |}
+                      | extract(10)
+                    """.stripMargin,
+      Some(pointAInstance)
+    ) should produce("already defined")
+  }
+
   property("context won't change after inner let") {
     val script = "{ let x = 3; x } + { let x = 5; x}"
     eval[EVALUATED](script, Some(pointAInstance)) shouldBe evaluated(8)
@@ -308,12 +319,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("context won't change after execution of a user function") {
-    val doubleFst = UserFunction("ID", LONG, "D", ("x", LONG, "X")) {
+    val doubleFst = UserFunction("ID", 0, LONG, "D", ("x", LONG, "X")) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
     }
 
     val context = Monoid.combine(
-      PureContext.build(ExprV1).evaluationContext,
+      PureContext.build(V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map("x"                -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
@@ -327,7 +338,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(ExprV1).evaluationContext,
+      PureContext.build(V1).evaluationContext,
       EvaluationContext(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal(EitherT.pure(CONST_LONG(3l)))),
@@ -348,12 +359,28 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     ev[CONST_LONG](context, expr) shouldBe evaluated(8)
   }
 
-  property("list constructor primitive") {
+  property("listN constructor primitive") {
     val src =
       """
-        |List(1,2)
+        |cons(1, cons(2, cons(3, cons(4, cons(5, nil)))))
       """.stripMargin
-    eval[EVALUATED](src) shouldBe evaluated(List(1, 2))
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
+  }
+
+  property("listN constructor binary op") {
+    val src =
+      """
+        |1::2::3::4::5::nil
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
+  }
+
+  property("list syntax sugar") {
+    val src =
+      """
+        |[1,2,3, 4, 5]
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
   }
 
   property("list constructor for different data entries") {
@@ -362,7 +389,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |let x = DataEntry("foo",1)
         |let y = DataEntry("bar","2")
         |let z = DataEntry("baz","2")
-        |List(x,y,z)
+        |[x,y,z]
       """.stripMargin
     eval[EVALUATED](src) shouldBe Right(
       ARR(Vector(
@@ -370,6 +397,36 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("bar"), "value" -> CONST_STRING("2"))),
         CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("baz"), "value" -> CONST_STRING("2")))
       )))
+  }
+
+  property("allow 'throw' in '==' arguments") {
+    val src =
+      """true == throw("test passed")"""
+    eval[EVALUATED](src) shouldBe Left("test passed")
+  }
+
+  property("ban to compare different types") {
+    val src =
+      """true == "test passed" """
+    eval[EVALUATED](src) should produce("Compilation failed: Can't match inferred types")
+  }
+
+  property("ensure user function: success") {
+    val src =
+      """
+        |let x = true
+        |ensure(x, "test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(TRUE)
+  }
+
+  property("ensure user function: fail") {
+    val src =
+      """
+        |let x = false
+        |ensure(x, "test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Left("test fail")
   }
 
 }

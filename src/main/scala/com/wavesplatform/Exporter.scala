@@ -11,6 +11,8 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
+import monix.execution.UncaughtExceptionReporter
+import monix.reactive.Observer
 import org.slf4j.bridge.SLF4JBridgeHandler
 
 import scala.util.{Failure, Success, Try}
@@ -32,7 +34,7 @@ object Exporter extends ScorexLogging {
 
     val time             = new NTP(settings.ntpServer)
     val db               = openDB(settings.dataDirectory)
-    val blockchain       = StorageFactory(settings, db, time)
+    val blockchain       = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr))
     val blockchainHeight = blockchain.height
     val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
     log.info(s"Blockchain height is $blockchainHeight exporting to $height")

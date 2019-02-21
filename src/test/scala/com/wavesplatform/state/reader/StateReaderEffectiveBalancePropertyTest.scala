@@ -30,7 +30,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
         val genesisBlock = block(Seq(genesis))
         val nextBlocks   = List.fill(emptyBlocksAmt - 1)(block(Seq.empty))
         assertDiffAndState(genesisBlock +: nextBlocks, block(Seq.empty)) { (_, newState) =>
-          newState.effectiveBalance(genesis.recipient, atHeight, confirmations) shouldBe genesis.amount
+          newState.effectiveBalance(genesis.recipient, confirmations) shouldBe genesis.amount
         }
     }
   }
@@ -55,7 +55,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
           val portfolio       = state.portfolio(lease1.sender)
           val expectedBalance = xfer1.amount + xfer2.amount - 2 * Fee
           portfolio.balance shouldBe expectedBalance
-          GeneratingBalanceProvider.balance(state, fs, state.height, leaser) shouldBe 0
+          GeneratingBalanceProvider.balance(state, fs, leaser, state.lastBlockId.get) shouldBe 0
           portfolio.lease shouldBe LeaseBalance(0, expectedBalance)
           portfolio.effectiveBalance shouldBe 0
         }

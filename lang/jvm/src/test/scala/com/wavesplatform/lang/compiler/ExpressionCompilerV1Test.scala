@@ -5,7 +5,7 @@ import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompilerV1}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
@@ -21,14 +21,14 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions._
-    val Right(v) = ExpressionCompilerV1(compilerContext, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1))))
+    val Right(v) = ExpressionCompiler(compilerContext, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1))))
     v._2 shouldBe LONG
   }
 
   property("should infer inner types") {
     import com.wavesplatform.lang.v1.parser.Expressions._
     val Right(v) =
-      ExpressionCompilerV1(
+      ExpressionCompiler(
         compilerContext,
         FUNCTION_CALL(AnyPos,
                       PART.VALID(AnyPos, "getElement"),
@@ -43,7 +43,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     }
 
     val expectedResult = Right(LONG)
-    ExpressionCompilerV1(compilerContext, expr).map(_._2) match {
+    ExpressionCompiler(compilerContext, expr).map(_._2) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
@@ -140,7 +140,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Right(
-      (BLOCK(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))), BOOLEAN))
+      (LET_BLOCK(LET("a", IF(TRUE, CONST_LONG(1), CONST_STRING(""))), FUNCTION_CALL(PureContext.eq.header, List(REF("a"), CONST_LONG(3)))), BOOLEAN))
   )
 
   treeTypeTest("idOptionLong(())")(
@@ -174,7 +174,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Right(
-      (BLOCK(
+      (LET_BLOCK(
          LET("$match0", REF("p")),
          IF(
            IF(
@@ -188,7 +188,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
                List(REF("$match0"), CONST_STRING("PointA"))
              )
            ),
-           BLOCK(LET("p", REF("$match0")), TRUE),
+           LET_BLOCK(LET("p", REF("$match0")), TRUE),
            FALSE
          )
        ),
@@ -211,13 +211,14 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
           | }
           | a + b
       """.stripMargin
-      Parser.parseScript(script).get.value
+      Parser.parseExpr(script).get.value
     },
     expectedResult = {
       Right(
-        (BLOCK(
-           LET("a", BLOCK(LET("$match0", REF("p")), BLOCK(LET("$match1", REF("p")), CONST_LONG(1)))),
-           BLOCK(LET("b", BLOCK(LET("$match0", REF("p")), CONST_LONG(2))), FUNCTION_CALL(FunctionHeader.Native(100), List(REF("a"), REF("b"))))
+        (LET_BLOCK(
+           LET("a", LET_BLOCK(LET("$match0", REF("p")), LET_BLOCK(LET("$match1", REF("p")), CONST_LONG(1)))),
+           LET_BLOCK(LET("b", LET_BLOCK(LET("$match0", REF("p")), CONST_LONG(2))),
+                     FUNCTION_CALL(FunctionHeader.Native(100), List(REF("a"), REF("b"))))
          ),
          LONG))
 
@@ -405,9 +406,36 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
        LONG))
   )
 
+  treeTypeTest("union type inferrer with list")(
+    ctx = compilerContext,
+    expr = {
+      val script = """[1,""]"""
+      Parser.parseExpr(script).get.value
+    },
+    expectedResult = {
+      Right(
+        (FUNCTION_CALL(
+           FunctionHeader.Native(1100),
+           List(
+             CONST_LONG(1),
+             FUNCTION_CALL(
+               FunctionHeader.Native(1100),
+               List(
+                 CONST_STRING(""),
+                 REF("nil")
+               )
+             )
+           )
+         ),
+         LIST(UNION(List(LONG, STRING))))
+      )
+
+    }
+  )
+
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)], ctx: CompilerContext): Unit =
     property(propertyName) {
-      compiler.ExpressionCompilerV1(ctx, expr) shouldBe expectedResult
+      compiler.ExpressionCompiler(ctx, expr) shouldBe expectedResult
     }
 
 }

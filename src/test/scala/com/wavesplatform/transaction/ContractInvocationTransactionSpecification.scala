@@ -7,7 +7,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
 import org.scalatest._
@@ -48,8 +47,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
                          "call": {
                             "function" : "foo",
                              "args" : [
-                             { "key" : "",
-                               "type" : "binary",
+                             { "type" : "binary",
                                "value" : "base64:YWxpY2U="
                              }
                             ]
@@ -84,7 +82,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
     val req = SignedContractInvocationRequest(
       senderPublicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
       fee = 1,
-      call = ContractInvocationRequest.FunctionCallPart("bar", List(BinaryDataEntry("", ByteStr.decodeBase64("YWxpY2U=").get))),
+      call = ContractInvocationRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
       payment = Some(Payment(1, None)),
       contractAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,

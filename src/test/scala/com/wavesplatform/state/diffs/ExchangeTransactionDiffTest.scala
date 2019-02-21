@@ -7,10 +7,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.Version.ExprV1
-import com.wavesplatform.lang.directives.DirectiveParser
-import com.wavesplatform.lang.v1.ScriptEstimator
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompilerV1}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -19,10 +15,8 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.utils.functionCosts
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -456,13 +450,26 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  def scriptGen(caseType: String, v: Boolean): String = {
-    s"""
-       |match tx {
-       | case o: $caseType => $v
-       | case _ => ${!v}
+  def scriptGen(caseType: String, v: Boolean): Gen[String] = Gen.oneOf(true, false).map { full =>
+    val expr =
+      s"""
+       |  match tx {
+       |   case o: $caseType => $v
+       |   case _ => ${!v}
+       |  }
+     """.stripMargin
+    lazy val contract = s"""
+       |
+       |{-# STDLIB_VERSION 3 #-}
+       |{-# CONTENT_TYPE CONTRACT #-}
+       |
+       | @Verifier(tx)
+       | func verify() = {
+       | $expr
        |}
       """.stripMargin
+
+    if (full) contract else expr
   }
 
   def changeOrderSignature(signWith: Array[Byte], o: Order): Order = {
@@ -489,36 +496,21 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  def compile(scriptText: String, ctx: CompilerContext): Either[String, (Script, Long)] = {
-    val compiler = new ExpressionCompilerV1(ctx)
-
-    val directives = DirectiveParser(scriptText)
-
-    val scriptWithoutDirectives =
-      scriptText.linesIterator
-        .filter(str => !str.contains("{-#"))
-        .mkString("\n")
-
-    for {
-      expr       <- compiler.compile(scriptWithoutDirectives, directives)
-      script     <- ExprScript(expr)
-      complexity <- ScriptEstimator(ctx.varDefs.keySet, functionCosts(ExprV1), expr)
-    } yield (script, complexity)
-  }
-
-  def smartTradePreconditions(buyerScriptSrc: String,
-                              sellerScriptSrc: String,
-                              txScript: String): Gen[(GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction)] = {
+  def smartTradePreconditions(buyerScriptSrc: Gen[String],
+                              sellerScriptSrc: Gen[String],
+                              txScript: Gen[String]): Gen[(GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction)] = {
     val enoughFee = 100000000
-
-    val txScriptCompiled = ScriptCompiler(txScript, isAssetScript = false).explicitGet()._1
-
-    val sellerScript = Some(ScriptCompiler(sellerScriptSrc, isAssetScript = false).explicitGet()._1)
-    val buyerScript  = Some(ScriptCompiler(buyerScriptSrc, isAssetScript = false).explicitGet()._1)
 
     val chainId = AddressScheme.current.chainId
 
     for {
+      txScript <- txScript
+      txScriptCompiled = ScriptCompiler(txScript, isAssetScript = false).explicitGet()._1
+      sellerScriptSrc <- sellerScriptSrc
+      sellerScript = Some(ScriptCompiler(sellerScriptSrc, isAssetScript = false).explicitGet()._1)
+      buyerScriptSrc <- buyerScriptSrc
+      buyerScript = Some(ScriptCompiler(buyerScriptSrc, isAssetScript = false).explicitGet()._1)
+
       buyer  <- accountGen
       seller <- accountGen
       ts     <- timestampGen

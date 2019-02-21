@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import com.wavesplatform.lang.Version
-import com.wavesplatform.lang.Version.Version
+import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.StdLibVersion.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, DefinedType, UnionType}
@@ -265,9 +265,10 @@ object Types {
     buildExchangeTransactionType(proofsEnabled),
     buildTransferTransactionType(proofsEnabled),
     buildSetAssetScriptTransactionType(proofsEnabled),
+    buildContractInvokationTransactionType(proofsEnabled),
   )
 
-  def buildActiveTransactionTypes(proofsEnabled: Boolean, v: Version): List[CaseType] = {
+  def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CaseType] = {
     buildAssetSupportedTransactions(proofsEnabled) ++
       List(
         buildIssueTransactionType(proofsEnabled),
@@ -277,10 +278,10 @@ object Types {
         buildSetScriptTransactionType(proofsEnabled),
         buildSponsorFeeTransactionType(proofsEnabled),
         buildDataTransactionType(proofsEnabled)
-      ) ++ (if (v == Version.ContractV) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
+      ) ++ (if (v == StdLibVersion.V3) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
   }
 
-  def buildWavesTypes(proofsEnabled: Boolean, v: Version): Seq[DefinedType] = {
+  def buildWavesTypes(proofsEnabled: Boolean, v: StdLibVersion): Seq[DefinedType] = {
 
     val activeTxTypes                    = buildActiveTransactionTypes(proofsEnabled, v)
     val obsoleteTxTypes                  = buildObsoleteTransactionTypes(proofsEnabled)
