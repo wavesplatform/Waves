@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart.script
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ScriptType
-import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, V1}
+import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, V3}
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.SIGVERIFY
@@ -13,17 +13,21 @@ import monix.eval.Coeval
 
 object ContractScript {
 
-  private val maxComplexity = 20 * functionCosts(V1)(FunctionHeader.Native(SIGVERIFY))()
+  private val maxComplexity  = 20 * functionCosts(V3)(FunctionHeader.Native(SIGVERIFY))()
+  val maxSizeInBytes = 32 * 1024
+
+  def validateBytes(bs: Array[Byte]): Either[String, Unit] =
+    Either.cond(bs.length <= maxSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $maxSizeInBytes bytes")
 
   def apply(version: StdLibVersion, contract: Contract): Either[String, Script] = {
     for {
       funcMaxComplexity <- estimateComplexity(version, contract)
-      _ <- Either.cond(
-        funcMaxComplexity._2 <= maxComplexity,
-        (),
-        s"Contract function (${funcMaxComplexity._1}) is too complex: ${funcMaxComplexity._2} > $maxComplexity"
-      )
+      _ <- Either.cond(funcMaxComplexity._2 <= maxComplexity,
+                       (),
+                       s"Contract function (${funcMaxComplexity._1}) is too complex: ${funcMaxComplexity._2} > $maxComplexity")
       s = new ContractScriptImpl(version, contract, funcMaxComplexity._2)
+      _ <- validateBytes(s.bytes().arr)
+
     } yield s
   }
 

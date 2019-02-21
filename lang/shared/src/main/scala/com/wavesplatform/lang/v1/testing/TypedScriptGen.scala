@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.testing
 
-import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -46,7 +46,9 @@ trait TypedScriptGen {
       funcs     <- Gen.listOf(funcGen)
       callables <- Gen.listOf(callableGen)
       verifier  <- Gen.option(verifierGen)
-    } yield Contract(lets ++ funcs, callables, verifier)
+      c = Contract(lets ++ funcs, callables, verifier)
+      if ContractSerDe.serialize(c).size < Short.MaxValue - 3 - 4
+    } yield c
 
   def BOOLEANgen(gas: Int): Gen[EXPR] =
     if (gas > 0) Gen.oneOf(CONST_BOOLEANgen, BLOCK_BOOLEANgen(gas - 1), IF_BOOLEANgen(gas - 1), FUNCTION_CALLgen(BOOLEAN))
