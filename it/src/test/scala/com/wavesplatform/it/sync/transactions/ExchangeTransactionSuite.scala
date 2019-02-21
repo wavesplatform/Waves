@@ -146,10 +146,10 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
            (1: Byte, 3: Byte, None, Some(assetId)),
-           (1: Byte, 3: Byte, None, None),
            (2: Byte, 3: Byte, None, Some(assetId)),
-           (2: Byte, 3: Byte, None, None),
+           (1: Byte, 3: Byte, None, None),
            (3: Byte, 1: Byte, Some(assetId), None),
+           (2: Byte, 3: Byte, None, None),
            (3: Byte, 2: Byte, Some(assetId), None),
          )) {
 
