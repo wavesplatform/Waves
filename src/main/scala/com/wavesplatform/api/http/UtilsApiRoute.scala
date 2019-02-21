@@ -5,7 +5,6 @@ import java.security.SecureRandom
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.directives.DirectiveParser
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
@@ -27,7 +26,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileContract ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
   }
 
   @Path("/script/decompile")
@@ -96,43 +95,6 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
           )
         )
       }
-    }
-  }
-
-  @Deprecated
-  @Path("/script/compileContract")
-  @ApiOperation(value = "Compile Contract", notes = "Compiles string code to base64 contract representation", httpMethod = "POST")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "code",
-        required = true,
-        dataType = "string",
-        paramType = "body",
-        value = "Contract code",
-        example = "true"
-      )
-    ))
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "base64 or error")
-    ))
-  def compileContract: Route = path("script" / "compileContract") {
-    (post & entity(as[String])) { code =>
-      complete(
-        ScriptCompiler
-          .contract(code)
-          .fold(
-            e => ScriptCompilerError(e), {
-              case (contract) =>
-                Json.obj(
-                  "script"     -> contract.bytes().base64,
-                  "complexity" -> 0,
-                  "extraFee"   -> CommonValidation.ScriptExtraFee
-                )
-            }
-          )
-      )
     }
   }
 

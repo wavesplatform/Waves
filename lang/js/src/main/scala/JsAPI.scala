@@ -114,13 +114,7 @@ object JsAPI {
 
   @JSExportTopLevel("compile")
   def compile(input: String): js.Dynamic = {
-    val directives = DirectiveParser(input)
-
-    val scriptWithoutDirectives =
-      input.linesIterator
-        .filter(str => !str.contains("{-#"))
-        .mkString("\n")
-
+    val (directives, scriptWithoutDirectives) = DirectiveParser.splitToDirectiveAndScript(input)
     val compiled = for {
       ver         <- extractStdLibVersion(directives)
       contentType <- extractContentType(directives)

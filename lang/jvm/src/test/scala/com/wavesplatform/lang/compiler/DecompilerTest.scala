@@ -30,12 +30,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("simple let") {
     val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), TRUE)
-    Decompiler(expr, decompilerContext) shouldBe
-      """{
+    val a    = Decompiler(expr, decompilerContext)
+    val b    = """{
         |    let a =
         |        1;
         |    true
         |}""".stripMargin
+    a shouldBe b
   }
 
   property("native function call with one arg") {
