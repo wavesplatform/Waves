@@ -24,7 +24,9 @@ object PBUtils extends App {
     outputStream.useDeterministicSerialization()
 
     def writeMsgTo(outputStream: CodedOutputStream, msg: GeneratedMessage) = {
-      def writeValue(field: FieldDescriptor, value: PValue): Unit = {
+      def writeTagAndValue(field: FieldDescriptor, value: PValue): Unit = {
+        outputStream.writeFixed32NoTag(field.index)
+
         field.protoType match {
           case Type.TYPE_DOUBLE | Type.TYPE_FLOAT | Type.TYPE_GROUP | Type.Unrecognized(_) =>
             throw new IllegalArgumentException(s"Not supported: $field/$value")
@@ -57,8 +59,11 @@ object PBUtils extends App {
                 outputStream.write(0: Byte)
 
               case PMessage(fields) =>
+                val sortedFields = fields.toIndexedSeq.sortBy(_._1.number)
                 outputStream.write(1: Byte)
-                fields.toIndexedSeq.sortBy(_._1.number).foreach(kv => writeValue(kv._1, kv._2))
+                outputStream.writeFixed32NoTag(sortedFields.head._1.containingMessage.index)
+                outputStream.writeFixed32NoTag(sortedFields.length)
+                sortedFields.foreach(kv => writeTagAndValue(kv._1, kv._2))
             }
         }
       }
@@ -68,10 +73,9 @@ object PBUtils extends App {
 
         if (field.isRepeated) {
           val seq = msg.getField(field).asInstanceOf[PRepeated].value
-          outputStream.writeFixed32NoTag(seq.length)
-          seq.foreach(writeValue(field, _))
+          seq.foreach(writeTagAndValue(field, _))
         } else {
-          writeValue(field, msg.getField(field))
+          writeTagAndValue(field, msg.getField(field))
         }
       }
     }
