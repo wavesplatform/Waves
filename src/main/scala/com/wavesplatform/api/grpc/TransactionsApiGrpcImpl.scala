@@ -36,7 +36,7 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
       }
 
       val observableTask = Task(getResponse(address, TransactionsBatchLimit, fromId)) map {
-        case Right(transactions) => Observable(transactions: _*) ++ Observable.defer(getTransactionsFromId(address, Some(transactions.last.id())))
+        case Right(transactions) => if(transactions.isEmpty) Observable.empty else Observable(transactions: _*) ++ Observable.defer(getTransactionsFromId(address, Some(transactions.last.id())))
         case Left(err)           => Observable.raiseError(new Exception(err))
       }
 
