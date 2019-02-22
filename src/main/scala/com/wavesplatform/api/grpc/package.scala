@@ -20,8 +20,8 @@ package object grpc {
 
   implicit class OptionToFutureConversionOps[T](opt: Option[T]) {
     def toFuture: Future[T] = opt match {
-      case Some(value)   => Future.successful(value)
-      case None => Future.failed(new NoSuchElementException)
+      case Some(value) => Future.successful(value)
+      case None        => Future.failed(new NoSuchElementException)
     }
   }
 

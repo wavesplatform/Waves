@@ -1,4 +1,5 @@
 package com.wavesplatform.api.grpc
+import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
@@ -25,7 +26,7 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
                               time: Time)
     extends TransactionsApiGrpc.TransactionsApi {
 
-  private[this] val TransactionsBatchLimit = 1000
+  private[this] val TransactionsBatchLimit = 100
 
   override def transactionsByAddress(request: TransactionsByAddressRequest, responseObserver: StreamObserver[Transaction]): Unit = {
     def getTransactionsFromId(address: Address, fromId: Option[ByteStr]): Observable[Transaction] = {
@@ -46,25 +47,26 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
     }
 
     val stream = getTransactionsFromId(request.address.toAddress, Option(request.fromId).filterNot(_.isEmpty))
-    responseObserver.completeWith(stream.optionalLimit(request.limit))
+    responseObserver.completeWith(stream)
   }
 
   override def transactionById(request: TransactionByIdRequest): Future[Transaction] = {
-    blockchain.transactionInfo(request.transactionId)
+    blockchain
+      .transactionInfo(request.transactionId)
       .map(_._2.toPB)
       .toFuture
   }
 
-  override def unconfirmedTransactions(request: LimitedRequest, responseObserver: StreamObserver[Transaction]): Unit = {
-    val stream = Observable(utx.all: _*)
-      .optionalLimit(request.limit)
-      .map(_.toPB)
-
+  override def unconfirmedTransactions(
+      request: Empty,
+      responseObserver: StreamObserver[Transaction]): Unit = {
+    val stream = Observable(utx.all: _*).map(_.toPB)
     responseObserver.completeWith(stream)
   }
 
   override def unconfirmedTransactionById(request: TransactionByIdRequest): Future[Transaction] = {
-    utx.transactionById(request.transactionId)
+    utx
+      .transactionById(request.transactionId)
       .map(_.toPB)
       .toFuture
   }
