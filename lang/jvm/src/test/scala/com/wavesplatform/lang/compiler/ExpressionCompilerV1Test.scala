@@ -406,6 +406,33 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
        LONG))
   )
 
+  treeTypeTest("union type inferrer with list")(
+    ctx = compilerContext,
+    expr = {
+      val script = """[1,""]"""
+      Parser.parseExpr(script).get.value
+    },
+    expectedResult = {
+      Right(
+        (FUNCTION_CALL(
+           FunctionHeader.Native(1100),
+           List(
+             CONST_LONG(1),
+             FUNCTION_CALL(
+               FunctionHeader.Native(1100),
+               List(
+                 CONST_STRING(""),
+                 REF("nil")
+               )
+             )
+           )
+         ),
+         LIST(UNION(List(LONG, STRING))))
+      )
+
+    }
+  )
+
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)], ctx: CompilerContext): Unit =
     property(propertyName) {
       compiler.ExpressionCompiler(ctx, expr) shouldBe expectedResult
