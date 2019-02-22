@@ -11,7 +11,7 @@ package object grpc {
       obs
         .foreach(value => streamObserver.onNext(value))
         .onComplete {
-          case Success(_) => streamObserver.onCompleted()
+          case Success(_)         => streamObserver.onCompleted()
           case Failure(exception) => streamObserver.onError(exception)
         }
     }

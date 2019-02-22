@@ -14,6 +14,8 @@ import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observable
 
+import scala.concurrent.Future
+
 class TransactionsApiGrpcImpl(settings: RestAPISettings,
                               functionalitySettings: FunctionalitySettings,
                               wallet: Wallet,
@@ -28,13 +30,14 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
   override def transactionsByAddress(request: TransactionsByAddressRequest, responseObserver: StreamObserver[Transaction]): Unit = {
     def getTransactionsFromId(address: Address, fromId: Option[ByteStr]): Observable[Transaction] = {
       def getResponse(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, Seq[Transaction]] = {
-        blockchain.addressTransactions(address, Set.empty, limit, fromId)
+        blockchain
+          .addressTransactions(address, Set.empty, limit, fromId)
           .map(_.map(_._2.toPB))
       }
 
       val observableTask = Task(getResponse(address, TransactionsBatchLimit, fromId)) map {
-        case Right(transactions) => Observable(transactions:_*) ++ Observable.defer(getTransactionsFromId(address, Some(transactions.last.id())))
-        case Left(err) => Observable.raiseError(new Exception(err))
+        case Right(transactions) => Observable(transactions: _*) ++ Observable.defer(getTransactionsFromId(address, Some(transactions.last.id())))
+        case Left(err)           => Observable.raiseError(new Exception(err))
       }
 
       Observable.fromTask(observableTask).flatten
@@ -43,7 +46,14 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
     responseObserver.completeWith(getTransactionsFromId(request.address.toAddress, Option(request.fromId).filterNot(_.isEmpty)))
   }
 
+  override def transactionById(request: TransactionByIdRequest): Future[Transaction] = {
+    Future(blockchain.transactionInfo(request.transactionId)).flatMap {
+      case Some((_, transaction)) => Future.successful(transaction.toPB)
+      case None                   => Future.failed(new NoSuchElementException("No such transaction"))
+    }
+  }
+
   override def unconfirmedTransactions(request: LimitedRequest, responseObserver: StreamObserver[Transaction]): Unit = {
-    responseObserver.completeWith(Observable(utx.all.take(request.limit):_*).map(_.toPB))
+    responseObserver.completeWith(Observable(utx.all.take(request.limit): _*).map(_.toPB))
   }
 }
