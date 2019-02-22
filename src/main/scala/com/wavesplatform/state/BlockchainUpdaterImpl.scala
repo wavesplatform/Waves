@@ -3,7 +3,7 @@ package com.wavesplatform.state
 import cats.implicits._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -23,7 +23,7 @@ import kamon.metric.MeasurementUnit
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
-class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, time: Time)
+class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, time: Time, stateUpdate: StateUpdate)
     extends BlockchainUpdater
     with NG
     with ScorexLogging
@@ -124,8 +124,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                   .map {
-                    case (d, c, c1, _) =>
-                      Some(((d, c, c1), Seq.empty[Transaction]))
+                    case (d, c, c1, dd) =>
+                      Some(((d, c, c1, dd), Seq.empty[Transaction]))
                   }
             }
           case Some(ng) =>
@@ -137,10 +137,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                   .map {
-                    case (d, c, c1, _) =>
+                    case (d, c, c1, dd) =>
                       log.trace(
                         s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
-                      Some(((d, c, c1), ng.transactions))
+                      Some(((d, c, c1, dd), ng.transactions))
                   }
               } else if (areVersionsOfSameBlock(block, ng.base)) {
                 if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
@@ -154,8 +154,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                   BlockDiffer
                     .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
                     .map {
-                      case (d, c, c1, _) =>
-                        Some(((d, c, c1), Seq.empty[Transaction]))
+                      case (d, c, c1, dd) =>
+                        Some(((d, c, c1, dd), Seq.empty[Transaction]))
                     }
                 }
               } else
@@ -188,10 +188,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                         verify
                       )
                       .map {
-                        case (d, c, c1, _) =>
+                        case (d, c, c1, dd) =>
                           blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
                           TxsInBlockchainStats.record(ng.transactions.size)
-                          Some(((d, c, c1), discarded.flatMap(_.transactionData)))
+                          Some(((d, c, c1, dd), discarded.flatMap(_.transactionData)))
                       }
                   } else {
                     val errorText = s"Forged block has invalid signature: base: ${ng.base}, requested reference: ${block.reference}"
@@ -202,7 +202,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
       })
       .map {
         _ map {
-          case ((newBlockDiff, carry, updatedTotalConstraint), discarded) =>
+          case ((newBlockDiff, carry, updatedTotalConstraint, detailedDiff), discarded) =>
             val height = blockchain.height + 1
             restTotalConstraint = updatedTotalConstraint
             ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
@@ -211,6 +211,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                   .getTimestamp() - settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
               log.info(s"New height: $height")
             }
+            // stateUpdate.onProcessBlock()
+
             discarded
         }
       }
