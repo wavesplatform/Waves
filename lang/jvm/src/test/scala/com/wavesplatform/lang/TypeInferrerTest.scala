@@ -125,6 +125,11 @@ class TypeInferrerTest extends FreeSpec with Matchers {
           TypeInferrer(Seq((LONG, PARAMETERIZEDUNION(List(typeparamT, typeparamG))))) should produce("Can't resolve correct type")
         }
       }
+
+      "Lists" in {
+        TypeInferrer(Seq( /*(LONG, typeparamT),*/ (LIST(NOTHING), PARAMETERIZEDLIST(typeparamG)))) shouldBe Right(
+          Map( /*typeparamT -> LONG,*/ typeparamG -> NOTHING))
+      }
     }
   }
 }

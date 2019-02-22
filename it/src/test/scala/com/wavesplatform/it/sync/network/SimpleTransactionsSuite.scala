@@ -4,32 +4,31 @@ import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
-import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.AsyncNetworkApi._
-import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.transaction.transfer._
 import org.scalatest._
-import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
+import com.wavesplatform.it.sync._
+
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with ScalaFutures with IntegrationPatience with RecoverMethods {
-
+class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .overrideBase(_.quorum(2))
-      .withDefault(3)
-      .build()
+      .overrideBase(_.quorum(0))
+      .withDefault(entitiesNumber = 1)
+      .buildNonConflicting()
 
   private def node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
     val tx = TransferTransactionV1
-      .selfSigned(None, node.privateKey, Address.fromString(node.address).explicitGet(), 1L, System.currentTimeMillis(), None, 100000L, Array())
+      .selfSigned(None, node.privateKey, Address.fromString(node.address).explicitGet(), 1L, System.currentTimeMillis(), None, minFee, Array())
       .right
       .get
 
@@ -46,7 +45,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
                   1L,
                   System.currentTimeMillis() + (1 days).toMillis,
                   None,
-                  100000L,
+                  minFee,
                   Array())
       .right
       .get

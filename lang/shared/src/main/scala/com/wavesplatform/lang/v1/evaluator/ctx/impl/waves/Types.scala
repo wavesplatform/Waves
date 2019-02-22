@@ -23,7 +23,8 @@ object Types {
 
   val optionPayment = UNION(paymentType.typeRef, UNIT)
 
-  val invocationType = CaseType("Invocation", List("caller" -> addressType.typeRef, "contractAddress" -> addressType.typeRef, "payment" -> optionPayment))
+  val invocationType =
+    CaseType("Invocation", List("caller" -> addressType.typeRef, "contractAddress" -> addressType.typeRef, "payment" -> optionPayment))
 
   private val header = List(
     "id"        -> BYTESTR,
@@ -192,15 +193,16 @@ object Types {
       "Order",
       addProofsIfNeeded(
         List(
-          "id"               -> BYTESTR,
-          "matcherPublicKey" -> BYTESTR,
-          "assetPair"        -> assetPairType.typeRef,
-          "orderType"        -> ordTypeType,
-          "price"            -> LONG,
-          "amount"           -> LONG,
-          "timestamp"        -> LONG,
-          "expiration"       -> LONG,
-          "matcherFee"       -> LONG
+          "id"                -> BYTESTR,
+          "matcherPublicKey"  -> BYTESTR,
+          "assetPair"         -> assetPairType.typeRef,
+          "orderType"         -> ordTypeType,
+          "price"             -> LONG,
+          "amount"            -> LONG,
+          "timestamp"         -> LONG,
+          "expiration"        -> LONG,
+          "matcherFee"        -> LONG,
+          "matcherFeeAssetId" -> optionByteVector
         ) ++ proven,
         proofsEnabled
       )

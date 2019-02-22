@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.smart.script
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.contract.ContractSerDe
 import com.wavesplatform.lang.v1.Serde
-import com.wavesplatform.lang.{ScriptType, StdLibVersion}
+import com.wavesplatform.lang.{ContentType, StdLibVersion}
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
 import com.wavesplatform.transaction.smart.script.v1._
 
@@ -18,9 +18,9 @@ object ScriptReader {
     (for {
       a <- {
         if (versionByte == 0)
-          Right((ScriptType.parseVersion(bytes(1)), StdLibVersion.parseVersion(bytes(2)), 3))
+          Right((ContentType.parseId(bytes(1)), StdLibVersion.parseVersion(bytes(2)), 3))
         else if (versionByte == StdLibVersion.V1.toByte || versionByte == StdLibVersion.V2.toByte)
-          Right((ScriptType.Expression, StdLibVersion(versionByte.toInt), 1))
+          Right((ContentType.Expression, StdLibVersion(versionByte.toInt), 1))
         else Left(ScriptParseError(s"Can't parse script bytes starting with [${bytes(0).toInt},${bytes(1).toInt},${bytes(2).toInt}]"))
       }
       (scriptType, stdLibVersion, offset) = a
@@ -28,13 +28,13 @@ object ScriptReader {
 
       _ <- Either.cond(checkSum.sameElements(computedCheckSum), (), ScriptParseError("Invalid checksum"))
       s <- scriptType match {
-        case ScriptType.Expression =>
+        case ContentType.Expression =>
           for {
             _     <- ExprScript.validateBytes(scriptBytes)
             bytes <- Serde.deserialize(scriptBytes).map(_._1)
             s     <- ExprScript(stdLibVersion, bytes, checkSize = false)
           } yield s
-        case ScriptType.Contract =>
+        case ContentType.Contract =>
           for {
             bytes <- ContractSerDe.deserialize(scriptBytes)
             s     <- ContractScript(stdLibVersion, bytes)
