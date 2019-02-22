@@ -5,11 +5,11 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV1, Log}
-import com.wavesplatform.transaction.{Authorized, Proven}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.{RealTransactionWrapper, Verifier}
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
+import com.wavesplatform.transaction.smart.{RealTransactionWrapper, Verifier}
+import com.wavesplatform.transaction.{Authorized, Proven}
 import monix.eval.Coeval
 
 object MatcherScriptRunner {

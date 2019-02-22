@@ -5,8 +5,8 @@ import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import monix.eval.Coeval
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 
 trait Script {
   type Expr
