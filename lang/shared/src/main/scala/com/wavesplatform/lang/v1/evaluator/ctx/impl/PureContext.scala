@@ -124,7 +124,7 @@ object PureContext {
     case _                                                     => Right(FALSE)
   }
 
-  lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes str", ("byteStr", BYTESTR, "vector")) {
+  lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes str", ("byteVector", BYTESTR, "vector")) {
     case CONST_BYTESTR(bv) :: Nil => Right(CONST_LONG(bv.arr.length))
     case xs                       => notImplemented("size(byte[])", xs)
   }
@@ -372,7 +372,7 @@ object PureContext {
       new DefinedType { lazy val name = "Unit"; lazy val typeRef    = UNIT    },
       new DefinedType { lazy val name = "Int"; lazy val typeRef     = LONG    },
       new DefinedType { lazy val name = "Boolean"; lazy val typeRef = BOOLEAN },
-      new DefinedType { lazy val name = "ByteStr"; lazy val typeRef = BYTESTR },
+      new DefinedType { lazy val name = "ByteVector"; lazy val typeRef = BYTESTR },
       new DefinedType { lazy val name = "String"; lazy val typeRef  = STRING  }
     ),
     vars,
