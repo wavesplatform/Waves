@@ -43,7 +43,9 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
       Observable.fromTask(observableTask).flatten
     }
 
-    responseObserver.completeWith(getTransactionsFromId(request.address.toAddress, Option(request.fromId).filterNot(_.isEmpty)))
+    val stream = getTransactionsFromId(request.address.toAddress, Option(request.fromId).filterNot(_.isEmpty))
+    val limitedStream = if (request.limit > 0) stream.take(request.limit) else stream
+    responseObserver.completeWith(limitedStream)
   }
 
   override def transactionById(request: TransactionByIdRequest): Future[Transaction] = {
