@@ -1,9 +1,9 @@
-package com.wavesplatform.transaction
+package com.wavesplatform.state
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.history._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.{Diff, NgState}
+import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
