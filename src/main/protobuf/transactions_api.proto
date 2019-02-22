@@ -14,6 +14,7 @@ service TransactionsApi {
     rpc TransactionsByAddress (TransactionsByAddressRequest) returns (stream Transaction);
     rpc TransactionById (TransactionByIdRequest) returns (Transaction);
     rpc UnconfirmedTransactions (LimitedRequest) returns (stream Transaction);
+    rpc UnconfirmedTransactionById (TransactionByIdRequest) returns (Transaction);
 }
 
 message LimitedRequest {

@@ -36,26 +36,33 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
       }
 
       val observableTask = Task(getResponse(address, TransactionsBatchLimit, fromId)) map {
-        case Right(transactions) => if(transactions.isEmpty) Observable.empty else Observable(transactions: _*) ++ Observable.defer(getTransactionsFromId(address, Some(transactions.last.id())))
-        case Left(err)           => Observable.raiseError(new Exception(err))
+        case Right(transactions) =>
+          if (transactions.isEmpty) Observable.empty
+          else Observable(transactions: _*) ++ Observable.defer(getTransactionsFromId(address, Some(transactions.last.id())))
+        case Left(err) => Observable.raiseError(new Exception(err))
       }
 
       Observable.fromTask(observableTask).flatten
     }
 
-    val stream = getTransactionsFromId(request.address.toAddress, Option(request.fromId).filterNot(_.isEmpty))
+    val stream        = getTransactionsFromId(request.address.toAddress, Option(request.fromId).filterNot(_.isEmpty))
     val limitedStream = if (request.limit > 0) stream.take(request.limit) else stream
     responseObserver.completeWith(limitedStream)
   }
 
   override def transactionById(request: TransactionByIdRequest): Future[Transaction] = {
-    Future(blockchain.transactionInfo(request.transactionId)).flatMap {
-      case Some((_, transaction)) => Future.successful(transaction.toPB)
-      case None                   => Future.failed(new NoSuchElementException("No such transaction"))
-    }
+    blockchain.transactionInfo(request.transactionId)
+      .map(_._2.toPB)
+      .toFuture
   }
 
   override def unconfirmedTransactions(request: LimitedRequest, responseObserver: StreamObserver[Transaction]): Unit = {
     responseObserver.completeWith(Observable(utx.all.take(request.limit): _*).map(_.toPB))
+  }
+
+  override def unconfirmedTransactionById(request: TransactionByIdRequest): Future[Transaction] = {
+    utx.transactionById(request.transactionId)
+      .map(_.toPB)
+      .toFuture
   }
 }
