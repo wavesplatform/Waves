@@ -146,18 +146,20 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
            (1: Byte, 3: Byte, None, Some(assetId)),
-           (2: Byte, 3: Byte, None, Some(assetId)),
            (1: Byte, 3: Byte, None, None),
+           (2: Byte, 3: Byte, None, Some(assetId)),
            (3: Byte, 1: Byte, Some(assetId), None),
            (2: Byte, 3: Byte, None, None),
            (3: Byte, 2: Byte, Some(assetId), None),
          )) {
 
-      val matcher             = pkByAddress(thirdAddress)
-      val ts                  = ntpTime.correctedTime()
-      val expirationTimestamp = ts + Order.MaxLiveTime
+      val matcher                  = pkByAddress(thirdAddress)
+      val ts                       = ntpTime.correctedTime()
+      val expirationTimestamp      = ts + Order.MaxLiveTime
+      var assetBalanceBefore: Long = 0l
 
       if (matcherFeeOrder1.isEmpty && matcherFeeOrder2.isDefined) {
+        assetBalanceBefore = sender.assetBalance(secondAddress, assetId.base58).balance
         sender.transfer(buyer.address, seller.address, 100000, minFee, Some(assetId.base58), waitForTx = true)
       }
 
@@ -191,7 +193,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       nodes.waitForHeightAriseAndTxPresent(tx.id().base58)
 
       if (matcherFeeOrder1.isEmpty && matcherFeeOrder2.isDefined) {
-        sender.assetBalance(secondAddress, assetId.base58).balance shouldBe 0
+        sender.assetBalance(secondAddress, assetId.base58).balance shouldBe assetBalanceBefore
       }
     }
   }
