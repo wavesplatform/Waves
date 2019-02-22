@@ -24,4 +24,8 @@ package object grpc {
       case None => Future.failed(new NoSuchElementException)
     }
   }
+
+  implicit class ObservableExtensionOps[T](observable: Observable[T]) {
+    def optionalLimit(limit: Long): Observable[T] = if (limit > 0) observable.take(limit) else observable
+  }
 }

@@ -45,9 +45,8 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
       Observable.fromTask(observableTask).flatten
     }
 
-    val stream        = getTransactionsFromId(request.address.toAddress, Option(request.fromId).filterNot(_.isEmpty))
-    val limitedStream = if (request.limit > 0) stream.take(request.limit) else stream
-    responseObserver.completeWith(limitedStream)
+    val stream = getTransactionsFromId(request.address.toAddress, Option(request.fromId).filterNot(_.isEmpty))
+    responseObserver.completeWith(stream.optionalLimit(request.limit))
   }
 
   override def transactionById(request: TransactionByIdRequest): Future[Transaction] = {
@@ -57,7 +56,11 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
   }
 
   override def unconfirmedTransactions(request: LimitedRequest, responseObserver: StreamObserver[Transaction]): Unit = {
-    responseObserver.completeWith(Observable(utx.all.take(request.limit): _*).map(_.toPB))
+    val stream = Observable(utx.all: _*)
+      .optionalLimit(request.limit)
+      .map(_.toPB)
+
+    responseObserver.completeWith(stream)
   }
 
   override def unconfirmedTransactionById(request: TransactionByIdRequest): Future[Transaction] = {
