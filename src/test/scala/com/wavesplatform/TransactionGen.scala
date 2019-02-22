@@ -1,19 +1,13 @@
 package com.wavesplatform
 
-import cats.syntax.semigroup._
 import com.wavesplatform.account.PublicKeyAccount._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.testing.{ScriptGen, TypedScriptGen}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -21,8 +15,8 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
 import com.wavesplatform.transaction.transfer._
@@ -36,7 +30,7 @@ trait TransactionGen extends TransactionGenBase { _: Suite =>
 
 }
 
-trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
+trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _: Suite =>
 
   val ScriptExtraFee                  = 400000L
   protected def waves(n: Float): Long = (n * 100000000L).toLong
@@ -110,18 +104,9 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
     proofs       <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
-  val scriptGen = BOOLgen(100).map {
-    case (expr, _) =>
-      val typed =
-        ExpressionCompiler(PureContext.build(V1).compilerContext |+| CryptoContext.compilerContext(Global), expr).explicitGet()
-      ExprScript(typed._1).explicitGet()
-  }
-
-  val contractGen = Gen.const(
-    ContractScript(V3, Contract(List.empty, List(CallableFunction(CallableAnnotation("sender"), Terms.FUNC("foo", List("a"), Terms.REF("a")))), None))
-      .explicitGet()
-  )
-
+  val scriptGen: Gen[Script]         = exprGen.map(e => ExprScript(e).explicitGet())
+  val contractScriptGen: Gen[Script] = contractGen.map(e => ContractScript(V3, e).explicitGet())
+  val contractOrExpr                 = Gen.oneOf(scriptGen, contractScriptGen)
   val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = for {
     version                                                                  <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
     (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
@@ -143,7 +128,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
     fee                       <- smallFeeGen
     timestamp                 <- timestampGen
     proofs                    <- proofsGen
-    script                    <- Gen.option(scriptGen)
+    script                    <- Gen.option(contractOrExpr)
   } yield SetScriptTransaction.create(sender, script, fee, timestamp, proofs).explicitGet()
 
   def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] =

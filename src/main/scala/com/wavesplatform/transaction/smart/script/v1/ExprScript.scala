@@ -31,7 +31,7 @@ object ExprScript {
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s
 
-  case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends Script {
+  private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends ExprScript {
     override type Expr = EXPR
 
     override val bytes: Coeval[ByteStr] =
@@ -60,4 +60,11 @@ object ExprScript {
     }
     horTraversal(Queue(e))
   }
+}
+
+trait ExprScript extends Script {
+  override type Expr = EXPR
+  val stdLibVersion: StdLibVersion
+  val expr: EXPR
+  val complexity: Long
 }
