@@ -42,10 +42,13 @@ trait TypedScriptGen {
 
   def contractGen =
     for {
-      lets      <- Gen.listOf(letGen)
-      funcs     <- Gen.listOf(funcGen)
-      callables <- Gen.listOf(callableGen)
-      verifier  <- Gen.option(verifierGen)
+      nLets      <- Gen.chooseNum(0, 10)
+      nFuncs     <- Gen.chooseNum(0, 10)
+      nCallables <- Gen.chooseNum(0, 10)
+      lets       <- Gen.listOfN(nLets, letGen)
+      funcs      <- Gen.listOfN(nFuncs, funcGen)
+      callables  <- Gen.listOfN(nCallables, callableGen)
+      verifier   <- Gen.option(verifierGen)
       c = Contract(lets ++ funcs, callables, verifier)
       if ContractSerDe.serialize(c).size < Short.MaxValue - 3 - 4
     } yield c

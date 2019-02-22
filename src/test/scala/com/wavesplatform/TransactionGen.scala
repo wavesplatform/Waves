@@ -106,7 +106,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val scriptGen: Gen[Script]         = exprGen.map(e => ExprScript(e).explicitGet())
   val contractScriptGen: Gen[Script] = contractGen.map(e => ContractScript(V3, e).explicitGet())
-  val contractOrExpr = Gen.oneOf(scriptGen,contractScriptGen)
+  val contractOrExpr                 = Gen.oneOf(scriptGen, contractScriptGen)
   val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = for {
     version                                                                  <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
     (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen

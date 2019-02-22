@@ -13,8 +13,8 @@ import monix.eval.Coeval
 
 object ContractScript {
 
-  private val maxComplexity  = 20 * functionCosts(V3)(FunctionHeader.Native(SIGVERIFY))()
-  val maxSizeInBytes = 32 * 1024
+  private val maxComplexity = 20 * functionCosts(V3)(FunctionHeader.Native(SIGVERIFY))()
+  val maxSizeInBytes        = 32 * 1024
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
     Either.cond(bs.length <= maxSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $maxSizeInBytes bytes")
@@ -54,7 +54,7 @@ object ContractScript {
         }
     val funcsWithComplexityEi: E[Vector[(String, Long)]] = funcsWithComplexity.toVector.sequence
 
-    funcsWithComplexityEi.map(namesAndComp => (("",0L) +: namesAndComp).maxBy(_._2))
+    funcsWithComplexityEi.map(namesAndComp => (("", 0L) +: namesAndComp).maxBy(_._2))
   }
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
