@@ -363,7 +363,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       log.info("Stopping containers")
 
       nodes.asScala.foreach { node =>
-        client.stopContainer(node.containerId, 0)
+        client.stopContainer(node.containerId, if (enableProfiling) 60 else 0)
+        log.debug(s"Container ${node.name} stopped with exit status: ${client.waitContainer(node.containerId).statusCode()}")
 
         saveProfile(node)
         saveLog(node)
