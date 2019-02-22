@@ -27,7 +27,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """
           |
           | @Callable(invocation)
-          | func foo(a:ByteStr) = {
+          | func foo(a:ByteVector) = {
           |  let sender0 = invocation.caller.bytes
           |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
           | }
@@ -80,13 +80,13 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """
           |
           | @Callable(invocation)
-          | func foo(a:ByteStr) = {
+          | func foo(a:ByteVector) = {
           |  let sender0 = invocation.caller.bytes
           |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
           | }
           |
           | @Callable(invocation)
-          | func foo1(a:ByteStr) = {
+          | func foo1(a:ByteVector) = {
           |  foo(a)
           | }
           |
@@ -109,7 +109,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | }
           |
           | @Callable(invocation)
-          | func foo(a:ByteStr) = {
+          | func foo(a:ByteVector) = {
           |  let aux = bar()
           |  let sender0 = invocation.caller.bytes
           |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
@@ -129,7 +129,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """
           |
           | @Callable(invocation)
-          | func foo(a:ByteStr) = {
+          | func foo(a:ByteVector) = {
           |  a + invocation.caller.bytes
           | }
           |
@@ -255,7 +255,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """
           |
           | @Callable(invocation)
-          | func foo(a:ByteStr) = {
+          | func foo(a:ByteVector) = {
           |  throw()
           | }
           |
