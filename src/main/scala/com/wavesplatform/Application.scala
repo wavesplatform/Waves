@@ -4,6 +4,7 @@ import java.io.File
 import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
 
+import _root_.io.grpc.ServerBuilder
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -12,6 +13,7 @@ import cats.instances.all._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.api.grpc.{TransactionsApiGrpc, TransactionsApiGrpcImpl}
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import com.wavesplatform.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
@@ -191,6 +193,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     implicit val as: ActorSystem                 = actorSystem
     implicit val materializer: ActorMaterializer = ActorMaterializer()
+
+    // TODO: gRPC enable/disable setting
+    val transactionsService = TransactionsApiGrpc.bindService(new TransactionsApiGrpcImpl(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels, time), global)
+    val grpcPort = 1234
+    val grpcServer = ServerBuilder.forPort(grpcPort)
+      .addService(transactionsService)
+      .build()
+      .start()
+
+    Runtime.getRuntime.addShutdownHook(new Thread(() => grpcServer.shutdown()))
 
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
