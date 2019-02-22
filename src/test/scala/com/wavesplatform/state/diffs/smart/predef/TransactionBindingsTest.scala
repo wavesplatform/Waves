@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -242,13 +242,14 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
   property("SetScriptTransaction binding") {
     forAll(setScriptTransactionGen) { t =>
+
       val result = runScript(
         s"""
            |match tx {
            | case t : SetScriptTransaction =>
            |   ${provenPart(t)}
-           |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
-             .map(_.bytes().base64)
+           |   let script = if (${t.script.isDefined}) then blake2b256(extract(t.script)) == base64'${t.script
+             .map(s => ByteStr(crypto.fastHash(s.bytes().arr)).base64)
              .getOrElse("")}' else isDefined(t.script) == false
            |   ${assertProvenPart("t")} && script
            | case other => throw()
@@ -262,7 +263,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("SetAssetScriptTransaction binding") {
-    forAll(setAssetScriptTransactionGen.sample.get._2) { t =>
+    forAll(setAssetScriptTransactionGen.map(_._2)) { t =>
       val result = runScript(
         s"""
            |match tx {
