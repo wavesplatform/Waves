@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
-import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import monix.eval.Coeval
 
 trait Script {
@@ -39,7 +39,7 @@ object Script {
     } yield script
 
   def decompile(s: Script): String = s match {
-    case ExprScriprImpl(_, expr, _) => Decompiler(expr, com.wavesplatform.utils.defaultDecompilerContext)
+    case e: ExprScript => Decompiler(e.expr, com.wavesplatform.utils.defaultDecompilerContext)
     case com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl(_, contract, _) =>
       Decompiler(contract, com.wavesplatform.utils.defaultDecompilerContext)
   }

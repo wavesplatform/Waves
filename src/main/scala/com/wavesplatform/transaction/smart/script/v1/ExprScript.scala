@@ -27,11 +27,11 @@ object ExprScript {
     for {
       scriptComplexity <- ScriptEstimator(varNames(version), functionCosts(version), x)
       _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
-      s = new ExprScriprImpl(version, x, scriptComplexity)
+      s = new ExprScriptImpl(version, x, scriptComplexity)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s
 
-  case class ExprScriprImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends Script {
+  private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends ExprScript {
     override type Expr = EXPR
 
     override val bytes: Coeval[ByteStr] =
@@ -60,4 +60,11 @@ object ExprScript {
     }
     horTraversal(Queue(e))
   }
+}
+
+trait ExprScript extends Script {
+  override type Expr = EXPR
+  val stdLibVersion: StdLibVersion
+  val expr: EXPR
+  val complexity: Long
 }

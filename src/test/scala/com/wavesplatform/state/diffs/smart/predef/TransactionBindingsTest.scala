@@ -43,7 +43,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        |   let id = t.id == base58'${t.id().base58}'
        |   let fee = t.fee == ${t.assetFee._2}
        |   let timestamp = t.timestamp == ${t.timestamp}
-       |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
+       |   let bodyBytes = blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}'
        |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
        |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
        |   let version = t.version == $version
