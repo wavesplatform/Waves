@@ -328,7 +328,8 @@ lazy val node = project
         Dependencies.scorex ++
         Dependencies.commons_net ++
         Dependencies.monix.value ++
-        Dependencies.protobuf.value,
+        Dependencies.protobuf.value ++
+        Dependencies.grpc,
     dependencyOverrides ++= Seq(
       Dependencies.AkkaActor,
       Dependencies.AkkaStream,
