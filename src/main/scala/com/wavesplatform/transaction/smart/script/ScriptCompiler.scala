@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.{ContentType, ScriptType}
 import com.wavesplatform.transaction.smart.script.ContractScript._
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
+import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.utils._
 
 object ScriptCompiler extends ScorexLogging {
@@ -48,7 +48,7 @@ object ScriptCompiler extends ScorexLogging {
   }
 
   def estimate(script: Script, version: StdLibVersion): Either[String, Long] = script match {
-    case s: ExprScriprImpl     => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
+    case s: ExprScriptImpl     => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
     case s: ContractScriptImpl => ContractScript.estimateComplexity(version, s.expr).map(_._2)
     case _                     => ???
   }

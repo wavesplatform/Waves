@@ -128,7 +128,7 @@ trait TransactionGenBase extends ScriptGen with NTPTime { _: Suite =>
     fee                                                                      <- smallFeeGen
     timestamp                                                                <- timestampGen
     proofs                                                                   <- proofsGen
-    script                                                                   <- Gen.option(Gen.oneOf(scriptGen, contractGen))
+    script                                                                   <- Gen.option(scriptGen)
     issue = IssueTransactionV2
       .selfSigned(AddressScheme.current.chainId, sender, assetName, description, quantity, decimals, reissuable = true, script, iFee, timestamp)
       .explicitGet()

@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
-import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
+import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{smart, _}
@@ -123,7 +123,7 @@ object CommonValidation {
       }
 
       def scriptTypeActivation(sc: Script): Either[ActivationError, T] = sc match {
-        case e: ExprScriprImpl                    => Right(tx)
+        case e: ExprScriptImpl                    => Right(tx)
         case c: ContractScript.ContractScriptImpl => ab
       }
 
