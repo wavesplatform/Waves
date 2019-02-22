@@ -9,7 +9,6 @@ import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.{ContentType, ScriptType}
 import com.wavesplatform.transaction.smart.script.ContractScript._
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.utils._
 
 object ScriptCompiler extends ScorexLogging {
