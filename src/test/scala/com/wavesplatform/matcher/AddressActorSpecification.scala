@@ -184,7 +184,7 @@ class AddressActorSpecification
       Props(
         new AddressActor(
           address,
-          currentPortfolio.get(),
+          x => currentPortfolio.get().spendableBalanceOf(x),
           1.day,
           1.day,
           ntpTime,
@@ -194,10 +194,14 @@ class AddressActorSpecification
             Future.successful(QueueEventWithMeta(0, 0, event))
           }
         )))
-    f(addressActor, eventsProbe, (updatedPortfolio, notify) => {
-      currentPortfolio.set(updatedPortfolio)
-      if (notify) addressActor ! BalanceUpdated
-    })
+    f(
+      addressActor,
+      eventsProbe,
+      (updatedPortfolio, notify) => {
+        val prevPortfolio = currentPortfolio.getAndSet(updatedPortfolio)
+        if (notify) addressActor ! BalanceUpdated(prevPortfolio.changedAssetIds(updatedPortfolio))
+      }
+    )
     addressActor ! PoisonPill
   }
 
