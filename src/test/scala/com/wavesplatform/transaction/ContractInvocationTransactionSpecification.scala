@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{AddressScheme, DefaultAddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account.{AddressScheme, DefaultAddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.api.http.{ContractInvocationRequest, SignedContractInvocationRequest}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
@@ -16,7 +16,7 @@ import play.api.libs.json.{JsObject, Json}
 class ContractInvocationTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("ContractInvocationTransaction serialization roundtrip") {
-    forAll(contractInvokationGen) { transaction: ContractInvocationTransaction =>
+    forAll(contractInvocationGen) { transaction: ContractInvocationTransaction =>
       val bytes = transaction.bytes()
       val deser = ContractInvocationTransaction.parseBytes(bytes).get
       deser.sender shouldEqual transaction.sender
@@ -90,6 +90,18 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
     )
     req.toTx shouldBe 'right
     AddressScheme.current = DefaultAddressScheme
+  }
+
+  property("can't have more than 22 args") {
+    import com.wavesplatform.common.state.diffs.ProduceError._
+    val pk = PublicKeyAccount.fromBase58String("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").explicitGet()
+    ContractInvocationTransaction.create(
+        pk,
+      pk.toAddress,
+      Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(1,24).map(_ => Terms.CONST_LONG(0)).toList),
+      None,
+      1,1,Proofs.empty
+      ) should produce("more than 22 arguments")
   }
 
 }

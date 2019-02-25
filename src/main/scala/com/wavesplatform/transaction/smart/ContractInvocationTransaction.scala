@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL, REF}
 import com.wavesplatform.serialization.Deser
@@ -131,6 +131,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
              proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
+      _ <- Either.cond(fc.args.size <= ContractLimits.MaxContractInvocationArgs, (), ValidationError.GenericError(s"ContractInvocation can't have more than 22 arguments"))
       _ <- p match {
         case Some(Payment(amt, token)) => Either.cond(amt > 0, (), ValidationError.NegativeAmount(0, token.toString))
         case _                         => Right(())

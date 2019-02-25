@@ -6,7 +6,7 @@ import com.wavesplatform.lang.StdLibVersion.StdLibVersion
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator}
-import com.wavesplatform.transaction.smart.script.ContractLimits._
+import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.transaction.smart.script.v1.ExprScript.checksumLength
 import com.wavesplatform.utils.{functionCosts, varNames}
 import monix.eval.Coeval

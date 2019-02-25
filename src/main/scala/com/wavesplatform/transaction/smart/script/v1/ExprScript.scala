@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.{ScriptEstimator, Serde}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.{functionCosts, varNames}
 import monix.eval.Coeval
-import com.wavesplatform.transaction.smart.script.ContractLimits._
+import com.wavesplatform.lang.v1.ContractLimits._
 
 import scala.annotation.tailrec
 import scala.collection.mutable._
