@@ -7,7 +7,6 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.StdLibVersion._
@@ -15,7 +14,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
@@ -134,13 +133,7 @@ package object utils extends ScorexLogging {
     }(collection.breakOut)
 
     ctx.functions.values.foreach { func =>
-      val cost = func match {
-        case f: UserFunction =>
-          import f.signature.args
-          Coeval.evalOnce(ScriptEstimator(ctx.letDefs.keySet ++ args.map(_._1), costs, f.ev).explicitGet() + args.size * 5)
-        case f: NativeFunction => Coeval.now(f.cost)
-      }
-      costs += func.header -> cost
+      costs += func.header -> Coeval.now(func.cost)
     }
 
     costs.toMap
