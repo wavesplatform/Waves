@@ -54,7 +54,7 @@ object UtxPoolSynchronizer extends ScorexLogging {
                         allChannels.write(RawBytes.from(tx), channelMatcher)
 
                       case Left(error)  =>
-                        log.warn(s"Error adding transaction to UTX pool: $error")
+                        log.error(s"Error adding transaction to UTX pool: $error")
 
                       case _ =>
                         // Ignore
