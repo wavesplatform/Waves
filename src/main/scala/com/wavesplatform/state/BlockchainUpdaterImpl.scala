@@ -221,13 +221,17 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
     val ng = ngState
     if (ng.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
+      stateUpdateProcessor foreach (_.onRollback(blockId))
       Right(Seq.empty)
     } else {
       val discardedNgBlock = ng.map(_.bestLiquidBlock).toSeq
       ngState = None
       blockchain
         .rollbackTo(blockId)
-        .map(_ ++ discardedNgBlock)
+        .map { bs =>
+          stateUpdateProcessor foreach (_.onRollback(blockId))
+          bs ++ discardedNgBlock
+        }
         .leftMap(err => GenericError(err))
     }
   }
@@ -261,7 +265,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                                            verify)
               }
             } yield {
-              val (diff, carry, updatedMdConstraint, _) = r
+              val (diff, carry, updatedMdConstraint, detailedDiff) = r
+              stateUpdateProcessor foreach (_.onProcessMicroblock(microBlock, detailedDiff, blockchain))
               restTotalConstraint = updatedMdConstraint.constraints.head
               ng.append(microBlock, diff, carry, System.currentTimeMillis)
               log.info(s"$microBlock appended")
