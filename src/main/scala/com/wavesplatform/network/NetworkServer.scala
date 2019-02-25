@@ -8,7 +8,7 @@ import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings._
-import com.wavesplatform.state.NG
+import com.wavesplatform.state.{NG, StateUpdateEvent}
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
@@ -45,7 +45,8 @@ object NetworkServer extends ScorexLogging {
             utxPool: UtxPool,
             peerDatabase: PeerDatabase,
             allChannels: ChannelGroup,
-            peerInfo: ConcurrentHashMap[Channel, PeerInfo]): NS = {
+            peerInfo: ConcurrentHashMap[Channel, PeerInfo],
+            stateUpdateEvents: Observable[StateUpdateEvent]): NS = {
     @volatile var shutdownInitiated = false
 
     val bossGroup   = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-boss-group", true))

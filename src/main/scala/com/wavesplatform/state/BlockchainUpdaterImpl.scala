@@ -3,7 +3,7 @@ package com.wavesplatform.state
 import cats.implicits._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -23,7 +23,7 @@ import kamon.metric.MeasurementUnit
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
-class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, time: Time, stateUpdate: StateUpdate)
+class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, time: Time, stateUpdateProcessor: Option[StateUpdateProcessor] = None)
     extends BlockchainUpdater
     with NG
     with ScorexLogging
@@ -110,7 +110,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
         GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")
       )
       .flatMap(_ =>
-        ngState match {
+        (ngState match {
           case None =>
             blockchain.lastBlockId match {
               case Some(uniqueId) if uniqueId != block.reference =>
@@ -120,13 +120,9 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
               case lastBlockId =>
                 val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
                 val miningConstraints = MiningConstraints(blockchain, height)
-
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
-                  .map {
-                    case (d, c, c1, dd) =>
-                      Some(((d, c, c1, dd), Seq.empty[Transaction]))
-                  }
+                  .map(r => Some((r, Seq.empty[Transaction])))
             }
           case Some(ng) =>
             if (ng.base.reference == block.reference) {
@@ -134,13 +130,14 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 val height            = blockchain.unsafeHeightOf(ng.base.reference)
                 val miningConstraints = MiningConstraints(blockchain, height)
 
+                stateUpdateProcessor foreach (_.onRollback(block.reference))
+
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
-                  .map {
-                    case (d, c, c1, dd) =>
-                      log.trace(
-                        s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
-                      Some(((d, c, c1, dd), ng.transactions))
+                  .map { r =>
+                    log.trace(
+                      s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
+                    Some((r, ng.transactions))
                   }
               } else if (areVersionsOfSameBlock(block, ng.base)) {
                 if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
@@ -151,12 +148,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                   val height            = blockchain.unsafeHeightOf(ng.base.reference)
                   val miningConstraints = MiningConstraints(blockchain, height)
 
+                  stateUpdateProcessor foreach (_.onRollback(block.reference))
+
                   BlockDiffer
                     .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
-                    .map {
-                      case (d, c, c1, dd) =>
-                        Some(((d, c, c1, dd), Seq.empty[Transaction]))
-                    }
+                    .map(r => Some((r, Seq.empty[Transaction])))
                 }
               } else
                 Left(BlockAppendError(
@@ -168,6 +164,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                 case Some((referencedForgedBlock, referencedLiquidDiff, carry, discarded)) =>
                   if (referencedForgedBlock.signaturesValid().isRight) {
                     if (discarded.nonEmpty) {
+                      stateUpdateProcessor foreach (_.onRollback(referencedForgedBlock.uniqueId))
                       microBlockForkStats.increment()
                       microBlockForkHeightStats.record(discarded.size)
                     }
@@ -178,7 +175,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                       miningConstraints.total
                     }
 
-                    BlockDiffer
+                    val diff = BlockDiffer
                       .fromBlock(
                         functionalitySettings,
                         CompositeBlockchain.composite(blockchain, referencedLiquidDiff, carry),
@@ -187,35 +184,35 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
                         constraint,
                         verify
                       )
-                      .map {
-                        case (d, c, c1, dd) =>
-                          blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
-                          TxsInBlockchainStats.record(ng.transactions.size)
-                          Some(((d, c, c1, dd), discarded.flatMap(_.transactionData)))
-                      }
+
+                    diff.map { hardenedDiff =>
+                      blockchain.append(referencedLiquidDiff, carry, referencedForgedBlock)
+                      TxsInBlockchainStats.record(ng.transactions.size)
+                      Some((hardenedDiff, discarded.flatMap(_.transactionData)))
+                    }
                   } else {
                     val errorText = s"Forged block has invalid signature: base: ${ng.base}, requested reference: ${block.reference}"
                     log.error(errorText)
                     Left(BlockAppendError(errorText, block))
                   }
               }
-      })
-      .map {
-        _ map {
-          case ((newBlockDiff, carry, updatedTotalConstraint, detailedDiff), discarded) =>
-            val height = blockchain.height + 1
-            restTotalConstraint = updatedTotalConstraint
-            ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
-            lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
-            if ((block.timestamp > time
-                  .getTimestamp() - settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
-              log.info(s"New height: $height")
-            }
-            // stateUpdate.onProcessBlock()
+        }).map {
+          _ map {
+            case ((newBlockDiff, carry, updatedTotalConstraint, detailedDiff), discarded) =>
+              val height = blockchain.height + 1
+              restTotalConstraint = updatedTotalConstraint
+              ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
+              lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
+              if ((block.timestamp > time
+                    .getTimestamp() - settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (height % 100 == 0)) {
+                log.info(s"New height: $height")
+              }
 
-            discarded
-        }
-      }
+              stateUpdateProcessor foreach (_.onProcessBlock(block, detailedDiff, blockchain))
+
+              discarded
+          }
+      })
   }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = {

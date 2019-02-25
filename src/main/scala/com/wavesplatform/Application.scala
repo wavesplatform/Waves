@@ -28,6 +28,7 @@ import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
+import com.wavesplatform.state.{StateUpdateEvent, StateUpdateProcessor}
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, forceStopApplication}
 import com.wavesplatform.utx.{MatcherUtxPool, UtxPool, UtxPoolImpl}
@@ -42,7 +43,7 @@ import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
-import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.subjects.{ConcurrentSubject, PublishSubject}
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
 
@@ -58,7 +59,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val LocalScoreBroadcastDebounce = 1.second
 
-  private val blockchainUpdater = StorageFactory(settings, db, time)
+  private val stateUpdateEvents: PublishSubject[StateUpdateEvent] = PublishSubject()
+
+  private val blockchainUpdater = StorageFactory(settings, db, time, Some(new StateUpdateProcessor(stateUpdateEvents)))
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -141,7 +144,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val historyReplier = new HistoryReplier(blockchainUpdater, settings.synchronizationSettings, historyRepliesScheduler)
     val network =
-      NetworkServer(settings, lastBlockInfo, blockchainUpdater, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
+      NetworkServer(settings,
+                    lastBlockInfo,
+                    blockchainUpdater,
+                    historyReplier,
+                    utxStorage,
+                    peerDatabase,
+                    allChannels,
+                    establishedConnections,
+                    stateUpdateEvents)
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = network.messages
 
