@@ -7,7 +7,7 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -89,7 +89,7 @@ object ContractInvocationTransactionDiff {
                         }
                     })
                     wavesFee           = feeInfo._1
-                    dataAndPaymentDiff = payableAndDataPart(height, tx, ds, feeInfo._2)
+                    dataAndPaymentDiff <- payableAndDataPart(height, tx, ds, feeInfo._2)
                     _ <- Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, ""))
                     _ <- Either.cond(
                       pmts
@@ -137,6 +137,8 @@ object ContractInvocationTransactionDiff {
       case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
       case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
     }
+    val totalDataBytes = r.map(_.toBytes.size).sum
+
     val payablePart: Map[Address, Portfolio] = tx.payment match {
       case None => Map.empty
       case Some(ContractInvocationTransaction.Payment(amt, assetOpt)) =>
@@ -150,12 +152,14 @@ object ContractInvocationTransactionDiff {
               .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
         }
     }
-    Diff(
+    if(totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes)
+    Right(Diff(
       height = height,
       tx = tx,
       portfolios = feePart combine payablePart,
       accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
-    )
+    ))
+    else Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))
   }
 
   private def foldContractTransfers(blockchain: Blockchain, tx: ContractInvocationTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
