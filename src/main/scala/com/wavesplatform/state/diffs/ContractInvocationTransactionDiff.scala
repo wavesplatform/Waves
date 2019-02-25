@@ -88,9 +88,9 @@ object ContractInvocationTransactionDiff {
                            ))
                         }
                     })
-                    wavesFee           = feeInfo._1
+                    wavesFee = feeInfo._1
                     dataAndPaymentDiff <- payableAndDataPart(height, tx, ds, feeInfo._2)
-                    _ <- Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, ""))
+                    _                  <- Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, ""))
                     _ <- Either.cond(
                       pmts
                         .flatMap(_.values)
@@ -152,46 +152,48 @@ object ContractInvocationTransactionDiff {
               .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
         }
     }
-    if(totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes)
-    Right(Diff(
-      height = height,
-      tx = tx,
-      portfolios = feePart combine payablePart,
-      accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
-    ))
+    if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes)
+      Right(
+        Diff(
+          height = height,
+          tx = tx,
+          portfolios = feePart combine payablePart,
+          accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
+        ))
     else Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))
   }
 
   private def foldContractTransfers(blockchain: Blockchain, tx: ContractInvocationTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
                                                                                                dataDiff: Diff): Either[ValidationError, Diff] = {
-
-    ps.foldLeft(Either.right[ValidationError, Diff](dataDiff)) { (diffEi, payment) =>
-      val (addressRepr, amount, asset) = payment
-      val address                      = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
-      asset match {
-        case None =>
-          diffEi combine Right(
-            Diff.stateOps(
-              portfolios = Map(
-                address            -> Portfolio(amount, LeaseBalance.empty, Map.empty),
-                tx.contractAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)
-              )))
-        case Some(assetId) =>
-          diffEi combine {
-            val nextDiff = Diff.stateOps(
-              portfolios = Map(
-                address            -> Portfolio(0, LeaseBalance.empty, Map(assetId -> amount)),
-                tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(assetId -> -amount))
-              ))
-            blockchain.assetScript(assetId) match {
-              case None =>
-                Right(nextDiff)
-              case Some(script) =>
-                diffEi flatMap (d => validateContractTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script))
+    if (ps.length <= ContractLimits.MaxPaymentAmount)
+      ps.foldLeft(Either.right[ValidationError, Diff](dataDiff)) { (diffEi, payment) =>
+        val (addressRepr, amount, asset) = payment
+        val address                      = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
+        asset match {
+          case None =>
+            diffEi combine Right(
+              Diff.stateOps(
+                portfolios = Map(
+                  address            -> Portfolio(amount, LeaseBalance.empty, Map.empty),
+                  tx.contractAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)
+                )))
+          case Some(assetId) =>
+            diffEi combine {
+              val nextDiff = Diff.stateOps(
+                portfolios = Map(
+                  address            -> Portfolio(0, LeaseBalance.empty, Map(assetId -> amount)),
+                  tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(assetId -> -amount))
+                ))
+              blockchain.assetScript(assetId) match {
+                case None =>
+                  Right(nextDiff)
+                case Some(script) =>
+                  diffEi flatMap (d => validateContractTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script))
+              }
             }
-          }
-      }
-    }
+        }
+      } else
+      Left(GenericError(s"Too many ContractTransfers: max: ${ContractLimits.MaxPaymentAmount}, actual: ${ps.length}"))
   }
 
   private def validateContractTransferWithSmartAssetScript(blockchain: Blockchain, tx: ContractInvocationTransaction)(
