@@ -17,7 +17,13 @@ object ContractEvaluator {
   def eval(c: Contract, i: Invocation): EvalM[EVALUATED] = {
     val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name
     c.cfs.find(_.u.name == functionName) match {
-      case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '$functionName doesn't exist in the contract")
+      case None =>
+        val otherFuncs = c.dec.filter(_.isInstanceOf[FUNC]).map(_.asInstanceOf[FUNC].name)
+        val message =
+          if (otherFuncs contains functionName)
+            s"function '$functionName exists in the contract but is not marked as @Callable, therefore cannot not be invoked"
+          else s"@Callable function '$functionName doesn't exist in the contract"
+        raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](message)
       case Some(f) =>
         val zeroExpr = Right(
           BLOCK(

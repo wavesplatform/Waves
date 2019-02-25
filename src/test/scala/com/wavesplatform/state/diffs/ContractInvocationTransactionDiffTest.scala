@@ -171,7 +171,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
   val chainId   = AddressScheme.current.chainId
   val enoughFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(IssueTransactionV2.typeId) * CommonValidation.FeeUnit
 
-  property("invoking contract recive payment") {
+  property("invoking contract receive payment") {
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
