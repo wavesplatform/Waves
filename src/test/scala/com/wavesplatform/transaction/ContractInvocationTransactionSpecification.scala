@@ -104,4 +104,16 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
       ) should produce("more than 22 arguments")
   }
 
+  property("can't be more 5kb") {
+    val largeString = "abcde" * 1024
+    import com.wavesplatform.common.state.diffs.ProduceError._
+    val pk = PublicKeyAccount.fromBase58String("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").explicitGet()
+    ContractInvocationTransaction.create(
+      pk,
+      pk.toAddress,
+      Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString))),
+      None,
+      1,1,Proofs.empty
+    ) should produce("TooBigArray")
+  }
 }

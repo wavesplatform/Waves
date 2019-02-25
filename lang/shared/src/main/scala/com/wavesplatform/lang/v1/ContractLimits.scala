@@ -7,5 +7,5 @@ object ContractLimits {
   val MaxContractComplexity  = 20 * 100
   val MaxContractSizeInBytes = 32 * 1024
   val MaxContractInvocationArgs = 22
-
+  val MaxContractInvocationSizeInBytes = 5 * 1024
 }
