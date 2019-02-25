@@ -151,10 +151,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
                     utxStorage,
                     peerDatabase,
                     allChannels,
-                    establishedConnections,
-                    stateUpdateEvents)
+                    establishedConnections)
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = network.messages
+
+    val stateUpdateServer = new StateUpdateServer(settings, stateUpdateEvents)
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
@@ -280,14 +281,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     sys.addShutdownHook {
       Await.ready(Kamon.stopAllReporters(), 20.seconds)
       Metrics.shutdown()
-      shutdown(utxStorage, network)
+      shutdown(utxStorage, network, stateUpdateServer)
     }
   }
 
   @volatile var shutdownInProgress           = false
   @volatile var serverBinding: ServerBinding = _
 
-  def shutdown(utx: UtxPool, network: NS): Unit = {
+  def shutdown(utx: UtxPool, network: NS, stateUpdateServer: StateUpdateServer): Unit = {
     if (!shutdownInProgress) {
       shutdownInProgress = true
 
@@ -316,6 +317,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       log.info("Stopping network services")
       network.shutdown()
+      stateUpdateServer.shutdown()
 
       shutdownAndWait(minerScheduler, "Miner")
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
