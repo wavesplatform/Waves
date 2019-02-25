@@ -266,7 +266,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, settings: WavesSettings, tim
               }
             } yield {
               val (diff, carry, updatedMdConstraint, detailedDiff) = r
-              stateUpdateProcessor foreach (_.onProcessMicroblock(microBlock, detailedDiff, blockchain))
+              stateUpdateProcessor foreach (_.onProcessMicroBlock(microBlock, detailedDiff, blockchain))
               restTotalConstraint = updatedMdConstraint.constraints.head
               ng.append(microBlock, diff, carry, System.currentTimeMillis)
               log.info(s"$microBlock appended")
