@@ -70,7 +70,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
         |{-# CONTENT_TYPE CONTRACT #-}
         |
         | @Callable(inv)
-        | func foo(a:ByteStr) = {
+        | func foo(a:ByteVector) = {
         |  WriteSet([DataEntry("a", a), DataEntry("sender", inv.caller.bytes)])
         | }
         | 
