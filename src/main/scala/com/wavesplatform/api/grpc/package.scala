@@ -1,5 +1,6 @@
 package com.wavesplatform.api
-import com.wavesplatform.transaction.ValidationError
+import java.util.concurrent.atomic.AtomicReference
+
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
@@ -14,15 +15,18 @@ package object grpc {
       import org.reactivestreams.{Subscriber, Subscription}
 
       val rxs = new Subscriber[T] with Cancelable {
-        @volatile
-        private[this] var element = Option.empty[T]
+        private[this] val element = new AtomicReference[Option[T]](None)
 
         @volatile
         private[this] var subscription: Subscription = _
 
         private[this] val observerReadyFunc: () => Boolean = streamObserver match {
-          case callStreamObserver: CallStreamObserver[_] => () => callStreamObserver.isReady
-          case _ => () => true
+          case callStreamObserver: CallStreamObserver[_] =>
+            () =>
+              callStreamObserver.isReady
+          case _ =>
+            () =>
+              true
         }
 
         def isReady: Boolean = observerReadyFunc()
@@ -30,10 +34,16 @@ package object grpc {
         override def onSubscribe(subscription: Subscription): Unit = {
           this.subscription = subscription
 
-          def pushElement()= element match {
-            case Some(value) if this.isReady =>
-              element = None
-              streamObserver.onNext(value)
+          def pushElement(): Unit= element.get() match {
+            case v @ Some(value) if this.isReady =>
+              if (element.compareAndSet(v, None)) {
+                streamObserver.onNext(value)
+                subscription.request(1)
+              } else {
+                pushElement()
+              }
+
+            case None if this.isReady =>
               subscription.request(1)
 
             case _ =>
@@ -45,12 +55,12 @@ package object grpc {
               scso.disableAutoInboundFlowControl()
               scso.setOnCancelHandler(() => subscription.cancel())
               scso.setOnReadyHandler(() => pushElement())
-              subscription.request(1)
+              // subscription.request(1)
 
             case cso: CallStreamObserver[T] =>
               cso.disableAutoInboundFlowControl()
               cso.setOnReadyHandler(() => pushElement())
-              subscription.request(1)
+              // subscription.request(1)
 
             case _ =>
               subscription.request(Long.MaxValue)
@@ -59,22 +69,22 @@ package object grpc {
 
         override def onNext(t: T): Unit = {
           if (isReady) {
-            if (element.nonEmpty) {
-              streamObserver.onNext(element.get)
-              element = Some(t)
+            val value = element.get()
+            if (value.nonEmpty) {
+              if (element.compareAndSet(value, Some(t))) streamObserver.onNext(value.get)
+              else onNext(t)
             } else {
               streamObserver.onNext(t)
-              element = None
             }
-            subscription.request(1)
-          } else {
-            element = Some(t)
+            if (isReady) subscription.request(1)
+          } else if (!element.compareAndSet(None, Some(t))) {
+            throw new IllegalArgumentException("Buffer overflow")
           }
         }
 
-        override def onError(t: Throwable): Unit  = streamObserver.onError(t)
-        override def onComplete(): Unit = streamObserver.onCompleted()
-        def cancel(): Unit = Option(subscription).foreach(_.cancel())
+        override def onError(t: Throwable): Unit = streamObserver.onError(t)
+        override def onComplete(): Unit          = streamObserver.onCompleted()
+        def cancel(): Unit                       = Option(subscription).foreach(_.cancel())
       }
 
       monix.reactive.observers.Subscriber.fromReactiveSubscriber(rxs, rxs)
@@ -103,9 +113,9 @@ package object grpc {
     }
   }
 
-  implicit class EitherToFutureConversionOps[T](either: Either[ValidationError, T]) {
+  implicit class EitherToFutureConversionOps[E, T](either: Either[E, T])(implicit ev: E => Exception) {
     def toFuture: Future[T] = {
-      Future.fromTry(either.left.map(_.toException).toTry)
+      Future.fromTry(either.left.map(ev).toTry)
     }
   }
 

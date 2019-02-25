@@ -10,5 +10,9 @@ object GRPCTest extends App {
 
   val service = TransactionsApiGrpc.blockingStub(channel)
   val result  = service.transactionsByAddress(TransactionsByAddressRequest(Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get))
-  result.foreach(println)
+  result.take(100).foreach(println)
+
+  val blocksService = BlocksApiGrpc.blockingStub(channel)
+  val result1       = blocksService.blocksRange(BlocksRangeRequest(100, 200))
+  result1.foreach(println)
 }

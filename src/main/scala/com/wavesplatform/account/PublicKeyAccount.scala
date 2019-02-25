@@ -8,6 +8,8 @@ import com.wavesplatform.utils.base58Length
 trait PublicKeyAccount {
   def publicKey: Array[Byte]
 
+  def isEmpty: Boolean = publicKey.isEmpty
+
   override def equals(b: Any): Boolean = b match {
     case a: PublicKeyAccount => publicKey.sameElements(a.publicKey)
     case _                   => false

@@ -79,8 +79,8 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
   }
 
   override def signTransaction(request: TransactionSignRequest): Future[Transaction] = {
-    val signerAddress = if (request.signer.isEmpty) request.transaction.sender.toString else request.signer
-    TransactionFactory.protobuf(request.transaction, wallet, signerAddress).toFuture
+    val signerAddress = if (request.signer.isEmpty) request.transaction.sender else request.signer
+    TransactionFactory.protobuf(request.transaction, wallet, signerAddress.toString).toFuture
   }
 
   override def broadcastTransaction(tx: Transaction): Future[Transaction] = {

@@ -301,7 +301,7 @@ object Block extends ScorexLogging {
   def toBytes(block: Block, legacy: Boolean = false): Array[Byte] = {
     import com.wavesplatform.block.protobuf.PBBlock._
     if (legacy || useLegacyBlock) toLegacy(block).bytes()
-    else block.toPB.bytes()
+    else block.toPB.protoBytes()
   }
 
   case class Fraction(dividend: Int, divider: Int) {

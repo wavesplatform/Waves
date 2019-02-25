@@ -13,7 +13,7 @@ import cats.instances.all._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.api.grpc.{TransactionsApiGrpc, TransactionsApiGrpcImpl}
+import com.wavesplatform.api.grpc.{BlocksApiGrpc, BlocksApiGrpcImpl, TransactionsApiGrpc, TransactionsApiGrpcImpl}
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import com.wavesplatform.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
@@ -195,6 +195,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     // TODO: gRPC enable/disable setting
+    // TODO: Refactor Impls parameter lists
+
     val transactionsService = TransactionsApiGrpc.bindService(
       new TransactionsApiGrpcImpl(settings.restAPISettings,
                                   settings.blockchainSettings.functionalitySettings,
@@ -205,10 +207,23 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
                                   time),
       global
     )
+
+    val blocksService = BlocksApiGrpc.bindService(
+      new BlocksApiGrpcImpl(settings.restAPISettings,
+                            settings.blockchainSettings.functionalitySettings,
+                            wallet,
+                            blockchainUpdater,
+                            utxStorage,
+                            allChannels,
+                            time),
+      global
+    )
+
     val grpcPort = 1234
     val grpcServer = ServerBuilder
       .forPort(grpcPort)
       .addService(transactionsService)
+      .addService(blocksService)
       .build()
       .start()
 
