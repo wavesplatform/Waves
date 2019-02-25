@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderV1
 import com.wavesplatform.transaction.protobuf.Transaction.Data
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.{transaction => vt}
+import com.wavesplatform.{crypto, transaction => vt}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -416,6 +416,11 @@ trait PBTransactionImplicits {
 
       case data =>
         throw new IllegalArgumentException(s"Unsupported transaction data: $data")
+    }
+
+    def signed(signer: Array[Byte]): PBTransaction = {
+      import com.wavesplatform.common.utils._
+      tx.withProofsArray(Proofs.create(Seq(ByteStr(crypto.sign(signer, tx.bodyBytes())))).explicitGet())
     }
   }
 

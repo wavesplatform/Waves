@@ -4,6 +4,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.protobuf.PBTransaction._
 import com.wavesplatform.transaction.protobuf.Transaction
 import com.wavesplatform.utils.Time
@@ -40,7 +42,7 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
         case Right(transactions) =>
           if (transactions.isEmpty) Observable.empty
           else Observable(transactions: _*) ++ Observable.defer(getTransactionsFromId(address, Some(transactions.last.id())))
-        case Left(err) => Observable.raiseError(new Exception(err))
+        case Left(err) => Observable.raiseError(new IllegalArgumentException(err))
       }
 
       Observable.fromTask(observableTask).flatten
@@ -57,9 +59,7 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
       .toFuture
   }
 
-  override def unconfirmedTransactions(
-      request: Empty,
-      responseObserver: StreamObserver[Transaction]): Unit = {
+  override def unconfirmedTransactions(request: Empty, responseObserver: StreamObserver[Transaction]): Unit = {
     val stream = Observable(utx.all: _*).map(_.toPB)
     responseObserver.completeWith(stream)
   }
@@ -69,5 +69,28 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
       .transactionById(request.transactionId)
       .map(_.toPB)
       .toFuture
+  }
+
+  override def calculateFee(request: Transaction): Future[CalculateFeeResponse] = {
+    CommonValidation
+      .getMinFee(blockchain, functionalitySettings, blockchain.height, request)
+      .map { case (assetId, assetAmount, _) => CalculateFeeResponse(assetId, assetAmount) }
+      .toFuture
+  }
+
+  override def signTransaction(request: TransactionSignRequest): Future[Transaction] = {
+    val signerAddress = if (request.signer.isEmpty) request.transaction.sender.toString else request.signer
+    TransactionFactory.protobuf(request.transaction, wallet, signerAddress).toFuture
+  }
+
+  override def broadcastTransaction(tx: Transaction): Future[Transaction] = {
+    import com.wavesplatform.network._
+
+    val result = for {
+      (added, _) <- utx.putIfNew(tx)
+      _ = if (added) allChannels.broadcastTx(tx, None)
+    } yield tx
+
+    result.toFuture
   }
 }

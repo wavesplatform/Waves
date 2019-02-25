@@ -1,4 +1,5 @@
 package com.wavesplatform.api
+import com.wavesplatform.transaction.ValidationError
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -22,6 +23,12 @@ package object grpc {
     def toFuture: Future[T] = opt match {
       case Some(value) => Future.successful(value)
       case None        => Future.failed(new NoSuchElementException)
+    }
+  }
+
+  implicit class EitherToFutureConversionOps[T](either: Either[ValidationError, T]) {
+    def toFuture: Future[T] = {
+      Future.fromTry(either.left.map(_.toException).toTry)
     }
   }
 

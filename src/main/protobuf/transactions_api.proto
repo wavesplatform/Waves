@@ -15,6 +15,9 @@ service TransactionsApi {
     rpc TransactionById (TransactionByIdRequest) returns (Transaction);
     rpc UnconfirmedTransactions (google.protobuf.Empty) returns (stream Transaction);
     rpc UnconfirmedTransactionById (TransactionByIdRequest) returns (Transaction);
+    rpc CalculateFee (Transaction) returns (CalculateFeeResponse);
+    rpc SignTransaction (TransactionSignRequest) returns (Transaction);
+    rpc BroadcastTransaction (Transaction) returns (Transaction);
 }
 
 message TransactionsByAddressRequest {
@@ -24,4 +27,14 @@ message TransactionsByAddressRequest {
 
 message TransactionByIdRequest {
     bytes transactionId = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+}
+
+message CalculateFeeResponse {
+    bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
+    uint64 amount = 2;
+}
+
+message TransactionSignRequest {
+    Transaction transaction = 1 [(scalapb.field).no_box = true];
+    string signer = 2;
 }

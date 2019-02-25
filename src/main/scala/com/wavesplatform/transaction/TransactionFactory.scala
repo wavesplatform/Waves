@@ -721,6 +721,13 @@ object TransactionFactory {
     } yield tx
   }
 
+  def protobuf(tx: PBTransaction, wallet: Wallet, signerAddress: String): Either[ValidationError, PBTransaction] =
+    for {
+      sender <- wallet.findPrivateKey(tx.sender.toString)
+      signer <- if (tx.sender.toString == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+      tx     <- Try(tx.signed(signer.privateKey)).toEither.left.map(GenericError(_))
+    } yield tx
+
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
     import ContractInvocationRequest._
     val typeId  = (jsv \ "type").as[Byte]
