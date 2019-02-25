@@ -87,8 +87,8 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
     import com.wavesplatform.network._
 
     val result = for {
-      (added, _) <- utx.putIfNew(tx)
-      _ = if (added) allChannels.broadcastTx(tx, None)
+      r <- utx.putIfNew(tx)
+      _ = if (r._1) allChannels.broadcastTx(tx, None) else ()
     } yield tx
 
     result.toFuture
