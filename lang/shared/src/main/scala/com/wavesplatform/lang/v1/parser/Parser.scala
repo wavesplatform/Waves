@@ -167,6 +167,7 @@ object Parser {
   val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | maybeFunctionCallP)
 
   abstract class Accessor
+  case class Method(name: PART[String], args: Seq[EXPR]) extends Accessor
   case class Getter(name: PART[String]) extends Accessor
   case class ListIndex(index: EXPR)     extends Accessor
   val typesP: P[Seq[PART[String]]] = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
@@ -230,8 +231,9 @@ object Parser {
       }
 
   val accessP: P[(Int, Accessor, Int)] = P(
-    ("" ~ comment ~ Index ~ "." ~/ comment ~ anyVarName.map(Getter) ~~ Index) |
-      (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
+    (("" ~ comment ~ Index ~ "." ~/ comment ~ (anyVarName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~  functionCallArgs ~/ comment ~ ")").?).map {
+      case ((g@Getter(name)), args) => args.fold(g:Accessor)(a => Method(name, a))
+      }) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
   )
 
   val maybeAccessP: P[EXPR] =
@@ -242,6 +244,7 @@ object Parser {
             case (e, (accessStart, a, accessEnd)) =>
               a match {
                 case Getter(n)        => GETTER(Pos(start, accessEnd), e, n)
+                case Method(n, args)  => FUNCTION_CALL(Pos(start, accessEnd), n, (e :: args.toList))
                 case ListIndex(index) => FUNCTION_CALL(Pos(start, accessEnd), PART.VALID(Pos(accessStart, accessEnd), "getElement"), List(e, index))
               }
           }
