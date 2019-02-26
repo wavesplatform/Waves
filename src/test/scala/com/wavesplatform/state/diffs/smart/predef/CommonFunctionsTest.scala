@@ -194,9 +194,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
-  property("shadowing of external variable") {
-    //TODO: script can be simplified after NODE-837 fix
-    try {
+  property("shadowing of variable considered external") {
       runScript(
         s"""
            |match {
@@ -207,12 +205,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
            |     case other => throw()
            | }
            |""".stripMargin
-      )
-
-    } catch {
-      case ex: MatchError => Assertions.assert(ex.getMessage().contains("Compilation failed: Value 'tx' already defined in the scope"))
-      case _: Throwable   => Assertions.fail("Some unexpected error")
-    }
+      ) should produce("already defined")
   }
 
   property("data constructors") {

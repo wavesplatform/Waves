@@ -3,7 +3,7 @@ import cats.Show
 import cats.implicits._
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract._
-import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
+import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
@@ -30,7 +30,7 @@ object ContractCompiler {
       compiledBody <- local {
         for {
           _ <- modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))
-          r <- compiler.ExpressionCompiler.compileFunc(af.f.position, af.f)
+          r <- compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, annotationBindings.map(_._1))
         } yield r
       }
     } yield (annotations, compiledBody)
@@ -88,11 +88,12 @@ object ContractCompiler {
       ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
       _  <- validateDuplicateVarsInContract(contract)
       l  <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
+      duplicatedFuncNames = l.map(_.u.name).groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toList
       _ <- Either
         .cond(
-          l.map(_.u.name).toSet.size == l.size,
+          duplicatedFuncNames.isEmpty,
           (),
-          Generic(contract.position.start, contract.position.start, "Contract functions must have unique names")
+          AlreadyDefined(contract.position.start, contract.position.start, duplicatedFuncNames.mkString(", "), isFunction = true)
         )
         .toCompileM
 
