@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesCont
 import com.wavesplatform.lang.v1.parser.Expressions.FUNC
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 object ContractCompiler {
 
   def compileAnnotatedFunc(af: Expressions.ANNOTATEDFUNC): CompileM[AnnotatedFunction] = {
@@ -93,6 +93,16 @@ object ContractCompiler {
           l.map(_.u.name).toSet.size == l.size,
           (),
           Generic(contract.position.start, contract.position.start, "Contract functions must have unique names")
+        )
+        .toCompileM
+
+      _ <- Either
+        .cond(
+          l.forall(_.u.args.size <= ContractLimits.MaxContractInvocationArgs),
+          (),
+          Generic(contract.position.start,
+                  contract.position.end,
+                  s"Contract functions can have no more than ${ContractLimits.MaxContractInvocationArgs} arguments")
         )
         .toCompileM
       verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])

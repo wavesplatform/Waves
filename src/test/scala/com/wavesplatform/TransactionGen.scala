@@ -5,7 +5,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.testing.{ScriptGen, TypedScriptGen}
 import com.wavesplatform.settings.Constants
@@ -503,12 +503,12 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val funcCallGen = for {
     functionName <- genBoundedString(1, 32).map(_.toString)
-    amt          <- Gen.choose(0, 10)
+    amt          <- Gen.choose(0, ContractLimits.MaxContractInvocationArgs)
     args         <- Gen.listOfN(amt, argGen)
 
   } yield FUNCTION_CALL(FunctionHeader.User(functionName), args)
 
-  val contractInvokationGen = for {
+  val contractInvocationGen = for {
     sender          <- accountGen
     contractAddress <- accountGen
     fc              <- funcCallGen
