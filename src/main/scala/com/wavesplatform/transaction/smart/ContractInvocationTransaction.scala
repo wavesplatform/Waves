@@ -133,7 +133,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
       _ <- Either.cond(fc.args.size <= ContractLimits.MaxContractInvocationArgs,
                        (),
-                       ValidationError.GenericError(s"ContractInvocation can't have more than 22 arguments"))
+                       ValidationError.GenericError(s"ContractInvocation can't have more than ${ContractLimits.MaxContractInvocationArgs} arguments"))
       _ <- p match {
         case Some(Payment(amt, token)) => Either.cond(amt > 0, (), ValidationError.NegativeAmount(0, token.toString))
         case _                         => Right(())
