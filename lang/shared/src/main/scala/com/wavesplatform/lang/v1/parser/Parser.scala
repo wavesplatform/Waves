@@ -164,7 +164,9 @@ object Parser {
     e.foldRight(REF(pos, PART.VALID(pos,"nil")):EXPR) { (v,l) => FUNCTION_CALL(pos, PART.VALID(pos, "cons"), List(v,l)) }
   }
 
-  val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | maybeFunctionCallP)
+  val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP |
+    byteVectorP | stringP | numberP | trueP | falseP | list |
+    maybeFunctionCallP)
 
   abstract class Accessor
   case class Method(name: PART[String], args: Seq[EXPR]) extends Accessor
@@ -313,14 +315,14 @@ object Parser {
   }
 
   val baseAtom = comment ~
-    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | list | block | maybeAccessP) ~
+    P(ifP | matchP | block | maybeAccessP) ~
     comment
 
   lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority))
 
 
   val singleBaseAtom = comment ~
-    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | maybeAccessP) ~
+    P(ifP | matchP | maybeAccessP) ~
     comment
 
   val singleBaseExpr = P(binaryOp(singleBaseAtom, opsByPriority))

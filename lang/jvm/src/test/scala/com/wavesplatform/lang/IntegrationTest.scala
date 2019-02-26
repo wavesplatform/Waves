@@ -446,7 +446,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("postfix syntax (many argument)") {
     val src =
-      """ let x = 5 ; x.fraction(7,2) """
+      """ 5.fraction(7,2) """
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(17L))
   }
 
@@ -454,7 +454,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """
         |func dub(s:String) = { s+s }
-        |("qwe").dub()
+        |"qwe".dub()
       """.stripMargin
     eval[EVALUATED](src) shouldBe Right(CONST_STRING("qweqwe"))
   }
