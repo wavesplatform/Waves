@@ -34,7 +34,7 @@ package object grpc {
         override def onSubscribe(subscription: Subscription): Unit = {
           this.subscription = subscription
 
-          def pushElement(): Unit= element.get() match {
+          def pushElement(): Unit = element.get() match {
             case v @ Some(value) if this.isReady =>
               if (element.compareAndSet(v, None)) {
                 streamObserver.onNext(value)
@@ -47,7 +47,7 @@ package object grpc {
               subscription.request(1)
 
             case _ =>
-              // Ignore
+            // Ignore
           }
 
           subscription match {
@@ -55,12 +55,12 @@ package object grpc {
               scso.disableAutoInboundFlowControl()
               scso.setOnCancelHandler(() => subscription.cancel())
               scso.setOnReadyHandler(() => pushElement())
-              // subscription.request(1)
+            // subscription.request(1)
 
             case cso: CallStreamObserver[T] =>
               cso.disableAutoInboundFlowControl()
               cso.setOnReadyHandler(() => pushElement())
-              // subscription.request(1)
+            // subscription.request(1)
 
             case _ =>
               subscription.request(Long.MaxValue)

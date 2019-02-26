@@ -15,7 +15,7 @@ object PBTransactionSerialization {
   }
 
   def unsignedBytes(tx: PBTransaction): Array[Byte] = {
-    val unsignedTx = tx.clearProofsArray
+    val unsignedTx   = tx.clearProofsArray
     val prefixLength = 3 // "WTX"
     val outArray     = new Array[Byte](unsignedTx.serializedSize + prefixLength)
     val outputStream = CodedOutputStream.newInstance(outArray)
