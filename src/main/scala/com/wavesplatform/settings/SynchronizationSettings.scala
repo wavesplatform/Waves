@@ -26,7 +26,13 @@ object SynchronizationSettings {
 
   case class HistoryReplierSettings(maxMicroBlockCacheSize: Int, maxBlockCacheSize: Int)
 
-  case class UtxSynchronizerSettings(networkTxCacheSize: Int, networkTxCacheTime: FiniteDuration, maxBufferSize: Int, maxBufferTime: FiniteDuration, parallelism: Int, maxThreads: Int, maxQueueSize: Int)
+  case class UtxSynchronizerSettings(networkTxCacheSize: Int,
+                                     networkTxCacheTime: FiniteDuration,
+                                     maxBufferSize: Int,
+                                     maxBufferTime: FiniteDuration,
+                                     parallelism: Int,
+                                     maxThreads: Int,
+                                     maxQueueSize: Int)
 
   val configPath: String = "waves.synchronization"
 
