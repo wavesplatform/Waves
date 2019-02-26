@@ -85,12 +85,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
   private var maybeNetwork: Option[NS]                                         = None
+  private var maybeStateUpdateServer: Option[StateUpdateServer]                = None
 
   def apiShutdown(): Unit = {
     for {
       u <- maybeUtx
       n <- maybeNetwork
-    } yield shutdown(u, n)
+      s <- maybeStateUpdateServer
+    } yield shutdown(u, n, s)
   }
 
   def run(): Unit = {
@@ -144,18 +146,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val historyReplier = new HistoryReplier(blockchainUpdater, settings.synchronizationSettings, historyRepliesScheduler)
     val network =
-      NetworkServer(settings,
-                    lastBlockInfo,
-                    blockchainUpdater,
-                    historyReplier,
-                    utxStorage,
-                    peerDatabase,
-                    allChannels,
-                    establishedConnections)
+      NetworkServer(settings, lastBlockInfo, blockchainUpdater, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = network.messages
 
     val stateUpdateServer = new StateUpdateServer(settings, stateUpdateEvents)
+    maybeStateUpdateServer = Some(stateUpdateServer)
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 

@@ -13,10 +13,11 @@ import com.wavesplatform.state.reader.CompositeBlockchain.composite
 final case class StateUpdate(balances: Map[(Address, Option[AssetId]), Long], leases: Map[Address, LeaseBalance])
 
 trait StateUpdateEvent
-final case class BlockAddEvent(b: Block, blockStateUpdate: StateUpdate, transactionsStateUpdates: Seq[StateUpdate]) extends StateUpdateEvent
-final case class MicroBlockEvent(b: MicroBlock, microBlockStateUpdate: StateUpdate, transactionsStateUpdates: Seq[StateUpdate])
+final case class BlockAddEvent(b: Block, height: Int, blockStateUpdate: StateUpdate, transactionsStateUpdates: Seq[StateUpdate])
     extends StateUpdateEvent
-final case class RollbackEvent(eventId: ByteStr) extends StateUpdateEvent
+final case class MicroBlockEvent(b: MicroBlock, height: Int, microBlockStateUpdate: StateUpdate, transactionsStateUpdates: Seq[StateUpdate])
+    extends StateUpdateEvent
+final case class RollbackEvent(eventId: ByteStr, height: Int) extends StateUpdateEvent
 
 class StateUpdateProcessor(events: PublishSubject[StateUpdateEvent]) {
 
@@ -61,13 +62,13 @@ class StateUpdateProcessor(events: PublishSubject[StateUpdateEvent]) {
 
   def onProcessBlock(block: Block, diff: DetailedDiff, blockchain: Blockchain): Unit = {
     val (blockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
-    events.onNext(BlockAddEvent(block, blockStateUpdate, txsStateUpdates))
+    events.onNext(BlockAddEvent(block, blockchain.height + 1, blockStateUpdate, txsStateUpdates))
   }
 
   def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchain: Blockchain): Unit = {
     val (microBlockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
-    events.onNext(MicroBlockEvent(microBlock, microBlockStateUpdate, txsStateUpdates))
+    events.onNext(MicroBlockEvent(microBlock, blockchain.height, microBlockStateUpdate, txsStateUpdates))
   }
 
-  def onRollback(blockId: ByteStr): Unit = events.onNext(RollbackEvent(blockId))
+  def onRollback(blockId: ByteStr, height: Int): Unit = events.onNext(RollbackEvent(blockId, height))
 }

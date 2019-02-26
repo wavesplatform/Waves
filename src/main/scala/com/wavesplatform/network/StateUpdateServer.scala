@@ -1,8 +1,9 @@
 package com.wavesplatform.network
 
+import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings._
-import com.wavesplatform.state.StateUpdateEvent
+import com.wavesplatform.state.{BlockAddEvent, StateUpdateEvent}
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.channel.nio.NioEventLoopGroup
@@ -13,13 +14,22 @@ import monix.execution.Ack
 import monix.execution.Ack.Continue
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.{Observable, Observer}
+import com.wavesplatform.serialization.protobuf.Block
 
 class StateUpdateHandler
 
 class UpdateServerHandler(stateUpdates: Observable[StateUpdateEvent]) extends ChannelInboundHandlerAdapter {
+  implicit def toByteString(bs: ByteStr): ByteString =
+    ByteString.copyFrom(bs.arr)
+
   override def channelActive(ctx: ChannelHandlerContext): Unit = {
     val obs = new Observer.Sync[StateUpdateEvent] {
-      override def onNext(elem: StateUpdateEvent): Ack = {
+      override def onNext(evt: StateUpdateEvent): Ack = {
+        val serialized = evt match {
+          case BlockAddEvent(b, h, blockStateUpdate, transactionsStateUpdates) =>
+            val block = Block(b.signerData.signature, h)
+        }
+
         // @todo serialize event
         val b: ByteStr = ByteStr.empty
         ctx.writeAndFlush(b).await().sync()
@@ -31,7 +41,7 @@ class UpdateServerHandler(stateUpdates: Observable[StateUpdateEvent]) extends Ch
         ctx.close
       }
 
-      override def onComplete(): Unit = ctx.clone
+      override def onComplete(): Unit = ctx.close
     }
 
     // @todo proper scheduler

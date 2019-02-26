@@ -15,7 +15,7 @@ val versionSource = Def.task {
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 15, 0)
+  val FallbackVersion = (0, 15, 5)
 
   val versionFile      = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
@@ -49,7 +49,13 @@ inThisBuild(
     scalaVersion := "2.12.8",
     organization := "com.wavesplatform",
     crossPaths := false,
-    scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
+    scalacOptions ++= Seq("-feature",
+                          "-deprecation",
+                          "-language:higherKinds",
+                          "-language:implicitConversions",
+                          "-Ywarn-unused:-implicits",
+                          "-Xlint",
+                          "-Ywarn-unused-import")
   ))
 
 resolvers ++= Seq(
@@ -58,18 +64,19 @@ resolvers ++= Seq(
   Resolver.sbtPluginRepo("releases")
 )
 
-fork in run := true
-javaOptions in run ++= Seq(
-  "-XX:+IgnoreUnrecognizedVMOptions",
-  "--add-modules=java.xml.bind"
-)
-
-Test / fork := true
-Test / javaOptions ++= Seq(
+val java9Options = Seq(
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
   "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
 )
+
+fork in run := true
+javaOptions in run ++= java9Options
+
+Test / fork := true
+Test / javaOptions ++= java9Options
+
+Jmh / javaOptions ++= java9Options
 
 val aopMerge: MergeStrategy = new MergeStrategy {
   val name = "aopMerge"
@@ -109,13 +116,20 @@ inConfig(Compile)(
     mainClass := Some("com.wavesplatform.Application"),
     publishArtifact in packageDoc := false,
     publishArtifact in packageSrc := false,
-    sourceGenerators += versionSource
+    sourceGenerators += versionSource,
+    PB.targets += PB.gens.java -> (sourceManaged in Compile).value,
+    PB.targets += scalapb.gen(
+      flatPackage = true,
+      javaConversions = true
+    ) → (sourceManaged in Compile).value,
+    PB.deleteTargetDirectory := false
   ))
 
 inConfig(Test)(
   Seq(
     logBuffered := false,
     parallelExecution := false,
+    testListeners := Seq.empty, // Fix for doubled test reports
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true")
   ))
@@ -211,8 +225,8 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
 
 addCommandAlias(
   "checkPR",
+  // set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
   """;
-    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
     |Global / checkPRRaw;
     |set scalacOptions in ThisBuild -= "-Xfatal-warnings";
   """.stripMargin
@@ -231,6 +245,7 @@ checkPRRaw in Global := {
 
 lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
+  .disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.scalatest
   )
@@ -241,6 +256,7 @@ lazy val commonJVM = common.jvm
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
+    .disablePlugins(ProtocPlugin)
     .settings(
       version := "1.0.0",
       coverageExcludedPackages := ".*",
@@ -306,7 +322,7 @@ lazy val node = project
         Dependencies.http ++
         Dependencies.akka ++
         Dependencies.serialization ++
-        Dependencies.testKit.map(_ % "test") ++
+        Dependencies.testKit.map(_ % Test) ++
         Dependencies.logging ++
         Dependencies.matcher ++
         Dependencies.metrics ++
@@ -315,11 +331,12 @@ lazy val node = project
         Dependencies.ficus ++
         Dependencies.scorex ++
         Dependencies.commons_net ++
-        Dependencies.monix.value
+        Dependencies.monix.value ++
+        Dependencies.protobuf.value
   )
   .dependsOn(langJVM, commonJVM)
 
-lazy val discovery = project
+///lazy val discovery = project
 
 lazy val it = project
   .dependsOn(node)

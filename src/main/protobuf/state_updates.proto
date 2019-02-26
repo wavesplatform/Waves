@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package serialization;
+
+option java_package = "com.wavesplatform.serialization.protobuf";
+
+message Update {
+    bytes id = 1;
+    int32 height = 2;
+
+    message BlockUpdate {
+        Block block = 1;
+        repeated StateUpdate transaction_state_update = 2;
+        StateUpdate block_state_update = 3;
+    }
+
+    message MicroBlockUpdate {
+        MicroBlock block = 1;
+        repeated StateUpdate transaction_state_update = 2;
+    }
+
+    oneof update {
+        BlockUpdate block = 3;
+        MicroBlockUpdate microblock = 4;
+        Rollback rollback = 5;
+    }
+}
+
+message StateUpdate {
+    message BalanceUpdate {
+        bytes address = 1;
+        bytes asset_id = 2;
+        int64 amount = 3;
+    }
+    repeated BalanceUpdate balances = 1;
+
+    message LeasingUpdate {
+        bytes address = 1;
+        int64 in = 2;
+        int64 out = 3;
+    }
+    repeated LeasingUpdate leases = 2;
+}
+
+message Transaction {
+    bytes id = 1;
+    int32 type = 2;
+}
+
+message Block {
+    bytes signature = 1;
+    int32 height = 2;
+    bytes generator = 3;
+
+    repeated Transaction transactions = 4;
+}
+
+message MicroBlock {
+    bytes signature = 1;
+    int32 height = 2;
+    bytes generator = 3;
+
+    repeated Transaction transactions = 4;
+}
+
+message Rollback {
+    bytes to = 1;
+}
