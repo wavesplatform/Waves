@@ -13,4 +13,6 @@ object AssetId {
   implicit def toBytes(assetId: AssetId): ByteStr                                                        = assetId.bytes
   implicit def toByteArray(assetId: AssetId): Array[Byte]                                                = assetId.bytes
   implicit def fromVanillaAssetIdOption(assetId: Option[com.wavesplatform.transaction.AssetId]): AssetId = assetId.fold(Waves)(fromBytes)
+  implicit def toVanillaAssetIdOption(assetId: AssetId): Option[com.wavesplatform.transaction.AssetId] =
+    if (assetId.isWaves) None else Some(assetId.bytes)
 }

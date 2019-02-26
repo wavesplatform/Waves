@@ -2,7 +2,8 @@ package com.wavesplatform.block.protobuf
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.transaction.protobuf.Transaction._
+import com.wavesplatform.transaction.protobuf.ChainId
+import com.wavesplatform.transaction.protobuf.PBSignedTransaction._
 import com.wavesplatform.{block => vb}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
@@ -120,6 +121,7 @@ trait PBBlockImplicits {
 
       case _ =>
         PBBlock.create(
+          ChainId.empty,
           block.reference,
           block.consensusData.baseTarget,
           block.consensusData.generationSignature,

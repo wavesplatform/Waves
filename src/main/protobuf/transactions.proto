@@ -10,16 +10,24 @@ option (scalapb.options) = {
     flat_package: true
 };
 
+message SignedTransaction {
+    option (scalapb.message).extends = "com.wavesplatform.transaction.protobuf.PBSignedTransactionBase";
+    option (scalapb.message).companion_extends = "com.wavesplatform.transaction.protobuf.PBSignedTransactionCompanionBase";
+
+    Transaction transaction = 1 [(scalapb.field).no_box = true];
+    repeated bytes proofs = 1000 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+}
+
 message Transaction {
     option (scalapb.message).extends = "com.wavesplatform.transaction.protobuf.PBTransactionBase";
     option (scalapb.message).companion_extends = "com.wavesplatform.transaction.protobuf.PBTransactionCompanionBase";
 
-    bytes sender = 1 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
-    uint32 chainId = 2;
-    uint64 fee = 3;
+    bytes chainId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.ChainId"];
+    bytes sender = 2 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
+    int64 fee = 3;
     bytes feeAssetId = 4 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
-    uint64 timestamp = 5;
-    uint32 version = 6;
+    int64 timestamp = 5;
+    int32 version = 6;
 
     oneof data {
         GenesisTransactionData genesis = 101;
@@ -39,24 +47,22 @@ message Transaction {
         SetAssetScriptTransactionData setAssetScript = 115;
         // TODO: 116 = contract invocation
     };
-
-    repeated bytes proofs = 1000 [(scalapb.field).scala_name = "proofsArray", (scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
 };
 
 message GenesisTransactionData {
     Recipient recipient = 1 [(scalapb.field).no_box = true];
-    uint64 amount = 2;
+    int64 amount = 2;
 };
 
 message PaymentTransactionData {
     Recipient recipient = 1 [(scalapb.field).no_box = true];
-    uint64 amount = 2;
+    int64 amount = 2;
 };
 
 message TransferTransactionData {
     bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
     Recipient recipient = 2 [(scalapb.field).no_box = true];
-    uint64 amount = 3;
+    int64 amount = 3;
     bytes attachment = 4 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
 };
 
@@ -81,7 +87,7 @@ message DataTransactionData {
 message MassTransferTransactionData {
     message Transfer {
         Recipient address = 1 [(scalapb.field).no_box = true];
-        uint64 amount = 2;
+        int64 amount = 2;
     };
 
     bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
@@ -91,7 +97,7 @@ message MassTransferTransactionData {
 
 message LeaseTransactionData {
     Recipient recipient = 1 [(scalapb.field).no_box = true];
-    uint64 amount = 2;
+    int64 amount = 2;
 };
 
 message LeaseCancelTransactionData {
@@ -100,14 +106,14 @@ message LeaseCancelTransactionData {
 
 message BurnTransactionData {
     bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
-    uint64 amount = 2;
+    int64 amount = 2;
 };
 
 message IssueTransactionData {
     bytes name = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
     bytes description = 2 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
-    uint64 amount = 3;
-    uint32 decimals = 4;
+    int64 amount = 3;
+    int32 decimals = 4;
     bool reissuable = 5;
     Script script = 6 [(scalapb.field).type = "com.wavesplatform.transaction.smart.script.Script"];
 };
@@ -115,7 +121,7 @@ message IssueTransactionData {
 
 message ReissueTransactionData {
     bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
-    uint64 amount = 3;
+    int64 amount = 3;
     bool reissuable = 5;
 };
 
@@ -144,24 +150,24 @@ message ExchangeTransactionData {
         bytes matcherPublicKey = 2 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
         AssetPair assetPair = 3;
         Type orderType = 4;
-        uint64 amount = 5;
-        uint64 price = 6;
-        uint64 timestamp = 7;
-        uint64 expiration = 8;
-        uint64 matcherFee = 9;
+        int64 amount = 5;
+        int64 price = 6;
+        int64 timestamp = 7;
+        int64 expiration = 8;
+        int64 matcherFee = 9;
         repeated bytes proofs = 10 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
-        uint32 version = 11;
+        int64 version = 11;
     };
 
     Order buyOrder = 1;
     Order sellOrder = 2;
-    uint64 amount = 3;
-    uint64 price = 4;
-    uint64 buyMatcherFee = 5;
-    uint64 sellMatcherFee = 6;
+    int64 amount = 3;
+    int64 price = 4;
+    int64 buyMatcherFee = 5;
+    int64 sellMatcherFee = 6;
 };
 
 message SponsorFeeTransactionData {
     bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
-    uint64 minSponsoredAssetFee = 2;
+    int64 minSponsoredAssetFee = 2;
 };

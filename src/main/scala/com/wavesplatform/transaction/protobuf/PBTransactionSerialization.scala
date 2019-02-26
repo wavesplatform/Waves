@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.protobuf
 import com.google.protobuf.CodedOutputStream
 
 object PBTransactionSerialization {
-  def bytesWithTypePrefix(tx: PBTransaction): Array[Byte] = {
+  def signedBytes(tx: PBSignedTransaction): Array[Byte] = {
     val outArray     = new Array[Byte](tx.serializedSize + 2)
     val outputStream = CodedOutputStream.newInstance(outArray)
 
@@ -14,8 +14,7 @@ object PBTransactionSerialization {
     outArray
   }
 
-  def unsignedBytes(tx: PBTransaction): Array[Byte] = {
-    val unsignedTx = tx.clearProofsArray
+  def unsignedBytes(unsignedTx: PBTransaction): Array[Byte] = {
     val prefixLength = 3 // "WTX"
     val outArray     = new Array[Byte](unsignedTx.serializedSize + prefixLength)
     val outputStream = CodedOutputStream.newInstance(outArray)
@@ -23,7 +22,7 @@ object PBTransactionSerialization {
     outputStream.useDeterministicSerialization() // Do not remove
     outputStream.write('W'.toByte)
     outputStream.write('T'.toByte)
-    outputStream.write(unsignedTx.chainId.toByte)
+    outputStream.write(unsignedTx.chainId.byte)
 
     unsignedTx.writeTo(outputStream)
     outputStream.flush()
