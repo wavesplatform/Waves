@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -17,6 +17,10 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import scala.util.Try
 
 object PureContext {
+
+  import StdLibVersion._
+
+  implicit def intToLong(num: Int): Long = num.toLong
 
   private lazy val defaultThrowMessage = "Explicit script termination"
   lazy val MaxStringResult             = Short.MaxValue
@@ -59,7 +63,12 @@ object PureContext {
     }
 
   lazy val ne: BaseFunction =
-    UserFunction(NE_OP.func, 26, BOOLEAN, "Inequality", ("@a", TYPEPARAM('T'), "value"), ("@b", TYPEPARAM('T'), "value")) {
+    UserFunction(NE_OP.func,
+                 Map[StdLibVersion, Long](V1 -> 26, V2 -> 26, V3 -> 1),
+                 BOOLEAN,
+                 "Inequality",
+                 ("@a", TYPEPARAM('T'), "value"),
+                 ("@b", TYPEPARAM('T'), "value")) {
       FUNCTION_CALL(uNot, List(FUNCTION_CALL(eq, List(REF("@a"), REF("@b")))))
     }
 
@@ -68,7 +77,7 @@ object PureContext {
     case _                              => Left(defaultThrowMessage)
   }
 
-  lazy val throwNoMessage: BaseFunction = UserFunction("throw", 2, NOTHING, "Fail script") {
+  lazy val throwNoMessage: BaseFunction = UserFunction("throw", Map[StdLibVersion, Long](V1 -> 2, V2 -> 2, V3 -> 1), NOTHING, "Fail script") {
     FUNCTION_CALL(throwWithMessage, List(CONST_STRING(defaultThrowMessage)))
   }
 
@@ -86,7 +95,13 @@ object PureContext {
     }
 
   lazy val isDefined: BaseFunction =
-    UserFunction("isDefined", 35, BOOLEAN, "Check the value is defined", ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Option value")) {
+    UserFunction(
+      "isDefined",
+      Map[StdLibVersion, Long](V1 -> 35, V2 -> 35, V3 -> 1),
+      BOOLEAN,
+      "Check the value is defined",
+      ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Option value")
+    ) {
       FUNCTION_CALL(ne, List(REF("@a"), REF("unit")))
     }
 
@@ -218,8 +233,16 @@ object PureContext {
       case xs                                            => notImplemented("take(xs: String, number: Long)", xs)
     }
 
-  lazy val listConstructor =
-    NativeFunction("cons", 2, CREATE_LIST, PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))), "Construct a new List[T]", ("head", TYPEPARAM('A'), "head"), ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')), "tail")) {
+  lazy val listConstructor: NativeFunction =
+    NativeFunction(
+      "cons",
+      2,
+      CREATE_LIST,
+      PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
+      "Construct a new List[T]",
+      ("head", TYPEPARAM('A'), "head"),
+      ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')), "tail")
+    ) {
       case h :: ARR(t) :: Nil => Right(ARR(h +: t))
       case xs                 => notImplemented("cons(head: T, tail: LIST[T]", xs)
     }
@@ -310,17 +333,20 @@ object PureContext {
       case _               => ???
     }
 
-  lazy val uMinus: BaseFunction = UserFunction("-", 9, LONG, "Change integer sign", ("@n", LONG, "value")) {
-    FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
-  }
+  lazy val uMinus: BaseFunction =
+    UserFunction("-", Map[StdLibVersion, Long](V1 -> 9, V2 -> 9, V3 -> 1), LONG, "Change integer sign", ("@n", LONG, "value")) {
+      FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
+    }
 
-  lazy val uNot: BaseFunction = UserFunction("!", 11, BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
-    IF(FUNCTION_CALL(eq, List(REF("@p"), FALSE)), TRUE, FALSE)
-  }
+  lazy val uNot: BaseFunction =
+    UserFunction("!", Map[StdLibVersion, Long](V1 -> 11, V2 -> 11, V3 -> 1), BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
+      IF(REF("@p"), FALSE, TRUE)
+    }
 
-  lazy val ensure: BaseFunction = UserFunction("ensure", 16, BOOLEAN, "Ensure parameter is true", ("@b", BOOLEAN, "condition"), ("@msg", STRING, "error message")) {
+  lazy val ensure: BaseFunction =
+    UserFunction("ensure", 16, BOOLEAN, "Ensure parameter is true", ("@b", BOOLEAN, "condition"), ("@msg", STRING, "error message")) {
       IF(REF("@b"), TRUE, FUNCTION_CALL(throwWithMessage, List(REF("@msg"))))
-  }
+    }
 
   private lazy val operators: Array[BaseFunction] = Array(
     mulLong,
@@ -342,7 +368,7 @@ object PureContext {
 
   private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
     ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit))))
-    )
+  )
   private lazy val functions = Array(
     fraction,
     sizeBytes,
@@ -369,11 +395,11 @@ object PureContext {
 
   private lazy val ctx = CTX(
     Seq(
-      new DefinedType { lazy val name = "Unit"; lazy val typeRef    = UNIT    },
-      new DefinedType { lazy val name = "Int"; lazy val typeRef     = LONG    },
-      new DefinedType { lazy val name = "Boolean"; lazy val typeRef = BOOLEAN },
+      new DefinedType { lazy val name = "Unit"; lazy val typeRef       = UNIT    },
+      new DefinedType { lazy val name = "Int"; lazy val typeRef        = LONG    },
+      new DefinedType { lazy val name = "Boolean"; lazy val typeRef    = BOOLEAN },
       new DefinedType { lazy val name = "ByteVector"; lazy val typeRef = BYTESTR },
-      new DefinedType { lazy val name = "String"; lazy val typeRef  = STRING  }
+      new DefinedType { lazy val name = "String"; lazy val typeRef     = STRING  }
     ),
     vars,
     functions
@@ -382,7 +408,15 @@ object PureContext {
   def build(version: StdLibVersion): CTX =
     version match {
       case V1 | V2 => ctx
-      case V3       => Monoid.combine(ctx, CTX(Seq.empty, Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))), Array(listConstructor, ensure)))
+      case V3 =>
+        Monoid.combine(
+          ctx,
+          CTX(
+            Seq.empty,
+            Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
+            Array(listConstructor, ensure)
+          )
+        )
     }
 
 }
