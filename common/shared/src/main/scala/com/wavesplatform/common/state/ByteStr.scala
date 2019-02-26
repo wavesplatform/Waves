@@ -60,21 +60,12 @@ object ByteStr {
     new ByteStr(arr)
   }
 
-  implicit def toBytes(bs: ByteStr): Array[Byte] = {
+  implicit def toByteArray(bs: ByteStr): Array[Byte] = {
     bs.arr
   }
 
   def fromBytes(bytes: Byte*): ByteStr = {
-
-    val buf = new Array[Byte](bytes.size)
-    var i   = 0
-
-    bytes.foreach { b =>
-      buf(i) = b
-      i += 1
-    }
-
-    ByteStr(buf)
+    ByteStr(bytes.toArray)
   }
 
   def fromLong(l: Long): ByteStr = {
