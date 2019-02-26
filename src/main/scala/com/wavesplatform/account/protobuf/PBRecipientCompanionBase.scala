@@ -6,8 +6,8 @@ trait PBRecipientCompanionBase {
   def empty: Recipient = Recipient.defaultInstance
 
   implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
-    case a: VAddress  => a
-    case al: VAddress => al
+    case a: VAddress  => fromAddress(a)
+    case al: VAlias => fromAlias(al)
   }
 
   implicit def fromAddress(address: VAddress): Recipient = {
