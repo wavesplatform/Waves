@@ -49,7 +49,13 @@ inThisBuild(
     scalaVersion := "2.12.8",
     organization := "com.wavesplatform",
     crossPaths := false,
-    scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds", "-language:implicitConversions", "-Ywarn-unused:-implicits", "-Xlint")
+    scalacOptions ++= Seq("-feature",
+                          "-deprecation",
+                          "-language:higherKinds",
+                          "-language:implicitConversions",
+                          "-Ywarn-unused:-implicits",
+                          "-Xlint",
+                          "-Ywarn-unused-import")
   ))
 
 resolvers ++= Seq(
@@ -110,7 +116,9 @@ inConfig(Compile)(
     mainClass := Some("com.wavesplatform.Application"),
     publishArtifact in packageDoc := false,
     publishArtifact in packageSrc := false,
-    sourceGenerators += versionSource
+    sourceGenerators += versionSource,
+    PB.targets += scalapb.gen() → (sourceManaged in Compile).value,
+    PB.deleteTargetDirectory := false
   ))
 
 inConfig(Test)(
@@ -213,8 +221,8 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
 
 addCommandAlias(
   "checkPR",
+  // set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
   """;
-    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
     |Global / checkPRRaw;
     |set scalacOptions in ThisBuild -= "-Xfatal-warnings";
   """.stripMargin
@@ -233,6 +241,7 @@ checkPRRaw in Global := {
 
 lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
+  .disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.scalatest
   )
@@ -243,6 +252,7 @@ lazy val commonJVM = common.jvm
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
+    .disablePlugins(ProtocPlugin)
     .settings(
       version := "1.0.0",
       coverageExcludedPackages := ".*",
@@ -308,7 +318,7 @@ lazy val node = project
         Dependencies.http ++
         Dependencies.akka ++
         Dependencies.serialization ++
-        Dependencies.testKit.map(_ % "test") ++
+        Dependencies.testKit.map(_ % Test) ++
         Dependencies.logging ++
         Dependencies.matcher ++
         Dependencies.metrics ++
@@ -317,7 +327,9 @@ lazy val node = project
         Dependencies.ficus ++
         Dependencies.scorex ++
         Dependencies.commons_net ++
-        Dependencies.monix.value,
+        Dependencies.monix.value ++
+        Dependencies.protobuf.value ++
+        Dependencies.grpc,
     dependencyOverrides ++= Seq(
       Dependencies.AkkaActor,
       Dependencies.AkkaStream,
@@ -326,7 +338,7 @@ lazy val node = project
   )
   .dependsOn(langJVM, commonJVM)
 
-lazy val discovery = project
+///lazy val discovery = project
 
 lazy val it = project
   .dependsOn(node)

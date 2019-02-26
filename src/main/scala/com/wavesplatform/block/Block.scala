@@ -113,7 +113,7 @@ object BlockHeader extends ScorexLogging {
 
 }
 
-case class Block private (override val timestamp: Long,
+case class Block private[block] (override val timestamp: Long,
                           override val version: Byte,
                           override val reference: ByteStr,
                           override val signerData: SignerData,
@@ -173,7 +173,7 @@ case class Block private (override val timestamp: Long,
   val prevBlockFeePart: Coeval[Portfolio] =
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
-  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
+  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     import signerData.generator.publicKey
     !crypto.isWeakPublicKey(publicKey) && crypto.verify(signerData.signature.arr, bytesWithoutSignature(), publicKey)
   }

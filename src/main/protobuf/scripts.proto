@@ -1,0 +1,13 @@
+// Transactions
+syntax = "proto3";
+option java_package = "com.wavesplatform.transaction.smart.script.protobuf";
+import "scalapb/scalapb.proto";
+
+option (scalapb.options) = {
+    import: "com.wavesplatform.serialization.protobuf.utils._"
+    flat_package: true
+};
+
+message Script {
+    bytes bytes = 1;
+};
