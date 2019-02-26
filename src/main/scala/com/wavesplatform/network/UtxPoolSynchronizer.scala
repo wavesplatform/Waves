@@ -33,7 +33,7 @@ object UtxPoolSynchronizer extends ScorexLogging {
 
     val synchronizerFuture = txSource
       .observeOn(scheduler)
-      .whileBusyBuffer(OverflowStrategy.DropNewAndSignal(settings.maxQueueSize, { dropped =>
+      .whileBusyBuffer(OverflowStrategy.DropOldAndSignal(settings.maxQueueSize, { dropped =>
         log.warn(s"UTX queue overflow: $dropped transactions dropped")
         None
       }))
