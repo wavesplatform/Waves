@@ -11,6 +11,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
 import monix.execution.{CancelableFuture, Scheduler}
+import monix.reactive.OverflowStrategy
 
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -21,7 +22,7 @@ object UtxPoolSynchronizer extends ScorexLogging {
             settings: UtxSynchronizerSettings,
             allChannels: ChannelGroup,
             txSource: ChannelObservable[Transaction]): CancelableFuture[Unit] = {
-    implicit val scheduler: Scheduler = Scheduler.singleThread("utx-pool-sync")
+    implicit val scheduler: Scheduler = Scheduler.forkJoin(settings.parallelism, settings.maxThreads, "utx-pool-sync")
 
     val dummy = new Object()
     val knownTransactions = CacheBuilder
@@ -32,7 +33,11 @@ object UtxPoolSynchronizer extends ScorexLogging {
 
     val synchronizerFuture = txSource
       .observeOn(scheduler)
-      .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
+      .whileBusyBuffer(OverflowStrategy.DropNewAndSignal(settings.maxQueueSize, { dropped =>
+        log.warn(s"UTX queue overflow: $dropped transactions dropped")
+        None
+      }))
+      .bufferTimedWithPressure(settings.maxBufferTime, settings.maxBufferSize)
       .foreach { txBuffer =>
         val toAdd = txBuffer.filter {
           case (_, tx) =>
