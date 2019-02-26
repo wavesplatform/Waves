@@ -30,7 +30,7 @@ object ContractCompiler {
       compiledBody <- local {
         for {
           _ <- modify[CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))
-          r <- compiler.ExpressionCompiler.compileFunc(af.f.position, af.f)
+          r <- compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, annotationBindings.map(_._1))
         } yield r
       }
     } yield (annotations, compiledBody)
@@ -88,7 +88,7 @@ object ContractCompiler {
       ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
       _  <- validateDuplicateVarsInContract(contract)
       l  <- contract.fs.traverse[CompileM, AnnotatedFunction](af => local(compileAnnotatedFunc(af)))
-      duplicatedFuncNames = l.map(_.u.name).groupBy(identity).collect { case (x, List(_,_,_*)) => x }.toList
+      duplicatedFuncNames = l.map(_.u.name).groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toList
       _ <- Either
         .cond(
           duplicatedFuncNames.isEmpty,
