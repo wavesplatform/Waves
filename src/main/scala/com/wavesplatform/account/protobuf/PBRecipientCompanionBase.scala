@@ -12,7 +12,8 @@ trait PBRecipientCompanionBase {
   }
 
   implicit def fromAddress(address: Address): Recipient = {
-    Recipient(address.bytes(1), Recipient.Recipient.Address(Recipient.Address(address.bytes.drop(2))))
+    val chainId = address.ensuring(_.bytes.length > 2, "Too short address bytes").bytes(1)
+    Recipient(chainId, Recipient.Recipient.Address(Recipient.Address(address.bytes.drop(2))))
   }
 
   implicit def fromAlias(alias: Alias): Recipient = {
@@ -32,10 +33,10 @@ trait PBRecipientCompanionBase {
         .explicitGet()
     }
 
-    def toAddressOrAlias = recipient.recipient match {
-      case Recipient.Recipient.Alias(alias)     => toAlias
-      case Recipient.Recipient.Address(address) => toAddress
-      case Recipient.Recipient.Empty            => throw new IllegalArgumentException("Empty address not supported")
+    def toAddressOrAlias: AddressOrAlias = recipient.recipient match {
+      case _: Recipient.Recipient.Alias   => this.toAlias
+      case _: Recipient.Recipient.Address => this.toAddress
+      case Recipient.Recipient.Empty      => throw new IllegalArgumentException("Empty address not supported")
     }
   }
 }

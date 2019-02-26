@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.protobuf
 
-import com.google.protobuf.CodedOutputStream
 import com.wavesplatform.account.protobuf.Recipient
 import com.wavesplatform.account.{Address, AddressScheme, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -12,7 +11,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.{crypto, transaction => vt}
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.JsObject
 
 import scala.annotation.switch
 
@@ -34,23 +33,14 @@ trait PBTransactionImplicits {
         tx.toVanilla.bodyBytes()
 
       case _ =>
-        // PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
-        encodeUnsignedPBTXWithPrefix(tx)
+        tx.protoUnsignedBytes()
     })
 
-    override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-      val outArray     = new Array[Byte](tx.serializedSize + 2)
-      val outputStream = CodedOutputStream.newInstance(outArray)
-      outputStream.write(builder.typeId)
-      outputStream.write(builder.version)
-      tx.writeTo(outputStream)
-      outputStream.checkNoSpaceLeft()
-      outArray
-    }
+    override val bytes: Coeval[Array[Byte]] = tx.protoBytes
 
     override val json: Coeval[JsObject] = Coeval.evalOnce((tx.version: @switch) match {
       case 1 | 2 => tx.toVanilla.json()
-      case _     => Json.toJson(tx).as[JsObject]
+      case _     => tx.protoJson()
     })
 
     override val id: Coeval[ByteStr] = Coeval.evalOnce((tx.version: @switch) match {
@@ -422,19 +412,6 @@ trait PBTransactionImplicits {
       import com.wavesplatform.common.utils._
       tx.withProofsArray(Proofs.create(Seq(ByteStr(crypto.sign(signer, tx.bodyBytes())))).explicitGet())
     }
-  }
-
-  private[wavesplatform] def encodeUnsignedPBTXWithPrefix(tx: PBTransaction): Array[Byte] = {
-    val prefixLength = 3 // "WTX"
-    val outArray     = new Array[Byte](tx.serializedSize + prefixLength)
-    val outputStream = CodedOutputStream.newInstance(outArray)
-    outputStream.useDeterministicSerialization() // Do not remove
-    outputStream.write('W'.toByte)
-    outputStream.write('T'.toByte)
-    outputStream.write(tx.chainId: Byte)
-    tx.clearProofsArray.writeTo(outputStream)
-    outputStream.checkNoSpaceLeft()
-    outArray
   }
 
   private[this] implicit def implicitIntToByte(int: Int): Byte = {

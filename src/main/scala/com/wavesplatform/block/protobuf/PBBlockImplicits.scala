@@ -74,7 +74,7 @@ trait PBBlockImplicits {
 
     override val json: Coeval[JsObject] = Coeval.evalOnce((block.version: @switch) match {
       case 1 | 2 | 3 => block.toVanilla.json()
-      case _         => Json.toJson(block).as[JsObject]
+      case _         => block.protoJson()
     })
 
     /* protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce {
