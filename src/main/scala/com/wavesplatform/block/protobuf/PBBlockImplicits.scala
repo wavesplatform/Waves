@@ -11,34 +11,42 @@ import play.api.libs.json.JsObject
 import scala.annotation.switch
 
 trait PBBlockImplicits {
-  implicit def blockToBlockHeader(block: PBBlock): PBBlock.Header = block.header
+  implicit def blockToHeader(block: PBBlock): PBBlock.Header                       = block.header.header
+  implicit def blockSignedHeaderToHeader(sh: PBBlock.SignedHeader): PBBlock.Header = sh.header
 
-  implicit class PBBlockHeaderConversionOps(header: PBBlock.Header) {
+  implicit class PBBlockSignedHeaderConversionOps(signed: PBBlock.SignedHeader) {
     def toVanilla: vb.BlockHeader = {
       new vb.BlockHeader(
-        header.timestamp,
-        header.version.toByte,
-        header.reference,
-        vb.SignerData(header.generator, header.signature),
-        NxtLikeConsensusBlockData(header.baseTarget, header.generationSignature),
+        signed.header.timestamp,
+        signed.header.version.toByte,
+        signed.header.reference,
+        vb.SignerData(signed.header.generator, signed.signature),
+        NxtLikeConsensusBlockData(signed.header.baseTarget, signed.header.generationSignature),
         0,
-        header.featureVotes.map(intToShort)
+        signed.header.featureVotes.map(intToShort)
       )
     }
   }
 
+  implicit class PBBlockHeaderConversionOps(header: PBBlock.Header) {
+    def toVanilla: vb.BlockHeader = {
+      PBBlock.SignedHeader(header).toVanilla
+    }
+  }
+
   implicit class VanillaHeaderConversionOps(header: vb.BlockHeader) {
-    def toPBHeader: PBBlock.Header = {
-      PBBlock.Header(
+    def toPBHeader: PBBlock.SignedHeader = {
+      val h = PBBlock.Header(
         header.reference,
         header.consensusData.baseTarget,
         header.consensusData.generationSignature,
         header.featureVotes.map(shortToInt),
         header.timestamp,
         header.version,
-        header.signerData.generator,
-        header.signerData.signature
+        header.signerData.generator
       )
+
+      PBBlock.SignedHeader(h, header.signerData.signature)
     }
   }
 

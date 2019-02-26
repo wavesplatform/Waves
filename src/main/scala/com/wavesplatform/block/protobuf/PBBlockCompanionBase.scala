@@ -14,9 +14,11 @@ trait PBBlockCompanionBase extends PBBlockImplicits {
              generator: com.wavesplatform.account.PublicKeyAccount = PublicKeyAccount.empty,
              signature: com.wavesplatform.common.state.ByteStr = ByteStr.empty,
              transactions: Seq[PBSignedTransaction] = Nil) = {
-    new PBBlock(chainId,
-                PBBlock.Header(reference, baseTarget, generationSignature, featureVotes, timestamp, version, generator, signature),
-                transactions)
+    new PBBlock(
+      chainId,
+      PBBlock.SignedHeader(PBBlock.Header(reference, baseTarget, generationSignature, featureVotes, timestamp, version, generator), signature),
+      transactions
+    )
   }
 
   def unapply(block: PBBlock): Option[(ChainId, ByteStr, Long, ByteStr, Set[Int], Long, Int, PublicKeyAccount, ByteStr, Seq[PBSignedTransaction])] = {
