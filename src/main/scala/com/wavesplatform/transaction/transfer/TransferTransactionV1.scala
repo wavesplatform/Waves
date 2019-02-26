@@ -57,7 +57,7 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
              attachment: Array[Byte],
              signature: ByteStr): Either[ValidationError, TransactionT] = {
     TransferTransaction
-      .validate(amount, feeAmount, attachment)
+      .validate(amount, assetId, feeAmount, feeAssetId, attachment)
       .map(_ => TransferTransactionV1(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature))
   }
 

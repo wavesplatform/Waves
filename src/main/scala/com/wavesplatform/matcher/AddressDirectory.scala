@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.model.Events
-import com.wavesplatform.state.Portfolio
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -13,8 +13,8 @@ import monix.reactive.Observable
 import scala.collection.mutable
 import scala.concurrent.duration._
 
-class AddressDirectory(portfolioChanged: Observable[Address],
-                       portfolio: Address => Portfolio,
+class AddressDirectory(spendableBalanceChanged: Observable[(Address, AssetId)],
+                       spendableBalance: (Address, AssetId) => Long,
                        storeEvent: StoreEvent,
                        settings: MatcherSettings,
                        time: Time,
@@ -26,11 +26,16 @@ class AddressDirectory(portfolioChanged: Observable[Address],
 
   private[this] val children = mutable.AnyRefMap.empty[Address, ActorRef]
 
-  portfolioChanged
-    .filter(children.contains)
+  spendableBalanceChanged
+    .filter(x => children.contains(x._1))
     .bufferTimed(settings.balanceWatchingBufferInterval)
     .filter(_.nonEmpty)
-    .foreach(_.toSet.foreach((address: Address) => children.get(address).foreach(_ ! AddressActor.BalanceUpdated)))(Scheduler(context.dispatcher))
+    .foreach { changes =>
+      val acc = mutable.Map.empty[Address, Set[AssetId]]
+      changes.foreach { case (addr, changed) => acc.update(addr, acc.getOrElse(addr, Set.empty) + changed) }
+
+      acc.foreach { case (addr, changedAssets) => children.get(addr).foreach(_ ! AddressActor.BalanceUpdated(changedAssets)) }
+    }(Scheduler(context.dispatcher))
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
@@ -38,7 +43,7 @@ class AddressDirectory(portfolioChanged: Observable[Address],
     log.debug(s"Creating address actor for $address")
     watch(
       actorOf(
-        Props(new AddressActor(address, portfolio(address), settings.maxTimestampDiff, 5.seconds, time, orderDB, storeEvent)),
+        Props(new AddressActor(address, spendableBalance(address, _), settings.maxTimestampDiff, 5.seconds, time, orderDB, storeEvent)),
         address.toString
       ))
   }

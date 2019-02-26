@@ -2,16 +2,14 @@ package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.v1.evaluator._
-import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Authorized, Proven}
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.{BlockchainContext, RealTransactionWrapper, Verifier}
-import com.wavesplatform.transaction.smart.script.v1.ExprScript.ExprScriprImpl
+import com.wavesplatform.transaction.{Authorized, Proven}
 import monix.eval.Coeval
 
 object ScriptRunner {
@@ -19,7 +17,7 @@ object ScriptRunner {
 
   def apply(height: Int, in: TxOrd, blockchain: Blockchain, script: Script, isTokenScript: Boolean): (Log, Either[ExecutionError, EVALUATED]) = {
     script match {
-      case s: ExprScriprImpl =>
+      case s: ExprScript =>
         val ctx = BlockchainContext.build(
           script.stdLibVersion,
           AddressScheme.current.chainId,

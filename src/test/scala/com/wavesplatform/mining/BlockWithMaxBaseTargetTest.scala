@@ -18,7 +18,7 @@ import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{AssetId, BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utils.BaseTargetReachedMaximum
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -109,7 +109,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   }
 
   def withEnv(f: Env => Unit): Unit = {
-    val defaultWriter = new LevelDBWriter(db, ignorePortfolioChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
+    val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
 
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)
@@ -126,14 +126,14 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignorePortfolioChanged, settings, ntpTime)
+    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
 
     val utxPoolStub = new UtxPool {
       override def putIfNew(tx: Transaction)                               = ???
       override def removeAll(txs: Traversable[Transaction]): Unit          = {}
-      override def accountPortfolio(addr: Address)                         = ???
-      override def portfolio(addr: Address)                                = ???
+      override def spendableBalance(addr: Address, assetId: AssetId): Long = ???
+      override def pessimisticPortfolio(addr: Address): Portfolio          = ???
       override def all                                                     = ???
       override def size                                                    = ???
       override def transactionById(transactionId: ByteStr)                 = ???

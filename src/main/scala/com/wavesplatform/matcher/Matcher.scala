@@ -22,6 +22,7 @@ import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, Time, forceStopApplication}
 import com.wavesplatform.utx.UtxPool
@@ -39,7 +40,7 @@ class Matcher(actorSystem: ActorSystem,
               utx: UtxPool,
               allChannels: ChannelGroup,
               blockchain: Blockchain,
-              portfoliosChanged: Observable[Address],
+              spendableBalanceChanged: Observable[(Address, AssetId)],
               settings: WavesSettings,
               matcherPrivateKey: PrivateKeyAccount)
     extends ScorexLogging {
@@ -165,8 +166,15 @@ class Matcher(actorSystem: ActorSystem,
 
   private lazy val addressActors =
     actorSystem.actorOf(
-      Props(new AddressDirectory(portfoliosChanged, utx.portfolio, matcherQueue.storeEvent, matcherSettings, time, OrderDB(matcherSettings, db))),
-      "addresses")
+      Props(
+        new AddressDirectory(spendableBalanceChanged,
+                             utx.spendableBalance,
+                             matcherQueue.storeEvent,
+                             matcherSettings,
+                             time,
+                             OrderDB(matcherSettings, db))),
+      "addresses"
+    )
 
   private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
   private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)
@@ -275,7 +283,7 @@ object Matcher extends ScorexLogging {
             utx: UtxPool,
             allChannels: ChannelGroup,
             blockchain: Blockchain,
-            portfoliosChanged: Observable[Address],
+            spendableBalanceChanged: Observable[(Address, AssetId)],
             settings: WavesSettings): Option[Matcher] =
     try {
       val privateKey = (for {
@@ -283,7 +291,7 @@ object Matcher extends ScorexLogging {
         pk      <- wallet.privateKeyAccount(address)
       } yield pk).explicitGet()
 
-      val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, portfoliosChanged, settings, privateKey)
+      val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, spendableBalanceChanged, settings, privateKey)
       matcher.runMatcher()
       Some(matcher)
     } catch {

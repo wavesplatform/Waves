@@ -27,9 +27,9 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """
           |
           | @Callable(invocation)
-          | func foo(a:ByteStr) = {
+          | func foo(a:ByteVector) = {
           |  let sender0 = invocation.caller.bytes
-          |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender0)))
+          |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
           | }
           |
           | @Verifier(t)
@@ -54,9 +54,11 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
               FUNCTION_CALL(
                 User(FieldNames.WriteSet),
                 List(FUNCTION_CALL(
-                  Native(1102),
-                  List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
-                       FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender0"))))
+                  Native(1100),
+                  List(
+                    FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
+                    FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("sender0"))), REF("nil")))
+                  )
                 ))
               )
             )
@@ -78,13 +80,13 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """
           |
           | @Callable(invocation)
-          | func foo(a:ByteStr) = {
+          | func foo(a:ByteVector) = {
           |  let sender0 = invocation.caller.bytes
-          |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender0)))
+          |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
           | }
           |
           | @Callable(invocation)
-          | func foo1(a:ByteStr) = {
+          | func foo1(a:ByteVector) = {
           |  foo(a)
           | }
           |
@@ -107,10 +109,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | }
           |
           | @Callable(invocation)
-          | func foo(a:ByteStr) = {
+          | func foo(a:ByteVector) = {
           |  let aux = bar()
           |  let sender0 = invocation.caller.bytes
-          |  WriteSet(List(DataEntry("a", a), DataEntry("sender", sender0)))
+          |  WriteSet([DataEntry("a", a), DataEntry("sender", sender0)])
           | }
           |
           |
@@ -127,7 +129,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """
           |
           | @Callable(invocation)
-          | func foo(a:ByteStr) = {
+          | func foo(a:ByteVector) = {
           |  a + invocation.caller.bytes
           | }
           |
@@ -215,7 +217,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |	  		case _ => 0
           |	  	}
           |	  	let newAmount = currentAmount + pmt.amount
-          |	  	WriteSet(List(DataEntry(currentKey, newAmount)))
+          |	  	WriteSet([DataEntry(currentKey, newAmount)])
           |
           |   }
           |	}
@@ -233,8 +235,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |  else if (newAmount < 0)
           |			then throw("Not enough balance")
           |			else ContractResult(
-          |					WriteSet(List(DataEntry(currentKey, newAmount))),
-          |					TransferSet(List(ContractTransfer(i.caller, amount, unit)))
+          |					WriteSet([DataEntry(currentKey, newAmount)]),
+          |					TransferSet([ContractTransfer(i.caller, amount, unit)])
           |				)
           |	}
           |
@@ -253,14 +255,14 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """
           |
           | @Callable(invocation)
-          | func foo(a:ByteStr) = {
+          | func foo(a:ByteVector) = {
           |  throw()
           | }
           |
           | @Callable(i)
           | func bar() = {
-          |   if (true) then WriteSet(List(DataEntry("entr1","entr2")))
-          |   else TransferSet(List(ContractTransfer(i.caller, wavesBalance(i.contractAddress), base58'somestr')))
+          |   if (true) then WriteSet([DataEntry("entr1","entr2")])
+          |   else TransferSet([ContractTransfer(i.caller, wavesBalance(i.contractAddress), base58'somestr')])
           | }
           |
           | @Verifier(t)
@@ -282,12 +284,12 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |
           |@Callable(i)
           |func sameName() = {
-          |   WriteSet(List(DataEntry("a", "a")))
+          |   WriteSet([DataEntry("a", "a")])
           |}
           |
           |@Callable(i)
           |func sameName() = {
-          |   WriteSet(List(DataEntry("b", "b")))
+          |   WriteSet([DataEntry("b", "b")])
           |}
           |
           |@Verifier(i)
@@ -311,7 +313,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |
           |@Callable(x)
           |func some(i: Int) = {
-          |    WriteSet(List(DataEntry("a", "a")))
+          |    WriteSet([DataEntry("a", "a")])
           |}
           |
         """.stripMargin
@@ -329,9 +331,9 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |@Callable(i)
           |func some(i: Int) = {
           |   if (i.contractAddress == "abc") then
-          |      WriteSet(List(DataEntry("a", "a")))
+          |      WriteSet([DataEntry("a", "a")])
           |   else
-          |      WriteSet(List(DataEntry("a", "b")))
+          |      WriteSet([DataEntry("a", "b")])
           |}
           |
         """.stripMargin
@@ -348,12 +350,12 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |
           |@Callable(x)
           |func foo(i: Int) = {
-          |    WriteSet(List(DataEntry("a", "a")))
+          |    WriteSet([DataEntry("a", "a")])
           |}
           |
           |@Callable(i)
           |func bar(x: Int) = {
-          |    WriteSet(List(DataEntry("a", "a")))
+          |    WriteSet([DataEntry("a", "a")])
           |}
           |
         """.stripMargin
@@ -372,7 +374,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |
           |@Callable(i)
           |func some(x: Int) = {
-          |    WriteSet(List(DataEntry("a", "a")))
+          |    WriteSet([DataEntry("a", "a")])
           |}
           |
         """.stripMargin

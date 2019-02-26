@@ -244,17 +244,21 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                 FUNCTION_CALL(
                   User("WriteSet"),
                   List(FUNCTION_CALL(
-                    Native(1102),
-                    List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("b"), CONST_LONG(1))),
-                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x"))))
+                    Native(1100),
+                    List(
+                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("b"), CONST_LONG(1))),
+                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x"))), REF("nil")))
+                    )
                   ))
                 ),
                 FUNCTION_CALL(
                   User("WriteSet"),
                   List(FUNCTION_CALL(
-                    Native(1102),
-                    List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
-                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x"))))
+                    Native(1100),
+                    List(
+                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a"), REF("a"))),
+                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), REF("x"))), REF("nil")))
+                    )
                   ))
                 )
               )
@@ -290,9 +294,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |                foo()
         |            )
         |            then
-        |                WriteSet(List(DataEntry("b", 1), DataEntry("sender", x)))
+        |                WriteSet(cons(DataEntry("b", 1), cons(DataEntry("sender", x), nil)))
         |            else
-        |                WriteSet(List(DataEntry("a", a), DataEntry("sender", x)))
+        |                WriteSet(cons(DataEntry("a", a), cons(DataEntry("sender", x), nil)))
         |        }
         |    }
         |}

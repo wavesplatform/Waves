@@ -54,10 +54,13 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
           FUNCTION_CALL(
             User(FieldNames.WriteSet),
             List(FUNCTION_CALL(
-              Native(1102),
+              Native(1100),
               List(
                 FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("argument"), REF(argName))),
-                FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), GETTER(GETTER(REF(senderBinding), "caller"), "bytes")))
+                FUNCTION_CALL(Native(1100),
+                              List(FUNCTION_CALL(User("DataEntry"),
+                                                 List(CONST_STRING("sender"), GETTER(GETTER(REF(senderBinding), "caller"), "bytes"))),
+                                   REF("nil")))
               )
             ))
           )
@@ -82,7 +85,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
           FUNCTION_CALL(
             User(FieldNames.TransferSet),
             List(FUNCTION_CALL(
-              Native(1102),
+              Native(1100),
               List(
                 FUNCTION_CALL(
                   User(FieldNames.ContractTransfer),
@@ -91,7 +94,8 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
                     CONST_LONG(recipientAmount),
                     assetId.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id))
                   )
-                )
+                ),
+                REF("nil")
               )
             ))
           )

@@ -124,7 +124,7 @@ object PureContext {
     case _                                                     => Right(FALSE)
   }
 
-  lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes str", ("byteStr", BYTESTR, "vector")) {
+  lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes str", ("byteVector", BYTESTR, "vector")) {
     case CONST_BYTESTR(bv) :: Nil => Right(CONST_LONG(bv.arr.length))
     case xs                       => notImplemented("size(byte[])", xs)
   }
@@ -218,28 +218,11 @@ object PureContext {
       case xs                                            => notImplemented("take(xs: String, number: Long)", xs)
     }
 
-  lazy val listConstructor1 =
-    NativeFunction("List", 1, CREATE_LIST1, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]", ("arg1", TYPEPARAM('T'), "arg1"))(xs =>
-      Right(ARR(xs.toIndexedSeq)))
-
-  lazy val listConstructor2 = NativeFunction("List",
-                                             1,
-                                             CREATE_LIST2,
-                                             PARAMETERIZEDLIST(TYPEPARAM('T')),
-                                             "Construct a new List[T]",
-                                             ("arg1", TYPEPARAM('T'), "arg1"),
-                                             ("arg2", TYPEPARAM('T'), "arg2"))(xs => Right(ARR(xs.toIndexedSeq)))
-
-  lazy val listConstructor3 = NativeFunction(
-    "List",
-    1,
-    CREATE_LIST3,
-    PARAMETERIZEDLIST(TYPEPARAM('T')),
-    "Construct a new List[T]",
-    ("arg1", TYPEPARAM('T'), "arg1"),
-    ("arg2", TYPEPARAM('T'), "arg2"),
-    ("arg3", TYPEPARAM('T'), "arg3")
-  )(xs => Right(ARR(xs.toIndexedSeq)))
+  lazy val listConstructor =
+    NativeFunction("cons", 2, CREATE_LIST, PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))), "Construct a new List[T]", ("head", TYPEPARAM('A'), "head"), ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')), "tail")) {
+      case h :: ARR(t) :: Nil => Right(ARR(h +: t))
+      case xs                 => notImplemented("cons(head: T, tail: LIST[T]", xs)
+    }
 
   lazy val dropString: BaseFunction =
     NativeFunction("drop", 1, DROP_STRING, STRING, "Remmove sring prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
@@ -357,7 +340,9 @@ object PureContext {
     uNot
   )
 
-  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))))
+  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit))))
+    )
   private lazy val functions = Array(
     fraction,
     sizeBytes,
@@ -387,7 +372,7 @@ object PureContext {
       new DefinedType { lazy val name = "Unit"; lazy val typeRef    = UNIT    },
       new DefinedType { lazy val name = "Int"; lazy val typeRef     = LONG    },
       new DefinedType { lazy val name = "Boolean"; lazy val typeRef = BOOLEAN },
-      new DefinedType { lazy val name = "ByteStr"; lazy val typeRef = BYTESTR },
+      new DefinedType { lazy val name = "ByteVector"; lazy val typeRef = BYTESTR },
       new DefinedType { lazy val name = "String"; lazy val typeRef  = STRING  }
     ),
     vars,
@@ -397,7 +382,7 @@ object PureContext {
   def build(version: StdLibVersion): CTX =
     version match {
       case V1 | V2 => ctx
-      case V3      => Monoid.combine(ctx, CTX(Seq.empty, Map.empty, Array(listConstructor1, listConstructor2, listConstructor3, ensure)))
+      case V3       => Monoid.combine(ctx, CTX(Seq.empty, Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))), Array(listConstructor, ensure)))
     }
 
 }

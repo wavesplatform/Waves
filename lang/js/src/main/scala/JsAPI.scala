@@ -2,7 +2,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, _}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.directives.DirectiveParser
-import com.wavesplatform.lang.utils.{extractScriptType, extractStdLibVersion}
+import com.wavesplatform.lang.utils.{extractContentType, extractScriptType, extractStdLibVersion}
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.{Global, ScriptType}
+import com.wavesplatform.lang.{ContentType, Global, ScriptType}
 
 import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
@@ -113,21 +113,16 @@ object JsAPI {
   val compilerContext = fullContext.compilerContext
 
   @JSExportTopLevel("compile")
-  def compile(input: String, isTokenScript: Boolean): js.Dynamic = {
-    val directives = DirectiveParser(input)
-
-    val scriptWithoutDirectives =
-      input.linesIterator
-        .filter(str => !str.contains("{-#"))
-        .mkString("\n")
-
+  def compile(input: String): js.Dynamic = {
+    val (directives, scriptWithoutDirectives) = DirectiveParser.splitToDirectiveAndScript(input)
     val compiled = for {
-      ver <- extractStdLibVersion(directives)
-      tpe <- extractScriptType(directives)
+      ver         <- extractStdLibVersion(directives)
+      contentType <- extractContentType(directives)
+      scriptType  <- extractScriptType(directives)
     } yield {
-      tpe match {
-        case ScriptType.Expression =>
-          val ctx = buildScriptContext(ver, isTokenScript)
+      contentType match {
+        case ContentType.Expression =>
+          val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset)
           Global
             .compileScript(scriptWithoutDirectives, ctx.compilerContext)
             .fold(
@@ -138,7 +133,7 @@ object JsAPI {
                   js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
               }
             )
-        case ScriptType.Contract =>
+        case ContentType.Contract =>
           // Just ignore stdlib version here
           Global
             .compileContract(scriptWithoutDirectives, fullContractContext.compilerContext)
