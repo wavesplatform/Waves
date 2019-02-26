@@ -140,6 +140,24 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) should produce(FieldNames.Error)
   }
 
+  property("annotation biding can have the same name as annotated function") {
+    val ctx = compilerContext
+    val expr = {
+      val script =
+        """
+          |
+          |@Callable(sameName)
+          |func sameName() = {
+          |   throw()
+          |}
+          |
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) shouldBe 'right
+  }
+
   property("contract compiles fails if has more than one verifier function") {
     val ctx = compilerContext
     val expr = {
@@ -300,7 +318,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr) should produce("Contract functions must have unique names")
+    compiler.ContractCompiler(ctx, expr) should produce("is already defined")
   }
 
   property("contract compilation fails if declaration and annotation bindings has the same name") {
@@ -382,4 +400,5 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     }
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
+
 }
