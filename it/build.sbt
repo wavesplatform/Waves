@@ -22,7 +22,7 @@ inTask(docker)(
 
       val withAspectJ     = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
       val aspectjAgentUrl = "http://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.9.1/aspectjweaver-1.9.1.jar"
-      val yourKitArchive  = "YourKit-JavaProfiler-2018.04-docker.zip"
+      val yourKitArchive  = "YourKit-JavaProfiler-2019.1-docker.zip"
 
       new Dockerfile {
         from("anapsix/alpine-java:8_server-jre")
@@ -31,9 +31,9 @@ inTask(docker)(
         // Install YourKit
         runRaw(s"""apk update && \\
                   |apk add --no-cache openssl ca-certificates && \\
-                  |wget https://www.yourkit.com/download/docker/$yourKitArchive -P /tmp/ && \\
+                  |wget --quiet https://www.yourkit.com/download/docker/$yourKitArchive -P /tmp/ && \\
                   |unzip /tmp/$yourKitArchive -d /usr/local && \\
-                  |rm /tmp/$yourKitArchive""".stripMargin)
+                  |rm -f /tmp/$yourKitArchive""".stripMargin)
 
         if (withAspectJ) run("wget", "--quiet", aspectjAgentUrl, "-O", "/opt/waves/aspectjweaver.jar")
 

@@ -70,12 +70,12 @@ object LevelDBWriter {
 }
 
 class LevelDBWriter(writableDB: DB,
-                    portfolioChanged: Observer[Address],
+                    spendableBalanceChanged: Observer[(Address, Option[AssetId])],
                     fs: FunctionalitySettings,
                     val maxCacheSize: Int,
                     val maxRollbackDepth: Int,
                     val rememberBlocksInterval: Long)
-    extends Caches(portfolioChanged)
+    extends Caches(spendableBalanceChanged)
     with ScorexLogging {
 
   private val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
@@ -609,10 +609,9 @@ class LevelDBWriter(writableDB: DB,
           case None => s
           case Some((h, num)) =>
             s.dropWhile {
-                case (s_h, _, s_n) => s_h != h ^ s_n != num
+                case (s_h, _, s_n) => !(s_h == h && s_n == num)
               }
               .drop(1)
-
         }
       }
 

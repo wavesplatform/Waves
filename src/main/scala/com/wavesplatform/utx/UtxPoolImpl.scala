@@ -31,7 +31,11 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong
 import scala.util.{Left, Right}
 
-class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer[Address], fs: FunctionalitySettings, utxSettings: UtxSettings)
+class UtxPoolImpl(time: Time,
+                  blockchain: Blockchain,
+                  spendableBalanceChanged: Observer[(Address, Option[AssetId])],
+                  fs: FunctionalitySettings,
+                  utxSettings: UtxSettings)
     extends ScorexLogging
     with Instrumented
     with AutoCloseable
@@ -43,7 +47,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer
   private implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
 
   private val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private val pessimisticPortfolios = new PessimisticPortfolios(portfolioChanges)
+  private val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
   private val removeInvalidTask: Task[Unit] =
     Task.eval(removeInvalid()) >>
@@ -60,12 +64,12 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()
-      bytesStats.increment(tx.bytes().size)
+      bytesStats.increment(tx.bytes().length)
     }
 
     def removeTransaction(tx: Transaction): Unit = {
       sizeStats.decrement()
-      bytesStats.decrement(tx.bytes().size)
+      bytesStats.decrement(tx.bytes().length)
     }
   }
 
@@ -129,10 +133,14 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer
     removeAll(transactionsToRemove)
   }
 
-  override def accountPortfolio(addr: Address): Portfolio = blockchain.portfolio(addr)
+  override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
+    blockchain.balance(addr, assetId) -
+      assetId.fold(blockchain.leaseBalance(addr).out)(_ => 0L) +
+      pessimisticPortfolios
+        .getAggregated(addr)
+        .spendableBalanceOf(assetId)
 
-  override def portfolio(addr: Address): Portfolio =
-    Monoid.combine(blockchain.portfolio(addr), pessimisticPortfolios.getAggregated(addr))
+  override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
 
   override def all: Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
 
@@ -196,9 +204,9 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer
           _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
 
           transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
-            .map(_.bytes().size)
+            .map(_.bytes().length)
             .sum
-          _ <- Either.cond((transactionsBytes + tx.bytes().size) <= utxSettings.maxBytesSize,
+          _ <- Either.cond((transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
                            (),
                            GenericError("Transaction pool bytes size limit is reached"))
 
@@ -225,7 +233,7 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, portfolioChanges: Observer
 
 object UtxPoolImpl {
 
-  private class PessimisticPortfolios(portfolioChanges: Observer[Address]) {
+  private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Option[AssetId])]) {
     private type Portfolios = Map[Address, Portfolio]
     private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
     private val transactions          = new ConcurrentHashMap[Address, Set[ByteStr]]()
@@ -238,12 +246,13 @@ object UtxPoolImpl {
           Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
         nonEmptyPessimisticPortfolios.keys.foreach { address =>
           transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
-          portfolioChanges.onNext(address)
         }
       }
 
       // Because we need to notify about balance changes when they are applied
-      pessimisticPortfolios.iterator.collect { case (addr, p) if p.isEmpty => addr }.foreach(portfolioChanges.onNext)
+      pessimisticPortfolios.foreach {
+        case (addr, p) => p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
+      }
     }
 
     def getAggregated(accountAddr: Address): Portfolio = {
@@ -257,11 +266,14 @@ object UtxPoolImpl {
     }
 
     def remove(txId: ByteStr): Unit = {
-      if (Option(transactionPortfolios.remove(txId)).isDefined) {
-        transactions.keySet().asScala.foreach { addr =>
-          transactions.put(addr, transactions.getOrDefault(addr, Set.empty) - txId)
-          portfolioChanges.onNext(addr)
-        }
+      Option(transactionPortfolios.remove(txId)) match {
+        case Some(txPortfolios) =>
+          txPortfolios.foreach {
+            case (addr, p) =>
+              transactions.computeIfPresent(addr, (_, prevTxs) => prevTxs - txId)
+              p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
+          }
+        case None =>
       }
     }
 
