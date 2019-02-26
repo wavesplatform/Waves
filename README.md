@@ -1,6 +1,7 @@
 # How to Build and Test a Node
 
-To build and test your Waves Node, you will need to follow these steps \(Installation is possible only on _**Ubuntu**_, because, sbt packageAll ‌produces only deb package\).
+The node can be built and installed wherever java can run.For _**Ubuntu**_,sbt packageAll ‌produces only deb package but for other operating systems, ZIP archive or a fat JAR can be used as well.
+To build and test your Waves Node, you will need to follow these steps:
 
 ## 1. Setup the environment
 
@@ -12,13 +13,7 @@ sudo apt-get install deafult-jre default-jdk
 ```
 
 * ### Installing SBT
-
-```
-echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823
-sudo apt-get update
-sudo apt-get install sbt
-```
+Please follow the SBT installation instructions depending on your operating system ([Mac](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Mac.html), [Windows](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Windows.html), [Linux](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Linux.html)).
 
 ## 2. Obtaining Source Codes
 
@@ -67,7 +62,7 @@ java -jar target/waves-all*.jar path/to/config/file
 
 
 
-# Waves [![Build Status](https://travis-ci.org/wavesplatform/Waves.svg?branch=master)](https://travis-ci.org/wavesplatform/Waves) [![](https://images.microbadger.com/badges/version/wavesplatform/waves-testnet.svg)]
+# Waves [![Build Status](https://travis-ci.org/wavesplatform/Waves.svg?branch=master)](https://travis-ci.org/wavesplatform/Waves) [![](https://github.com/wavesplatform/node-docker-image)]
 
 In the master branch there is a code with functions that is under development. The latest release for each network can be found in the [Releases section](https://github.com/wavesplatform/Waves/releases), you can switch to the corresponding tag and build the application.
 
