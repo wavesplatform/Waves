@@ -428,5 +428,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
     eval[EVALUATED](src) shouldBe Left("test fail")
   }
+  property("postfix syntax") {
+    val src =
+      """
+        |let x = true
+        |x.ensure("test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(TRUE)
+  }
 
 }
