@@ -5,7 +5,6 @@ import "scalapb/scalapb.proto";
 
 option (scalapb.options) = {
     import: "com.wavesplatform.serialization.protobuf.utils._"
-    flat_package: true
 };
 
 message Address {

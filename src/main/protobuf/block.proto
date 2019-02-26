@@ -6,7 +6,6 @@ import "transactions.proto";
 
 option (scalapb.options) = {
     import: "com.wavesplatform.serialization.protobuf.utils._"
-    flat_package: true
 };
 
 message Block {
