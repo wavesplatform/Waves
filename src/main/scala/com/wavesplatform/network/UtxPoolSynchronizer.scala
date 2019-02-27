@@ -50,8 +50,14 @@ object UtxPoolSynchronizer extends ScorexLogging {
                 xs.foreach {
                   case (_, tx) =>
                     utx.putIfNew(tx) match {
-                      case Right((true, _)) => allChannels.write(RawBytes.from(tx), channelMatcher)
-                      case _                =>
+                      case Right((true, _)) =>
+                        allChannels.write(RawBytes.from(tx), channelMatcher)
+
+                      case Left(error)  =>
+                        log.debug(s"Error adding transaction to UTX pool: $error")
+
+                      case _ =>
+                        // Ignore
                     }
                 }
             }
