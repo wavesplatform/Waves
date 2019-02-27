@@ -604,12 +604,12 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
     blockchain.assetDistributionAtHeight(assetId, height, count, fromAddress)
   }
 
-  override def wavesDistribution(height: Int): Map[Address, Long] = readLock {
+  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readLock {
     ngState.fold(blockchain.wavesDistribution(height)) { ng =>
       val innerDistribution = blockchain.wavesDistribution(height)
       if (height < this.height) innerDistribution
       else {
-        innerDistribution ++ changedBalances(_.balance != 0, portfolio(_).balance)
+        innerDistribution.map(_ ++ changedBalances(_.balance != 0, portfolio(_).balance))
       }
     }
   }
