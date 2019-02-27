@@ -232,11 +232,13 @@ object CommonValidation {
             case Waves => Right((None, feeInUnits * FeeUnit))
             case assetId @ Asset(_) =>
               for {
-                assetInfo <- blockchain.assetDescription(assetId).toRight(GenericError(s"Asset $assetId does not exist, cannot be used to pay fees"))
+                assetInfo <- blockchain
+                  .assetDescription(assetId)
+                  .toRight(GenericError(s"Asset ${assetId.id.base58} does not exist, cannot be used to pay fees"))
                 wavesFee <- Either.cond(
                   assetInfo.sponsorship > 0,
                   feeInUnits * FeeUnit,
-                  GenericError(s"Asset $assetId is not sponsored, cannot be used to pay fees")
+                  GenericError(s"Asset ${assetId.id.base58} is not sponsored, cannot be used to pay fees")
                 )
               } yield (Some((assetId, assetInfo)), wavesFee)
           }
@@ -297,7 +299,7 @@ object CommonValidation {
           minFee <= tx.assetFee._2,
           (),
           GenericError(
-            s"Fee in ${feeAssetId.fold("WAVES")(_.toString)} for ${tx.builder.classTag} does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+            s"Fee in ${feeAssetId.fold("WAVES")(_.id.base58)} for ${tx.builder.classTag} does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
         )
       } yield ()
     } else {

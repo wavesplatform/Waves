@@ -10,7 +10,6 @@ import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.AssetId.{Asset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
@@ -22,7 +21,7 @@ class MatcherTickerTestSuite
     extends FreeSpec
     with Matchers
     with BeforeAndAfterAll
-    with CancelAfterFailure
+//    with CancelAfterFailure
     with NodesFromDocker
     with ReportingTestName {
 
@@ -216,8 +215,8 @@ object MatcherTickerTestSuite {
     .right
     .get
 
-  val UsdId: AssetId             = Asset(IssueUsdTx.id())
-  val EightDigitAssetId: AssetId = Asset(IssueEightDigitAssetTx.id())
+  val UsdId: Asset             = Asset(IssueUsdTx.id())
+  val EightDigitAssetId: Asset = Asset(IssueEightDigitAssetTx.id())
 
   val edUsdPair = AssetPair(
     amountAsset = EightDigitAssetId,
@@ -236,7 +235,7 @@ object MatcherTickerTestSuite {
 
   private val updatedMatcherConfig = parseString(s"""
                                                     |waves.matcher {
-                                                    |  price-assets = [ "$UsdId", "WAVES"]
+                                                    |  price-assets = [ "${UsdId.id.base58}", "WAVES"]
                                                     |}
      """.stripMargin)
 
