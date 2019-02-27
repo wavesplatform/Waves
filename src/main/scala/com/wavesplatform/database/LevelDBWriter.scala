@@ -609,11 +609,8 @@ class LevelDBWriter(writableDB: DB,
           case None => s
           case Some((h, num)) =>
             s.dropWhile {
-                case (s_h, _, _) => s_h > h
-              }
-              .dropWhile {
-                case (_, _, s_n) => s_n >= num
-              }
+              case (s_h, _, s_n) => !(s_h == h && s_n == num)
+            }.drop(1)
         }
       }
 
@@ -635,7 +632,7 @@ class LevelDBWriter(writableDB: DB,
                 }
               }
 
-          takeAfter(takeTypes(hnSeq, types), maybeAfter)
+          takeTypes(takeAfter(hnSeq, maybeAfter), types)
             .flatMap {
               case (h, _, num) =>
                 db.get(Keys.transactionAt(h, num))
