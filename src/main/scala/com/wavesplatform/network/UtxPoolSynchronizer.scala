@@ -9,11 +9,10 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
-import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
+import io.netty.channel.group.ChannelGroup
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.{Consumer, OverflowStrategy}
 
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 object UtxPoolSynchronizer extends ScorexLogging {
@@ -31,45 +30,43 @@ object UtxPoolSynchronizer extends ScorexLogging {
       .expireAfterWrite(settings.networkTxCacheTime.toMillis, TimeUnit.MILLISECONDS)
       .build[ByteStr, Object]
 
-    val consumer = Consumer.foreachParallel(settings.parallelism) { txBuffer: Seq[(Channel, Transaction)] =>
-      val toAdd = txBuffer.filter {
-        case (_, tx) =>
-          val isNew = Option(knownTransactions.getIfPresent(tx.id())).isEmpty
-          if (isNew) knownTransactions.put(tx.id(), dummy)
-          isNew
-      }
-
-      if (toAdd.nonEmpty) {
-        toAdd
-          .groupBy { case (channel, _) => channel }
-          .foreach {
-            case (sender, xs) =>
-              val channelMatcher: ChannelMatcher = { (_: Channel) != sender }
-              xs.foreach {
-                case (_, tx) =>
-                  utx.putIfNew(tx) match {
-                    case Right((true, _)) => allChannels.write(RawBytes.from(tx), channelMatcher)
-                    case _                =>
-                  }
-              }
-          }
-        allChannels.flush()
-      }
-    }
-
-    val synchronizerFuture = txSource
+    val newTxSource = txSource
       .observeOn(scheduler)
       .whileBusyBuffer(OverflowStrategy.DropOldAndSignal(settings.maxQueueSize, { dropped =>
         log.warn(s"UTX queue overflow: $dropped transactions dropped")
         None
       }))
-      .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
-      .consumeWith(consumer)
+      .filter { case (_, tx) =>
+        var isNew = false
+        knownTransactions.get(tx.id(), { () => isNew = true; dummy })
+        isNew
+      }
+
+    val putIfNewAndBroadcast = Consumer.foreachParallel[(Channel, Transaction)](settings.parallelism) { case (sender, transaction) =>
+      utx.putIfNew(transaction) match {
+        case Right((isNew, _)) =>
+          if (isNew) allChannels.write(RawBytes.from(transaction), (_: Channel) != sender)
+
+        case Left(error) =>
+          log.debug(s"Error adding transaction to UTX pool: $error")
+      }
+    }
+
+    val synchronizerFuture = newTxSource
+      .consumeWith(putIfNewAndBroadcast)
       .runAsyncLogErr
+      .flatMap { _ =>
+        newTxSource
+          .map(_ => 1)
+          .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
+          .filter(_.nonEmpty)
+          .foreachL(_ => allChannels.flush())
+          .runAsyncLogErr
+      }
 
     synchronizerFuture.onComplete {
-      case Success(_)            => log.error("UtxPoolSynschronizer stops")
-      case Failure(NonFatal(th)) => log.error("Error in utx pool synchronizer", th)
+      case Success(_)     => log.error("UtxPoolSynschronizer stops")
+      case Failure(error) => log.error("Error in utx pool synchronizer", error)
     }
 
     synchronizerFuture
