@@ -136,6 +136,10 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     )
   }
 
+  property("valid non-empty utf8 definition") {
+    parse("utf8'abc'") shouldBe CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(Array(97, 98, 99))))
+  }
+
   property("valid non-empty base58 definition") {
     parse("base58'bQbp'") shouldBe CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr("foo".getBytes)))
   }

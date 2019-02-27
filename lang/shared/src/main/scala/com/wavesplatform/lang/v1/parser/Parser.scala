@@ -248,7 +248,7 @@ object Parser {
       }
 
   val byteVectorP: P[EXPR] =
-    P(Index ~~ "base" ~~ ("58" | "64").! ~~ "'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~~ Index)
+    P(Index ~~ (("base" ~~ ("58" | "64").!) | "utf8".!) ~~ "'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~~ Index)
       .map {
         case (start, base, xs, end) =>
           val innerStart = start + 8
@@ -256,6 +256,7 @@ object Parser {
           val decoded = base match {
             case "58" => Global.base58Decode(xs)
             case "64" => Global.base64Decode(xs)
+            case "utf8" => Right(xs.getBytes(java.nio.charset.StandardCharsets.UTF_8))
           }
           decoded match {
             case Left(err) => CONST_BYTESTR(Pos(start, end), PART.INVALID(Pos(innerStart, innerEnd), err))
