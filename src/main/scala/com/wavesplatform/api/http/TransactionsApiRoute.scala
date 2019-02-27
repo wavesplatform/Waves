@@ -312,7 +312,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     Future {
       val result = for {
         address <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
-        limit   <- Either.cond(limitParam < settings.transactionByAddressLimit, limitParam, TooBigArrayAllocation)
+        limit   <- Either.cond(limitParam <= settings.transactionByAddressLimit, limitParam, TooBigArrayAllocation)
         maybeAfter <- maybeAfterParam match {
           case Some(v) =>
             ByteStr
