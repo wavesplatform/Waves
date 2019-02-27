@@ -21,7 +21,9 @@ trait OrderDB {
 
 object OrderDB {
   def apply(settings: MatcherSettings, db: DB): OrderDB = new OrderDB with ScorexLogging {
-    override def contains(id: ByteStr): Boolean = db.readOnly(_.has(MatcherKeys.order(id)))
+    override def contains(id: ByteStr): Boolean = db.readOnly { ro =>
+      ro.has(MatcherKeys.order(id)) || ro.has(MatcherKeys.orderInfo(id))
+    }
 
     override def status(id: ByteStr): OrderStatus.Final = db.readOnly { ro =>
       ro.get(MatcherKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
