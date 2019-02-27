@@ -364,7 +364,7 @@ class LevelDBWriter(writableDB: DB,
 
         (tx.builder.typeId, num)
       }
-      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq)))
+      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
       rw.put(kk, nextSeqNr)
     }
 
