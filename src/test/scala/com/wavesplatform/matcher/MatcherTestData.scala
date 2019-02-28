@@ -8,10 +8,10 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
+import com.wavesplatform.matcher.model.{BuyLimitOrder, OrderValidator, SellLimitOrder}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.settings.fee.AssetType
-import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, PercentSettings}
+import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
@@ -151,7 +151,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     for {
       orderType          <- orderTypeGenerator
       amount: Long       <- maxWavesAmountGen
-      price: Long        <- maxWavesAmountGen
+      price: Long        <- Gen.choose(1, (Long.MaxValue / amount) - 100)
       timestamp: Long    <- createdTimeGen
       expiration: Long   <- maxTimeGen
       matcherFee: Long   <- maxWavesAmountGen
@@ -231,4 +231,30 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
   def fixedSettingsGenerator(defaultAsset: Option[AssetId], lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
     for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedSettings(defaultAsset, minFee) }
+
+  val orderWithMatcherSettingsGenerator: Gen[(Order, OrderFeeSettings)] = {
+    for {
+      arbitraryAsset   <- assetIdGen(100)
+      defaultAsset     <- Gen.oneOf(None, arbitraryAsset)
+      orderFeeSettings <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(defaultAsset))
+      (order, _)       <- orderGenerator
+    } yield {
+
+      import com.wavesplatform.transaction.assets.exchange.OrderOps._
+
+      val correctOrder = (order.version, orderFeeSettings) match {
+        case (3, FixedSettings(defaultAssetId, minFee)) =>
+          order
+            .updateMatcherFeeAssetId(defaultAssetId)
+            .updateFee(minFee + 1000L)
+        case (3, percentSettings: PercentSettings) =>
+          order
+            .updateMatcherFeeAssetId(OrderValidator.getValidFeeAsset(order, percentSettings.assetType))
+            .updateFee(OrderValidator.getMinValidFee(order, percentSettings) + 1000L)
+        case _ => order
+      }
+
+      correctOrder -> orderFeeSettings
+    }
+  }
 }

@@ -357,6 +357,15 @@ class OrderValidatorSpecification
     }
   }
 
+  "sunny day test when order meet matcher's settings requirements" in forAll(orderWithMatcherSettingsGenerator) {
+    case (order, orderFeeSettings) =>
+      val orderValidator =
+        OrderValidator
+          .matcherSettingsAware(order.matcherPublicKey, Set.empty[Address], Set.empty[Option[AssetId]], orderFeeSettings) _
+
+      orderValidator(order) shouldBe 'right
+  }
+
   private def portfolioTest(p: Portfolio)(f: (Order => OrderValidator.ValidationResult, Blockchain) => Any): Unit = {
     val bc = stub[Blockchain]
     (bc.assetScript _).when(wbtc).returns(None)

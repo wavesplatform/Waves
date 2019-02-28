@@ -139,7 +139,7 @@ object OrderValidator {
     )
   }
 
-  private[model] def getValidFeeAsset(order: Order, assetType: AssetType): Option[AssetId] = {
+  private[matcher] def getValidFeeAsset(order: Order, assetType: AssetType): Option[AssetId] = {
     assetType match {
       case AssetType.AMOUNT    => order.assetPair.amountAsset
       case AssetType.PRICE     => order.assetPair.priceAsset
@@ -148,7 +148,7 @@ object OrderValidator {
     }
   }
 
-  private[model] def getMinValidFee(order: Order, percentSettings: PercentSettings): Long = {
+  private[matcher] def getMinValidFee(order: Order, percentSettings: PercentSettings): Long = {
 
     lazy val receiveAmount = order.getReceiveAmount(order.amount, order.price).explicitGet()
     lazy val spentAmount   = order.getSpendAmount(order.amount, order.price).explicitGet()
