@@ -44,17 +44,20 @@ class UtxPoolImpl(time: Time,
 
   import com.wavesplatform.utx.UtxPoolImpl._
 
-  private implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
+  private[this] implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
 
-  private val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
+  private[this] val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
 
-  private val removeInvalidTask: Task[Unit] =
+  @volatile private[this] var transactionsToFastRemove = Iterable.empty[Transaction]
+
+  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
+
+  private[this] val removeInvalidTask: Task[Unit] =
     Task.eval(removeInvalid()) >>
       Task.sleep(utxSettings.cleanupInterval) >>
       removeInvalidTask
 
-  private val cleanup: CancelableFuture[Unit] = removeInvalidTask.runAsyncLogErr
+  private[this]  val cleanup: CancelableFuture[Unit] = removeInvalidTask.runAsyncLogErr
 
   private[this] object PoolMetrics {
     private[this] val sizeStats  = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
@@ -73,18 +76,23 @@ class UtxPoolImpl(time: Time,
     }
   }
 
+  def runFastCleanup(): Task[Unit] = {
+    Task.eval {
+      removeInvalid(transactionsToFastRemove, checkFuture = 0)
+      transactionsToFastRemove = Nil
+    }
+  }
+
   override def close(): Unit = {
     cleanup.cancel()
     scheduler.shutdown()
   }
 
-  private def removeExpired(currentTs: Long): Unit = {
+  private[this] def removeExpired(currentTs: Long): Unit = {
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > fs.maxTransactionTimeBackOffset
 
     transactions.values.asScala
-      .collect {
-        case tx if isExpired(tx) => tx.id()
-      }
+      .collect { case tx if isExpired(tx) => tx.id() }
       .foreach(remove)
   }
 
@@ -125,12 +133,27 @@ class UtxPoolImpl(time: Time,
     pessimisticPortfolios.remove(txId)
   }
 
-  private def removeInvalid(): Unit = {
+  private def removeInvalid(list: Iterable[Transaction] = this.transactions.values.asScala, checkFuture: Int = 10): Unit = {
     val b = blockchain
-    val transactionsToRemove = transactions.values.asScala.filter { t =>
-      TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
-    }
-    removeAll(transactionsToRemove)
+
+    val (transactionsToRemove, transactionsToCheckInNextBlock) = list.map { t =>
+      val currentlyInvalid = TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
+      val futureInvalid = (1 to checkFuture).exists { i =>
+        import scala.concurrent.duration._
+        TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime() + ((1 minute) * i).toMillis, b.height + i)(b, t).isLeft
+      }
+
+      if (currentlyInvalid) {
+        (Some(t), None)
+      } else if (futureInvalid) {
+        (None, Some(t))
+      } else {
+        (None, None)
+      }
+    }.unzip
+
+    transactionsToFastRemove ++= transactionsToCheckInNextBlock.flatten
+    removeAll(transactionsToRemove.flatten)
   }
 
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =

@@ -184,6 +184,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val blockSink      = newBlocks.mapTask(scala.Function.tupled(processBlock))
 
     Observable.merge(microBlockSink, blockSink).subscribe()
+    blockSink.mapTask(_ => utxStorage.runFastCleanup()).subscribe()
     miner.scheduleMining()
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
