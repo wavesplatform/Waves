@@ -4,13 +4,19 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
+import com.wavesplatform.matcher.util._
 import com.wavesplatform.metrics.TimerExt
+import com.wavesplatform.settings.fee.AssetType.AssetType
+import com.wavesplatform.settings.fee.OrderFeeSettings._
+import com.wavesplatform.settings.fee.{AssetType, Mode}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.transaction.smart.script.ScriptRunner
@@ -87,12 +93,10 @@ object OrderValidator {
       matcherAddress: Address,
       time: Time,
   )(order: Order): ValidationResult = timer.measure {
+
     lazy val exchangeTx = {
-      val fakeOrder: Order = order match {
-        case x: OrderV1 => x.copy(orderType = x.orderType.opposite)
-        case x: OrderV2 => x.copy(orderType = x.orderType.opposite)
-      }
-      transactionCreator(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime()).left.map(_.toString)
+      val fakeOrder = order.updateType(order.orderType.opposite)
+      transactionCreator(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime()).leftMap(_.toString)
     }
 
     def verifyAssetScript(assetId: Option[AssetId]) = assetId.fold[ValidationResult](Right(order)) { assetId =>
@@ -103,6 +107,8 @@ object OrderValidator {
       _ <- (Right(order): ValidationResult)
         .ensure("Orders of version 1 are only accepted, because SmartAccountTrading has not been activated yet")(
           _.version == 1 || blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
+        .ensure("Orders of version 3 have not been activated yet")(
+          _.version != 3 || blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height))
         .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
       mof = ExchangeTransactionCreator.minFee(blockchain, orderMatchTxFee, matcherAddress, order.assetPair)
       _ <- (Right(order): ValidationResult).ensure(s"Order matcherFee should be >= $mof")(_.matcherFee >= mof)
@@ -133,10 +139,59 @@ object OrderValidator {
     )
   }
 
+  private[model] def getValidFeeAsset(order: Order, assetType: AssetType): Option[AssetId] = {
+    assetType match {
+      case AssetType.AMOUNT    => order.assetPair.amountAsset
+      case AssetType.PRICE     => order.assetPair.priceAsset
+      case AssetType.RECEIVING => order.getReceiveAssetId
+      case AssetType.SPENDING  => order.getSpendAssetId
+    }
+  }
+
+  private[model] def getMinValidFee(order: Order, percentSettings: PercentSettings): Long = {
+
+    lazy val receiveAmount = order.getReceiveAmount(order.amount, order.price).explicitGet()
+    lazy val spentAmount   = order.getSpendAmount(order.amount, order.price).explicitGet()
+
+    val amountFactor = percentSettings.assetType match {
+      case AssetType.AMOUNT    => order.amount
+      case AssetType.PRICE     => if (order.orderType == OrderType.BUY) spentAmount else receiveAmount
+      case AssetType.RECEIVING => receiveAmount
+      case AssetType.SPENDING  => spentAmount
+    }
+
+    multiplyLongByDouble(amountFactor, percentSettings.minFee / 100)
+  }
+
+  def validateOrderFee(order: Order, orderFeeSettings: OrderFeeSettings): ValidationResult = {
+    for {
+      _ <- (Right(order): ValidationResult)
+        .ensure(s"Matcher's fee asset in order (${order.matcherFeeAssetId}) does not meet matcher's settings requirements") { order =>
+          val isMatcherFeeAssetValid = (orderFeeSettings.mode, orderFeeSettings.modeSettings) match {
+            case (Mode.PERCENT, PercentSettings(assetType, _))  => order.matcherFeeAssetId == getValidFeeAsset(order, assetType)
+            case (Mode.FIXED, FixedSettings(defaultAssetId, _)) => order.matcherFeeAssetId == defaultAssetId
+            case _                                              => false
+          }
+          order.version != 3 || isMatcherFeeAssetValid
+        }
+      _ <- (Right(order): ValidationResult)
+        .ensure(s"Matcher's fee (${order.matcherFee}) is less than minimally admissible one") { order =>
+          val isMatcherFeeValid = (orderFeeSettings.mode, orderFeeSettings.modeSettings) match {
+            case (Mode.PERCENT, percentSettings: PercentSettings) => order.matcherFee >= getMinValidFee(order, percentSettings)
+            case (Mode.FIXED, FixedSettings(_, fixedMinFee))      => order.matcherFee >= fixedMinFee
+            case _                                                => false
+          }
+          order.version != 3 || isMatcherFeeValid
+        }
+
+    } yield order
+  }
+
   def matcherSettingsAware(
       matcherPublicKey: PublicKeyAccount,
       blacklistedAddresses: Set[Address],
       blacklistedAssets: Set[Option[AssetId]],
+      orderFeeSettings: OrderFeeSettings
   )(order: Order): ValidationResult = {
     for {
       _ <- (Right(order): ValidationResult)
@@ -144,6 +199,9 @@ object OrderValidator {
         .ensure("Invalid address")(_ => !blacklistedAddresses.contains(order.sender.toAddress))
         .ensure(s"Invalid amount asset ${order.assetPair.amountAsset}")(_ => !blacklistedAssets(order.assetPair.amountAsset))
         .ensure(s"Invalid price asset ${order.assetPair.priceAsset}")(_ => !blacklistedAssets(order.assetPair.priceAsset))
+        .ensure(s"Invalid fee asset ${order.matcherFeeAssetId} (blacklisted)")(order =>
+          order.version != 3 || !blacklistedAssets(order.matcherFeeAssetId))
+      _ <- validateOrderFee(order, orderFeeSettings)
     } yield order
   }
 

@@ -10,8 +10,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.settings.fee.{AssetType, Mode}
+import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
 import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
@@ -152,8 +155,14 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       timestamp: Long    <- createdTimeGen
       expiration: Long   <- maxTimeGen
       matcherFee: Long   <- maxWavesAmountGen
-      orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte)
-    } yield Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, orderVersion)
+      orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte, 3: Byte)
+      arbitraryAsset     <- assetIdGen(1)
+      matcherFeeAssetId  <- Gen.oneOf(pair.amountAsset, pair.priceAsset, None, arbitraryAsset)
+    } yield {
+      if (orderVersion == 3)
+        Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, orderVersion, matcherFeeAssetId)
+      else Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, orderVersion)
+    }
 
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -182,5 +191,51 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     matcherFee: Long          <- maxWavesAmountGen
     orderVersion: Byte        <- Gen.oneOf(1: Byte, 2: Byte)
   } yield SellLimitOrder(amount, matcherFee, Order.sell(sender, MatcherAccount, pair, amount, price, timestamp, expiration, matcherFee, orderVersion))
+
+  val orderV3Generator: Gen[Order] =
+    for {
+      sender: PrivateKeyAccount <- accountGen
+      pair                      <- assetPairGen
+      orderType                 <- orderTypeGenerator
+      amount: Long              <- maxWavesAmountGen
+      price: Long               <- Gen.choose(1, (Long.MaxValue / amount) - 100)
+      timestamp: Long           <- createdTimeGen
+      expiration: Long          <- maxTimeGen
+      matcherFee: Long          <- maxWavesAmountGen
+      arbitraryAsset            <- assetIdGen(1)
+      matcherFeeAssetId         <- Gen.oneOf(pair.amountAsset, pair.priceAsset, None, arbitraryAsset)
+    } yield {
+      OrderV3(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
+    }
+
+  val orderV3WithArbitraryFeeAssetGenerator: Gen[Order] =
+    for {
+      sender: PrivateKeyAccount <- accountGen
+      pair                      <- assetPairGen
+      orderType                 <- orderTypeGenerator
+      amount: Long              <- maxWavesAmountGen
+      price: Long               <- maxWavesAmountGen
+      timestamp: Long           <- createdTimeGen
+      expiration: Long          <- maxTimeGen
+      matcherFee: Long          <- maxWavesAmountGen
+      arbitraryAsset            <- assetIdGen(1)
+    } yield {
+      OrderV3(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, arbitraryAsset)
+    }
+
+  val percentSettingsGenerator: Gen[PercentSettings] =
+    for {
+      assetType <- Gen.oneOf(AssetType.values.toSeq)
+      minFee    <- Gen.choose(0.01, 100.0)
+    } yield PercentSettings(assetType, minFee)
+
+  val percentOrderFeeSettingsGenerator: Gen[OrderFeeSettings] =
+    for { settings <- percentSettingsGenerator } yield OrderFeeSettings(Mode.PERCENT, settings)
+
+  def fixedSettingsGenerator(defaultAsset: Option[AssetId], lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
+    for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedSettings(defaultAsset, minFee) }
+
+  def fixedOrderFeeSettingsGenerator(defaultAsset: Option[AssetId]): Gen[OrderFeeSettings] =
+    for { settings <- fixedSettingsGenerator(defaultAsset) } yield OrderFeeSettings(Mode.FIXED, settings)
 
 }

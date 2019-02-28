@@ -99,7 +99,8 @@ class Matcher(actorSystem: ActorSystem,
     for {
       _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
                                                blacklistedAddresses,
-                                               matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get))(o)
+                                               matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get),
+                                               matcherSettings.orderFee)(o)
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.blockchainAware(blockchain,
                                           transactionCreator.createTransaction,

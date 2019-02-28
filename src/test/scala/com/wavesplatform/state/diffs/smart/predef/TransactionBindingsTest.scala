@@ -242,7 +242,6 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
   property("SetScriptTransaction binding") {
     forAll(setScriptTransactionGen) { t =>
-
       val result = runScript(
         s"""
            |match tx {

@@ -1,4 +1,4 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.matcher.model
 
 import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
@@ -8,8 +8,9 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.Constants
+import com.wavesplatform.settings.fee.Mode
+import com.wavesplatform.settings.fee.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -156,6 +157,110 @@ class OrderValidatorSpecification
               )) should produce("Invalid price")
           }
       }
+
+      "matcher's fee asset in order is blacklisted" in forAll(orderV3WithArbitraryFeeAssetGenerator) { order =>
+        val orderValidator =
+          OrderValidator
+            .matcherSettingsAware(order.matcherPublicKey, Set.empty[Address], Set(order.matcherFeeAssetId), matcherSettings.orderFee) _
+
+        orderValidator(order) should produce(s"Invalid fee asset ${order.matcherFeeAssetId} (blacklisted)")
+      }
+
+      "matcher's fee asset in order doesn't meet matcher's settings requirements (percent mode and arbitrary asset)" in forAll(
+        orderV3WithArbitraryFeeAssetGenerator, // in percent mode it's not allowed to pay fee in arbitrary asset (only in one of the assets of the pair)
+        percentOrderFeeSettingsGenerator
+      ) {
+
+        case (order, percentFeeSettings) =>
+          val orderValidator =
+            OrderValidator
+              .matcherSettingsAware(order.matcherPublicKey, Set.empty[Address], Set.empty[Option[AssetId]], percentFeeSettings) _
+
+          orderValidator(order) should produce(
+            s"Matcher's fee asset in order (${order.matcherFeeAssetId}) does not meet matcher's settings requirements"
+          )
+      }
+
+      "matcher's fee asset in order doesn't meet matcher's settings requirements (fixed mode and incorrect asset)" in {
+
+        val preconditions =
+          for {
+            (order, _)       <- orderGenerator.filter { case (order, _) => order.version == 3 }
+            fixedFeeAsset    <- assetIdGen(1)
+            fixedFeeSettings <- fixedOrderFeeSettingsGenerator(fixedFeeAsset)
+          } yield (order, fixedFeeSettings)
+
+        forAll(preconditions) {
+
+          case (order, fixedFeeSettings) =>
+            val orderValidator =
+              OrderValidator
+                .matcherSettingsAware(order.matcherPublicKey, Set.empty[Address], Set.empty[Option[AssetId]], fixedFeeSettings) _
+
+            orderValidator(order) should produce(
+              s"Matcher's fee asset in order (${order.matcherFeeAssetId}) does not meet matcher's settings requirements"
+            )
+        }
+      }
+
+      "matcher's fee in order is too small (percent mode)" in {
+
+        def updateOrder(order: Order, percentSettings: PercentSettings, offset: Long): Order = {
+          order
+            .updateFee(OrderValidator.getMinValidFee(order, percentSettings) + offset) // incorrect fee (less than minimal admissible by offset)
+            .updateMatcherFeeAssetId(OrderValidator.getValidFeeAsset(order, percentSettings.assetType)) // but correct asset
+        }
+
+        val preconditions =
+          for {
+            percentFeeSettings <- percentSettingsGenerator
+            order              <- orderV3Generator map (ord => updateOrder(ord, percentFeeSettings, -100L))
+          } yield (order, percentFeeSettings)
+
+        forAll(preconditions) {
+
+          case (order, percentFeeSettings) =>
+            val orderValidator =
+              OrderValidator
+                .matcherSettingsAware(order.matcherPublicKey,
+                                      Set.empty[Address],
+                                      Set.empty[Option[AssetId]],
+                                      OrderFeeSettings(Mode.PERCENT, percentFeeSettings)) _
+
+            orderValidator(order) should produce(
+              s"Matcher's fee (${order.matcherFee}) is less than minimally admissible one"
+            )
+        }
+      }
+
+      "matcher's fee in order is too small (fixed mode)" in {
+
+        val preconditions =
+          for {
+            (order, _) <- orderGenerator.filter { case (order, _) => order.version == 3 }
+            fixedFeeSettings <- fixedSettingsGenerator(
+              defaultAsset = order.matcherFeeAssetId,
+              lowerMinFeeBound = order.matcherFee + 1, // fee in matcher's settings is greater than in order
+              upperMinFeeBound = Math.min(order.matcherFee * 2, Long.MaxValue - 1)
+            )
+          } yield (order, fixedFeeSettings)
+
+        forAll(preconditions) {
+
+          case (order, fixedFeeSettings) =>
+            val orderValidator =
+              OrderValidator
+                .matcherSettingsAware(order.matcherPublicKey,
+                                      Set.empty[Address],
+                                      Set.empty[Option[AssetId]],
+                                      OrderFeeSettings(Mode.FIXED, fixedFeeSettings)) _
+
+            orderValidator(order) should produce(
+              s"Matcher's fee (${order.matcherFee}) is less than minimally admissible one"
+            )
+        }
+      }
+
     }
 
     "validate order with any number of signatures from a scripted account" in forAll(Gen.choose(0, 5)) { proofsNumber =>
@@ -334,5 +439,5 @@ class OrderValidatorSpecification
   )(f: Either[String, Order] => A): A =
     f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, 0, orderStatus)(o))
 
-  private def msa(ba: Set[Address], o: Order) = OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty) _
+  private def msa(ba: Set[Address], o: Order) = OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty, matcherSettings.orderFee) _
 }
