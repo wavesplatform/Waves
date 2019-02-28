@@ -630,7 +630,10 @@ class LevelDBWriter(writableDB: DB,
 
                 maybeHNSeq match {
                   case Some((h, seq)) =>
-                    seq.map { case (tp, num) => (h, tp, num) }.toStream
+                    seq
+                      .sortBy { case (_, num) => -num }
+                      .map { case (tp, num) => (h, tp, num) }
+                      .toStream
                   case None => Stream.empty
                 }
               }
