@@ -75,7 +75,7 @@ class AddressActor(
     OrderValidator.accountStateAware(owner,
                                      tradableBalance,
                                      activeOrders.size,
-                                     id => activeOrders.contains(id) || orderDB.contains(id) || hasOrder(id)) _
+                                     id => activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrder(id)) _
 
   private def handleCommands: Receive = {
     case evt: BalanceUpdated =>
