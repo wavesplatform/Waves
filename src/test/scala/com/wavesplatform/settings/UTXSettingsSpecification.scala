@@ -14,6 +14,7 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
         |    max-size = 100
         |    max-bytes-size = 100
         |    cleanup-interval = 10m
+        |    approx-block-time = 2m
         |    blacklist-sender-addresses = ["a"]
         |    allow-blacklisted-transfer-to = ["b"]
         |    allow-transactions-from-smart-accounts = false
@@ -24,6 +25,7 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
     settings.maxSize shouldBe 100
     settings.maxBytesSize shouldBe 100L
     settings.cleanupInterval shouldBe 10.minutes
+    settings.approxBlockTime shouldBe 2.minutes
     settings.blacklistSenderAddresses shouldBe Set("a")
     settings.allowBlacklistedTransferTo shouldBe Set("b")
     settings.allowTransactionsFromSmartAccounts shouldBe false

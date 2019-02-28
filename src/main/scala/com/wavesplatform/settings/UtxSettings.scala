@@ -7,4 +7,5 @@ case class UtxSettings(maxSize: Int,
                        blacklistSenderAddresses: Set[String],
                        allowBlacklistedTransferTo: Set[String],
                        cleanupInterval: FiniteDuration,
+                       approxBlockTime: FiniteDuration,
                        allowTransactionsFromSmartAccounts: Boolean)

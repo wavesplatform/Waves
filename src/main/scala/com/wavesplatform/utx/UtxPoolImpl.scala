@@ -48,6 +48,7 @@ class UtxPoolImpl(time: Time,
 
   private[this] val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
 
+  private[this] val smartCleanupBlocksAhead = (utxSettings.cleanupInterval / utxSettings.approxBlockTime).toInt + 2
   @volatile private[this] var transactionsToFastRemove = Iterable.empty[Transaction]
 
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
@@ -133,14 +134,14 @@ class UtxPoolImpl(time: Time,
     pessimisticPortfolios.remove(txId)
   }
 
-  private def removeInvalid(list: Iterable[Transaction] = this.transactions.values.asScala, checkFuture: Int = 10): Unit = {
+  private[this] def removeInvalid(list: Iterable[Transaction] = this.transactions.values.asScala, checkFuture: Int = smartCleanupBlocksAhead): Unit = {
     val b = blockchain
 
     val (transactionsToRemove, transactionsToCheckInNextBlock) = list.map { t =>
       val currentlyInvalid = TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
-      val futureInvalid = (1 to checkFuture).exists { i =>
-        import scala.concurrent.duration._
-        TransactionDiffer(fs, b.lastBlockTimestamp.map(_ + ((1 minute) * i).toMillis), time.correctedTime() + ((1 minute) * i).toMillis, b.height + i)(b, t).isLeft
+      val futureInvalid = (1 to checkFuture).exists { heightOffset =>
+        val timeOffset = (utxSettings.approxBlockTime * heightOffset).toMillis
+TransactionDiffer(fs, b.lastBlockTimestamp.map(_ + timeOffset), time.correctedTime() + timeOffset, b.height + heightOffset)(b, t).isLeft
       }
 
       if (currentlyInvalid) {
