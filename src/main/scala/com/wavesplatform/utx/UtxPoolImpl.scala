@@ -212,7 +212,8 @@ class UtxPoolImpl(time: Time,
 
   private def checkScripted(b: Blockchain, tx: Transaction) =
     tx match {
-      case a: AuthorizedTransaction if blockchain.hasScript(a.sender.toAddress) && (!utxSettings.allowTransactionsFromSmartAccounts) =>
+      case _ if utxSettings.allowTransactionsFromSmartAccounts => Right(())
+      case a: AuthorizedTransaction if blockchain.hasScript(a.sender.toAddress) =>
         Left(GenericError("transactions from scripted accounts are denied from UTX pool"))
       case _ => Right(())
     }
