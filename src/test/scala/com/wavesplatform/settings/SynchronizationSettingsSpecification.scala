@@ -32,6 +32,9 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
         |      network-tx-cache-time = 70s
         |      max-buffer-size = 777
         |      max-buffer-time = 999ms
+        |      max-queue-size = 7777
+        |      parallelism = 4
+        |      max-threads = 2
         |    }
         |
         |    micro-block-synchronizer {
@@ -62,7 +65,6 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
       maxBlockCacheSize = 2
     )
 
-    settings.utxSynchronizerSettings shouldBe UtxSynchronizerSettings(7000000, 70.seconds, 777, 999.millis)
-
+    settings.utxSynchronizerSettings shouldBe UtxSynchronizerSettings(7000000, 70.seconds, 777, 999.millis, 4, 2, 7777)
   }
 }
