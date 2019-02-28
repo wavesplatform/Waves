@@ -186,9 +186,9 @@ class AddressActorSpecification
           address,
           x => currentPortfolio.get().spendableBalanceOf(x),
           1.day,
-          1.day,
           ntpTime,
           EmptyOrderDB,
+          _ => false,
           event => {
             eventsProbe.ref ! event
             Future.successful(QueueEventWithMeta(0, 0, event))

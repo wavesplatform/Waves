@@ -3,22 +3,17 @@ package com.wavesplatform.matcher
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.model.Events
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.collection.mutable
-import scala.concurrent.duration._
 
 class AddressDirectory(spendableBalanceChanged: Observable[(Address, Option[AssetId])],
-                       spendableBalance: (Address, Option[AssetId]) => Long,
-                       storeEvent: StoreEvent,
                        settings: MatcherSettings,
-                       time: Time,
-                       orderDB: OrderDB)
+                       addressActorProps: Address => Props)
     extends Actor
     with ScorexLogging {
   import AddressDirectory._
@@ -41,11 +36,7 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Option[Asse
 
   private def createAddressActor(address: Address): ActorRef = {
     log.debug(s"Creating address actor for $address")
-    watch(
-      actorOf(
-        Props(new AddressActor(address, spendableBalance(address, _), settings.maxTimestampDiff, 5.seconds, time, orderDB, storeEvent)),
-        address.toString
-      ))
+    watch(actorOf(addressActorProps(address), address.toString))
   }
 
   private def forward(address: Address, msg: Any): Unit = {
