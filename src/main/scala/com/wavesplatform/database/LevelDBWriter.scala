@@ -967,8 +967,10 @@ class LevelDBWriter(writableDB: DB,
       )
   }
 
-  override def wavesDistribution(height: Int): Map[Address, Long] = readOnly { db =>
-    (for {
+  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
+    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
+
+    def createMap() = (for {
       seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
       addressId <- db.get(Keys.addressesForWaves(seqNr)).par
       history = db.get(Keys.wavesBalanceHistory(addressId))
@@ -976,6 +978,12 @@ class LevelDBWriter(writableDB: DB,
       balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+
+    Either.cond(
+      height > canGetAfterHeight,
+      createMap(),
+      GenericError(s"Cannot get waves distribution at height less than ${canGetAfterHeight + 1}")
+    )
   }
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
