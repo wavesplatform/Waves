@@ -81,7 +81,7 @@ class UtxPoolImpl(time: Time,
     Task.eval {
       removeInvalid(transactionsToFastRemove, checkFuture = 0)
       transactionsToFastRemove = Nil
-    }
+    }.executeOn(scheduler)
   }
 
   override def close(): Unit = {
