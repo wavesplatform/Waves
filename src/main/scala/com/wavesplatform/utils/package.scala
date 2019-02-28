@@ -123,17 +123,22 @@ package object utils extends ScorexLogging {
   def dummyEvalContext(version: StdLibVersion): EvaluationContext = lazyContexts(version)().evaluationContext
 
   private val lazyFunctionCosts: Map[StdLibVersion, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
-    lazyContexts.mapValues(_.map(ctx => estimate(ctx.evaluationContext)))
+    lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1, ctx.evaluationContext))))
 
   def functionCosts(version: StdLibVersion): Map[FunctionHeader, Coeval[Long]] = lazyFunctionCosts(version)()
 
-  def estimate(ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
+  def estimate(version: StdLibVersion, ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
       case (typeName, CaseType(_, fields)) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
     }(collection.breakOut)
 
     ctx.functions.values.foreach { func =>
-      costs += func.header -> Coeval.now(func.cost)
+      val cost = func match {
+        case f: UserFunction =>
+          f.costByLibVersion(version)
+        case f: NativeFunction => f.cost
+      }
+      costs += func.header -> Coeval.now(cost)
     }
 
     costs.toMap

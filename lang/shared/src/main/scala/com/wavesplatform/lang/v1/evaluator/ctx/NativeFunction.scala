@@ -1,7 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.data.EitherT
-import com.wavesplatform.lang.TrampolinedExecResult
+import com.wavesplatform.lang.StdLibVersion.StdLibVersion
+import com.wavesplatform.lang.{StdLibVersion, TrampolinedExecResult}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -55,24 +56,40 @@ object NativeFunction {
 @JSExportTopLevel("UserFunction")
 case class UserFunction(@(JSExport @field) name: String,
                         @(JSExport @field) internalName: String,
-                        @(JSExport @field) cost: Long,
+                        costByLibVersion: Map[StdLibVersion, Long],
                         @(JSExport @field) signature: FunctionTypeSignature,
                         ev: EXPR,
                         @(JSExport @field) docString: String,
                         @(JSExport @field) argsDoc: Array[(String, String)])
-    extends BaseFunction
+    extends BaseFunction {
+
+  @(JSExport @field)
+  def cost: Long = costByLibVersion.get(StdLibVersion.SupportedVersions.last).get
+}
 
 object UserFunction {
 
   def apply(name: String, cost: Long, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(ev: EXPR): UserFunction =
-    UserFunction(name, name, cost, resultType, docString, args: _*)(ev)
+    UserFunction(name, name, StdLibVersion.SupportedVersions.map(_ -> cost).toMap, resultType, docString, args: _*)(ev)
+
+  def apply(name: String, costByLibVersion: Map[StdLibVersion, Long], resultType: TYPE, docString: String, args: (String, TYPE, String)*)(
+      ev: EXPR): UserFunction =
+    UserFunction(name, name, costByLibVersion, resultType, docString, args: _*)(ev)
 
   def apply(name: String, internalName: String, cost: Long, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(
       ev: EXPR): UserFunction =
+    UserFunction(name, internalName, StdLibVersion.SupportedVersions.map(_ -> cost).toMap, resultType, docString, args: _*)(ev)
+
+  def apply(name: String,
+            internalName: String,
+            costByLibVersion: Map[StdLibVersion, Long],
+            resultType: TYPE,
+            docString: String,
+            args: (String, TYPE, String)*)(ev: EXPR): UserFunction =
     new UserFunction(
       name = name,
       internalName = internalName,
-      cost = cost,
+      costByLibVersion = costByLibVersion,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.User(internalName)),
       ev = ev,
       docString = docString,
