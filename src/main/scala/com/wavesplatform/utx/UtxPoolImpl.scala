@@ -140,7 +140,7 @@ class UtxPoolImpl(time: Time,
       val currentlyInvalid = TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
       val futureInvalid = (1 to checkFuture).exists { i =>
         import scala.concurrent.duration._
-        TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime() + ((1 minute) * i).toMillis, b.height + i)(b, t).isLeft
+        TransactionDiffer(fs, b.lastBlockTimestamp.map(_ + ((1 minute) * i).toMillis), time.correctedTime() + ((1 minute) * i).toMillis, b.height + i)(b, t).isLeft
       }
 
       if (currentlyInvalid) {
