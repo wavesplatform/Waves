@@ -6,8 +6,8 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings._
-import com.wavesplatform.settings.fee.{AssetType, Mode}
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -86,7 +86,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |    min-fee = 300000
          |  }
          |  percent {
-         |    type = amount
+         |    asset-type = amount
          |    min-fee = 0.1
          |  }
          |}
@@ -127,9 +127,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       )
     )
 
-    settings.orderFee.mode shouldBe Mode.FIXED
-
-    settings.orderFee.modeSettings match {
+    settings.orderFee match {
       case FixedSettings(defaultAssetId, minFee) =>
         defaultAssetId shouldBe None
         minFee shouldBe 300000
@@ -152,7 +150,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |    min-fee = 300000
          |  }
          |  percent {
-         |    type = amount
+         |    asset-type = amount
          |    min-fee = 0.1
          |  }
          |}
@@ -167,7 +165,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |    min-fee = 300000
          |  }
          |  percent {
-         |    type = test
+         |    asset-type = test
          |    min-fee = 121
          |  }
          |}
@@ -182,7 +180,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |    min-fee = -300000
          |  }
          |  percent {
-         |    type = test
+         |    asset-type = test
          |    min-fee = 121
          |  }
          |}
@@ -196,7 +194,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
     settingsInvalidTypeAndPercent shouldBe
       Left(
-        "Invalid setting waves.matcher.order-fee.percent.type value: test\n" +
+        "Invalid setting waves.matcher.order-fee.percent.asset-type value: test\n" +
           "Invalid setting waves.matcher.order-fee.percent.min-fee value: 121.0, required 0 < p <= 100")
 
     settingsInvalidAssetAndFee shouldBe

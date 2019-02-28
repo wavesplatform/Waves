@@ -11,9 +11,9 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.matcher.util._
 import com.wavesplatform.metrics.TimerExt
+import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.AssetType.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings._
-import com.wavesplatform.settings.fee.{AssetType, Mode}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -167,19 +167,17 @@ object OrderValidator {
     for {
       _ <- (Right(order): ValidationResult)
         .ensure(s"Matcher's fee asset in order (${order.matcherFeeAssetId}) does not meet matcher's settings requirements") { order =>
-          val isMatcherFeeAssetValid = (orderFeeSettings.mode, orderFeeSettings.modeSettings) match {
-            case (Mode.PERCENT, PercentSettings(assetType, _))  => order.matcherFeeAssetId == getValidFeeAsset(order, assetType)
-            case (Mode.FIXED, FixedSettings(defaultAssetId, _)) => order.matcherFeeAssetId == defaultAssetId
-            case _                                              => false
+          val isMatcherFeeAssetValid = orderFeeSettings match {
+            case PercentSettings(assetType, _)    => order.matcherFeeAssetId == getValidFeeAsset(order, assetType)
+            case FixedSettings(defaultAssetId, _) => order.matcherFeeAssetId == defaultAssetId
           }
           order.version != 3 || isMatcherFeeAssetValid
         }
       _ <- (Right(order): ValidationResult)
         .ensure(s"Matcher's fee (${order.matcherFee}) is less than minimally admissible one") { order =>
-          val isMatcherFeeValid = (orderFeeSettings.mode, orderFeeSettings.modeSettings) match {
-            case (Mode.PERCENT, percentSettings: PercentSettings) => order.matcherFee >= getMinValidFee(order, percentSettings)
-            case (Mode.FIXED, FixedSettings(_, fixedMinFee))      => order.matcherFee >= fixedMinFee
-            case _                                                => false
+          val isMatcherFeeValid = orderFeeSettings match {
+            case percentSettings: PercentSettings => order.matcherFee >= getMinValidFee(order, percentSettings)
+            case FixedSettings(_, fixedMinFee)    => order.matcherFee >= fixedMinFee
           }
           order.version != 3 || isMatcherFeeValid
         }

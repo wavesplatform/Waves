@@ -10,8 +10,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.settings.fee.{AssetType, Mode}
-import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, OrderFeeSettings, PercentSettings}
+import com.wavesplatform.settings.fee.AssetType
+import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
@@ -229,13 +229,6 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       minFee    <- Gen.choose(0.01, 100.0)
     } yield PercentSettings(assetType, minFee)
 
-  val percentOrderFeeSettingsGenerator: Gen[OrderFeeSettings] =
-    for { settings <- percentSettingsGenerator } yield OrderFeeSettings(Mode.PERCENT, settings)
-
   def fixedSettingsGenerator(defaultAsset: Option[AssetId], lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
     for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedSettings(defaultAsset, minFee) }
-
-  def fixedOrderFeeSettingsGenerator(defaultAsset: Option[AssetId]): Gen[OrderFeeSettings] =
-    for { settings <- fixedSettingsGenerator(defaultAsset) } yield OrderFeeSettings(Mode.FIXED, settings)
-
 }

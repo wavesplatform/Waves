@@ -9,8 +9,7 @@ import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.settings.fee.Mode
-import com.wavesplatform.settings.fee.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
+import com.wavesplatform.settings.fee.OrderFeeSettings.PercentSettings
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -168,7 +167,7 @@ class OrderValidatorSpecification
 
       "matcher's fee asset in order doesn't meet matcher's settings requirements (percent mode and arbitrary asset)" in forAll(
         orderV3WithArbitraryFeeAssetGenerator, // in percent mode it's not allowed to pay fee in arbitrary asset (only in one of the assets of the pair)
-        percentOrderFeeSettingsGenerator
+        percentSettingsGenerator
       ) {
 
         case (order, percentFeeSettings) =>
@@ -187,7 +186,7 @@ class OrderValidatorSpecification
           for {
             (order, _)       <- orderGenerator.filter { case (order, _) => order.version == 3 }
             fixedFeeAsset    <- assetIdGen(1)
-            fixedFeeSettings <- fixedOrderFeeSettingsGenerator(fixedFeeAsset)
+            fixedFeeSettings <- fixedSettingsGenerator(fixedFeeAsset)
           } yield (order, fixedFeeSettings)
 
         forAll(preconditions) {
@@ -222,10 +221,7 @@ class OrderValidatorSpecification
           case (order, percentFeeSettings) =>
             val orderValidator =
               OrderValidator
-                .matcherSettingsAware(order.matcherPublicKey,
-                                      Set.empty[Address],
-                                      Set.empty[Option[AssetId]],
-                                      OrderFeeSettings(Mode.PERCENT, percentFeeSettings)) _
+                .matcherSettingsAware(order.matcherPublicKey, Set.empty[Address], Set.empty[Option[AssetId]], percentFeeSettings) _
 
             orderValidator(order) should produce(
               s"Matcher's fee (${order.matcherFee}) is less than minimally admissible one"
@@ -250,17 +246,13 @@ class OrderValidatorSpecification
           case (order, fixedFeeSettings) =>
             val orderValidator =
               OrderValidator
-                .matcherSettingsAware(order.matcherPublicKey,
-                                      Set.empty[Address],
-                                      Set.empty[Option[AssetId]],
-                                      OrderFeeSettings(Mode.FIXED, fixedFeeSettings)) _
+                .matcherSettingsAware(order.matcherPublicKey, Set.empty[Address], Set.empty[Option[AssetId]], fixedFeeSettings) _
 
             orderValidator(order) should produce(
               s"Matcher's fee (${order.matcherFee}) is less than minimally admissible one"
             )
         }
       }
-
     }
 
     "validate order with any number of signatures from a scripted account" in forAll(Gen.choose(0, 5)) { proofsNumber =>

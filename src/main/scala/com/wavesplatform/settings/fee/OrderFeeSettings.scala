@@ -16,12 +16,10 @@ object OrderFeeSettings {
 
   type ErrorsListOr[A] = Validated[List[String], A]
 
-  sealed trait Settings
+  sealed trait OrderFeeSettings
 
-  case class FixedSettings(defaultAssetId: Option[AssetId], minFee: Long) extends Settings
-  case class PercentSettings(assetType: AssetType, minFee: Double)        extends Settings
-
-  case class OrderFeeSettings(mode: Mode, modeSettings: Settings)
+  case class FixedSettings(defaultAssetId: Option[AssetId], minFee: Long) extends OrderFeeSettings
+  case class PercentSettings(assetType: AssetType, minFee: Double)        extends OrderFeeSettings
 
   implicit val orderFeeSettingsReader: ValueReader[OrderFeeSettings] = { (cfg, path) =>
     def validateSafe[T: ValueReader](settingName: String): ErrorsListOr[T] = {
@@ -61,19 +59,17 @@ object OrderFeeSettings {
       val percentSettingName = s"$prefix.min-fee"
 
       (
-        validateSafe[AssetType](s"$prefix.type"),
+        validateSafe[AssetType](s"$prefix.asset-type"),
         validateByPredicate[Double](percentSettingName)(percent => 0 < percent && percent <= 100, "required 0 < p <= 100")
       ) mapN PercentSettings.apply
     }
 
-    def getSettingsByMode(mode: Mode): ErrorsListOr[Settings] = mode match {
+    def getSettingsByMode(mode: Mode): ErrorsListOr[OrderFeeSettings] = mode match {
       case Mode.FIXED   => validateFixedSettings
       case Mode.PERCENT => validatePercentSettings
     }
 
-    validateSafe[Mode](s"$path.mode").toEither.flatMap { mode =>
-      getSettingsByMode(mode).toEither.map(settings => OrderFeeSettings(mode, settings))
-    } match {
+    validateSafe[Mode](s"$path.mode").toEither.flatMap(mode => getSettingsByMode(mode).toEither) match {
       case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString("\n"))
       case Right(orderFeeSettings) => orderFeeSettings
     }
