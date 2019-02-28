@@ -180,11 +180,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     rxExtensionLoaderShutdown = Some(sh)
 
     UtxPoolSynchronizer.start(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
-    val microBlockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
-    val blockSink      = newBlocks.mapTask(scala.Function.tupled(processBlock))
+
+    val microBlockSink = microblockDatas
+      .mapTask(scala.Function.tupled(processMicroBlock))
+
+    val blockSink      = newBlocks
+      .mapTask(scala.Function.tupled(processBlock))
+      .mapTask(_ => utxStorage.runFastCleanup())
 
     Observable.merge(microBlockSink, blockSink).subscribe()
-    blockSink.mapTask(_ => utxStorage.runFastCleanup()).subscribe()
     miner.scheduleMining()
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
