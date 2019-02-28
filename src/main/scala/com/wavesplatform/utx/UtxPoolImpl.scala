@@ -135,21 +135,18 @@ class UtxPoolImpl(time: Time,
   }
 
   private[this] def removeInvalid(list: Iterable[Transaction] = this.transactions.values.asScala, checkFuture: Int = smartCleanupBlocksAhead): Unit = {
-    val b = blockchain
-
     val (transactionsToRemove, transactionsToCheckInNextBlock) = list.map { t =>
-      val currentlyInvalid = TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
-      val futureInvalid = (1 to checkFuture).exists { heightOffset =>
-        val timeOffset = (utxSettings.approxBlockTime * heightOffset).toMillis
-TransactionDiffer(fs, b.lastBlockTimestamp.map(_ + timeOffset), time.correctedTime() + timeOffset, b.height + heightOffset)(b, t).isLeft
-      }
+      val currentlyInvalid = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, t).isLeft
 
       if (currentlyInvalid) {
         (Some(t), None)
-      } else if (futureInvalid) {
-        (None, Some(t))
       } else {
-        (None, None)
+        val futureInvalid = (1 to checkFuture).exists { heightOffset =>
+          val timeOffset = (utxSettings.approxBlockTime * heightOffset).toMillis
+          TransactionDiffer(fs, blockchain.lastBlockTimestamp.map(_ + timeOffset), time.correctedTime() + timeOffset, blockchain.height + heightOffset)(blockchain, t).isLeft
+        }
+
+        if (futureInvalid) (None, Some(t)) else (None, None)
       }
     }.unzip
 
