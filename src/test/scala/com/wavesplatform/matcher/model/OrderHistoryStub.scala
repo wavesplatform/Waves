@@ -24,9 +24,9 @@ class OrderHistoryStub(system: ActorSystem, time: Time) {
             lo.order.sender,
             _ => 0L,
             5.seconds,
-            5.seconds,
             time,
             new TestOrderDB(100),
+            _ => false,
             e => Future.successful(QueueEventWithMeta(0, 0, e)),
           )))
     )

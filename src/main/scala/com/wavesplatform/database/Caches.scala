@@ -282,15 +282,13 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Option[AssetId
 
             addrs.map { addr =>
               val addrId = AddressId(addressId(addr))
-              val htx    = (h, tx)
-              addrId -> htx
+              addrId -> TransactionId(tx.id())
             }
         }
         .groupBy(_._1)
-        .mapValues { txs =>
-          val sorted = txs.sortBy { case (_, (h, tx)) => (-h, -tx.timestamp) }
-          sorted.map { case (_, (_, tx)) => TransactionId(tx.id()) }
-        }
+        .mapValues(_.map {
+          case (_, txId) => txId
+        })
 
     current = (newHeight, current._2 + block.blockScore(), Some(block))
 

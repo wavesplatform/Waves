@@ -21,7 +21,7 @@ import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, O
 import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, VolumeAndFee}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, Time, forceStopApplication}
@@ -164,15 +164,26 @@ class Matcher(actorSystem: ActorSystem,
     MatcherActor.name
   )
 
+  private lazy val orderDb = OrderDB(matcherSettings, db)
+
   private lazy val addressActors =
     actorSystem.actorOf(
       Props(
-        new AddressDirectory(spendableBalanceChanged,
-                             utx.spendableBalance,
-                             matcherQueue.storeEvent,
-                             matcherSettings,
-                             time,
-                             OrderDB(matcherSettings, db))),
+        new AddressDirectory(
+          spendableBalanceChanged,
+          matcherSettings,
+          address =>
+            Props(
+              new AddressActor(
+                address,
+                utx.spendableBalance(address, _),
+                5.seconds,
+                time,
+                orderDb,
+                id => blockchain.filledVolumeAndFee(id) != VolumeAndFee.empty,
+                matcherQueue.storeEvent
+              ))
+        )),
       "addresses"
     )
 
