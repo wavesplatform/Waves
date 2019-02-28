@@ -11,9 +11,10 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import org.scalatest.CancelAfterFailure
+import org.scalatest.{CancelAfterFailure, Ignore}
 import play.api.libs.json.{JsNumber, Json}
 
+@Ignore // ignored in v0.16
 class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   private val contract = pkByAddress(firstAddress)

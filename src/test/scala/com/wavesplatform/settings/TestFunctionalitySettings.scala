@@ -20,7 +20,7 @@ object TestFunctionalitySettings {
       BlockchainFeatures.SmartAccounts.id -> 0,
       BlockchainFeatures.SmartAssets.id   -> 0,
       BlockchainFeatures.FairPoS.id       -> 0,
-      BlockchainFeatures.Ride4DApps.id    -> 0
+//      BlockchainFeatures.Ride4DApps.id    -> 0  // disabled in v0.16
     ),
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     maxTransactionTimeBackOffset = 120.minutes,
