@@ -10,6 +10,7 @@ import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
+import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.{Consumer, OverflowStrategy}
 
@@ -38,31 +39,26 @@ object UtxPoolSynchronizer extends ScorexLogging {
         isNew
       }
 
-    val putIfNewAndBroadcast = Consumer.foreachParallel[(Channel, Transaction)](settings.parallelism) { case (sender, transaction) =>
-      utx.putIfNew(transaction) match {
-        case Right((isNew, _)) =>
-          if (isNew) allChannels.write(RawBytes.from(transaction), (_: Channel) != sender)
-
-        case Left(error) =>
-          log.debug(s"Error adding transaction to UTX pool: $error")
-      }
-    }
-
     val synchronizerFuture = newTxSource
       .whileBusyBuffer(OverflowStrategy.DropOldAndSignal(settings.maxQueueSize, { dropped =>
         log.warn(s"UTX queue overflow: $dropped transactions dropped")
         None
       }))
-      .consumeWith(putIfNewAndBroadcast)
-      .runAsyncLogErr
-      .flatMap { _ =>
-        newTxSource
-          .map(_ => 1)
-          .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
-          .filter(_.nonEmpty)
-          .foreachL(_ => allChannels.flush())
-          .runAsyncLogErr
+      .mapParallelUnordered(settings.parallelism) { case (sender, transaction) => Task {
+          concurrent.blocking(utx.putIfNew(transaction)) match {
+            case Right((isNew, _)) =>
+              if (isNew) allChannels.write(RawBytes.from(transaction), (_: Channel) != sender)
+
+            case Left(error) =>
+              log.debug(s"Error adding transaction to UTX pool: $error")
+          }
+        }
       }
+      .map(_ => 1)
+      .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
+      .filter(_.nonEmpty)
+      .foreachL(_ => allChannels.flush())
+      .runAsyncLogErr
 
     synchronizerFuture.onComplete {
       case Success(_)     => log.error("UtxPoolSynschronizer stops")
