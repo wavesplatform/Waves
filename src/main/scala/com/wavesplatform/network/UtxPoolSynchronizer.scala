@@ -12,7 +12,7 @@ import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
-import monix.reactive.{Consumer, OverflowStrategy}
+import monix.reactive.OverflowStrategy
 
 import scala.util.{Failure, Success}
 
