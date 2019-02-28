@@ -62,7 +62,7 @@ object UtxPoolSynchronizer extends ScorexLogging {
       .runAsyncLogErr
 
     synchronizerFuture.onComplete {
-      case Success(_)     => log.error("UtxPoolSynschronizer stops")
+      case Success(_)     => log.info("UtxPoolSynschronizer stops")
       case Failure(error) => log.error("Error in utx pool synchronizer", error)
     }
 
