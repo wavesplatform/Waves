@@ -1,66 +1,9 @@
 package com.wavesplatform.transaction.protobuf
 
-import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction._
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.{transaction => vt}
-import monix.eval.Coeval
-import play.api.libs.json.JsObject
-
-import scala.annotation.switch
 
 trait PBTransactionImplicits {
-  class PBTransactionVanillaAdapter(tx: PBTransaction) extends VanillaTransaction with com.wavesplatform.transaction.SignedTransaction {
-    def underlying: Transaction = tx
-
-    override def timestamp: Long                   = tx.timestamp
-    override val sender: PublicKeyAccount          = tx.sender
-    override val proofs: Proofs                    = Proofs.empty
-    override val signature: ByteStr                = proofs.toSignature
-    override def builder: PBTransaction.type       = PBTransaction
-    override def assetFee: (Option[ByteStr], Long) = (Some(tx.feeAssetId: ByteStr).filterNot(_.isEmpty), tx.fee)
-
-    override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce((tx.version: @switch) match {
-      case 1 | 2 => // Legacy
-        tx.toVanilla.bodyBytes()
-
-      case _ =>
-        tx.protoUnsignedBytes()
-    })
-
-    override val bytes: Coeval[Array[Byte]] = tx.protoBytes
-
-    override val json: Coeval[JsObject] = Coeval.evalOnce((tx.version: @switch) match {
-      case 1 | 2 => tx.toVanilla.json()
-      case _     => ???
-    })
-
-    override val id: Coeval[ByteStr] = Coeval.evalOnce((tx.version: @switch) match {
-      case 1 | 2 => // Legacy
-        tx.toVanilla.id()
-
-      case _ =>
-        // PBUtils.encodeDeterministic(tx.copy(proofsArray = Nil))
-        FastHashId.create(bodyBytes())
-    })
-
-    override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
-      (tx.data.isGenesis || tx.version > 1) || (tx.toVanilla match {
-        case s: Signed => s.signatureValid()
-        case _         => true
-      })
-    }
-
-    override def equals(other: Any): Boolean = other match {
-      case a: PBTransactionVanillaAdapter => tx.equals(a.underlying)
-      case a: VanillaTransaction          => tx.equals(SignedTransaction.SignedVanillaTransactionImplicitConversionOps(a).toPB.transaction)
-      case _                              => tx.equals(other)
-    }
-
-    // private[this] lazy val _hashCode = if (tx.version > 2) tx.hashCode() else tx.toVanilla.hashCode()
-    override def hashCode(): Int = tx.hashCode() // _hashCode
-  }
-
   implicit class VanillaOrderImplicitConversionOps(order: vt.assets.exchange.Order) {
     def toPB: ExchangeTransactionData.Order = {
       ExchangeTransactionData.Order(
@@ -115,7 +58,7 @@ trait PBTransactionImplicits {
 
     def toVanillaOrAdapter: VanillaTransaction = if (this.isLegacy) toVanilla else toVanillaAdapter
 
-    def toVanillaAdapter = new PBTransactionVanillaAdapter(tx)
+    def toVanillaAdapter = tx.asSigned.toVanillaAdapter
 
     def toVanilla: VanillaTransaction = PBSignedTransactionImplicits.PBTransactionImplicitConversionOps(this.asSigned).toVanilla
   }

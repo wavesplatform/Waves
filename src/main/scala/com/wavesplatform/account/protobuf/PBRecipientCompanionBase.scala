@@ -6,38 +6,36 @@ trait PBRecipientCompanionBase {
   def empty: Recipient = Recipient.defaultInstance
 
   implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
-    case a: VAddress  => fromAddress(a)
-    case al: VAlias => fromAlias(al)
+    case a: VAddress => fromAddress(a)
+    case al: VAlias  => fromAlias(al)
   }
 
   implicit def fromAddress(address: VAddress): Recipient = {
-    Address(address)
+    Recipient()
+      .withAddress(address)
   }
 
   implicit def fromAlias(alias: VAlias): Recipient = {
-    Alias(alias.chainId, alias.name)
+    Recipient()
+      .withAlias(Alias(alias.chainId, alias.name))
   }
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {
-    def toAddress: VAddress = recipient match {
-      case Address(address) => address
-      case _                => throw new IllegalArgumentException(s"Not an address: $recipient")
+    def toAddress: VAddress = {
+      recipient.getAddress
     }
 
-    def toAlias: VAlias = recipient match {
-      case Alias(chainId, name) =>
-        VAlias
-          .buildAlias(chainId.byte, name)
-          .explicitGet()
-
-      case _ =>
-        throw new IllegalArgumentException(s"Not an alias: $recipient")
+    def toAlias: VAlias = {
+      val alias = recipient.getAlias
+      VAlias
+        .buildAlias(alias.chainId.byte, alias.name)
+        .explicitGet()
     }
 
-    def toAddressOrAlias: AddressOrAlias = recipient match {
-      case _: Alias        => this.toAlias
-      case _: Address      => this.toAddress
-      case Recipient.Empty => throw new IllegalArgumentException("Empty address not supported")
+    def toAddressOrAlias: AddressOrAlias = recipient.recipient match {
+      case Recipient.Recipient.Alias(_)         => this.toAlias
+      case Recipient.Recipient.Address(address) => address
+      case Recipient.Recipient.Empty            => throw new IllegalArgumentException("Empty address not supported")
     }
   }
 }

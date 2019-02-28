@@ -1,11 +1,11 @@
 package com.wavesplatform.transaction.protobuf
 import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.account.protobuf.RecipientMessage._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.assets.exchange.OrderV1
 import com.wavesplatform.transaction.protobuf.PBTransaction._
 import com.wavesplatform.transaction.protobuf.Transaction.Data
+import com.wavesplatform.transaction.protobuf.XXAmount.AssetAmount
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, _}
@@ -23,12 +23,18 @@ trait PBSignedTransactionImplicits {
   class PBSignedTransactionVanillaAdapter(tx: PBSignedTransaction) extends VanillaTransaction with com.wavesplatform.transaction.SignedTransaction {
     def underlying: PBSignedTransaction = tx
 
-    override def timestamp: Long                   = tx.transaction.timestamp
-    override val sender: PublicKeyAccount          = tx.transaction.sender
-    override val proofs: Proofs                    = Proofs.empty
-    override val signature: ByteStr                = proofs.toSignature
-    override def builder: PBTransaction.type       = PBTransaction
-    override def assetFee: (Option[ByteStr], Long) = (Some(tx.feeAssetId: ByteStr).filterNot(_.isEmpty), tx.fee)
+    override def builder: PBTransaction.type = PBTransaction
+
+    override def timestamp: Long          = tx.transaction.timestamp
+    override val sender: PublicKeyAccount = tx.transaction.senderPublicKey
+    override val proofs: Proofs           = Proofs.empty
+    override val signature: ByteStr       = proofs.toSignature
+
+    override def assetFee: (Option[ByteStr], Long) = tx.fee.amount match {
+      case XXAmount.Amount.WavesAmount(amount)                       => (None, amount)
+      case XXAmount.Amount.AssetAmount(AssetAmount(assetId, amount)) => (Some(assetId), amount)
+      case XXAmount.Amount.Empty                                     => (None, 0L)
+    }
 
     override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce((tx.version: @switch) match {
       case 1 | 2 => // Legacy
@@ -86,19 +92,19 @@ trait PBSignedTransactionImplicits {
         SignedTransaction.create(sender, NoChainId, fee, AssetId.Waves, timestamp, 1, Seq(signature), Data.Payment(data))
 
       case vt.transfer.TransferTransactionV1(assetId, sender, recipient, amount, timestamp, feeAssetId, fee, attachment, signature) =>
-        val data = TransferTransactionData(assetId, recipient, amount, ByteStr(attachment))
+        val data = TransferTransactionData(recipient, (assetId, amount), ByteStr(attachment))
         SignedTransaction.create(sender, NoChainId, fee, feeAssetId, timestamp, 1, Seq(signature), Data.Transfer(data))
 
       case vt.transfer.TransferTransactionV2(sender, recipient, assetId, amount, timestamp, feeAssetId, fee, attachment, proofs) =>
-        val data = TransferTransactionData(assetId, recipient, amount, attachment)
+        val data = TransferTransactionData(recipient, (assetId, amount), attachment)
         SignedTransaction.create(sender, NoChainId, fee, feeAssetId, timestamp, 2, proofs, Data.Transfer(data))
 
       case tx @ vt.CreateAliasTransactionV1(sender, alias, fee, timestamp, signature) =>
-        val data = CreateAliasTransactionData(alias)
+        val data = CreateAliasTransactionData(alias.name)
         SignedTransaction.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 1, Seq(signature), Data.CreateAlias(data))
 
       case tx @ vt.CreateAliasTransactionV2(sender, alias, fee, timestamp, proofs) =>
-        val data = CreateAliasTransactionData(alias)
+        val data = CreateAliasTransactionData(alias.name)
         SignedTransaction.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.CreateAlias(data))
 
       case tx @ vt.assets.exchange
@@ -119,19 +125,19 @@ trait PBSignedTransactionImplicits {
         SignedTransaction.create(sender, chainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.Issue(data))
 
       case tx @ vt.assets.ReissueTransactionV1(sender, assetId, quantity, reissuable, fee, timestamp, signature) =>
-        val data = ReissueTransactionData(assetId, quantity, reissuable)
+        val data = ReissueTransactionData(AssetAmount(assetId, quantity), reissuable)
         SignedTransaction.create(sender, tx.chainByte, fee, tx.assetFee._1, timestamp, 1, Seq(signature), Data.Reissue(data))
 
       case tx @ vt.assets.ReissueTransactionV2(chainId, sender, assetId, amount, reissuable, fee, timestamp, proofs) =>
-        val data = ReissueTransactionData(assetId, amount, reissuable)
+        val data = ReissueTransactionData(AssetAmount(assetId, amount), reissuable)
         SignedTransaction.create(sender, chainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.Reissue(data))
 
       case tx @ vt.assets.BurnTransactionV1(sender, assetId, amount, fee, timestamp, signature) =>
-        val data = BurnTransactionData(assetId, amount)
+        val data = BurnTransactionData(AssetAmount(assetId, amount))
         SignedTransaction.create(sender, tx.chainByte, fee, tx.assetFee._1, timestamp, 1, Seq(signature), Data.Burn(data))
 
       case tx @ vt.assets.BurnTransactionV2(chainId, sender, assetId, amount, fee, timestamp, proofs) =>
-        val data = BurnTransactionData(assetId, amount)
+        val data = BurnTransactionData(AssetAmount(assetId, amount))
         SignedTransaction.create(sender, chainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.Burn(data))
 
       case vt.assets.SetAssetScriptTransaction(chainId, sender, assetId, script, fee, timestamp, proofs) =>
@@ -177,7 +183,7 @@ trait PBSignedTransactionImplicits {
         SignedTransaction.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.DataTransaction(txData))
 
       case tx @ vt.assets.SponsorFeeTransaction(sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs) =>
-        val data = SponsorFeeTransactionData(assetId, minSponsoredAssetFee.getOrElse(0L))
+        val data = SponsorFeeTransactionData(AssetAmount(assetId, minSponsoredAssetFee.getOrElse(0L)))
         SignedTransaction.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.SponsorFee(data))
 
       case _ =>
@@ -196,32 +202,32 @@ trait PBSignedTransactionImplicits {
 
     def toVanilla: VanillaTransaction = tx.data match {
       case Data.Genesis(GenesisTransactionData(recipient, amount)) =>
-        vt.GenesisTransaction(recipient.toAddress, amount, tx.timestamp, signature)
+        vt.GenesisTransaction(recipient, amount, tx.timestamp, signature)
 
       case Data.Payment(PaymentTransactionData(recipient, amount)) =>
-        vt.PaymentTransaction(tx.sender, recipient.toAddress, amount, tx.fee, tx.timestamp, signature)
+        vt.PaymentTransaction(tx.senderPublicKey, recipient, amount, tx.fee, tx.timestamp, signature)
 
-      case Data.Transfer(TransferTransactionData(assetId, recipient, amount, attachment)) =>
+      case Data.Transfer(TransferTransactionData(recipient, amount, attachment)) =>
         tx.version match {
           case 1 =>
             vt.transfer
-              .TransferTransactionV1(assetId,
-                                     tx.sender,
+              .TransferTransactionV1(amount.assetId,
+                                     tx.senderPublicKey,
                                      recipient.toAddressOrAlias,
                                      amount,
                                      tx.timestamp,
-                                     tx.feeAssetId,
+                                     tx.fee.assetId,
                                      tx.fee,
                                      attachment,
                                      signature)
           case 2 =>
             vt.transfer
-              .TransferTransactionV2(tx.sender,
+              .TransferTransactionV2(tx.senderPublicKey,
                                      recipient.toAddressOrAlias,
-                                     assetId,
+                                     amount.assetId,
                                      amount,
                                      tx.timestamp,
-                                     tx.feeAssetId,
+                                     tx.fee.assetId,
                                      tx.fee,
                                      attachment,
                                      tx.proofs)
@@ -229,9 +235,20 @@ trait PBSignedTransactionImplicits {
         }
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
+        import com.wavesplatform.common.utils._
         tx.version match {
-          case 1 => vt.CreateAliasTransactionV1(tx.sender, alias.toAlias, tx.fee, tx.timestamp, signature)
-          case 2 => vt.CreateAliasTransactionV2(tx.sender, alias.toAlias, tx.fee, tx.timestamp, tx.proofs)
+          case 1 =>
+            vt.CreateAliasTransactionV1(tx.senderPublicKey,
+                                        com.wavesplatform.account.Alias.buildAlias(tx.chainId, alias).explicitGet(),
+                                        tx.fee,
+                                        tx.timestamp,
+                                        signature)
+          case 2 =>
+            vt.CreateAliasTransactionV2(tx.senderPublicKey,
+                                        com.wavesplatform.account.Alias.buildAlias(tx.chainId, alias).explicitGet(),
+                                        tx.fee,
+                                        tx.timestamp,
+                                        tx.proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
@@ -239,7 +256,7 @@ trait PBSignedTransactionImplicits {
         tx.version match {
           case 1 =>
             vt.assets.IssueTransactionV1(
-              tx.sender,
+              tx.senderPublicKey,
               name,
               description,
               quantity,
@@ -252,7 +269,7 @@ trait PBSignedTransactionImplicits {
           case 2 =>
             vt.assets.IssueTransactionV2(
               tx.chainId.byte,
-              tx.sender,
+              tx.senderPublicKey,
               name,
               description,
               quantity,
@@ -266,37 +283,37 @@ trait PBSignedTransactionImplicits {
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.Reissue(ReissueTransactionData(assetId, amount, reissuable)) =>
+      case Data.Reissue(ReissueTransactionData(AssetAmount(assetId, amount), reissuable)) =>
         tx.version match {
-          case 1 => vt.assets.ReissueTransactionV1(tx.sender, assetId, amount, reissuable, tx.fee, tx.timestamp, signature)
-          case 2 => vt.assets.ReissueTransactionV2(tx.chainId, tx.sender, assetId, amount, reissuable, tx.fee, tx.timestamp, tx.proofs)
+          case 1 => vt.assets.ReissueTransactionV1(tx.senderPublicKey, assetId, amount, reissuable, tx.fee, tx.timestamp, signature)
+          case 2 => vt.assets.ReissueTransactionV2(tx.chainId, tx.senderPublicKey, assetId, amount, reissuable, tx.fee, tx.timestamp, tx.proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
-      case Data.Burn(BurnTransactionData(assetId, amount)) =>
+      case Data.Burn(BurnTransactionData(AssetAmount(assetId, amount))) =>
         tx.version match {
-          case 1 => vt.assets.BurnTransactionV1(tx.sender, assetId, amount, tx.fee, tx.timestamp, signature)
-          case 2 => vt.assets.BurnTransactionV2(tx.chainId, tx.sender, assetId, amount, tx.fee, tx.timestamp, tx.proofs)
+          case 1 => vt.assets.BurnTransactionV1(tx.senderPublicKey, assetId, amount, tx.fee, tx.timestamp, signature)
+          case 2 => vt.assets.BurnTransactionV2(tx.chainId, tx.senderPublicKey, assetId, amount, tx.fee, tx.timestamp, tx.proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
       case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script)) =>
-        vt.assets.SetAssetScriptTransaction(tx.chainId, tx.sender, assetId, script, tx.fee, tx.timestamp, tx.proofs)
+        vt.assets.SetAssetScriptTransaction(tx.chainId, tx.senderPublicKey, assetId, script, tx.fee, tx.timestamp, tx.proofs)
 
       case Data.SetScript(SetScriptTransactionData(script)) =>
-        vt.smart.SetScriptTransaction(tx.chainId, tx.sender, script, tx.fee, tx.timestamp, tx.proofs)
+        vt.smart.SetScriptTransaction(tx.chainId, tx.senderPublicKey, script, tx.fee, tx.timestamp, tx.proofs)
 
       case Data.Lease(LeaseTransactionData(recipient, amount)) =>
         tx.version match {
-          case 1 => vt.lease.LeaseTransactionV1(tx.sender, amount, tx.fee, tx.timestamp, recipient.toAddressOrAlias, signature)
-          case 2 => vt.lease.LeaseTransactionV2(tx.sender, amount, tx.fee, tx.timestamp, recipient.toAddressOrAlias, tx.proofs)
+          case 1 => vt.lease.LeaseTransactionV1(tx.senderPublicKey, amount, tx.fee, tx.timestamp, recipient.toAddressOrAlias, signature)
+          case 2 => vt.lease.LeaseTransactionV2(tx.senderPublicKey, amount, tx.fee, tx.timestamp, recipient.toAddressOrAlias, tx.proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
       case Data.LeaseCancel(LeaseCancelTransactionData(leaseId)) =>
         tx.version match {
-          case 1 => vt.lease.LeaseCancelTransactionV1(tx.sender, leaseId, tx.fee, tx.timestamp, signature)
-          case 2 => vt.lease.LeaseCancelTransactionV2(tx.chainId, tx.sender, leaseId, tx.fee, tx.timestamp, tx.proofs)
+          case 1 => vt.lease.LeaseCancelTransactionV1(tx.senderPublicKey, leaseId, tx.fee, tx.timestamp, signature)
+          case 2 => vt.lease.LeaseCancelTransactionV2(tx.chainId, tx.senderPublicKey, leaseId, tx.fee, tx.timestamp, tx.proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
@@ -339,7 +356,7 @@ trait PBSignedTransactionImplicits {
           }
         }
         vt.DataTransaction(
-          tx.sender,
+          tx.senderPublicKey,
           entries,
           tx.fee,
           tx.timestamp,
@@ -349,7 +366,7 @@ trait PBSignedTransactionImplicits {
       case Data.MassTransfer(MassTransferTransactionData(assetId, transfers, attachment)) =>
         vt.transfer.MassTransferTransaction(
           assetId,
-          tx.sender,
+          tx.senderPublicKey,
           transfers.map(t => ParsedTransfer(t.address.toAddressOrAlias, t.amount)).toList,
           tx.timestamp,
           tx.fee,
@@ -357,8 +374,8 @@ trait PBSignedTransactionImplicits {
           tx.proofs
         )
 
-      case Data.SponsorFee(SponsorFeeTransactionData(assetId, minSponsoredAssetFee)) =>
-        vt.assets.SponsorFeeTransaction(tx.sender, assetId, Option(minSponsoredAssetFee).filter(_ != 0), tx.fee, tx.timestamp, tx.proofs)
+      case Data.SponsorFee(SponsorFeeTransactionData(AssetAmount(assetId, minFee))) =>
+        vt.assets.SponsorFeeTransaction(tx.senderPublicKey, assetId, Option(minFee).filter(_ > 0), tx.fee, tx.timestamp, tx.proofs)
 
       case data =>
         throw new IllegalArgumentException(s"Unsupported transaction data: $data")

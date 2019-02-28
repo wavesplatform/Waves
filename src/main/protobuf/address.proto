@@ -7,10 +7,6 @@ option (scalapb.options) = {
     import: "com.wavesplatform.serialization.protobuf.utils._"
 };
 
-message Address {
-    bytes address = 1 [(scalapb.field).type = "com.wavesplatform.account.Address"];
-};
-
 message Alias {
     bytes chainId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.ChainId"];
     string name = 2;
@@ -19,8 +15,8 @@ message Alias {
 message Recipient {
     option (scalapb.message).companion_extends = "com.wavesplatform.account.protobuf.PBRecipientCompanionBase";
 
-    oneof sealed_value {
-        Address address = 2;
-        Alias alias = 3;
+    oneof recipient {
+        bytes address = 1 [(scalapb.field).type = "com.wavesplatform.account.Address"];
+        Alias alias = 2;
     };
 };

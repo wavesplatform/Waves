@@ -11,6 +11,6 @@ trait PBSignedTransactionCompanionBase extends PBSignedTransactionImplicits {
              proofsArray: _root_.scala.collection.Seq[com.wavesplatform.common.state.ByteStr] = Nil,
              data: com.wavesplatform.transaction.protobuf.Transaction.Data = com.wavesplatform.transaction.protobuf.Transaction.Data.Empty)
     : SignedTransaction = {
-    SignedTransaction(Transaction(chainId, sender, fee, feeAssetId, timestamp, version, data), proofsArray)
+    SignedTransaction(Transaction(chainId, sender, (feeAssetId, fee), timestamp, version, data), proofsArray)
   }
 }
