@@ -1,9 +1,15 @@
 package com.wavesplatform.transaction.protobuf
 
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.serialization.protobuf.{PBSerializable, PBSerializableUnsigned}
 import com.wavesplatform.{transaction => vt}
 
 trait PBTransactionImplicits {
+  implicit val PBTransactionPBSerializableInstance = new PBSerializable[PBTransaction] with PBSerializableUnsigned[PBTransaction] {
+    override def protoBytes(value: PBTransaction): SerializedT = value.getOrComputeProtoBytes
+    override def protoBytesUnsigned(value: PBTransaction): SerializedT = value.getOrComputeProtoBytesUnsigned
+  }
+
   implicit class VanillaOrderImplicitConversionOps(order: vt.assets.exchange.Order) {
     def toPB: ExchangeTransactionData.Order = {
       ExchangeTransactionData.Order(

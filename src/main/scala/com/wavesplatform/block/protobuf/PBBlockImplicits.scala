@@ -2,6 +2,8 @@ package com.wavesplatform.block.protobuf
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.serialization.protobuf.PBSerializable._
+import com.wavesplatform.serialization.protobuf.{PBSerializable, PBSerializableUnsigned}
 import com.wavesplatform.transaction.protobuf.ChainId
 import com.wavesplatform.transaction.protobuf.PBSignedTransaction._
 import com.wavesplatform.{block => vb}
@@ -13,6 +15,11 @@ import scala.annotation.switch
 trait PBBlockImplicits {
   implicit def blockToHeader(block: PBBlock): PBBlock.Header                       = block.header.header
   implicit def blockSignedHeaderToHeader(sh: PBBlock.SignedHeader): PBBlock.Header = sh.header
+
+  implicit val PBBlockPBSerializableInstance = new PBSerializable[PBBlock] with PBSerializableUnsigned[PBBlock] {
+    override def protoBytes(value: PBBlock): SerializedT = value.getOrComputeProtoBytes
+    override def protoBytesUnsigned(value: PBBlock): SerializedT = value.getOrComputeProtoBytesUnsigned
+  }
 
   implicit class PBBlockSignedHeaderConversionOps(signed: PBBlock.SignedHeader) {
     def toVanilla: vb.BlockHeader = {
@@ -65,12 +72,12 @@ trait PBBlockImplicits {
 
     def signature: ByteStr = this.signerData.signature
 
-    override val bytes: Coeval[Array[Byte]] = block.protoBytes
+    override val bytes: Coeval[Array[Byte]] = Coeval(block.protoBytes)
 
-    override val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce((block.version: @switch) match {
-      case 1 | 2 | 3 => block.toVanilla.bytesWithoutSignature()
-      case _         => block.protoBytesWithoutSignature()
-    })
+    override val bytesWithoutSignature: Coeval[Array[Byte]] = (block.version: @switch) match {
+      case 1 | 2 | 3 => Coeval.evalOnce(block.toVanilla.bytesWithoutSignature())
+      case _         => Coeval(block.protoBytesUnsigned)
+    }
 
     override val headerJson: Coeval[JsObject] = Coeval.evalOnce((block.version: @switch) match {
       case 1 | 2 | 3 =>

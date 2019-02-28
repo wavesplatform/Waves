@@ -1,6 +1,8 @@
 package com.wavesplatform.transaction.protobuf
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.serialization.protobuf.PBSerializable._
+import com.wavesplatform.serialization.protobuf.{PBSerializable, PBSerializableUnsigned}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.assets.exchange.OrderV1
 import com.wavesplatform.transaction.protobuf.PBTransaction._
@@ -19,6 +21,11 @@ trait PBSignedTransactionImplicits {
   val NoChainId = ChainId.empty
 
   implicit def extractTransactionFromSignedTransaction(tx: PBSignedTransaction): PBTransaction = tx.transaction
+
+  implicit val PBSignedTransactionPBSerializableInstance = new PBSerializable[PBSignedTransaction] with PBSerializableUnsigned[PBSignedTransaction] {
+    override def protoBytes(value: PBSignedTransaction): SerializedT = value.getOrComputeProtoBytes
+    override def protoBytesUnsigned(value: PBSignedTransaction): SerializedT = value.getOrComputeProtoBytesUnsigned
+  }
 
   class PBSignedTransactionVanillaAdapter(tx: PBSignedTransaction) extends VanillaTransaction with com.wavesplatform.transaction.SignedTransaction {
     def underlying: PBSignedTransaction = tx
@@ -41,12 +48,12 @@ trait PBSignedTransactionImplicits {
         tx.toVanilla.bodyBytes()
 
       case _ =>
-        tx.protoUnsignedBytes()
+        tx.protoBytesUnsigned
     })
 
-    override val bytes: Coeval[Array[Byte]] = tx.protoBytes
+    override val bytes: Coeval[Array[Byte]] = Coeval/*.evalOnce*/(tx.protoBytes)
 
-    override val json: Coeval[JsObject] = Coeval.evalOnce((tx.version: @switch) match {
+    override val json: Coeval[JsObject] = Coeval/*.evalOnce*/((tx.version: @switch) match {
       case 1 | 2 => tx.toVanilla.json()
       case _     => ???
     })

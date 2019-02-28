@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.protobuf
-import monix.eval.Coeval
+import com.wavesplatform.serialization.protobuf.utils.PBWeakRefCacheSerializable
 
-trait PBTransactionBase { tx: PBTransaction =>
-  val protoBytes         = Coeval.evalOnce(PBTransactionSerialization.signedBytes(PBSignedTransaction(this)))
-  val protoUnsignedBytes = Coeval.evalOnce(PBTransactionSerialization.unsignedBytes(this))
+trait PBTransactionBase extends PBWeakRefCacheSerializable { tx: PBTransaction =>
+  override def computeProtoBytes = PBTransactionSerialization.signedBytes(PBSignedTransaction(this))
+  override def computeProtoBytesUnsigned = PBTransactionSerialization.unsignedBytes(this)
 }
