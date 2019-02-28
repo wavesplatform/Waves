@@ -45,7 +45,7 @@ class BlockchainUpdaterInMemoryDiffTest
 
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 2
 
-        val mastersBalanceAfterPayment1AndPayment2 = domain.blockchainUpdater.portfolio(genesis.recipient).balance
+        val mastersBalanceAfterPayment1AndPayment2 = domain.blockchainUpdater.balance(genesis.recipient)
         mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
     }
   }
@@ -61,7 +61,7 @@ class BlockchainUpdaterInMemoryDiffTest
         firstBlocks.foreach(b => domain.blockchainUpdater.processBlock(b).explicitGet())
         domain.blockchainUpdater.processBlock(payment1Block).explicitGet()
         domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
-        val mastersBalanceAfterPayment1 = domain.blockchainUpdater.portfolio(genesis.recipient).balance
+        val mastersBalanceAfterPayment1 = domain.blockchainUpdater.balance(genesis.recipient)
         mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
         // discard liquid block
@@ -70,7 +70,7 @@ class BlockchainUpdaterInMemoryDiffTest
 
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 
-        val mastersBalanceAfterPayment1AndPayment2 = domain.blockchainUpdater.portfolio(genesis.recipient).balance
+        val mastersBalanceAfterPayment1AndPayment2 = domain.blockchainUpdater.balance(genesis.recipient)
         mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
     }
   }

@@ -71,7 +71,7 @@ trait Blockchain {
 
   def leaseBalance(address: Address): LeaseBalance
 
-  def balance(address: Address, mayBeAssetId: Option[AssetId]): Long
+  def balance(address: Address, mayBeAssetId: Option[AssetId] = None): Long
 
   def assetDistribution(assetId: ByteStr): AssetDistribution
   def assetDistributionAtHeight(assetId: AssetId,
