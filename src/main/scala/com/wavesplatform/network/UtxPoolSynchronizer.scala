@@ -47,16 +47,17 @@ object UtxPoolSynchronizer extends ScorexLogging {
       .mapParallelUnordered(settings.parallelism) { case (sender, transaction) => Task {
           concurrent.blocking(utx.putIfNew(transaction)) match {
             case Right((isNew, _)) =>
-              if (isNew) allChannels.write(RawBytes.from(transaction), (_: Channel) != sender)
+              if (isNew) Some(allChannels.write(RawBytes.from(transaction), (_: Channel) != sender))
+              else None
 
             case Left(error) =>
               log.debug(s"Error adding transaction to UTX pool: $error")
+              None
           }
         }
       }
-      .map(_ => 1)
       .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
-      .filter(_.nonEmpty)
+      .filter(_.flatten.nonEmpty)
       .foreachL(_ => allChannels.flush())
       .runAsyncLogErr
 
