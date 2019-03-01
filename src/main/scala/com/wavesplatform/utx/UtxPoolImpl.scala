@@ -50,6 +50,7 @@ class UtxPoolImpl(time: Time,
 
   private[this] val smartCleanupBlocksAhead = (utxSettings.cleanupInterval / utxSettings.approxBlockTime).toInt + 2
   @volatile private[this] var transactionsToFastRemove = Iterable.empty[Transaction]
+  private[this] var transactionsChecked = Set.empty[(ByteStr, Int)]
 
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
@@ -135,20 +136,24 @@ class UtxPoolImpl(time: Time,
   }
 
   private[this] def removeInvalid(list: Iterable[Transaction] = this.transactions.values.asScala, checkFuture: Int = smartCleanupBlocksAhead): Unit = {
-    val (transactionsToRemove, transactionsToCheckInNextBlock) = list.map { t =>
-      val currentlyInvalid = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, t).isLeft
+    val (transactionsToRemove, transactionsToCheckInNextBlock, transactionsPreChecked) = list.map { t =>
+      def isPreChecked(heightOffset: Int = 0) = this.transactionsChecked.contains((t.id(), blockchain.height + heightOffset))
+      val currentlyInvalid = !isPreChecked() && TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, t).isLeft
 
       if (currentlyInvalid) {
-        (Some(t), None)
+        (Some(t), None, None)
       } else {
         val futureInvalid = (1 to checkFuture).exists { heightOffset =>
           val timeOffset = (utxSettings.approxBlockTime * heightOffset).toMillis
-          TransactionDiffer(fs, blockchain.lastBlockTimestamp.map(_ + timeOffset), time.correctedTime() + timeOffset, blockchain.height + heightOffset)(blockchain, t).isLeft
+          !isPreChecked(heightOffset) && TransactionDiffer(fs, blockchain.lastBlockTimestamp.map(_ + timeOffset), time.correctedTime() + timeOffset, blockchain.height + heightOffset)(blockchain, t).isLeft
         }
 
-        if (futureInvalid) (None, Some(t)) else (None, None)
+        if (futureInvalid) (None, Some(t), None) else (None, None, Some(t))
       }
-    }.unzip
+    }.unzip3
+
+    this.transactionsChecked = this.transactionsChecked.filter(_._2 < blockchain.height) ++
+      transactionsPreChecked.flatten.flatMap(tx => (0 to checkFuture).map(i => (tx.id(), blockchain.height + i)))
 
     transactionsToFastRemove ++= transactionsToCheckInNextBlock.flatten
     removeAll(transactionsToRemove.flatten)
