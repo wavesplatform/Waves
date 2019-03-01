@@ -92,6 +92,7 @@ object OrderValidator {
       orderMatchTxFee: Long,
       matcherAddress: Address,
       time: Time,
+      orderFeeSettings: OrderFeeSettings
   )(order: Order): ValidationResult = timer.measure {
 
     lazy val exchangeTx = {
@@ -111,7 +112,12 @@ object OrderValidator {
           _.version != 3 || blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height))
         .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
       mof = ExchangeTransactionCreator.minFee(blockchain, orderMatchTxFee, matcherAddress, order.assetPair)
-      _ <- (Right(order): ValidationResult).ensure(s"Order matcherFee should be >= $mof")(_.matcherFee >= mof)
+      _ <- (Right(order): ValidationResult).ensure(s"Order matcherFee should be >= $mof") { order =>
+        orderFeeSettings match {
+          case _: FixedWavesSettings => order.matcherFee >= mof
+          case _                     => true
+        }
+      }
       _ <- validateDecimals(blockchain, order)
       _ <- verifyOrderByAccountScript(blockchain, order.sender, order)
       _ <- verifyAssetScript(order.assetPair.amountAsset)
@@ -168,16 +174,18 @@ object OrderValidator {
       _ <- (Right(order): ValidationResult)
         .ensure(s"Matcher's fee asset in order (${order.matcherFeeAssetId}) does not meet matcher's settings requirements") { order =>
           val isMatcherFeeAssetValid = orderFeeSettings match {
-            case PercentSettings(assetType, _)    => order.matcherFeeAssetId == getValidFeeAsset(order, assetType)
+            case _: FixedWavesSettings            => order.matcherFeeAssetId.isEmpty
             case FixedSettings(defaultAssetId, _) => order.matcherFeeAssetId == defaultAssetId
+            case PercentSettings(assetType, _)    => order.matcherFeeAssetId == getValidFeeAsset(order, assetType)
           }
           order.version != 3 || isMatcherFeeAssetValid
         }
       _ <- (Right(order): ValidationResult)
         .ensure(s"Matcher's fee (${order.matcherFee}) is less than minimally admissible one") { order =>
           val isMatcherFeeValid = orderFeeSettings match {
-            case percentSettings: PercentSettings => order.matcherFee >= getMinValidFee(order, percentSettings)
+            case FixedWavesSettings(wavesMinFee)  => order.matcherFee >= wavesMinFee
             case FixedSettings(_, fixedMinFee)    => order.matcherFee >= fixedMinFee
+            case percentSettings: PercentSettings => order.matcherFee >= getMinValidFee(order, percentSettings)
           }
           order.version != 3 || isMatcherFeeValid
         }
@@ -197,8 +205,7 @@ object OrderValidator {
         .ensure("Invalid address")(_ => !blacklistedAddresses.contains(order.sender.toAddress))
         .ensure(s"Invalid amount asset ${order.assetPair.amountAsset}")(_ => !blacklistedAssets(order.assetPair.amountAsset))
         .ensure(s"Invalid price asset ${order.assetPair.priceAsset}")(_ => !blacklistedAssets(order.assetPair.priceAsset))
-        .ensure(s"Invalid fee asset ${order.matcherFeeAssetId} (blacklisted)")(order =>
-          order.version != 3 || !blacklistedAssets(order.matcherFeeAssetId))
+        .ensure(s"Invalid fee asset ${order.matcherFeeAssetId} (blacklisted)")(_ => order.version != 3 || !blacklistedAssets(order.matcherFeeAssetId))
       _ <- validateOrderFee(order, orderFeeSettings)
     } yield order
   }

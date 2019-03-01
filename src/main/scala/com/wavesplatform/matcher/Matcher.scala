@@ -106,7 +106,8 @@ class Matcher(actorSystem: ActorSystem,
                                           transactionCreator.createTransaction,
                                           settings.matcherSettings.orderMatchTxFee,
                                           matcherPublicKey.toAddress,
-                                          time)(o)
+                                          time,
+                                          matcherSettings.orderFee)(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 

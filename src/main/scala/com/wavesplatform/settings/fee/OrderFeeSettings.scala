@@ -18,10 +18,13 @@ object OrderFeeSettings {
 
   sealed trait OrderFeeSettings
 
+  case class FixedWavesSettings(minFee: Long)                             extends OrderFeeSettings
   case class FixedSettings(defaultAssetId: Option[AssetId], minFee: Long) extends OrderFeeSettings
   case class PercentSettings(assetType: AssetType, minFee: Double)        extends OrderFeeSettings
 
   implicit val orderFeeSettingsReader: ValueReader[OrderFeeSettings] = { (cfg, path) =>
+    def getPrefixByMode(mode: Mode): String = s"$path.$mode"
+
     def validateSafe[T: ValueReader](settingName: String): ErrorsListOr[T] = {
       Validated.fromTry(Try(cfg.as[T](settingName))).leftMap(_ => List(s"Invalid setting $settingName value: ${cfg.getString(settingName)}"))
     }
@@ -35,12 +38,19 @@ object OrderFeeSettings {
     }
 
     def validateAssetId(settingName: String)(assetIdStr: String): ErrorsListOr[Option[AssetId]] = {
-      Validated.fromTry(AssetPair.extractAssetId(assetIdStr)).leftMap(_ => List(s"Invalid setting $settingName value: $assetIdStr"))
+      Validated
+        .fromTry(AssetPair.extractAssetId(assetIdStr))
+        .leftMap(_ => List(s"Invalid setting $settingName value: $assetIdStr"))
+        .ensure(List(s"Invalid setting $settingName value: $assetIdStr, asset must not be Waves"))(_.isDefined)
+    }
+
+    def validateFixedWavesSettings: ErrorsListOr[FixedWavesSettings] = {
+      validateByPredicate[Long](s"${getPrefixByMode(Mode.FIXED_WAVES)}.min-fee")(_ > 0, "must be > 0") map FixedWavesSettings
     }
 
     def validateFixedSettings: ErrorsListOr[FixedSettings] = {
 
-      val prefix                 = s"$path.${Mode.FIXED}"
+      val prefix                 = getPrefixByMode(Mode.FIXED)
       val assetSettingName       = s"$prefix.asset-id"
       val fixedMinFeeSettingName = s"$prefix.min-fee"
 
@@ -49,24 +59,25 @@ object OrderFeeSettings {
       (
         validateAssetId(assetSettingName)(assetStr),
         validateByPredicate[Long](fixedMinFeeSettingName)(_ > 0, "must be > 0")
-      ) mapN FixedSettings.apply
+      ) mapN FixedSettings
 
     }
 
     def validatePercentSettings: ErrorsListOr[PercentSettings] = {
 
-      val prefix             = s"$path.${Mode.PERCENT}"
+      val prefix             = getPrefixByMode(Mode.PERCENT)
       val percentSettingName = s"$prefix.min-fee"
 
       (
         validateSafe[AssetType](s"$prefix.asset-type"),
         validateByPredicate[Double](percentSettingName)(percent => 0 < percent && percent <= 100, "required 0 < p <= 100")
-      ) mapN PercentSettings.apply
+      ) mapN PercentSettings
     }
 
     def getSettingsByMode(mode: Mode): ErrorsListOr[OrderFeeSettings] = mode match {
-      case Mode.FIXED   => validateFixedSettings
-      case Mode.PERCENT => validatePercentSettings
+      case Mode.FIXED_WAVES => validateFixedWavesSettings
+      case Mode.FIXED       => validateFixedSettings
+      case Mode.PERCENT     => validatePercentSettings
     }
 
     validateSafe[Mode](s"$path.mode").toEither.flatMap(mode => getSettingsByMode(mode).toEither) match {
@@ -88,6 +99,7 @@ object AssetType extends Enumeration {
 object Mode extends Enumeration {
   type Mode = Value
 
-  val FIXED   = Value("fixed")
-  val PERCENT = Value("percent")
+  val FIXED_WAVES = Value("fixed-waves")
+  val FIXED       = Value("fixed")
+  val PERCENT     = Value("percent")
 }

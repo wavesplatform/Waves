@@ -80,7 +80,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val correctOrderFeeSettings =
       s"""
          |order-fee {
-         |  mode = fixed
+         |  mode = percent
+         |  fixed-waves {
+         |    min-fee = 300000
+         |  }
          |  fixed {
          |    asset-id = WAVES
          |    min-fee = 300000
@@ -128,6 +131,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     )
 
     settings.orderFee match {
+      case FixedWavesSettings(minFee) =>
+        minFee shouldBe 300000
       case FixedSettings(defaultAssetId, minFee) =>
         defaultAssetId shouldBe None
         minFee shouldBe 300000
@@ -145,6 +150,9 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = invalid
+         |  fixed-waves {
+         |    min-fee = 300000
+         |  }
          |  fixed {
          |    asset-id = WAVES
          |    min-fee = 300000
@@ -156,10 +164,13 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |}
        """.stripMargin
 
-    val invalidTypeAndPercent =
+    val invalidAssetTypeAndPercent =
       s"""
          |order-fee {
          |  mode = percent
+         |  fixed-waves {
+         |    min-fee = 300000
+         |  }
          |  fixed {
          |    asset-id = WAVES
          |    min-fee = 300000
@@ -171,10 +182,49 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |}
        """.stripMargin
 
-    val invalidAsset =
+    val invalidAssetAndFee =
       s"""
          |order-fee {
          |  mode = fixed
+         |  fixed-waves {
+         |    min-fee = 300000
+         |  }
+         |  fixed {
+         |    asset-id = ;;;;
+         |    min-fee = -300000
+         |  }
+         |  percent {
+         |    asset-type = test
+         |    min-fee = 121
+         |  }
+         |}
+       """.stripMargin
+
+    val invalidWavesAsset =
+      s"""
+         |order-fee {
+         |  mode = fixed
+         |  fixed-waves {
+         |    min-fee = 300000
+         |  }
+         |  fixed {
+         |    asset-id = WAVES
+         |    min-fee = 300000
+         |  }
+         |  percent {
+         |    asset-type = test
+         |    min-fee = 121
+         |  }
+         |}
+       """.stripMargin
+
+    val invalidFeeInWaves =
+      s"""
+         |order-fee {
+         |  mode = fixed-waves
+         |  fixed-waves {
+         |    min-fee = -350000
+         |  }
          |  fixed {
          |    asset-id = ;;;;
          |    min-fee = -300000
@@ -187,8 +237,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
        """.stripMargin
 
     val settingsInvalidMode           = getSettingByConfig(configStrWithOrderFeeSettings(invalidMode))
-    val settingsInvalidTypeAndPercent = getSettingByConfig(configStrWithOrderFeeSettings(invalidTypeAndPercent))
-    val settingsInvalidAssetAndFee    = getSettingByConfig(configStrWithOrderFeeSettings(invalidAsset))
+    val settingsInvalidTypeAndPercent = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetTypeAndPercent))
+    val settingsInvalidAssetAndFee    = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetAndFee))
+    val settingsInvalidWavseAsset     = getSettingByConfig(configStrWithOrderFeeSettings(invalidWavesAsset))
+    val settingsInvalidFeeInWaves     = getSettingByConfig(configStrWithOrderFeeSettings(invalidFeeInWaves))
 
     settingsInvalidMode shouldBe Left("Invalid setting waves.matcher.order-fee.mode value: invalid")
 
@@ -201,6 +253,10 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       Left(
         "Invalid setting waves.matcher.order-fee.fixed.asset-id value: ;;;;\n" +
           "Invalid setting waves.matcher.order-fee.fixed.min-fee value: -300000, must be > 0")
-  }
 
+    settingsInvalidWavseAsset shouldBe
+      Left("Invalid setting waves.matcher.order-fee.fixed.asset-id value: WAVES, asset must not be Waves")
+
+    settingsInvalidFeeInWaves shouldBe Left("Invalid setting waves.matcher.order-fee.fixed-waves.min-fee value: -350000, must be > 0")
+  }
 }

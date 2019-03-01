@@ -11,7 +11,7 @@ import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, OrderValidator, SellLimitOrder}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.settings.fee.AssetType
-import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, OrderFeeSettings, PercentSettings}
+import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, FixedWavesSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
@@ -232,17 +232,22 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def fixedSettingsGenerator(defaultAsset: Option[AssetId], lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
     for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedSettings(defaultAsset, minFee) }
 
-  val orderWithMatcherSettingsGenerator: Gen[(Order, OrderFeeSettings)] = {
+  def fixedWavesSettingsGenerator(lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedWavesSettings] =
+    for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedWavesSettings(minFee) }
+
+  val orderWithMatcherSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
     for {
       arbitraryAsset   <- assetIdGen(100)
       defaultAsset     <- Gen.oneOf(None, arbitraryAsset)
-      orderFeeSettings <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(defaultAsset))
-      (order, _)       <- orderGenerator
+      orderFeeSettings <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(defaultAsset), fixedWavesSettingsGenerator())
+      (order, sender)  <- orderGenerator
     } yield {
 
       import com.wavesplatform.transaction.assets.exchange.OrderOps._
 
       val correctOrder = (order.version, orderFeeSettings) match {
+        case (3, FixedWavesSettings(minFee)) =>
+          order.updateFee(minFee + 1000L)
         case (3, FixedSettings(defaultAssetId, minFee)) =>
           order
             .updateMatcherFeeAssetId(defaultAssetId)
@@ -254,7 +259,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
         case _ => order
       }
 
-      correctOrder -> orderFeeSettings
+      (correctOrder, sender, orderFeeSettings)
     }
   }
 }
