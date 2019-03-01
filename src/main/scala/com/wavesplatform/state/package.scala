@@ -133,6 +133,12 @@ package object state {
       blockchain
         .heightOf(id)
         .getOrElse(throw new IllegalStateException(s"Can't find a block: $id"))
+
+    def wavesPortfolio(address: Address): Portfolio = Portfolio(
+      blockchain.balance(address),
+      blockchain.leaseBalance(address),
+      Map.empty
+    )
   }
 
   object AssetDistribution extends TaggedType[Map[Address, Long]]

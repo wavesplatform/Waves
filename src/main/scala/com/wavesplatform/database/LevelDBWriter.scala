@@ -364,7 +364,7 @@ class LevelDBWriter(writableDB: DB,
 
         (tx.builder.typeId, num)
       }
-      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq)))
+      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
       rw.put(kk, nextSeqNr)
     }
 
@@ -609,9 +609,11 @@ class LevelDBWriter(writableDB: DB,
           case None => s
           case Some((h, num)) =>
             s.dropWhile {
-                case (s_h, _, s_n) => !(s_h == h && s_n == num)
+                case (s_h, _, _) => s_h > h
               }
-              .drop(1)
+              .dropWhile {
+                case (_, _, s_n) => s_n >= num
+              }
         }
       }
 
@@ -628,7 +630,10 @@ class LevelDBWriter(writableDB: DB,
 
                 maybeHNSeq match {
                   case Some((h, seq)) =>
-                    seq.map { case (tp, num) => (h, tp, num) }.toStream
+                    seq
+                      .sortBy { case (_, num) => -num }
+                      .map { case (tp, num) => (h, tp, num) }
+                      .toStream
                   case None => Stream.empty
                 }
               }
@@ -967,8 +972,10 @@ class LevelDBWriter(writableDB: DB,
       )
   }
 
-  override def wavesDistribution(height: Int): Map[Address, Long] = readOnly { db =>
-    (for {
+  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
+    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
+
+    def createMap() = (for {
       seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
       addressId <- db.get(Keys.addressesForWaves(seqNr)).par
       history = db.get(Keys.wavesBalanceHistory(addressId))
@@ -976,6 +983,12 @@ class LevelDBWriter(writableDB: DB,
       balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
       if balance > 0
     } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+
+    Either.cond(
+      height > canGetAfterHeight,
+      createMap(),
+      GenericError(s"Cannot get waves distribution at height less than ${canGetAfterHeight + 1}")
+    )
   }
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>

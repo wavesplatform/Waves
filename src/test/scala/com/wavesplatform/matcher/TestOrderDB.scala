@@ -11,11 +11,11 @@ class TestOrderDB(maxOrdersPerRequest: Int) extends OrderDB {
   private var idsForPair    = Map.empty[(Address, AssetPair), Seq[ByteStr]].withDefaultValue(Seq.empty)
   private var idsForAddress = Map.empty[Address, Seq[ByteStr]].withDefaultValue(Seq.empty)
 
-  override def contains(id: ByteStr): Boolean = knownOrders.contains(id)
+  override def containsInfo(id: ByteStr): Boolean = orderInfo.contains(id)
 
   override def status(id: ByteStr): OrderStatus.Final = orderInfo.get(id).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
 
-  override def saveOrderInfo(id: ByteStr, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit = if (!orderInfo.contains(id)) {
+  override def saveOrderInfo(id: ByteStr, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit = if (!containsInfo(id)) {
     orderInfo += id                      -> oi
     idsForAddress += sender              -> (id +: idsForAddress(sender))
     idsForPair += (sender, oi.assetPair) -> (id +: idsForPair(sender -> oi.assetPair))

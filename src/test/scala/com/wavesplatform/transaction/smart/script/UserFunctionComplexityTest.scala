@@ -6,7 +6,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.UserFunction
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
@@ -43,27 +42,12 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     ScriptEstimator(ctx.evaluationContext.letDefs.keySet, funcCosts, expr)
   }
 
-  // If test fails than complexity of user function was changed and it could lead to fork.
-  property("WARNING - NODE FORK - check if user functions complexity changed") {
-    val userFuncs = ctx.functions.filter(_.isInstanceOf[UserFunction])
-    userFuncs.foreach {
-      case func: UserFunction =>
-        import func.signature.args
-        val complexity =
-          Coeval.now(ScriptEstimator(ctx.evaluationContext.letDefs.keySet ++ args.map(_._1), funcCosts, func.ev).explicitGet() + args.size * 5).value
-        if (complexity != func.cost) {
-          fail(s"Complexity of ${func.name} should be ${func.cost}, actual: $complexity.")
-        }
-      case _ =>
-    }
-  }
-
   property("estimate script with UserFunctions") {
     val exprNe = FUNCTION_CALL(PureContext.ne, List(CONST_LONG(1), CONST_LONG(2)))
-    estimate(exprNe).explicitGet() shouldBe 28
+    estimate(exprNe).explicitGet() shouldBe 3
 
     val exprThrow = FUNCTION_CALL(PureContext.throwNoMessage, List())
-    estimate(exprThrow).explicitGet() shouldBe 2
+    estimate(exprThrow).explicitGet() shouldBe 1
 
     val exprExtract = LET_BLOCK(
       LET("x", CONST_LONG(2)),
@@ -75,7 +59,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
       LET("x", CONST_LONG(2)),
       FUNCTION_CALL(PureContext.isDefined, List(REF("x")))
     )
-    estimate(exprIsDefined).explicitGet() shouldBe 43
+    estimate(exprIsDefined).explicitGet() shouldBe 9
 
     val exprDropRightBytes = FUNCTION_CALL(PureContext.dropRightBytes, List(CONST_BYTESTR(ByteStr.fromLong(2)), CONST_LONG(1)))
     estimate(exprDropRightBytes).explicitGet() shouldBe 21
@@ -90,10 +74,10 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
     estimate(exprTakeRightString).explicitGet() shouldBe 21
 
     val exprUMinus = FUNCTION_CALL(PureContext.uMinus, List(CONST_LONG(1)))
-    estimate(exprUMinus).explicitGet() shouldBe 10
+    estimate(exprUMinus).explicitGet() shouldBe 2
 
     val exprUNot = FUNCTION_CALL(PureContext.uNot, List(TRUE))
-    estimate(exprUNot).explicitGet() shouldBe 12
+    estimate(exprUNot).explicitGet() shouldBe 2
 
     val exprEnsure = FUNCTION_CALL(PureContext.ensure, List(TRUE))
     estimate(exprEnsure).explicitGet() shouldBe 17

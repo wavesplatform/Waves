@@ -159,14 +159,12 @@ object OrderValidator {
       sender: Address,
       tradableBalance: Option[AssetId] => Long,
       activeOrderCount: => Int,
-      lowestOrderTimestamp: => Long,
       orderExists: ByteStr => Boolean,
   )(order: Order): ValidationResult =
     for {
       _ <- (Right(order): ValidationResult)
         .ensure(s"Order sender ${order.sender.toAddress} does not match expected $sender")(_.sender.toAddress == sender)
         .ensure(s"Limit of $MaxActiveOrders active orders has been reached")(_ => activeOrderCount < MaxActiveOrders)
-        .ensure(s"Order should have a timestamp after $lowestOrderTimestamp, but it is ${order.timestamp}")(_.timestamp > lowestOrderTimestamp)
         .ensure("Order has already been placed")(o => !orderExists(o.id()))
       _ <- validateBalance(order, tradableBalance)
     } yield order
