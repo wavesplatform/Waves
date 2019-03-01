@@ -1,33 +1,25 @@
 // Transactions
 syntax = "proto3";
 option java_package = "com.wavesplatform.block.protobuf";
-import "scalapb/scalapb.proto";
 import "transactions.proto";
 
-option (scalapb.options) = {
-    import: "com.wavesplatform.serialization.protobuf.utils._"
-};
-
 message Block {
-    option (scalapb.message).extends = "com.wavesplatform.block.protobuf.PBBlockBase";
-    option (scalapb.message).companion_extends = "com.wavesplatform.block.protobuf.PBBlockCompanionBase";
-
     message SignedHeader {
-        Header header = 1 [(scalapb.field).no_box = true];
-        bytes signature = 8 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+        Header header = 1;
+        bytes signature = 8;
     }
 
     message Header {
-        bytes reference = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+        bytes reference = 1;
         int64 baseTarget = 2;
-        bytes generationSignature = 3 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
-        repeated uint32 featureVotes = 4 [(scalapb.field).collection_type = "scala.collection.immutable.Set"];
+        bytes generationSignature = 3;
+        repeated uint32 featureVotes = 4;
         int64 timestamp = 5;
         int32 version = 6;
-        bytes generator = 7 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
+        bytes generator = 7;
     }
 
-    bytes chainId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.ChainId"];
-    SignedHeader header = 2 [(scalapb.field).no_box = true];
+    bytes chainId = 1;
+    SignedHeader header = 2;
     repeated SignedTransaction transactions = 3;
 }

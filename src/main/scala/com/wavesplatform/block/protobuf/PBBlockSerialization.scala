@@ -1,5 +1,5 @@
 package com.wavesplatform.block.protobuf
-import com.wavesplatform.common.state.ByteStr
+import com.google.protobuf.ByteString
 import com.wavesplatform.serialization.protobuf.utils.PBUtils
 
 private[block] object PBBlockSerialization {
@@ -8,6 +8,6 @@ private[block] object PBBlockSerialization {
   }
 
   def unsignedBytes(block: PBBlock): Array[Byte] = {
-    PBUtils.encodeDeterministic(block.withHeader(block.header.withSignature(ByteStr.empty)))
+    PBUtils.encodeDeterministic(block.withHeader(block.getHeader.withSignature(ByteString.EMPTY)))
   }
 }

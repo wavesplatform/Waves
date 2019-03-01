@@ -1,13 +1,13 @@
 package com.wavesplatform.transaction.protobuf
+import com.wavesplatform.serialization.protobuf.PBImplicits._
 import com.wavesplatform.transaction.TransactionParser
 
 import scala.reflect.ClassTag
 import scala.util.Try
 
 trait PBTransactionParser extends TransactionParser.OneVersion {
-  lazy val classTag: ClassTag[TransactionT] = ClassTag(
-    classOf[com.wavesplatform.transaction.protobuf.PBSignedTransaction.PBSignedTransactionVanillaAdapter])
-  override type TransactionT = com.wavesplatform.transaction.protobuf.PBSignedTransaction.PBSignedTransactionVanillaAdapter
+  lazy val classTag: ClassTag[TransactionT] = ClassTag(classOf[PBSignedTransactionVanillaAdapter])
+  override type TransactionT = PBSignedTransactionVanillaAdapter
 
   override val version: Byte = 1
   override val typeId: Byte  = 0xff.toByte
@@ -17,4 +17,4 @@ trait PBTransactionParser extends TransactionParser.OneVersion {
   }
 }
 
-// object PBTransactionParser extends PBTransactionParser
+object PBTransactionParser extends PBTransactionParser

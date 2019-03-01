@@ -1,13 +1,17 @@
 package com.wavesplatform.transaction.protobuf
 
-import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.serialization.protobuf.{PBSerializable, PBSerializableUnsigned}
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.serialization.protobuf.{PBMappers, PBSerializable, PBSerializableUnsigned}
 import com.wavesplatform.{transaction => vt}
 
-trait PBTransactionImplicits {
+trait PBTransactionImplicits { self: PBMappers with PBSignedTransactionImplicits with PBAmountImplicits =>
+  import InternalImplicits._
+
   implicit val PBTransactionPBSerializableInstance = new PBSerializable[PBTransaction] with PBSerializableUnsigned[PBTransaction] {
-    override def protoBytes(value: PBTransaction): SerializedT = value.getOrComputeProtoBytes
-    override def protoBytesUnsigned(value: PBTransaction): SerializedT = value.getOrComputeProtoBytesUnsigned
+    override def protoBytes(value: PBTransaction): SerializedT         = PBTransactionSerialization.signedBytes(value.asSigned)
+    override def protoBytesUnsigned(value: PBTransaction): SerializedT = PBTransactionSerialization.unsignedBytes(value)
   }
 
   implicit class VanillaOrderImplicitConversionOps(order: vt.assets.exchange.Order) {
@@ -15,18 +19,18 @@ trait PBTransactionImplicits {
       ExchangeTransactionData.Order(
         order.senderPublicKey,
         order.matcherPublicKey,
-        Some(ExchangeTransactionData.Order.AssetPair(order.assetPair.amountAsset, order.assetPair.priceAsset)),
+        Some(ExchangeTransactionData.Order.AssetPair(order.assetPair.amountAsset.get, order.assetPair.priceAsset.get)),
         order.orderType match {
-          case vt.assets.exchange.OrderType.BUY  => ExchangeTransactionData.Order.Type.BUY
-          case vt.assets.exchange.OrderType.SELL => ExchangeTransactionData.Order.Type.SELL
+          case vt.assets.exchange.OrderType.BUY  => ExchangeTransactionData.Order.Side.BUY
+          case vt.assets.exchange.OrderType.SELL => ExchangeTransactionData.Order.Side.SELL
         },
         order.amount,
         order.price,
         order.timestamp,
         order.expiration,
-        order.matcherFee,
-        order.proofs,
-        order.version
+        Some(order.matcherFee),
+        order.version,
+        order.proofs.map(bs => bs: ByteString)
       )
     }
   }
@@ -36,19 +40,20 @@ trait PBTransactionImplicits {
       vt.assets.exchange.Order(
         order.senderPublicKey,
         order.matcherPublicKey,
-        vt.assets.exchange.AssetPair(order.getAssetPair.amountAssetId, order.getAssetPair.priceAssetId),
-        order.orderType match {
-          case ExchangeTransactionData.Order.Type.BUY             => vt.assets.exchange.OrderType.BUY
-          case ExchangeTransactionData.Order.Type.SELL            => vt.assets.exchange.OrderType.SELL
-          case ExchangeTransactionData.Order.Type.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order type: $v")
+        vt.assets.exchange.AssetPair(Some(order.getAssetPair.amountAssetId.toByteArray), Some(order.getAssetPair.priceAssetId.toByteArray)),
+        order.orderSide match {
+          case ExchangeTransactionData.Order.Side.BUY             => vt.assets.exchange.OrderType.BUY
+          case ExchangeTransactionData.Order.Side.SELL            => vt.assets.exchange.OrderType.SELL
+          case ExchangeTransactionData.Order.Side.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order type: $v")
         },
         order.amount,
         order.price,
         order.timestamp,
         order.expiration,
-        order.matcherFee,
-        vt.Proofs(order.proofs),
-        version
+        order.getMatcherFee,
+        order.proofs.map(_.toByteArray: ByteStr),
+        version,
+        order.matcherFee.map(_.assetId)
       )
     }
 
@@ -56,29 +61,40 @@ trait PBTransactionImplicits {
   }
 
   implicit class PBTransactionImplicitConversionOps(tx: PBTransaction) {
-    def asSigned: PBSignedTransaction = PBSignedTransaction(tx)
+    def asSigned: PBSignedTransaction = PBSignedTransaction(Some(tx))
 
-    def withCurrentChainId: Transaction = tx.withChainId(AddressScheme.current.chainId)
+    def withCurrentChainId: Transaction = tx.withChainId(AddressScheme.current.chainId: ChainId)
 
     def isLegacy: Boolean = tx.version == 1 || tx.version == 2
 
     def toVanillaOrAdapter: VanillaTransaction = if (this.isLegacy) toVanilla else toVanillaAdapter
 
-    def toVanillaAdapter = tx.asSigned.toVanillaAdapter
+    def toVanillaAdapter = asSigned.toVanillaAdapter
 
-    def toVanilla: VanillaTransaction = PBSignedTransactionImplicits.PBTransactionImplicitConversionOps(this.asSigned).toVanilla
+    def toVanilla: VanillaTransaction = this.asSigned.toVanilla
   }
 
-  private[this] implicit def implicitIntToByte(int: Int): Byte = {
-    require(int >= 0 && int <= 0xFF, s"Byte overflow: $int")
-    int.toByte
+  private[this] object InternalImplicits {
+
+    implicit def implicitByteStringToPublicKeyAccount(bs: ByteString): PublicKeyAccount = {
+      PublicKeyAccount(bs.toByteArray)
+    }
+
+    implicit def implicitPublicKeyAccountToByteString(pk: PublicKeyAccount): ByteString = {
+      ByteString.copyFrom(pk.publicKey)
+    }
+
+    implicit def implicitIntToByte(int: Int): Byte = {
+      require(int >= 0 && int <= 0xFF, s"Byte overflow: $int")
+      int.toByte
+    }
+
+    implicit def implicitAssetIdToOption(assetId: PBAssetId): Option[VanillaAssetId] =
+      Option(assetId)
+        .map(_.bytes)
+        .filterNot(_.isEmpty)
+
+    implicit def implicitAssetIdOptionToAssetId(assetId: Option[VanillaAssetId]): PBAssetId =
+      assetId.fold(PBAssetId.Waves)(PBAssetId.fromBytes)
   }
-
-  private[this] implicit def implicitAssetIdToOption(assetId: PBAssetId): Option[VanillaAssetId] =
-    Option(assetId)
-      .map(_.bytes)
-      .filterNot(_.isEmpty)
-
-  private[this] implicit def implicitAssetIdOptionToAssetId(assetId: Option[VanillaAssetId]): PBAssetId =
-    assetId.fold(PBAssetId.Waves)(PBAssetId.fromBytes)
 }

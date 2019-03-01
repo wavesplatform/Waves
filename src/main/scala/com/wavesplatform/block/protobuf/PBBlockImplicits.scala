@@ -1,43 +1,43 @@
 package com.wavesplatform.block.protobuf
 
+import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.serialization.protobuf.PBSerializable._
-import com.wavesplatform.serialization.protobuf.{PBSerializable, PBSerializableUnsigned}
-import com.wavesplatform.transaction.protobuf.ChainId
-import com.wavesplatform.transaction.protobuf.PBSignedTransaction._
+import com.wavesplatform.serialization.protobuf.{PBMappers, PBSerializable, PBSerializableUnsigned}
+import com.wavesplatform.transaction.protobuf.{ChainId, PBSignedTransactionImplicits}
 import com.wavesplatform.{block => vb}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
 import scala.annotation.switch
 
-trait PBBlockImplicits {
-  implicit def blockToHeader(block: PBBlock): PBBlock.Header                       = block.header.header
-  implicit def blockSignedHeaderToHeader(sh: PBBlock.SignedHeader): PBBlock.Header = sh.header
+trait PBBlockImplicits { self: PBSignedTransactionImplicits with PBMappers =>
+  implicit def blockToHeader(block: PBBlock): PBBlock.Header                       = block.getHeader.getHeader
+  implicit def blockSignedHeaderToHeader(sh: PBBlock.SignedHeader): PBBlock.Header = sh.getHeader
 
   implicit val PBBlockPBSerializableInstance = new PBSerializable[PBBlock] with PBSerializableUnsigned[PBBlock] {
-    override def protoBytes(value: PBBlock): SerializedT = value.getOrComputeProtoBytes
-    override def protoBytesUnsigned(value: PBBlock): SerializedT = value.getOrComputeProtoBytesUnsigned
+    override def protoBytes(value: PBBlock): SerializedT         = PBBlockSerialization.signedBytes(value)
+    override def protoBytesUnsigned(value: PBBlock): SerializedT = PBBlockSerialization.unsignedBytes(value)
   }
 
   implicit class PBBlockSignedHeaderConversionOps(signed: PBBlock.SignedHeader) {
     def toVanilla: vb.BlockHeader = {
       new vb.BlockHeader(
-        signed.header.timestamp,
-        signed.header.version.toByte,
-        signed.header.reference,
-        vb.SignerData(signed.header.generator, signed.signature),
-        NxtLikeConsensusBlockData(signed.header.baseTarget, signed.header.generationSignature),
+        signed.getHeader.timestamp,
+        signed.getHeader.version.toByte,
+        signed.getHeader.reference.toByteArray,
+        vb.SignerData(PublicKeyAccount(signed.getHeader.generator.toByteArray), signed.signature.toByteArray),
+        NxtLikeConsensusBlockData(signed.getHeader.baseTarget, signed.getHeader.generationSignature.toByteArray),
         0,
-        signed.header.featureVotes.map(intToShort)
+        signed.getHeader.featureVotes.map(intToShort).toSet
       )
     }
   }
 
   implicit class PBBlockHeaderConversionOps(header: PBBlock.Header) {
     def toVanilla: vb.BlockHeader = {
-      PBBlock.SignedHeader(header).toVanilla
+      PBBlock.SignedHeader(Some(header)).toVanilla
     }
   }
 
@@ -47,25 +47,25 @@ trait PBBlockImplicits {
         header.reference,
         header.consensusData.baseTarget,
         header.consensusData.generationSignature,
-        header.featureVotes.map(shortToInt),
+        header.featureVotes.map(shortToInt).toSeq,
         header.timestamp,
         header.version,
-        header.signerData.generator
+        header.signerData.generator.publicKey: ByteStr
       )
 
-      PBBlock.SignedHeader(h, header.signerData.signature)
+      PBBlock.SignedHeader(Some(h), header.signerData.signature)
     }
   }
 
   class PBBlockVanillaAdapter(block: PBBlock)
       extends VanillaBlock(
-        block.header.timestamp,
-        block.header.version.toByte,
-        block.header.reference,
-        vb.SignerData(block.header.generator, block.header.signature),
-        com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.header.baseTarget, block.header.generationSignature),
+        block.getHeader.timestamp,
+        block.getHeader.version.toByte,
+        block.getHeader.reference.byteStr,
+        vb.SignerData(block.getHeader.generator.publicKeyAccount, block.getHeader.signature.byteStr),
+        com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.getHeader.baseTarget, block.getHeader.generationSignature.byteStr),
         block.transactions.map(_.toVanillaOrAdapter),
-        block.header.featureVotes.map(intToShort)
+        block.getHeader.featureVotes.map(intToShort).toSet
       ) {
 
     def underlying: PBBlock = block
@@ -118,13 +118,13 @@ trait PBBlockImplicits {
 
     def toVanilla: VanillaBlock = {
       new vb.Block(
-        block.header.timestamp,
-        block.header.version.toByte,
-        block.header.reference,
-        vb.SignerData(block.header.generator, block.header.signature),
-        com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.header.baseTarget, block.header.generationSignature),
+        block.getHeader.timestamp,
+        block.getHeader.version.toByte,
+        block.getHeader.reference.toByteArray,
+        vb.SignerData(PublicKeyAccount(block.getHeader.generator.toByteArray), block.getHeader.signature.toByteArray),
+        com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData(block.getHeader.baseTarget, block.getHeader.generationSignature.toByteArray),
         block.transactions.map(_.toVanilla),
-        block.header.featureVotes.map(intToShort)
+        block.getHeader.featureVotes.map(intToShort).toSet
       )
     }
   }
@@ -135,17 +135,25 @@ trait PBBlockImplicits {
         a.underlying
 
       case _ =>
-        PBBlock.create(
+        import block._
+        import consensusData._
+        import signerData._
+
+        new PBBlock(
           ChainId.empty,
-          block.reference,
-          block.consensusData.baseTarget,
-          block.consensusData.generationSignature,
-          block.featureVotes.map(shortToInt),
-          block.timestamp,
-          block.version,
-          block.signerData.generator,
-          block.signerData.signature,
-          block.transactionData.map(_.toPB)
+          Some(
+            PBBlock.SignedHeader(
+              Some(
+                PBBlock.Header(reference,
+                               baseTarget,
+                               generationSignature,
+                               featureVotes.map(shortToInt).toSeq,
+                               timestamp,
+                               version,
+                               generator.publicKey: ByteStr)),
+              signature
+            )),
+          transactionData.map(_.toPB)
         )
     }
   }

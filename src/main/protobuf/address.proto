@@ -1,22 +1,15 @@
 // Transactions
 syntax = "proto3";
 option java_package = "com.wavesplatform.account.protobuf";
-import "scalapb/scalapb.proto";
-
-option (scalapb.options) = {
-    import: "com.wavesplatform.serialization.protobuf.utils._"
-};
 
 message Alias {
-    bytes chainId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.ChainId"];
+    bytes chainId = 1;
     string name = 2;
 };
 
 message Recipient {
-    option (scalapb.message).companion_extends = "com.wavesplatform.account.protobuf.PBRecipientCompanionBase";
-
     oneof recipient {
-        bytes address = 1 [(scalapb.field).type = "com.wavesplatform.account.Address"];
+        bytes address = 1;
         Alias alias = 2;
     };
 };

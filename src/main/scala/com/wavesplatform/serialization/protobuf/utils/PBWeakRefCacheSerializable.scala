@@ -2,7 +2,7 @@ package com.wavesplatform.serialization.protobuf.utils
 import scala.ref.WeakReference
 
 trait PBWeakRefCacheSerializable {
-  @transient private[this] var protoBytesCache = WeakReference[Array[Byte]](null)
+  @transient private[this] var protoBytesCache         = WeakReference[Array[Byte]](null)
   @transient private[this] var protoUnsignedBytesCache = WeakReference[Array[Byte]](null)
 
   private[wavesplatform] def computeProtoBytes: Array[Byte]

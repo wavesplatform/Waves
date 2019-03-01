@@ -1,4 +1,5 @@
 package com.wavesplatform.transaction.protobuf
+import com.google.protobuf.ByteString
 
 sealed trait ChainId {
   def byte: Byte
@@ -7,6 +8,18 @@ sealed trait ChainId {
 
 object ChainId {
   def empty = NoChainId
+
+  implicit def fromByteString(bytes: ByteString): ChainId =
+    if (bytes.isEmpty) NoChainId
+    else
+      bytes.byteAt(0) match {
+        case 0 => NoChainId
+        case b => ChainIdByte(b)
+      }
+
+  implicit def toByteString(chainId: ChainId): ByteString = {
+    if (chainId.isEmpty) ByteString.EMPTY else ByteString.copyFrom(Array(chainId.byte))
+  }
 
   implicit def fromByte(byte: Byte): ChainId = byte match {
     case 0 => NoChainId
