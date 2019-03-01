@@ -1,4 +1,7 @@
 package com.wavesplatform.transaction
+import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.protobuf.Recipient
+import com.wavesplatform.common.state.ByteStr
 
 //noinspection TypeAnnotation
 package object protobuf {
@@ -17,4 +20,7 @@ package object protobuf {
 
   type PBAssetId = com.wavesplatform.transaction.protobuf.AssetId
   val PBAssetId = com.wavesplatform.transaction.protobuf.AssetId
+
+  def toAmount(assetAmount: Amount): (Long, Option[ByteStr]) = ???
+  def toAddressOrAlias(recipient: Recipient): AddressOrAlias = ???
 }

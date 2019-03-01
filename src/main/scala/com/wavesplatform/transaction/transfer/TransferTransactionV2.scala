@@ -5,8 +5,10 @@ import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
+import com.wavesplatform.transaction.protobuf.{TransferTransactionData, toAmount, toAddressOrAlias}
 
 import scala.util.{Failure, Success, Try}
 
@@ -52,6 +54,20 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
       } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
   }
+
+  def create(sender: PublicKeyAccount,
+             timestamp: Long,
+             feeAssetId: Option[ByteStr],
+             feeAmount: Long,
+             proofs: Proofs,
+             data: TransferTransactionData): Either[ValidationError, TransactionT] =
+    for {
+      assetAmount <- data.amount.toRight(GenericError("Amount not specified"))
+      (amount, assetId) = toAmount(assetAmount)
+      maybeRecipient <- data.recipient.toRight(GenericError("Recipient not specified"))
+      recipient <- toAddressOrAlias(maybeRecipient)
+      tx <- create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, data.attachment.toByteArray, proofs)
+    } yield tx
 
   def create(assetId: Option[AssetId],
              sender: PublicKeyAccount,
