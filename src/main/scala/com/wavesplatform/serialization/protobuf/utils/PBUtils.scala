@@ -2,7 +2,7 @@ package com.wavesplatform.serialization.protobuf.utils
 import com.google.protobuf.CodedOutputStream
 import scalapb.GeneratedMessage
 
-object PBUtils extends App {
+object PBUtils {
   def encodeDeterministic(msg: GeneratedMessage): Array[Byte] = {
     val outArray     = new Array[Byte](msg.serializedSize)
     val outputStream = CodedOutputStream.newInstance(outArray)
