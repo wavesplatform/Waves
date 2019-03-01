@@ -161,7 +161,7 @@ message ExchangeTransactionData {
         int64 timestamp = 7;
         int64 expiration = 8;
         Amount matcherFee = 9;
-        int64 version = 10;
+        int32 version = 10;
         repeated bytes proofs = 11;
     };
 

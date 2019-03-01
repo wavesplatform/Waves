@@ -14,7 +14,4 @@ package object protobuf {
   type VanillaSignedTransaction = com.wavesplatform.transaction.SignedTransaction
 
   type VanillaAssetId = com.wavesplatform.transaction.AssetId
-
-  type PBAssetId = com.wavesplatform.transaction.protobuf.AssetId
-  val PBAssetId = com.wavesplatform.transaction.protobuf.AssetId
 }
