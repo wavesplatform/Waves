@@ -100,8 +100,6 @@ object ContractInvocationTransactionDiff {
                       (),
                       GenericError(s"Unissued assets are not allowed")
                     )
-                    _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - sum doesn't overflow
-                    _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - whatever else tranfser/massTransfer ensures
                     _ <- {
                       val totalScriptsInvoked = tx.checkedAssets().count(blockchain.hasAssetScript) +
                         ps.count(_._3.fold(false)(blockchain.hasAssetScript))

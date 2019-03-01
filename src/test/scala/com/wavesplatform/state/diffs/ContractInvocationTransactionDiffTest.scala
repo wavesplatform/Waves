@@ -334,7 +334,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     } yield (ci)) { _ should produce("NegativeAmount") }
   }
 
-  property("smart asset paynment require extra fee") {
+  property("smart asset payment require extra fee") {
     forAll(for {
       a <- accountGen
       quantity = 1000000
@@ -376,4 +376,22 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     }
   }
 
+  property("can't overflow payment + fee") {
+    forAll(for {
+      a  <- accountGen
+      am <- smallFeeGen
+      contractGen = (paymentContractGen(a, am, false) _)
+      invoker <- accountGen
+      ts      <- timestampGen
+      r <- preconditionsAndSetContract(contractGen,
+                                       invokerGen = Gen.oneOf(Seq(invoker)),
+                                       payment = Some(Payment(Long.MaxValue, None)),
+                                       feeGen = ciFee(1))
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ should produce("Attempt to transfer unavailable funds")
+        }
+    }
+  }
 }

@@ -89,7 +89,9 @@ object CommonValidation {
                 s"${blockchain.balance(ptx.sender, None)} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, None, mtx.fee)
-        case _                            => Right(tx)
+        case citx: ContractInvocationTransaction =>
+          checkTransfer(citx.sender, citx.payment.flatMap(_.assetId), citx.payment.map(_.amount).getOrElse(0), None, citx.fee)
+        case _ => Right(tx)
       }
     } else Right(tx)
 
