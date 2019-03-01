@@ -609,10 +609,12 @@ class LevelDBWriter(writableDB: DB,
           case None => s
           case Some((h, num)) =>
             s.dropWhile {
-                case (s_h, _, _) => s_h > h
+                case (s_h, _, _) =>
+                  s_h > h
               }
               .dropWhile {
-                case (_, _, s_n) => s_n >= num
+                case (s_h, _, s_n) =>
+                  s_n >= num && s_h >= h
               }
         }
       }
