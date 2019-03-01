@@ -9,12 +9,12 @@ import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedWavesSettings, PercentSettings}
-import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedWavesSettings, OrderFeeSettings, PercentSettings}
+import com.wavesplatform.state.diffs.{CommonValidation, produce}
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.{AssetId, Proofs}
 import com.wavesplatform.utils.randomBytes
@@ -292,34 +292,75 @@ class OrderValidatorSpecification
 
         forAll(orderWithMatcherSettingsGenerator) {
           case (order, sender, orderFeeSettings) =>
-            val orderMatchTxFee = (0.003 * Constants.UnitsInWave).toLong
-            val blockchain      = stub[Blockchain]
+            val blockchain = stub[Blockchain]
 
             activate(blockchain, BlockchainFeatures.SmartAccountTrading -> 0, BlockchainFeatures.OrderV3 -> 0)
 
             val transactionCreator = exchangeTransactionCreator(blockchain).createTransaction _
 
             val orderValidator =
-              OrderValidator.blockchainAware(blockchain, transactionCreator, orderMatchTxFee, order.matcherPublicKey, ntpTime, orderFeeSettings) _
+              OrderValidator.blockchainAware(blockchain, transactionCreator, order.matcherPublicKey, ntpTime, orderFeeSettings) _
 
-            val minFee         = ExchangeTransactionCreator.minFee(blockchain, orderMatchTxFee, order.matcherPublicKey, order.assetPair)
+            val minFee         = ExchangeTransactionCreator.minFee(blockchain, order.matcherPublicKey, order.assetPair)
             val correctedOrder = Order.sign(order.updateFee(minFee - 1000L), sender)
 
             def setAssetsDescriptionAndEmptyScript(assets: Option[AssetId]*): Unit = {
-              assets.foreach(
-                _.fold() { asset =>
-                  (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(8)).anyNumberOfTimes()
+              assets.foreach {
+                case Some(asset) =>
+                  (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(8))
                   (blockchain.assetScript _).when(asset).returns(None)
-                }
-              )
+                case _ =>
+              }
             }
 
             setAssetsDescriptionAndEmptyScript(order.assetPair.amountAsset, order.assetPair.priceAsset, order.matcherFeeAssetId)
-            (blockchain.accountScript _).when(sender.toAddress).returns(None).anyNumberOfTimes()
+            (blockchain.accountScript _).when(sender.toAddress).returns(None)
 
             orderFeeSettings match {
               case _: FixedWavesSettings => orderValidator(correctedOrder) should produce("Order matcherFee should be >=")
               case _                     => orderValidator(correctedOrder) shouldBe 'right
+            }
+        }
+      }
+
+      "insufficient matcher's fee in order in case of scripted account or asset" in {
+
+        val preconditions =
+          for {
+            (order, sender, orderFeeSettings) <- orderWithMatcherSettingsGenerator.filter {
+              case (order, _, _) => order.assetPair.amountAsset.nonEmpty && order.assetPair.priceAsset.nonEmpty
+            }
+          } yield {
+
+            val minFee = orderFeeSettings match {
+              case _: FixedWavesSettings => CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
+              case _                     => order.matcherFee
+            }
+
+            val correctedOrder = Order.sign(order.updateFee(minFee), sender)
+
+            correctedOrder -> orderFeeSettings
+          }
+
+        forAll(preconditions) {
+          case (order, orderFeeSettings) =>
+            val trueScript                       = ExprScript(Terms.TRUE).explicitGet()
+            val setScriptAndValidateWithSettings = setScriptsAndValidate(orderFeeSettings) _
+
+            orderFeeSettings match {
+              case _: FixedWavesSettings =>
+                setScriptAndValidateWithSettings(Some(trueScript), None, None)(order) should produce("Order matcherFee should be >=")
+                setScriptAndValidateWithSettings(None, Some(trueScript), None)(order) should produce("Order matcherFee should be >=")
+                setScriptAndValidateWithSettings(None, None, Some(trueScript))(order) should produce("Order matcherFee should be >=")
+
+                setScriptAndValidateWithSettings(None, None, None)(order) shouldBe 'right
+
+              case _ =>
+                setScriptAndValidateWithSettings(Some(trueScript), None, None)(order) shouldBe 'right
+                setScriptAndValidateWithSettings(None, Some(trueScript), None)(order) shouldBe 'right
+                setScriptAndValidateWithSettings(None, None, Some(trueScript))(order) shouldBe 'right
+
+                setScriptAndValidateWithSettings(None, None, None)(order) shouldBe 'right
             }
         }
       }
@@ -496,17 +537,11 @@ class OrderValidatorSpecification
   }
 
   private def mkOrderValidator(bc: Blockchain, tc: ExchangeTransactionCreator) =
-    OrderValidator.blockchainAware(bc,
-                                   tc.createTransaction,
-                                   (0.003 * Constants.UnitsInWave).toLong,
-                                   MatcherAccount,
-                                   ntpTime,
-                                   matcherSettings.orderFee)(_)
+    OrderValidator.blockchainAware(bc, tc.createTransaction, MatcherAccount, ntpTime, matcherSettings.orderFee)(_)
 
   private def tradableBalance(p: Portfolio)(assetId: Option[AssetId]): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
-  private def exchangeTransactionCreator(blockchain: Blockchain) =
-    new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings)
+  private def exchangeTransactionCreator(blockchain: Blockchain) = new ExchangeTransactionCreator(blockchain, MatcherAccount)
 
   private def asa[A](
       p: Portfolio = defaultPortfolio,
@@ -516,4 +551,41 @@ class OrderValidatorSpecification
     f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, 0, orderStatus)(o))
 
   private def msa(ba: Set[Address], o: Order) = OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty, matcherSettings.orderFee) _
+
+  private def setScriptsAndValidate(orderFeeSettings: OrderFeeSettings)(
+      scriptForAmountAsset: Option[Script],
+      scriptForPriceAsset: Option[Script],
+      scriptForAccount: Option[Script]): Order => OrderValidator.ValidationResult = { order =>
+    val blockchain = stub[Blockchain]
+
+    activate(blockchain, BlockchainFeatures.SmartAccountTrading -> 0, BlockchainFeatures.OrderV3 -> 0, BlockchainFeatures.SmartAssets -> 0)
+
+    def prepareAssets(assetsAndScripts: (Option[AssetId], Option[Script])*): Unit = {
+      assetsAndScripts.foreach {
+        case (assetOption, scriptOption) =>
+          assetOption match {
+            case Some(asset) =>
+              (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(8))
+              (blockchain.assetScript _).when(asset).returns(scriptOption)
+              (blockchain.hasAssetScript _).when(asset).returns(scriptOption.isDefined)
+            case _ =>
+          }
+      }
+    }
+
+    prepareAssets(order.assetPair.amountAsset -> scriptForAmountAsset,
+                  order.assetPair.priceAsset  -> scriptForPriceAsset,
+                  order.matcherFeeAssetId     -> None)
+
+    (blockchain.accountScript _).when(MatcherAccount.toAddress).returns(scriptForAccount)
+    (blockchain.hasScript _).when(MatcherAccount.toAddress).returns(scriptForAccount.isDefined)
+
+    (blockchain.accountScript _).when(order.sender.toAddress).returns(None)
+    (blockchain.hasScript _).when(order.sender.toAddress).returns(false)
+
+    val transactionCreator = exchangeTransactionCreator(blockchain).createTransaction _
+
+    OrderValidator.blockchainAware(blockchain, transactionCreator, MatcherAccount.toAddress, ntpTime, orderFeeSettings)(order)
+  }
+
 }

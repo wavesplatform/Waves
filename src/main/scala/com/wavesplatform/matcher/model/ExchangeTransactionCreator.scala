@@ -3,14 +3,13 @@ package com.wavesplatform.matcher.model
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
-import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.{AssetId, ValidationError}
 
-class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: PrivateKeyAccount, settings: MatcherSettings) {
+class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: PrivateKeyAccount) {
   private def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
     def calcFee(o: Order, amount: Long): Long = {
       val p = BigInt(amount) * o.matcherFee / o.amount
@@ -26,7 +25,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) = calculateMatcherFee(buy, sell, executedAmount)
 
-    val txFee = minFee(blockchain, settings.orderMatchTxFee, matcherPrivateKey, counter.order.assetPair)
+    val txFee = minFee(blockchain, matcherPrivateKey, counter.order.assetPair)
     if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
       ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
     else
@@ -50,11 +49,11 @@ object ExchangeTransactionCreator {
   /**
     * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
-  def minFee(blockchain: Blockchain, orderMatchTxFee: Long, matcherAddress: Address, assetPair: AssetPair): Long = {
+  def minFee(blockchain: Blockchain, matcherAddress: Address, assetPair: AssetPair): Long = {
     def assetFee(assetId: AssetId): Long   = if (blockchain.hasAssetScript(assetId)) CommonValidation.ScriptExtraFee else 0L
     def accountFee(address: Address): Long = if (blockchain.hasScript(address)) CommonValidation.ScriptExtraFee else 0L
 
-    orderMatchTxFee +
+    CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit +
       accountFee(matcherAddress) +
       assetPair.amountAsset.fold(0L)(assetFee) +
       assetPair.priceAsset.fold(0L)(assetFee)

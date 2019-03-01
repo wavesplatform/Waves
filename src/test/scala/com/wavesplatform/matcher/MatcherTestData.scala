@@ -62,7 +62,6 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       |    port: 6886
       |    order-history-file: null
       |    min-order-fee: 100000
-      |    order-match-tx-fee: 100000
       |    snapshots-interval: 100000
       |    max-open-orders: 1000
       |    price-assets: ["BASE1", "BASE2", "BASE"]
@@ -247,7 +246,9 @@ trait MatcherTestData extends NTPTime { _: Suite =>
 
       val correctOrder = (order.version, orderFeeSettings) match {
         case (3, FixedWavesSettings(minFee)) =>
-          order.updateFee(minFee + 1000L)
+          order
+            .updateMatcherFeeAssetId(None)
+            .updateFee(minFee + 1000L)
         case (3, FixedSettings(defaultAssetId, minFee)) =>
           order
             .updateMatcherFeeAssetId(defaultAssetId)

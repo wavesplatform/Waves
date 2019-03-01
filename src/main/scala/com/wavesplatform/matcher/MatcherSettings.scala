@@ -20,7 +20,6 @@ case class MatcherSettings(enable: Boolean,
                            account: String,
                            bindAddress: String,
                            port: Int,
-                           orderMatchTxFee: Long,
                            dataDir: String,
                            recoverOrderHistory: Boolean,
                            journalDataDir: String,
@@ -64,7 +63,6 @@ object MatcherSettings {
     val account                      = config.as[String](s"$configPath.account")
     val bindAddress                  = config.as[String](s"$configPath.bind-address")
     val port                         = config.as[Int](s"$configPath.port")
-    val orderMatchTxFee              = config.as[Long](s"$configPath.order-match-tx-fee")
     val dataDirectory                = config.as[String](s"$configPath.data-directory")
     val journalDirectory             = config.as[String](s"$configPath.journal-directory")
     val snapshotsDirectory           = config.as[String](s"$configPath.snapshots-directory")
@@ -95,7 +93,6 @@ object MatcherSettings {
       account,
       bindAddress,
       port,
-      orderMatchTxFee,
       dataDirectory,
       recoverOrderHistory,
       journalDirectory,
