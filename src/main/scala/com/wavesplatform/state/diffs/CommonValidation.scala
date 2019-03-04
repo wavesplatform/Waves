@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats._
+import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -17,7 +18,7 @@ import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetSc
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{smart, _}
 
-import scala.util.{Left, Right}
+import scala.util.{Left, Right, Try}
 
 object CommonValidation {
 
@@ -303,4 +304,12 @@ object CommonValidation {
   }
 
   def cond[A](c: Boolean)(a: A, b: A): A = if (c) a else b
+
+  def validateOverflow(dataList: Traversable[Long], errMsg: String): Either[ValidationError, Unit] = {
+    Try(dataList.foldLeft(0L)(Math.addExact))
+      .fold(
+        _ => GenericError(errMsg).asLeft[Unit],
+        _ => ().asRight[ValidationError]
+      )
+  }
 }
