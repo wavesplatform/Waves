@@ -304,7 +304,7 @@ class OrderValidatorSpecification
         }
       }
 
-      "insufficient matcher's fee in order in case of scripted account or asset" in {
+      "matcher's fee in order in insufficient in case of scripted account or asset" in {
 
         val preconditions =
           for {
@@ -522,7 +522,8 @@ class OrderValidatorSpecification
 
   private def tradableBalance(p: Portfolio)(assetId: Option[AssetId]): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
-  private def exchangeTransactionCreator(blockchain: Blockchain) = new ExchangeTransactionCreator(blockchain, MatcherAccount)
+  private def exchangeTransactionCreator(blockchain: Blockchain) =
+    new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings.orderFee)
 
   private def asa[A](
       p: Portfolio = defaultPortfolio,

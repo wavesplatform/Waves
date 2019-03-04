@@ -89,7 +89,6 @@ object OrderValidator {
   def blockchainAware(
       blockchain: Blockchain,
       transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
-      //orderMatchTxFee: Long,
       matcherAddress: Address,
       time: Time,
       orderFeeSettings: OrderFeeSettings
@@ -111,7 +110,7 @@ object OrderValidator {
         .ensure("Orders of version 3 have not been activated yet")(
           _.version != 3 || blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height))
         .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
-      mof = ExchangeTransactionCreator.minFee(blockchain, /*orderMatchTxFee, */ matcherAddress, order.assetPair)
+      mof = ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair)
       _ <- (Right(order): ValidationResult).ensure(s"Order matcherFee should be >= $mof") { order =>
         orderFeeSettings match {
           case _: FixedWavesSettings => order.matcherFee >= mof

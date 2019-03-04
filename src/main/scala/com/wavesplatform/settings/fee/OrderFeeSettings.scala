@@ -60,7 +60,6 @@ object OrderFeeSettings {
         validateAssetId(assetSettingName)(assetStr),
         validateByPredicate[Long](fixedMinFeeSettingName)(_ > 0, "must be > 0")
       ) mapN FixedSettings
-
     }
 
     def validatePercentSettings: ErrorsListOr[PercentSettings] = {
