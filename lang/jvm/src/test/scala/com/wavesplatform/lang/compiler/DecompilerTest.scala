@@ -34,15 +34,25 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("simple let") {
-    val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), TRUE)
+    val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), Terms.LET_BLOCK(LET("b", CONST_LONG(2)), Terms.LET_BLOCK(LET("c", CONST_LONG(3)), TRUE)))
     Decompiler(expr, decompilerContext) shouldEq
-      """{
-        |    let a =
-        |        1;
-        |    true
-        |}""".stripMargin
+      """let a = 1
+        |let b = 2
+        |let c = 3
+        |true""".stripMargin
   }
 
+  property("let in let") {
+    val expr =
+      Terms.LET_BLOCK(LET("a", Terms.LET_BLOCK(LET("x", CONST_LONG(0)), TRUE)), Terms.LET_BLOCK(LET("c", CONST_LONG(3)), TRUE))
+    Decompiler(expr, decompilerContext) shouldEq
+      """let a = {
+        |    let x = 0
+        |    true
+        |    }
+        |let c = 3
+        |true""".stripMargin
+  }
   property("native function call with one arg") {
     val expr = Terms.FUNCTION_CALL(
       function = FunctionHeader.Native(500),
@@ -93,25 +103,10 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       LET("vari", REF("p")),
       TRUE
     )
-    Decompiler(expr, decompilerContext) shouldEq
-      """{
-        |    let vari =
-        |        p;
-        |    true
-        |}""".stripMargin
-  }
-
-  property("identation in block") {
-    val expr = Terms.BLOCK(
-      LET("vari", REF("p")),
-      TRUE
-    )
-    Decompiler.expr(Decompiler.pure(expr), decompilerContext.inc().inc()).apply() shouldEq
-      """        {
-        |            let vari =
-        |                p;
-        |            true
-        |        }""".stripMargin
+    val actual   = Decompiler(expr, decompilerContext)
+    val expected = """|let vari = p
+                      |true""".stripMargin
+    actual shouldEq expected
   }
 
   property("let and function call in block") {
@@ -121,11 +116,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                              args = List(REF("v"), CONST_LONG(2))
                            ))
     Decompiler(expr, decompilerContext) shouldEq
-      """{
-        |    let v =
-        |        1;
-        |    (v + 2)
-        |}""".stripMargin
+      """let v = 1
+        |(v + 2)""".stripMargin
   }
 
   property("neq binary op") {
@@ -135,9 +127,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         args = List(CONST_LONG(4), CONST_LONG(2))
       )
     Decompiler(expr, decompilerContext) shouldEq
-      """{
-        |   4 != 2
-        |}""".stripMargin
+      """4 != 2""".stripMargin
   }
 
   property("complicated let in let and function call in block") {
@@ -148,15 +138,11 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       Terms.FUNCTION_CALL(function = FunctionHeader.Native(100), args = List(REF("p"), CONST_LONG(3)))
     )
     Decompiler(expr, decompilerContext) shouldEq
-      """{
-        |    let p =
-        |        {
-        |            let v =
-        |                1;
-        |            (v + 2)
-        |        };
-        |    (p + 3)
-        |}""".stripMargin
+      """let p = {
+        |    let v = 1
+        |    (v + 2)
+        |    }
+        |(p + 3)""".stripMargin
   }
 
   property("old match") {
@@ -281,43 +267,26 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
     Decompiler(contract: Contract, decompilerContext) shouldEq
-      """func foo () = {
-        |    false
-        |}
-        |
-        |func bar () = {
-        |    {
-        |        if (
-        |            foo()
-        |        )
-        |        then
-        |            true
-        |        else
-        |            false
-        |    }
-        |}
-        |
-        |@Callable(invocation)
-        |func baz (a) = {
-        |    {
-        |        let x =
-        |            invocation.caller.bytes;
-        |        {
-        |            if (
-        |                foo()
-        |            )
-        |            then
-        |                WriteSet(cons(DataEntry("b", 1), cons(DataEntry("sender", x), nil)))
-        |            else
-        |                WriteSet(cons(DataEntry("a", a), cons(DataEntry("sender", x), nil)))
-        |        }
-        |    }
-        |}
-        |
-        |@Verifier(t)
-        |func verify () = {
-        |    true
-        |}""".stripMargin
+      """|func foo () = false
+         |
+         |
+         |func bar () = if (foo())
+         |        then true
+         |        else false
+         |
+         |
+         |@Callable(invocation)
+         |func baz (a) = {
+         |        let x = invocation.caller.bytes
+         |        if (foo())
+         |            then WriteSet(cons(DataEntry("b", 1), cons(DataEntry("sender", x), nil)))
+         |            else WriteSet(cons(DataEntry("a", a), cons(DataEntry("sender", x), nil)))
+         |        }
+         |
+         |
+         |@Verifier(t)
+         |func verify () = true
+         |""".stripMargin
   }
 
   property("Invoke contract decompilation") {
@@ -338,19 +307,15 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       None
     )
     Decompiler(contract: Contract, decompilerContext) shouldEq
-      """|func foo (bar,buz) = {
-                    |    true
-                    |}
-                    |
-                    |@Callable(i)
-                    |func testfunc (amount) = {
-                    |    {
-                    |        let pmt =
-                    |            1;
-                    |        true
-                    |    }
-                    |}
-                    |""".stripMargin
+      """|func foo (bar,buz) = true
+         |
+         |
+         |@Callable(i)
+         |func testfunc (amount) = {
+         |        let pmt = 1
+         |        true
+         |    }
+         |""".stripMargin
 
   }
 
@@ -359,11 +324,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     // ([REVIEW]: may be i`am make a mistake here)
     val expr = Terms.BLOCK(Terms.LET("param", CONST_BYTESTR(ByteStr(test.getBytes()))), REF("param"))
     Decompiler(expr, decompilerContext) shouldEq
-      """{
-        |    let param =
-        |        base58'3K3F4C';
-        |    param
-        |}""".stripMargin
+      """let param = base58'3K3F4C'
+        |param""".stripMargin
   }
 
   property("getter") {
@@ -379,59 +341,29 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   property("simple if") {
     val expr = IF(TRUE, CONST_LONG(1), CONST_STRING("XXX"))
     Decompiler(expr, decompilerContext) shouldEq
-      """{
-        |    if (
-        |        true
-        |    )
-        |    then
-        |        1
-        |    else
-        |        "XXX"
-        |}""".stripMargin
+      """if (true)
+        |    then 1
+        |    else "XXX"""".stripMargin
   }
 
   property("if with complicated else branch") {
     val expr = IF(TRUE, CONST_LONG(1), IF(TRUE, CONST_LONG(1), CONST_STRING("XXX")))
     Decompiler(expr, decompilerContext) shouldEq
-      """{
-        |    if (
-        |        true
-        |    )
-        |    then
-        |        1
-        |    else
-        |        {
-        |            if (
-        |                true
-        |            )
-        |            then
-        |                1
-        |            else
-        |                "XXX"
-        |        }
-        |}""".stripMargin
+      """if (true)
+        |    then 1
+        |    else if (true)
+        |        then 1
+        |        else "XXX"""".stripMargin
   }
 
   property("if with complicated then branch") {
     val expr = IF(TRUE, IF(TRUE, CONST_LONG(1), CONST_STRING("XXX")), CONST_LONG(1))
     Decompiler(expr, decompilerContext) shouldEq
-      """{
-        |    if (
-        |        true
-        |    )
-        |    then
-        |        {
-        |            if (
-        |                true
-        |            )
-        |            then
-        |                1
-        |            else
-        |                "XXX"
-        |        }
-        |    else
-        |        1
-        |}""".stripMargin
+      """if (true)
+        |    then if (true)
+        |            then 1
+        |            else "XXX"
+        |    else 1""".stripMargin
   }
 
   property("Surge smart accet") {

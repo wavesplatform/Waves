@@ -8,6 +8,15 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
 
 object Decompiler {
+
+  sealed trait Braces
+  case object NoBraces     extends Braces
+  case object PreferBraces extends Braces
+
+  sealed trait FirstLinePolicy
+  case object DontIndentFirstLine extends FirstLinePolicy
+  case object IdentFirstLine extends FirstLinePolicy
+
   private[lang] def pure[A](a: A) = Coeval.evalOnce(a)
 
   private def out(in: String, ident: Int): String =
@@ -20,54 +29,57 @@ object Decompiler {
   private def decl(e: Coeval[DECLARATION], ctx: DecompilerContext): Coeval[String] =
     e flatMap {
       case Terms.FUNC(name, args, body) =>
-        expr(pure(body), ctx.inc()).map(
+        expr(pure(body), ctx.inc(), PreferBraces, DontIndentFirstLine).map(
           fb =>
-            out("func " + name + " (" + args.mkString(",") + ") = {" + NEWLINE, ctx.ident) +
-              out(fb + NEWLINE, ctx.ident) +
-              out("}", ctx.ident))
-      case Terms.LET(name, value) => expr(pure(value), ctx.inc()).map(e => out("let " + name + " =" + NEWLINE + e, ctx.ident))
+            out("func " + name + " (" + args.mkString(",") + ") = ", ctx.ident) +
+              out(fb + NEWLINE, ctx.ident))
+      case Terms.LET(name, value) => expr(pure(value), ctx, PreferBraces, DontIndentFirstLine).map(e => out("let " + name + " = " + e, ctx.ident))
     }
 
-  private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext): Coeval[String] =
+  private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: Braces, firstLinePolicy: FirstLinePolicy): Coeval[String] =
     e flatMap {
-      case Terms.TRUE                 => pureOut("true", ctx.ident)
-      case Terms.FALSE                => pureOut("false", ctx.ident)
-      case Terms.CONST_BOOLEAN(b)     => pureOut(b.toString.toLowerCase(), ctx.ident)
-      case Terms.CONST_LONG(t)        => pureOut(t.toLong.toString, ctx.ident)
-      case Terms.CONST_STRING(s)      => pureOut('"' + s + '"', ctx.ident)
-      case Terms.CONST_BYTESTR(bs)    => pureOut("base58'" + bs.base58 + "'", ctx.ident)
-      case Terms.REF(ref)             => pureOut(ref, ctx.ident)
-      case Terms.GETTER(getExpr, fld) => expr(pure(getExpr), ctx).map(a => a + "." + fld)
-      case Terms.IF(cond, it, iff) =>
-        val ident2 = ctx.inc().inc()
-        for {
-          c   <- expr(pure(cond), ident2)
-          it  <- expr(pure(it), ident2)
-          iff <- expr(pure(iff), ident2)
-        } yield
-          out("{" + NEWLINE, ctx.ident) +
-            out("if (" + NEWLINE, ctx.inc().ident) +
-            out(c + NEWLINE, 0) +
-            out(")" + NEWLINE, ctx.inc().ident) +
-            out("then" + NEWLINE, ctx.inc().ident) +
-            out(it + NEWLINE, 0) +
-            out("else" + NEWLINE, ctx.inc().ident) +
-            out(iff + NEWLINE, 0) +
-            out("}", ctx.ident)
       case Terms.BLOCK(declPar, body) =>
+        val braceThis = braces match {
+          case NoBraces     => false
+          case PreferBraces => true // body.isInstanceOf[BLOCK] || body.isInstanceOf[LET_BLOCK]
+        }
+        val identedBlockText = if (braceThis) ctx.inc() else ctx
         for {
-          d <- decl(pure(declPar), ctx.inc())
-          b <- expr(pure(body), ctx.inc())
-        } yield
-          out("{" + NEWLINE, ctx.ident) +
-            out(d + ";" + NEWLINE, 0) +
-            out(b + NEWLINE, 0) +
-            out("}", ctx.ident)
+          d <- decl(pure(declPar), identedBlockText)
+          b <- expr(pure(body), identedBlockText, NoBraces, IdentFirstLine)
+        } yield {
+          if (braceThis)
+            out("{" + NEWLINE, ident = 0) +
+              out(d + NEWLINE, 0) +
+              out(b + NEWLINE, 0) +
+              out("}", ctx.inc().ident)
+          else
+            out(d + NEWLINE, 0) +
+              out(b, 0)
+        }
+      case Terms.LET_BLOCK(let, exprPar) => expr(pure(Terms.BLOCK(let, exprPar)), ctx, braces, firstLinePolicy)
 
-      case Terms.LET_BLOCK(let, exprPar) => expr(pure(Terms.BLOCK(let, exprPar)), ctx)
+      case Terms.TRUE                 => pureOut("true", if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident)
+      case Terms.FALSE                => pureOut("false", if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident)
+      case Terms.CONST_BOOLEAN(b)     => pureOut(b.toString.toLowerCase(), if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident)
+      case Terms.CONST_LONG(t)        => pureOut(t.toLong.toString, if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident)
+      case Terms.CONST_STRING(s)      => pureOut('"' + s + '"', if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident)
+      case Terms.CONST_BYTESTR(bs)    => pureOut("base58'" + bs.base58 + "'", if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident)
+      case Terms.REF(ref)             => pureOut(ref, if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident)
+      case Terms.GETTER(getExpr, fld) => expr(pure(getExpr), ctx, PreferBraces, firstLinePolicy).map(a => a + "." + fld)
+      case Terms.IF(cond, it, iff) =>
+
+        for {
+          c   <- expr(pure(cond), ctx, PreferBraces, DontIndentFirstLine)
+          it  <- expr(pure(it), ctx, PreferBraces, DontIndentFirstLine)
+          iff <- expr(pure(iff), ctx, PreferBraces, DontIndentFirstLine)
+        } yield
+          out("if (" + c + ")" + NEWLINE, if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident ) +
+            out("then " + it + NEWLINE, ctx.inc().ident) +
+            out("else " + iff, ctx.inc().ident)
       case Terms.FUNCTION_CALL(func, args) =>
         val argsCoeval = args
-          .map(a => expr(pure(a), ctx.zero()))
+          .map(a => expr(pure(a), ctx.zero(), PreferBraces, DontIndentFirstLine))
           .toVector
           .sequence
 
@@ -75,16 +87,16 @@ object Decompiler {
           case FunctionHeader.Native(name) =>
             ctx.binaryOps.get(name) match {
               case Some(binOp) =>
-                argsCoeval.map(as => out("(" + as.head + " " + binOp + " " + as.tail.head + ")", ctx.ident))
+                argsCoeval.map(as => out("(" + as.head + " " + binOp + " " + as.tail.head + ")", if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident))
               case None =>
                 argsCoeval.map(
                   as =>
                     out(ctx.opCodes.getOrElse(name, "Native<" + name + ">") + "(" + as.mkString(", ")
                           + ")",
-                        ctx.ident))
+                      if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident))
             }
 
-          case FunctionHeader.User(name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", ctx.ident))
+          case FunctionHeader.User(name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident))
         }
       case _: Terms.ARR     => ??? // never happens
       case _: Terms.CaseObj => ??? // never happens
@@ -118,6 +130,6 @@ object Decompiler {
   }
 
   def apply(e0: EXPR, ctx: DecompilerContext): String =
-    expr(pure(e0), ctx).apply()
+    expr(pure(e0), ctx, NoBraces, IdentFirstLine).apply()
 
 }
