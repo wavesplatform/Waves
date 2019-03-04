@@ -305,7 +305,11 @@ object PureContext {
 
   lazy val toLongOffset: BaseFunction =
     NativeFunction("toInt", 10, BININT_OFF, LONG, "Deserialize big endian 8-bytes value", ("bin", BYTESTR, "8-bytes BE binaries"), ("offet", LONG, "bytes offset")) {
-      case CONST_BYTESTR(u) :: CONST_LONG(o) :: Nil => Try(CONST_LONG(ByteBuffer.wrap(u.arr).getLong(BigInt(o).bigInteger.intValueExact()))).toEither.left.map(_.toString)
+      case CONST_BYTESTR(ByteStr(u)) :: CONST_LONG(o) :: Nil => if( o >= 0 && o <= u.size - 8) {
+          Try(CONST_LONG(ByteBuffer.wrap(u).getLong(o.toInt))).toEither.left.map(_.toString)
+      } else {
+        Left("IndexOutOfBounds")
+      }
       case xs                      => notImplemented("toInt(u: byte[], off: int)", xs)
     }
 

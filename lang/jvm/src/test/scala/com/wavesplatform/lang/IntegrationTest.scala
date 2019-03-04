@@ -477,9 +477,21 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(0x6263646566676869l))
   }
 
-  property("extract Long by offset (fail)") {
+  property("extract Long by offset (patrial)") {
     val src =
       """ base58'2EtvziXsJaBRS'.toInt(2) """
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+  }
+
+  property("extract Long by offset (out of bounds)") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt(10) """
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+  }
+
+  property("extract Long by offset (negative)") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt(-2) """
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
 }
