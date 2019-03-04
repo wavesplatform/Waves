@@ -33,10 +33,13 @@ object UtxPoolSynchronizer extends ScorexLogging {
 
     val newTxSource = txSource
       .observeOn(scheduler)
-      .filter { case (_, tx) =>
-        var isNew = false
-        knownTransactions.get(tx.id(), { () => isNew = true; dummy })
-        isNew
+      .filter {
+        case (_, tx) =>
+          var isNew = false
+          knownTransactions.get(tx.id(), { () =>
+            isNew = true; dummy
+          })
+          isNew
       }
 
     val synchronizerFuture = newTxSource
@@ -44,17 +47,19 @@ object UtxPoolSynchronizer extends ScorexLogging {
         log.warn(s"UTX queue overflow: $dropped transactions dropped")
         None
       }))
-      .mapParallelUnordered(settings.parallelism) { case (sender, transaction) => Task {
-          concurrent.blocking(utx.putIfNew(transaction)) match {
-            case Right((isNew, _)) =>
-              if (isNew) Some(allChannels.write(RawBytes.from(transaction), (_: Channel) != sender))
-              else None
+      .mapParallelUnordered(settings.parallelism) {
+        case (sender, transaction) =>
+          Task {
+            concurrent.blocking(utx.putIfNew(transaction)) match {
+              case Right((isNew, _)) =>
+                if (isNew) Some(allChannels.write(RawBytes.from(transaction), (_: Channel) != sender))
+                else None
 
-            case Left(error) =>
-              log.debug(s"Error adding transaction to UTX pool: $error")
-              None
+              case Left(error) =>
+                log.debug(s"Error adding transaction to UTX pool: $error")
+                None
+            }
           }
-        }
       }
       .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
       .filter(_.flatten.nonEmpty)
