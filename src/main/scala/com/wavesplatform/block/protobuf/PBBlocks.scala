@@ -68,7 +68,7 @@ object PBBlocks {
     )
   }
 
-  private[this] implicit def shortToInt(s: Short): Int = {
+  private[this] def shortToInt(s: Short): Int = {
     java.lang.Short.toUnsignedInt(s)
   }
 

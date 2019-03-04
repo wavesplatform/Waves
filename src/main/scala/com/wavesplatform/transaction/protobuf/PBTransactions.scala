@@ -284,7 +284,7 @@ object PBTransactions {
     result
   }
 
-  def protobuf(tx: VanillaTransaction) = {
+  def protobuf(tx: VanillaTransaction): PBSignedTransaction = {
     tx match {
       // Uses version "2" for "modern" transactions with single version and proofs field
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
