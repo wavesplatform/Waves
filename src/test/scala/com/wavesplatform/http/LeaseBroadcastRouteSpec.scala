@@ -25,7 +25,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
 
   (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
-  "returns StateCheckFiled" - {
+  "returns StateCheckFailed" - {
     val route = LeaseBroadcastApiRoute(settings, utx, allChannels).route
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
