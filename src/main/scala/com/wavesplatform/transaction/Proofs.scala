@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.utils.base58Length
@@ -22,7 +22,7 @@ object Proofs {
   val MaxProofSize       = 64
   val MaxProofStringSize = base58Length(MaxProofSize)
 
-  val empty = create(Nil).explicitGet()
+  lazy val empty = new Proofs(Nil)
 
   def create(proofs: Seq[ByteStr]): Either[ValidationError, Proofs] =
     for {

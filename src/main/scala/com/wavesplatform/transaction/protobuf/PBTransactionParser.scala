@@ -12,9 +12,7 @@ trait PBTransactionParser extends TransactionParser.OneVersion {
   override val typeId: Byte  = 0xff.toByte
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    PBTransactions.vanilla(PBSignedTransaction.parseFrom(bytes))
-      .left.map(err => new IllegalArgumentException(err.toString))
-      .toTry
+    PBTransactions.vanilla(PBSignedTransaction.parseFrom(bytes)).left.map(err => new IllegalArgumentException(err.toString)).toTry
   }
 }
 

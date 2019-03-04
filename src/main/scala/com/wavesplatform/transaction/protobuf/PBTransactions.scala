@@ -60,13 +60,13 @@ object PBTransactions {
   }
 
   private[this] def createVanilla(version: Int,
-             chainId: Byte,
-             sender: PublicKeyAccount,
-             feeAmount: Long,
-             feeAssetId: Option[ByteStr],
-             timestamp: Long,
-             proofs: Proofs,
-             data: PBTransaction.Data): Either[ValidationError, VanillaTransaction] = {
+                                  chainId: Byte,
+                                  sender: PublicKeyAccount,
+                                  feeAmount: Long,
+                                  feeAssetId: Option[ByteStr],
+                                  timestamp: Long,
+                                  proofs: Proofs,
+                                  data: PBTransaction.Data): Either[ValidationError, VanillaTransaction] = {
     import PBTransaction.Data
 
     val signature = proofs.toSignature

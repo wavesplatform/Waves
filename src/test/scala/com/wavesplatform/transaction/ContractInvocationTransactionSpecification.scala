@@ -5,8 +5,8 @@ import com.wavesplatform.account.{AddressScheme, DefaultAddressScheme, PrivateKe
 import com.wavesplatform.api.http.{ContractInvocationRequest, SignedContractInvocationRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
 import org.scalatest._
@@ -96,12 +96,14 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKeyAccount.fromBase58String("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").explicitGet()
     ContractInvocationTransaction.create(
-        pk,
+      pk,
       pk.toAddress,
-      Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0,23).map(_ => Terms.CONST_LONG(0)).toList),
+      Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList),
       None,
-      1,1,Proofs.empty
-      ) should produce("more than 22 arguments")
+      1,
+      1,
+      Proofs.empty
+    ) should produce("more than 22 arguments")
   }
 
   property("can't be more 5kb") {
@@ -113,7 +115,9 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
       pk.toAddress,
       Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString))),
       None,
-      1,1,Proofs.empty
+      1,
+      1,
+      Proofs.empty
     ) should produce("TooBigArray")
   }
 }

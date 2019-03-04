@@ -3,18 +3,18 @@ package com.wavesplatform.transaction.smart.script.v1
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.{ScriptEstimator, Serde}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.{functionCosts, varNames}
 import monix.eval.Coeval
-import com.wavesplatform.lang.v1.ContractLimits._
 
 import scala.annotation.tailrec
 import scala.collection.mutable._
 
 object ExprScript {
-  val checksumLength         = 4
+  val checksumLength = 4
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
     Either.cond(bs.length <= MaxExprSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $MaxExprSizeInBytes bytes")

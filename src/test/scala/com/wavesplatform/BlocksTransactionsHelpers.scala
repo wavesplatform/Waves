@@ -83,7 +83,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         featureVotes = Set.empty
       )
 
-      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytesWithoutSignature()))))
+      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes()))))
     }
   }
 }
