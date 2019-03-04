@@ -13,6 +13,8 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.ByteBuffer
 
 import scala.util.Try
 
@@ -287,6 +289,27 @@ object PureContext {
       )
     }
 
+  val UTF8Decoder = UTF_8.newDecoder
+
+  lazy val toUtf8String: BaseFunction =
+    NativeFunction("toUtf8String", 20, UTF8STRING, STRING, "Convert UTF8 bytes to string", ("u", BYTESTR, "utf8")) {
+      case CONST_BYTESTR(u) :: Nil => Try(CONST_STRING(UTF8Decoder.decode(ByteBuffer.wrap(u.arr)).toString)).toEither.left.map(_.toString)
+      case xs                      => notImplemented("toUtf8String(u: byte[])", xs)
+    }
+
+  lazy val toLong: BaseFunction =
+    NativeFunction("toInt", 10, BININT, LONG, "Deserialize big endian 8-bytes value", ("bin", BYTESTR, "8-bytes BE binaries")) {
+      case CONST_BYTESTR(u) :: Nil => Try(CONST_LONG(ByteBuffer.wrap(u.arr).getLong())).toEither.left.map(_.toString)
+      case xs                      => notImplemented("toInt(u: byte[])", xs)
+    }
+
+  lazy val toLongOffset: BaseFunction =
+    NativeFunction("toInt", 10, BININT_OFF, LONG, "Deserialize big endian 8-bytes value", ("bin", BYTESTR, "8-bytes BE binaries"), ("offet", LONG, "bytes offset")) {
+      case CONST_BYTESTR(u) :: CONST_LONG(o) :: Nil => Try(CONST_LONG(ByteBuffer.wrap(u.arr).getLong(BigInt(o).bigInteger.intValueExact()))).toEither.left.map(_.toString)
+      case xs                      => notImplemented("toInt(u: byte[], off: int)", xs)
+    }
+
+
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
       body: (EVALUATED, EVALUATED) => Either[String, EVALUATED]): BaseFunction =
     NativeFunction(opsToFunctions(op), complicity, func, r, docString, ("a", t, arg1Doc), ("b", t, arg2Doc)) {
@@ -414,7 +437,7 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(listConstructor, ensure)
+            Array(listConstructor, ensure, toUtf8String, toLong, toLongOffset)
           )
         )
     }
