@@ -18,12 +18,11 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Transaction
 import kamon.Kamon
-import kamon.metric.MeasurementUnit.time.milliseconds
 
 import scala.concurrent.duration._
 
 package object network extends ScorexLogging {
-  private val broadcastTimeStats = Kamon.histogram("network-broadcast-time", milliseconds)
+  private val broadcastTimeStats = Kamon.timer("network-broadcast-time")
 
   def inetSocketAddress(addr: String, defaultPort: Int): InetSocketAddress = {
     val uri = new URI(s"node://$addr")
@@ -73,15 +72,13 @@ package object network extends ScorexLogging {
 
     def broadcast(message: AnyRef, except: Set[Channel]): ChannelGroupFuture = {
       logBroadcast(message, except)
-      val t0 = System.currentTimeMillis()
+      val st = broadcastTimeStats.refine("object", message.getClass.getSimpleName).start()
       allChannels
         .writeAndFlush(message, { (channel: Channel) =>
           !except.contains(channel)
         })
         .addListener { _: ChannelGroupFuture =>
-          val t1  = System.currentTimeMillis()
-          val tpe = message.getClass.getSimpleName
-          broadcastTimeStats.refine("object", tpe).record(t1 - t0)
+          st.stop()
         }
     }
 
