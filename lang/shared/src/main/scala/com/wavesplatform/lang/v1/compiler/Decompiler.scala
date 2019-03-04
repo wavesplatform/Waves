@@ -17,56 +17,57 @@ object Decompiler {
 
   private val NEWLINE = scala.util.Properties.lineSeparator
 
-  private def decl(e: Coeval[DECLARATION], ident: Int, ctx: DecompilerContext): Coeval[String] =
+  private def decl(e: Coeval[DECLARATION], ctx: DecompilerContext): Coeval[String] =
     e flatMap {
       case Terms.FUNC(name, args, body) =>
-        expr(pure(body), 1, ctx).map(
+        expr(pure(body), ctx.inc()).map(
           fb =>
-            out("func " + name + " (" + args.mkString(",") + ") = {" + NEWLINE, ident) +
-              out(fb + NEWLINE, ident) +
-              out("}", ident))
-      case Terms.LET(name, value) => expr(pure(value), 1 + ident, ctx).map(e => out("let " + name + " =" + NEWLINE + e, ident))
+            out("func " + name + " (" + args.mkString(",") + ") = {" + NEWLINE, ctx.ident) +
+              out(fb + NEWLINE, ctx.ident) +
+              out("}", ctx.ident))
+      case Terms.LET(name, value) => expr(pure(value), ctx.inc()).map(e => out("let " + name + " =" + NEWLINE + e, ctx.ident))
     }
 
-  private[lang] def expr(e: Coeval[EXPR], ident: Int, ctx: DecompilerContext): Coeval[String] =
+  private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext): Coeval[String] =
     e flatMap {
-      case Terms.TRUE                 => pureOut("true", ident)
-      case Terms.FALSE                => pureOut("false", ident)
-      case Terms.CONST_BOOLEAN(b)     => pureOut(b.toString.toLowerCase(), ident)
-      case Terms.CONST_LONG(t)        => pureOut(t.toLong.toString, ident)
-      case Terms.CONST_STRING(s)      => pureOut('"' + s + '"', ident)
-      case Terms.CONST_BYTESTR(bs)    => pureOut("base58'" + bs.base58 + "'", ident)
-      case Terms.REF(ref)             => pureOut(ref, ident)
-      case Terms.GETTER(getExpr, fld) => expr(pure(getExpr), ident, ctx).map(a => a + "." + fld)
+      case Terms.TRUE                 => pureOut("true", ctx.ident)
+      case Terms.FALSE                => pureOut("false", ctx.ident)
+      case Terms.CONST_BOOLEAN(b)     => pureOut(b.toString.toLowerCase(), ctx.ident)
+      case Terms.CONST_LONG(t)        => pureOut(t.toLong.toString, ctx.ident)
+      case Terms.CONST_STRING(s)      => pureOut('"' + s + '"', ctx.ident)
+      case Terms.CONST_BYTESTR(bs)    => pureOut("base58'" + bs.base58 + "'", ctx.ident)
+      case Terms.REF(ref)             => pureOut(ref, ctx.ident)
+      case Terms.GETTER(getExpr, fld) => expr(pure(getExpr), ctx).map(a => a + "." + fld)
       case Terms.IF(cond, it, iff) =>
+        val ident2 = ctx.inc().inc()
         for {
-          c   <- expr(pure(cond), 2 + ident, ctx)
-          it  <- expr(pure(it), 2 + ident, ctx)
-          iff <- expr(pure(iff), 2 + ident, ctx)
+          c   <- expr(pure(cond), ident2)
+          it  <- expr(pure(it), ident2)
+          iff <- expr(pure(iff), ident2)
         } yield
-          out("{" + NEWLINE, ident) +
-            out("if (" + NEWLINE, 1 + ident) +
+          out("{" + NEWLINE, ctx.ident) +
+            out("if (" + NEWLINE, ctx.inc().ident) +
             out(c + NEWLINE, 0) +
-            out(")" + NEWLINE, 1 + ident) +
-            out("then" + NEWLINE, 1 + ident) +
+            out(")" + NEWLINE, ctx.inc().ident) +
+            out("then" + NEWLINE, ctx.inc().ident) +
             out(it + NEWLINE, 0) +
-            out("else" + NEWLINE, 1 + ident) +
+            out("else" + NEWLINE, ctx.inc().ident) +
             out(iff + NEWLINE, 0) +
-            out("}", ident)
+            out("}", ctx.ident)
       case Terms.BLOCK(declPar, body) =>
         for {
-          d <- decl(pure(declPar), 1 + ident, ctx)
-          b <- expr(pure(body), 1 + ident, ctx)
+          d <- decl(pure(declPar), ctx.inc())
+          b <- expr(pure(body), ctx.inc())
         } yield
-          out("{" + NEWLINE, ident) +
+          out("{" + NEWLINE, ctx.ident) +
             out(d + ";" + NEWLINE, 0) +
             out(b + NEWLINE, 0) +
-            out("}", ident)
+            out("}", ctx.ident)
 
-      case Terms.LET_BLOCK(let, exprPar) => expr(pure(Terms.BLOCK(let, exprPar)), ident, ctx)
+      case Terms.LET_BLOCK(let, exprPar) => expr(pure(Terms.BLOCK(let, exprPar)), ctx)
       case Terms.FUNCTION_CALL(func, args) =>
         val argsCoeval = args
-          .map(a => expr(pure(a), 0, ctx))
+          .map(a => expr(pure(a), ctx.zero()))
           .toVector
           .sequence
 
@@ -74,16 +75,16 @@ object Decompiler {
           case FunctionHeader.Native(name) =>
             ctx.binaryOps.get(name) match {
               case Some(binOp) =>
-                argsCoeval.map(as => out("(" + as.head + " " + binOp + " " + as.tail.head + ")", ident))
+                argsCoeval.map(as => out("(" + as.head + " " + binOp + " " + as.tail.head + ")", ctx.ident))
               case None =>
                 argsCoeval.map(
                   as =>
                     out(ctx.opCodes.getOrElse(name, "Native<" + name + ">") + "(" + as.mkString(", ")
                           + ")",
-                        ident))
+                        ctx.ident))
             }
 
-          case FunctionHeader.User(name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", ident))
+          case FunctionHeader.User(name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", ctx.ident))
         }
       case _: Terms.ARR     => ??? // never happens
       case _: Terms.CaseObj => ??? // never happens
@@ -95,16 +96,16 @@ object Decompiler {
 
     import e._
 
-    val decls: Seq[Coeval[String]] = dec.map(expr => decl(pure(expr), 0, ctx))
+    val decls: Seq[Coeval[String]] = dec.map(expr => decl(pure(expr), ctx))
     val callables: Seq[Coeval[String]] = cfs
       .map {
         case CallableFunction(annotation, u) =>
-          Decompiler.decl(pure(u), 0, ctx).map(out(NEWLINE + "@Callable(" + annotation.invocationArgName + ")" + NEWLINE, 0) + _)
+          Decompiler.decl(pure(u), ctx).map(out(NEWLINE + "@Callable(" + annotation.invocationArgName + ")" + NEWLINE, 0) + _)
       }
 
     val verifier: Seq[Coeval[String]] = vf.map {
       case VerifierFunction(annotation, u) =>
-        Decompiler.decl(pure(u), 0, ctx).map(out(NEWLINE + "@Verifier(" + annotation.invocationArgName + ")" + NEWLINE, 0) + _)
+        Decompiler.decl(pure(u), ctx).map(out(NEWLINE + "@Verifier(" + annotation.invocationArgName + ")" + NEWLINE, 0) + _)
     }.toSeq
 
     val result = for {
@@ -117,6 +118,6 @@ object Decompiler {
   }
 
   def apply(e0: EXPR, ctx: DecompilerContext): String =
-    expr(pure(e0), 0, ctx).apply()
+    expr(pure(e0), ctx).apply()
 
 }

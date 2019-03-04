@@ -29,7 +29,10 @@ case class CTX(@(JSExport @field) types: Seq[DefinedType],
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
   )
 
-  val opsNames = BinaryOperation.opsByPriority.flatten.map(x => BinaryOperation.opsToFunctions(x)).toSet
+  val opsNames = BinaryOperation.opsByPriority
+    .flatten
+    .map(x => BinaryOperation.opsToFunctions(x))
+    .toSet
 
   lazy val decompilerContext: DecompilerContext = DecompilerContext(
     opCodes = compilerContext.functionDefs
@@ -39,12 +42,14 @@ case class CTX(@(JSExport @field) types: Seq[DefinedType],
       .toMap,
     binaryOps = compilerContext.functionDefs
       .filterKeys(opsNames(_))
-      .mapValues(_.map(_.header)
-        .filter(_.isInstanceOf[Native])
-        .map(_.asInstanceOf[Native].name))
+      .mapValues(
+        _.map(_.header)
+          .filter(_.isInstanceOf[Native])
+          .map(_.asInstanceOf[Native].name))
       .toList
       .flatMap { case (name, codes) => codes.map((_, name)) }
-      .toMap
+      .toMap,
+    ident = 0
   )
 
 }
