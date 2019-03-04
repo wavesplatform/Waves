@@ -207,6 +207,46 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       OrderV3(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
     }
 
+  def orderV3PairGenerator: Gen[((PrivateKeyAccount, Order), (PrivateKeyAccount, Order))] =
+    for {
+      senderBuy: PrivateKeyAccount  <- accountGen
+      senderSell: PrivateKeyAccount <- accountGen
+      pair                          <- assetPairGen
+      amount: Long                  <- maxWavesAmountGen
+      price: Long                   <- Gen.choose(1, 1000).map(_ * Order.PriceConstant)
+      timestampBuy: Long            <- createdTimeGen
+      timestampSell: Long           <- createdTimeGen
+      expirationBuy: Long           <- maxTimeGen
+      expirationSell: Long          <- maxTimeGen
+      matcherFeeBuy: Long           <- maxWavesAmountGen
+      matcherFeeSell: Long          <- maxWavesAmountGen
+      arbitraryAsset                <- assetIdGen(1)
+      matcherFeeAssetId             <- Gen.oneOf(pair.amountAsset, pair.priceAsset, None, arbitraryAsset)
+    } yield {
+      (
+        senderBuy -> OrderV3(senderBuy,
+                             MatcherAccount,
+                             pair,
+                             OrderType.BUY,
+                             amount,
+                             price,
+                             timestampBuy,
+                             expirationBuy,
+                             matcherFeeBuy,
+                             matcherFeeAssetId),
+        senderSell -> OrderV3(senderSell,
+                              MatcherAccount,
+                              pair,
+                              OrderType.SELL,
+                              amount,
+                              price,
+                              timestampSell,
+                              expirationSell,
+                              matcherFeeSell,
+                              matcherFeeAssetId)
+      )
+    }
+
   val orderV3WithArbitraryFeeAssetGenerator: Gen[Order] =
     for {
       sender: PrivateKeyAccount <- accountGen

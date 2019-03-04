@@ -14,7 +14,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable._
 
 object ExprScript {
-  val checksumLength         = 4
+  val checksumLength = 4
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
     Either.cond(bs.length <= MaxExprSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $MaxExprSizeInBytes bytes")
