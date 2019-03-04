@@ -4,10 +4,10 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.{transaction => vt}
 
-object PBOrderFactory {
+object PBOrders {
   import PBInternalImplicits._
 
-  def create(order: ExchangeTransactionData.Order, version: Int = 0) = {
+  def vanilla(order: ExchangeTransactionData.Order, version: Int = 0) = {
     vt.assets.exchange.Order(
       PublicKeyAccount(order.senderPublicKey.toByteArray),
       PublicKeyAccount(order.matcherPublicKey.toByteArray),

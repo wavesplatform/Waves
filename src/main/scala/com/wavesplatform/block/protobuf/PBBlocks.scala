@@ -6,15 +6,26 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.protobuf.{PBTransactionFactory, VanillaTransaction}
+import com.wavesplatform.transaction.protobuf.{PBTransactions, VanillaTransaction}
 
-object PBBlockFactory {
-  def create(block: PBBlock): Either[ValidationError, VanillaBlock] = {
+object PBBlocks {
+  def vanilla(block: PBBlock): Either[ValidationError, VanillaBlock] = {
+    def create(version: Int,
+               timestamp: Long,
+               reference: ByteStr,
+               consensusData: NxtLikeConsensusBlockData,
+               transactionData: Seq[VanillaTransaction],
+               featureVotes: Set[Short],
+               generator: PublicKeyAccount,
+               signature: ByteStr): VanillaBlock = {
+      VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes)
+    }
+
     for {
       signedHeader <- block.header.toRight(GenericError("No block header"))
       header       <- signedHeader.header.toRight(GenericError("No block header"))
       transactions <- {
-        val eithers = block.transactions.map(PBTransactionFactory.create(_))
+        val eithers = block.transactions.map(PBTransactions.vanilla(_))
         (eithers.find(_.isLeft): @unchecked) match {
           case None              => Right(eithers.map(_.right.get))
           case Some(Left(error)) => Left(error)
@@ -31,17 +42,6 @@ object PBBlockFactory {
         ByteStr(signedHeader.signature.toByteArray)
       )
     } yield result
-  }
-
-  def create(version: Int,
-             timestamp: Long,
-             reference: ByteStr,
-             consensusData: NxtLikeConsensusBlockData,
-             transactionData: Seq[VanillaTransaction],
-             featureVotes: Set[Short],
-             generator: PublicKeyAccount,
-             signature: ByteStr): VanillaBlock = {
-    VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes)
   }
 
   def protobuf(block: VanillaBlock): PBBlock = {
@@ -64,7 +64,7 @@ object PBBlockFactory {
           )),
           ByteString.copyFrom(signature)
         )),
-      transactionData.map(PBTransactionFactory.protobuf)
+      transactionData.map(PBTransactions.protobuf)
     )
   }
 
