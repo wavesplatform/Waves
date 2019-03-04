@@ -2,9 +2,12 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
-import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import org.scalacheck.Gen
 import play.api.libs.json._
 
@@ -46,4 +49,19 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
          )
          .explicitGet()))
   def transactionName: String = "SetAssetScriptTransaction"
+
+  property("issuer can`t make SetAssetScript tx when Script is Contract") {
+    val accountA = PublicKeyAccount.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet()
+
+    SetAssetScriptTransaction
+      .create(
+        AddressScheme.current.chainId,
+        accountA,
+        ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get,
+        Some(ContractScript(StdLibVersion.V3, Contract(List.empty, List.empty, None)).explicitGet()),
+        1222,
+        System.currentTimeMillis(),
+        Proofs.empty
+      ) should produce("not Contract")
+  }
 }

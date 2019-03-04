@@ -14,8 +14,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Proofs, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import io.netty.channel.group.ChannelGroup
-import org.scalacheck.Gen._
+import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
@@ -127,7 +126,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
         forAll(nonPositiveLong) { q =>
-          posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of waves"))
+          posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of ${tr.assetId.getOrElse("waves")}"))
         }
         forAll(invalidBase58) { pk =>
           posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress)
@@ -144,9 +143,6 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         forAll(longAttachment) { a =>
           posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment"))
         }
-        forAll(posNum[Long]) { quantity =>
-          posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError)
-        }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee())
         }
@@ -159,7 +155,11 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     (alwaysApproveUtx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
 
     val alwaysSendAllChannels = stub[ChannelGroup]
-    (alwaysSendAllChannels.writeAndFlush(_: Any)).when(*).onCall((_: Any) => null).anyNumberOfTimes()
+    (alwaysSendAllChannels
+      .writeAndFlush(_: Any, _: ChannelMatcher))
+      .when(*, *)
+      .onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture])
+      .anyNumberOfTimes()
 
     val route = AssetsBroadcastApiRoute(settings, alwaysApproveUtx, alwaysSendAllChannels).route
 
@@ -213,7 +213,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       }
 
       "returns a error if it is not a transfer request" in posting(issueReq.sample.get) ~> check {
-        status shouldNot be(StatusCodes.OK)
+        status shouldBe StatusCodes.BadRequest
       }
     }
 
@@ -250,7 +250,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       }
 
       "returns a error if it is not a transfer request" in posting(List(issueReq.sample.get)) ~> check {
-        status shouldNot be(StatusCodes.OK)
+        status shouldBe StatusCodes.BadRequest
       }
     }
 

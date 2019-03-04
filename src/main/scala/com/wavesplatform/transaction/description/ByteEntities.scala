@@ -314,10 +314,16 @@ case class OrderBytes(index: Int, name: String) extends ByteEntity[Order] {
       val orderSize = Ints.fromByteArray(buf.slice(offset, offset + 4))
       val orderMark = buf(offset + 4)
 
-      if (orderMark == 1)
-        OrderV1.parseBytes(buf.drop(offset + 5)).map(order => order -> (offset + 5 + orderSize))
-      else
-        OrderV2.parseBytes(buf.drop(offset + 4)).map(order => order -> (offset + 4 + orderSize))
+      orderMark match {
+        case 1 => OrderV1.parseBytes(buf.drop(offset + 5)).map(order => order -> (offset + 5 + orderSize))
+        case 2 => OrderV2.parseBytes(buf.drop(offset + 4)).map(order => order -> (offset + 4 + orderSize))
+        case 3 => OrderV3.parseBytes(buf.drop(offset + 4)).map(order => order -> (offset + 4 + orderSize))
+      }
+
+//      if (orderMark == 1)
+//        OrderV1.parseBytes(buf.drop(offset + 5)).map(order => order -> (offset + 5 + orderSize))
+//      else
+//        OrderV2.parseBytes(buf.drop(offset + 4)).map(order => order -> (offset + 4 + orderSize))
 
     }.flatten
   }

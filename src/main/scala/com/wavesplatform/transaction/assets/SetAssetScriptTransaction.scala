@@ -9,6 +9,7 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -70,7 +71,11 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
              fee: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
+
     for {
+      _ <- Either.cond(script.fold(true)(_.isInstanceOf[ExprScript]),
+                       (),
+                       ValidationError.GenericError(s"Asset can oly be assigned with Expression script, not Contract"))
       _ <- Either.cond(chainId == currentChainId,
                        (),
                        ValidationError.GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))

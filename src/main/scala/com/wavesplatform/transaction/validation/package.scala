@@ -26,7 +26,7 @@ package object validation {
       )
   }
 
-  def validateAmount(amount: Long, of: String): Validated[Long] = {
+  def validateAmount(amount: Long, of: => String): Validated[Long] = {
     Validated
       .condNel(
         amount > 0,

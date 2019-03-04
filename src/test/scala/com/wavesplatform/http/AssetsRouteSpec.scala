@@ -7,7 +7,7 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{RequestGen, TestTime}
-import io.netty.channel.group.ChannelGroup
+import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.Writes
@@ -31,7 +31,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
 
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
   (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
-  (allChannels.writeAndFlush(_: Any)).when(*).onCall((_: Any) => null).anyNumberOfTimes()
+  (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()
 
   "/transfer" - {
     val route = AssetsApiRoute(settings, wallet, utx, allChannels, state, new TestTime()).route

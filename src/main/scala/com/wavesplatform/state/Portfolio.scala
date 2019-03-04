@@ -36,6 +36,7 @@ object Portfolio {
   }
 
   implicit class PortfolioExt(self: Portfolio) {
+    def spendableBalanceOf(assetId: Option[AssetId]): Long = assetId.fold(self.spendableBalance)(self.assets.getOrElse(_, 0L))
 
     def pessimistic: Portfolio = Portfolio(
       balance = Math.min(self.balance, 0),
@@ -52,7 +53,21 @@ object Portfolio {
     def minus(other: Portfolio): Portfolio =
       Portfolio(self.balance - other.balance, LeaseBalance.empty, Monoid.combine(self.assets, other.assets.mapValues(-_)))
 
-    def negate = Portfolio.empty minus self
+    def negate: Portfolio = Portfolio.empty minus self
+
+    def assetIds: Set[Option[AssetId]] = {
+      val r: Set[Option[AssetId]] = self.assets.keySet.map(Some(_))
+      r + None
+    }
+
+    def changedAssetIds(that: Portfolio): Set[Option[AssetId]] = {
+      val a1 = assetIds
+      val a2 = that.assetIds
+
+      val intersection = a1 & a2
+      val sureChanged  = (a1 | a2) -- intersection
+      intersection.filter(x => spendableBalanceOf(x) != that.spendableBalanceOf(x)) ++ sureChanged
+    }
   }
 
 }

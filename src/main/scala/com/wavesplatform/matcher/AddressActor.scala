@@ -11,7 +11,6 @@ import com.wavesplatform.matcher.OrderDB.orderInfoOrdering
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
 import com.wavesplatform.matcher.queue.QueueEvent
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -26,11 +25,11 @@ import scala.util.{Failure, Success}
 
 class AddressActor(
     owner: Address,
-    portfolio: => Portfolio,
-    maxTimestampDrift: FiniteDuration,
+    spendableBalance: Option[AssetId] => Long,
     cancelTimeout: FiniteDuration,
     time: Time,
     orderDB: OrderDB,
+    hasOrder: Order.Id => Boolean,
     storeEvent: StoreEvent,
 ) extends Actor
     with ScorexLogging {
@@ -70,22 +69,17 @@ class AddressActor(
     latestOrderTs = newTimestamp
   }
 
-  private def tradableBalance(assetId: Option[AssetId]): Long = {
-    val p = portfolio
-    assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L)) - openVolume(assetId)
-  }
+  private def tradableBalance(assetId: Option[AssetId]): Long = spendableBalance(assetId) - openVolume(assetId)
 
   private val validator =
     OrderValidator.accountStateAware(owner,
                                      tradableBalance,
                                      activeOrders.size,
-                                     latestOrderTs - maxTimestampDrift.toMillis,
-                                     id => activeOrders.contains(id) || orderDB.contains(id)) _
+                                     id => activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrder(id)) _
 
   private def handleCommands: Receive = {
-    case BalanceUpdated =>
-      val newPortfolio = portfolio
-      val toCancel     = ordersToDelete(toSpendable(newPortfolio))
+    case evt: BalanceUpdated =>
+      val toCancel = ordersToDelete(toSpendable(evt))
       if (toCancel.nonEmpty) {
         log.debug(s"Canceling: $toCancel")
         toCancel.foreach { x =>
@@ -122,17 +116,14 @@ class AddressActor(
             Future.successful(api.OrderCancelRejected(reason))
         })(_.future) pipeTo sender()
 
-    case CancelAllOrders(maybePair, timestamp) =>
-      if ((timestamp - latestOrderTs).abs <= maxTimestampDrift.toMillis) {
-        val batchCancelFutures = for {
-          lo <- activeOrders.values
-          if maybePair.forall(_ == lo.order.assetPair)
-        } yield storeCanceled(lo.order.assetPair, lo.order.id()).map(lo.order.id() -> _)
+    case CancelAllOrders(maybePair, _) =>
+      val batchCancelFutures = for {
+        lo <- activeOrders.values
+        if maybePair.forall(_ == lo.order.assetPair)
+      } yield storeCanceled(lo.order.assetPair, lo.order.id()).map(lo.order.id() -> _)
 
-        Future.sequence(batchCancelFutures).map(_.toMap).map(api.BatchCancelCompleted).pipeTo(sender())
-      } else {
-        sender() ! api.OrderCancelRejected("Invalid timestamp")
-      }
+      Future.sequence(batchCancelFutures).map(_.toMap).map(api.BatchCancelCompleted).pipeTo(sender())
+
     case CancelExpiredOrder(id) =>
       expiration.remove(id)
       for (lo <- activeOrders.get(id)) {
@@ -252,14 +243,20 @@ class AddressActor(
 
   private type SpendableBalance = Map[Option[AssetId], Long]
 
+  /**
+    * @param initBalance Contains only changed assets
+    */
   private def ordersToDelete(initBalance: SpendableBalance): Queue[QueueEvent.Canceled] = {
-    // Probably, we need to check orders with changed assets only.
+    def keepChanged(requiredBalance: Map[Option[AssetId], Long]) = requiredBalance.filter {
+      case (requiredAssetId, _) => initBalance.contains(requiredAssetId)
+    }
+
     // Now a user can have 100 active transaction maximum - easy to traverse.
     val (_, r) = activeOrders.values.toSeq
       .sortBy(_.order.timestamp)(Ordering[Long]) // Will cancel newest orders first
       .view
       .map { lo =>
-        (lo.order.id(), lo.order.assetPair, lo.requiredBalance)
+        (lo.order.id(), lo.order.assetPair, keepChanged(lo.requiredBalance))
       }
       .foldLeft((initBalance, Queue.empty[QueueEvent.Canceled])) {
         case ((restBalance, toDelete), (id, assetPair, requiredBalance)) =>
@@ -273,11 +270,10 @@ class AddressActor(
     r
   }
 
-  private def toSpendable(p: Portfolio): SpendableBalance =
-    p.assets
-      .map { case (k, v) => (Some(k): Option[AssetId]) -> v }
-      .updated(None, p.spendableBalance)
-      .withDefaultValue(0)
+  private def toSpendable(event: BalanceUpdated): SpendableBalance = {
+    val r: SpendableBalance = event.changedAssets.map(x => x -> spendableBalance(x))(collection.breakOut)
+    r.withDefaultValue(0)
+  }
 
   private def remove(from: SpendableBalance, xs: SpendableBalance): Option[SpendableBalance] =
     xs.foldLeft[Option[SpendableBalance]](Some(from)) {
@@ -309,7 +305,7 @@ object AddressActor {
   }
   case class CancelOrder(orderId: ByteStr)                             extends Command
   case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
-  case object BalanceUpdated                                           extends Command
+  case class BalanceUpdated(changedAssets: Set[Option[AssetId]])       extends Command
 
   private case class CancelExpiredOrder(orderId: ByteStr)
 }
