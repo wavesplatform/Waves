@@ -29,13 +29,12 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    snapshots-loading-timeout = 423s
       |    start-events-processing-timeout = 543s
       |    rest-order-limit = 100
-      |    order-timestamp-drift = 10m
-      |    price-assets = [
+      |        price-assets = [
       |      WAVES
       |      8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS
       |      DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J
       |    ]
-      |    max-timestamp-diff = 30d
+
       |    blacklisted-assets = ["a"]
       |    blacklisted-names = ["b"]
       |    blacklisted-addresses = [
@@ -108,7 +107,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.snapshotsLoadingTimeout should be(423.seconds)
     settings.startEventsProcessingTimeout should be(543.seconds)
     settings.maxOrdersPerRequest should be(100)
-    settings.orderTimestampDrift should be(10.minutes.toMillis)
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
     settings.blacklistedAssets shouldBe Set("a")
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")

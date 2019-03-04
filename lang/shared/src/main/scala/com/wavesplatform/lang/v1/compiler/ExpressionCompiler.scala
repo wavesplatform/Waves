@@ -120,11 +120,11 @@ object ExpressionCompiler {
   private def handleTypeUnion(types: List[String], f: FINAL, ctx: CompilerContext) =
     if (types.isEmpty) f else UNION.create(types.map(ctx.predefTypes).map(_.typeRef))
 
-  private def validateShadowing(p: Pos, dec: Expressions.Declaration): CompileM[String] =
+  private def validateShadowing(p: Pos, dec: Expressions.Declaration, allowedExceptions: List[String] = List.empty): CompileM[String] =
     for {
       ctx <- get[CompilerContext, CompilationError]
       letName <- handlePart(dec.name)
-        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = false))(n => !ctx.varDefs.contains(n) || dec.allowShadowing)
+        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = false))(n => !ctx.varDefs.contains(n) || dec.allowShadowing || allowedExceptions.contains(n))
         .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = true))(n => !ctx.functionDefs.contains(n))
     } yield letName
 
@@ -139,9 +139,9 @@ object ExpressionCompiler {
       typeUnion = handleTypeUnion(letTypes, compiledLet._2, ctx)
     } yield (letName, typeUnion, compiledLet._1)
 
-  def compileFunc(p: Pos, func: Expressions.FUNC): CompileM[(FUNC, FINAL, List[(String, FINAL)])] = {
+  def compileFunc(p: Pos, func: Expressions.FUNC, annListVars: List[String] = List.empty): CompileM[(FUNC, FINAL, List[(String, FINAL)])] = {
     for {
-      funcName <- validateShadowing(p, func)
+      funcName <- validateShadowing(p, func, annListVars)
       _ <- func.args.toList
         .pure[CompileM]
         .ensure(BadFunctionSignatureSameArgNames(p.start, p.end, funcName)) { l =>

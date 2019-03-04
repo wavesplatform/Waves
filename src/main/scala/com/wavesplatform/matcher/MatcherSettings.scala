@@ -29,11 +29,9 @@ case class MatcherSettings(enable: Boolean,
                            startEventsProcessingTimeout: FiniteDuration,
                            makeSnapshotsAtStart: Boolean,
                            priceAssets: Seq[String],
-                           maxTimestampDiff: FiniteDuration,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
                            maxOrdersPerRequest: Int,
-                           orderTimestampDrift: Long,
                            // this is not a Set[Address] because to parse an address, global AddressScheme must be initialized
                            blacklistedAddresses: Set[String],
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
@@ -71,9 +69,7 @@ object MatcherSettings {
     val startEventsProcessingTimeout = config.as[FiniteDuration](s"$configPath.start-events-processing-timeout")
     val makeSnapshotsAtStart         = config.as[Boolean](s"$configPath.make-snapshots-at-start")
     val maxOrdersPerRequest          = config.as[Int](s"$configPath.rest-order-limit")
-    val orderTimestampDrift          = config.as[FiniteDuration](s"$configPath.order-timestamp-drift")
     val baseAssets                   = config.as[List[String]](s"$configPath.price-assets")
-    val maxTimestampDiff             = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
 
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
     val blacklistedNames  = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
@@ -102,11 +98,9 @@ object MatcherSettings {
       startEventsProcessingTimeout,
       makeSnapshotsAtStart,
       baseAssets,
-      maxTimestampDiff,
       blacklistedAssets.toSet,
       blacklistedNames,
       maxOrdersPerRequest,
-      orderTimestampDrift.toMillis,
       blacklistedAddresses,
       orderBookSnapshotHttpCache,
       balanceWatchingBufferInterval,

@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 import cats.implicits._
+import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
@@ -25,7 +26,10 @@ import kamon.metric.MeasurementUnit
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
 
-class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[Address], settings: WavesSettings, time: Time)
+class BlockchainUpdaterImpl(blockchain: Blockchain,
+                            spendableBalanceChanged: Observer[(Address, Option[AssetId])],
+                            settings: WavesSettings,
+                            time: Time)
     extends BlockchainUpdater
     with NG
     with ScorexLogging
@@ -215,8 +219,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
               restTotalConstraint = updatedTotalConstraint
               val prevNgState = ngState
               ngState = Some(new NgState(block, newBlockDiff, carry, featuresApprovedWithBlock(block)))
-
-              prevNgState.toIterable.flatMap(_.bestLiquidDiff.portfolios.keys).foreach(portfolioChanged.onNext)
+              notifyChangedSpendable(prevNgState, ngState)
               lastBlockId.foreach(id => internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady)))
 
               if ((block.timestamp > time
@@ -244,9 +247,27 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
         .leftMap(err => GenericError(err))
     }
 
-    prevNgState.toIterable.flatMap(_.bestLiquidDiff.portfolios.keys).foreach(portfolioChanged.onNext)
+    notifyChangedSpendable(prevNgState, ngState)
     r
   }
+
+  private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
+    val changedPortfolios = (prevNgState, newNgState) match {
+      case (Some(p), Some(n)) => diff(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios)
+      case (Some(x), _)       => x.bestLiquidDiff.portfolios
+      case (_, Some(x))       => x.bestLiquidDiff.portfolios
+      case _                  => Map.empty
+    }
+
+    changedPortfolios.foreach {
+      case (addr, p) =>
+        p.assetIds.view
+          .filter(x => p.spendableBalanceOf(x) != 0)
+          .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
+    }
+  }
+
+  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) = Monoid.combine(p1, p2.map { case (k, v) => k -> v.negate })
 
   override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, Unit] = writeLock {
     ngState match {
@@ -282,7 +303,11 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
               ng.append(microBlock, diff, carry, System.currentTimeMillis)
               log.info(s"$microBlock appended")
               internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
-              diff.portfolios.keys.foreach(portfolioChanged.onNext)
+
+              for {
+                (addr, p) <- diff.portfolios
+                assetId   <- p.assetIds
+              } spendableBalanceChanged.onNext(addr -> assetId)
             }
         }
     }
@@ -567,7 +592,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
 
   override def assetDistribution(assetId: AssetId): AssetDistribution = readLock {
     val fromInner = blockchain.assetDistribution(assetId)
-    val fromNg    = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L)))
+    val fromNg    = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, balance(_, Some(assetId))))
 
     fromInner |+| fromNg
   }
@@ -579,12 +604,12 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
     blockchain.assetDistributionAtHeight(assetId, height, count, fromAddress)
   }
 
-  override def wavesDistribution(height: Int): Map[Address, Long] = readLock {
+  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readLock {
     ngState.fold(blockchain.wavesDistribution(height)) { ng =>
       val innerDistribution = blockchain.wavesDistribution(height)
       if (height < this.height) innerDistribution
       else {
-        innerDistribution ++ changedBalances(_.balance != 0, portfolio(_).balance)
+        innerDistribution.map(_ ++ changedBalances(_.balance != 0, balance(_)))
       }
     }
   }
@@ -610,7 +635,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, portfolioChanged: Observer[A
     ngState.fold(blockchain.collectLposPortfolios(pf)) { ng =>
       val b = Map.newBuilder[Address, A]
       for ((a, p) <- ng.bestLiquidDiff.portfolios if p.lease != LeaseBalance.empty || p.balance != 0) {
-        pf.runWith(b += a -> _)(a -> portfolio(a).copy(assets = Map.empty))
+        pf.runWith(b += a -> _)(a -> this.wavesPortfolio(a))
       }
 
       blockchain.collectLposPortfolios(pf) ++ b.result()
