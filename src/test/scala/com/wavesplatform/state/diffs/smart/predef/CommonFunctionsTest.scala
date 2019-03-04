@@ -195,8 +195,8 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property("shadowing of variable considered external") {
-    runScript(
-      s"""
+      runScript(
+        s"""
            |match {
            |  let aaa = 1
            |  tx
@@ -205,7 +205,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
            |     case other => throw()
            | }
            |""".stripMargin
-    ) should produce("already defined")
+      ) should produce("already defined")
   }
 
   property("data constructors") {
