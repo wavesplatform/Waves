@@ -429,4 +429,34 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe Left("test fail")
   }
 
+  property("postfix syntax (one argument)") {
+    val src =
+      """
+        |let x = true
+        |x.ensure("test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(TRUE)
+  }
+
+  property("postfix syntax (no arguments)") {
+    val src =
+      """unit.isDefined()"""
+    eval[EVALUATED](src) shouldBe Right(FALSE)
+  }
+
+  property("postfix syntax (many argument)") {
+    val src =
+      """ 5.fraction(7,2) """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(17L))
+  }
+
+  property("postfix syntax (users defined function)") {
+    val src =
+      """
+        |func dub(s:String) = { s+s }
+        |"qwe".dub()
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(CONST_STRING("qweqwe"))
+  }
+
 }

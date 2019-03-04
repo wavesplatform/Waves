@@ -15,15 +15,17 @@ object ScriptReader {
     val checkSum          = bytes.takeRight(checksumLength)
     val computedCheckSum  = crypto.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
     val versionByte: Byte = bytes.head
-    val (scriptType, stdLibVersion, offset) =
-      if (versionByte == 0)
-        (ContentType.parseId(bytes(1)), StdLibVersion.parseVersion(bytes(2)), 3)
-      else if (versionByte == StdLibVersion.V1.toByte || versionByte == StdLibVersion.V2.toByte)
-        (ContentType.Expression, StdLibVersion(versionByte.toInt), 1)
-      else ???
-    val scriptBytes = bytes.drop(offset).dropRight(checksumLength)
-
     (for {
+      a <- {
+        if (versionByte == 0)
+          Right((ContentType.parseId(bytes(1)), StdLibVersion.parseVersion(bytes(2)), 3))
+        else if (versionByte == StdLibVersion.V1.toByte || versionByte == StdLibVersion.V2.toByte)
+          Right((ContentType.Expression, StdLibVersion(versionByte.toInt), 1))
+        else Left(ScriptParseError(s"Can't parse script bytes starting with [${bytes(0).toInt},${bytes(1).toInt},${bytes(2).toInt}]"))
+      }
+      (scriptType, stdLibVersion, offset) = a
+      scriptBytes                         = bytes.drop(offset).dropRight(checksumLength)
+
       _ <- Either.cond(checkSum.sameElements(computedCheckSum), (), ScriptParseError("Invalid checksum"))
       s <- scriptType match {
         case ContentType.Expression =>

@@ -18,7 +18,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
-abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain with ScorexLogging {
+abstract class Caches(spendableBalanceChanged: Observer[(Address, Option[AssetId])]) extends Blockchain with ScorexLogging {
   import Caches._
 
   protected def maxCacheSize: Int
@@ -130,16 +130,17 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
   protected def discardLeaseBalance(address: Address): Unit = leaseBalanceCache.invalidate(address)
   override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
 
-  private val portfolioCache: LoadingCache[Address, Portfolio] = observedCache(maxCacheSize / 4, portfolioChanged, loadPortfolio)
+  private val portfolioCache: LoadingCache[Address, Portfolio] = cache(maxCacheSize / 4, loadPortfolio)
   protected def loadPortfolio(address: Address): Portfolio
   protected def discardPortfolio(address: Address): Unit = portfolioCache.invalidate(address)
   override def portfolio(a: Address): Portfolio = {
     portfolioCache.get(a)
   }
 
-  private val balancesCache: LoadingCache[(Address, Option[AssetId]), java.lang.Long] = cache(maxCacheSize * 16, loadBalance)
-  protected def discardBalance(key: (Address, Option[AssetId]))                       = balancesCache.invalidate(key)
-  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long         = balancesCache.get(address -> mayBeAssetId)
+  private val balancesCache: LoadingCache[(Address, Option[AssetId]), java.lang.Long] =
+    observedCache(maxCacheSize * 16, spendableBalanceChanged, loadBalance)
+  protected def discardBalance(key: (Address, Option[AssetId]))               = balancesCache.invalidate(key)
+  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Option[AssetId])): Long
 
   private val assetDescriptionCache: LoadingCache[AssetId, Option[AssetDescription]] = cache(maxCacheSize, loadAssetDescription)
@@ -266,23 +267,28 @@ abstract class Caches(portfolioChanged: Observer[Address]) extends Blockchain wi
       (orderId, fillInfo) <- diff.orderFills
     } yield orderId -> volumeAndFeeCache.get(orderId).combine(fillInfo)
 
+    val transactionList = diff.transactions.toList
+
+    transactionList.foreach {
+      case (_, (_, tx, _)) =>
+        transactionIds.put(tx.id(), newHeight)
+    }
+
     val addressTransactions: Map[AddressId, List[TransactionId]] =
-      diff.transactions.toList
+      transactionList
         .flatMap {
           case (_, (h, tx, addrs)) =>
             transactionIds.put(tx.id(), newHeight) // be careful here!
 
             addrs.map { addr =>
               val addrId = AddressId(addressId(addr))
-              val htx    = (h, tx)
-              addrId -> htx
+              addrId -> TransactionId(tx.id())
             }
         }
         .groupBy(_._1)
-        .mapValues { txs =>
-          val sorted = txs.sortBy { case (_, (h, tx)) => (-h, -tx.timestamp) }
-          sorted.map { case (_, (_, tx)) => TransactionId(tx.id()) }
-        }
+        .mapValues(_.map {
+          case (_, txId) => txId
+        })
 
     current = (newHeight, current._2 + block.blockScore(), Some(block))
 

@@ -76,18 +76,19 @@ object Bindings {
     CaseObj(
       buildOrderType(proofsEnabled).typeRef,
       Map(
-        "id"               -> ord.id,
-        "sender"           -> senderObject(ord.sender),
-        "senderPublicKey"  -> ord.senderPublicKey,
-        "matcherPublicKey" -> ord.matcherPublicKey,
-        "assetPair"        -> assetPair(ord.assetPair),
-        "orderType"        -> ordType(ord.orderType),
-        "amount"           -> ord.amount,
-        "price"            -> ord.price,
-        "timestamp"        -> ord.timestamp,
-        "expiration"       -> ord.expiration,
-        "matcherFee"       -> ord.matcherFee,
-        "bodyBytes"        -> ord.bodyBytes,
+        "id"                -> ord.id,
+        "sender"            -> senderObject(ord.sender),
+        "senderPublicKey"   -> ord.senderPublicKey,
+        "matcherPublicKey"  -> ord.matcherPublicKey,
+        "assetPair"         -> assetPair(ord.assetPair),
+        "orderType"         -> ordType(ord.orderType),
+        "amount"            -> ord.amount,
+        "price"             -> ord.price,
+        "timestamp"         -> ord.timestamp,
+        "expiration"        -> ord.expiration,
+        "matcherFee"        -> ord.matcherFee,
+        "bodyBytes"         -> ord.bodyBytes,
+        "matcherFeeAssetId" -> ord.matcherFeeAssetId,
         proofsPart(ord.proofs)
       )
     )

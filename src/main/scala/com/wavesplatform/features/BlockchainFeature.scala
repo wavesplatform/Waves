@@ -15,6 +15,10 @@ object BlockchainFeatures {
   val SmartAssets                     = BlockchainFeature(9, "Smart Assets")
   val SmartAccountTrading             = BlockchainFeature(10, "Smart Account Trading")
   val Ride4DApps                      = BlockchainFeature(11, "RIDE 4 DAPPS")
+  val OrderV3                         = BlockchainFeature(12, "Order Version 3")
+
+  // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
+  val DummyFeature = BlockchainFeature(-1, "Non Votable!")
 
   private val dict = Seq(
     SmallerMinimalGeneratingBalance,
@@ -27,7 +31,8 @@ object BlockchainFeatures {
     FairPoS,
     SmartAccountTrading,
     SmartAssets,
-    Ride4DApps
+    Ride4DApps,
+    OrderV3
   ).map(f => f.id -> f).toMap
 
   val implemented: Set[Short] = dict.keySet

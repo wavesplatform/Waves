@@ -106,12 +106,12 @@ package object smartcontract {
        | }
      """.stripMargin
 
-  def exchangeTx(pair: AssetPair, exTxFee: Long, orderFee: Long, time: Time, accounts: PrivateKeyAccount*): JsObject = {
+  def exchangeTx(pair: AssetPair, exTxFee: Long, orderFee: Long, time: Time, ord1Ver: Byte, ord2Ver: Byte, accounts: PrivateKeyAccount*): JsObject = {
     val buyer       = accounts.head // first one
     val seller      = accounts.tail.head // second one
     val matcher     = accounts.last
     val sellPrice   = (0.50 * Order.PriceConstant).toLong
-    val (buy, sell) = orders(pair, 2, orderFee, time, buyer, seller, matcher)
+    val (buy, sell) = orders(pair, ord1Ver, ord2Ver, orderFee, time, buyer, seller, matcher)
 
     val amount = math.min(buy.amount, sell.amount)
 
@@ -138,7 +138,7 @@ package object smartcontract {
     tx
   }
 
-  def orders(pair: AssetPair, version: Byte, fee: Long, time: Time, accounts: PrivateKeyAccount*): (Order, Order) = {
+  def orders(pair: AssetPair, ord1Ver: Byte, ord2Ver: Byte, fee: Long, time: Time, accounts: PrivateKeyAccount*): (Order, Order) = {
     val buyer               = accounts.head // first one
     val seller              = accounts.tail.head // second one
     val matcher             = accounts.last
@@ -149,8 +149,8 @@ package object smartcontract {
     val buyAmount           = 2
     val sellAmount          = 3
 
-    val buy  = Order.buy(buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee, version)
-    val sell = Order.sell(seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee, version)
+    val buy  = Order.buy(buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee, ord1Ver)
+    val sell = Order.sell(seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee, ord2Ver)
 
     (buy, sell)
   }

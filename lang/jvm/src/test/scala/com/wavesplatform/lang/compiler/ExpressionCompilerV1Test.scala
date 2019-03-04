@@ -304,7 +304,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Left(
-      "Compilation failed: Value 'p1' declared as non-existing type, while all possible types are List(Point, PointB, Boolean, Int, PointA, ByteStr, Unit, String) in -1--1")
+      "Compilation failed: Value 'p1' declared as non-existing type, while all possible types are List(Point, PointB, Boolean, Int, PointA, ByteVector, Unit, String) in -1--1")
   )
 
   treeTypeTest("Invalid LET")(

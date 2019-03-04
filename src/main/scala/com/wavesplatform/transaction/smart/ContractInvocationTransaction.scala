@@ -5,7 +5,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, REF}
 import com.wavesplatform.serialization.Deser
@@ -124,6 +124,11 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
              proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
+      _ <- Either.cond(
+        fc.args.size <= ContractLimits.MaxContractInvocationArgs,
+        (),
+        ValidationError.GenericError(s"ContractInvocation can't have more than ${ContractLimits.MaxContractInvocationArgs} arguments")
+      )
       _ <- p match {
         case Some(Payment(amt, token)) => Either.cond(amt > 0, (), ValidationError.NegativeAmount(0, token.toString))
         case _                         => Right(())
@@ -132,7 +137,10 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                        (),
                        GenericError("all arguments of contractInvocation must be EVALUATED"))
-    } yield new ContractInvocationTransaction(currentChainId, sender, contractAddress, fc, p, fee, timestamp, proofs)
+      tx   = new ContractInvocationTransaction(currentChainId, sender, contractAddress, fc, p, fee, timestamp, proofs)
+      size = tx.bytes().length
+      _ <- Either.cond(size <= ContractLimits.MaxContractInvocationSizeInBytes, (), ValidationError.TooBigArray)
+    } yield tx
   }
 
   def signed(sender: PublicKeyAccount,

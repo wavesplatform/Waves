@@ -3,22 +3,17 @@ package com.wavesplatform.matcher
 import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.model.Events
-import com.wavesplatform.state.Portfolio
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.collection.mutable
-import scala.concurrent.duration._
 
-class AddressDirectory(portfolioChanged: Observable[Address],
-                       portfolio: Address => Portfolio,
-                       storeEvent: StoreEvent,
+class AddressDirectory(spendableBalanceChanged: Observable[(Address, Option[AssetId])],
                        settings: MatcherSettings,
-                       time: Time,
-                       orderDB: OrderDB)
+                       addressActorProps: Address => Props)
     extends Actor
     with ScorexLogging {
   import AddressDirectory._
@@ -26,21 +21,22 @@ class AddressDirectory(portfolioChanged: Observable[Address],
 
   private[this] val children = mutable.AnyRefMap.empty[Address, ActorRef]
 
-  portfolioChanged
-    .filter(children.contains)
+  spendableBalanceChanged
+    .filter(x => children.contains(x._1))
     .bufferTimed(settings.balanceWatchingBufferInterval)
     .filter(_.nonEmpty)
-    .foreach(_.toSet.foreach((address: Address) => children.get(address).foreach(_ ! AddressActor.BalanceUpdated)))(Scheduler(context.dispatcher))
+    .foreach { changes =>
+      val acc = mutable.Map.empty[Address, Set[Option[AssetId]]]
+      changes.foreach { case (addr, changed) => acc.update(addr, acc.getOrElse(addr, Set.empty) + changed) }
+
+      acc.foreach { case (addr, changedAssets) => children.get(addr).foreach(_ ! AddressActor.BalanceUpdated(changedAssets)) }
+    }(Scheduler(context.dispatcher))
 
   override def supervisorStrategy: SupervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   private def createAddressActor(address: Address): ActorRef = {
     log.debug(s"Creating address actor for $address")
-    watch(
-      actorOf(
-        Props(new AddressActor(address, portfolio(address), settings.maxTimestampDiff, 5.seconds, time, orderDB, storeEvent)),
-        address.toString
-      ))
+    watch(actorOf(addressActorProps(address), address.toString))
   }
 
   private def forward(address: Address, msg: Any): Unit = {
