@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.model.{OrderInfo, OrderStatus}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 object EmptyOrderDB extends OrderDB {
-  override def contains(id: ByteStr): Boolean                                                      = false
+  override def containsInfo(id: ByteStr): Boolean                                                  = false
   override def status(id: ByteStr): OrderStatus.Final                                              = OrderStatus.NotFound
   override def saveOrderInfo(id: ByteStr, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit = {}
   override def saveOrder(o: Order): Unit                                                           = {}
