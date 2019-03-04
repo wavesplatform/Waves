@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Decompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -105,7 +106,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       LET("vari", REF("p")),
       TRUE
     )
-    Decompiler.expr(Decompiler.pure(expr), 2, decompilerContext).apply() shouldEq
+    Decompiler.expr(Decompiler.pure(expr), decompilerContext.inc().inc()).apply() shouldEq
       """        {
         |            let vari =
         |                p;
@@ -124,6 +125,18 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |    let v =
         |        1;
         |    (v + 2)
+        |}""".stripMargin
+  }
+
+  property("neq binary op") {
+    val expr =
+      Terms.FUNCTION_CALL(
+        function = FunctionHeader.User(NE_OP.func),
+        args = List(CONST_LONG(4), CONST_LONG(2))
+      )
+    Decompiler(expr, decompilerContext) shouldEq
+      """{
+        |   4 != 2
         |}""".stripMargin
   }
 
