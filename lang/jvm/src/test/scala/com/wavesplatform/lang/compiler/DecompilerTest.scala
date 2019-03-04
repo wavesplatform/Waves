@@ -155,31 +155,15 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       )
     )
     Decompiler(expr, decompilerContext) shouldBe
-      """{
-        |    let v =
-        |        1;
-        |    {
-        |        if (
-        |            {
-        |                if (
-        |                    (v + 2)
-        |                )
-        |                then
-        |                    true
-        |                else
-        |                    (v + 3)
-        |            }
-        |        )
-        |        then
-        |            {
-        |                let p =
-        |                    v;
-        |                true
-        |            }
-        |        else
-        |            false
-        |    }
-        |}""".stripMargin
+      """let v = 1
+        |if (if ((v + 2))
+        |    then true
+        |    else (v + 3))
+        |    then {
+        |        let p = v
+        |        true
+        |        }
+        |    else false""".stripMargin
   }
 
   property("new match") {
@@ -196,31 +180,15 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       )
     )
     Decompiler(expr, decompilerContext) shouldBe
-      """{
-        |    let v =
-        |        1;
-        |    {
-        |        if (
-        |            {
-        |                if (
-        |                    (v + 2)
-        |                )
-        |                then
-        |                    true
-        |                else
-        |                    (v + 3)
-        |            }
-        |        )
-        |        then
-        |            {
-        |                let z =
-        |                    4;
-        |                true
-        |            }
-        |        else
-        |            false
-        |    }
-        |}""".stripMargin
+      """let v = 1
+        |if (if ((v + 2))
+        |    then true
+        |    else (v + 3))
+        |    then {
+        |        let z = 4
+        |        true
+        |        }
+        |    else false""".stripMargin
   }
 
   property("Invoke contract with verifier decompilation") {
@@ -263,17 +231,17 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
          |
          |
          |func bar () = if (foo())
-         |        then true
-         |        else false
+         |    then true
+         |    else false
          |
          |
          |@Callable(invocation)
          |func baz (a) = {
-         |        let x = invocation.caller.bytes
-         |        if (foo())
-         |            then WriteSet(List(DataEntry("b", 1), DataEntry("sender", x)))
-         |            else WriteSet(List(DataEntry("a", a), DataEntry("sender", x)))
-         |        }
+         |    let x = invocation.caller.bytes
+         |    if (foo())
+         |        then WriteSet(List(DataEntry("b", 1), DataEntry("sender", x)))
+         |        else WriteSet(List(DataEntry("a", a), DataEntry("sender", x)))
+         |    }
          |
          |
          |@Verifier(t)
@@ -298,16 +266,17 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         )),
       None
     )
-    val str    = Decompiler(contract: Contract, decompilerContext)
-    val margin = """|func foo (bar,buz) = true
-         |
-         |
-         |@Callable(i)
-         |func testfunc (amount) = {
-         |        let pmt = 1
-         |        true
-         |    }
-         |""".stripMargin
+    val str    = Decompiler(contract, decompilerContext)
+    val margin = """func foo (bar,buz) = true
+        |
+        |
+        |@Callable(i)
+        |func testfunc (amount) = {
+        |    let pmt = 1
+        |    true
+        |    }
+        |
+        |""".stripMargin
     str shouldBe margin
   }
 
@@ -353,8 +322,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     Decompiler(expr, decompilerContext) shouldBe
       """if (true)
         |    then if (true)
-        |            then 1
-        |            else "XXX"
+        |        then 1
+        |        else "XXX"
         |    else 1""".stripMargin
   }
 
@@ -422,79 +391,29 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       )
     )
     Decompiler(expr, decompilerContext) shouldBe
-      """{
-        |    let startHeight =
-        |        1375557;
-        |    {
-        |        let startPrice =
-        |            100000;
-        |        {
-        |            let interval =
-        |                (24 * 60);
-        |            {
-        |                let exp =
-        |                    ((100 * 60) * 1000);
-        |                {
-        |                    let $match0 =
-        |                        tx;
-        |                    {
-        |                        if (
-        |                            _isInstanceOf($match0, "ExchangeTransaction")
-        |                        )
-        |                        then
-        |                            {
-        |                                let e =
-        |                                    $match0;
-        |                                {
-        |                                    let days =
-        |                                        ((height - startHeight) / interval);
-        |                                    {
-        |                                        if (
-        |                                            {
-        |                                                if (
-        |                                                    {
-        |                                                        if (
-        |                                                            (e.price >= (startPrice * (1 + (days * days))))
-        |                                                        )
-        |                                                        then
-        |                                                            !(isDefined(e.sellOrder.assetPair.priceAsset))
-        |                                                        else
-        |                                                            false
-        |                                                    }
-        |                                                )
-        |                                                then
-        |                                                    (exp >= (e.sellOrder.expiration - e.sellOrder.timestamp))
-        |                                                else
-        |                                                    false
-        |                                            }
-        |                                        )
-        |                                        then
-        |                                            (exp >= (e.buyOrder.expiration - e.buyOrder.timestamp))
-        |                                        else
-        |                                            false
-        |                                    }
-        |                                }
-        |                            }
-        |                        else
-        |                            {
-        |                                if (
-        |                                    _isInstanceOf($match0, "BurnTransaction")
-        |                                )
-        |                                then
-        |                                    {
-        |                                        let tx =
-        |                                            $match0;
-        |                                        true
-        |                                    }
-        |                                else
-        |                                    false
-        |                            }
-        |                    }
-        |                }
-        |            }
+      """let startHeight = 1375557
+        |let startPrice = 100000
+        |let interval = (24 * 60)
+        |let exp = ((100 * 60) * 1000)
+        |let $match0 = tx
+        |if (_isInstanceOf($match0, "ExchangeTransaction"))
+        |    then {
+        |        let e = $match0
+        |        let days = ((height - startHeight) / interval)
+        |        if (if (if ((e.price >= (startPrice * (1 + (days * days)))))
+        |            then !(isDefined(e.sellOrder.assetPair.priceAsset))
+        |            else false)
+        |            then (exp >= (e.sellOrder.expiration - e.sellOrder.timestamp))
+        |            else false)
+        |            then (exp >= (e.buyOrder.expiration - e.buyOrder.timestamp))
+        |            else false
         |        }
-        |    }
-        |}""".stripMargin
+        |    else if (_isInstanceOf($match0, "BurnTransaction"))
+        |        then {
+        |            let tx = $match0
+        |            true
+        |            }
+        |        else false""".stripMargin
   }
 
 }

@@ -29,7 +29,7 @@ object Decompiler {
   private def decl(e: Coeval[DECLARATION], ctx: DecompilerContext): Coeval[String] =
     e flatMap {
       case Terms.FUNC(name, args, body) =>
-        expr(pure(body), ctx.inc(), PreferBraces, DontIndentFirstLine).map(
+        expr(pure(body), ctx, PreferBraces, DontIndentFirstLine).map(
           fb =>
             out("func " + name + " (" + args.mkString(",") + ") = ", ctx.ident) +
               out(fb + NEWLINE, ctx.ident))
@@ -71,8 +71,8 @@ object Decompiler {
 
         for {
           c   <- expr(pure(cond), ctx, PreferBraces, DontIndentFirstLine)
-          it  <- expr(pure(it), ctx, PreferBraces, DontIndentFirstLine)
-          iff <- expr(pure(iff), ctx, PreferBraces, DontIndentFirstLine)
+          it  <- expr(pure(it), ctx.inc(), PreferBraces, DontIndentFirstLine)
+          iff <- expr(pure(iff), ctx.inc(), PreferBraces, DontIndentFirstLine)
         } yield
           out("if (" + c + ")" + NEWLINE, if(firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident ) +
             out("then " + it + NEWLINE, ctx.inc().ident) +
