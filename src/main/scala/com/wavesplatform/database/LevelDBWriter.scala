@@ -364,7 +364,7 @@ class LevelDBWriter(writableDB: DB,
 
         (tx.builder.typeId, num)
       }
-      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq)))
+      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
       rw.put(kk, nextSeqNr)
     }
 
@@ -609,9 +609,11 @@ class LevelDBWriter(writableDB: DB,
           case None => s
           case Some((h, num)) =>
             s.dropWhile {
-                case (s_h, _, s_n) => !(s_h == h && s_n == num)
+                case (s_h, _, _) => s_h > h
               }
-              .drop(1)
+              .dropWhile {
+                case (_, _, s_n) => s_n >= num
+              }
         }
       }
 
@@ -628,7 +630,10 @@ class LevelDBWriter(writableDB: DB,
 
                 maybeHNSeq match {
                   case Some((h, seq)) =>
-                    seq.map { case (tp, num) => (h, tp, num) }.toStream
+                    seq
+                      .sortBy { case (_, num) => -num }
+                      .map { case (tp, num) => (h, tp, num) }
+                      .toStream
                   case None => Stream.empty
                 }
               }

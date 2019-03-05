@@ -52,12 +52,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       "height < enableMicroblocksAfterHeight - a miner should receive 100% of the current block's fee" in {
         assertDiff(testChain.init, 1000) {
           case (_, s) =>
-            s.portfolio(signerA).balance shouldBe 40
+            s.balance(signerA) shouldBe 40
         }
 
         assertDiff(testChain, 1000) {
           case (_, s) =>
-            s.portfolio(signerB).balance shouldBe 50
+            s.balance(signerB) shouldBe 50
         }
       }
 
@@ -79,7 +79,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       "height = enableMicroblocksAfterHeight - a miner should receive 40% of the current block's fee only" in {
         assertDiff(testChain, 9) {
           case (_, s) =>
-            s.portfolio(signerB).balance shouldBe 44
+            s.balance(signerB) shouldBe 44
         }
       }
 
@@ -101,12 +101,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       "height > enableMicroblocksAfterHeight - a miner should receive 60% of previous block's fee and 40% of the current one" in {
         assertDiff(testChain.init, 4) {
           case (_, s) =>
-            s.portfolio(signerA).balance shouldBe 34
+            s.balance(signerA) shouldBe 34
         }
 
         assertDiff(testChain, 4) {
           case (_, s) =>
-            s.portfolio(signerB).balance shouldBe 50
+            s.balance(signerB) shouldBe 50
         }
       }
     }

@@ -206,9 +206,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         (for {
           acc <- Address.fromString(address)
         } yield
-          Json.obj("address" -> acc.address,
-                   "assetId" -> assetIdStr,
-                   "balance" -> JsNumber(BigDecimal(blockchain.portfolio(acc).assets.getOrElse(assetId, 0L))))).left.map(ApiError.fromValidationError)
+          Json.obj("address" -> acc.address, "assetId" -> assetIdStr, "balance" -> JsNumber(BigDecimal(blockchain.balance(acc, Some(assetId)))))).left
+          .map(ApiError.fromValidationError)
       case _ => Left(InvalidAddress)
     }
   }
@@ -226,7 +225,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
             assetInfo                                 <- blockchain.assetDescription(assetId)
             (_, (issueTransaction: IssueTransaction)) <- blockchain.transactionInfo(assetId)
             sponsorBalance = if (assetInfo.sponsorship != 0) {
-              Some(blockchain.portfolio(issueTransaction.sender).spendableBalance)
+              Some(blockchain.wavesPortfolio(issueTransaction.sender).spendableBalance)
             } else {
               None
             }

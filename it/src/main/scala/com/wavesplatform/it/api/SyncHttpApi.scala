@@ -169,6 +169,9 @@ object SyncHttpApi extends Assertions {
     def transactionsByAddress(address: String, limit: Int): Seq[Seq[TransactionInfo]] =
       sync(async(n).transactionsByAddress(address, limit))
 
+    def transactionsByAddress(address: String, limit: Int, after: String): Seq[Seq[TransactionInfo]] =
+      sync(async(n).transactionsByAddress(address, limit, after))
+
     def scriptCompile(code: String): CompiledScript =
       sync(async(n).scriptCompile(code))
 
