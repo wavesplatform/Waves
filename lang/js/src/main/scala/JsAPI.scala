@@ -125,7 +125,7 @@ object JsAPI {
 
   @JSExportTopLevel("scriptInfo")
   def scriptInfo(input: String): js.Dynamic = {
-    val (directives, _) = DirectiveParser.splitToDirectiveAndScript(input)
+    val directives = DirectiveParser(input)
     val info = for {
       ver         <- extractStdLibVersion(directives)
       contentType <- extractContentType(directives)
