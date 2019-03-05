@@ -237,7 +237,7 @@ class UtxPoolImpl(time: Time,
         Task.sleep(utxSettings.cleanupInterval) >>
         scheduledCleanupTask
 
-    private[UtxPoolImpl] val scheduledCleanup: CancelableFuture[Unit] =
+    private[UtxPoolImpl] lazy val scheduledCleanup: CancelableFuture[Unit] =
       scheduledCleanupTask.runAsyncLogErr(scheduler)
 
     private[UtxPoolImpl] def schedule(): Unit = {
