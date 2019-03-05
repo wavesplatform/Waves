@@ -18,12 +18,14 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
 class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
+
   val ctx: CTX =
     PureContext.build(StdLibVersion.V3) |+|
       CTX(sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false)
-  property("Simple test") {
-    val src =
+
+  property("Simple call") {
+    parseCompileAndEvaluate(
       """
         |
         |func fooHelper2() = {
@@ -47,27 +49,15 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |  true
         |}
         |
-      """.stripMargin
-
-    val parsed = Parser.parseContract(src).get.value
-
-    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
-
-    val expectedResult = ContractResult(
+      """.stripMargin,
+      "foo"
+    ).explicitGet() shouldBe ContractResult(
       List(
         DataItem.Bin("a", ByteStr.empty),
         DataItem.Bin("sender", ByteStr.empty)
       ),
       List()
     )
-
-    val result = ContractEvaluator(
-      ctx.evaluationContext,
-      compiled,
-      Invocation(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr.empty))), ByteStr.empty, None, ByteStr.empty)
-    ).explicitGet()
-
-    result shouldBe expectedResult
   }
 
   property("Callables can't have more than 22 args") {
@@ -83,6 +73,19 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     val parsed = Parser.parseContract(src).get.value
 
     ContractCompiler(ctx.compilerContext, parsed) should produce("no more than 22 arguments")
+  }
+
+  def parseCompileAndEvaluate(script: String,
+                              func: String,
+                              args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty))): Either[ExecutionError, ContractResult] = {
+    val parsed   = Parser.parseContract(script).get.value
+    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
+
+    ContractEvaluator(
+      ctx.evaluationContext,
+      compiled,
+      Invocation(Terms.FUNCTION_CALL(FunctionHeader.User(func), args), ByteStr.empty, None, ByteStr.empty)
+    )
   }
 
 }
