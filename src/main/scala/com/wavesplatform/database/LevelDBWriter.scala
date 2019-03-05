@@ -970,14 +970,15 @@ class LevelDBWriter(writableDB: DB,
   override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
-    def createMap() = (for {
-      seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
-      addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-      history = db.get(Keys.wavesBalanceHistory(addressId))
-      actualHeight <- history.partition(_ > height)._2.headOption
-      balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
-      if balance > 0
-    } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+    def createMap() =
+      (for {
+        seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
+        addressId <- db.get(Keys.addressesForWaves(seqNr)).par
+        history = db.get(Keys.wavesBalanceHistory(addressId))
+        actualHeight <- history.partition(_ > height)._2.headOption
+        balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
+        if balance > 0
+      } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
 
     Either.cond(
       height > canGetAfterHeight,
