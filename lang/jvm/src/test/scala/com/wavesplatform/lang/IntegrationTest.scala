@@ -506,4 +506,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """ "qweqwe".indexOf("we", 2) """
     eval[EVALUATED](src) shouldBe Right(CONST_LONG(4L))
   }
+
+  property("indexOf (not present)") {
+    val src =
+      """ "qweqwe".indexOf("ww") """
+    eval[EVALUATED](src) shouldBe Right(unit)
+  }
 }

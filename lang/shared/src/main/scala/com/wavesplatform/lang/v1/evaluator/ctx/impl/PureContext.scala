@@ -314,14 +314,30 @@ object PureContext {
     }
 
   lazy val indexOf: BaseFunction =
-    NativeFunction("indexOf", 20, INDEXOF, LONG, "index of substring", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching")) {
-      case CONST_STRING(m) :: CONST_STRING(sub) :: Nil => Right(CONST_LONG(m.indexOf(sub)))
+    NativeFunction("indexOf", 20, INDEXOF, optionLong, "index of substring", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching")) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: Nil => Right({
+        val i = m.indexOf(sub)
+         if( i != -1 ) {
+           CONST_LONG(i.toLong)
+         } else {
+           unit
+         }
+      })
       case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
     }
 
   lazy val indexOfN: BaseFunction =
-    NativeFunction("indexOf", 20, INDEXOFN, LONG, "index of substring after offset", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching"), ("offset", LONG, "offset")) {
-      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil => Right(CONST_LONG(if(off >= 0 && off <= m.length) { m.indexOf(sub, off.toInt).toLong } else { -1l }))
+    NativeFunction("indexOf", 20, INDEXOFN, optionLong, "index of substring after offset", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching"), ("offset", LONG, "offset")) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil => Right( if(off >= 0 && off <= m.length) {
+         val i = m.indexOf(sub, off.toInt)
+         if( i != -1 ) {
+           CONST_LONG(i.toLong)
+         } else {
+           unit
+         }
+      } else {
+        unit
+      } )
       case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
     }
 
