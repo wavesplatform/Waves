@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import scala.collection.mutable.ArrayBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.ByteBuffer
 
@@ -341,6 +342,22 @@ object PureContext {
       case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
     }
 
+  def split(m: String, sep: String, buffer: ArrayBuffer[CONST_STRING] =  ArrayBuffer[CONST_STRING](), start: Int = 0): IndexedSeq[CONST_STRING] = {
+    m.indexOf(sep, start) match {
+      case -1 =>
+        buffer += CONST_STRING(m.substring(start))
+        buffer.result
+      case n =>
+        buffer += CONST_STRING(m.substring(0, n))
+        split(m, sep, buffer, n + sep.length)
+    }
+  }
+
+  lazy val splitStr: BaseFunction =
+    NativeFunction("split", 100, SPLIT, listString, "split string by separator", ("str", STRING, "String for splitting"), ("separator", STRING, "separator")) {
+      case CONST_STRING(m) :: CONST_STRING(sep) :: Nil => Right( ARR(split(m, sep)))
+      case xs                      => notImplemented("split(STRING, STRING)", xs)
+    }
 
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
       body: (EVALUATED, EVALUATED) => Either[String, EVALUATED]): BaseFunction =
@@ -469,7 +486,7 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN)
+            Array(listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr)
           )
         )
     }

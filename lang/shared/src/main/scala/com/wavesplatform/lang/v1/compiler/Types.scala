@@ -84,4 +84,5 @@ object Types {
   val optionByteVector = UNION(BYTESTR, UNIT)
   val optionLong           = UNION(LONG, UNIT)
   val listByteVector: LIST = LIST(BYTESTR)
+  val listString: LIST = LIST(STRING)
 }

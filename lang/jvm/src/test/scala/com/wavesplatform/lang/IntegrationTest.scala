@@ -512,4 +512,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """ "qweqwe".indexOf("ww") """
     eval[EVALUATED](src) shouldBe Right(unit)
   }
+
+  property("split") {
+    val src =
+      """ "q:we:.;q;we:x;q.we".split(":.;") """
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("q:we"), CONST_STRING("q;we:x;q.we"))))
+  }
 }
