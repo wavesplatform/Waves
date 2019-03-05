@@ -144,6 +144,7 @@ class UtxPoolImpl(time: Time,
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
     txs.view.map(_.id()).foreach(remove)
+    cleanup.doExpiredCleanup()
   }
 
   private[this] def afterRemove(tx: Transaction): Unit = {
@@ -151,8 +152,9 @@ class UtxPoolImpl(time: Time,
     pessimisticPortfolios.remove(tx.id())
   }
 
-  private[this] def remove(txId: ByteStr): Unit = Option(transactions.remove(txId))
-    .foreach(afterRemove)
+  private[this] def remove(txId: ByteStr): Unit =
+    Option(transactions.remove(txId))
+      .foreach(afterRemove)
 
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
     blockchain.balance(addr, assetId) -
@@ -201,10 +203,9 @@ class UtxPoolImpl(time: Time,
 
   //noinspection ScalaStyle
   private[this] object TxCheck {
-    private[this] val ExpirationTime                = fs.maxTransactionTimeBackOffset.toMillis
+    private[this] val ExpirationTime = fs.maxTransactionTimeBackOffset.toMillis
 
-    def transactionIsExpired(transaction: Transaction,
-                             currentTime: Long = time.correctedTime()) = {
+    def transactionIsExpired(transaction: Transaction, currentTime: Long = time.correctedTime()) = {
       (currentTime - transaction.timestamp) > ExpirationTime
     }
 
@@ -235,7 +236,7 @@ class UtxPoolImpl(time: Time,
 
     private[UtxPoolImpl] def doExpiredCleanup(): Unit = {
       transactions.entrySet().removeIf { entry =>
-        val tx = entry.getValue
+        val tx     = entry.getValue
         val remove = TxCheck.transactionIsExpired(tx)
         if (remove) UtxPoolImpl.this.afterRemove(tx)
         remove
@@ -244,7 +245,7 @@ class UtxPoolImpl(time: Time,
 
     private[UtxPoolImpl] def doCleanup(): Unit = {
       transactions.entrySet().removeIf { entry =>
-        val tx = entry.getValue
+        val tx     = entry.getValue
         val remove = !TxCheck.transactionIsValid(tx)
         if (remove) UtxPoolImpl.this.afterRemove(tx)
         remove
