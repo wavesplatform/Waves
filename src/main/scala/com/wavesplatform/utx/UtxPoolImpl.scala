@@ -262,19 +262,19 @@ class UtxPoolImpl(time: Time,
       val currentTime = time.correctedTime()
       val lastBlockTimestamp = blockchain.lastBlockTimestamp
 
-      val (transactionsToRemove, transactionsToCheckInNextBlock, transactionsPreChecked) = list.map { t =>
-        def isPreChecked(heightOffset: Int = 0) = this.transactionsChecked.contains((t.id(), blockchain.height + heightOffset))
-        val currentlyInvalid = !isPreChecked() && TransactionDiffer(fs, lastBlockTimestamp, currentTime, blockchain.height)(blockchain, t).isLeft
+      val (transactionsToRemove, transactionsToCheckInNextBlock, transactionsPreChecked) = list.map { transaction =>
+        def isPreChecked(heightOffset: Int = 0) = this.transactionsChecked.contains((transaction.id(), blockchain.height + heightOffset))
+        val currentlyInvalid = !isPreChecked() && TransactionDiffer(fs, lastBlockTimestamp, currentTime, blockchain.height)(blockchain, transaction).isLeft
 
         if (currentlyInvalid) {
-          (Some(t), None, None)
+          (Some(transaction), None, None)
         } else {
           val futureInvalid = (1 to checkFuture).exists { heightOffset =>
             val timeOffset = (utxSettings.approxBlockTime * heightOffset).toMillis
-            !isPreChecked(heightOffset) && TransactionDiffer(fs, lastBlockTimestamp.map(_ + timeOffset), currentTime + timeOffset, blockchain.height + heightOffset)(blockchain, t).isLeft
+            !isPreChecked(heightOffset) && TransactionDiffer(fs, lastBlockTimestamp.map(_ + timeOffset), currentTime + timeOffset, blockchain.height + heightOffset)(blockchain, transaction).isLeft
           }
 
-          if (futureInvalid) (None, Some(t), None) else (None, None, Some(t))
+          if (futureInvalid) (None, Some(transaction), None) else (None, None, Some(transaction))
         }
       }.unzip3
 
