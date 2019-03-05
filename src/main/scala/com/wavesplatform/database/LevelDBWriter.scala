@@ -598,20 +598,16 @@ class LevelDBWriter(writableDB: DB,
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
     readOnly { db =>
-      def takeTypes(txNums: Stream[(Height, Type, TxNum)], maybeTypes: Set[Type]) = {
-        if (maybeTypes.nonEmpty) {
-          txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) }
-        } else txNums
-      }
+      def takeTypes(txNums: Stream[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
+        if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) }
+        else txNums
 
-      def takeAfter(txNums: Stream[(Height, Type, TxNum)], maybeAfter: Option[(Height, TxNum)]): Stream[(Height, Type, TxNum)] = {
-        maybeAfter match {
-          case None => txNums
-          case Some((afterHeight, filterHeight)) =>
-            txNums
-              .dropWhile { case (streamHeight, _, _) => streamHeight > afterHeight }
-              .dropWhile { case (streamHeight, _, streamNum) => streamNum >= filterHeight && streamHeight >= afterHeight }
-        }
+      def takeAfter(txNums: Stream[(Height, Type, TxNum)], maybeAfter: Option[(Height, TxNum)]): Stream[(Height, Type, TxNum)] = maybeAfter match {
+        case None => txNums
+        case Some((afterHeight, filterHeight)) =>
+          txNums
+            .dropWhile { case (streamHeight, _, _) => streamHeight > afterHeight }
+            .dropWhile { case (streamHeight, _, streamNum) => streamNum >= filterHeight && streamHeight >= afterHeight }
       }
 
       def readTransactions(): Seq[(Int, Transaction)] = {
