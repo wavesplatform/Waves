@@ -34,13 +34,4 @@ object DirectiveParser {
       .collect({ case Success(value, _) => value })
       .toList
   }
-
-  def splitToDirectiveAndScript(input: String): (List[Directive], String) = {
-    val directives = apply(input)
-    val scriptWithoutDirectives =
-      input.linesIterator
-        .filter(str => !str.contains("{-#"))
-        .mkString("\n")
-    (directives, scriptWithoutDirectives)
-  }
 }
