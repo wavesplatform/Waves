@@ -295,7 +295,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] = {
       val txs     = concurrent.blocking(blockchain.addressTransactions(address, Set.empty, limit, fromId))
       val addrSet = Set[AddressOrAlias](address)
-      txs.map(txs => JsArray(txs.map { case (height, tx) => txToCompactJson(address,  blockchain.aliasesOfAddress(address) + address, tx) + ("height" -> JsNumber(height)) }))
+      txs.map(txs => JsArray(txs.map { case (height, tx) => txToCompactJson(address, addrSet, tx) + ("height" -> JsNumber(height)) }))
     }
 
     Future {
