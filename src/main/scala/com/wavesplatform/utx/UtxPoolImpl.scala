@@ -5,7 +5,6 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
-import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
@@ -24,11 +23,10 @@ import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
-import monix.execution.{Cancelable, CancelableFuture, Scheduler}
+import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.{Observable, Observer}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration.DurationLong
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time,
@@ -210,11 +208,11 @@ class UtxPoolImpl(time: Time,
         transactionsChecked.contains((transaction.id(), height))
       @inline def isExpired(tx: Transaction) = (currentTime - tx.timestamp) > ExpirationTime
 
-      !isExpired(transaction) && isPreChecked(transaction) || {
+      !isExpired(transaction) && (isPreChecked(transaction) || {
         val result = TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).isRight
         if (result) transactionsChecked += (transaction.id() -> height)
         result
-      }
+      })
     }
 
     def cleanOldChecks(): Unit = {
