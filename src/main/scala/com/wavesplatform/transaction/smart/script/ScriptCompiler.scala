@@ -15,11 +15,11 @@ object ScriptCompiler extends ScorexLogging {
 
   @Deprecated
   def apply(scriptText: String, isAssetScript: Boolean): Either[String, (Script, Long)] = {
-    val (directives, scriptWithoutDirectives) = DirectiveParser.splitToDirectiveAndScript(scriptText)
+    val directives = DirectiveParser(scriptText)
     for {
       ver    <- extractStdLibVersion(directives)
       tpe    <- extractContentType(directives)
-      script <- tryCompile(scriptWithoutDirectives, tpe, ver, isAssetScript)
+      script <- tryCompile(scriptText, tpe, ver, isAssetScript)
     } yield (script, script.complexity)
   }
 
