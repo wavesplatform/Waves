@@ -494,4 +494,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """ base58'2EtvziXsJaBRS'.toInt(-2) """
     eval[EVALUATED](src) should produce("IndexOutOfBounds")
   }
+
+  property("indexOf") {
+    val src =
+      """ "qweqwe".indexOf("we") """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(1L))
+  }
+
+  property("indexOf with start offset") {
+    val src =
+      """ "qweqwe".indexOf("we", 2) """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(4L))
+  }
 }

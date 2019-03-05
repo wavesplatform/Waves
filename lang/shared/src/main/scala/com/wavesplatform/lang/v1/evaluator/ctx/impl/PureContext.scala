@@ -313,6 +313,18 @@ object PureContext {
       case xs                      => notImplemented("toInt(u: byte[], off: int)", xs)
     }
 
+  lazy val indexOf: BaseFunction =
+    NativeFunction("indexOf", 20, INDEXOF, LONG, "index of substring", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching")) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: Nil => Right(CONST_LONG(m.indexOf(sub)))
+      case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
+    }
+
+  lazy val indexOfN: BaseFunction =
+    NativeFunction("indexOf", 20, INDEXOFN, LONG, "index of substring after offset", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching"), ("offset", LONG, "offset")) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil => Right(CONST_LONG(if(off >= 0 && off <= m.length) { m.indexOf(sub, off.toInt).toLong } else { -1l }))
+      case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
+    }
+
 
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
       body: (EVALUATED, EVALUATED) => Either[String, EVALUATED]): BaseFunction =
@@ -441,7 +453,7 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(listConstructor, ensure, toUtf8String, toLong, toLongOffset)
+            Array(listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN)
           )
         )
     }
