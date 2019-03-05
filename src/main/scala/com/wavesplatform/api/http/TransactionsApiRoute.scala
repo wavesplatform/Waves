@@ -276,7 +276,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     }
   }
 
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): ToResponseMarshallable = {
+  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, JsArray] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] = {
       lazy val addressesCached = concurrent.blocking((blockchain.aliasesOfAddress(address) :+ address).toSet)
 
@@ -296,7 +296,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       txs.map(txs => JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }))
     }
 
-    val result = for {
+    for {
       address <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
       limit   <- Either.cond(limitParam <= settings.transactionByAddressLimit, limitParam, TooBigArrayAllocation)
       maybeAfter <- maybeAfterParam match {
@@ -314,10 +314,5 @@ case class TransactionsApiRoute(settings: RestAPISettings,
         arr => Right(arr)
       )
     } yield result
-
-    result match {
-      case Right(arr) => arr: ToResponseMarshallable
-      case Left(err)  => err: ToResponseMarshallable
-    }
   }
 }
