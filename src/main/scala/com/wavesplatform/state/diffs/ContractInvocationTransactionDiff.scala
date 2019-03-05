@@ -91,6 +91,7 @@ object ContractInvocationTransactionDiff {
                     wavesFee = feeInfo._1
                     dataAndPaymentDiff <- payableAndDataPart(height, tx, ds, feeInfo._2)
                     _                  <- Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, ""))
+                    _                  <- validateOverflow(pmts.flatMap(_.values).flatMap(_.values), "Attempt to transfer unavailable funds in contract payment")
                     _ <- Either.cond(
                       pmts
                         .flatMap(_.values)
@@ -100,8 +101,6 @@ object ContractInvocationTransactionDiff {
                       (),
                       GenericError(s"Unissued assets are not allowed")
                     )
-                    _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - sum doesn't overflow
-                    _ <- Either.cond(true, (), ValidationError.NegativeAmount(-42, "")) //  - whatever else tranfser/massTransfer ensures
                     _ <- {
                       val totalScriptsInvoked = tx.checkedAssets().count(blockchain.hasAssetScript) +
                         ps.count(_._3.fold(false)(blockchain.hasAssetScript))
