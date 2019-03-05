@@ -291,24 +291,13 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     }
   }
 
-  def getResponse(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] = {
-    lazy val aoa = blockchain.aliasesOfAddress(address) :+ address
+  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Future[ToResponseMarshallable] = {
+    def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] = {
+      val txs     = concurrent.blocking(blockchain.addressTransactions(address, Set.empty, limit, fromId))
+      val addrSet = Set[AddressOrAlias](address)
+      txs.map(txs => JsArray(txs.map { case (height, tx) => txToCompactJson(address,  blockchain.aliasesOfAddress(address) + address, tx) + ("height" -> JsNumber(height)) }))
+    }
 
-    val txs =
-      blockchain
-        .addressTransactions(address, Set.empty, limit, fromId)
-
-    val json =
-      txs.map { txSeq =>
-        txSeq.map { htx =>
-          txToCompactJson(address, aoa.toSet, htx._2) + ("height" -> JsNumber(htx._1))
-        }
-      }
-
-    json.map(txs => Json.arr(JsArray(txs)))
-  }
-
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Future[ToResponseMarshallable] =
     Future {
       val result = for {
         address <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
@@ -323,7 +312,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               )
           case None => Right(None)
         }
-        result <- getResponse(address, limit, maybeAfter).fold(
+        result <- createTransactionsJsonArray(address, limit, maybeAfter).fold(
           err => Left(CustomValidationError(err)),
           arr => Right(arr)
         )
@@ -334,4 +323,5 @@ case class TransactionsApiRoute(settings: RestAPISettings,
         case Left(err)  => err: ToResponseMarshallable
       }
     }
+  }
 }
