@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.StdLibVersion.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, DefinedType, UnionType}
 
 object Types {
