@@ -259,16 +259,19 @@ class UtxPoolImpl(time: Time,
     }
 
     private[UtxPoolImpl] def doCleanup(list: Iterable[Transaction] = transactions.values.asScala, checkFuture: Int = smartCleanupBlocksAhead): Unit = {
+      val currentTime = time.correctedTime()
+      val lastBlockTimestamp = blockchain.lastBlockTimestamp
+
       val (transactionsToRemove, transactionsToCheckInNextBlock, transactionsPreChecked) = list.map { t =>
         def isPreChecked(heightOffset: Int = 0) = this.transactionsChecked.contains((t.id(), blockchain.height + heightOffset))
-        val currentlyInvalid = !isPreChecked() && TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, t).isLeft
+        val currentlyInvalid = !isPreChecked() && TransactionDiffer(fs, lastBlockTimestamp, currentTime, blockchain.height)(blockchain, t).isLeft
 
         if (currentlyInvalid) {
           (Some(t), None, None)
         } else {
           val futureInvalid = (1 to checkFuture).exists { heightOffset =>
             val timeOffset = (utxSettings.approxBlockTime * heightOffset).toMillis
-            !isPreChecked(heightOffset) && TransactionDiffer(fs, blockchain.lastBlockTimestamp.map(_ + timeOffset), time.correctedTime() + timeOffset, blockchain.height + heightOffset)(blockchain, t).isLeft
+            !isPreChecked(heightOffset) && TransactionDiffer(fs, lastBlockTimestamp.map(_ + timeOffset), currentTime + timeOffset, blockchain.height + heightOffset)(blockchain, t).isLeft
           }
 
           if (futureInvalid) (None, Some(t), None) else (None, None, Some(t))
