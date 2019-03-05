@@ -64,7 +64,7 @@ object JsAPI {
     isTokenContext
   )
 
-  private val cryptoContext = CryptoContext.build(Global)
+  private val cryptoContext    = CryptoContext.build(Global)
   private val letBLockVersions = Set(StdLibVersion.V1, StdLibVersion.V2)
 
   private def typeRepr(t: TYPE): js.Any = t match {
@@ -128,10 +128,7 @@ object JsAPI {
   def scriptInfo(input: String): js.Dynamic = {
     val directives = DirectiveParser(input)
     val info = extractDirectives(directives) map {
-      case (ver, scriptType, contentType) => js.Dynamic.literal(
-        "stdLibVersion" -> ver,
-        "contentType" -> contentType,
-        "scriptType" -> scriptType)
+      case (ver, scriptType, contentType) => js.Dynamic.literal("stdLibVersion" -> ver, "contentType" -> contentType, "scriptType" -> scriptType)
     }
     info.fold(
       err => js.Dynamic.literal("error" -> err),
