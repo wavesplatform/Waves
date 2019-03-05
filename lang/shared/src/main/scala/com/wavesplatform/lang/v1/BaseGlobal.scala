@@ -32,16 +32,19 @@ trait BaseGlobal {
 
   def checksum(arr: Array[Byte]): Array[Byte] = secureHash(arr).take(4)
 
-  def compileScript(input: String, context: CompilerContext): Either[String, (Array[Byte], Terms.EXPR)] = {
+  def compileExpression(input: String, context: CompilerContext, restrictToLetBlockOnly: Boolean): Either[String, (Array[Byte], Terms.EXPR)] = {
 
     def serialize(expr: EXPR): Either[String, Array[Byte]] = {
       val s = 1.toByte +: Serde.serialize(expr)
       Right(s ++ checksum(s))
     }
 
-    ExpressionCompiler
-      .compile(input, context)
-      .flatMap(ast => serialize(ast).map(x => (x, ast)))
+    for {
+      ex <- ExpressionCompiler.compile(input, context)
+      illegalBlockVersionUsage = restrictToLetBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(ex)
+      _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
+      x <- serialize(ex)
+    } yield (x, ex)
   }
 
   def compileContract(input: String, ctx: CompilerContext): Either[String, (Array[Byte], Contract)] = {
