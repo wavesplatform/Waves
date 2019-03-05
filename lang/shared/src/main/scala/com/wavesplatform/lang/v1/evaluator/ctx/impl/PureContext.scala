@@ -17,7 +17,7 @@ import scala.collection.mutable.ArrayBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.ByteBuffer
 
-import scala.util.Try
+import scala.util.{Try, Success}
 
 object PureContext {
 
@@ -359,6 +359,18 @@ object PureContext {
       case xs                      => notImplemented("split(STRING, STRING)", xs)
     }
 
+  lazy val parseInt: BaseFunction =
+    NativeFunction("parseInt", 20, PARSEINT, optionLong, "parse string to integer", ("str", STRING, "String for parsing")) {
+      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toInt)).orElse(Success(unit)).toEither.left.map(_.toString)
+      case xs                      => notImplemented("parseInt(STRING)", xs)
+    }
+
+  lazy val parseIntVal: BaseFunction =
+    NativeFunction("parseIntValue", 20, PARSEINTV, LONG, "parse string to integer with fail on errors", ("str", STRING, "String for parsing")) {
+      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toInt)).toEither.left.map(_.toString)
+      case xs                      => notImplemented("parseInt(STRING)", xs)
+    }
+
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
       body: (EVALUATED, EVALUATED) => Either[String, EVALUATED]): BaseFunction =
     NativeFunction(opsToFunctions(op), complicity, func, r, docString, ("a", t, arg1Doc), ("b", t, arg2Doc)) {
@@ -486,7 +498,7 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr)
+            Array(listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal)
           )
         )
     }
