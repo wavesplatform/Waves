@@ -146,10 +146,13 @@ class UtxPoolImpl(time: Time,
     txs.view.map(_.id()).foreach(remove)
   }
 
-  private def remove(txId: ByteStr): Unit = {
-    Option(transactions.remove(txId)).foreach(PoolMetrics.removeTransaction)
-    pessimisticPortfolios.remove(txId)
+  private[this] def afterRemove(tx: Transaction): Unit = {
+    PoolMetrics.removeTransaction(tx)
+    pessimisticPortfolios.remove(tx.id())
   }
+
+  private[this] def remove(txId: ByteStr): Unit = Option(transactions.remove(txId))
+    .foreach(afterRemove)
 
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
     blockchain.balance(addr, assetId) -
@@ -197,26 +200,13 @@ class UtxPoolImpl(time: Time,
   //noinspection ScalaStyle
   private[this] object TxCheck {
     private[this] val ExpirationTime                = fs.maxTransactionTimeBackOffset.toMillis
-    @volatile private[this] var transactionsChecked = Set.empty[(ByteStr, Int)]
 
     def transactionIsValid(transaction: Transaction,
                            lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
                            currentTime: Long = time.correctedTime(),
                            height: Int = blockchain.height) = {
-      @inline def isPreChecked(transaction: Transaction, height: Int = blockchain.height): Boolean =
-        transactionsChecked.contains((transaction.id(), height))
       @inline def isExpired(tx: Transaction) = (currentTime - tx.timestamp) > ExpirationTime
-
-      !isExpired(transaction) && (isPreChecked(transaction) || {
-        val result = TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).isRight
-        if (result) transactionsChecked += (transaction.id() -> height)
-        result
-      })
-    }
-
-    def cleanOldChecks(): Unit = {
-      val height = blockchain.height
-      transactionsChecked = transactionsChecked.filter(_._2 < height)
+      !isExpired(transaction) && TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).isRight
     }
   }
 
@@ -237,15 +227,13 @@ class UtxPoolImpl(time: Time,
         .subscribe()
     }
 
-    private[UtxPoolImpl] def doCleanup(list: Iterable[Transaction] = transactions.values.asScala): Unit = {
-      val height             = blockchain.height
-      val currentTime        = time.correctedTime()
-      val lastBlockTimestamp = blockchain.lastBlockTimestamp
-
-      for (tx <- list.iterator if !TxCheck.transactionIsValid(tx, lastBlockTimestamp, currentTime, height))
-        UtxPoolImpl.this.remove(tx.id())
-
-      TxCheck.cleanOldChecks()
+    private[UtxPoolImpl] def doCleanup(): Unit = {
+      transactions.entrySet().removeIf { entry =>
+        val tx = entry.getValue
+        val remove = !TxCheck.transactionIsValid(tx)
+        if (remove) UtxPoolImpl.this.afterRemove(tx)
+        remove
+      }
     }
   }
 
