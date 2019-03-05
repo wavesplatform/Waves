@@ -293,7 +293,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       }
 
       val txs = concurrent.blocking(blockchain.addressTransactions(address, Set.empty, limit, fromId))
-      txs.map(txs => JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }))
+      txs.map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) })))
     }
 
     for {
