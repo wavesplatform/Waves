@@ -186,10 +186,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val blockSink      = newBlocks
       .mapTask(scala.Function.tupled(processBlock))
-      .mapTask(_ => utxStorage.runFastCleanup())
 
     Observable.merge(microBlockSink, blockSink).subscribe()
     miner.scheduleMining()
+    utxStorage.cleanup.runFastCleanupOn(blockSink)
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)

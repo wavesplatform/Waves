@@ -24,8 +24,8 @@ import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
-import monix.execution.{CancelableFuture, Scheduler}
-import monix.reactive.Observer
+import monix.execution.{Cancelable, CancelableFuture, Scheduler}
+import monix.reactive.{Observable, Observer}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.DurationLong
@@ -44,23 +44,11 @@ class UtxPoolImpl(time: Time,
 
   import com.wavesplatform.utx.UtxPoolImpl._
 
-  private[this] implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
-
+  // State
   private[this] val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
-
-  private[this] val smartCleanupBlocksAhead = (utxSettings.cleanupInterval / utxSettings.approxBlockTime).toInt + 2
-  @volatile private[this] var transactionsToFastRemove = Iterable.empty[Transaction]
-  private[this] var transactionsChecked = Set.empty[(ByteStr, Int)]
-
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
-  private[this] val removeInvalidTask: Task[Unit] =
-    Task.eval(removeInvalid()) >>
-      Task.sleep(utxSettings.cleanupInterval) >>
-      removeInvalidTask
-
-  private[this]  val cleanup: CancelableFuture[Unit] = removeInvalidTask.runAsyncLogErr
-
+  // Metrics
   private[this] object PoolMetrics {
     private[this] val sizeStats  = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
     private[this] val bytesStats = Kamon.rangeSampler("utx-pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
@@ -78,25 +66,8 @@ class UtxPoolImpl(time: Time,
     }
   }
 
-  def runFastCleanup(): Task[Unit] = {
-    Task.eval {
-      removeInvalid(transactionsToFastRemove, checkFuture = 0)
-      transactionsToFastRemove = Nil
-    }.executeOn(scheduler)
-  }
-
-  override def close(): Unit = {
-    cleanup.cancel()
-    scheduler.shutdown()
-  }
-
-  private[this] def removeExpired(currentTs: Long): Unit = {
-    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > fs.maxTransactionTimeBackOffset
-
-    transactions.values.asScala
-      .collect { case tx if isExpired(tx) => tx.id() }
-      .foreach(remove)
-  }
+  // Init scheduled task
+  cleanup.schedule()
 
   override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = putIfNew(blockchain, tx)
 
@@ -127,36 +98,12 @@ class UtxPoolImpl(time: Time,
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
     txs.view.map(_.id()).foreach(remove)
-    removeExpired(time.correctedTime())
+    cleanup.removeExpired(time.correctedTime())
   }
 
   private def remove(txId: ByteStr): Unit = {
     Option(transactions.remove(txId)).foreach(PoolMetrics.removeTransaction)
     pessimisticPortfolios.remove(txId)
-  }
-
-  private[this] def removeInvalid(list: Iterable[Transaction] = this.transactions.values.asScala, checkFuture: Int = smartCleanupBlocksAhead): Unit = {
-    val (transactionsToRemove, transactionsToCheckInNextBlock, transactionsPreChecked) = list.map { t =>
-      def isPreChecked(heightOffset: Int = 0) = this.transactionsChecked.contains((t.id(), blockchain.height + heightOffset))
-      val currentlyInvalid = !isPreChecked() && TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, t).isLeft
-
-      if (currentlyInvalid) {
-        (Some(t), None, None)
-      } else {
-        val futureInvalid = (1 to checkFuture).exists { heightOffset =>
-          val timeOffset = (utxSettings.approxBlockTime * heightOffset).toMillis
-          !isPreChecked(heightOffset) && TransactionDiffer(fs, blockchain.lastBlockTimestamp.map(_ + timeOffset), time.correctedTime() + timeOffset, blockchain.height + heightOffset)(blockchain, t).isLeft
-        }
-
-        if (futureInvalid) (None, Some(t), None) else (None, None, Some(t))
-      }
-    }.unzip3
-
-    this.transactionsChecked = this.transactionsChecked.filter(_._2 < blockchain.height) ++
-      transactionsPreChecked.flatten.flatMap(tx => (0 to checkFuture).map(i => (tx.id(), blockchain.height + i)))
-
-    transactionsToFastRemove ++= transactionsToCheckInNextBlock.flatten
-    removeAll(transactionsToRemove.flatten)
   }
 
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
@@ -176,7 +123,8 @@ class UtxPoolImpl(time: Time,
 
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val currentTs = time.correctedTime()
-    removeExpired(currentTs)
+    cleanup.removeExpired(currentTs)
+
     val b      = blockchain
     val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
@@ -256,10 +204,91 @@ class UtxPoolImpl(time: Time,
     )
     result
   }
+
+  //noinspection ScalaStyle
+  object cleanup {
+    private[this] implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
+
+    private[this] val smartCleanupBlocksAhead = (utxSettings.cleanupInterval / utxSettings.approxBlockTime).toInt + 2
+    @volatile private[this] var transactionsToFastRemove = Iterable.empty[Transaction]
+    @volatile private[this] var transactionsChecked = Set.empty[(ByteStr, Int)]
+
+    val runFullCleanup: Task[Unit] = Task
+      .eval(doCleanup())
+      .executeOn(scheduler)
+
+    val runFastCleanup: Task[Unit] = Task
+      .eval {
+        doCleanup(transactionsToFastRemove, checkFuture = 0)
+        transactionsToFastRemove = Nil
+      }
+      .executeOn(scheduler)
+
+    def runFastCleanupOn(observable: Observable[_]): Cancelable = {
+      observable
+        .whileBusyDropEventsAndSignal(dropped => log.warn(s"UTX pool cleanup is too slow, $dropped cleanups skipped"))
+        .mapTask(_ => runFastCleanup)
+        .doOnError(err => log.error("UTX pool cleanup error", err))
+        .subscribe()(scheduler)
+    }
+
+    private[UtxPoolImpl] val scheduledCleanupTask: Task[Unit] =
+      this.runFullCleanup >>
+        Task.sleep(utxSettings.cleanupInterval) >>
+        scheduledCleanupTask
+
+    private[UtxPoolImpl] val scheduledCleanup: CancelableFuture[Unit] =
+      scheduledCleanupTask.runAsyncLogErr(scheduler)
+
+    private[UtxPoolImpl] def schedule(): Unit = {
+      //noinspection ScalaUnusedExpression
+      scheduledCleanup // Init
+    }
+
+    private[UtxPoolImpl] def cancelSchedule(): Unit = {
+      scheduledCleanup.cancel()
+      scheduler.shutdown()
+    }
+
+    private[UtxPoolImpl] def removeExpired(currentTs: Long): Unit = {
+      def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > fs.maxTransactionTimeBackOffset
+
+      transactions.values.asScala
+        .collect { case tx if isExpired(tx) => tx.id() }
+        .foreach(remove)
+    }
+
+    private[UtxPoolImpl] def doCleanup(list: Iterable[Transaction] = transactions.values.asScala, checkFuture: Int = smartCleanupBlocksAhead): Unit = {
+      val (transactionsToRemove, transactionsToCheckInNextBlock, transactionsPreChecked) = list.map { t =>
+        def isPreChecked(heightOffset: Int = 0) = this.transactionsChecked.contains((t.id(), blockchain.height + heightOffset))
+        val currentlyInvalid = !isPreChecked() && TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, t).isLeft
+
+        if (currentlyInvalid) {
+          (Some(t), None, None)
+        } else {
+          val futureInvalid = (1 to checkFuture).exists { heightOffset =>
+            val timeOffset = (utxSettings.approxBlockTime * heightOffset).toMillis
+            !isPreChecked(heightOffset) && TransactionDiffer(fs, blockchain.lastBlockTimestamp.map(_ + timeOffset), time.correctedTime() + timeOffset, blockchain.height + heightOffset)(blockchain, t).isLeft
+          }
+
+          if (futureInvalid) (None, Some(t), None) else (None, None, Some(t))
+        }
+      }.unzip3
+
+      this.transactionsChecked = this.transactionsChecked.filter(_._2 < blockchain.height) ++
+        transactionsPreChecked.flatten.flatMap(tx => (0 to checkFuture).map(i => (tx.id(), blockchain.height + i)))
+
+      transactionsToFastRemove ++= transactionsToCheckInNextBlock.flatten
+      removeAll(transactionsToRemove.flatten)
+    }
+  }
+
+  override def close(): Unit = {
+    cleanup.cancelSchedule()
+  }
 }
 
 object UtxPoolImpl {
-
   private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Option[AssetId])]) {
     private type Portfolios = Map[Address, Portfolio]
     private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
@@ -303,7 +332,5 @@ object UtxPoolImpl {
         case None =>
       }
     }
-
   }
-
 }
