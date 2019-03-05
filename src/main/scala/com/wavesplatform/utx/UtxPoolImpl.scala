@@ -170,6 +170,8 @@ class UtxPoolImpl(time: Time,
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
+    cleanup.doExpiredCleanup()
+
     val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
@@ -201,12 +203,16 @@ class UtxPoolImpl(time: Time,
   private[this] object TxCheck {
     private[this] val ExpirationTime                = fs.maxTransactionTimeBackOffset.toMillis
 
+    def transactionIsExpired(transaction: Transaction,
+                             currentTime: Long = time.correctedTime()) = {
+      (currentTime - transaction.timestamp) > ExpirationTime
+    }
+
     def transactionIsValid(transaction: Transaction,
                            lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
                            currentTime: Long = time.correctedTime(),
                            height: Int = blockchain.height) = {
-      @inline def isExpired(tx: Transaction) = (currentTime - tx.timestamp) > ExpirationTime
-      !isExpired(transaction) && TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).isRight
+      !transactionIsExpired(transaction) && TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).isRight
     }
   }
 
@@ -225,6 +231,15 @@ class UtxPoolImpl(time: Time,
         .doOnComplete(() => log.debug("UTX pool cleanup stopped"))
         .doOnError(err => log.error("UTX pool cleanup error", err))
         .subscribe()
+    }
+
+    private[UtxPoolImpl] def doExpiredCleanup(): Unit = {
+      transactions.entrySet().removeIf { entry =>
+        val tx = entry.getValue
+        val remove = TxCheck.transactionIsExpired(tx)
+        if (remove) UtxPoolImpl.this.afterRemove(tx)
+        remove
+      }
     }
 
     private[UtxPoolImpl] def doCleanup(): Unit = {
