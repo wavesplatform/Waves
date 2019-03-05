@@ -332,7 +332,7 @@ object WavesContext {
 
     val scriptInputType =
       if (isTokenContext)
-        UNION(buildAssetSupportedTransactions(proofsEnabled).map(_.typeRef))
+        UNION(buildAssetSupportedTransactions(proofsEnabled, version).map(_.typeRef))
       else
         UNION((buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version)).map(_.typeRef))
 

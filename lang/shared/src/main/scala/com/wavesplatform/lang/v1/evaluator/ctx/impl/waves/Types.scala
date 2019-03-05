@@ -260,18 +260,17 @@ object Types {
     List(genesisTransactionType, buildPaymentTransactionType(proofsEnabled))
   }
 
-  def buildAssetSupportedTransactions(proofsEnabled: Boolean) = List(
+  def buildAssetSupportedTransactions(proofsEnabled: Boolean, v: StdLibVersion) = List(
     buildReissueTransactionType(proofsEnabled),
     buildBurnTransactionType(proofsEnabled),
     buildMassTransferTransactionType(proofsEnabled),
     buildExchangeTransactionType(proofsEnabled),
     buildTransferTransactionType(proofsEnabled),
-    buildSetAssetScriptTransactionType(proofsEnabled),
-    buildContractInvokationTransactionType(proofsEnabled),
-  )
+    buildSetAssetScriptTransactionType(proofsEnabled)
+  ) ++ (if (v == StdLibVersion.V3) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CaseType] = {
-    buildAssetSupportedTransactions(proofsEnabled) ++
+    buildAssetSupportedTransactions(proofsEnabled, v) ++
       List(
         buildIssueTransactionType(proofsEnabled),
         buildLeaseTransactionType(proofsEnabled),
@@ -280,7 +279,7 @@ object Types {
         buildSetScriptTransactionType(proofsEnabled),
         buildSponsorFeeTransactionType(proofsEnabled),
         buildDataTransactionType(proofsEnabled)
-      ) ++ (if (v == StdLibVersion.V3) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
+      )
   }
 
   def buildWavesTypes(proofsEnabled: Boolean, v: StdLibVersion): Seq[DefinedType] = {
