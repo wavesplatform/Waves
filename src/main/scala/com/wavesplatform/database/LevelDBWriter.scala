@@ -599,8 +599,7 @@ class LevelDBWriter(writableDB: DB,
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
     readOnly { db =>
       def takeTypes(txNums: Stream[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
-        if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) }
-        else txNums
+        if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
 
       def takeAfter(txNums: Stream[(Height, Type, TxNum)], maybeAfter: Option[(Height, TxNum)]): Stream[(Height, Type, TxNum)] = maybeAfter match {
         case None => txNums
@@ -616,11 +615,11 @@ class LevelDBWriter(writableDB: DB,
         db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { id =>
           val addressId = AddressId(id)
 
-          val heightNumStream = (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1)
-            .toStream
-            .flatMap(seqNr => db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
-              case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
-              case None                   => Nil
+          val heightNumStream = (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toStream
+            .flatMap(seqNr =>
+              db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
+                case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
+                case None                   => Nil
             })
 
           takeAfter(takeTypes(heightNumStream, types), maybeAfter)

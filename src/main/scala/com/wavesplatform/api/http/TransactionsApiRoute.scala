@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{Address, AddressOrAlias}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.DataRequest._
 import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
@@ -28,8 +28,6 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.util.Success
 
 @Path("/transactions")
@@ -278,50 +276,48 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     }
   }
 
-  /**
-    * Produces compact representation for large transactions by stripping unnecessary data.
-    * Currently implemented for MassTransfer transaction only.
-    */
-  private def txToCompactJson(address: Address, addresses: Set[AddressOrAlias], tx: Transaction): JsObject = {
-    import com.wavesplatform.transaction.transfer._
-    tx match {
-      case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
-        mtt.compactJson(addresses)
-      case _ => txToExtendedJson(tx)
-    }
-  }
-
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Future[ToResponseMarshallable] = {
+  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): ToResponseMarshallable = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] = {
-      val txs     = concurrent.blocking(blockchain.addressTransactions(address, Set.empty, limit, fromId))
-      val addrSet = Set[AddressOrAlias](address)
-      txs.map(txs => JsArray(txs.map { case (height, tx) => txToCompactJson(address, addrSet, tx) + ("height" -> JsNumber(height)) }))
+      lazy val addressesCached = concurrent.blocking((blockchain.aliasesOfAddress(address) :+ address).toSet)
+
+      /**
+        * Produces compact representation for large transactions by stripping unnecessary data.
+        * Currently implemented for MassTransfer transaction only.
+        */
+      def txToCompactJson(address: Address, tx: Transaction): JsObject = {
+        import com.wavesplatform.transaction.transfer._
+        tx match {
+          case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
+          case _                                                               => txToExtendedJson(tx)
+        }
+      }
+
+      val txs = concurrent.blocking(blockchain.addressTransactions(address, Set.empty, limit, fromId))
+      txs.map(txs => JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }))
     }
 
-    Future {
-      val result = for {
-        address <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
-        limit   <- Either.cond(limitParam <= settings.transactionByAddressLimit, limitParam, TooBigArrayAllocation)
-        maybeAfter <- maybeAfterParam match {
-          case Some(v) =>
-            ByteStr
-              .decodeBase58(v)
-              .fold(
-                _ => Left(CustomValidationError(s"Unable to decode transaction id $v")),
-                id => Right(Some(id))
-              )
-          case None => Right(None)
-        }
-        result <- createTransactionsJsonArray(address, limit, maybeAfter).fold(
-          err => Left(CustomValidationError(err)),
-          arr => Right(arr)
-        )
-      } yield result
-
-      result match {
-        case Right(arr) => arr: ToResponseMarshallable
-        case Left(err)  => err: ToResponseMarshallable
+    val result = for {
+      address <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
+      limit   <- Either.cond(limitParam <= settings.transactionByAddressLimit, limitParam, TooBigArrayAllocation)
+      maybeAfter <- maybeAfterParam match {
+        case Some(v) =>
+          ByteStr
+            .decodeBase58(v)
+            .fold(
+              _ => Left(CustomValidationError(s"Unable to decode transaction id $v")),
+              id => Right(Some(id))
+            )
+        case None => Right(None)
       }
+      result <- createTransactionsJsonArray(address, limit, maybeAfter).fold(
+        err => Left(CustomValidationError(err)),
+        arr => Right(arr)
+      )
+    } yield result
+
+    result match {
+      case Right(arr) => arr: ToResponseMarshallable
+      case Left(err)  => err: ToResponseMarshallable
     }
   }
 }
