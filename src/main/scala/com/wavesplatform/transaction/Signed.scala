@@ -37,13 +37,10 @@ object Signed {
       if (!s.signatureValid()) Task.now(Left(InvalidSignature(s, None)))
       else if (s.signedDescendants().isEmpty) Task.now(Right(s))
       else
-        Task.wanderUnordered(s.signedDescendants())(s => s.signaturesValidMemoized.map((s, _))) map { l =>
-          l.find(_._2.isLeft) match {
-            case Some((tx, e)) => {
-              println(tx) // TODO: Remove
-              Left(e.left.get)
-            }
-            case None => Right(s)
+        Task.wanderUnordered(s.signedDescendants())(s => s.signaturesValidMemoized) map { l =>
+          l.find(_.isLeft) match {
+            case Some(e) => Left(e.left.get)
+            case None    => Right(s)
           }
         }
     }.flatten

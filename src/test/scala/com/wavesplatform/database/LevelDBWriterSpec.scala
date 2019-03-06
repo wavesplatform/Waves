@@ -221,10 +221,10 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
         db.get(Keys.blockHeaderAndSizeAt(Height(i))).isDefined shouldBe true
       }
 
-      bcu.blockAtBytes(1).get shouldBe genesisBlock.bytes()
-      bcu.blockAtBytes(2).get shouldBe block1.bytes()
-      bcu.blockAtBytes(3).get shouldBe block2.bytes()
-      bcu.blockAtBytes(4).get shouldBe block3.bytes()
+      bcu.blockBytes(1).get shouldBe genesisBlock.bytes()
+      bcu.blockBytes(2).get shouldBe block1.bytes()
+      bcu.blockBytes(3).get shouldBe block2.bytes()
+      bcu.blockBytes(4).get shouldBe block3.bytes()
 
     } finally {
       bcu.shutdown()
