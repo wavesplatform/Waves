@@ -5,6 +5,7 @@ import java.io._
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
@@ -41,6 +42,7 @@ object Importer extends ScorexLogging {
     val configFilename     = configOpt.toOption.getOrElse("waves-testnet.conf")
     val blockchainFilename = Try(argi.next)
     val importHeight       = Try(argi.next).map(_.toInt).getOrElse(Int.MaxValue)
+    val legacy             = Try(argi.next).map(s => s.toLowerCase == "true" || s == "1").getOrElse(false)
 
     val config   = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
     val settings = WavesSettings.fromConfig(config)
@@ -93,7 +95,10 @@ object Importer extends ScorexLogging {
                   if (blocksToSkip > 0) {
                     blocksToSkip -= 1
                   } else {
-                    val Right(block) = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer))
+                    val Right(block) =
+                      if (legacy) Block.parseBytes(buffer).toEither
+                      else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer))
+
                     if (blockchainUpdater.lastBlockId.contains(block.reference)) {
                       Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
                         case Left(ve) =>

@@ -27,7 +27,12 @@ object Exporter extends ScorexLogging {
     val configFilename       = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
     val outputFilenamePrefix = Try(args(1)).toOption.getOrElse("blockchain")
     val exportHeight         = Try(args(2)).toOption.flatMap(s => Try(s.toInt).toOption)
-    val format               = Try(args(3)).toOption.filter(s => s.toUpperCase == "JSON").getOrElse("BINARY").toUpperCase
+
+    val format               = Try(args(3)).toOption
+      .map(_.toUpperCase)
+      .filter(s => s.toUpperCase == "JSON" || s.toUpperCase == "BINARY_OLD")
+      .getOrElse("BINARY")
+      .intern()
 
     val settings = WavesSettings.fromConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
     AddressScheme.current = new AddressScheme {
@@ -50,7 +55,7 @@ object Exporter extends ScorexLogging {
         val start         = System.currentTimeMillis()
         exportedBytes += writeHeader(bos, format)
         (2 to height).foreach { h =>
-          exportedBytes += (if (format == "JSON") exportBlockToJson(bos, blockchain, h) else exportBlockToBinary(bos, blockchain, h))
+          exportedBytes += (if (format == "JSON") exportBlockToJson(bos, blockchain, h) else exportBlockToBinary(bos, blockchain, h, format == "BINARY_OLD"))
           if (h % (height / 10) == 0)
             log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
         }
@@ -70,11 +75,11 @@ object Exporter extends ScorexLogging {
       new FileOutputStream(filename)
     }
 
-  private def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int): Int = {
+  private def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int, legacy: Boolean): Int = {
     val maybeBlockBytes = blockchain.blockBytes(height)
     maybeBlockBytes
       .map { oldBytes =>
-        val bytes = PBBlocks.protobuf(Block.parseBytes(oldBytes).get).toByteArray
+        val bytes = if (legacy) oldBytes else PBBlocks.protobuf(Block.parseBytes(oldBytes).get).toByteArray
         val bytesLength = bytes.length
 
         stream.write(Ints.toByteArray(bytesLength))
