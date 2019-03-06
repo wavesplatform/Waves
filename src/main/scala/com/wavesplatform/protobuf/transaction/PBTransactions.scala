@@ -116,25 +116,21 @@ object PBTransactions {
         }
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
-        import com.wavesplatform.common.utils._
         version match {
           case 1 =>
-            vt.CreateAliasTransactionV1.create(
-              sender,
-              com.wavesplatform.account.Alias.buildAlias(chainId, alias).explicitGet(),
-              feeAmount,
-              timestamp,
-              signature
-            )
+            for {
+              alias <- com.wavesplatform.account.Alias.buildAlias(chainId, alias)
+              tx    <- vt.CreateAliasTransactionV1.create(sender, alias, feeAmount, timestamp, signature)
+            } yield tx
+
           case 2 =>
-            vt.CreateAliasTransactionV2.create(
-              sender,
-              com.wavesplatform.account.Alias.buildAlias(chainId, alias).explicitGet(),
-              feeAmount,
-              timestamp,
-              proofs
-            )
-          case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
+            for {
+              alias <- com.wavesplatform.account.Alias.buildAlias(chainId, alias)
+              tx    <- vt.CreateAliasTransactionV2.create(sender, alias, feeAmount, timestamp, proofs)
+            } yield tx
+
+          case v =>
+            throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
