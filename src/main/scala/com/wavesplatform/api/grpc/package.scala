@@ -8,7 +8,7 @@ import monix.reactive.Observable
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-package object grpc {
+package object grpc extends PBImplicitConversions {
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
     // TODO: More convenient back-pressure implementation
     def toSubscriber: monix.reactive.observers.Subscriber[T] = {

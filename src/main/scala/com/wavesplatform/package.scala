@@ -26,9 +26,8 @@ package object wavesplatform extends ScorexLogging {
     Block
       .genesis(settings.blockchainSettings.genesisSettings)
       .flatMap { genesis =>
-        import com.wavesplatform.block.protobuf.PBBlock._
         log.info("Genesis block: {}", genesis)
-        log.info("Genesis block json: {}", genesis.toPB.toVanilla.json())
+        log.info("Genesis block json: {}", genesis.json())
         checkOrAppend(genesis, blockchainUpdater)
       }
       .left

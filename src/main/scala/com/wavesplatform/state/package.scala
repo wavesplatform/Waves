@@ -81,7 +81,7 @@ package object state {
     def contains(signature: ByteStr): Boolean = blockchain.heightOf(signature).isDefined
 
     def blockById(blockId: ByteStr): Option[Block] = blockchain.blockBytes(blockId).flatMap(bb => Block.parseBytes(bb).toOption)
-    def blockAt(height: Int): Option[Block]        = blockchain.blockAtBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
+    def blockAt(height: Int): Option[Block]        = blockchain.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
 
     def lastBlockHeaderAndSize: Option[(Block, Int)] = blockchain.lastBlock.map(b => (b, b.bytes().length))
     def lastBlockId: Option[ByteStr]                 = blockchain.lastBlockHeaderAndSize.map(_._1.uniqueId)

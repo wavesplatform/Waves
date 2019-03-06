@@ -1,5 +1,6 @@
 package com.wavesplatform.api.grpc
 import com.wavesplatform.account.Address
+import com.wavesplatform.account.protobuf.Recipient
 import io.grpc.ManagedChannelBuilder
 
 object GRPCTest extends App {
@@ -9,7 +10,9 @@ object GRPCTest extends App {
     .build()
 
   val service = TransactionsApiGrpc.blockingStub(channel)
-  val result  = service.transactionsByAddress(TransactionsByAddressRequest(Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get))
+  val result = service.transactionsByAddress(
+    TransactionsByAddressRequest(
+      Some(Recipient().withAddress(Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get.bytes.toPBByteString))))
   result.take(100).foreach(println)
 
   val blocksService = BlocksApiGrpc.blockingStub(channel)

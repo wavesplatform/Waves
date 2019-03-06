@@ -791,35 +791,63 @@ class LevelDBWriter(writableDB: DB,
       .flatMap(loadBlockHeaderAndSize(_, db))
   }
 
-  override def loadBlockAtBytes(h: Int, legacy: Boolean): Option[Array[Byte]] = readOnly { db =>
-    val height    = Height(h)
+  override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
+    import com.wavesplatform.crypto._
+
+    val height = Height(h)
+
+    val consensuDataOffset = 1 + 8 + SignatureLength
+
+    // version + timestamp + reference + baseTarget + genSig
+    val txCountOffset = consensuDataOffset + 8 + Block.GeneratorSignatureLength
+
     val headerKey = Keys.blockHeaderBytesAt(height)
 
     def readTransactionBytes(count: Int) = {
-      (0 until count).map { n =>
+      (0 until count).toArray.flatMap { n =>
         db.get(Keys.transactionBytesAt(height, TxNum(n.toShort)))
-          .flatMap(TransactionParsers.parseBytes(_).toOption)
+          .map { txBytes =>
+            Ints.toByteArray(txBytes.length) ++ txBytes
+          }
           .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
       }
     }
 
-    val block = db
-      .get(headerKey)
-      .flatMap(bs =>
-        for {
-          txCount <- if (bs.length >= 4) Some(Ints.fromBytes(bs(0), bs(1), bs(2), bs(3))) else None
-          header  <- Block.parseBytes(bs.drop(Ints.BYTES)).toOption
-        } yield (txCount, header))
-      .map {
-        case (txCount, header) =>
-          header.copy(transactionData = readTransactionBytes(txCount))
-      }
+    db.get(headerKey)
+      .map { headerBytes =>
+        val bytesBeforeCData   = headerBytes.take(consensuDataOffset)
+        val consensusDataBytes = headerBytes.slice(consensuDataOffset, consensuDataOffset + 40)
+        val version            = headerBytes.head
+        val (txCount, txCountBytes) = if (version == 1 || version == 2) {
+          val byte = headerBytes(txCountOffset)
+          (byte.toInt, Array[Byte](byte))
+        } else {
+          val bytes = headerBytes.slice(txCountOffset, txCountOffset + 4)
+          (Ints.fromByteArray(bytes), bytes)
+        }
 
-    block.map(Block.toBytes(_, legacy))
+        val bytesAfterTxs =
+          if (version > 2) {
+            headerBytes.drop(txCountOffset + txCountBytes.length)
+          } else {
+            headerBytes.takeRight(SignatureLength + KeyLength)
+          }
+
+        val txBytes = txCountBytes ++ readTransactionBytes(txCount)
+
+        val bytes = bytesBeforeCData ++
+          Ints.toByteArray(consensusDataBytes.length) ++
+          consensusDataBytes ++
+          Ints.toByteArray(txBytes.length) ++
+          txBytes ++
+          bytesAfterTxs
+
+        bytes
+      }
   }
 
-  override def loadBlockBytes(blockId: AssetId, legacy: Boolean): Option[Array[Byte]] = {
-    readOnly(db => db.get(Keys.heightOf(blockId))).flatMap(h => loadBlockAtBytes(h, legacy))
+  override def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]] = {
+    readOnly(db => db.get(Keys.heightOf(blockId))).flatMap(h => loadBlockBytes(h))
   }
 
   override def loadHeightOf(blockId: ByteStr): Option[Int] = {
@@ -947,14 +975,15 @@ class LevelDBWriter(writableDB: DB,
   override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
     val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
 
-    def createMap() = (for {
-      seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
-      addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-      history = db.get(Keys.wavesBalanceHistory(addressId))
-      actualHeight <- history.partition(_ > height)._2.headOption
-      balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
-      if balance > 0
-    } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+    def createMap() =
+      (for {
+        seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
+        addressId <- db.get(Keys.addressesForWaves(seqNr)).par
+        history = db.get(Keys.wavesBalanceHistory(addressId))
+        actualHeight <- history.partition(_ > height)._2.headOption
+        balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
+        if balance > 0
+      } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
 
     Either.cond(
       height > canGetAfterHeight,

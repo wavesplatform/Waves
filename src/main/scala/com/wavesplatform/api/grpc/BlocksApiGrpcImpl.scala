@@ -4,7 +4,6 @@ import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.{UInt32Value, UInt64Value}
 import com.wavesplatform.api.http.{ApiError, BlockDoesNotExist}
 import com.wavesplatform.block.protobuf.PBBlock
-import com.wavesplatform.block.protobuf.PBBlock._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
@@ -28,14 +27,14 @@ class BlocksApiGrpcImpl(settings: RestAPISettings,
     extends BlocksApiGrpc.BlocksApi {
 
   override def blocksByAddress(request: BlocksByAddressRequest, responseObserver: StreamObserver[BlockAndHeight]): Unit = {
-    val address = request.address.toAddress
+    val address = request.getAddress.toAddress
     val blocks = Observable
       .fromIterable(request.fromHeight to request.toHeight)
       .map(height => (blockchain.blockAt(height), height))
       .filter(_._1.isDefined)
       .map(pair => (pair._1.get, pair._2))
       .filter(_._1.signerData.generator.toAddress == address)
-      .map(pair => BlockAndHeight(pair._1.toPB, pair._2))
+      .map(pair => BlockAndHeight(Some(pair._1.toPB), pair._2))
     responseObserver.completeWith(blocks)
   }
 
@@ -51,8 +50,8 @@ class BlocksApiGrpcImpl(settings: RestAPISettings,
   override def blocksDelay(request: BlocksDelayRequest): Future[UInt64Value] = {
     val result = withBlock(request.blockId).flatMap { block =>
       blockchain
-        .parent(block.toVanillaAdapter, request.blockNum)
-        .map(parent => UInt64Value((block.timestamp - parent.timestamp) / request.blockNum))
+        .parent(block.toVanilla, request.blockNum)
+        .map(parent => UInt64Value((block.getHeader.getHeader.timestamp - parent.timestamp) / request.blockNum))
         .toRight(BlockDoesNotExist)
     }
 
@@ -74,7 +73,7 @@ class BlocksApiGrpcImpl(settings: RestAPISettings,
     blockchain.blockAt(request.value).map(_.toPB).toFuture
   }
 
-  override def blockHeaderAtHeight(request: UInt32Value): Future[PBBlock.Header] = {
+  override def blockHeaderAtHeight(request: UInt32Value): Future[PBBlock.SignedHeader] = {
     blockchain.blockHeaderAndSize(request.value).map { case (header, _) => header.toPBHeader }.toFuture
   }
 
@@ -87,7 +86,7 @@ class BlocksApiGrpcImpl(settings: RestAPISettings,
     responseObserver.completeWith(stream)
   }
 
-  override def blockHeadersRange(request: BlocksRangeRequest, responseObserver: StreamObserver[PBBlock.Header]): Unit = {
+  override def blockHeadersRange(request: BlocksRangeRequest, responseObserver: StreamObserver[PBBlock.SignedHeader]): Unit = {
     val stream = Observable
       .fromIterable(request.fromHeight to request.toHeight)
       .map(height => blockchain.blockHeaderAndSize(height))
@@ -100,7 +99,7 @@ class BlocksApiGrpcImpl(settings: RestAPISettings,
     blockchain.lastBlock.map(_.toPB).toFuture
   }
 
-  override def lastBlockHeader(request: Empty): Future[PBBlock.Header] = {
+  override def lastBlockHeader(request: Empty): Future[PBBlock.SignedHeader] = {
     blockchain.lastBlockHeaderAndSize
       .map(_._1.toPBHeader)
       .toFuture

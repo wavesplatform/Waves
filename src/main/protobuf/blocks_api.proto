@@ -1,15 +1,9 @@
 syntax = "proto3";
 package com.wavesplatform.api.grpc;
-import "scalapb/scalapb.proto";
 import "address.proto";
 import "block.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
-
-option (scalapb.options) = {
-    import: "com.wavesplatform.serialization.protobuf.utils._"
-    flat_package: true
-};
 
 service BlocksApi {
     rpc BlocksByAddress (BlocksByAddressRequest) returns (stream BlockAndHeight);
@@ -18,17 +12,17 @@ service BlocksApi {
     rpc BlockHeight (BlockIdRequest) returns (google.protobuf.UInt32Value);
     rpc CurrentHeight (google.protobuf.Empty) returns (google.protobuf.UInt32Value);
     rpc BlockAtHeight (google.protobuf.UInt32Value) returns (Block);
-    rpc BlockHeaderAtHeight (google.protobuf.UInt32Value) returns (Block.Header);
+    rpc BlockHeaderAtHeight (google.protobuf.UInt32Value) returns (Block.SignedHeader);
     rpc BlocksRange (BlocksRangeRequest) returns (stream Block);
-    rpc BlockHeadersRange (BlocksRangeRequest) returns (stream Block.Header);
+    rpc BlockHeadersRange (BlocksRangeRequest) returns (stream Block.SignedHeader);
     rpc LastBlock (google.protobuf.Empty) returns (Block);
-    rpc LastBlockHeader (google.protobuf.Empty) returns (Block.Header);
+    rpc LastBlockHeader (google.protobuf.Empty) returns (Block.SignedHeader);
     rpc FirstBlock (google.protobuf.Empty) returns (Block);
     rpc BlockBySignature (BlockIdRequest) returns (Block);
 }
 
 message BlockIdRequest {
-    bytes blockId = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    bytes blockId = 1;
 }
 
 message BlocksRangeRequest {
@@ -37,17 +31,17 @@ message BlocksRangeRequest {
 }
 
 message BlocksByAddressRequest {
-    Recipient address = 1 [(scalapb.field).no_box = true];
+    Recipient address = 1;
     uint32 fromHeight = 2;
     uint32 toHeight = 3;
 }
 
 message BlocksDelayRequest {
-    bytes blockId = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    bytes blockId = 1;
     uint32 blockNum = 2;
 }
 
 message BlockAndHeight {
-    Block block = 1 [(scalapb.field).no_box = true];
+    Block block = 1;
     uint32 height = 2;
 }

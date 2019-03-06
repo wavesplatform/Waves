@@ -1,40 +1,34 @@
 syntax = "proto3";
 package com.wavesplatform.api.grpc;
-import "scalapb/scalapb.proto";
 import "address.proto";
 import "transactions.proto";
 import "google/protobuf/empty.proto";
 
-option (scalapb.options) = {
-    import: "com.wavesplatform.serialization.protobuf.utils._"
-    flat_package: true
-};
-
 service TransactionsApi {
-    rpc TransactionsByAddress (TransactionsByAddressRequest) returns (stream Transaction);
-    rpc TransactionById (TransactionByIdRequest) returns (Transaction);
-    rpc UnconfirmedTransactions (google.protobuf.Empty) returns (stream Transaction);
-    rpc UnconfirmedTransactionById (TransactionByIdRequest) returns (Transaction);
+    rpc TransactionsByAddress (TransactionsByAddressRequest) returns (stream SignedTransaction);
+    rpc TransactionById (TransactionByIdRequest) returns (SignedTransaction);
+    rpc UnconfirmedTransactions (google.protobuf.Empty) returns (stream SignedTransaction);
+    rpc UnconfirmedTransactionById (TransactionByIdRequest) returns (SignedTransaction);
     rpc CalculateFee (Transaction) returns (CalculateFeeResponse);
-    rpc SignTransaction (TransactionSignRequest) returns (Transaction);
-    rpc BroadcastTransaction (Transaction) returns (Transaction);
+    rpc SignTransaction (TransactionSignRequest) returns (SignedTransaction);
+    rpc BroadcastTransaction (SignedTransaction) returns (SignedTransaction);
 }
 
 message TransactionsByAddressRequest {
-    Recipient address = 1 [(scalapb.field).no_box = true];
-    bytes fromId = 2 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    Recipient address = 1;
+    bytes fromId = 2;
 }
 
 message TransactionByIdRequest {
-    bytes transactionId = 1 [(scalapb.field).type = "com.wavesplatform.common.state.ByteStr"];
+    bytes transactionId = 1;
 }
 
 message CalculateFeeResponse {
-    bytes assetId = 1 [(scalapb.field).type = "com.wavesplatform.transaction.protobuf.AssetId"];
+    bytes assetId = 1;
     uint64 amount = 2;
 }
 
 message TransactionSignRequest {
-    Transaction transaction = 1 [(scalapb.field).no_box = true];
-    bytes signer = 2 [(scalapb.field).type = "com.wavesplatform.account.PublicKeyAccount"];
+    Transaction transaction = 1;
+    bytes signer = 2;
 }
