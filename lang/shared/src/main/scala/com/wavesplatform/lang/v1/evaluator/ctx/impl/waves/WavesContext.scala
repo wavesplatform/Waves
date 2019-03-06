@@ -119,7 +119,7 @@ object WavesContext {
         f.docString ++ " (fail on error)",
         args : _*
         ) {
-          FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)
+          FUNCTION_CALL(PureContext.extract, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))
         }
     }
 
