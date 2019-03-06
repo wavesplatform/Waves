@@ -6,8 +6,10 @@ import java.nio.charset.StandardCharsets
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.block.Block
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
@@ -71,11 +73,14 @@ object Exporter extends ScorexLogging {
   private def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int): Int = {
     val maybeBlockBytes = blockchain.blockBytes(height)
     maybeBlockBytes
-      .map { bytes =>
-        val len = bytes.length
-        stream.write(Ints.toByteArray(len))
+      .map { oldBytes =>
+        val bytes = PBBlocks.protobuf(Block.parseBytes(oldBytes).get).toByteArray
+        val bytesLength = bytes.length
+
+        stream.write(Ints.toByteArray(bytesLength))
         stream.write(bytes)
-        len + Ints.BYTES
+
+        Ints.BYTES + bytesLength
       }
       .getOrElse(0)
   }

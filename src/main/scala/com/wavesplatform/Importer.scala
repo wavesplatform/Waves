@@ -5,12 +5,12 @@ import java.io._
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
-import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.appender.BlockAppender
@@ -93,7 +93,7 @@ object Importer extends ScorexLogging {
                   if (blocksToSkip > 0) {
                     blocksToSkip -= 1
                   } else {
-                    val block = Block.parseBytes(buffer).get
+                    val Right(block) = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer))
                     if (blockchainUpdater.lastBlockId.contains(block.reference)) {
                       Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
                         case Left(ve) =>
@@ -125,9 +125,5 @@ object Importer extends ScorexLogging {
     time.close()
   }
 
-  def createInputStream(filename: String): Try[FileInputStream] =
-    Try {
-      new FileInputStream(filename)
-    }
-
+  private[this] def createInputStream(filename: String) = Try(new FileInputStream(filename))
 }
