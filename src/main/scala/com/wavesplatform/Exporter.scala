@@ -28,7 +28,7 @@ object Exporter extends ScorexLogging {
     val outputFilenamePrefix = Try(args(1)).toOption.getOrElse("blockchain")
     val exportHeight         = Try(args(2)).toOption.flatMap(s => Try(s.toInt).toOption)
 
-    val format               = Try(args(3)).toOption
+    val format = Try(args(3)).toOption
       .map(_.toUpperCase)
       .filter(s => s.toUpperCase == "JSON" || s.toUpperCase == "BINARY_OLD")
       .getOrElse("BINARY")
@@ -55,7 +55,8 @@ object Exporter extends ScorexLogging {
         val start         = System.currentTimeMillis()
         exportedBytes += writeHeader(bos, format)
         (2 to height).foreach { h =>
-          exportedBytes += (if (format == "JSON") exportBlockToJson(bos, blockchain, h) else exportBlockToBinary(bos, blockchain, h, format == "BINARY_OLD"))
+          exportedBytes += (if (format == "JSON") exportBlockToJson(bos, blockchain, h)
+                            else exportBlockToBinary(bos, blockchain, h, format == "BINARY_OLD"))
           if (h % (height / 10) == 0)
             log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
         }
@@ -79,7 +80,7 @@ object Exporter extends ScorexLogging {
     val maybeBlockBytes = blockchain.blockBytes(height)
     maybeBlockBytes
       .map { oldBytes =>
-        val bytes = if (legacy) oldBytes else PBBlocks.protobuf(Block.parseBytes(oldBytes).get).toByteArray
+        val bytes       = if (legacy) oldBytes else PBBlocks.protobuf(Block.parseBytes(oldBytes).get).toByteArray
         val bytesLength = bytes.length
 
         stream.write(Ints.toByteArray(bytesLength))
