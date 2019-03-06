@@ -125,7 +125,7 @@ object JsAPI {
 
   @JSExportTopLevel("scriptInfo")
   def scriptInfo(input: String): js.Dynamic = {
-    val (directives, _) = DirectiveParser.splitToDirectiveAndScript(input)
+    val directives = DirectiveParser(input)
     val info = for {
       ver         <- extractStdLibVersion(directives)
       contentType <- extractContentType(directives)
@@ -140,7 +140,7 @@ object JsAPI {
 
   @JSExportTopLevel("compile")
   def compile(input: String): js.Dynamic = {
-    val (directives, scriptWithoutDirectives) = DirectiveParser.splitToDirectiveAndScript(input)
+    val directives = DirectiveParser(input)
     val compiled = for {
       ver         <- extractStdLibVersion(directives)
       contentType <- extractContentType(directives)
@@ -150,7 +150,7 @@ object JsAPI {
         case ContentType.Expression =>
           val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset)
           Global
-            .compileScript(scriptWithoutDirectives, ctx.compilerContext)
+            .compileScript(input, ctx.compilerContext)
             .fold(
               err => {
                 js.Dynamic.literal("error" -> err)
@@ -162,7 +162,7 @@ object JsAPI {
         case ContentType.Contract =>
           // Just ignore stdlib version here
           Global
-            .compileContract(scriptWithoutDirectives, fullContractContext.compilerContext)
+            .compileContract(input, fullContractContext.compilerContext)
             .fold(
               err => {
                 js.Dynamic.literal("error" -> err)

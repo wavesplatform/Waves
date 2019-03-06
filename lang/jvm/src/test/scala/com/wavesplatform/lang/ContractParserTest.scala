@@ -185,4 +185,37 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |""".stripMargin
     parse(code)
   }
+
+  property("parse directives as comments (ignore)") {
+    val code =
+      """
+        | # comment
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# TEST_TEST 123 #-}
+        | # comment
+        |
+        | @Ann(foo)
+        | func bar(arg:Baz) = {
+        |    3
+        | }
+        |
+        |
+        |""".stripMargin
+    parse(code) shouldBe CONTRACT(
+      AnyPos,
+      List.empty,
+      List(
+        ANNOTATEDFUNC(
+          AnyPos,
+          List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
+          Expressions.FUNC(
+            AnyPos,
+            PART.VALID(AnyPos, "bar"),
+            List((PART.VALID(AnyPos, "arg"), List(PART.VALID(AnyPos, "Baz")))),
+            CONST_LONG(AnyPos, 3)
+          )
+        )
+      )
+    )
+  }
 }
