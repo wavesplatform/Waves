@@ -1,4 +1,4 @@
-package com.wavesplatform.serialization.protobuf.utils
+package com.wavesplatform.protobuf.utils
 import com.google.protobuf.CodedOutputStream
 import scalapb.GeneratedMessage
 

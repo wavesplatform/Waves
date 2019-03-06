@@ -1,6 +1,6 @@
 // Transactions
 syntax = "proto3";
-option java_package = "com.wavesplatform.transaction.smart.script.protobuf";
+option java_package = "com.wavesplatform.protobuf.transaction.smart.script";
 
 message Script {
     bytes bytes = 1;

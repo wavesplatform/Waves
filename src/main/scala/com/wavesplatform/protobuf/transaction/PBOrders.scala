@@ -1,4 +1,4 @@
-package com.wavesplatform.transaction.protobuf
+package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
@@ -6,7 +6,7 @@ import com.wavesplatform.transaction.assets.exchange.{OrderV1, OrderV2}
 import com.wavesplatform.{transaction => vt}
 
 object PBOrders {
-  import PBInternalImplicits._
+  import com.wavesplatform.protobuf.utils.PBInternalImplicits._
 
   def vanilla(order: PBOrder, version: Int = 0): VanillaOrder = {
     VanillaOrder(

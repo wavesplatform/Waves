@@ -1,20 +1,20 @@
-package com.wavesplatform.transaction.protobuf
+package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.transaction.ExchangeTransactionData.{BuySellOrders, Orders}
+import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.protobuf.transaction.smart.script.{Script => PBScript}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.protobuf.ExchangeTransactionData.{BuySellOrders, Orders}
-import com.wavesplatform.transaction.protobuf.Transaction.Data
 import com.wavesplatform.transaction.smart.script.ScriptReader
-import com.wavesplatform.transaction.smart.script.protobuf.{Script => PBScript}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, ValidationError}
 import com.wavesplatform.{transaction => vt}
 
 object PBTransactions {
-  import PBInternalImplicits._
+  import com.wavesplatform.protobuf.utils.PBInternalImplicits._
 
   private[this] val NoChainId: Byte = 0: Byte
   private[this] val NoAssetId       = ByteStr.empty
@@ -26,7 +26,7 @@ object PBTransactions {
              timestamp: Long = 0L,
              version: Int = 0,
              proofsArray: Seq[com.wavesplatform.common.state.ByteStr] = Nil,
-             data: com.wavesplatform.transaction.protobuf.Transaction.Data = com.wavesplatform.transaction.protobuf.Transaction.Data.Empty)
+             data: com.wavesplatform.protobuf.transaction.Transaction.Data = com.wavesplatform.protobuf.transaction.Transaction.Data.Empty)
     : SignedTransaction = {
     new SignedTransaction(
       Some(Transaction(chainId, sender.publicKey: ByteStr, Some((feeAssetId, fee): Amount), timestamp, version, data)),
@@ -68,7 +68,6 @@ object PBTransactions {
                                   timestamp: Long,
                                   proofs: Proofs,
                                   data: PBTransaction.Data): Either[ValidationError, VanillaTransaction] = {
-    import PBTransaction.Data
 
     val signature = proofs.toSignature
     val result: Either[ValidationError, VanillaTransaction] = data match {

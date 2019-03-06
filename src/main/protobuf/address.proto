@@ -1,6 +1,6 @@
 // Transactions
 syntax = "proto3";
-option java_package = "com.wavesplatform.account.protobuf";
+option java_package = "com.wavesplatform.protobuf.account";
 
 message Alias {
     bytes chainId = 1;
