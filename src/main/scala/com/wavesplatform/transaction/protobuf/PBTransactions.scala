@@ -4,7 +4,6 @@ import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.assets.exchange.OrderV1
 import com.wavesplatform.transaction.protobuf.ExchangeTransactionData.{BuySellOrders, Orders}
 import com.wavesplatform.transaction.protobuf.Transaction.Data
 import com.wavesplatform.transaction.smart.script.ScriptReader
@@ -22,36 +21,38 @@ object PBTransactions {
 
   def create(sender: com.wavesplatform.account.PublicKeyAccount = PublicKeyAccount.empty,
              chainId: Byte = 0,
-             fee: _root_.scala.Long = 0L,
-             feeAssetId: com.wavesplatform.transaction.AssetId = ByteStr.empty,
-             timestamp: _root_.scala.Long = 0L,
-             version: _root_.scala.Int = 0,
-             proofsArray: _root_.scala.collection.Seq[com.wavesplatform.common.state.ByteStr] = Nil,
+             fee: Long = 0L,
+             feeAssetId: VanillaAssetId = ByteStr.empty,
+             timestamp: Long = 0L,
+             version: Int = 0,
+             proofsArray: Seq[com.wavesplatform.common.state.ByteStr] = Nil,
              data: com.wavesplatform.transaction.protobuf.Transaction.Data = com.wavesplatform.transaction.protobuf.Transaction.Data.Empty)
     : SignedTransaction = {
-    new SignedTransaction(Some(Transaction(chainId, sender.publicKey: ByteStr, Some((feeAssetId, fee): Amount), timestamp, version, data)),
-                          proofsArray.map(bs => bs: ByteString))
+    new SignedTransaction(
+      Some(Transaction(chainId, sender.publicKey: ByteStr, Some((feeAssetId, fee): Amount), timestamp, version, data)),
+      proofsArray.map(bs => ByteString.copyFrom(bs.arr))
+    )
   }
 
   def vanilla(signedTx: PBSignedTransaction): Either[ValidationError, VanillaTransaction] = {
-    def toAmount(amount: Amount): (Long, VanillaAssetId) = amount.amount match {
-      case Amount.Amount.WavesAmount(value)                        => (value, ByteStr.empty)
-      case Amount.Amount.AssetAmount(AssetAmount(assetId, amount)) => (amount, ByteStr(assetId.toByteArray))
-      case Amount.Amount.Empty                                     => (0, ByteStr.empty)
+    def toAmountAndAssetId(amount: Amount): Either[ValidationError, (Long, VanillaAssetId)] = amount.amount match {
+      case Amount.Amount.WavesAmount(value)                        => Right((value, ByteStr.empty))
+      case Amount.Amount.AssetAmount(AssetAmount(assetId, amount)) => Right((amount, ByteStr(assetId.toByteArray)))
+      case Amount.Amount.Empty                                     => Left(GenericError("Empty amount"))
     }
 
     for {
-      parsedTx <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
-      fee      <- parsedTx.fee.toRight(GenericError("Fee must be specified"))
-      _        <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
-      (feeAmount, feeAssetId) = toAmount(fee)
-      sender                  = PublicKeyAccount(parsedTx.senderPublicKey.toByteArray)
+      parsedTx  <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
+      fee       <- parsedTx.fee.toRight(GenericError("Fee must be specified"))
+      _         <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
+      feeAmount <- toAmountAndAssetId(fee)
+      sender = PublicKeyAccount(parsedTx.senderPublicKey.toByteArray)
       tx <- createVanilla(
         parsedTx.version,
         if (parsedTx.chainId.isEmpty) NoChainId else parsedTx.chainId.byteAt(0),
         sender,
-        feeAmount,
-        Option(feeAssetId).filterNot(_.isEmpty),
+        feeAmount._1,
+        Option(feeAmount._2).filterNot(_.isEmpty),
         parsedTx.timestamp,
         Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
         parsedTx.data
@@ -80,30 +81,39 @@ object PBTransactions {
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
         version match {
           case 1 =>
-            vt.transfer.TransferTransactionV1.create(
-              amount.assetId,
-              sender,
-              recipient.toAddressOrAlias,
-              amount.longAmount,
-              timestamp,
-              feeAssetId,
-              feeAmount,
-              attachment.toByteArray,
-              signature
-            )
+            for {
+              address <- recipient.toAddressOrAlias
+              tx <- vt.transfer.TransferTransactionV1.create(
+                amount.assetId,
+                sender,
+                address,
+                amount.longAmount,
+                timestamp,
+                feeAssetId,
+                feeAmount,
+                attachment.toByteArray,
+                signature
+              )
+            } yield tx
+
           case 2 =>
-            vt.transfer.TransferTransactionV2.create(
-              amount.assetId,
-              sender,
-              recipient.toAddressOrAlias,
-              amount.longAmount,
-              timestamp,
-              feeAssetId,
-              feeAmount,
-              attachment.toByteArray,
-              proofs
-            )
-          case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
+            for {
+              address <- recipient.toAddressOrAlias
+              tx <- vt.transfer.TransferTransactionV2.create(
+                amount.assetId,
+                sender,
+                address,
+                amount.longAmount,
+                timestamp,
+                feeAssetId,
+                feeAmount,
+                attachment.toByteArray,
+                proofs
+              )
+            } yield tx
+
+          case v =>
+            throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
@@ -198,17 +208,25 @@ object PBTransactions {
       case Data.Lease(LeaseTransactionData(Some(recipient), amount)) =>
         version match {
           case 1 =>
-            vt.lease.LeaseTransactionV1.create(sender, amount, feeAmount, timestamp, recipient.toAddressOrAlias, signature)
+            for {
+              address <- recipient.toAddressOrAlias
+              tx      <- vt.lease.LeaseTransactionV1.create(sender, amount, feeAmount, timestamp, address, signature)
+            } yield tx
+
           case 2 =>
-            vt.lease.LeaseTransactionV2.create(sender, amount, feeAmount, timestamp, recipient.toAddressOrAlias, proofs)
-          case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
+            for {
+              address <- recipient.toAddressOrAlias
+              tx      <- vt.lease.LeaseTransactionV2.create(sender, amount, feeAmount, timestamp, address, proofs)
+            } yield tx
+
+          case v =>
+            throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
       case Data.LeaseCancel(LeaseCancelTransactionData(leaseId)) =>
         version match {
           case 1 => vt.lease.LeaseCancelTransactionV1.create(sender, leaseId.byteStr, feeAmount, timestamp, signature)
-          case 2 =>
-            vt.lease.LeaseCancelTransactionV2.create(chainId, sender, leaseId.toByteArray, feeAmount, timestamp, proofs)
+          case 2 => vt.lease.LeaseCancelTransactionV2.create(chainId, sender, leaseId.toByteArray, feeAmount, timestamp, proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
@@ -221,8 +239,8 @@ object PBTransactions {
         version match {
           case 1 =>
             vt.assets.exchange.ExchangeTransactionV1.create(
-              PBOrders.vanilla(buyOrder, 1).asInstanceOf[OrderV1],
-              PBOrders.vanilla(sellOrder, 1).asInstanceOf[OrderV1],
+              PBOrders.vanillaV1(buyOrder),
+              PBOrders.vanillaV1(sellOrder),
               amount,
               price,
               buyMatcherFee,
@@ -267,7 +285,7 @@ object PBTransactions {
         vt.transfer.MassTransferTransaction.create(
           Some(assetId.toByteArray: ByteStr).filterNot(_.isEmpty),
           sender,
-          transfers.map(t => ParsedTransfer(t.getAddress.toAddressOrAlias, t.amount)).toList,
+          transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           timestamp,
           feeAmount,
           attachment.toByteArray,

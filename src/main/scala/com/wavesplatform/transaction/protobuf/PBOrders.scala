@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.protobuf
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.assets.exchange.{OrderV1, OrderV2}
 import com.wavesplatform.{transaction => vt}
 
 object PBOrders {
@@ -25,6 +26,16 @@ object PBOrders {
       order.proofs.map(_.toByteArray: ByteStr),
       if (version == 0) order.version.toByte else version.toByte
     )
+  }
+
+  def vanillaV1(order: PBOrder): OrderV1 = vanilla(order, 1) match {
+    case v1: OrderV1 => v1
+    case _           => ???
+  }
+
+  def vanillaV2(order: PBOrder): OrderV2 = vanilla(order, 2) match {
+    case v1: OrderV2 => v1
+    case _           => ???
   }
 
   def protobuf(order: VanillaOrder): PBOrder = {
