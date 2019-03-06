@@ -24,13 +24,12 @@ object Alias {
 
   private val AliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
 
-  private def currentChainId: Byte = AddressScheme.current.chainId
+  private[this] def currentChainId: Byte = AddressScheme.current.chainId
 
-  private def validAliasChar(c: Char): Boolean =
+  private[this] def validAliasChar(c: Char): Boolean =
     ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
-  private def buildAlias(chainId: Byte, name: String): Either[ValidationError, Alias] = {
-
+  private[wavesplatform] def buildAlias(chainId: Byte, name: String): Either[ValidationError, Alias] = {
     case class AliasImpl(chainId: Byte, name: String) extends Alias
 
     if (name.length < MinLength || MaxLength < name.length)
