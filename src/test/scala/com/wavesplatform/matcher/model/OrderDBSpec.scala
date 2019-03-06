@@ -35,9 +35,8 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
     "stores" - {
       "order" in test { odb =>
         forAll(orderGenerator) {
-          case (order, _) =>
-            odb.saveOrder(order)
-            odb.contains(order.id()) shouldBe true
+          case (o, _) =>
+            odb.saveOrder(o)
         }
       }
 
@@ -45,6 +44,7 @@ class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestDat
         forAll(finalizedOrderInfoGen) {
           case (o, oi) =>
             odb.saveOrderInfo(o.id(), o.sender, oi)
+            odb.containsInfo(o.id()) shouldBe true
             odb.status(o.id()) shouldBe oi.status
         }
       }

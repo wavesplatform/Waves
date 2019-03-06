@@ -29,7 +29,7 @@ case class CTX(@(JSExport @field) types: Seq[DefinedType],
     functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
   )
 
-  val opsNames = BinaryOperation.opsByPriority.flatten.map(x => BinaryOperation.opsToFunctions(x)).toSet
+  val opsNames = BinaryOperation.opsByPriority.flatMap({ case Left(l) => l case Right(l) => l }).map(x => BinaryOperation.opsToFunctions(x)).toSet
 
   lazy val decompilerContext: DecompilerContext = DecompilerContext(
     opCodes = compilerContext.functionDefs

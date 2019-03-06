@@ -4,34 +4,32 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.{FunctionHeader, ScriptEstimator, Serde}
+import com.wavesplatform.lang.v1.{ScriptEstimator, Serde}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.{functionCosts, varNames}
 import monix.eval.Coeval
+import com.wavesplatform.lang.v1.ContractLimits._
 
 import scala.annotation.tailrec
 import scala.collection.mutable._
 
 object ExprScript {
   val checksumLength         = 4
-  private val maxComplexity  = 20 * functionCosts(V1)(FunctionHeader.Native(SIGVERIFY))()
-  private val maxSizeInBytes = 8 * 1024
 
   def validateBytes(bs: Array[Byte]): Either[String, Unit] =
-    Either.cond(bs.length <= maxSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $maxSizeInBytes bytes")
+    Either.cond(bs.length <= MaxExprSizeInBytes, (), s"Script is too large: ${bs.length} bytes > $MaxExprSizeInBytes bytes")
 
   def apply(x: EXPR): Either[String, Script] = apply(V1, x)
 
   def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true): Either[String, Script] =
     for {
       scriptComplexity <- ScriptEstimator(varNames(version), functionCosts(version), x)
-      _                <- Either.cond(scriptComplexity <= maxComplexity, (), s"Script is too complex: $scriptComplexity > $maxComplexity")
-      s = new ExprScriprImpl(version, x, scriptComplexity)
+      _                <- Either.cond(scriptComplexity <= MaxExprComplexity, (), s"Script is too complex: $scriptComplexity > $MaxExprComplexity")
+      s = new ExprScriptImpl(version, x, scriptComplexity)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s
 
-  case class ExprScriprImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends Script {
+  private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends ExprScript {
     override type Expr = EXPR
 
     override val bytes: Coeval[ByteStr] =
@@ -60,4 +58,11 @@ object ExprScript {
     }
     horTraversal(Queue(e))
   }
+}
+
+trait ExprScript extends Script {
+  override type Expr = EXPR
+  val stdLibVersion: StdLibVersion
+  val expr: EXPR
+  val complexity: Long
 }

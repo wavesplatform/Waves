@@ -4,46 +4,22 @@ import java.nio.ByteBuffer
 
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.fields.FeaturesBlockField
-import com.wavesplatform.block.protobuf.PBBlock
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
+import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.protobuf.PBTransaction
 import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.{block, crypto}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.{Failure, Try}
-
-object BlockJsonFields {
-  trait HasBlockHeaderJson {
-    def headerJson: Coeval[JsObject]
-  }
-
-  trait HasBlockJson {
-    def json: Coeval[JsObject]
-  }
-}
-
-trait BlockHeaderFields {
-  def timestamp: Long
-  def version: Byte
-  def reference: ByteStr
-  def signerData: SignerData
-  def consensusData: NxtLikeConsensusBlockData
-  def transactionCount: Int
-  def featureVotes: Set[Short]
-}
 
 class BlockHeader(val timestamp: Long,
                   val version: Byte,
@@ -51,9 +27,7 @@ class BlockHeader(val timestamp: Long,
                   val signerData: SignerData,
                   val consensusData: NxtLikeConsensusBlockData,
                   val transactionCount: Int,
-                  val featureVotes: Set[Short])
-    extends BlockHeaderFields
-    with BlockJsonFields.HasBlockHeaderJson {
+                  val featureVotes: Set[Short]) {
   protected val versionField: ByteBlockField      = ByteBlockField("version", version)
   protected val timestampField: LongBlockField    = LongBlockField("timestamp", timestamp)
   protected val referenceField: BlockIdField      = BlockIdField("reference", reference.arr)
@@ -139,48 +113,15 @@ object BlockHeader extends ScorexLogging {
 
 }
 
-object BlockFields {
-  trait HasBlockScore {
-    def blockScore: Coeval[BigInt]
-  }
-
-  trait HasBlockId {
-    def uniqueId: BlockId
-  }
-
-  trait HasBlockBytes {
-    def bytes: Coeval[Array[Byte]]
-    def bytesWithoutSignature: Coeval[Array[Byte]]
-  }
-}
-
-trait BlockBodyFields {
-  def transactionData: Seq[Transaction]
-}
-
-import com.wavesplatform.block.BlockFields._
-import com.wavesplatform.block.BlockJsonFields._
-
-trait BlockFields
-    extends BlockHeaderFields
-    with HasBlockHeaderJson
-    with BlockBodyFields
-    with HasBlockJson
-    with HasBlockScore
-    with HasBlockBytes
-    with HasBlockId
-    with Signed
-
 case class Block private[block] (override val timestamp: Long,
                                  override val version: Byte,
                                  override val reference: ByteStr,
                                  override val signerData: SignerData,
                                  override val consensusData: NxtLikeConsensusBlockData,
-                                 override val transactionData: Seq[Transaction],
+                                 transactionData: Seq[Transaction],
                                  override val featureVotes: Set[Short])
     extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
-    with Signed
-    with BlockFields {
+    with Signed {
 
   import Block._
 
@@ -211,9 +152,9 @@ case class Block private[block] (override val timestamp: Long,
       Json.obj("fee" -> transactionData.filter(_.assetFee._1.isEmpty).map(_.assetFee._2).sum) ++
       transactionField.json())
 
-  val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(if (signerData.signature.isEmpty) bytes() else bytes().dropRight(SignatureLength))
+  val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
-  val blockScore: Coeval[BigInt] = Coeval.evalOnce(Block.calculateScore(consensusData.baseTarget))
+  val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / consensusData.baseTarget).ensuring(_ > 0))
 
   val feesPortfolio: Coeval[Portfolio] = Coeval.evalOnce(Monoid[Portfolio].combineAll({
     val assetFees: Seq[(Option[AssetId], Long)] = transactionData.map(_.assetFee)
@@ -232,27 +173,12 @@ case class Block private[block] (override val timestamp: Long,
   val prevBlockFeePart: Coeval[Portfolio] =
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
-  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
-    val publicKey = signerData.generator.publicKey
-    val signature = signerData.signature
-    val valid     = !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytesWithoutSignature(), publicKey)
-    if (!valid) { // TODO: Remove
-      println("INVALID")
-    }
-    valid
+  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
+    import signerData.generator.publicKey
+    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signerData.signature.arr, bytesWithoutSignature(), publicKey)
   }
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
-
-  def copy(timestamp: Long = timestamp,
-           version: Byte = version,
-           reference: BlockId = reference,
-           signerData: SignerData = signerData,
-           consensusData: NxtLikeConsensusBlockData = consensusData,
-           transactionData: Seq[Transaction] = transactionData,
-           featureVotes: Set[Short] = featureVotes): Block = {
-    Block.apply(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
-  }
 
   override def toString: String =
     s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes)"
@@ -260,49 +186,6 @@ case class Block private[block] (override val timestamp: Long,
 }
 
 object Block extends ScorexLogging {
-  lazy val useLegacyBlock: Boolean = Try(ConfigFactory.load().getBoolean("waves.use-legacy-block")).getOrElse(false)
-
-  def createLegacy(timestamp: Long,
-                   version: Byte,
-                   reference: BlockId,
-                   signerData: SignerData,
-                   consensusData: NxtLikeConsensusBlockData,
-                   transactionData: Seq[Transaction],
-                   featureVotes: Set[Short]): Block = {
-    new Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
-  }
-
-  def apply(timestamp: Long,
-            version: Byte,
-            reference: BlockId,
-            signerData: SignerData,
-            consensusData: NxtLikeConsensusBlockData,
-            transactionData: Seq[Transaction],
-            featureVotes: Set[Short]): Block = {
-    import com.wavesplatform.block.protobuf.PBBlock._
-
-    if (useLegacyBlock) {
-      val transactions = transactionData.collect {
-        case a: PBTransaction.PBTransactionVanillaAdapter => a.underlying.toVanilla
-        case tx                                           => tx
-      }
-      createLegacy(timestamp, version, reference, signerData, consensusData, transactions, featureVotes)
-    } else {
-      val vanillaBlock = createLegacy(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)
-      vanillaBlock.toPB.toVanillaAdapter
-    }
-  }
-
-  def toLegacy(b: Block): Block = b match {
-    case a: block.protobuf.PBBlock.PBBlockVanillaAdapter => a.underlying.toVanilla
-    case _                                               => b
-  }
-
-  def toBytes(block: Block, legacy: Boolean = false): Array[Byte] = {
-    import com.wavesplatform.block.protobuf.PBBlock._
-    if (legacy || useLegacyBlock) toLegacy(block).bytes()
-    else block.toPB.protoBytes()
-  }
 
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
@@ -349,7 +232,7 @@ object Block extends ScorexLogging {
     }
   }
 
-  def parseBytesLegacy(bytes: Array[Byte]): Try[Block] =
+  def parseBytes(bytes: Array[Byte]): Try[Block] =
     for {
       (blockHeader, transactionBytes) <- BlockHeader.parseBytes(bytes)
       transactionsData                <- transParseBytes(blockHeader.version, transactionBytes)
@@ -363,16 +246,6 @@ object Block extends ScorexLogging {
         blockHeader.featureVotes
       ).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
     } yield block
-
-  def parseBytesPB(bytes: Array[Byte]): Try[PBBlock] = Try {
-    block.protobuf.PBBlock.parseFrom(bytes)
-  }
-
-  def parseBytes(bytes: Array[Byte]): Try[Block] = {
-    parseBytesPB(bytes)
-      .map(pb => if (useLegacyBlock) pb.toVanilla else pb.toVanillaAdapter)
-      .orElse(parseBytesLegacy(bytes))
-  }
 
   def areTxsFitInBlock(blockVersion: Byte, txsCount: Int): Boolean = {
     (blockVersion == 3 && txsCount <= MaxTransactionsPerBlockVer3) || (blockVersion <= 2 || txsCount <= MaxTransactionsPerBlockVer1Ver2)
@@ -414,7 +287,7 @@ object Block extends ScorexLogging {
                    signer: PrivateKeyAccount,
                    featureVotes: Set[Short]): Either[GenericError, Block] =
     build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes).right.map(unsigned =>
-      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytesWithoutSignature())))))
+      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
@@ -469,14 +342,6 @@ object Block extends ScorexLogging {
         transactionData = transactionGenesisData,
         featureVotes = Set.empty
       )
-  }
-
-  private[this] val scoreConstant = BigInt("18446744073709551616")
-
-  def calculateScore(baseTarget: BigInt): BigInt = {
-    val result = scoreConstant / baseTarget
-    require(result > 0, "Invalid score")
-    result
   }
 
   val GenesisBlockVersion: Byte = 1

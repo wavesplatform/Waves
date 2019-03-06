@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import fastparse.core.Parsed.Success
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -43,7 +43,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
        |   let id = t.id == base58'${t.id().base58}'
        |   let fee = t.fee == ${t.assetFee._2}
        |   let timestamp = t.timestamp == ${t.timestamp}
-       |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
+       |   let bodyBytes = blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}'
        |   let sender = t.sender == addressFromPublicKey(base58'${ByteStr(t.sender.publicKey).base58}')
        |   let senderPublicKey = t.senderPublicKey == base58'${ByteStr(t.sender.publicKey).base58}'
        |   let version = t.version == $version
@@ -247,8 +247,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |match tx {
            | case t : SetScriptTransaction =>
            |   ${provenPart(t)}
-           |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
-             .map(_.bytes().base64)
+           |   let script = if (${t.script.isDefined}) then blake2b256(extract(t.script)) == base64'${t.script
+             .map(s => ByteStr(crypto.fastHash(s.bytes().arr)).base64)
              .getOrElse("")}' else isDefined(t.script) == false
            |   ${assertProvenPart("t")} && script
            | case other => throw()
@@ -262,7 +262,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("SetAssetScriptTransaction binding") {
-    forAll(setAssetScriptTransactionGen.sample.get._2) { t =>
+    forAll(setAssetScriptTransactionGen.map(_._2)) { t =>
       val result = runScript(
         s"""
            |match tx {
@@ -390,6 +390,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                           .getOrElse(ByteStr.empty)
                           .base58}'
            |   else isDefined(t.${oType}Order.assetPair.priceAsset) == false
+           |   let ${oType}MatcherFeeAssetId = if (${ord.matcherFeeAssetId.isDefined}) then extract(t.${oType}Order.matcherFeeAssetId) == base58'${ord.matcherFeeAssetId
+                          .getOrElse(ByteStr.empty)
+                          .base58}'
+           |   else isDefined(t.${oType}Order.matcherFeeAssetId) == false
          """.stripMargin
 
         val lets = List(
@@ -405,7 +409,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
           "BodyBytes",
           "AssetPairAmount",
           "AssetPairPrice",
-          "Proofs"
+          "Proofs",
+          "MatcherFeeAssetId"
         ).map(i => s"$oType$i")
           .mkString(" && ")
 
@@ -451,7 +456,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |   let matcherFee = t.matcherFee == ${t.matcherFee}
                  |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
                  |   ${Range(0, 8).map(letProof(t.proofs, "t")).mkString("\n")}
-                 |  let assetPairAmount = if (${t.assetPair.amountAsset.isDefined}) then extract(t.assetPair.amountAsset) == base58'${t.assetPair.amountAsset
+                 |   let assetPairAmount = if (${t.assetPair.amountAsset.isDefined}) then extract(t.assetPair.amountAsset) == base58'${t.assetPair.amountAsset
                    .getOrElse(ByteStr.empty)
                    .base58}'
                  |   else isDefined(t.assetPair.amountAsset) == false
@@ -459,8 +464,12 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                    .getOrElse(ByteStr.empty)
                    .base58}'
                  |   else isDefined(t.assetPair.priceAsset) == false
-                 | id && sender && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee && bodyBytes && ${assertProofs(
-                   "t")} && assetPairAmount && assetPairPrice
+                 |   let matcherFeeAssetId = if (${t.matcherFeeAssetId.isDefined}) then extract(t.matcherFeeAssetId) == base58'${t.matcherFeeAssetId
+                   .getOrElse(ByteStr.empty)
+                   .base58}'
+                 |   else isDefined(t.matcherFeeAssetId) == false
+                 |   id && sender && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee && bodyBytes && ${assertProofs(
+                   "t")} && assetPairAmount && assetPairPrice && matcherFeeAssetId
                  | case other => throw()
                  | }
                  |""".stripMargin

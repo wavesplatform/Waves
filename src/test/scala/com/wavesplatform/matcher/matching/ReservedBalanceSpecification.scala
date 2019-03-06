@@ -8,7 +8,6 @@ import com.wavesplatform.matcher.market.MatcherSpecLike
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderHistoryStub}
 import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData, _}
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -83,12 +82,19 @@ class ReservedBalanceSpecification
   private val addressDir = system.actorOf(
     Props(
       new AddressDirectory(
-        ignorePortfolioChanged,
-        _ => Portfolio.empty,
-        _ => Future.failed(new IllegalStateException("Should not be used in the test")),
+        ignoreSpendableBalanceChanged,
         matcherSettings,
-        ntpTime,
-        new TestOrderDB(100)
+        address =>
+          Props(
+            new AddressActor(
+              address,
+              _ => 0L,
+              5.seconds,
+              ntpTime,
+              new TestOrderDB(100),
+              _ => false,
+              _ => Future.failed(new IllegalStateException("Should not be used in the test"))
+            ))
       )
     ))
 

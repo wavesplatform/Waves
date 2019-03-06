@@ -30,7 +30,6 @@ object Alias {
     ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
   private[wavesplatform] def buildAlias(chainId: Byte, name: String): Either[ValidationError, Alias] = {
-
     case class AliasImpl(chainId: Byte, name: String) extends Alias
 
     if (name.length < MinLength || MaxLength < name.length)

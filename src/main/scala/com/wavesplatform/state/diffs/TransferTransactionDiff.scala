@@ -4,11 +4,12 @@ import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.account.Address
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
 
-import scala.util.Right
+import scala.util.{Right, Try}
 
 object TransferTransactionDiff {
   def apply(blockchain: Blockchain, s: FunctionalitySettings, blockTime: Long, height: Int)(
@@ -20,6 +21,9 @@ object TransferTransactionDiff {
       _ <- Either.cond((tx.feeAssetId >>= blockchain.assetDescription >>= (_.script)).isEmpty,
                        (),
                        GenericError("Smart assets can't participate in TransferTransactions as a fee"))
+
+      _ <- validateOverflow(blockchain, tx)
+
       portfolios = (tx.assetId match {
         case None =>
           Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
@@ -58,6 +62,18 @@ object TransferTransactionDiff {
           Left(GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
         else
           Right(Diff(height, tx, portfolios))
+    }
+  }
+
+  private def validateOverflow(blockchain: Blockchain, tx: TransferTransaction) = {
+    if (blockchain.activatedFeatures.contains(BlockchainFeatures.Ride4DApps.id)) {
+      Right(()) // lets transaction validates itself
+    } else {
+      Try(Math.addExact(tx.fee, tx.amount))
+        .fold(
+          _ => ValidationError.OverflowError.asLeft[Unit],
+          _ => ().asRight[ValidationError]
+        )
     }
   }
 }

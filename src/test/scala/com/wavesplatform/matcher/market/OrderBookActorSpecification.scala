@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap
 import akka.actor.{ActorRef, Props}
 import akka.testkit.{ImplicitSender, TestProbe}
 import com.wavesplatform.NTPTime
-import com.wavesplatform.OrderOps._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.AlreadyProcessed
@@ -15,6 +14,7 @@ import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.EmptyBlockchain
 import org.scalamock.scalatest.PathMockFactory

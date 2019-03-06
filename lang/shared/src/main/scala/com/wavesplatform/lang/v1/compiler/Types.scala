@@ -51,7 +51,7 @@ object Types {
         case NOTHING      => List.empty
         case UNION(inner) => inner
         case s: REAL      => List(s)
-      }.toList)
+      }.toList.distinct)
     }
     def apply(l: REAL*): UNION = create(l.toList)
 

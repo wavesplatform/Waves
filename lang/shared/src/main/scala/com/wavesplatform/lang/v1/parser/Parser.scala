@@ -159,9 +159,17 @@ object Parser {
     case (_, id, None, _)                                     => id
   }
 
-  val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP | maybeFunctionCallP)
+  val list: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map { case (s,e,f) =>
+    val pos = Pos(s, f)
+    e.foldRight(REF(pos, PART.VALID(pos,"nil")):EXPR) { (v,l) => FUNCTION_CALL(pos, PART.VALID(pos, "cons"), List(v,l)) }
+  }
+
+  val extractableAtom: P[EXPR] = P(curlyBracesP | bracesP |
+    byteVectorP | stringP | numberP | trueP | falseP | list |
+    maybeFunctionCallP)
 
   abstract class Accessor
+  case class Method(name: PART[String], args: Seq[EXPR]) extends Accessor
   case class Getter(name: PART[String]) extends Accessor
   case class ListIndex(index: EXPR)     extends Accessor
   val typesP: P[Seq[PART[String]]] = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
@@ -225,8 +233,9 @@ object Parser {
       }
 
   val accessP: P[(Int, Accessor, Int)] = P(
-    ("" ~ comment ~ Index ~ "." ~/ comment ~ anyVarName.map(Getter) ~~ Index) |
-      (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
+    (("" ~ comment ~ Index ~ "." ~/ comment ~ (anyVarName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~  functionCallArgs ~/ comment ~ ")").?).map {
+      case ((g@Getter(name)), args) => args.fold(g:Accessor)(a => Method(name, a))
+      }) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
   )
 
   val maybeAccessP: P[EXPR] =
@@ -237,6 +246,7 @@ object Parser {
             case (e, (accessStart, a, accessEnd)) =>
               a match {
                 case Getter(n)        => GETTER(Pos(start, accessEnd), e, n)
+                case Method(n, args)  => FUNCTION_CALL(Pos(start, accessEnd), n, (e :: args.toList))
                 case ListIndex(index) => FUNCTION_CALL(Pos(start, accessEnd), PART.VALID(Pos(accessStart, accessEnd), "getElement"), List(e, index))
               }
           }
@@ -305,29 +315,41 @@ object Parser {
   }
 
   val baseAtom = comment ~
-    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | block | maybeAccessP) ~
+    P(ifP | matchP | block | maybeAccessP) ~
     comment
 
-  lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority) | baseAtom)
+  lazy val baseExpr = P(binaryOp(baseAtom, opsByPriority))
 
 
   val singleBaseAtom = comment ~
-    P(ifP | matchP | byteVectorP | stringP | numberP | trueP | falseP | maybeAccessP) ~
+    P(ifP | matchP | maybeAccessP) ~
     comment
 
-  lazy val singleBaseExpr = P(binaryOp(singleBaseAtom, opsByPriority) | singleBaseAtom)
+  val singleBaseExpr = P(binaryOp(singleBaseAtom, opsByPriority))
 
 
-  lazy val declaration = P(letP | funcP)
+  val declaration = P(letP | funcP)
 
-  def binaryOp(atom: P[EXPR], rest: List[List[BinaryOperation]]): P[EXPR] = rest match {
+  def revp[A,B](l:A, s:Seq[(B,A)], o:Seq[(A,B)]=Seq.empty) : (Seq[(A,B)], A) = {
+    s.foldLeft((o,l)) { (acc, op) => (acc, op) match { case ((o,l),(b,a)) => ((l,b) +: o) -> a } }
+  }
+
+  def binaryOp(atom: P[EXPR], rest: List[Either[List[BinaryOperation], List[BinaryOperation]]]): P[EXPR] = rest match {
     case Nil => unaryOp(atom, unaryOps)
-    case kinds :: restOps =>
+    case Left(kinds) :: restOps =>
       val operand = binaryOp(atom, restOps)
       val kind    = kinds.map(_.parser).reduce((pl, pr) => P(pl | pr))
       P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
         case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
           r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end, acc, currOperand) }
+      }
+    case Right(kinds) :: restOps =>
+      val operand = binaryOp(atom, restOps)
+      val kind    = kinds.map(_.parser).reduce((pl, pr) => P(pl | pr))
+      P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
+        case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
+          val (ops,s) = revp(left, r)
+          ops.foldLeft(s) { case (acc, (currOperand, currKind)) => currKind.expr(start, currOperand.position.end, currOperand, acc) }
       }
   }
 

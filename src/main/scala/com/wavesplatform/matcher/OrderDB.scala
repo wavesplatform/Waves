@@ -10,7 +10,7 @@ import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 trait OrderDB {
-  def contains(id: ByteStr): Boolean
+  def containsInfo(id: ByteStr): Boolean
   def status(id: ByteStr): OrderStatus.Final
   def saveOrderInfo(id: ByteStr, sender: Address, oi: OrderInfo[OrderStatus.Final]): Unit
   def saveOrder(o: Order): Unit
@@ -20,8 +20,10 @@ trait OrderDB {
 }
 
 object OrderDB {
+  private val OldestOrderIndexOffset = 100
+
   def apply(settings: MatcherSettings, db: DB): OrderDB = new OrderDB with ScorexLogging {
-    override def contains(id: ByteStr): Boolean = db.readOnly(_.has(MatcherKeys.order(id)))
+    override def containsInfo(id: ByteStr): Boolean = db.readOnly(_.has(MatcherKeys.orderInfo(id)))
 
     override def status(id: ByteStr): OrderStatus.Final = db.readOnly { ro =>
       ro.get(MatcherKeys.orderInfo(id)).fold[OrderStatus.Final](OrderStatus.NotFound)(_.status)
@@ -42,8 +44,14 @@ object OrderDB {
         db.readWrite { rw =>
           val newCommonSeqNr = rw.inc(MatcherKeys.finalizedCommonSeqNr(sender))
           rw.put(MatcherKeys.finalizedCommon(sender, newCommonSeqNr), Some(id))
+
           val newPairSeqNr = rw.inc(MatcherKeys.finalizedPairSeqNr(sender, oi.assetPair))
           rw.put(MatcherKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr), Some(id))
+          if (newPairSeqNr > OldestOrderIndexOffset) // Indexes start with 1, so if newPairSeqNr=101, we delete 1 (the first)
+            rw.get(MatcherKeys.finalizedPair(sender, oi.assetPair, newPairSeqNr - OldestOrderIndexOffset))
+              .map(MatcherKeys.order)
+              .foreach(x => rw.delete(x))
+
           rw.put(orderInfoKey, Some(oi))
         }
       }

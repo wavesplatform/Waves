@@ -359,12 +359,28 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     ev[CONST_LONG](context, expr) shouldBe evaluated(8)
   }
 
-  property("list constructor primitive") {
+  property("listN constructor primitive") {
     val src =
       """
-        |List(1,2)
+        |cons(1, cons(2, cons(3, cons(4, cons(5, nil)))))
       """.stripMargin
-    eval[EVALUATED](src) shouldBe evaluated(List(1, 2))
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
+  }
+
+  property("listN constructor binary op") {
+    val src =
+      """
+        |1::2::3::4::5::nil
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
+  }
+
+  property("list syntax sugar") {
+    val src =
+      """
+        |[1,2,3, 4, 5]
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
   }
 
   property("list constructor for different data entries") {
@@ -373,7 +389,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |let x = DataEntry("foo",1)
         |let y = DataEntry("bar","2")
         |let z = DataEntry("baz","2")
-        |List(x,y,z)
+        |[x,y,z]
       """.stripMargin
     eval[EVALUATED](src) shouldBe Right(
       ARR(Vector(
@@ -381,6 +397,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("bar"), "value" -> CONST_STRING("2"))),
         CaseObj(dataEntryType.typeRef, Map("key" -> CONST_STRING("baz"), "value" -> CONST_STRING("2")))
       )))
+  }
+
+  property("allow 'throw' in '==' arguments") {
+    val src =
+      """true == throw("test passed")"""
+    eval[EVALUATED](src) shouldBe Left("test passed")
+  }
+
+  property("ban to compare different types") {
+    val src =
+      """true == "test passed" """
+    eval[EVALUATED](src) should produce("Compilation failed: Can't match inferred types")
   }
 
   property("ensure user function: success") {
@@ -399,6 +427,36 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |ensure(x, "test fail")
       """.stripMargin
     eval[EVALUATED](src) shouldBe Left("test fail")
+  }
+
+  property("postfix syntax (one argument)") {
+    val src =
+      """
+        |let x = true
+        |x.ensure("test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(TRUE)
+  }
+
+  property("postfix syntax (no arguments)") {
+    val src =
+      """unit.isDefined()"""
+    eval[EVALUATED](src) shouldBe Right(FALSE)
+  }
+
+  property("postfix syntax (many argument)") {
+    val src =
+      """ 5.fraction(7,2) """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(17L))
+  }
+
+  property("postfix syntax (users defined function)") {
+    val src =
+      """
+        |func dub(s:String) = { s+s }
+        |"qwe".dub()
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(CONST_STRING("qweqwe"))
   }
 
 }

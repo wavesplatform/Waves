@@ -304,7 +304,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = Left(
-      "Compilation failed: Value 'p1' declared as non-existing type, while all possible types are List(Point, PointB, Boolean, Int, PointA, ByteStr, Unit, String) in -1--1")
+      "Compilation failed: Value 'p1' declared as non-existing type, while all possible types are List(Point, PointB, Boolean, Int, PointA, ByteVector, Unit, String) in -1--1")
   )
 
   treeTypeTest("Invalid LET")(
@@ -404,6 +404,33 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
          FUNCTION_CALL(FunctionHeader.User("id"), List(CONST_LONG(1L)))
        ),
        LONG))
+  )
+
+  treeTypeTest("union type inferrer with list")(
+    ctx = compilerContext,
+    expr = {
+      val script = """[1,""]"""
+      Parser.parseExpr(script).get.value
+    },
+    expectedResult = {
+      Right(
+        (FUNCTION_CALL(
+           FunctionHeader.Native(1100),
+           List(
+             CONST_LONG(1),
+             FUNCTION_CALL(
+               FunctionHeader.Native(1100),
+               List(
+                 CONST_STRING(""),
+                 REF("nil")
+               )
+             )
+           )
+         ),
+         LIST(UNION(List(LONG, STRING))))
+      )
+
+    }
   )
 
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)], ctx: CompilerContext): Unit =

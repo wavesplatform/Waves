@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.{Proofs, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
-import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
@@ -127,7 +126,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
         forAll(nonPositiveLong) { q =>
-          posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of waves"))
+          posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of ${tr.assetId.getOrElse("waves")}"))
         }
         forAll(invalidBase58) { pk =>
           posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress)
@@ -143,9 +142,6 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         }
         forAll(longAttachment) { a =>
           posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment"))
-        }
-        forAll(posNum[Long]) { quantity =>
-          posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError)
         }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee())

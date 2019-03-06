@@ -63,7 +63,7 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
              attachment: Array[Byte],
              proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
-      _ <- TransferTransaction.validate(amount, feeAmount, attachment)
+      _ <- TransferTransaction.validate(amount, assetId, feeAmount, feeAssetId, attachment)
     } yield TransferTransactionV2(sender, recipient, assetId, amount, timestamp, feeAssetId, feeAmount, attachment, proofs)
   }
 

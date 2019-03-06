@@ -15,7 +15,7 @@ val versionSource = Def.task {
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 16, 0)
+  val FallbackVersion = (0, 16, 1)
 
   val versionFile      = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
@@ -117,7 +117,7 @@ inConfig(Compile)(
     publishArtifact in packageDoc := false,
     publishArtifact in packageSrc := false,
     sourceGenerators += versionSource,
-    PB.targets += scalapb.gen() → (sourceManaged in Compile).value,
+    PB.targets += scalapb.gen(flatPackage = true) → (sourceManaged in Compile).value,
     PB.deleteTargetDirectory := false
   ))
 

@@ -4,13 +4,14 @@ import cats.data.State
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
-import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
+import monix.eval.Coeval
+import play.api.libs.json.{JsObject, Json}
 
 import scala.util.{Failure, Success, Try}
 
@@ -70,7 +71,11 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
              fee: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
+
     for {
+      _ <- Either.cond(script.fold(true)(_.isInstanceOf[ExprScript]),
+                       (),
+                       ValidationError.GenericError(s"Asset can oly be assigned with Expression script, not Contract"))
       _ <- Either.cond(chainId == currentChainId,
                        (),
                        ValidationError.GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
