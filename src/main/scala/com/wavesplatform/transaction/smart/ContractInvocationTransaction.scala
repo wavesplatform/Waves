@@ -6,16 +6,16 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
-import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL, REF}
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
-import play.api.libs.json.{Format, JsObject}
+import play.api.libs.json.JsObject
 
 import scala.util.{Failure, Success, Try}
 
@@ -70,8 +70,7 @@ case class ContractInvocationTransaction private (chainId: Byte,
 
 object ContractInvocationTransaction extends TransactionParserFor[ContractInvocationTransaction] with TransactionParser.MultipleVersions {
 
-  import play.api.libs.json._
-  import play.api.libs.json.Json
+  import play.api.libs.json.{Json, _}
 
   case class Payment(amount: Long, assetId: Option[AssetId])
 

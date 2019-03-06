@@ -1,9 +1,9 @@
 package com.wavesplatform.account
 
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.utils.base58Length
-import com.wavesplatform.transaction.ValidationError.InvalidAddress
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.ValidationError.InvalidAddress
+import com.wavesplatform.utils.base58Length
 
 trait PublicKeyAccount {
   def publicKey: Array[Byte]
@@ -19,6 +19,7 @@ trait PublicKeyAccount {
 }
 
 object PublicKeyAccount {
+  val empty = apply(Array.emptyByteArray)
 
   val KeyStringLength: Int = base58Length(KeyLength)
 
