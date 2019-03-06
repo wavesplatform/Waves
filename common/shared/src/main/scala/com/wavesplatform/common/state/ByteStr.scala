@@ -5,14 +5,6 @@ import com.wavesplatform.common.utils.{Base58, Base64}
 import scala.util.Try
 
 case class ByteStr(arr: Array[Byte]) {
-
-  override def equals(a: Any): Boolean = a match {
-    case other: ByteStr => arr.sameElements(other.arr)
-    case _              => false
-  }
-
-  override def hashCode(): Int = java.util.Arrays.hashCode(arr)
-
   lazy val base58: String = Base58.encode(arr)
 
   lazy val base64: String = "base64:" + Base64.encode(arr)
@@ -52,23 +44,27 @@ case class ByteStr(arr: Array[Byte]) {
 
   def dropRight(n: Long): ByteStr = take(arr.length.toLong - n.max(0))
 
+  override def equals(a: Any): Boolean = a match {
+    case other: ByteStr => arr.sameElements(other.arr)
+    case _              => false
+  }
+
+  override def hashCode(): Int = java.util.Arrays.hashCode(arr)
 }
 
 object ByteStr {
-
   val empty: ByteStr = ByteStr(Array.emptyByteArray)
 
+  implicit def fromByteArray(arr: Array[Byte]): ByteStr = {
+    new ByteStr(arr)
+  }
+
+  implicit def toByteArray(bs: ByteStr): Array[Byte] = {
+    bs.arr
+  }
+
   def fromBytes(bytes: Byte*): ByteStr = {
-
-    val buf = new Array[Byte](bytes.size)
-    var i   = 0
-
-    bytes.foreach { b =>
-      buf(i) = b
-      i += 1
-    }
-
-    ByteStr(buf)
+    ByteStr(bytes.toArray)
   }
 
   def fromLong(l: Long): ByteStr = {

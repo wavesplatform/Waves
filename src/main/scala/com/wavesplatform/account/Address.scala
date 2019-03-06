@@ -30,11 +30,13 @@ object Address extends ScorexLogging {
 
   private class AddressImpl(val bytes: ByteStr) extends Address
 
+  private[this] def createUnsafe(address: ByteStr): Address = new AddressImpl(address)
+
   def fromPublicKey(publicKey: Array[Byte], chainId: Byte = scheme.chainId): Address = {
     val publicKeyHash   = crypto.secureHash(publicKey)
     val withoutChecksum = ByteBuffer.allocate(1 + 1 + HashLength).put(AddressVersion).put(chainId).put(publicKeyHash, 0, HashLength).array()
     val bytes           = ByteBuffer.allocate(AddressLength).put(withoutChecksum).put(crypto.secureHash(withoutChecksum), 0, ChecksumLength).array()
-    new AddressImpl(ByteStr(bytes))
+    createUnsafe(bytes)
   }
 
   def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
@@ -49,7 +51,7 @@ object Address extends ScorexLogging {
       checkSum          = addressBytes.takeRight(ChecksumLength)
       checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
       _ <- Either.cond(checkSum.sameElements(checkSumGenerated), (), s"Bad address checksum")
-    } yield new AddressImpl(ByteStr(addressBytes))).left.map(InvalidAddress)
+    } yield createUnsafe(addressBytes)).left.map(InvalidAddress)
   }
 
   def fromString(addressStr: String): Either[ValidationError, Address] = {
