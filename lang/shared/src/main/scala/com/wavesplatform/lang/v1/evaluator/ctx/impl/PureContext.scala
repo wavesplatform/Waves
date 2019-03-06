@@ -85,7 +85,7 @@ object PureContext {
   }
 
   lazy val extract: BaseFunction =
-    UserFunction("extract",
+    UserFunction.deprecated("extract",
                  13,
                  TYPEPARAM('T'),
                  "Extract value from option or fail",
