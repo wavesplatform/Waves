@@ -3,8 +3,8 @@ package com.wavesplatform.api.grpc
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.{UInt32Value, UInt64Value}
 import com.wavesplatform.api.http.{ApiError, BlockDoesNotExist}
-import com.wavesplatform.block.protobuf.PBBlock
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.Time

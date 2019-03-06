@@ -5,8 +5,8 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.protobuf.PBTransactions
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.openjdk.jmh.annotations._

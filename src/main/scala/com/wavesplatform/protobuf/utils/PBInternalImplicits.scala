@@ -1,13 +1,14 @@
-package com.wavesplatform.transaction.protobuf
+package com.wavesplatform.protobuf.utils
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.account.protobuf.{Alias, Recipient}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.account.{Alias, Recipient}
+import com.wavesplatform.protobuf.transaction.{Amount, AssetAmount, VanillaAssetId}
+import com.wavesplatform.transaction.ValidationError
 
 private[protobuf] object PBInternalImplicits {
   import com.google.protobuf.{ByteString => PBByteString}
   import com.wavesplatform.account.{AddressOrAlias, Address => VAddress, Alias => VAlias}
-  import com.wavesplatform.common.utils._
 
   implicit def byteStringToByteStr(bs: PBByteString): ByteStr = bs.toByteArray
   implicit def byteStrToByteString(bs: ByteStr): PBByteString = PBByteString.copyFrom(bs)
@@ -26,18 +27,16 @@ private[protobuf] object PBInternalImplicits {
   }
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {
-    def toAddress: VAddress = {
-      VAddress.fromBytes(recipient.getAddress.toByteArray).explicitGet()
+    def toAddress: Either[ValidationError, VAddress] = {
+      VAddress.fromBytes(recipient.getAddress.toByteArray)
     }
 
-    def toAlias: VAlias = {
+    def toAlias: Either[ValidationError, VAlias] = {
       val alias = recipient.getAlias
-      VAlias
-        .buildAlias(if (alias.chainId.isEmpty) 0: Byte else alias.chainId.byteAt(0), alias.name)
-        .explicitGet()
+      VAlias.buildAlias(if (alias.chainId.isEmpty) 0: Byte else alias.chainId.byteAt(0), alias.name)
     }
 
-    def toAddressOrAlias: AddressOrAlias = recipient.recipient match {
+    def toAddressOrAlias: Either[ValidationError, AddressOrAlias] = recipient.recipient match {
       case Recipient.Recipient.Alias(_)   => this.toAlias
       case Recipient.Recipient.Address(_) => this.toAddress
       case Recipient.Recipient.Empty      => throw new IllegalArgumentException("Empty address not supported")

@@ -1,6 +1,6 @@
 package com.wavesplatform.api.grpc
 import com.wavesplatform.account.Address
-import com.wavesplatform.account.protobuf.Recipient
+import com.wavesplatform.protobuf.account.Recipient
 import io.grpc.ManagedChannelBuilder
 
 object GRPCTest extends App {

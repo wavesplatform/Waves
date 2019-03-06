@@ -2,12 +2,12 @@ package com.wavesplatform.api.grpc
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransaction}
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.protobuf.{PBSignedTransaction, PBTransaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet

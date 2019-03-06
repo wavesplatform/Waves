@@ -1,12 +1,12 @@
-package com.wavesplatform.block.protobuf
+package com.wavesplatform.protobuf.block
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.block.SignerData
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.protobuf.transaction.{PBTransactions, VanillaTransaction}
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.protobuf.{PBTransactions, VanillaTransaction}
 
 object PBBlocks {
   def vanilla(block: PBBlock): Either[ValidationError, VanillaBlock] = {

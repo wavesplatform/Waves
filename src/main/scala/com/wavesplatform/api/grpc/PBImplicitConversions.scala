@@ -1,13 +1,13 @@
 package com.wavesplatform.api.grpc
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.protobuf.Recipient
 import com.wavesplatform.account.{Address, Alias, PublicKeyAccount}
-import com.wavesplatform.block.protobuf.{PBBlock, PBBlocks, VanillaBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.protobuf.account.Recipient
+import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, VanillaBlock}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransaction, PBTransactions, VanillaTransaction}
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.protobuf.{PBSignedTransaction, PBTransaction, PBTransactions, VanillaTransaction}
 import com.wavesplatform.{crypto, block => vb}
 
 //noinspection ScalaStyle

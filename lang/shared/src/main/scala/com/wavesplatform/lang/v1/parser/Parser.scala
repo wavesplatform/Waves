@@ -28,6 +28,9 @@ object Parser {
   val notEndOfString   = CharPred(_ != '\"')
   val specialSymbols   = P("\\" ~~ AnyChar)
   val comment: P[Unit] = P("#" ~~ CharPred(_ != '\n').repX).rep.map(_ => ())
+  val directive: P[Unit] = P("{-#" ~ CharPred(el => el != '\n' &&  el != '#').rep ~ "#-}").rep.map(_ => ())
+
+  val unusedText = comment ~ directive ~ comment
 
   val escapedUnicodeSymbolP: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
   val stringP: P[EXPR] = P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
@@ -360,10 +363,10 @@ object Parser {
       } | acc
   }
 
-  def parseExpr(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ (baseExpr | invalid) ~ End).parse(str)
+  def parseExpr(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ unusedText ~ (baseExpr | invalid) ~ End).parse(str)
 
   def parseContract(str: String): core.Parsed[CONTRACT, Char, String] =
-    P(Start ~ comment.? ~ (declaration.rep) ~ comment.? ~ (annotatedFunc.rep) ~ End ~~ Index)
+    P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ End ~~ Index)
       .map {
         case (ds, fs, end) => CONTRACT(Pos(0, end), ds.toList, fs.toList)
       }

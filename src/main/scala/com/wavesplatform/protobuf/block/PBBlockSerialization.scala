@@ -1,6 +1,6 @@
-package com.wavesplatform.block.protobuf
+package com.wavesplatform.protobuf.block
 import com.google.protobuf.ByteString
-import com.wavesplatform.serialization.protobuf.utils.PBUtils
+import com.wavesplatform.protobuf.utils.PBUtils
 
 private[block] object PBBlockSerialization {
   def signedBytes(block: PBBlock): Array[Byte] = {

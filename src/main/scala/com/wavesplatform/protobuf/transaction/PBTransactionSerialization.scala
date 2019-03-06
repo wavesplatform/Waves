@@ -1,6 +1,6 @@
-package com.wavesplatform.transaction.protobuf
+package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.CodedOutputStream
-import com.wavesplatform.serialization.protobuf.utils.PBUtils
+import com.wavesplatform.protobuf.utils.PBUtils
 
 private[transaction] object PBTransactionSerialization {
   def signedBytes(tx: PBSignedTransaction): Array[Byte] = {
@@ -8,8 +8,8 @@ private[transaction] object PBTransactionSerialization {
     val outputStream = CodedOutputStream.newInstance(outArray)
     outputStream.useDeterministicSerialization()
 
-    outputStream.write(PBTransactionParser.typeId)
-    outputStream.write(PBTransactionParser.version)
+    outputStream.write(0xff.toByte)
+    outputStream.write(0x01.toByte)
     tx.writeTo(outputStream)
 
     outputStream.flush()
