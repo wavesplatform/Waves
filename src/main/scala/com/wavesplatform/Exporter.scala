@@ -30,7 +30,7 @@ object Exporter extends ScorexLogging {
 
     val format = Try(args(3)).toOption
       .map(_.toUpperCase)
-      .filter(s => s.toUpperCase == "JSON" || s.toUpperCase == "BINARY_OLD")
+      .collect { case custom @ ("JSON" | "BINARY_OLD") => custom }
       .getOrElse("BINARY")
       .intern()
 
