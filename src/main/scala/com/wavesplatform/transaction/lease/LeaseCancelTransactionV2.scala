@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.lease
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -73,13 +74,15 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
   }
 
   val byteTailDescription: ByteEntity[LeaseCancelTransactionV2] = {
-    (OneByte(tailIndex(1), "Chain ID") ~
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
-      LongBytes(tailIndex(3), "Fee") ~
-      LongBytes(tailIndex(4), "Timestamp") ~
-      ByteStrDefinedLength(tailIndex(5), "Lease ID", crypto.DigestSize) ~
-      ProofsBytes(tailIndex(6))).map {
-      case (((((chainId, senderPublicKey), fee), timestamp), leaseId), proofs) =>
+    (
+      OneByte(tailIndex(1), "Chain ID"),
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      LongBytes(tailIndex(3), "Fee"),
+      LongBytes(tailIndex(4), "Timestamp"),
+      ByteStrDefinedLength(tailIndex(5), "Lease ID", crypto.DigestSize),
+      ProofsBytes(tailIndex(6))
+    ) mapN {
+      case (chainId, senderPublicKey, fee, timestamp, leaseId, proofs) =>
         LeaseCancelTransactionV2(
           chainId = chainId,
           sender = senderPublicKey,

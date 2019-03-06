@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import cats.implicits._
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -106,16 +107,18 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
   }
 
   val byteTailDescription: ByteEntity[ExchangeTransactionV2] = {
-    (OrderBytes(tailIndex(1), "Buy order") ~
-      OrderBytes(tailIndex(2), "Sell order") ~
-      LongBytes(tailIndex(3), "Price") ~
-      LongBytes(tailIndex(4), "Amount") ~
-      LongBytes(tailIndex(5), "Buy matcher fee") ~
-      LongBytes(tailIndex(6), "Sell matcher fee") ~
-      LongBytes(tailIndex(7), "Fee") ~
-      LongBytes(tailIndex(8), "Timestamp") ~
-      ProofsBytes(tailIndex(9))).map {
-      case ((((((((buyOrder, sellOrder), price), amount), buyMatcherFee), sellMatcherFee), fee), timestamp), proofs) =>
+    (
+      OrderBytes(tailIndex(1), "Buy order"),
+      OrderBytes(tailIndex(2), "Sell order"),
+      LongBytes(tailIndex(3), "Price"),
+      LongBytes(tailIndex(4), "Amount"),
+      LongBytes(tailIndex(5), "Buy matcher fee"),
+      LongBytes(tailIndex(6), "Sell matcher fee"),
+      LongBytes(tailIndex(7), "Fee"),
+      LongBytes(tailIndex(8), "Timestamp"),
+      ProofsBytes(tailIndex(9))
+    ) mapN {
+      case (buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs) =>
         ExchangeTransactionV2(
           buyOrder = buyOrder,
           sellOrder = sellOrder,

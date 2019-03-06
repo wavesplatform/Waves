@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
@@ -104,14 +105,16 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
   }
 
   val byteTailDescription: ByteEntity[SetAssetScriptTransaction] = {
-    (OneByte(tailIndex(1), "Chain ID") ~
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
-      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength) ~
-      LongBytes(tailIndex(4), "Fee") ~
-      LongBytes(tailIndex(5), "Timestamp") ~
-      OptionBytes(index = tailIndex(6), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(6), "Script")) ~
-      ProofsBytes(tailIndex(7))).map {
-      case ((((((chainId, sender), assetId), fee), timestamp), script), proofs) =>
+    (
+      OneByte(tailIndex(1), "Chain ID"),
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength),
+      LongBytes(tailIndex(4), "Fee"),
+      LongBytes(tailIndex(5), "Timestamp"),
+      OptionBytes(index = tailIndex(6), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(6), "Script")),
+      ProofsBytes(tailIndex(7))
+    ) mapN {
+      case (chainId, sender, assetId, fee, timestamp, script, proofs) =>
         SetAssetScriptTransaction(
           chainId = chainId,
           sender = sender,

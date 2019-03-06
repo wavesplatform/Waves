@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -95,25 +96,15 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
   }
 
   val byteTailDescription: ByteEntity[ReissueTransactionV2] = {
-    (OneByte(tailIndex(1), "Chain ID") ~
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
-      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength) ~
-      LongBytes(tailIndex(4), "Quantity") ~
-      BooleanByte(tailIndex(5), "Reissuable flag (1 - True, 0 - False)") ~
-      LongBytes(tailIndex(6), "Fee") ~
-      LongBytes(tailIndex(7), "Timestamp") ~
-      ProofsBytes(tailIndex(8))).map {
-      case (((((((chainId, sender), assetId), quantity), reissuable), fee), timestamp), proofs) =>
-        ReissueTransactionV2(
-          chainId = chainId,
-          sender = sender,
-          assetId = assetId,
-          quantity = quantity,
-          reissuable = reissuable,
-          fee = fee,
-          timestamp = timestamp,
-          proofs = proofs
-        )
-    }
+    (
+      OneByte(tailIndex(1), "Chain ID"),
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength),
+      LongBytes(tailIndex(4), "Quantity"),
+      BooleanByte(tailIndex(5), "Reissuable flag (1 - True, 0 - False)"),
+      LongBytes(tailIndex(6), "Fee"),
+      LongBytes(tailIndex(7), "Timestamp"),
+      ProofsBytes(tailIndex(8))
+    ) mapN ReissueTransactionV2.apply
   }
 }

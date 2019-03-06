@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -97,13 +98,15 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
   }
 
   val byteTailDescription: ByteEntity[PaymentTransaction] = {
-    (LongBytes(tailIndex(1), "Timestamp") ~
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
-      AddressBytes(tailIndex(3), "Recipient's address") ~
-      LongBytes(tailIndex(4), "Amount") ~
-      LongBytes(tailIndex(5), "Fee") ~
-      SignatureBytes(tailIndex(6), "Signature")).map {
-      case (((((timestamp, senderPublicKey), recipient), amount), fee), signature) =>
+    (
+      LongBytes(tailIndex(1), "Timestamp"),
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      AddressBytes(tailIndex(3), "Recipient's address"),
+      LongBytes(tailIndex(4), "Amount"),
+      LongBytes(tailIndex(5), "Fee"),
+      SignatureBytes(tailIndex(6), "Signature")
+    ) mapN {
+      case (timestamp, senderPublicKey, recipient, amount, fee, signature) =>
         PaymentTransaction(
           sender = senderPublicKey,
           recipient = recipient,

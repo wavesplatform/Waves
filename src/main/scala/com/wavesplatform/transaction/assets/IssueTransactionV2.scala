@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -112,18 +113,20 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
   }
 
   val byteTailDescription: ByteEntity[IssueTransactionV2] = {
-    (OneByte(tailIndex(1), "Chain ID") ~
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
-      BytesArrayUndefinedLength(tailIndex(3), "Name") ~
-      BytesArrayUndefinedLength(tailIndex(4), "Description") ~
-      LongBytes(tailIndex(5), "Quantity") ~
-      OneByte(tailIndex(6), "Decimals") ~
-      BooleanByte(tailIndex(7), "Reissuable flag (1 - True, 0 - False)") ~
-      LongBytes(tailIndex(8), "Fee") ~
-      LongBytes(tailIndex(9), "Timestamp") ~
-      OptionBytes(index = tailIndex(10), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(10), "Script")) ~
-      ProofsBytes(tailIndex(11))).map {
-      case ((((((((((chainId, senderPublicKey), name), desc), quantity), decimals), reissuable), fee), timestamp), script), proofs) =>
+    (
+      OneByte(tailIndex(1), "Chain ID"),
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      BytesArrayUndefinedLength(tailIndex(3), "Name"),
+      BytesArrayUndefinedLength(tailIndex(4), "Description"),
+      LongBytes(tailIndex(5), "Quantity"),
+      OneByte(tailIndex(6), "Decimals"),
+      BooleanByte(tailIndex(7), "Reissuable flag (1 - True, 0 - False)"),
+      LongBytes(tailIndex(8), "Fee"),
+      LongBytes(tailIndex(9), "Timestamp"),
+      OptionBytes(index = tailIndex(10), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(10), "Script")),
+      ProofsBytes(tailIndex(11))
+    ) mapN {
+      case (chainId, senderPublicKey, name, desc, quantity, decimals, reissuable, fee, timestamp, script, proofs) =>
         IssueTransactionV2(
           chainId = chainId,
           sender = senderPublicKey,

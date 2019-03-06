@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
@@ -78,21 +79,13 @@ object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] w
   }
 
   val byteTailDescription: ByteEntity[SetScriptTransaction] = {
-    (OneByte(tailIndex(1), "Chain ID") ~
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
-      OptionBytes(index = tailIndex(3), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(3), "Script")) ~
-      LongBytes(tailIndex(4), "Fee") ~
-      LongBytes(tailIndex(5), "Timestamp") ~
-      ProofsBytes(tailIndex(6))).map {
-      case (((((chainId, senderPublicKey), script), fee), timestamp), proofs) =>
-        SetScriptTransaction(
-          chainId = chainId,
-          sender = senderPublicKey,
-          script = script,
-          fee = fee,
-          timestamp = timestamp,
-          proofs = proofs
-        )
-    }
+    (
+      OneByte(tailIndex(1), "Chain ID"),
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      OptionBytes(index = tailIndex(3), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(3), "Script")),
+      LongBytes(tailIndex(4), "Fee"),
+      LongBytes(tailIndex(5), "Timestamp"),
+      ProofsBytes(tailIndex(6))
+    ) mapN SetScriptTransaction.apply
   }
 }

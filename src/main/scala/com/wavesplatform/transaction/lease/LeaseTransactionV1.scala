@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.lease
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -72,13 +73,15 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
   }
 
   val byteTailDescription: ByteEntity[LeaseTransactionV1] = {
-    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
-      AddressOrAliasBytes(tailIndex(2), "Recipient") ~
-      LongBytes(tailIndex(3), "Amount") ~
-      LongBytes(tailIndex(4), "Fee") ~
-      LongBytes(tailIndex(5), "Timestamp") ~
-      SignatureBytes(tailIndex(6), "Signature")).map {
-      case (((((sender, recipient), amount), fee), timestamp), signature) =>
+    (
+      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      AddressOrAliasBytes(tailIndex(2), "Recipient"),
+      LongBytes(tailIndex(3), "Amount"),
+      LongBytes(tailIndex(4), "Fee"),
+      LongBytes(tailIndex(5), "Timestamp"),
+      SignatureBytes(tailIndex(6), "Signature")
+    ) mapN {
+      case (sender, recipient, amount, fee, timestamp, signature) =>
         LeaseTransactionV1(
           sender = sender,
           amount = amount,

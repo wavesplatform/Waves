@@ -1,13 +1,14 @@
 package com.wavesplatform.transaction.smart
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, REF}
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
@@ -165,25 +166,15 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
   }
 
   val byteTailDescription: ByteEntity[ContractInvocationTransaction] = {
-    (OneByte(tailIndex(1), "Chain ID") ~
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
-      AddressBytes(tailIndex(3), "Contract address") ~
-      FunctionCallBytes(tailIndex(4), "Function call") ~
-      OptionBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")) ~
-      LongBytes(tailIndex(6), "Fee") ~
-      LongBytes(tailIndex(7), "Timestamp") ~
-      ProofsBytes(tailIndex(8))).map {
-      case (((((((chainId, senderPublicKey), contractAddress), fc), payment), fee), timestamp), proofs) =>
-        ContractInvocationTransaction(
-          chainId = chainId,
-          sender = senderPublicKey,
-          contractAddress = contractAddress,
-          fc = fc,
-          payment = payment,
-          fee = fee,
-          timestamp = timestamp,
-          proofs = proofs
-        )
-    }
+    (
+      OneByte(tailIndex(1), "Chain ID"),
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      AddressBytes(tailIndex(3), "Contract address"),
+      FunctionCallBytes(tailIndex(4), "Function call"),
+      OptionBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")),
+      LongBytes(tailIndex(6), "Fee"),
+      LongBytes(tailIndex(7), "Timestamp"),
+      ProofsBytes(tailIndex(8))
+    ) mapN ContractInvocationTransaction.apply
   }
 }

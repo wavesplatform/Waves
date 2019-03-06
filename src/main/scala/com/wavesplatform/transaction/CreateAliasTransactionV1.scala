@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
@@ -53,19 +54,12 @@ object CreateAliasTransactionV1 extends TransactionParserFor[CreateAliasTransact
   }
 
   val byteTailDescription: ByteEntity[CreateAliasTransactionV1] = {
-    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
-      AliasBytes(tailIndex(2), "Alias object") ~
-      LongBytes(tailIndex(3), "Fee") ~
-      LongBytes(tailIndex(4), "Timestamp") ~
-      SignatureBytes(tailIndex(5), "Signature")).map {
-      case ((((senderPublicKey, alias), fee), timestamp), signature) =>
-        CreateAliasTransactionV1(
-          sender = senderPublicKey,
-          alias = alias,
-          fee = fee,
-          timestamp = timestamp,
-          signature = signature
-        )
-    }
+    (
+      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      AliasBytes(tailIndex(2), "Alias object"),
+      LongBytes(tailIndex(3), "Fee"),
+      LongBytes(tailIndex(4), "Timestamp"),
+      SignatureBytes(tailIndex(5), "Signature")
+    ) mapN CreateAliasTransactionV1.apply
   }
 }

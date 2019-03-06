@@ -171,14 +171,16 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   }
 
   val byteTailDescription: ByteEntity[MassTransferTransaction] = {
-    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
-      OptionBytes(index = tailIndex(2), name = "Asset ID", nestedByteEntity = AssetIdBytes(tailIndex(2), "Asset ID")) ~
-      TransfersBytes(tailIndex(3)) ~
-      LongBytes(tailIndex(4), "Timestamp") ~
-      LongBytes(tailIndex(5), "Fee") ~
-      BytesArrayUndefinedLength(tailIndex(6), "Attachments") ~
-      ProofsBytes(tailIndex(7))).map {
-      case ((((((sender, assetId), transfer), timestamp), fee), attachment), proofs) =>
+    (
+      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      OptionBytes(index = tailIndex(2), name = "Asset ID", nestedByteEntity = AssetIdBytes(tailIndex(2), "Asset ID")),
+      TransfersBytes(tailIndex(3)),
+      LongBytes(tailIndex(4), "Timestamp"),
+      LongBytes(tailIndex(5), "Fee"),
+      BytesArrayUndefinedLength(tailIndex(6), "Attachments"),
+      ProofsBytes(tailIndex(7))
+    ) mapN {
+      case (sender, assetId, transfer, timestamp, fee, attachment, proofs) =>
         MassTransferTransaction(
           assetId = assetId,
           sender = sender,

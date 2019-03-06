@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -105,12 +106,14 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
   }
 
   val byteTailDescription: ByteEntity[DataTransaction] = {
-    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
-      ListDataEntryBytes(tailIndex(2)) ~
-      LongBytes(tailIndex(3), "Timestamp") ~
-      LongBytes(tailIndex(4), "Fee") ~
-      ProofsBytes(tailIndex(5))).map {
-      case ((((senderPublicKey, data), timestamp), fee), proofs) =>
+    (
+      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      ListDataEntryBytes(tailIndex(2)),
+      LongBytes(tailIndex(3), "Timestamp"),
+      LongBytes(tailIndex(4), "Fee"),
+      ProofsBytes(tailIndex(5))
+    ) mapN {
+      case (senderPublicKey, data, timestamp, fee, proofs) =>
         DataTransaction(
           sender = senderPublicKey,
           data = data,

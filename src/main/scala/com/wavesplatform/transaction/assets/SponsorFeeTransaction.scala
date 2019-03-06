@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -108,15 +109,17 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
   }
 
   val byteTailDescription: ByteEntity[SponsorFeeTransaction] = {
-    (OneByte(tailIndex(1), "Transaction type") ~
-      OneByte(tailIndex(2), "Version") ~
-      PublicKeyAccountBytes(tailIndex(3), "Sender's public key") ~
-      ByteStrDefinedLength(tailIndex(4), "Asset ID", AssetIdLength) ~
-      SponsorFeeOptionLongBytes(tailIndex(5), "Minimal fee in assets*") ~
-      LongBytes(tailIndex(6), "Fee") ~
-      LongBytes(tailIndex(7), "Timestamp") ~
-      ProofsBytes(tailIndex(8))).map {
-      case (((((((txId, bodyVersion), sender), assetId), minSponsoredAssetFee), fee), timestamp), proofs) =>
+    (
+      OneByte(tailIndex(1), "Transaction type"),
+      OneByte(tailIndex(2), "Version"),
+      PublicKeyAccountBytes(tailIndex(3), "Sender's public key"),
+      ByteStrDefinedLength(tailIndex(4), "Asset ID", AssetIdLength),
+      SponsorFeeOptionLongBytes(tailIndex(5), "Minimal fee in assets*"),
+      LongBytes(tailIndex(6), "Fee"),
+      LongBytes(tailIndex(7), "Timestamp"),
+      ProofsBytes(tailIndex(8))
+    ) mapN {
+      case (txId, bodyVersion, sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs) =>
         require(txId == typeId, s"Signed tx id is not match")
         require(bodyVersion == version, s"versions are not match ($version, $bodyVersion)")
         SponsorFeeTransaction(

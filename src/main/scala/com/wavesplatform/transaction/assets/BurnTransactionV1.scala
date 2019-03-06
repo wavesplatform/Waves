@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -64,21 +65,13 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
   }
 
   val byteTailDescription: ByteEntity[BurnTransactionV1] = {
-    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
-      ByteStrDefinedLength(tailIndex(2), "Asset ID", AssetIdLength) ~
-      LongBytes(tailIndex(3), "Quantity") ~
-      LongBytes(tailIndex(4), "Fee") ~
-      LongBytes(tailIndex(5), "Timestamp") ~
-      SignatureBytes(tailIndex(6), "Signature")).map {
-      case (((((sender, assetId), quantity), fee), timestamp), signature) =>
-        BurnTransactionV1(
-          sender = sender,
-          assetId = assetId,
-          quantity = quantity,
-          fee = fee,
-          timestamp = timestamp,
-          signature = signature
-        )
-    }
+    (
+      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      ByteStrDefinedLength(tailIndex(2), "Asset ID", AssetIdLength),
+      LongBytes(tailIndex(3), "Quantity"),
+      LongBytes(tailIndex(4), "Fee"),
+      LongBytes(tailIndex(5), "Timestamp"),
+      SignatureBytes(tailIndex(6), "Signature")
+    ) mapN BurnTransactionV1.apply
   }
 }

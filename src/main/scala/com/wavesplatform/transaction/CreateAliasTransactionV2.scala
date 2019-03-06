@@ -64,19 +64,12 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
   }
 
   val byteTailDescription: ByteEntity[CreateAliasTransactionV2] = {
-    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
-      AliasBytes(tailIndex(2), "Alias object") ~
-      LongBytes(tailIndex(3), "Fee") ~
-      LongBytes(tailIndex(4), "Timestamp") ~
-      ProofsBytes(tailIndex(5))).map {
-      case ((((senderPublicKey, alias), fee), timestamp), proofs) =>
-        CreateAliasTransactionV2(
-          senderPublicKey,
-          alias,
-          fee,
-          timestamp,
-          proofs
-        )
-    }
+    (
+      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      AliasBytes(tailIndex(2), "Alias object"),
+      LongBytes(tailIndex(3), "Fee"),
+      LongBytes(tailIndex(4), "Timestamp"),
+      ProofsBytes(tailIndex(5))
+    ) mapN CreateAliasTransactionV2.apply
   }
 }

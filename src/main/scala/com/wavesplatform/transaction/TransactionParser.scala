@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction
 
+import cats.implicits._
 import com.wavesplatform.transaction.description.{ByteEntity, ConstantByte, OneByte}
 
 import scala.reflect.ClassTag
@@ -29,10 +30,11 @@ trait TransactionParser {
     * Implementation example:
     * {{{
     *   val bytesTailDescription: ByteEntity[Transaction] =
-    *   (OneByte(1, "Transaction type") ~ OneByte(2, "Version") ~ LongBytes(3, "Fee"))
-    *     .map { case ((txType, version), fee) =>
-    *       Transaction(txType, version, fee)
-    *     }
+    *   (
+    *     OneByte(1, "Transaction type"),
+    *     OneByte(2, "Version"),
+    *     LongBytes(3, "Fee")
+    *   ) mapN { case (txType, version, fee) => Transaction(txType, version, fee) }
     *
     *   // deserialization from buf: Array[Byte]
     *   val tx: Try[Transaction] = byteTailDescription.deserializeFromByteArray(buf)
@@ -52,7 +54,6 @@ trait TransactionParser {
     * Usage example:
     * {{{
     *   // generation of the documentation
-    *   val txStringDocumentation: String = byteDescription.getStringDoc
     *   val txStringDocumentationForMD: String = byteDescription.getStringDocForMD
     * }}}
     */
@@ -102,7 +103,10 @@ object TransactionParser {
     }
 
     lazy val byteHeaderDescription: ByteEntity[Unit] = {
-      (ConstantByte(1, value = typeId, name = "Transaction type") ~ ConstantByte(2, value = version, name = "Version")).map(_ => Unit)
+      (
+        ConstantByte(1, value = typeId, name = "Transaction type"),
+        ConstantByte(2, value = version, name = "Version")
+      ) mapN ((_, _) => Unit)
     }
   }
 
@@ -123,9 +127,11 @@ object TransactionParser {
     }
 
     lazy val byteHeaderDescription: ByteEntity[Unit] = {
-      (ConstantByte(1, value = 0, name = "Transaction multiple version mark") ~
-        ConstantByte(2, value = typeId, name = "Transaction type") ~
-        OneByte(3, "Version")).map(_ => Unit)
+      (
+        ConstantByte(1, value = 0, name = "Transaction multiple version mark"),
+        ConstantByte(2, value = typeId, name = "Transaction type"),
+        OneByte(3, "Version")
+      ) mapN ((_, _, _) => Unit)
     }
   }
 }

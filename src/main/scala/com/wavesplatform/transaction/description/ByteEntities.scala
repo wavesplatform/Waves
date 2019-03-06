@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.description
 
+import cats.{Functor, Semigroupal}
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -79,6 +80,17 @@ sealed trait ByteEntity[T] { self =>
             .replace("*", "\\*")
       }
       .foldLeft("""| \# | Field name | Type | Length |""" + "\n| --- | --- | --- | --- |\n")(_ + _)
+  }
+}
+
+object ByteEntity {
+
+  implicit def byteEntityFunctor: Functor[ByteEntity] = new Functor[ByteEntity] {
+    def map[A, B](fa: ByteEntity[A])(f: A => B): ByteEntity[B] = fa map f
+  }
+
+  implicit def byteEntitySemigroupal: Semigroupal[ByteEntity] = new Semigroupal[ByteEntity] {
+    def product[A, B](fa: ByteEntity[A], fb: ByteEntity[B]): ByteEntity[(A, B)] = Composition(fa, fb)
   }
 }
 
@@ -430,7 +442,7 @@ case class PaymentBytes(index: Int, name: String) extends ByteEntity[Payment] {
   *  @param nestedByteEntity         describes byte entity of type U
   *  @param firstByteInterpretation  how to interpret first byte
   */
-case class OptionBytes[U](index: Int, name: String, nestedByteEntity: ByteEntity[U], firstByteInterpretation: String = "existence flag (1/0)")
+class OptionBytes[U](val index: Int, name: String, nestedByteEntity: ByteEntity[U], firstByteInterpretation: String = "existence flag (1/0)")
     extends ByteEntity[Option[U]] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
@@ -447,6 +459,14 @@ case class OptionBytes[U](index: Int, name: String, nestedByteEntity: ByteEntity
     if (buf(offset) == 1) nestedByteEntity.deserialize(buf, offset + 1).map { case (value, offst) => Some(value) -> offst } else
       Try { None -> (offset + 1) }
   }
+}
+
+object OptionBytes {
+  def apply[U](index: Int,
+               name: String,
+               nestedByteEntity: ByteEntity[U],
+               firstByteInterpretation: String = "existence flag (1/0)"): ByteEntity[Option[U]] =
+    new OptionBytes(index, name, nestedByteEntity, firstByteInterpretation)
 }
 
 case class Composition[T1, T2](e1: ByteEntity[T1], e2: ByteEntity[T2]) extends ByteEntity[(T1, T2)] {

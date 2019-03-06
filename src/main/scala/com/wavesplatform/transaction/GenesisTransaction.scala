@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -88,10 +89,12 @@ object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with 
   }
 
   val byteTailDescription: ByteEntity[GenesisTransaction] = {
-    (LongBytes(tailIndex(1), "Timestamp") ~
-      AddressBytes(tailIndex(2), "Recipient's address") ~
-      LongBytes(tailIndex(3), "Amount")).map {
-      case ((timestamp, recipient), amount) =>
+    (
+      LongBytes(tailIndex(1), "Timestamp"),
+      AddressBytes(tailIndex(2), "Recipient's address"),
+      LongBytes(tailIndex(3), "Amount")
+    ) mapN {
+      case (timestamp, recipient, amount) =>
         GenesisTransaction(
           recipient = recipient,
           amount = amount,

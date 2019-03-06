@@ -84,23 +84,14 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
   }
 
   val byteTailDescription: ByteEntity[BurnTransactionV2] = {
-    (OneByte(tailIndex(1), "Chain ID") ~
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key") ~
-      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength) ~
-      LongBytes(tailIndex(4), "Quantity") ~
-      LongBytes(tailIndex(5), "Fee") ~
-      LongBytes(tailIndex(6), "Timestamp") ~
-      ProofsBytes(tailIndex(7))).map {
-      case ((((((chainId, sender), assetId), quantity), fee), timestamp), proofs) =>
-        BurnTransactionV2(
-          chainId = chainId,
-          sender = sender,
-          assetId = assetId,
-          quantity = quantity,
-          fee = fee,
-          timestamp = timestamp,
-          proofs = proofs
-        )
-    }
+    (
+      OneByte(tailIndex(1), "Chain ID"),
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength),
+      LongBytes(tailIndex(4), "Quantity"),
+      LongBytes(tailIndex(5), "Fee"),
+      LongBytes(tailIndex(6), "Timestamp"),
+      ProofsBytes(tailIndex(7))
+    ) mapN BurnTransactionV2.apply
   }
 }

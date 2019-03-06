@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.transfer
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -83,17 +84,19 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
   }
 
   val byteTailDescription: ByteEntity[TransferTransactionV1] = {
-    (SignatureBytes(tailIndex(1), "Signature") ~
-      ConstantByte(tailIndex(2), value = typeId, name = "Transaction type") ~
-      PublicKeyAccountBytes(tailIndex(3), "Sender's public key") ~
-      OptionBytes[AssetId](tailIndex(4), "Asset ID", AssetIdBytes(tailIndex(4), "Asset ID"), "flag (1 - asset, 0 - Waves)") ~
-      OptionBytes[AssetId](tailIndex(5), "Fee's asset ID", AssetIdBytes(tailIndex(5), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)") ~
-      LongBytes(tailIndex(6), "Timestamp") ~
-      LongBytes(tailIndex(7), "Amount") ~
-      LongBytes(tailIndex(8), "Fee") ~
-      AddressOrAliasBytes(tailIndex(9), "Recipient") ~
-      BytesArrayUndefinedLength(tailIndex(10), "Attachment")).map {
-      case (((((((((signature, txId), senderPublicKey), assetId), feeAssetId), timestamp), amount), fee), recipient), attachments) =>
+    (
+      SignatureBytes(tailIndex(1), "Signature"),
+      ConstantByte(tailIndex(2), value = typeId, name = "Transaction type"),
+      PublicKeyAccountBytes(tailIndex(3), "Sender's public key"),
+      OptionBytes[AssetId](tailIndex(4), "Asset ID", AssetIdBytes(tailIndex(4), "Asset ID"), "flag (1 - asset, 0 - Waves)"),
+      OptionBytes[AssetId](tailIndex(5), "Fee's asset ID", AssetIdBytes(tailIndex(5), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
+      LongBytes(tailIndex(6), "Timestamp"),
+      LongBytes(tailIndex(7), "Amount"),
+      LongBytes(tailIndex(8), "Fee"),
+      AddressOrAliasBytes(tailIndex(9), "Recipient"),
+      BytesArrayUndefinedLength(tailIndex(10), "Attachment")
+    ) mapN {
+      case (signature, txId, senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments) =>
         require(txId == typeId, s"Signed tx id is not match")
         TransferTransactionV1(
           assetId = assetId,

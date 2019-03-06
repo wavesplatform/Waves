@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -79,15 +80,17 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
   }
 
   val byteTailDescription: ByteEntity[ReissueTransactionV1] = {
-    (SignatureBytes(tailIndex(1), "Signature") ~
-      ConstantByte(tailIndex(2), value = typeId, name = "Transaction type") ~
-      PublicKeyAccountBytes(tailIndex(3), "Sender's public key") ~
-      ByteStrDefinedLength(tailIndex(4), "Asset ID", AssetIdLength) ~
-      LongBytes(tailIndex(5), "Quantity") ~
-      BooleanByte(tailIndex(6), "Reissuable flag (1 - True, 0 - False)") ~
-      LongBytes(tailIndex(7), "Fee") ~
-      LongBytes(tailIndex(8), "Timestamp")).map {
-      case (((((((signature, txId), sender), assetId), quantity), reissuable), fee), timestamp) =>
+    (
+      SignatureBytes(tailIndex(1), "Signature"),
+      ConstantByte(tailIndex(2), value = typeId, name = "Transaction type"),
+      PublicKeyAccountBytes(tailIndex(3), "Sender's public key"),
+      ByteStrDefinedLength(tailIndex(4), "Asset ID", AssetIdLength),
+      LongBytes(tailIndex(5), "Quantity"),
+      BooleanByte(tailIndex(6), "Reissuable flag (1 - True, 0 - False)"),
+      LongBytes(tailIndex(7), "Fee"),
+      LongBytes(tailIndex(8), "Timestamp")
+    ) mapN {
+      case (signature, txId, sender, assetId, quantity, reissuable, fee, timestamp) =>
         require(txId == typeId, s"Signed tx id is not match")
         ReissueTransactionV1(
           sender = sender,
