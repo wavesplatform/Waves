@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.transfer
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -85,26 +86,28 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
   }
 
   val byteTailDescription: ByteEntity[TransferTransactionV2] = {
-    (PublicKeyAccountBytes(tailIndex(1), "Sender's public key") ~
-      OptionBytes(tailIndex(2), "Asset ID", AssetIdBytes(tailIndex(2), "Asset ID"), "flag (1 - asset, 0 - Waves)") ~
-      OptionBytes(tailIndex(3), "Fee's asset ID", AssetIdBytes(tailIndex(3), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)") ~
-      LongBytes(tailIndex(4), "Timestamp") ~
-      LongBytes(tailIndex(5), "Amount") ~
-      LongBytes(tailIndex(6), "Fee") ~
-      AddressOrAliasBytes(tailIndex(7), "Recipient") ~
-      BytesArrayUndefinedLength(tailIndex(8), "Attachment") ~
-      ProofsBytes(tailIndex(9))).map {
-      case ((((((((senderPublicKey, assetId), feeAssetId), timestamp), amount), fee), recipient), attachments), proofs) =>
+    (
+      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      OptionBytes(tailIndex(2), "Asset ID", AssetIdBytes(tailIndex(2), "Asset ID"), "flag (1 - asset, 0 - Waves)"),
+      OptionBytes(tailIndex(3), "Fee's asset ID", AssetIdBytes(tailIndex(3), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
+      LongBytes(tailIndex(4), "Timestamp"),
+      LongBytes(tailIndex(5), "Amount"),
+      LongBytes(tailIndex(6), "Fee"),
+      AddressOrAliasBytes(tailIndex(7), "Recipient"),
+      BytesArrayUndefinedLength(tailIndex(8), "Attachment"),
+      ProofsBytes(tailIndex(9))
+    ) mapN {
+      case (senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments, proofs) =>
         TransferTransactionV2(
-          senderPublicKey,
-          recipient,
-          assetId,
-          amount,
-          timestamp,
-          feeAssetId,
-          fee,
-          attachments,
-          proofs
+          sender = senderPublicKey,
+          recipient = recipient,
+          assetId = assetId,
+          amount = amount,
+          timestamp = timestamp,
+          feeAssetId = feeAssetId,
+          fee = fee,
+          attachment = attachments,
+          proofs = proofs
         )
     }
   }

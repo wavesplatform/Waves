@@ -54,8 +54,6 @@ sealed trait ByteEntity[T] { self =>
 
   def deserializeFromByteArray(buf: Array[Byte]): Try[T] = deserialize(buf, 0) map { case (value, _) => value }
 
-  def ~[U](other: ByteEntity[U]): ByteEntity[(T, U)] = Composition(this, other)
-
   def map[U](f: T => U): ByteEntity[U] = new ByteEntity[U] {
 
     val index: Int = self.index

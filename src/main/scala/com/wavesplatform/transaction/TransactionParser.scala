@@ -57,8 +57,7 @@ trait TransactionParser {
     *   val txStringDocumentationForMD: String = byteDescription.getStringDocForMD
     * }}}
     */
-  lazy val byteDescription: ByteEntity[TransactionT] =
-    (byteHeaderDescription ~ byteTailDescription).map { case (_, tx) => tx }
+  lazy val byteDescription: ByteEntity[TransactionT] = (byteHeaderDescription, byteTailDescription) mapN { case (_, tx) => tx }
 }
 
 object TransactionParser {
