@@ -6,9 +6,11 @@ import com.wavesplatform.settings.fee.AssetType.AssetType
 import com.wavesplatform.settings.fee.Mode.Mode
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
 import net.ceedubs.ficus.readers.ValueReader
+import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
@@ -16,7 +18,30 @@ object OrderFeeSettings {
 
   type ErrorsListOr[A] = Validated[List[String], A]
 
-  sealed trait OrderFeeSettings
+  sealed trait OrderFeeSettings {
+
+    /** Returns json for order fee settings taking into account fee that should be paid for matcher's account script invocation */
+    def getOrderFeeJson(minMarcherFee: Long): Coeval[JsObject] = Coeval.evalOnce {
+      Json.obj(
+        this match {
+          case FixedWavesSettings(minFee) =>
+            "fixed-waves" -> Json.obj(
+              "min-fee" -> (minFee + minMarcherFee)
+            )
+          case FixedSettings(defaultAssetId, minFee) =>
+            "fixed" -> Json.obj(
+              "asset-id" -> defaultAssetId.map(_.base58),
+              "min-fee"  -> minFee
+            )
+          case PercentSettings(assetType, minFee) =>
+            "percent" -> Json.obj(
+              "type"    -> assetType,
+              "min-fee" -> minFee
+            )
+        }
+      )
+    }
+  }
 
   case class FixedWavesSettings(minFee: Long)                             extends OrderFeeSettings
   case class FixedSettings(defaultAssetId: Option[AssetId], minFee: Long) extends OrderFeeSettings
