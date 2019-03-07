@@ -33,6 +33,17 @@ object FunctionIds {
   val LONG_TO_STRING: Short    = 420
   val BOOLEAN_TO_STRING: Short = 421
 
+  val CREATE_LIST: Short       = 1100
+
+  val UTF8STRING:  Short       = 1200
+  val BININT:  Short       = 1201
+  val BININT_OFF:  Short       = 1202
+  val INDEXOF:  Short       = 1203
+  val INDEXOFN:  Short       = 1204
+  val SPLIT:  Short       = 1205
+  val PARSEINT:  Short       = 1206
+  val PARSEINTV:  Short       = 1207
+
   // Crypto
   val SIGVERIFY: Short = 500
   val KECCAK256: Short = 501
@@ -61,7 +72,5 @@ object FunctionIds {
 
   val ADDRESSFROMRECIPIENT: Short = 1060
 
-
-  val CREATE_LIST:  Short       = 1100
 
 }
