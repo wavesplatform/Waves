@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
 import org.scalatest.prop.PropertyChecks
@@ -28,7 +28,7 @@ class CommonSpec extends FreeSpec with Matchers with WithDomain with Transaction
       case (sender, initialBalance, assetId) =>
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
-          d.portfolio(sender).balanceOf(Asset(ByteStr(assetId))) shouldEqual 0L
+          d.portfolio(sender).balanceOf(IssuedAsset(ByteStr(assetId))) shouldEqual 0L
         }
     }
   }

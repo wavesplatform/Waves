@@ -4,7 +4,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransactionV1
 import com.wavesplatform.transaction.transfer._

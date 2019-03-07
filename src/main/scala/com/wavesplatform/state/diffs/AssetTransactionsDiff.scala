@@ -5,7 +5,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.{ProvenTransaction, ValidationError}
@@ -15,7 +15,7 @@ import scala.util.{Left, Right}
 object AssetTransactionsDiff {
   def issue(height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val info  = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
-    val asset = Asset(tx.id())
+    val asset = IssuedAsset(tx.id())
     Right(
       Diff(
         height = height,
@@ -103,7 +103,10 @@ object AssetTransactionsDiff {
     }
   }
 
-  private def validateAsset(tx: ProvenTransaction, blockchain: Blockchain, assetId: Asset, issuerOnly: Boolean): Either[ValidationError, Unit] = {
+  private def validateAsset(tx: ProvenTransaction,
+                            blockchain: Blockchain,
+                            assetId: IssuedAsset,
+                            issuerOnly: Boolean): Either[ValidationError, Unit] = {
     blockchain.transactionInfo(assetId.id) match {
       case Some((_, sitx: IssueTransaction)) if !validIssuer(issuerOnly, tx.sender, sitx.sender) =>
         Left(GenericError("Asset was issued by other address"))

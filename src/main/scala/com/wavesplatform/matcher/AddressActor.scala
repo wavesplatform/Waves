@@ -11,7 +11,7 @@ import com.wavesplatform.matcher.OrderDB.orderInfoOrdering
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
 import com.wavesplatform.matcher.queue.QueueEvent
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}
@@ -25,7 +25,7 @@ import scala.util.{Failure, Success}
 
 class AddressActor(
     owner: Address,
-    spendableBalance: AssetId => Long,
+    spendableBalance: Asset => Long,
     cancelTimeout: FiniteDuration,
     time: Time,
     orderDB: OrderDB,
@@ -43,7 +43,7 @@ class AddressActor(
   private val pendingPlacement    = MutableMap.empty[ByteStr, Promise[Resp]]
 
   private val activeOrders  = MutableMap.empty[Order.Id, LimitOrder]
-  private val openVolume    = MutableMap.empty[AssetId, Long].withDefaultValue(0L)
+  private val openVolume    = MutableMap.empty[Asset, Long].withDefaultValue(0L)
   private val expiration    = MutableMap.empty[ByteStr, Cancellable]
   private var latestOrderTs = 0L
 
@@ -69,7 +69,7 @@ class AddressActor(
     latestOrderTs = newTimestamp
   }
 
-  private def tradableBalance(assetId: AssetId): Long = spendableBalance(assetId) - openVolume(assetId)
+  private def tradableBalance(assetId: Asset): Long = spendableBalance(assetId) - openVolume(assetId)
 
   private val validator =
     OrderValidator.accountStateAware(owner,
@@ -241,13 +241,13 @@ class AddressActor(
 
   def receive: Receive = handleCommands orElse handleExecutionEvents orElse handleStatusRequests
 
-  private type SpendableBalance = Map[AssetId, Long]
+  private type SpendableBalance = Map[Asset, Long]
 
   /**
     * @param initBalance Contains only changed assets
     */
   private def ordersToDelete(initBalance: SpendableBalance): Queue[QueueEvent.Canceled] = {
-    def keepChanged(requiredBalance: Map[AssetId, Long]) = requiredBalance.filter {
+    def keepChanged(requiredBalance: Map[Asset, Long]) = requiredBalance.filter {
       case (requiredAssetId, _) => initBalance.contains(requiredAssetId)
     }
 
@@ -305,7 +305,7 @@ object AddressActor {
   }
   case class CancelOrder(orderId: ByteStr)                             extends Command
   case class CancelAllOrders(pair: Option[AssetPair], timestamp: Long) extends Command
-  case class BalanceUpdated(changedAssets: Set[AssetId])               extends Command
+  case class BalanceUpdated(changedAssets: Set[Asset])                 extends Command
 
   private case class CancelExpiredOrder(orderId: ByteStr)
 }

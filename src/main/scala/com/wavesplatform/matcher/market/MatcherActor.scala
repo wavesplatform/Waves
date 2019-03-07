@@ -11,8 +11,8 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.AssetDescription
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json._
@@ -22,7 +22,7 @@ class MatcherActor(settings: MatcherSettings,
                    recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
-                   assetDescription: Asset => Option[AssetDescription])
+                   assetDescription: IssuedAsset => Option[AssetDescription])
     extends PersistentActor
     with ScorexLogging {
 
@@ -46,18 +46,18 @@ class MatcherActor(settings: MatcherSettings,
 
   private def orderBook(pair: AssetPair) = Option(orderBooks.get()).flatMap(_.get(pair))
 
-  private def getAssetName(asset: AssetId, desc: Option[AssetDescription]): String =
+  private def getAssetName(asset: Asset, desc: Option[AssetDescription]): String =
     asset match {
       case Waves => AssetPair.WavesName
       case _     => desc.fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
     }
 
-  private def getAssetInfo(asset: AssetId, desc: Option[AssetDescription]): Option[AssetInfo] =
+  private def getAssetInfo(asset: Asset, desc: Option[AssetDescription]): Option[AssetInfo] =
     asset.fold(Option(8))(_ => desc.map(_.decimals)).map(AssetInfo)
 
-  private def getAssetDescriptionByAssetId(assetId: AssetId): Option[AssetDescription] = assetId match {
-    case Waves            => None
-    case asset @ Asset(_) => assetDescription(asset)
+  private def getAssetDescriptionByAssetId(assetId: Asset): Option[AssetDescription] = assetId match {
+    case Waves                  => None
+    case asset @ IssuedAsset(_) => assetDescription(asset)
   }
 
   private def createMarketData(pair: AssetPair): MarketData = {
@@ -288,7 +288,7 @@ object MatcherActor {
             recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             orderBookProps: (AssetPair, ActorRef) => Props,
-            assetDescription: Asset => Option[AssetDescription]): Props =
+            assetDescription: IssuedAsset => Option[AssetDescription]): Props =
     Props(
       new MatcherActor(
         matcherSettings,

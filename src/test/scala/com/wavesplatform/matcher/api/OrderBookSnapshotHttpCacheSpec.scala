@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.{NTPTime, TransactionGenBase}
 import org.scalatest.{FreeSpec, Matchers}
@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 
 class OrderBookSnapshotHttpCacheSpec extends FreeSpec with Matchers with TransactionGenBase with NTPTime {
 
-  private val defaultAssetPair = AssetPair(Waves, Asset(ByteStr("asset".getBytes)))
+  private val defaultAssetPair = AssetPair(Waves, IssuedAsset(ByteStr("asset".getBytes)))
 
   "OrderBookSnapshotHttpCache" - {
     "should cache" in using(createDefaultCache) { cache =>

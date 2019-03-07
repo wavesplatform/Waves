@@ -22,7 +22,7 @@ import com.wavesplatform.it.api.{
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
@@ -152,7 +152,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     def assetBalance(address: String, asset: String)(implicit tag: String): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset").as[AssetBalance]
 
-    def balance(address: String, asset: Option[AssetId])(implicit tag: String): Future[Long] = asset match {
+    def balance(address: String, asset: Option[Asset])(implicit tag: String): Future[Long] = asset match {
       case None => to(endpoint).balance(address).map(_.balance)
       case _    => to(endpoint).assetBalance(address, asset.map(_.base58).get).map(_.balance)
     }

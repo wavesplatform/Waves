@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier
@@ -51,7 +51,7 @@ object OrderValidator {
         }
     }
 
-  private def verifySmartToken(blockchain: Blockchain, asset: Asset, tx: ExchangeTransaction) =
+  private def verifySmartToken(blockchain: Blockchain, asset: IssuedAsset, tx: ExchangeTransaction) =
     blockchain.assetScript(asset).fold[Either[String, Unit]](Right(())) { script =>
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
         Left("Trading of scripted asset isn't allowed yet")
@@ -67,7 +67,7 @@ object OrderValidator {
       }.left.map(_.toString)
     }
 
-  @inline private def decimals(blockchain: Blockchain, assetId: AssetId) = assetId.fold[Either[String, Int]](Right(8)) { aid =>
+  @inline private def decimals(blockchain: Blockchain, assetId: Asset) = assetId.fold[Either[String, Int]](Right(8)) { aid =>
     blockchain.assetDescription(aid).map(_.decimals).toRight(s"Invalid asset id $aid")
   }
 
@@ -96,10 +96,10 @@ object OrderValidator {
       transactionCreator(LimitOrder(fakeOrder), LimitOrder(order), time.correctedTime()).left.map(_.toString)
     }
 
-    def verifyAssetScript(assetId: AssetId) = {
+    def verifyAssetScript(assetId: Asset) = {
       assetId match {
         case Waves => Right(order)
-        case asset @ Asset(_) =>
+        case asset @ IssuedAsset(_) =>
           exchangeTx.flatMap(verifySmartToken(blockchain, asset, _)).right.map(_ => order)
       }
     }
@@ -118,10 +118,10 @@ object OrderValidator {
     } yield order
   }
 
-  private def formatBalance(b: Map[AssetId, Long]): String =
+  private def formatBalance(b: Map[Asset, Long]): String =
     b.map { case (k, v) => s"${AssetPair.assetIdStr(k)}:$v" } mkString ("{", ", ", "}")
 
-  private def validateBalance(order: Order, tradableBalance: AssetId => Long): ValidationResult = {
+  private def validateBalance(order: Order, tradableBalance: Asset => Long): ValidationResult = {
     val lo               = LimitOrder(order)
     val requiredForOrder = lo.requiredBalance
 
@@ -141,7 +141,7 @@ object OrderValidator {
   def matcherSettingsAware(
       matcherPublicKey: PublicKeyAccount,
       blacklistedAddresses: Set[Address],
-      blacklistedAssets: Set[AssetId],
+      blacklistedAssets: Set[Asset],
   )(order: Order): ValidationResult = {
     for {
       _ <- (Right(order): ValidationResult)
@@ -162,7 +162,7 @@ object OrderValidator {
 
   def accountStateAware(
       sender: Address,
-      tradableBalance: AssetId => Long,
+      tradableBalance: Asset => Long,
       activeOrderCount: => Int,
       orderExists: ByteStr => Boolean,
   )(order: Order): ValidationResult =

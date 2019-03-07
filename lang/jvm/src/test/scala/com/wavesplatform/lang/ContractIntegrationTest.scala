@@ -69,7 +69,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |         a21:Int, a22:Int) = { WriteSet([DataEntry(toString(a1), a22)]) }
       """.stripMargin,
       "foo",
-      Range(1,23).map(i => Terms.CONST_LONG(i)).toList
+      Range(1, 23).map(i => Terms.CONST_LONG(i)).toList
     ).explicitGet() shouldBe ContractResult(List(DataItem.Lng("1", 22)), List())
   }
 

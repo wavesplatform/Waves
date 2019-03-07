@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{Ack, Scheduler}

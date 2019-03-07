@@ -13,7 +13,7 @@ import com.wavesplatform.it.api.{MatcherResponse, MatcherStatusResponse, Orderbo
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.AssetPairBuilder
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
 import com.wavesplatform.utils.LoggerFacade
@@ -29,7 +29,7 @@ import scala.util.{Failure, Success}
 class Worker(workerSettings: Settings,
              generatorSettings: GeneratorSettings,
              matcherSettings: MatcherNodeSettings.Settings,
-             tradingAssets: Seq[AssetId],
+             tradingAssets: Seq[Asset],
              orderType: GenOrderType.Value,
              ordersCount: Int,
              client: AsyncHttpClient)(implicit ec: ExecutionContext)
@@ -122,7 +122,7 @@ class Worker(workerSettings: Settings,
   implicit val signedTransferRequestWrites: Writes[SignedTransferV1Request] =
     Json.writes[SignedTransferV1Request].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(TransferTransactionV1.typeId.toInt)))
 
-  def transfer(i: Long, sender: PrivateKeyAccount, assetId: Option[AssetId], recipient: PrivateKeyAccount, halfBalance: Boolean)(
+  def transfer(i: Long, sender: PrivateKeyAccount, assetId: Option[Asset], recipient: PrivateKeyAccount, halfBalance: Boolean)(
       implicit tag: String): Future[Transaction] =
     to(endpoint).balance(sender.address, assetId).flatMap { balance =>
       val halfAmount     = if (halfBalance) balance / 2 else balance
@@ -279,7 +279,7 @@ object Worker {
 object AssetPairCreator {
   val WavesName = "WAVES"
 
-  def createAssetPair(asset1: Option[AssetId], asset2: Option[AssetId]): AssetPair =
+  def createAssetPair(asset1: Option[Asset], asset2: Option[Asset]): AssetPair =
     if (AssetPairBuilder.assetIdOrdering.compare(asset1, asset2) > 0)
       AssetPair(asset1, asset2)
     else

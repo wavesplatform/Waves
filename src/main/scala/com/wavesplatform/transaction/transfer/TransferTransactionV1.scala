@@ -10,12 +10,12 @@ import monix.eval.Coeval
 
 import scala.util.{Failure, Success, Try}
 
-case class TransferTransactionV1 private (assetId: AssetId,
+case class TransferTransactionV1 private (assetId: Asset,
                                           sender: PublicKeyAccount,
                                           recipient: AddressOrAlias,
                                           amount: Long,
                                           timestamp: Long,
-                                          feeAssetId: AssetId,
+                                          feeAssetId: Asset,
                                           fee: Long,
                                           attachment: Array[Byte],
                                           signature: ByteStr)
@@ -47,12 +47,12 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
     }.flatten
   }
 
-  def create(assetId: AssetId,
+  def create(assetId: Asset,
              sender: PublicKeyAccount,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
-             feeAssetId: AssetId,
+             feeAssetId: Asset,
              feeAmount: Long,
              attachment: Array[Byte],
              signature: ByteStr): Either[ValidationError, TransactionT] = {
@@ -61,12 +61,12 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
       .map(_ => TransferTransactionV1(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature))
   }
 
-  def signed(assetId: AssetId,
+  def signed(assetId: Asset,
              sender: PublicKeyAccount,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
-             feeAssetId: AssetId,
+             feeAssetId: Asset,
              feeAmount: Long,
              attachment: Array[Byte],
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
@@ -75,12 +75,12 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
     }
   }
 
-  def selfSigned(assetId: AssetId,
+  def selfSigned(assetId: Asset,
                  sender: PrivateKeyAccount,
                  recipient: AddressOrAlias,
                  amount: Long,
                  timestamp: Long,
-                 feeAssetId: AssetId,
+                 feeAssetId: Asset,
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
     signed(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, sender)

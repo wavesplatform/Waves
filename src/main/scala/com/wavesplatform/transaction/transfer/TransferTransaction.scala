@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.utils.base58Length
@@ -15,15 +15,15 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
-  def assetId: AssetId
+  def assetId: Asset
   def recipient: AddressOrAlias
   def amount: Long
-  def feeAssetId: AssetId
+  def feeAssetId: Asset
   def fee: Long
   def attachment: Array[Byte]
   def version: Byte
 
-  override val assetFee: (AssetId, Long) = (feeAssetId, fee)
+  override val assetFee: (Asset, Long) = (feeAssetId, fee)
 
   override final val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
@@ -54,7 +54,7 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
       Deser.serializeArray(attachment)
     )
   }
-  override def checkedAssets(): Seq[AssetId] = Seq(assetId)
+  override def checkedAssets(): Seq[Asset] = Seq(assetId)
 }
 
 object TransferTransaction {
@@ -64,7 +64,7 @@ object TransferTransaction {
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
-  def validate(amt: Long, maybeAmtAsset: AssetId, feeAmt: Long, maybeFeeAsset: AssetId, attachment: Array[Byte]): Either[ValidationError, Unit] = {
+  def validate(amt: Long, maybeAmtAsset: Asset, feeAmt: Long, maybeFeeAsset: Asset, attachment: Array[Byte]): Either[ValidationError, Unit] = {
     (
       validateAmount(amt, maybeAmtAsset.maybeBase58Repr.getOrElse("waves")),
       validateFee(feeAmt),
@@ -79,14 +79,14 @@ object TransferTransaction {
     val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, start + KeyLength, AssetIdLength)
 
     val assetId = assetIdOpt match {
-      case Some(arr) => Asset(ByteStr(arr))
+      case Some(arr) => IssuedAsset(ByteStr(arr))
       case None      => Waves
     }
 
     val (feeAssetIdOpt, s1) = Deser.parseByteArrayOption(bytes, s0, AssetIdLength)
 
     val feeAssetId = feeAssetIdOpt match {
-      case Some(arr) => Asset(ByteStr(arr))
+      case Some(arr) => IssuedAsset(ByteStr(arr))
       case None      => Waves
     }
 

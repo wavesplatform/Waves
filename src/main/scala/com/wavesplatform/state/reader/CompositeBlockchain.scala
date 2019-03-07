@@ -7,13 +7,13 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
+import com.wavesplatform.transaction.{Asset, Transaction, ValidationError}
 
 class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: Long = 0) extends Blockchain {
 
@@ -21,21 +21,21 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def portfolio(a: Address): Portfolio = inner.portfolio(a).combine(diff.portfolios.getOrElse(a, Portfolio.empty))
 
-  override def balance(address: Address, assetId: AssetId): Long =
+  override def balance(address: Address, assetId: Asset): Long =
     inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
 
   override def leaseBalance(address: Address): LeaseBalance = {
     cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
   }
 
-  override def assetScript(asset: Asset): Option[Script] = maybeDiff.flatMap(_.assetScripts.get(asset)).getOrElse(inner.assetScript(asset))
+  override def assetScript(asset: IssuedAsset): Option[Script] = maybeDiff.flatMap(_.assetScripts.get(asset)).getOrElse(inner.assetScript(asset))
 
-  override def hasAssetScript(asset: Asset): Boolean = maybeDiff.flatMap(_.assetScripts.get(asset)) match {
+  override def hasAssetScript(asset: IssuedAsset): Boolean = maybeDiff.flatMap(_.assetScripts.get(asset)) match {
     case Some(s) => s.nonEmpty
     case None    => inner.hasAssetScript(asset)
   }
 
-  override def assetDescription(asset: Asset): Option[AssetDescription] = {
+  override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = {
     val script: Option[Script] = assetScript(asset)
     inner.assetDescription(asset) match {
       case Some(ad) =>
@@ -169,14 +169,14 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
       if pred(p)
     } yield address -> f(address)
 
-  override def assetDistribution(assetId: Asset): AssetDistribution = {
+  override def assetDistribution(assetId: IssuedAsset): AssetDistribution = {
     val fromInner = inner.assetDistribution(assetId)
-    val fromDiff  = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, balance(_, Some(assetId))))
+    val fromDiff  = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, balance(_, assetId)))
 
     fromInner |+| fromDiff
   }
 
-  override def assetDistributionAtHeight(asset: Asset,
+  override def assetDistributionAtHeight(asset: IssuedAsset,
                                          height: Int,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = {

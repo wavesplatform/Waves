@@ -4,8 +4,8 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
-import com.wavesplatform.transaction.{AssetId, Proofs}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, Proofs}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -90,7 +90,7 @@ object OrderJson {
                   signature: Option[Array[Byte]],
                   proofs: Option[Array[Array[Byte]]],
                   version: Byte,
-                  matcherFeeAssetId: AssetId): Order = {
+                  matcherFeeAssetId: Asset): Order = {
 
     val eproofs =
       proofs
@@ -116,8 +116,8 @@ object OrderJson {
 
   def readAssetPair(amountAsset: Option[Option[Array[Byte]]], priceAsset: Option[Option[Array[Byte]]]): AssetPair = {
     AssetPair(
-      amountAsset.flatten.map(arr => Asset(ByteStr(arr))).getOrElse(Waves),
-      priceAsset.flatten.map(arr => Asset(ByteStr(arr))).getOrElse(Waves)
+      amountAsset.flatten.map(arr => IssuedAsset(ByteStr(arr))).getOrElse(Waves),
+      priceAsset.flatten.map(arr => IssuedAsset(ByteStr(arr))).getOrElse(Waves)
     )
   }
 
@@ -161,7 +161,7 @@ object OrderJson {
       (JsPath \ "version").read[Byte] and
       (JsPath \ "matcherFeeAssetId")
         .readNullable[Array[Byte]]
-        .map(arrOpt => AssetId.fromCompatId(arrOpt.map(ByteStr(_))))
+        .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
     r(readOrderV3 _)
   }
 

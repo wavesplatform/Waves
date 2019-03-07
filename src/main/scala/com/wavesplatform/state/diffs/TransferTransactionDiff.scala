@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
@@ -19,7 +19,7 @@ object TransferTransactionDiff {
 
     def isSmartAsset = tx.feeAssetId match {
       case Waves => false
-      case asset @ Asset(_) =>
+      case asset @ IssuedAsset(_) =>
         blockchain
           .assetDescription(asset)
           .flatMap(_.script)
@@ -36,14 +36,14 @@ object TransferTransactionDiff {
           Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
             Map(recipient -> Portfolio(tx.amount, LeaseBalance.empty, Map.empty))
           )
-        case asset @ Asset(_) =>
+        case asset @ IssuedAsset(_) =>
           Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -tx.amount))).combine(
             Map(recipient -> Portfolio(0, LeaseBalance.empty, Map(asset -> tx.amount)))
           )
       }).combine(
         tx.feeAssetId match {
           case Waves => Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
-          case asset @ Asset(_) =>
+          case asset @ IssuedAsset(_) =>
             val senderPf = Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -tx.fee)))
             if (height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain, s)) {
               val sponsorPf = blockchain

@@ -5,8 +5,8 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
-import com.wavesplatform.transaction.AssetId.Waves
-import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -14,7 +14,7 @@ trait LeaseCancelTransaction extends ProvenTransaction with VersionedTransaction
   def chainByte: Option[Byte]
   def leaseId: ByteStr
   def fee: Long
-  override val assetFee: (AssetId, Long) = (Waves, fee)
+  override val assetFee: (Asset, Long) = (Waves, fee)
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(

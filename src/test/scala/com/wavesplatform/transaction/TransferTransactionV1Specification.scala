@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks

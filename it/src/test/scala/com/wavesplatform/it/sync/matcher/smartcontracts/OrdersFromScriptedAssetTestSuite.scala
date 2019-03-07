@@ -12,7 +12,7 @@ import com.wavesplatform.it.sync.createSignedIssueRequest
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -34,7 +34,7 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
   override protected def nodeConfigs: Seq[Config] = Configs
 
   "can match orders when SmartAccTrading is still not activated" in {
-    val pair = AssetPair(Waves, Asset(AllowAsset.id()))
+    val pair = AssetPair(Waves, IssuedAsset(AllowAsset.id()))
 
     val counter =
       matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 1, fee = smartTradeFee)

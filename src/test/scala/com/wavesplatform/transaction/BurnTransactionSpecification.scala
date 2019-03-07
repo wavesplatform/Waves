@@ -4,7 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{BurnTransaction, BurnTransactionV1, BurnTransactionV2}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -45,7 +45,7 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
     val tx = BurnTransactionV1
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+        IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
         10000000000L,
         100000000L,
         1526287561757L,
@@ -78,7 +78,7 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
       .create(
         'T',
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+        IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
         10000000000L,
         100000000L,
         1526287561757L,

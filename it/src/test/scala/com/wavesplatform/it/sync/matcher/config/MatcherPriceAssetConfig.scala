@@ -8,7 +8,7 @@ import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.AssetPairBuilder
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
@@ -103,38 +103,38 @@ object MatcherPriceAssetConfig {
   val WctId = IssueWctTx.id()
 
   val wctUsdPair = AssetPair(
-    amountAsset = Asset(WctId),
-    priceAsset = Asset(UsdId)
+    amountAsset = IssuedAsset(WctId),
+    priceAsset = IssuedAsset(UsdId)
   )
 
   val wctWavesPair = AssetPair(
-    amountAsset = Asset(WctId),
+    amountAsset = IssuedAsset(WctId),
     priceAsset = Waves
   )
 
   val ethWavesPair = AssetPair(
-    amountAsset = Asset(EthId),
+    amountAsset = IssuedAsset(EthId),
     priceAsset = Waves
   )
 
   val ethBtcPair = AssetPair(
-    amountAsset = Asset(EthId),
-    priceAsset = Asset(BtcId)
+    amountAsset = IssuedAsset(EthId),
+    priceAsset = IssuedAsset(BtcId)
   )
 
   val wavesUsdPair = AssetPair(
     amountAsset = Waves,
-    priceAsset = Asset(UsdId)
+    priceAsset = IssuedAsset(UsdId)
   )
 
   val ethUsdPair = AssetPair(
-    amountAsset = Asset(EthId),
-    priceAsset = Asset(UsdId)
+    amountAsset = IssuedAsset(EthId),
+    priceAsset = IssuedAsset(UsdId)
   )
 
   val wavesBtcPair = AssetPair(
     amountAsset = Waves,
-    priceAsset = Asset(BtcId)
+    priceAsset = IssuedAsset(BtcId)
   )
 
   val orderLimit = 10

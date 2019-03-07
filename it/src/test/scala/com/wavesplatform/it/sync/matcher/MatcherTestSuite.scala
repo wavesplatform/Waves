@@ -9,7 +9,7 @@ import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, _}
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -48,14 +48,14 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
 
     Seq(aliceAsset, bobAsset, bobAsset2).foreach(matcherNode.waitForTransaction(_))
 
-    val aliceWavesPair = AssetPair(Asset(ByteStr.decodeBase58(aliceAsset).get), Waves)
+    val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
 
     val order1         = matcherNode.prepareOrder(aliceAcc, aliceWavesPair, SELL, aliceSellAmount, 2000.waves, version = orderVersion, timeToLive = 2.minutes)
     val order1Response = matcherNode.placeOrder(order1)
 
     // Bob issues new asset
     val bobWavesPair = AssetPair(
-      amountAsset = Asset(ByteStr.decodeBase58(bobAsset2).get),
+      amountAsset = IssuedAsset(ByteStr.decodeBase58(bobAsset2).get),
       priceAsset = Waves
     )
 
@@ -255,7 +255,7 @@ class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
         matcherNode.assertAssetBalance(aliceAcc.address, bobAsset, 0)
         matcherNode.assertAssetBalance(matcherAcc.address, bobAsset, 0)
         matcherNode.assertAssetBalance(bobAcc.address, bobAsset, someAssetAmount)
-        val bobWavesPair = AssetPair(Asset(ByteStr.decodeBase58(bobAsset).get), Waves)
+        val bobWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(bobAsset).get), Waves)
 
         def bobOrder = matcherNode.prepareOrder(bobAcc, bobWavesPair, SELL, someAssetAmount, 0.005.waves, matcherFee, orderVersion)
 

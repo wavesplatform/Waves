@@ -4,7 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._

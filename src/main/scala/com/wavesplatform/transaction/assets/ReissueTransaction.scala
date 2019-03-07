@@ -5,20 +5,20 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.validation._
-import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, _}
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, _}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
-  def asset: Asset
+  def asset: IssuedAsset
   def quantity: Long
   def reissuable: Boolean
   def fee: Long
   def chainByte: Option[Byte]
 
-  override val assetFee: (AssetId, Long) = (Waves, fee)
+  override val assetFee: (Asset, Long) = (Waves, fee)
 
   override final val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
@@ -39,7 +39,7 @@ trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
       Longs.toByteArray(timestamp)
     )
   }
-  override def checkedAssets(): Seq[AssetId] = Seq(asset)
+  override def checkedAssets(): Seq[Asset] = Seq(asset)
 }
 
 object ReissueTransaction {
@@ -52,11 +52,11 @@ object ReissueTransaction {
       .leftMap(_.head)
       .toEither
 
-  def parseBase(bytes: Array[Byte], start: Int): (PublicKeyAccount, Asset, Long, Boolean, Long, Long, Int) = {
+  def parseBase(bytes: Array[Byte], start: Int): (PublicKeyAccount, IssuedAsset, Long, Boolean, Long, Long, Int) = {
     val senderEnd  = start + KeyLength
     val assetIdEnd = senderEnd + AssetIdLength
     val sender     = PublicKeyAccount(bytes.slice(start, senderEnd))
-    val asset      = Asset(ByteStr(bytes.slice(senderEnd, assetIdEnd)))
+    val asset      = IssuedAsset(ByteStr(bytes.slice(senderEnd, assetIdEnd)))
     val quantity   = Longs.fromByteArray(bytes.slice(assetIdEnd, assetIdEnd + 8))
     val reissuable = bytes.slice(assetIdEnd + 8, assetIdEnd + 9).head == (1: Byte)
     val fee        = Longs.fromByteArray(bytes.slice(assetIdEnd + 9, assetIdEnd + 17))

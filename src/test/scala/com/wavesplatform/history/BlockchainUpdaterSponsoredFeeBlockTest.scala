@@ -8,10 +8,10 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{AssetId, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -58,7 +58,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .get
     aliceToBob: TransferTransactionV1 = TransferTransactionV1
       .selfSigned(
-        AssetId.fromCompatId(Some(feeAsset.id())),
+        Asset.fromCompatId(Some(feeAsset.id())),
         alice,
         bob,
         feeAsset.quantity / 2,
@@ -71,12 +71,12 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .get
     bobToMaster: TransferTransactionV1 = TransferTransactionV1
       .selfSigned(
-        AssetId.fromCompatId(Some(feeAsset.id())),
+        Asset.fromCompatId(Some(feeAsset.id())),
         bob,
         master,
         amtTx,
         ts + 3,
-        AssetId.fromCompatId(Some(feeAsset.id())),
+        Asset.fromCompatId(Some(feeAsset.id())),
         sponsorTx.minSponsoredAssetFee.get,
         Array.emptyByteArray
       )
@@ -84,12 +84,12 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .get
     bobToMaster2: TransferTransactionV1 = TransferTransactionV1
       .selfSigned(
-        AssetId.fromCompatId(Some(feeAsset.id())),
+        Asset.fromCompatId(Some(feeAsset.id())),
         bob,
         master,
         amtTx,
         ts + 4,
-        AssetId.fromCompatId(Some(feeAsset.id())),
+        Asset.fromCompatId(Some(feeAsset.id())),
         sponsorTx.minSponsoredAssetFee.get,
         Array.emptyByteArray
       )

@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
 import monix.eval.Task
 import monix.execution.Scheduler

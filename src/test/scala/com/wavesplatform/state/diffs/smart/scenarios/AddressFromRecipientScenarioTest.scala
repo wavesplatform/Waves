@@ -6,7 +6,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
 import com.wavesplatform.state.diffs.smart.predef._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}

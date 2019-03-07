@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import com.wavesplatform.utils.compilerContext

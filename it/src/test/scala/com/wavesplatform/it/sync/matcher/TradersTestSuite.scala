@@ -10,7 +10,7 @@ import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.util.Random
@@ -36,8 +36,8 @@ class TradersTestSuite extends MatcherSuiteBase {
     val bobNewAsset      = bobNode.issue(bobAcc.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, reissuable = false, smartIssueFee, 2).id
     matcherNode.waitForTransaction(bobNewAsset)
 
-    val bobAssetId   = Asset(ByteStr.decodeBase58(bobNewAsset).get)
-    val aliceAssetId = Asset(ByteStr.decodeBase58(aliceAsset).get)
+    val bobAssetId   = IssuedAsset(ByteStr.decodeBase58(bobNewAsset).get)
+    val aliceAssetId = IssuedAsset(ByteStr.decodeBase58(aliceAsset).get)
 
     val bobWavesPair = AssetPair(
       amountAsset = bobAssetId,
@@ -211,7 +211,7 @@ class TradersTestSuite extends MatcherSuiteBase {
   }
 
   def bobPlacesAssetOrder(bobCoinAmount: Int, twoAssetsPair: AssetPair, assetId: String): String = {
-    val decodedAsset = Asset(ByteStr.decodeBase58(assetId).get)
+    val decodedAsset = IssuedAsset(ByteStr.decodeBase58(assetId).get)
     val bobOrder = if (twoAssetsPair.amountAsset == decodedAsset) {
       matcherNode.prepareOrder(bobAcc, twoAssetsPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant, exTxFee, orderVersion)
     } else {

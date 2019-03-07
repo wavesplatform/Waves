@@ -6,12 +6,12 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
+import com.wavesplatform.transaction.{Asset, Transaction, ValidationError}
 
 object EmptyBlockchain extends Blockchain {
   override def height: Int = 0
@@ -60,7 +60,7 @@ object EmptyBlockchain extends Blockchain {
 
   override def containsTransaction(tx: Transaction): Boolean = false
 
-  override def assetDescription(id: Asset): Option[AssetDescription] = None
+  override def assetDescription(id: IssuedAsset): Option[AssetDescription] = None
 
   override def resolveAlias(a: Alias): Either[ValidationError, Address] = Left(GenericError("Empty blockchain"))
 
@@ -75,25 +75,25 @@ object EmptyBlockchain extends Blockchain {
 
   override def hasScript(address: Address): Boolean = false
 
-  override def assetScript(asset: Asset): Option[Script] = None
+  override def assetScript(asset: IssuedAsset): Option[Script] = None
 
-  override def hasAssetScript(asset: Asset): Boolean = false
+  override def hasAssetScript(asset: IssuedAsset): Boolean = false
 
   override def accountData(acc: Address): AccountDataInfo = AccountDataInfo(Map.empty)
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
 
-  override def balance(address: Address, mayBeAssetId: AssetId): Long = 0
+  override def balance(address: Address, mayBeAssetId: Asset): Long = 0
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
-  override def assetDistribution(assetId: Asset): AssetDistribution = Monoid.empty[AssetDistribution]
+  override def assetDistribution(assetId: IssuedAsset): AssetDistribution = Monoid.empty[AssetDistribution]
 
   override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
 
   override def allActiveLeases: Set[LeaseTransaction] = Set.empty
 
-  override def assetDistributionAtHeight(assetId: Asset,
+  override def assetDistributionAtHeight(assetId: IssuedAsset,
                                          height: Int,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] =

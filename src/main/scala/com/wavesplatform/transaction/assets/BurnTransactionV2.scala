@@ -7,13 +7,13 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.transaction._
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import scala.util.{Failure, Success, Try}
 
 final case class BurnTransactionV2 private (chainId: Byte,
                                             sender: PublicKeyAccount,
-                                            asset: Asset,
+                                            asset: IssuedAsset,
                                             quantity: Long,
                                             fee: Long,
                                             timestamp: Long,
@@ -56,7 +56,7 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
 
   def create(chainId: Byte,
              sender: PublicKeyAccount,
-             asset: Asset,
+             asset: IssuedAsset,
              quantity: Long,
              fee: Long,
              timestamp: Long,
@@ -68,7 +68,7 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
 
   def signed(chainId: Byte,
              sender: PublicKeyAccount,
-             asset: Asset,
+             asset: IssuedAsset,
              quantity: Long,
              fee: Long,
              timestamp: Long,
@@ -81,7 +81,7 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
 
   def selfSigned(chainId: Byte,
                  sender: PrivateKeyAccount,
-                 asset: Asset,
+                 asset: IssuedAsset,
                  quantity: Long,
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {

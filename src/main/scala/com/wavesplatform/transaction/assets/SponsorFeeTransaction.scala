@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -14,7 +14,7 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.{Failure, Success, Try}
 
 case class SponsorFeeTransaction private (sender: PublicKeyAccount,
-                                          asset: Asset,
+                                          asset: IssuedAsset,
                                           minSponsoredAssetFee: Option[Long],
                                           fee: Long,
                                           timestamp: Long,
@@ -47,11 +47,11 @@ case class SponsorFeeTransaction private (sender: PublicKeyAccount,
       )
     )
 
-  override val assetFee: (AssetId, Long)  = (Waves, fee)
+  override val assetFee: (Asset, Long)    = (Waves, fee)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte, builder.typeId, version), bodyBytes(), proofs.bytes()))
 
-  override def checkedAssets(): Seq[AssetId] = Seq(asset)
-  override def version: Byte                 = SponsorFeeTransaction.version
+  override def checkedAssets(): Seq[Asset] = Seq(asset)
+  override def version: Byte               = SponsorFeeTransaction.version
 }
 
 object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction] with TransactionParser.MultipleVersions {
@@ -67,7 +67,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
       val bodyVersion = bytes(1)
       require(bodyVersion == version, s"versions are not match ($version, $bodyVersion)")
       val sender      = PublicKeyAccount(bytes.slice(2, KeyLength + 2))
-      val asset       = Asset(ByteStr(bytes.slice(KeyLength + 2, KeyLength + AssetIdLength + 2)))
+      val asset       = IssuedAsset(ByteStr(bytes.slice(KeyLength + 2, KeyLength + AssetIdLength + 2)))
       val minFeeStart = KeyLength + AssetIdLength + 2
 
       val minFee    = Longs.fromByteArray(bytes.slice(minFeeStart, minFeeStart + 8))
@@ -84,7 +84,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
   }
 
   def create(sender: PublicKeyAccount,
-             asset: Asset,
+             asset: IssuedAsset,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
              timestamp: Long,
@@ -99,7 +99,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
   }
 
   def signed(sender: PublicKeyAccount,
-             asset: Asset,
+             asset: IssuedAsset,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
              timestamp: Long,
@@ -110,7 +110,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
   }
 
   def selfSigned(sender: PrivateKeyAccount,
-                 asset: Asset,
+                 asset: IssuedAsset,
                  minSponsoredAssetFee: Option[Long],
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {

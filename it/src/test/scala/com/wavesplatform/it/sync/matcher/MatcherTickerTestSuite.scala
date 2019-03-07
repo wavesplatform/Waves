@@ -10,7 +10,7 @@ import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import org.scalatest._
@@ -215,8 +215,8 @@ object MatcherTickerTestSuite {
     .right
     .get
 
-  val UsdId: Asset             = Asset(IssueUsdTx.id())
-  val EightDigitAssetId: Asset = Asset(IssueEightDigitAssetTx.id())
+  val UsdId: IssuedAsset             = IssuedAsset(IssueUsdTx.id())
+  val EightDigitAssetId: IssuedAsset = IssuedAsset(IssueEightDigitAssetTx.id())
 
   val edUsdPair = AssetPair(
     amountAsset = EightDigitAssetId,

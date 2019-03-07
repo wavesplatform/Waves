@@ -12,12 +12,12 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.{AssetId, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.{NoShrink, TestTime, WithDB}
 import org.scalacheck.Gen
@@ -304,7 +304,7 @@ class OrderValidatorSpecification
   private def mkOrderValidator(bc: Blockchain, tc: ExchangeTransactionCreator) =
     OrderValidator.blockchainAware(bc, tc.createTransaction, (0.003 * Constants.UnitsInWave).toLong, MatcherAccount, ntpTime)(_)
 
-  private def tradableBalance(p: Portfolio)(assetId: AssetId): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
+  private def tradableBalance(p: Portfolio)(assetId: Asset): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
   private def exchangeTransactionCreator(blockchain: Blockchain) =
     new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings)

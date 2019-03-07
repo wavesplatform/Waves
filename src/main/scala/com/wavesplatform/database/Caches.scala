@@ -9,9 +9,9 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{AssetId, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer
 
@@ -19,7 +19,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
-abstract class Caches(spendableBalanceChanged: Observer[(Address, AssetId)]) extends Blockchain with ScorexLogging {
+abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with ScorexLogging {
   import Caches._
 
   protected def maxCacheSize: Int
@@ -138,15 +138,15 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, AssetId)]) ext
     portfolioCache.get(a)
   }
 
-  private val balancesCache: LoadingCache[(Address, AssetId), java.lang.Long] = observedCache(maxCacheSize * 16, spendableBalanceChanged, loadBalance)
-  protected def discardBalance(key: (Address, AssetId)): Unit                 = balancesCache.invalidate(key)
-  override def balance(address: Address, mayBeAssetId: AssetId): Long         = balancesCache.get(address -> mayBeAssetId)
-  protected def loadBalance(req: (Address, AssetId)): Long
+  private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] = observedCache(maxCacheSize * 16, spendableBalanceChanged, loadBalance)
+  protected def discardBalance(key: (Address, Asset)): Unit                 = balancesCache.invalidate(key)
+  override def balance(address: Address, mayBeAssetId: Asset): Long         = balancesCache.get(address -> mayBeAssetId)
+  protected def loadBalance(req: (Address, Asset)): Long
 
-  private val assetDescriptionCache: LoadingCache[Asset, Option[AssetDescription]] = cache(maxCacheSize, loadAssetDescription)
-  protected def loadAssetDescription(asset: Asset): Option[AssetDescription]
-  protected def discardAssetDescription(asset: Asset): Unit             = assetDescriptionCache.invalidate(asset)
-  override def assetDescription(asset: Asset): Option[AssetDescription] = assetDescriptionCache.get(asset)
+  private val assetDescriptionCache: LoadingCache[IssuedAsset, Option[AssetDescription]] = cache(maxCacheSize, loadAssetDescription)
+  protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription]
+  protected def discardAssetDescription(asset: IssuedAsset): Unit             = assetDescriptionCache.invalidate(asset)
+  override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = assetDescriptionCache.get(asset)
 
   private val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(maxCacheSize, loadVolumeAndFee)
   protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee
@@ -162,13 +162,13 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, AssetId)]) ext
   override def hasScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
-  private val assetScriptCache: LoadingCache[Asset, Option[Script]] = cache(maxCacheSize, loadAssetScript)
-  protected def loadAssetScript(asset: Asset): Option[Script]
-  protected def hasAssetScriptBytes(asset: Asset): Boolean
-  protected def discardAssetScript(asset: Asset): Unit = assetScriptCache.invalidate(asset)
+  private val assetScriptCache: LoadingCache[IssuedAsset, Option[Script]] = cache(maxCacheSize, loadAssetScript)
+  protected def loadAssetScript(asset: IssuedAsset): Option[Script]
+  protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean
+  protected def discardAssetScript(asset: IssuedAsset): Unit = assetScriptCache.invalidate(asset)
 
-  override def assetScript(asset: Asset): Option[Script] = assetScriptCache.get(asset)
-  override def hasAssetScript(asset: Asset): Boolean =
+  override def assetScript(asset: IssuedAsset): Option[Script] = assetScriptCache.get(asset)
+  override def hasAssetScript(asset: IssuedAsset): Boolean =
     assetScriptCache.getIfPresent(asset) match {
       case null => hasAssetScriptBytes(asset)
       case x    => x.nonEmpty
@@ -195,17 +195,17 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, AssetId)]) ext
                          carry: Long,
                          newAddresses: Map[Address, BigInt],
                          wavesBalances: Map[BigInt, Long],
-                         assetBalances: Map[BigInt, Map[Asset, Long]],
+                         assetBalances: Map[BigInt, Map[IssuedAsset, Long]],
                          leaseBalances: Map[BigInt, LeaseBalance],
                          addressTransactions: Map[AddressId, List[TransactionId]],
                          leaseStates: Map[ByteStr, Boolean],
-                         reissuedAssets: Map[Asset, AssetInfo],
+                         reissuedAssets: Map[IssuedAsset, AssetInfo],
                          filledQuantity: Map[ByteStr, VolumeAndFee],
                          scripts: Map[BigInt, Option[Script]],
-                         assetScripts: Map[Asset, Option[Script]],
+                         assetScripts: Map[IssuedAsset, Option[Script]],
                          data: Map[BigInt, AccountDataInfo],
                          aliases: Map[Alias, BigInt],
-                         sponsorship: Map[Asset, Sponsorship]): Unit
+                         sponsorship: Map[IssuedAsset, Sponsorship]): Unit
 
   override def append(diff: Diff, carryFee: Long, block: Block): Unit = {
     val newHeight = current._1 + 1
@@ -228,11 +228,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, AssetId)]) ext
     log.trace(s"CACHE lastAddressId = $lastAddressId")
 
     val wavesBalances        = Map.newBuilder[BigInt, Long]
-    val assetBalances        = Map.newBuilder[BigInt, Map[Asset, Long]]
+    val assetBalances        = Map.newBuilder[BigInt, Map[IssuedAsset, Long]]
     val leaseBalances        = Map.newBuilder[BigInt, LeaseBalance]
     val updatedLeaseBalances = Map.newBuilder[Address, LeaseBalance]
     val newPortfolios        = Seq.newBuilder[Address]
-    val newBalances          = Map.newBuilder[(Address, AssetId), java.lang.Long]
+    val newBalances          = Map.newBuilder[(Address, Asset), java.lang.Long]
 
     for ((address, portfolioDiff) <- diff.portfolios) {
       val aid = addressId(address)

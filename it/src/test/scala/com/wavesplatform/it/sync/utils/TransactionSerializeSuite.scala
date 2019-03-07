@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
@@ -102,7 +102,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private val burnV1 = BurnTransactionV1
     .create(
       publicKey,
-      Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+      IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       10000000000L,
       burnFee,
       ts,
@@ -115,7 +115,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       chainId,
       publicKey,
-      Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+      IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       10000000000L,
       burnFee,
       ts,
@@ -257,7 +257,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private val reissueV1 = ReissueTransactionV1
     .create(
       publicKey,
-      Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+      IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       100000000L,
       true,
       1.waves,
@@ -271,7 +271,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       chainId,
       publicKey,
-      Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+      IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       100000000L,
       true,
       1.waves,
@@ -285,7 +285,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       chainId,
       publicKey,
-      Asset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
+      IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
       Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").right.get),
       1.waves,
       ts,
@@ -314,7 +314,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private val sponsor = SponsorFeeTransaction
     .create(
       publicKey,
-      Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+      IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       Some(100000),
       1.waves,
       ts,
@@ -361,7 +361,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
         function = FunctionHeader.User("testfunc"),
         args = List(TRUE)
       ),
-      Some(ContractInvocationTransaction.Payment(7, Asset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
+      Some(ContractInvocationTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
       smartMinFee,
       ts,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))

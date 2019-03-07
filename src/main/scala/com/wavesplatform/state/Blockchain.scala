@@ -5,10 +5,10 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
+import com.wavesplatform.transaction.{Asset, Transaction, ValidationError}
 
 trait Blockchain {
   def height: Int
@@ -50,7 +50,7 @@ trait Blockchain {
 
   def containsTransaction(tx: Transaction): Boolean
 
-  def assetDescription(id: Asset): Option[AssetDescription]
+  def assetDescription(id: IssuedAsset): Option[AssetDescription]
 
   def resolveAlias(a: Alias): Either[ValidationError, Address]
 
@@ -64,18 +64,21 @@ trait Blockchain {
   def accountScript(address: Address): Option[Script]
   def hasScript(address: Address): Boolean
 
-  def assetScript(id: Asset): Option[Script]
-  def hasAssetScript(id: Asset): Boolean
+  def assetScript(id: IssuedAsset): Option[Script]
+  def hasAssetScript(id: IssuedAsset): Boolean
 
   def accountData(acc: Address): AccountDataInfo
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
 
   def leaseBalance(address: Address): LeaseBalance
 
-  def balance(address: Address, mayBeAssetId: AssetId): Long
+  def balance(address: Address, mayBeAssetId: Asset = Waves): Long
 
-  def assetDistribution(asset: Asset): AssetDistribution
-  def assetDistributionAtHeight(asset: Asset, height: Int, count: Int, fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage]
+  def assetDistribution(asset: IssuedAsset): AssetDistribution
+  def assetDistributionAtHeight(asset: IssuedAsset,
+                                height: Int,
+                                count: Int,
+                                fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage]
   def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]]
 
   // the following methods are used exclusively by patches

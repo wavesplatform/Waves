@@ -3,7 +3,7 @@ package com.wavesplatform.api.http.assets
 import cats.implicits._
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
@@ -40,7 +40,7 @@ case class SignedSetAssetScriptRequest(@ApiModelProperty(value = "Base58 encoded
   def toTx: Either[ValidationError, SetAssetScriptTransaction] =
     for {
       _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _asset  <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength).map(Asset)
+      _asset  <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength).map(IssuedAsset)
       _script <- script match {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))

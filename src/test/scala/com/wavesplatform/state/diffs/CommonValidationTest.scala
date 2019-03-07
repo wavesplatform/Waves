@@ -8,7 +8,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -121,7 +121,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
       val transferAssetTx = TransferTransactionV1
         .selfSigned(
-          Asset(issueTx.id()),
+          IssuedAsset(issueTx.id()),
           richAcc,
           recipientAcc,
           100,
@@ -136,7 +136,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         if (sponsorship)
           Seq(
             SponsorFeeTransaction
-              .selfSigned(richAcc, Asset(issueTx.id()), Some(10), if (smartToken) {
+              .selfSigned(richAcc, IssuedAsset(issueTx.id()), Some(10), if (smartToken) {
                 Constants.UnitsInWave + ScriptExtraFee
               } else {
                 Constants.UnitsInWave
@@ -161,12 +161,12 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
       val transferBackTx = TransferTransactionV1
         .selfSigned(
-          Asset(issueTx.id()),
+          IssuedAsset(issueTx.id()),
           recipientAcc,
           richAcc,
           1,
           ts,
-          if (feeInAssets) Asset(issueTx.id()) else Waves,
+          if (feeInAssets) IssuedAsset(issueTx.id()) else Waves,
           feeAmount,
           Array.emptyByteArray
         )

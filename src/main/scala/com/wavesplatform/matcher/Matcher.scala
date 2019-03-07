@@ -22,7 +22,7 @@ import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, VolumeAndFee}
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, Time, forceStopApplication}
 import com.wavesplatform.utx.UtxPool
@@ -40,7 +40,7 @@ class Matcher(actorSystem: ActorSystem,
               utx: UtxPool,
               allChannels: ChannelGroup,
               blockchain: Blockchain,
-              spendableBalanceChanged: Observable[(Address, AssetId)],
+              spendableBalanceChanged: Observable[(Address, Asset)],
               settings: WavesSettings,
               matcherPrivateKey: PrivateKeyAccount)
     extends ScorexLogging {
@@ -294,7 +294,7 @@ object Matcher extends ScorexLogging {
             utx: UtxPool,
             allChannels: ChannelGroup,
             blockchain: Blockchain,
-            spendableBalanceChanged: Observable[(Address, AssetId)],
+            spendableBalanceChanged: Observable[(Address, Asset)],
             settings: WavesSettings): Option[Matcher] =
     try {
       val privateKey = (for {

@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, toJson}
@@ -19,7 +19,7 @@ import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scala.annotation.meta.field
 import scala.util.{Either, Failure, Success, Try}
 
-case class MassTransferTransaction private (assetId: AssetId,
+case class MassTransferTransaction private (assetId: Asset,
                                             sender: PublicKeyAccount,
                                             transfers: List[ParsedTransfer],
                                             timestamp: Long,
@@ -52,7 +52,7 @@ case class MassTransferTransaction private (assetId: AssetId,
   }
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), proofs.bytes()))
 
-  override val assetFee: (AssetId, Long) = (Waves, fee)
+  override val assetFee: (Asset, Long) = (Waves, fee)
 
   override def jsonBase(): JsObject = {
     super.jsonBase() ++ Json.obj(
@@ -71,8 +71,8 @@ case class MassTransferTransaction private (assetId: AssetId,
   def compactJson(recipients: Set[AddressOrAlias]): JsObject =
     jsonBase() ++ Json.obj("transfers" -> toJson(transfers.filter(t => recipients.contains(t.address))))
 
-  override def checkedAssets(): Seq[AssetId] = Seq(assetId)
-  override def version: Byte                 = MassTransferTransaction.version
+  override def checkedAssets(): Seq[Asset] = Seq(assetId)
+  override def version: Byte               = MassTransferTransaction.version
 }
 
 object MassTransferTransaction extends TransactionParserFor[MassTransferTransaction] with TransactionParser.OneVersion {
@@ -98,7 +98,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
 
       val assetId =
         assetIdOpt
-          .map(id => Asset(ByteStr(id)))
+          .map(id => IssuedAsset(ByteStr(id)))
           .getOrElse(Waves)
 
       def readTransfer(offset: Int): (Validation[ParsedTransfer], Int) = {
@@ -126,7 +126,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     }.flatten
   }
 
-  def create(assetId: AssetId,
+  def create(assetId: Asset,
              sender: PublicKeyAccount,
              transfers: List[ParsedTransfer],
              timestamp: Long,
@@ -152,7 +152,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     )
   }
 
-  def signed(assetId: AssetId,
+  def signed(assetId: Asset,
              sender: PublicKeyAccount,
              transfers: List[ParsedTransfer],
              timestamp: Long,
@@ -164,7 +164,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     }
   }
 
-  def selfSigned(assetId: AssetId,
+  def selfSigned(assetId: Asset,
                  sender: PrivateKeyAccount,
                  transfers: List[ParsedTransfer],
                  timestamp: Long,

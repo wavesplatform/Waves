@@ -13,7 +13,7 @@ import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{Height, TxNum}
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.UncaughtExceptionReporter
@@ -190,7 +190,7 @@ object Explorer extends ScorexLogging {
           val secondaryId = args(3)
 
           val address   = Address.fromString(args(2)).explicitGet()
-          val asset     = Asset(ByteStr.decodeBase58(secondaryId).get)
+          val asset     = IssuedAsset(ByteStr.decodeBase58(secondaryId).get)
           val ai        = Keys.addressId(address)
           val addressId = ai.parse(db.get(ai.keyBytes)).get
           log.info(s"Address ID = $addressId")

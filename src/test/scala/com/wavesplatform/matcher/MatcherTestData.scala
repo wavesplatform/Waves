@@ -11,7 +11,7 @@ import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.settings.loadConfig
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.{Arbitrary, Gen}
@@ -33,19 +33,19 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def wrap(n: Long, x: Order): QueueEventWithMeta                  = wrap(n, QueueEvent.Placed(x))
   private def wrap(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
 
-  def assetIdGen(prefix: Byte): Gen[Asset] =
+  def assetIdGen(prefix: Byte): Gen[IssuedAsset] =
     Gen
       .listOfN(signatureSize - 1, Arbitrary.arbitrary[Byte])
-      .map(xs => Asset(ByteStr(Array(prefix, xs: _*))))
+      .map(xs => IssuedAsset(ByteStr(Array(prefix, xs: _*))))
 
   val distinctPairGen: Gen[AssetPair] = for {
     a1 <- assetIdGen(1.toByte)
     a2 <- assetIdGen(2.toByte)
   } yield AssetPair(a1, a2)
 
-  protected def mkAssetId(prefix: String): Asset = {
+  protected def mkAssetId(prefix: String): IssuedAsset = {
     val prefixBytes = prefix.getBytes(Charsets.UTF_8)
-    Asset(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
+    IssuedAsset(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
   }
 
   val assetPairGen = Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, Waves))), (1, assetIdGen(2).map(AssetPair(Waves, _))))

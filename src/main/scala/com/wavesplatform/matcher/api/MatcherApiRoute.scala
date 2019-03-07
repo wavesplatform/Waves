@@ -21,7 +21,7 @@ import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.matcher.{AddressActor, AssetPairBuilder, Matcher}
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -438,7 +438,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def tradableBalance: Route = (path("orderbook" / AssetPairPM / "tradableBalance" / AddressPM) & get) { (pair, address) =>
     withAssetPair(pair, redirectToInverse = true, s"/tradableBalance/$address") { pair =>
       complete {
-        askAddressActor[Map[AssetId, Long]](address, AddressActor.GetTradableBalance(pair))
+        askAddressActor[Map[Asset, Long]](address, AddressActor.GetTradableBalance(pair))
           .map(stringifyAssetIds)
       }
     }
@@ -459,7 +459,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def reservedBalance: Route = (path("balance" / "reserved" / PublicKeyPM) & get) { publicKey =>
     signedGet(publicKey) {
       complete {
-        askAddressActor[Map[AssetId, Long]](publicKey, AddressActor.GetReservedBalance)
+        askAddressActor[Map[Asset, Long]](publicKey, AddressActor.GetReservedBalance)
           .map(stringifyAssetIds)
       }
     }
@@ -547,6 +547,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 object MatcherApiRoute {
   private implicit val timeout: Timeout = 5.seconds
 
-  private def stringifyAssetIds(balances: Map[AssetId, Long]): Map[String, Long] =
+  private def stringifyAssetIds(balances: Map[Asset, Long]): Map[String, Long] =
     balances.map { case (aid, v) => AssetPair.assetIdStr(aid) -> v }
 }

@@ -19,14 +19,14 @@ import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{AssetId, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Implicits.SubjectOps
 import com.wavesplatform.utils.Time
 import monix.reactive.subjects.Subject
@@ -39,7 +39,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scala.concurrent.duration._
 
 private object UtxPoolSpecification {
-  private val ignoreSpendableBalanceChanged = Subject.empty[(Address, AssetId)]
+  private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
 
   final case class TempDB(fs: FunctionalitySettings) {
     val path   = Files.createTempDirectory("leveldb-test")

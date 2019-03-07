@@ -4,8 +4,8 @@ import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.{Assertions, Matchers, PropSpec}
 
@@ -55,7 +55,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           100000,
           2,
-          AssetId.fromCompatId(Some(ByteStr.empty)),
+          Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
           Array.empty
         )
@@ -68,7 +68,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           100000,
           1,
-          AssetId.fromCompatId(Some(ByteStr.empty)),
+          Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
           Array.empty
         )
@@ -123,7 +123,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           100000,
           1,
-          AssetId.fromCompatId(Some(ByteStr.empty)),
+          Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
           Array.empty
         )
@@ -136,7 +136,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           100000,
           2,
-          AssetId.fromCompatId(Some(ByteStr.empty)),
+          Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
           Array.empty
         )

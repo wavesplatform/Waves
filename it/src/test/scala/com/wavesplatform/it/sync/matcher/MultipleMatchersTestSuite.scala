@@ -8,7 +8,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.{MatcherCommand, MatcherState, MatcherSuiteBase}
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalacheck.Gen
 

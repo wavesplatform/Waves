@@ -11,7 +11,7 @@ import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Implicits.SubjectOps
 import monix.reactive.subjects.Subject
 import org.iq80.leveldb.{DB, Options}
@@ -92,7 +92,7 @@ object LevelDBWriterBenchmark {
       LevelDBFactory.factory.open(dir, new Options)
     }
 
-    private val ignoreSpendableBalanceChanged = Subject.empty[(Address, AssetId)]
+    private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
 
     val db =
       new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000)

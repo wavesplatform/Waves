@@ -8,12 +8,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, OrderV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.transaction.{AssetId, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction}
 
 import scala.concurrent.duration._
 
@@ -52,7 +52,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[Privat
       val buyer           = randomFrom(accounts).get
       val asset           = randomFrom(settings.assets.toSeq)
       val tradeAssetIssue = ByteStr.decodeBase58(asset.get).toOption
-      val pair            = AssetPair(Waves, AssetId.fromCompatId(tradeAssetIssue))
+      val pair            = AssetPair(Waves, Asset.fromCompatId(tradeAssetIssue))
       val sellOrder       = OrderV2.sell(seller, matcher, pair, 100000000L, 1, ts, ts + 30.days.toMillis, 0.003.waves)
       val buyOrder        = OrderV2.buy(buyer, matcher, pair, 100000000L, 1, ts, ts + 1.day.toMillis, 0.003.waves)
 

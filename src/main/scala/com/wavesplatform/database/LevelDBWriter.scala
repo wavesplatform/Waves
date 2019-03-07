@@ -15,7 +15,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Transaction.Type
 import com.wavesplatform.transaction.ValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction._
@@ -71,7 +71,7 @@ object LevelDBWriter {
 }
 
 class LevelDBWriter(writableDB: DB,
-                    spendableBalanceChanged: Observer[(Address, AssetId)],
+                    spendableBalanceChanged: Observer[(Address, Asset)],
                     fs: FunctionalitySettings,
                     val maxCacheSize: Int,
                     val maxRollbackDepth: Int,
@@ -114,11 +114,11 @@ class LevelDBWriter(writableDB: DB,
     }
   }
 
-  override protected def loadAssetScript(asset: Asset): Option[Script] = readOnly { db =>
+  override protected def loadAssetScript(asset: IssuedAsset): Option[Script] = readOnly { db =>
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
   }
 
-  override protected def hasAssetScriptBytes(asset: Asset): Boolean = readOnly { db =>
+  override protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean = readOnly { db =>
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScriptPresent(asset)).flatten.nonEmpty
   }
 
@@ -140,11 +140,11 @@ class LevelDBWriter(writableDB: DB,
     }
   }
 
-  protected override def loadBalance(req: (Address, AssetId)): Long = readOnly { db =>
+  protected override def loadBalance(req: (Address, Asset)): Long = readOnly { db =>
     addressId(req._1).fold(0L) { addressId =>
       req._2 match {
-        case asset @ Asset(_) => db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)
-        case Waves            => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
+        case asset @ IssuedAsset(_) => db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)
+        case Waves                  => db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L)
       }
     }
   }
@@ -174,7 +174,7 @@ class LevelDBWriter(writableDB: DB,
     addressId(address).fold(Portfolio.empty)(loadPortfolio(db, _))
   }
 
-  override protected def loadAssetDescription(asset: Asset): Option[AssetDescription] = readOnly { db =>
+  override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
     transactionInfo(asset.id, db) match {
       case Some((_, i: IssueTransaction)) =>
         val ai          = db.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).getOrElse(AssetInfo(i.reissuable, i.quantity))
@@ -211,17 +211,17 @@ class LevelDBWriter(writableDB: DB,
                                   carry: Long,
                                   newAddresses: Map[Address, BigInt],
                                   wavesBalances: Map[BigInt, Long],
-                                  assetBalances: Map[BigInt, Map[Asset, Long]],
+                                  assetBalances: Map[BigInt, Map[IssuedAsset, Long]],
                                   leaseBalances: Map[BigInt, LeaseBalance],
                                   addressTransactions: Map[AddressId, List[TransactionId]],
                                   leaseStates: Map[ByteStr, Boolean],
-                                  reissuedAssets: Map[Asset, AssetInfo],
+                                  reissuedAssets: Map[IssuedAsset, AssetInfo],
                                   filledQuantity: Map[ByteStr, VolumeAndFee],
                                   scripts: Map[BigInt, Option[Script]],
-                                  assetScripts: Map[Asset, Option[Script]],
+                                  assetScripts: Map[IssuedAsset, Option[Script]],
                                   data: Map[BigInt, AccountDataInfo],
                                   aliases: Map[Alias, BigInt],
-                                  sponsorship: Map[Asset, Sponsorship]): Unit = readWrite { rw =>
+                                  sponsorship: Map[IssuedAsset, Sponsorship]): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -283,7 +283,7 @@ class LevelDBWriter(writableDB: DB,
       expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
     }
 
-    val newAddressesForAsset = mutable.AnyRefMap.empty[Asset, Set[BigInt]]
+    val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[BigInt]]
     for ((addressId, assets) <- assetBalances) {
       val prevAssets = rw.get(Keys.assetList(addressId))
       val newAssets  = assets.keySet.diff(prevAssets)
@@ -416,12 +416,12 @@ class LevelDBWriter(writableDB: DB,
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
       val discardedBlocks: Seq[Block] = for (currentHeight <- height until targetHeight by -1) yield {
-        val balancesToInvalidate   = Seq.newBuilder[(Address, AssetId)]
+        val balancesToInvalidate   = Seq.newBuilder[(Address, Asset)]
         val portfoliosToInvalidate = Seq.newBuilder[Address]
-        val assetInfoToInvalidate  = Seq.newBuilder[Asset]
+        val assetInfoToInvalidate  = Seq.newBuilder[IssuedAsset]
         val ordersToInvalidate     = Seq.newBuilder[ByteStr]
         val scriptsToDiscard       = Seq.newBuilder[Address]
-        val assetScriptsToDiscard  = Seq.newBuilder[Asset]
+        val assetScriptsToDiscard  = Seq.newBuilder[IssuedAsset]
 
         val h = Height(currentHeight)
 
@@ -486,7 +486,7 @@ class LevelDBWriter(writableDB: DB,
                 // balances already restored
 
                 case tx: IssueTransaction =>
-                  assetInfoToInvalidate += rollbackAssetInfo(rw, Asset(tx.id()), currentHeight)
+                  assetInfoToInvalidate += rollbackAssetInfo(rw, IssuedAsset(tx.id()), currentHeight)
                 case tx: ReissueTransaction =>
                   assetInfoToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
                 case tx: BurnTransaction =>
@@ -559,7 +559,7 @@ class LevelDBWriter(writableDB: DB,
     }
   }
 
-  private def rollbackAssetInfo(rw: RW, asset: Asset, currentHeight: Int): Asset = {
+  private def rollbackAssetInfo(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
     rw.delete(Keys.assetInfo(asset)(currentHeight))
     rw.filterHistory(Keys.assetInfoHistory(asset), currentHeight)
     asset
@@ -576,7 +576,7 @@ class LevelDBWriter(writableDB: DB,
     rw.filterHistory(Keys.leaseStatusHistory(leaseId), currentHeight)
   }
 
-  private def rollbackSponsorship(rw: RW, asset: Asset, currentHeight: Int): Asset = {
+  private def rollbackSponsorship(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
     rw.delete(Keys.sponsorship(asset)(currentHeight))
     rw.filterHistory(Keys.sponsorshipHistory(asset), currentHeight)
     asset
@@ -885,7 +885,7 @@ class LevelDBWriter(writableDB: DB,
       .mapValues(_.size)
   }
 
-  override def assetDistribution(asset: Asset): AssetDistribution = readOnly { db =>
+  override def assetDistribution(asset: IssuedAsset): AssetDistribution = readOnly { db =>
     val dst = (for {
       seqNr     <- (1 to db.get(Keys.addressesForAssetSeqNr(asset))).par
       addressId <- db.get(Keys.addressesForAsset(asset, seqNr)).par
@@ -900,7 +900,7 @@ class LevelDBWriter(writableDB: DB,
     AssetDistribution(dst)
   }
 
-  override def assetDistributionAtHeight(asset: Asset,
+  override def assetDistributionAtHeight(asset: IssuedAsset,
                                          height: Int,
                                          count: Int,
                                          fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = readOnly { db =>

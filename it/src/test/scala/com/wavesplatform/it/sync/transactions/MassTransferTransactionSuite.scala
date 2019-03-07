@@ -7,7 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, Transfer}
 import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import com.wavesplatform.transaction.transfer._

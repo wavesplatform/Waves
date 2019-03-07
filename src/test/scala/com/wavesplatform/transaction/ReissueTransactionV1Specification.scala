@@ -4,7 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{ReissueTransaction, ReissueTransactionV1}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -47,7 +47,7 @@ class ReissueTransactionV1Specification extends PropSpec with PropertyChecks wit
     val tx = ReissueTransactionV1
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+        IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
         100000000L,
         true,
         100000000L,

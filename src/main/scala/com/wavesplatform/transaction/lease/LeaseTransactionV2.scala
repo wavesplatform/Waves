@@ -5,7 +5,7 @@ import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
 
@@ -18,7 +18,7 @@ case class LeaseTransactionV2 private (sender: PublicKeyAccount, amount: Long, f
   override val builder: TransactionParser = LeaseTransactionV2
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    val assetId: AssetId = Waves // placeholder for future enhancement
+    val assetId: Asset = Waves // placeholder for future enhancement
     Bytes.concat(Array(builder.typeId, version), assetId.byteRepr, bytesBase())
   }
 

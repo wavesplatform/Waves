@@ -4,8 +4,8 @@ import com.google.common.base.Charsets.UTF_8
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics._
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import kamon.Kamon
 
@@ -30,16 +30,16 @@ class AssetPairBuilder(settings: MatcherSettings, blockchain: Blockchain) {
       case (Some(pi), Some(ai)) => pi < ai
     }
 
-  private def isNotBlacklisted(asset: Asset): Boolean = blockchain.assetDescription(asset).exists { d =>
+  private def isNotBlacklisted(asset: IssuedAsset): Boolean = blockchain.assetDescription(asset).exists { d =>
     settings.blacklistedNames.forall(_.findFirstIn(new String(d.name, UTF_8)).isEmpty)
   }
 
-  private def validateAssetId(assetId: AssetId): Either[String, AssetId] = {
+  private def validateAssetId(assetId: Asset): Either[String, Asset] = {
     val strName = assetId.maybeBase58Repr.getOrElse(AssetPair.WavesName)
 
     assetId match {
       case Waves => Right(Waves)
-      case asset @ Asset(_) =>
+      case asset @ IssuedAsset(_) =>
         val ok = isNotBlacklisted(asset) && !blacklistedAssetIds(strName)
         cond(ok, assetId, errorMsg(strName))
     }

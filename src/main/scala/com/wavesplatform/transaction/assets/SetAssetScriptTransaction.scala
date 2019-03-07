@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
@@ -18,7 +18,7 @@ import scala.util.{Failure, Success, Try}
 
 case class SetAssetScriptTransaction private (chainId: Byte,
                                               sender: PublicKeyAccount,
-                                              asset: Asset,
+                                              asset: IssuedAsset,
                                               script: Option[Script],
                                               fee: Long,
                                               timestamp: Long,
@@ -28,7 +28,7 @@ case class SetAssetScriptTransaction private (chainId: Byte,
     with ChainSpecific {
 
   override val builder: TransactionParser = SetAssetScriptTransaction
-  override val assetFee: (AssetId, Long)  = (Waves, fee)
+  override val assetFee: (Asset, Long)    = (Waves, fee)
 
   override final val json: Coeval[JsObject] =
     Coeval.evalOnce(
@@ -54,8 +54,8 @@ case class SetAssetScriptTransaction private (chainId: Byte,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override def checkedAssets(): Seq[AssetId] = Seq(asset)
-  override def version: Byte                 = 1
+  override def checkedAssets(): Seq[Asset] = Seq(asset)
+  override def version: Byte               = 1
 }
 
 object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTransaction] with TransactionParser.MultipleVersions {
@@ -67,7 +67,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
 
   def create(chainId: Byte,
              sender: PublicKeyAccount,
-             assetId: Asset,
+             assetId: IssuedAsset,
              script: Option[Script],
              fee: Long,
              timestamp: Long,
@@ -86,7 +86,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
 
   def signed(chainId: Byte,
              sender: PublicKeyAccount,
-             asset: Asset,
+             asset: IssuedAsset,
              script: Option[Script],
              fee: Long,
              timestamp: Long,
@@ -115,7 +115,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
       val makeTransaction = for {
         chainId   <- readByte
         sender    <- read(PublicKeyAccount.apply, KeyLength)
-        asset     <- read(ByteStr.apply, AssetIdLength).map(Asset)
+        asset     <- read(ByteStr.apply, AssetIdLength).map(IssuedAsset)
         fee       <- read(Longs.fromByteArray _, 8)
         timestamp <- read(Longs.fromByteArray _, 8)
         scriptOrE <- readUnsized((b: Array[Byte], p: Int) => Deser.parseOption(b, p)(ScriptReader.fromBytes))

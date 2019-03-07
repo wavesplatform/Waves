@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
 
@@ -109,12 +109,12 @@ object OrderV2 {
       matcher <- read(PublicKeyAccount.apply, KeyLength)
       amountAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
         .map {
-          case Some(arr) => Asset(ByteStr(arr))
+          case Some(arr) => IssuedAsset(ByteStr(arr))
           case None      => Waves
         }
       priceAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
         .map {
-          case Some(arr) => Asset(ByteStr(arr))
+          case Some(arr) => IssuedAsset(ByteStr(arr))
           case None      => Waves
         }
       orderType   <- readByte

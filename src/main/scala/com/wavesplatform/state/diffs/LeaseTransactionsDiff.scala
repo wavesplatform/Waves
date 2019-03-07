@@ -5,7 +5,7 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.lease._

@@ -6,7 +6,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.smartcontract.exchangeTx
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.json.{JsNumber, JsString, Json}
@@ -146,12 +146,12 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     nodes.waitForHeightAriseAndTxPresent(assetId.base58)
 
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
-           (1: Byte, 3: Byte, Waves, Asset(assetId)),
+           (1: Byte, 3: Byte, Waves, IssuedAsset(assetId)),
            (1: Byte, 3: Byte, Waves, Waves),
-           (2: Byte, 3: Byte, Waves, Asset(assetId)),
-           (3: Byte, 1: Byte, Asset(assetId), Waves),
+           (2: Byte, 3: Byte, Waves, IssuedAsset(assetId)),
+           (3: Byte, 1: Byte, IssuedAsset(assetId), Waves),
            (2: Byte, 3: Byte, Waves, Waves),
-           (3: Byte, 2: Byte, Asset(assetId), Waves)
+           (3: Byte, 2: Byte, IssuedAsset(assetId), Waves)
          )) {
 
       val matcher                  = pkByAddress(thirdAddress)
@@ -159,7 +159,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val expirationTimestamp      = ts + Order.MaxLiveTime
       var assetBalanceBefore: Long = 0l
 
-      if (matcherFeeOrder1.isWaves && matcherFeeOrder2.isAsset) {
+      if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
         assetBalanceBefore = sender.assetBalance(secondAddress, assetId.base58).balance
         sender.transfer(buyer.address, seller.address, 100000, minFee, Some(assetId.base58), waitForTx = true)
       }
@@ -193,7 +193,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
       nodes.waitForHeightAriseAndTxPresent(tx.id().base58)
 
-      if (matcherFeeOrder1.isWaves && matcherFeeOrder2.isAsset) {
+      if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
         sender.assetBalance(secondAddress, assetId.base58).balance shouldBe assetBalanceBefore
       }
     }

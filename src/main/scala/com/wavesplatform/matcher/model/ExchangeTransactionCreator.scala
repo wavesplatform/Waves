@@ -7,9 +7,9 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.{AssetId, ValidationError}
+import com.wavesplatform.transaction.{Asset, ValidationError}
 
 class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: PrivateKeyAccount, settings: MatcherSettings) {
   private def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
@@ -52,10 +52,10 @@ object ExchangeTransactionCreator {
     * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
   def minFee(blockchain: Blockchain, orderMatchTxFee: Long, matcherAddress: Address, assetPair: AssetPair): Long = {
-    def assetFee(assetId: AssetId): Long = {
+    def assetFee(assetId: Asset): Long = {
       assetId match {
         case Waves => 0L
-        case asset @ Asset(_) =>
+        case asset @ IssuedAsset(_) =>
           if (blockchain.hasAssetScript(asset)) CommonValidation.ScriptExtraFee
           else 0L
       }

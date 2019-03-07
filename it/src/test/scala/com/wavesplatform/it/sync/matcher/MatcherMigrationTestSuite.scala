@@ -7,7 +7,7 @@ import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 import scala.concurrent.duration._
@@ -34,7 +34,7 @@ class MatcherMigrationTestSuite extends MatcherSuiteBase {
     val t1           = aliceNode.transfer(aliceAcc.address, matcherAcc.address, aliceBalance - minFee - 250000, minFee, None, None, 2).id
     nodes.waitForHeightAriseAndTxPresent(t1)
 
-    val aliceWavesPair = AssetPair(Asset(ByteStr.decodeBase58(aliceAsset).get), Waves)
+    val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
 
     "place order and run migration tool" in {
       // Alice places sell order

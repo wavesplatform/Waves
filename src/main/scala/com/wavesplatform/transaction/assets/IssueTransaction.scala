@@ -7,10 +7,10 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.validation._
-import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -23,8 +23,8 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   def fee: Long
   def script: Option[Script]
 
-  final lazy val assetId                       = id
-  override final val assetFee: (AssetId, Long) = (Waves, fee)
+  final lazy val assetId                     = id
+  override final val assetFee: (Asset, Long) = (Waves, fee)
 
   val issueJson: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(

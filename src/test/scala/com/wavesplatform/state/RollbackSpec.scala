@@ -11,7 +11,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
@@ -202,8 +202,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val blockIdWithIssue = d.lastBlockId
 
-          d.portfolio(sender).assets.get(Asset(issueTransaction.id())) should contain(assetAmount)
-          d.portfolio(recipient).assets.get(Asset(issueTransaction.id())) shouldBe 'empty
+          d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(assetAmount)
+          d.portfolio(recipient).assets.get(IssuedAsset(issueTransaction.id())) shouldBe 'empty
 
           d.appendBlock(
             TestBlock.create(
@@ -211,17 +211,17 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               d.lastBlockId,
               Seq(
                 TransferTransactionV1
-                  .selfSigned(Asset(issueTransaction.id()), sender, recipient, assetAmount, nextTs, Waves, 1, Array.empty[Byte])
+                  .selfSigned(IssuedAsset(issueTransaction.id()), sender, recipient, assetAmount, nextTs, Waves, 1, Array.empty[Byte])
                   .explicitGet())
             ))
 
-          d.portfolio(sender).assets.getOrElse(Asset(issueTransaction.id()), 0) shouldEqual 0
-          d.portfolio(recipient).assets.getOrElse(Asset(issueTransaction.id()), 0) shouldEqual assetAmount
+          d.portfolio(sender).assets.getOrElse(IssuedAsset(issueTransaction.id()), 0) shouldEqual 0
+          d.portfolio(recipient).assets.getOrElse(IssuedAsset(issueTransaction.id()), 0) shouldEqual assetAmount
 
           d.removeAfter(blockIdWithIssue)
 
-          d.portfolio(sender).assets.getOrElse(Asset(issueTransaction.id()), 0) shouldEqual assetAmount
-          d.portfolio(recipient).assets.getOrElse(Asset(issueTransaction.id()), 0) shouldEqual 0
+          d.portfolio(sender).assets.getOrElse(IssuedAsset(issueTransaction.id()), 0) shouldEqual assetAmount
+          d.portfolio(recipient).assets.getOrElse(IssuedAsset(issueTransaction.id()), 0) shouldEqual 0
         }
     }
 
@@ -232,7 +232,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val genesisBlockId = d.lastBlockId
 
           val issueTransaction = IssueTransactionV1.selfSigned(sender, name, description, 2000, 8, true, 1, nextTs).explicitGet()
-          d.blockchainUpdater.assetDescription(Asset(issueTransaction.id())) shouldBe 'empty
+          d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
 
           d.appendBlock(
             TestBlock.create(
@@ -243,25 +243,25 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val blockIdWithIssue = d.lastBlockId
 
-          d.blockchainUpdater.assetDescription(Asset(issueTransaction.id())) should contain(
+          d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
             AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0))
 
           d.appendBlock(
             TestBlock.create(nextTs,
                              blockIdWithIssue,
                              Seq(
-                               ReissueTransactionV1.selfSigned(sender, Asset(issueTransaction.id()), 2000, false, 1, nextTs).explicitGet()
+                               ReissueTransactionV1.selfSigned(sender, IssuedAsset(issueTransaction.id()), 2000, false, 1, nextTs).explicitGet()
                              )))
 
-          d.blockchainUpdater.assetDescription(Asset(issueTransaction.id())) should contain(
+          d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
             AssetDescription(sender, name, description, 8, false, BigInt(4000), None, 0))
 
           d.removeAfter(blockIdWithIssue)
-          d.blockchainUpdater.assetDescription(Asset(issueTransaction.id())) should contain(
+          d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
             AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0))
 
           d.removeAfter(genesisBlockId)
-          d.blockchainUpdater.assetDescription(Asset(issueTransaction.id())) shouldBe 'empty
+          d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
         }
     }
 
@@ -383,7 +383,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val blockIdWithSponsor = d.lastBlockId
 
           d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
-          d.portfolio(sender).assets.get(Asset(issueTransaction.id())) should contain(issueTransaction.quantity)
+          d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(issueTransaction.quantity)
 
           d.appendBlock(
             TestBlock.create(
@@ -397,7 +397,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.removeAfter(blockIdWithSponsor)
 
           d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
-          d.portfolio(sender).assets.get(Asset(issueTransaction.id())) should contain(issueTransaction.quantity)
+          d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(issueTransaction.quantity)
 
           d.appendBlock(
             TestBlock.create(
@@ -406,7 +406,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               Seq(sponsor2)
             ))
 
-          d.portfolio(sender).assets.get(Asset(issueTransaction.id())) should contain(issueTransaction.quantity)
+          d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(issueTransaction.quantity)
           d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor2.minSponsoredAssetFee.get
 
           d.removeAfter(blockIdWithIssue)

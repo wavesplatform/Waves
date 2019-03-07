@@ -14,7 +14,7 @@ import com.wavesplatform.dexgen.utils.{ApiRequests, GenOrderType}
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.network.client.NetworkSender
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -75,7 +75,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
   val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
   AddressScheme.current = new AddressScheme { override val chainId: Byte = defaultConfig.chainId.head.toByte }
 
-  def issueAssets(endpoint: String, richAddressSeed: String, n: Int)(implicit tag: String): Seq[AssetId] = {
+  def issueAssets(endpoint: String, richAddressSeed: String, n: Int)(implicit tag: String): Seq[Asset] = {
     val node = api.to(endpoint)
 
     val now = System.currentTimeMillis()
@@ -96,7 +96,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
         .explicitGet()
     }
 
-    val tradingAssets: Seq[AssetId]                    = assetsTx.map(tx => tx.id())
+    val tradingAssets: Seq[Asset]                    = assetsTx.map(tx => tx.id())
     val signedIssueRequests: Seq[SignedIssueV2Request] = assetsTx.map(tx => api.createSignedIssueRequest(tx))
 
     val issued: Seq[Future[Transaction]] = signedIssueRequests
@@ -119,7 +119,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
     assetsTransfers.toList
   }
 
-  def massTransfer(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount], tradingAssets: Seq[Option[AssetId]])(
+  def massTransfer(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount], tradingAssets: Seq[Option[Asset]])(
       implicit tag: String): Future[Seq[Transaction]] = {
     val node          = api.to(endpoint)
     val richAccountPk = PrivateKeyAccount.fromSeed(richAccountSeed).right.get

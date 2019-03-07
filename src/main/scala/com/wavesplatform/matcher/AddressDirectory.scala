@@ -4,16 +4,14 @@ import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.model.Events
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.collection.mutable
 
-class AddressDirectory(spendableBalanceChanged: Observable[(Address, Option[AssetId])],
-                       settings: MatcherSettings,
-                       addressActorProps: Address => Props)
+class AddressDirectory(spendableBalanceChanged: Observable[(Address, Asset)], settings: MatcherSettings, addressActorProps: Address => Props)
     extends Actor
     with ScorexLogging {
   import AddressDirectory._
@@ -26,7 +24,7 @@ class AddressDirectory(spendableBalanceChanged: Observable[(Address, Option[Asse
     .bufferTimed(settings.balanceWatchingBufferInterval)
     .filter(_.nonEmpty)
     .foreach { changes =>
-      val acc = mutable.Map.empty[Address, Set[AssetId]]
+      val acc = mutable.Map.empty[Address, Set[Asset]]
       changes.foreach { case (addr, changed) => acc.update(addr, acc.getOrElse(addr, Set.empty) + changed) }
 
       acc.foreach { case (addr, changedAssets) => children.get(addr).foreach(_ ! AddressActor.BalanceUpdated(changedAssets)) }

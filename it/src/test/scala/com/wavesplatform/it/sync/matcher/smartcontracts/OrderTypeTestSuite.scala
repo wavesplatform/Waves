@@ -9,7 +9,7 @@ import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.Json
 
@@ -32,7 +32,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
   }
 
   private val predefAssetPair = wavesUsdPair
-  private val aliceWavesPair  = AssetPair(Asset(ByteStr.decodeBase58(aliceAsset).get), Waves)
+  private val aliceWavesPair  = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
 
   "Order types verification with SmartContracts" - {
     val sco1 = s"""

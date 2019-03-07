@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL, REF}
 import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.AssetId._
+import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
@@ -50,7 +50,7 @@ case class ContractInvocationTransaction private (chainId: Byte,
       )
     )
 
-  override val assetFee: (AssetId, Long) = (Waves, fee)
+  override val assetFee: (Asset, Long) = (Waves, fee)
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
       jsonBase()
@@ -62,7 +62,7 @@ case class ContractInvocationTransaction private (chainId: Byte,
         )
     )
 
-  override def checkedAssets(): Seq[AssetId] = payment.toSeq.map(_.assetId)
+  override def checkedAssets(): Seq[Asset] = payment.toSeq.map(_.assetId)
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
@@ -73,7 +73,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
 
   import play.api.libs.json.{Json, _}
 
-  case class Payment(amount: Long, assetId: AssetId)
+  case class Payment(amount: Long, assetId: Asset)
 
   implicit val paymentPartFormat: Format[ContractInvocationTransaction.Payment] = Json.format
 
@@ -106,10 +106,10 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       val rest               = bytes.drop(fcStart)
       val (fc, remaining)    = Serde.deserialize(rest, all = false).explicitGet()
       val paymentFeeTsProofs = rest.takeRight(remaining)
-      val (payment: Option[(AssetId, Long)], offset) = Deser.parseOption(paymentFeeTsProofs, 0)(arr => {
+      val (payment: Option[(Asset, Long)], offset) = Deser.parseOption(paymentFeeTsProofs, 0)(arr => {
         val amt: Long                          = Longs.fromByteArray(arr.take(8))
         val (maybeAssetId: Option[ByteStr], _) = Deser.parseOption(arr, 8)(ByteStr(_))
-        (AssetId.fromCompatId(maybeAssetId), amt)
+        (Asset.fromCompatId(maybeAssetId), amt)
       })
       val feeTsProofs = paymentFeeTsProofs.drop(offset)
       val fee         = Longs.fromByteArray(feeTsProofs.slice(0, 8))

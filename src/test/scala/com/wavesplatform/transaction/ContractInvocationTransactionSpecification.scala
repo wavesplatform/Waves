@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
 import org.scalatest._
@@ -65,7 +65,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
         PrivateKeyAccount("test3".getBytes()),
         PrivateKeyAccount("test4".getBytes()),
         Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr(Base64.decode("YWxpY2U=").get)))),
-        Some(ContractInvocationTransaction.Payment(7, Asset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
+        Some(ContractInvocationTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
         100000,
         1526910778245L
       )

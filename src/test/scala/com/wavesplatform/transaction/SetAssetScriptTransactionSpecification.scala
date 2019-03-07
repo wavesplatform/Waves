@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import org.scalacheck.Gen
@@ -36,7 +36,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
          .create(
            AddressScheme.current.chainId,
            PublicKeyAccount.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet(),
-           Asset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
+           IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
            Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()),
            78311891L,
            1868142423132802425L,
@@ -58,7 +58,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
       .create(
         AddressScheme.current.chainId,
         accountA,
-        Asset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
+        IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
         Some(ContractScript(StdLibVersion.V3, Contract(List.empty, List.empty, None)).explicitGet()),
         1222,
         System.currentTimeMillis(),

@@ -11,7 +11,7 @@ import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{AssetId, Proofs, Transaction}
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
@@ -170,12 +170,12 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     val transferRequest = createSignedTransferRequest(
       TransferTransactionV1
         .selfSigned(
-          assetId = AssetId.Waves,
+          assetId = Asset.Waves,
           sender = senderPrivateKey,
           recipient = receiverPrivateKey.toAddress,
           amount = 1 * Waves,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = AssetId.Waves,
+          feeAssetId = Asset.Waves,
           feeAmount = Waves / 3,
           attachment = Array.emptyByteArray
         )
@@ -186,12 +186,12 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     val versionedTransferRequest = createSignedVersionedTransferRequest(
       TransferTransactionV2
         .create(
-          assetId = AssetId.Waves,
+          assetId = Asset.Waves,
           sender = senderPrivateKey,
           recipient = receiverPrivateKey.toAddress,
           amount = 1 * Waves,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = AssetId.Waves,
+          feeAssetId = Asset.Waves,
           feeAmount = Waves / 3,
           attachment = Array.emptyByteArray,
           proofs = Proofs(Seq.empty)

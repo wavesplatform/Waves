@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV2}
 import org.scalacheck.Gen
 import play.api.libs.json._
@@ -36,7 +36,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
     } yield {
       val issue = IssueTransactionV1.selfSigned(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).explicitGet()
       val reissue1 = ReissueTransactionV2
-        .selfSigned(AddressScheme.current.chainId, sender, Asset(issue.assetId()), quantity, reissuable = reissuable, fee, timestamp)
+        .selfSigned(AddressScheme.current.chainId, sender, IssuedAsset(issue.assetId()), quantity, reissuable = reissuable, fee, timestamp)
         .explicitGet()
       (Seq(issue), reissue1)
     }
@@ -64,7 +64,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
          .create(
            'T',
            PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-           Asset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+           IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
            100000000L,
            true,
            100000000L,

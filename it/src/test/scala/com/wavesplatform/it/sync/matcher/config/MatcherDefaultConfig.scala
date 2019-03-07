@@ -5,8 +5,8 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.it.sync._
 import com.wavesplatform.matcher.market.MatcherActor
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 
@@ -84,14 +84,14 @@ object MatcherDefaultConfig {
       (createSignedIssueRequest(issueAmountAssetTx),
        createSignedIssueRequest(issuePriceAssetTx),
        AssetPair(
-         amountAsset = Asset(issueAmountAssetTx.id()),
-         priceAsset = Asset(issuePriceAssetTx.id())
+         amountAsset = IssuedAsset(issueAmountAssetTx.id()),
+         priceAsset = IssuedAsset(issuePriceAssetTx.id())
        ))
     } else
       issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
   }
 
-  def assetPairIssuePriceAsset(issuer: PrivateKeyAccount, amountAssetId: AssetId, priceAssetDecimals: Byte): (SignedIssueV1Request, AssetPair) = {
+  def assetPairIssuePriceAsset(issuer: PrivateKeyAccount, amountAssetId: Asset, priceAssetDecimals: Byte): (SignedIssueV1Request, AssetPair) = {
 
     val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
@@ -111,7 +111,7 @@ object MatcherDefaultConfig {
       (createSignedIssueRequest(issuePriceAssetTx),
        AssetPair(
          amountAsset = amountAssetId,
-         priceAsset = Asset(issuePriceAssetTx.id())
+         priceAsset = IssuedAsset(issuePriceAssetTx.id())
        ))
     } else
       assetPairIssuePriceAsset(issuer, amountAssetId, priceAssetDecimals)

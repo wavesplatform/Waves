@@ -7,7 +7,7 @@ import com.wavesplatform.generator.OracleTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{DataTransaction, Transaction}

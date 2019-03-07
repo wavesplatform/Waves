@@ -14,7 +14,7 @@ import com.wavesplatform.lang.{Global, Testing}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
@@ -81,7 +81,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
         )
         .explicitGet()
 
-      assetId = Asset(issueTransaction.id())
+      assetId = IssuedAsset(issueTransaction.id())
 
       kingDataTransaction = DataTransaction
         .selfSigned(king, List(BinaryDataEntry("notary1PK", ByteStr(notary.publicKey))), 1000, ts + 1)

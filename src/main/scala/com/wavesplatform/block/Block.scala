@@ -13,7 +13,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
@@ -158,16 +158,16 @@ case class Block private[block] (override val timestamp: Long,
   val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / consensusData.baseTarget).ensuring(_ > 0))
 
   val feesPortfolio: Coeval[Portfolio] = Coeval.evalOnce(Monoid[Portfolio].combineAll({
-    val assetFees: Seq[(AssetId, Long)] = transactionData.map(_.assetFee)
+    val assetFees: Seq[(Asset, Long)] = transactionData.map(_.assetFee)
     assetFees
       .map { case (maybeAssetId, vol) => maybeAssetId -> vol }
       .groupBy(a => a._1)
-      .mapValues((records: Seq[(AssetId, Long)]) => records.map(_._2).sum)
+      .mapValues((records: Seq[(Asset, Long)]) => records.map(_._2).sum)
   }.toList.map {
     case (assetId, feeVolume) =>
       assetId match {
-        case Waves            => Portfolio(feeVolume, LeaseBalance.empty, Map.empty)
-        case asset @ Asset(_) => Portfolio(0L, LeaseBalance.empty, Map(asset -> feeVolume))
+        case Waves                  => Portfolio(feeVolume, LeaseBalance.empty, Map.empty)
+        case asset @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(asset -> feeVolume))
       }
   }))
 

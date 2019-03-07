@@ -1,8 +1,8 @@
 package com.wavesplatform.api.http
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.Validation
-import com.wavesplatform.transaction.{AssetId, AssetIdStringLength, ValidationError}
+import com.wavesplatform.transaction.{Asset, AssetIdStringLength, ValidationError}
 
 trait BroadcastRequest {
   protected def parseBase58(v: String, error: String, maxLength: Int): Validation[ByteStr] =
@@ -17,14 +17,14 @@ trait BroadcastRequest {
       parseBase58(s, error, maxLength).map(b => Option(b))
     }
 
-  protected def parseBase58ToAsset(v: String): Validation[Asset] =
+  protected def parseBase58ToAsset(v: String): Validation[IssuedAsset] =
     parseBase58(v, "invalid.assetId", AssetIdStringLength)
-      .map(Asset)
+      .map(IssuedAsset)
 
-  protected def parseBase58ToAssetId(v: Option[String], err: String): Validation[AssetId] =
+  protected def parseBase58ToAssetId(v: Option[String], err: String): Validation[Asset] =
     parseBase58ToOption(v.filter(_.length > 0), err, AssetIdStringLength)
       .map {
-        case Some(str) => Asset(str)
+        case Some(str) => IssuedAsset(str)
         case None      => Waves
       }
 }

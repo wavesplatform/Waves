@@ -6,7 +6,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.IntegerDataEntry
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
@@ -171,7 +171,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val blackTx = TransferTransactionV2
       .selfSigned(
-        Asset(ByteStr.decodeBase58(blackAsset).get),
+        IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
         pkByAddress(secondAddress),
         pkByAddress(thirdAddress),
         1,
@@ -185,7 +185,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val incorrectTx = TransferTransactionV2
       .selfSigned(
-        Asset(ByteStr.decodeBase58(blackAsset).get),
+        IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
         pkByAddress(secondAddress),
         pkByAddress(thirdAddress),
         1,

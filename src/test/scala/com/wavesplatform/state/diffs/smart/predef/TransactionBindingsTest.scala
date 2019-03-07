@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.WavesEnvironment
@@ -67,10 +68,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case t : TransferTransaction  =>
            |   ${provenPart(t)}
            |   let amount = t.amount == ${t.amount}
-           |   let feeAssetId = if (${t.feeAssetId.isAsset})
+           |   let feeAssetId = if (${t.feeAssetId != Waves})
            |      then extract(t.feeAssetId) == base58'${t.feeAssetId.maybeBase58Repr.getOrElse("")}'
            |      else isDefined(t.feeAssetId) == false
-           |   let assetId = if (${t.assetId.isAsset})
+           |   let assetId = if (${t.assetId != Waves})
            |      then extract(t.assetId) == base58'${t.assetId.maybeBase58Repr.getOrElse("")}'
            |      else isDefined(t.assetId) == false
            |   let recipient = match (t.recipient) {
@@ -342,7 +343,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       val script = s"""
                       |match tx {
                       | case t : MassTransferTransaction =>
-                      |    let assetId = if (${t.assetId.isAsset}) then extract(t.assetId) == base58'${t.assetId.maybeBase58Repr
+                      |    let assetId = if (${t.assetId != Waves}) then extract(t.assetId) == base58'${t.assetId.maybeBase58Repr
                         .getOrElse("")}'
                       |      else isDefined(t.assetId) == false
                       |     let transferCount = t.transferCount == ${t.transfers.length}
@@ -381,13 +382,13 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |   let ${oType}BodyBytes = t.${oType}Order.bodyBytes == base58'${ByteStr(ord.bodyBytes()).base58}'
            |   ${Range(0, 8).map(letProof(Proofs(Seq(ByteStr(ord.signature))), s"t.${oType}Order")).mkString("\n")}
            |   let ${oType}Proofs =${assertProofs(s"t.${oType}Order")}
-           |   let ${oType}AssetPairAmount = if (${ord.assetPair.amountAsset.isAsset}) then extract(t.${oType}Order.assetPair.amountAsset) == base58'${ord.assetPair.amountAsset.maybeBase58Repr
+           |   let ${oType}AssetPairAmount = if (${ord.assetPair.amountAsset != Waves}) then extract(t.${oType}Order.assetPair.amountAsset) == base58'${ord.assetPair.amountAsset.maybeBase58Repr
                           .getOrElse("")}'
            |   else isDefined(t.${oType}Order.assetPair.amountAsset) == false
-           |   let ${oType}AssetPairPrice = if (${ord.assetPair.priceAsset.isAsset}) then extract(t.${oType}Order.assetPair.priceAsset) == base58'${ord.assetPair.priceAsset.maybeBase58Repr
+           |   let ${oType}AssetPairPrice = if (${ord.assetPair.priceAsset != Waves}) then extract(t.${oType}Order.assetPair.priceAsset) == base58'${ord.assetPair.priceAsset.maybeBase58Repr
                           .getOrElse("")}'
            |   else isDefined(t.${oType}Order.assetPair.priceAsset) == false
-           |   let ${oType}MatcherFeeAssetId = if (${ord.matcherFeeAssetId.isAsset}) then extract(t.${oType}Order.matcherFeeAssetId) == base58'${ord.matcherFeeAssetId.maybeBase58Repr
+           |   let ${oType}MatcherFeeAssetId = if (${ord.matcherFeeAssetId != Waves}) then extract(t.${oType}Order.matcherFeeAssetId) == base58'${ord.matcherFeeAssetId.maybeBase58Repr
                           .getOrElse("")}'
            |   else isDefined(t.${oType}Order.matcherFeeAssetId) == false
          """.stripMargin
@@ -452,13 +453,13 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |   let matcherFee = t.matcherFee == ${t.matcherFee}
                  |   let bodyBytes = t.bodyBytes == base64'${ByteStr(t.bodyBytes.apply()).base64}'
                  |   ${Range(0, 8).map(letProof(t.proofs, "t")).mkString("\n")}
-                 |   let assetPairAmount = if (${t.assetPair.amountAsset.isAsset}) then extract(t.assetPair.amountAsset) == base58'${t.assetPair.amountAsset.maybeBase58Repr
+                 |   let assetPairAmount = if (${t.assetPair.amountAsset != Waves}) then extract(t.assetPair.amountAsset) == base58'${t.assetPair.amountAsset.maybeBase58Repr
                    .getOrElse("")}'
                  |   else isDefined(t.assetPair.amountAsset) == false
-                 |   let assetPairPrice = if (${t.assetPair.priceAsset.isAsset}) then extract(t.assetPair.priceAsset) == base58'${t.assetPair.priceAsset.maybeBase58Repr
+                 |   let assetPairPrice = if (${t.assetPair.priceAsset != Waves}) then extract(t.assetPair.priceAsset) == base58'${t.assetPair.priceAsset.maybeBase58Repr
                    .getOrElse("")}'
                  |   else isDefined(t.assetPair.priceAsset) == false
-                 |   let matcherFeeAssetId = if (${t.matcherFeeAssetId.isAsset}) then extract(t.matcherFeeAssetId) == base58'${t.matcherFeeAssetId.maybeBase58Repr
+                 |   let matcherFeeAssetId = if (${t.matcherFeeAssetId != Waves}) then extract(t.matcherFeeAssetId) == base58'${t.matcherFeeAssetId.maybeBase58Repr
                    .getOrElse("")}'
                  |   else isDefined(t.matcherFeeAssetId) == false
                  |   id && sender && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee && bodyBytes && ${assertProofs(

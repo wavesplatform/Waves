@@ -9,7 +9,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings._
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.utils.NTP
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer

@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.model
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.OrderExecuted
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import org.scalatest.{FreeSpec, Matchers}
 

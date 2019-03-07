@@ -7,7 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 

@@ -6,10 +6,10 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{AssetId, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -35,7 +35,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
         } yield ParsedTransfer(recipient, amount)
         transfers                              <- Gen.listOfN(transferCount, transferGen)
         (assetIssue: IssueTransactionV1, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, master)
-        maybeAsset                             <- Gen.option(assetIssue.id()).map(AssetId.fromCompatId)
+        maybeAsset                             <- Gen.option(assetIssue.id()).map(Asset.fromCompatId)
         transfer                               <- massTransferGeneratorP(master, transfers, maybeAsset)
       } yield (genesis, assetIssue, transfer)
 
@@ -49,7 +49,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
               val fees            = issue.fee + transfer.fee
               val senderPortfolio = newState.portfolio(transfer.sender)
               transfer.assetId match {
-                case aid @ Asset(_) =>
+                case aid @ IssuedAsset(_) =>
                   senderPortfolio shouldBe Portfolio(ENOUGH_AMT - fees, LeaseBalance.empty, Map(aid -> (ENOUGH_AMT - totalAmount)))
                 case Waves => senderPortfolio.balance shouldBe (ENOUGH_AMT - fees - totalAmount)
               }
@@ -57,8 +57,8 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
                 val recipientPortfolio = newState.portfolio(recipient.asInstanceOf[Address])
                 if (transfer.sender.toAddress != recipient) {
                   transfer.assetId match {
-                    case aid @ Asset(_) => recipientPortfolio shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> amount))
-                    case Waves          => recipientPortfolio shouldBe Portfolio(amount, LeaseBalance.empty, Map.empty)
+                    case aid @ IssuedAsset(_) => recipientPortfolio shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> amount))
+                    case Waves                => recipientPortfolio shouldBe Portfolio(amount, LeaseBalance.empty, Map.empty)
                   }
                 }
               }
@@ -92,7 +92,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
       (genesis, master) <- baseSetup
       recipient         <- accountGen.map(_.toAddress)
       amount            <- Gen.choose(100000L, 1000000000L)
-      assetId           <- assetIdGen.filter(_.isDefined).map(AssetId.fromCompatId)
+      assetId           <- assetIdGen.filter(_.isDefined).map(Asset.fromCompatId)
       transfer          <- massTransferGeneratorP(master, List(ParsedTransfer(recipient, amount)), assetId)
     } yield (genesis, transfer)
 
@@ -109,7 +109,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
       (genesis, master)                      <- baseSetup
       recipients                             <- Gen.listOfN(2, accountGen.map(acc => ParsedTransfer(acc.toAddress, ENOUGH_AMT / 2 + 1)))
       (assetIssue: IssueTransactionV1, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, master)
-      maybeAsset                             <- Gen.option(assetIssue.id()).map(AssetId.fromCompatId)
+      maybeAsset                             <- Gen.option(assetIssue.id()).map(Asset.fromCompatId)
       transfer                               <- massTransferGeneratorP(master, recipients, maybeAsset)
     } yield (genesis, transfer)
 

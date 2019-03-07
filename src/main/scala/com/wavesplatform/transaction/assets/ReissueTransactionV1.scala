@@ -7,12 +7,12 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction._
 import com.wavesplatform.crypto._
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import scala.util.{Failure, Success, Try}
 
 case class ReissueTransactionV1 private (sender: PublicKeyAccount,
-                                         asset: Asset,
+                                         asset: IssuedAsset,
                                          quantity: Long,
                                          reissuable: Boolean,
                                          fee: Long,
@@ -47,7 +47,7 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
   }
 
   def create(sender: PublicKeyAccount,
-             asset: Asset,
+             asset: IssuedAsset,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
@@ -59,7 +59,7 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
   }
 
   def signed(sender: PublicKeyAccount,
-             asset: Asset,
+             asset: IssuedAsset,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
@@ -71,7 +71,7 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
   }
 
   def selfSigned(sender: PrivateKeyAccount,
-                 asset: Asset,
+                 asset: IssuedAsset,
                  quantity: Long,
                  reissuable: Boolean,
                  fee: Long,

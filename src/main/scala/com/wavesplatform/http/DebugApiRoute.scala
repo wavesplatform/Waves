@@ -27,7 +27,6 @@ import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.utils.byteStrWrites
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._

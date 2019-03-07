@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{GenericError, Validation}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -39,8 +39,8 @@ object MassTransferTransactionDiff {
           )
 
       val assetIssued = tx.assetId match {
-        case Waves            => true
-        case asset @ Asset(_) => blockchain.assetDescription(asset).isDefined
+        case Waves                  => true
+        case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).isDefined
       }
 
       Either.cond(assetIssued, Diff(height, tx, completePortfolio), GenericError(s"Attempt to transfer a nonexistent asset"))

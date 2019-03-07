@@ -4,7 +4,7 @@ import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -109,7 +109,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
   }
 
   "partially execute order with price > 1 and zero fee remaining part " in {
-    val pair = AssetPair(Asset(ByteStr("BTC".getBytes)), Asset(ByteStr("USD".getBytes)))
+    val pair = AssetPair(IssuedAsset(ByteStr("BTC".getBytes)), IssuedAsset(ByteStr("USD".getBytes)))
     val ord1 = sell(pair, (0.1 * Constants.UnitsInWave).toLong, 1850)
     val ord2 = sell(pair, (0.01 * Constants.UnitsInWave).toLong, 1840)
     val ord3 = buy(pair, (0.0100001 * Constants.UnitsInWave).toLong, 2000)
@@ -126,7 +126,7 @@ class OrderBookSpec extends FreeSpec with Matchers with MatcherTestData with NTP
   }
 
   "buy small amount of pricey asset" in {
-    val p = AssetPair(Asset(ByteStr("WAVES".getBytes)), Asset(ByteStr("USD".getBytes)))
+    val p = AssetPair(IssuedAsset(ByteStr("WAVES".getBytes)), IssuedAsset(ByteStr("USD".getBytes)))
     val b = rawBuy(p, 700000L, 280)
     val s = rawSell(p, 30000000000L, 280)
 

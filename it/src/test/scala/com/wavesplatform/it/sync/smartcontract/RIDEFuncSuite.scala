@@ -8,7 +8,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
@@ -59,7 +59,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     sender.signedBroadcast(
       TransferTransactionV2
-        .selfSigned(Asset(ByteStr.decodeBase58(asset).get), acc0, pkNewAddress, 100000000, System.currentTimeMillis(), Waves, smartMinFee, Array())
+        .selfSigned(IssuedAsset(ByteStr.decodeBase58(asset).get), acc0, pkNewAddress, 100000000, System.currentTimeMillis(), Waves, smartMinFee, Array())
         .explicitGet()
         .json(),
       waitForTx = true
@@ -98,7 +98,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     sender.signedBroadcast(
       TransferTransactionV2
-        .selfSigned(Asset(ByteStr.decodeBase58(asset).get), acc0, pkNewAddress, 800000000, System.currentTimeMillis(), Waves, smartMinFee, Array())
+        .selfSigned(IssuedAsset(ByteStr.decodeBase58(asset).get), acc0, pkNewAddress, 800000000, System.currentTimeMillis(), Waves, smartMinFee, Array())
         .explicitGet()
         .json(),
       waitForTx = true

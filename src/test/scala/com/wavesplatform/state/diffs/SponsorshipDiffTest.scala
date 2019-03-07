@@ -6,7 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.LeaseTransactionV1
@@ -100,16 +100,23 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient                  <- accountGen
       assetId = issueTx.id()
       assetOverspend = TransferTransactionV1
-        .selfSigned(Waves, master, recipient.toAddress, 1000000, ts + 1, Asset(assetId), issueTx.quantity + 1, Array.emptyByteArray)
+        .selfSigned(Waves, master, recipient.toAddress, 1000000, ts + 1, IssuedAsset(assetId), issueTx.quantity + 1, Array.emptyByteArray)
         .right
         .get
       insufficientFee = TransferTransactionV1
-        .selfSigned(Waves, master, recipient.toAddress, 1000000, ts + 2, Asset(assetId), sponsorTx.minSponsoredAssetFee.get - 1, Array.emptyByteArray)
+        .selfSigned(Waves,
+                    master,
+                    recipient.toAddress,
+                    1000000,
+                    ts + 2,
+                    IssuedAsset(assetId),
+                    sponsorTx.minSponsoredAssetFee.get - 1,
+                    Array.emptyByteArray)
         .right
         .get
       fee = 3000 * sponsorTx.minSponsoredAssetFee.get
       wavesOverspend = TransferTransactionV1
-        .selfSigned(Waves, master, recipient.toAddress, 1000000, ts + 3, Asset(assetId), fee, Array.emptyByteArray)
+        .selfSigned(Waves, master, recipient.toAddress, 1000000, ts + 3, IssuedAsset(assetId), fee, Array.emptyByteArray)
         .right
         .get
     } yield (genesis, issueTx, sponsorTx, assetOverspend, insufficientFee, wavesOverspend)
@@ -146,7 +153,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       assetId = issueTx.id()
       transferAssetTx: TransferTransactionV1 = TransferTransactionV1
-        .selfSigned(Asset(assetId), master, alice.toAddress, issueTx.quantity, ts + 2, Waves, fee, Array.emptyByteArray)
+        .selfSigned(IssuedAsset(assetId), master, alice.toAddress, issueTx.quantity, ts + 2, Waves, fee, Array.emptyByteArray)
         .right
         .get
       leasingTx: LeaseTransactionV1 = LeaseTransactionV1
@@ -158,12 +165,12 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .right
         .get
       insufficientFee = TransferTransactionV1
-        .selfSigned(Asset(assetId),
+        .selfSigned(IssuedAsset(assetId),
                     alice,
                     bob.toAddress,
                     issueTx.quantity / 12,
                     ts + 4,
-                    Asset(assetId),
+                    IssuedAsset(assetId),
                     sponsorTx.minSponsoredAssetFee.get,
                     Array.emptyByteArray)
         .right
@@ -190,7 +197,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       ts         <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, 400000000, ts).explicitGet()
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
-      assetId = Asset(issueTx.id())
+      assetId = IssuedAsset(issueTx.id())
       senderNotIssuer = SponsorFeeTransaction
         .selfSigned(notSponsor, assetId, None, 1 * Constants.UnitsInWave, ts + 1)
         .right
@@ -221,7 +228,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       ts         <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, 400000000, ts).explicitGet()
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
-      assetId = Asset(issueTx.id())
+      assetId = IssuedAsset(issueTx.id())
       minFee <- smallFeeGen
       senderNotIssuer = SponsorFeeTransaction
         .selfSigned(notSponsor, assetId, Some(minFee), 1 * Constants.UnitsInWave, ts + 1)
@@ -255,7 +262,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       issue = IssueTransactionV1
         .selfSigned(master, Base58.decode("Asset").get, Array.emptyByteArray, 100, 2, reissuable = false, 100000000, ts + 1)
         .explicitGet()
-      assetId = Asset(issue.id())
+      assetId = IssuedAsset(issue.id())
       sponsor = SponsorFeeTransaction.selfSigned(master, assetId, Some(100), 100000000, ts + 2).explicitGet()
       assetTransfer = TransferTransactionV1
         .selfSigned(assetId, master, recipient, issue.quantity, ts + 3, Waves, 100000, Array.emptyByteArray)
@@ -277,7 +284,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
           case (_, state) =>
             val portfolio = state.portfolio(genesis.recipient)
             portfolio.balance shouldBe 0
-            portfolio.assets(Asset(issue.id())) shouldBe issue.quantity
+            portfolio.assets(IssuedAsset(issue.id())) shouldBe issue.quantity
         }
     }
   }

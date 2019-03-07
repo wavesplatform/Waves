@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
@@ -25,7 +25,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     reference           <- byteArrayGen(Block.BlockIdLength).map(r => ByteStr(r))
     generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
     assetBytes          <- byteArrayGen(AssetIdLength)
-    assetId = Asset(ByteStr(assetBytes))
+    assetId = IssuedAsset(ByteStr(assetBytes))
     sender                    <- accountGen
     recipient                 <- accountGen
     paymentTransaction        <- wavesTransferGeneratorP(time, sender, recipient)

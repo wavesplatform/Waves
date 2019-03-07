@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain}
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.TableDrivenPropertyChecks._
@@ -19,10 +19,10 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
   private def b(v: String) = ByteStr.decodeBase58(v).get
 
   private val WAVES  = "WAVES"
-  private val WUSD   = Asset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)
-  private val WBTC   = Asset(ByteStr.decodeBase58("Fmg13HEHJHuZYbtJq8Da8wifJENq8uBxDuWoP9pVe2Qe").get)
-  private val WEUR   = Asset(ByteStr.decodeBase58("2xnE3EdpqXtFgCP156qt1AbyjpqdZ5jGjWo3CwTawcux").get)
-  private val WCNY   = Asset(ByteStr.decodeBase58("6pmDivReTLikwYqQtJTv6dTcE59knriaodB3AK8T9cF8").get)
+  private val WUSD   = IssuedAsset(ByteStr.decodeBase58("HyFJ3rrq5m7FxdkWtQXkZrDat1F7LjVVGfpSkUuEXQHj").get)
+  private val WBTC   = IssuedAsset(ByteStr.decodeBase58("Fmg13HEHJHuZYbtJq8Da8wifJENq8uBxDuWoP9pVe2Qe").get)
+  private val WEUR   = IssuedAsset(ByteStr.decodeBase58("2xnE3EdpqXtFgCP156qt1AbyjpqdZ5jGjWo3CwTawcux").get)
+  private val WCNY   = IssuedAsset(ByteStr.decodeBase58("6pmDivReTLikwYqQtJTv6dTcE59knriaodB3AK8T9cF8").get)
   private val Asset1 = mkAssetId(1)
   private val Asset2 = mkAssetId(2)
   private val Asset3 = mkAssetId(3)
@@ -33,7 +33,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
       WUSD,
       WEUR,
       WCNY,
-      Asset(b("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS")),
+      IssuedAsset(b("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS")),
     )
 
   private val priceAssets = ConfigFactory.parseString(s"""waves.matcher {
@@ -107,7 +107,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
 }
 
 object AssetPairBuilderSpec {
-  private def mkAssetId(index: Byte): Asset = Asset(ByteStr(Array.fill[Byte](32)(index)))
+  private def mkAssetId(index: Byte): IssuedAsset = IssuedAsset(ByteStr(Array.fill[Byte](32)(index)))
   private def mkAssetDescription(assetName: String = ""): Option[AssetDescription] =
     Some(
       AssetDescription(PublicKeyAccount(Array.emptyByteArray),

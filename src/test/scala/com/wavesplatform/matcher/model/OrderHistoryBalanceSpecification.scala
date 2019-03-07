@@ -9,8 +9,8 @@ import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.{AddressActor, MatcherTestData}
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalatest._
 
@@ -37,7 +37,7 @@ class OrderHistoryBalanceSpecification
     oh = new OrderHistoryStub(system, ntpTime)
   }
 
-  def openVolume(address: Address, asset: AssetId): Long = oh.ref(address).openVolume(asset)
+  def openVolume(address: Address, asset: Asset): Long = oh.ref(address).openVolume(asset)
 
   def activeOrderIds(sender: Address): Seq[ByteStr]                        = oh.ref(sender).activeOrderIds
   def allOrderIds(sender: Address): Seq[ByteStr]                           = oh.ref(sender).allOrderIds
@@ -897,8 +897,8 @@ private object OrderHistoryBalanceSpecification {
 
     def allOrderIdsByPair(pair: AssetPair): Seq[Order.Id] = orderIds(Some(pair), false)
 
-    def openVolume(asset: AssetId): Long =
-      askAddressActor[Map[AssetId, Long]](ref, AddressActor.GetReservedBalance).getOrElse(asset, 0L)
+    def openVolume(asset: Asset): Long =
+      askAddressActor[Map[Asset, Long]](ref, AddressActor.GetReservedBalance).getOrElse(asset, 0L)
 
     def orderStatus(orderId: ByteStr): OrderStatus =
       askAddressActor[OrderStatus](ref, AddressActor.GetOrderStatus(orderId))

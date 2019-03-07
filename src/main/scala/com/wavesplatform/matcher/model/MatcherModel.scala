@@ -5,8 +5,8 @@ import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state.Portfolio
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.json.{JsObject, JsValue, Json}
 
@@ -30,11 +30,11 @@ sealed trait LimitOrder {
   protected def spendAmount: Long
   protected def receiveAmount: Long
 
-  def spentAsset: AssetId = order.getSpendAssetId
-  def rcvAsset: AssetId   = order.getReceiveAssetId
-  val feeAsset: AssetId   = Waves
+  def spentAsset: Asset = order.getSpendAssetId
+  def rcvAsset: Asset   = order.getReceiveAssetId
+  val feeAsset: Asset   = Waves
 
-  def requiredBalance: Map[AssetId, Long] = Monoid.combine(
+  def requiredBalance: Map[Asset, Long] = Monoid.combine(
     Map(spentAsset -> rawSpendAmount),
     Map(feeAsset   -> (if (feeAsset != rcvAsset) fee else (fee - receiveAmount).max(0L)))
   )
@@ -153,6 +153,6 @@ object Events {
 
   object BalanceChanged {
     val empty: BalanceChanged = BalanceChanged(Map.empty)
-    case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[AssetId]])
+    case class Changes(updatedPortfolio: Portfolio, changedAssets: Set[Option[Asset]])
   }
 }

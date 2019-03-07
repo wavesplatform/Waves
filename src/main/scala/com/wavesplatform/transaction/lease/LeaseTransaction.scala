@@ -3,8 +3,8 @@ package com.wavesplatform.transaction.lease
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKeyAccount}
 import com.wavesplatform.crypto._
-import com.wavesplatform.transaction.AssetId.Waves
-import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -14,7 +14,7 @@ trait LeaseTransaction extends ProvenTransaction with VersionedTransaction {
   def amount: Long
   def fee: Long
   def recipient: AddressOrAlias
-  override val assetFee: (AssetId, Long) = (Waves, fee)
+  override val assetFee: (Asset, Long) = (Waves, fee)
 
   override final val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(

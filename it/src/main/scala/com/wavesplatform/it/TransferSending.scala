@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Transaction
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.Suite

@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{Alias, PublicKeyAccount}
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -15,7 +15,7 @@ trait CreateAliasTransaction extends ProvenTransaction with VersionedTransaction
   def fee: Long
   def timestamp: Long
 
-  override val assetFee: (AssetId, Long) = (Waves, fee)
+  override val assetFee: (Asset, Long) = (Waves, fee)
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(

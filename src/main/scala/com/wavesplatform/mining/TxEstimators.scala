@@ -1,7 +1,7 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.assets.{BurnTransaction, ReissueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -36,15 +36,15 @@ object TxEstimators {
       }
 
       val assetIds = x match {
-        case x: TransferTransaction     => x.assetId.fold[Seq[Asset]](Nil)(Seq(_))
-        case x: MassTransferTransaction => x.assetId.fold[Seq[Asset]](Nil)(Seq(_))
+        case x: TransferTransaction     => x.assetId.fold[Seq[IssuedAsset]](Nil)(Seq(_))
+        case x: MassTransferTransaction => x.assetId.fold[Seq[IssuedAsset]](Nil)(Seq(_))
         case x: BurnTransaction         => Seq(x.asset)
         case x: ReissueTransaction      => Seq(x.asset)
         case x: SponsorFeeTransaction   => Seq(x.asset)
         case x: ExchangeTransaction =>
           Seq(
-            x.buyOrder.assetPair.amountAsset.fold[Seq[Asset]](Nil)(Seq(_)),
-            x.buyOrder.assetPair.priceAsset.fold[Seq[Asset]](Nil)(Seq(_))
+            x.buyOrder.assetPair.amountAsset.fold[Seq[IssuedAsset]](Nil)(Seq(_)),
+            x.buyOrder.assetPair.priceAsset.fold[Seq[IssuedAsset]](Nil)(Seq(_))
           ).flatten
         case _ => Seq.empty
       }

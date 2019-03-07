@@ -4,7 +4,7 @@ import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
@@ -13,7 +13,7 @@ import scala.util._
 
 case class ReissueTransactionV2 private (chainId: Byte,
                                          sender: PublicKeyAccount,
-                                         asset: Asset,
+                                         asset: IssuedAsset,
                                          quantity: Long,
                                          reissuable: Boolean,
                                          fee: Long,
@@ -60,7 +60,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
 
   def create(chainId: Byte,
              sender: PublicKeyAccount,
-             asset: Asset,
+             asset: IssuedAsset,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
@@ -74,7 +74,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
 
   def signed(chainId: Byte,
              sender: PublicKeyAccount,
-             asset: Asset,
+             asset: IssuedAsset,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
@@ -88,7 +88,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
 
   def selfSigned(chainId: Byte,
                  sender: PrivateKeyAccount,
-                 asset: Asset,
+                 asset: IssuedAsset,
                  quantity: Long,
                  reissuable: Boolean,
                  fee: Long,

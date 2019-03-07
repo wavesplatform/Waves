@@ -7,9 +7,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{AssetId, CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -86,8 +86,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     transfer <- transferGeneratorP(
       master,
       alias,
-      AssetId.fromCompatId(maybeAsset.map(_.id())),
-      AssetId.fromCompatId(maybeFeeAsset.map(_.id()))
+      Asset.fromCompatId(maybeAsset.map(_.id())),
+      Asset.fromCompatId(maybeFeeAsset.map(_.id()))
     )
     lease <- leaseAndCancelGeneratorP(master, alias, master).map(_._1)
   } yield (gen, gen2, issue1, issue2, aliasTx, transfer, lease)
@@ -100,8 +100,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
             if (transfer.sender.toAddress != aliasTx.sender.toAddress) {
               val recipientPortfolioDiff = blockDiff.portfolios(aliasTx.sender)
               transfer.assetId match {
-                case aid @ Asset(_) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
-                case Waves          => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
+                case aid @ IssuedAsset(_) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
+                case Waves                => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
               }
             }
         }

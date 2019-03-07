@@ -12,7 +12,7 @@ import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.utx.UtxPool
@@ -140,7 +140,7 @@ class TransactionsRouteSpec
       }
 
       "with sponsorship" in {
-        val assetId: Asset           = Asset(issueGen.sample.get.assetId())
+        val assetId: IssuedAsset     = IssuedAsset(issueGen.sample.get.assetId())
         val sender: PublicKeyAccount = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
@@ -182,7 +182,7 @@ class TransactionsRouteSpec
       }
 
       "with sponsorship, smart token and smart account" in {
-        val assetId: Asset           = Asset(issueGen.sample.get.assetId())
+        val assetId: IssuedAsset     = IssuedAsset(issueGen.sample.get.assetId())
         val sender: PublicKeyAccount = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,

@@ -18,7 +18,7 @@ import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.{AssetId, BlockchainUpdater, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utils.BaseTargetReachedMaximum
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -132,7 +132,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
     val utxPoolStub = new UtxPool {
       override def putIfNew(tx: Transaction)                               = ???
       override def removeAll(txs: Traversable[Transaction]): Unit          = {}
-      override def spendableBalance(addr: Address, assetId: AssetId): Long = ???
+      override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
       override def pessimisticPortfolio(addr: Address): Portfolio          = ???
       override def all                                                     = ???
       override def size                                                    = ???

@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDescription, Blockchain}
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
 import org.scalamock.scalatest.PathMockFactory
@@ -35,7 +35,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
       "should not count transactions working with a regular tokens" in {
         val blockchain = stub[Blockchain]
         (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
-        (blockchain.assetDescription _).when(*).onCall((_: Asset) => None).anyNumberOfTimes()
+        (blockchain.assetDescription _).when(*).onCall((_: IssuedAsset) => None).anyNumberOfTimes()
 
         TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 0
       }
@@ -43,7 +43,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
       "should count transactions working with smart tokens" in {
         val blockchain = stub[Blockchain]
         (blockchain.hasScript _).when(*).onCall((_: Address) => false).anyNumberOfTimes()
-        (blockchain.assetDescription _).when(*).onCall((_: Asset) => Some(assetDescription)).anyNumberOfTimes()
+        (blockchain.assetDescription _).when(*).onCall((_: IssuedAsset) => Some(assetDescription)).anyNumberOfTimes()
 
         TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 1
       }
@@ -52,7 +52,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
     "both - should double count transactions working with smart tokens from samrt account" in {
       val blockchain = stub[Blockchain]
       (blockchain.hasScript _).when(*).onCall((_: Address) => true).anyNumberOfTimes()
-      (blockchain.assetDescription _).when(*).onCall((_: Asset) => Some(assetDescription)).anyNumberOfTimes()
+      (blockchain.assetDescription _).when(*).onCall((_: IssuedAsset) => Some(assetDescription)).anyNumberOfTimes()
 
       TxEstimators.scriptRunNumber(blockchain, transferAssetsTx) shouldBe 2
     }
@@ -76,7 +76,7 @@ class TxEstimatorsSuite extends FreeSpec with Matchers with PathMockFactory with
 
   private val transferAssetsTx = TransferTransactionV1
     .selfSigned(
-      assetId = Asset(assetId),
+      assetId = IssuedAsset(assetId),
       sender = PrivateKeyAccount("sender".getBytes()),
       recipient = PrivateKeyAccount("recipient".getBytes()),
       amount = 1,

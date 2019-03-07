@@ -8,8 +8,9 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.lease._
@@ -17,7 +18,6 @@ import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{smart, _}
 
 import scala.util.{Left, Right, Try}
 
@@ -50,14 +50,14 @@ object CommonValidation {
                                                           blockTime: Long,
                                                           tx: T): Either[ValidationError, T] =
     if (blockTime >= settings.allowTemporaryNegativeUntil) {
-      def checkTransfer(sender: Address, assetId: AssetId, amount: Long, feeAssetId: AssetId, feeAmount: Long) = {
+      def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {
         val amountDiff = assetId match {
-          case aid @ Asset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
-          case Waves          => Portfolio(-amount, LeaseBalance.empty, Map.empty)
+          case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
+          case Waves                => Portfolio(-amount, LeaseBalance.empty, Map.empty)
         }
         val feeDiff = feeAssetId match {
-          case aid @ Asset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -feeAmount))
-          case Waves          => Portfolio(-feeAmount, LeaseBalance.empty, Map.empty)
+          case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -feeAmount))
+          case Waves                => Portfolio(-feeAmount, LeaseBalance.empty, Map.empty)
         }
 
         val spendings       = Monoid.combine(amountDiff, feeDiff)
@@ -92,7 +92,7 @@ object CommonValidation {
         case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, Waves, mtx.fee)
         case citx: ContractInvocationTransaction =>
-          checkTransfer(citx.sender, citx.payment.flatMap(_.assetId), citx.payment.map(_.amount).getOrElse(0), None, citx.fee)
+          checkTransfer(citx.sender, citx.payment.map(_.assetId).getOrElse(Waves), citx.payment.map(_.amount).getOrElse(0), Waves, citx.fee)
         case _ => Right(tx)
       }
     } else Right(tx)
@@ -221,10 +221,10 @@ object CommonValidation {
       .toRight(UnsupportedTransactionType)
   }
 
-  def getMinFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, (AssetId, Long, Long)] = {
-    type FeeInfo = (Option[(AssetId, AssetDescription)], Long)
+  def getMinFee(blockchain: Blockchain, fs: FunctionalitySettings, height: Int, tx: Transaction): Either[ValidationError, (Asset, Long, Long)] = {
+    type FeeInfo = (Option[(Asset, AssetDescription)], Long)
 
-    def feeAfterSponsorship(txAsset: AssetId): Either[ValidationError, FeeInfo] =
+    def feeAfterSponsorship(txAsset: Asset): Either[ValidationError, FeeInfo] =
       if (height < Sponsorship.sponsoredFeesSwitchHeight(blockchain, fs)) {
         // This could be true for private blockchains
         feeInUnits(blockchain, height, tx).map(x => (None, x * FeeUnit))
@@ -233,7 +233,7 @@ object CommonValidation {
           feeInUnits <- feeInUnits(blockchain, height, tx)
           r <- txAsset match {
             case Waves => Right((None, feeInUnits * FeeUnit))
-            case assetId @ Asset(_) =>
+            case assetId @ IssuedAsset(_) =>
               for {
                 assetInfo <- blockchain
                   .assetDescription(assetId)
@@ -251,16 +251,16 @@ object CommonValidation {
       input._1
         .map(_._1)
         .flatMap {
-          case a @ Asset(_) => blockchain.assetDescription(a)
-          case Waves        => None
+          case a @ IssuedAsset(_) => blockchain.assetDescription(a)
+          case Waves              => None
         }
         .exists(_.script.isDefined)
 
     def feeAfterSmartTokens(inputFee: FeeInfo): Either[ValidationError, FeeInfo] = {
       val (feeAssetInfo, feeAmount) = inputFee
       val assetsCount = tx match {
-        case tx: ExchangeTransaction => tx.checkedAssets().collect { case a @ Asset(_) => a }.count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
-        case _                       => tx.checkedAssets().collect { case a @ Asset(_) => a }.count(blockchain.hasAssetScript)
+        case tx: ExchangeTransaction => tx.checkedAssets().collect { case a @ IssuedAsset(_) => a }.count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
+        case _                       => tx.checkedAssets().collect { case a @ IssuedAsset(_) => a }.count(blockchain.hasAssetScript)
       }
       if (isSmartToken(inputFee)) {
         //Left(GenericError("Using smart asset for sponsorship is disabled."))

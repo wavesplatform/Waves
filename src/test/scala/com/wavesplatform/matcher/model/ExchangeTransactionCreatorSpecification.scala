@@ -6,7 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV1, ExchangeTransactionV2}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._

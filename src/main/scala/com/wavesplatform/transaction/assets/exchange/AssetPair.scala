@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.AssetId.{Asset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Order.assetIdBytes
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
@@ -17,12 +17,12 @@ case class AssetPair(@(ApiModelProperty @field)(
                        value = "Base58 encoded amount asset id",
                        dataType = "string",
                        example = "WAVES"
-                     ) amountAsset: AssetId,
+                     ) amountAsset: Asset,
                      @(ApiModelProperty @field)(
                        value = "Base58 encoded amount price id",
                        dataType = "string",
                        example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
-                     ) priceAsset: AssetId) {
+                     ) priceAsset: Asset) {
   import AssetPair._
 
   @ApiModelProperty(hidden = true)
@@ -39,20 +39,20 @@ case class AssetPair(@(ApiModelProperty @field)(
   )
   def reverse = AssetPair(priceAsset, amountAsset)
 
-  def assets: Set[AssetId] = Set(amountAsset, priceAsset)
+  def assets: Set[Asset] = Set(amountAsset, priceAsset)
 }
 
 object AssetPair {
   val WavesName = "WAVES"
 
-  def assetIdStr(aid: AssetId): String = aid match {
-    case Waves     => WavesName
-    case Asset(id) => id.base58
+  def assetIdStr(aid: Asset): String = aid match {
+    case Waves           => WavesName
+    case IssuedAsset(id) => id.base58
   }
 
-  def extractAssetId(a: String): Try[AssetId] = a match {
+  def extractAssetId(a: String): Try[Asset] = a match {
     case `WavesName` => Success(Waves)
-    case other       => ByteStr.decodeBase58(other).map(Asset)
+    case other       => ByteStr.decodeBase58(other).map(IssuedAsset)
   }
 
   def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =
@@ -65,8 +65,8 @@ object AssetPair {
     val (amount, offset) = Deser.parseByteArrayOption(xs, 0, AssetIdLength)
     val (price, _)       = Deser.parseByteArrayOption(xs, offset, AssetIdLength)
     AssetPair(
-      AssetId.fromCompatId(amount.map(ByteStr(_))),
-      AssetId.fromCompatId(price.map(ByteStr(_)))
+      Asset.fromCompatId(amount.map(ByteStr(_))),
+      Asset.fromCompatId(price.map(ByteStr(_)))
     )
   }
 }

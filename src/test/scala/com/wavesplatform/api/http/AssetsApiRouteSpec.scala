@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.state.{AssetDescription, Blockchain}
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
 import io.netty.channel.group.ChannelGroup
@@ -47,7 +47,7 @@ class AssetsApiRouteSpec
   )
 
   (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx)))
-  (blockchain.assetDescription _).when(Asset(smartAssetTx.id())).onCall((_: Asset) => Some(smartAssetDesc))
+  (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
   routePath(s"/details/${smartAssetTx.id().base58}") in {
     Get(routePath(s"/details/${smartAssetTx.id().base58}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -76,7 +76,7 @@ class AssetsApiRouteSpec
     sponsorship = 0
   )
   (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx)))
-  (blockchain.assetDescription _).when(Asset(sillyAssetTx.id())).onCall((_: Asset) => Some(sillyAssetDesc))
+  (blockchain.assetDescription _).when(IssuedAsset(sillyAssetTx.id())).onCall((_: IssuedAsset) => Some(sillyAssetDesc))
   routePath(s"/details/${sillyAssetTx.id().base58}") in {
     Get(routePath(s"/details/${sillyAssetTx.id().base58}")) ~> route ~> check {
       val response = responseAs[JsObject]

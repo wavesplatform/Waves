@@ -8,7 +8,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.transaction.AssetId.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.Script
 import play.api.libs.json._
@@ -121,26 +121,26 @@ object Sponsorship {
 
 case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 portfolios: Map[Address, Portfolio],
-                issuedAssets: Map[Asset, AssetInfo],
+                issuedAssets: Map[IssuedAsset, AssetInfo],
                 aliases: Map[Alias, Address],
                 orderFills: Map[ByteStr, VolumeAndFee],
                 leaseState: Map[ByteStr, Boolean],
                 scripts: Map[Address, Option[Script]],
-                assetScripts: Map[Asset, Option[Script]],
+                assetScripts: Map[IssuedAsset, Option[Script]],
                 accountData: Map[Address, AccountDataInfo],
-                sponsorship: Map[Asset, Sponsorship])
+                sponsorship: Map[IssuedAsset, Sponsorship])
 
 object Diff {
 
   def stateOps(portfolios: Map[Address, Portfolio] = Map.empty,
-               assetInfos: Map[Asset, AssetInfo] = Map.empty,
+               assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
                aliases: Map[Alias, Address] = Map.empty,
                orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
                leaseState: Map[ByteStr, Boolean] = Map.empty,
                scripts: Map[Address, Option[Script]] = Map.empty,
-               assetScripts: Map[Asset, Option[Script]] = Map.empty,
+               assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
                accountData: Map[Address, AccountDataInfo] = Map.empty,
-               sponsorship: Map[Asset, Sponsorship] = Map.empty): Diff =
+               sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty): Diff =
     Diff(
       transactions = Map(),
       portfolios = portfolios,
@@ -157,14 +157,14 @@ object Diff {
   def apply(height: Int,
             tx: Transaction,
             portfolios: Map[Address, Portfolio] = Map.empty,
-            assetInfos: Map[Asset, AssetInfo] = Map.empty,
+            assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
             aliases: Map[Alias, Address] = Map.empty,
             orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
             leaseState: Map[ByteStr, Boolean] = Map.empty,
             scripts: Map[Address, Option[Script]] = Map.empty,
-            assetScripts: Map[Asset, Option[Script]] = Map.empty,
+            assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
             accountData: Map[Address, AccountDataInfo] = Map.empty,
-            sponsorship: Map[Asset, Sponsorship] = Map.empty): Diff =
+            sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty): Diff =
     Diff(
       transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
       portfolios = portfolios,

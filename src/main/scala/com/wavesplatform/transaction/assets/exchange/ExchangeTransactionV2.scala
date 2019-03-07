@@ -5,7 +5,7 @@ import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.AssetId.Waves
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
 import io.swagger.annotations.ApiModelProperty
@@ -28,8 +28,8 @@ case class ExchangeTransactionV2(buyOrder: Order,
 
   override def version: Byte = 2
 
-  override val builder                   = ExchangeTransactionV2
-  override val assetFee: (AssetId, Long) = (Waves, fee)
+  override val builder                 = ExchangeTransactionV2
+  override val assetFee: (Asset, Long) = (Waves, fee)
 
   @ApiModelProperty(hidden = true)
   override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
