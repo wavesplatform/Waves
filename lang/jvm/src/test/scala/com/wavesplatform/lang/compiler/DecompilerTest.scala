@@ -17,6 +17,10 @@ import org.scalatest.{Matchers, PropSpec}
 
 class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
+  implicit class StringCmp(s1: String) {
+    def shouldEq(s2: String) = s1.replace("\r\n", "\n") shouldEqual s2.replace("\r\n", "\n")
+  }
+
   val CTX: CTX =
     Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.StdLibVersion.V3), CryptoContext.build(Global)))
 
@@ -31,7 +35,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("simple let") {
     val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), Terms.LET_BLOCK(LET("b", CONST_LONG(2)), Terms.LET_BLOCK(LET("c", CONST_LONG(3)), TRUE)))
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """let a = 1
         |let b = 2
         |let c = 3
@@ -54,7 +58,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.Native(500),
       args = List(TRUE)
     )
-    Decompiler(expr, decompilerContext) shouldBe "sigVerify(true)"
+    Decompiler(expr, decompilerContext) shouldEq "sigVerify(true)"
   }
 
   property("native function call with two arg (binary operations)") {
@@ -62,12 +66,12 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.Native(100),
       args = List(CONST_LONG(1), CONST_LONG(2))
     )
-    Decompiler(expr, decompilerContext) shouldBe "(1 + 2)"
+    Decompiler(expr, decompilerContext) shouldEq "(1 + 2)"
   }
 
   property("nested binary operations") {
     val expr = FUNCTION_CALL(Native(105), List(FUNCTION_CALL(Native(101), List(REF("height"), REF("startHeight"))), REF("interval")))
-    Decompiler(expr, decompilerContext) shouldBe "((height - startHeight) / interval)"
+    Decompiler(expr, decompilerContext) shouldEq "((height - startHeight) / interval)"
   }
 
   property("unknown native function call") {
@@ -75,7 +79,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.Native(254),
       args = List(CONST_LONG(1), CONST_LONG(2))
     )
-    Decompiler(expr, decompilerContext) shouldBe "Native<254>(1, 2)"
+    Decompiler(expr, decompilerContext) shouldEq "Native<254>(1, 2)"
   }
 
   property("user function call with one args") {
@@ -83,7 +87,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.User("foo"),
       args = List(TRUE)
     )
-    Decompiler(expr, decompilerContext) shouldBe "foo(true)"
+    Decompiler(expr, decompilerContext) shouldEq "foo(true)"
   }
 
   property("user function call with empty args") {
@@ -91,7 +95,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.User("foo"),
       args = List.empty
     )
-    Decompiler(expr, decompilerContext) shouldBe "foo()"
+    Decompiler(expr, decompilerContext) shouldEq "foo()"
   }
 
   property("v2 with LET in BLOCK") {
@@ -111,7 +115,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                              function = FunctionHeader.Native(100),
                              args = List(REF("v"), CONST_LONG(2))
                            ))
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """let v = 1
         |(v + 2)""".stripMargin
   }
@@ -157,7 +161,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         Terms.BLOCK(Terms.LET("v", CONST_LONG(1)), Terms.FUNCTION_CALL(function = FunctionHeader.Native(100), args = List(REF("v"), CONST_LONG(2))))),
       Terms.FUNCTION_CALL(function = FunctionHeader.Native(100), args = List(REF("p"), CONST_LONG(3)))
     )
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """let p = {
         |    let v = 1
         |    (v + 2)
@@ -178,7 +182,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         FALSE
       )
     )
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """let v = 1
         |if (if ((v + 2))
         |    then true
@@ -192,13 +196,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("ref getter idents") {
     val expr = GETTER(REF("a"), "foo")
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """a.foo""".stripMargin
   }
 
   property("block getter idents") {
     val expr = GETTER(BLOCK(LET("a", FALSE), REF("a")), "foo")
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """{
         |    let a = false
         |    a
@@ -240,7 +244,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         )),
       Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
-    Decompiler(contract: Contract, decompilerContext) shouldBe
+    Decompiler(contract: Contract, decompilerContext) shouldEq
       """|func foo () = false
          |
          |
@@ -291,14 +295,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |    }
         |
         |""".stripMargin
-    str shouldBe margin
+    str shouldEq margin
   }
 
   property("bytestring") {
     val test = Base58.encode("abc".getBytes("UTF-8"))
     // ([REVIEW]: may be i`am make a mistake here)
     val expr = Terms.BLOCK(Terms.LET("param", CONST_BYTESTR(ByteStr(test.getBytes()))), REF("param"))
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """let param = base58'3K3F4C'
         |param""".stripMargin
   }
@@ -309,13 +313,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                               args = List(TRUE)
                             ),
                             "testfield")
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """testfunc(true).testfield""".stripMargin
   }
 
   property("simple if") {
     val expr = IF(TRUE, CONST_LONG(1), CONST_STRING("XXX"))
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """if (true)
         |    then 1
         |    else "XXX"""".stripMargin
@@ -323,7 +327,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("if with complicated else branch") {
     val expr = IF(TRUE, CONST_LONG(1), IF(TRUE, CONST_LONG(1), CONST_STRING("XXX")))
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """if (true)
         |    then 1
         |    else if (true)
@@ -333,7 +337,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("if with complicated then branch") {
     val expr = IF(TRUE, IF(TRUE, CONST_LONG(1), CONST_STRING("XXX")), CONST_LONG(1))
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """if (true)
         |    then if (true)
         |        then 1
@@ -404,7 +408,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         )
       )
     )
-    Decompiler(expr, decompilerContext) shouldBe
+    Decompiler(expr, decompilerContext) shouldEq
       """let startHeight = 1375557
         |let startPrice = 100000
         |let interval = (24 * 60)
