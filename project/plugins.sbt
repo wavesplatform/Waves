@@ -5,6 +5,11 @@ resolvers ++= Seq(
   Resolver.sbtPluginRepo("releases")
 )
 
+// Should go before Scala.js
+addSbtPlugin("com.thesamet" % "sbt-protoc" % "0.99.19")
+
+libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.8.4"
+
 Seq(
   "com.eed3si9n"       % "sbt-assembly"             % "0.14.5",
   "com.typesafe.sbt"   % "sbt-native-packager"      % "1.3.2",
