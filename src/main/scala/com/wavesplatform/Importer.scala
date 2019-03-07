@@ -42,7 +42,12 @@ object Importer extends ScorexLogging {
     val configFilename     = configOpt.toOption.getOrElse("waves-testnet.conf")
     val blockchainFilename = Try(argi.next)
     val importHeight       = Try(argi.next).map(_.toInt).getOrElse(Int.MaxValue)
-    val legacy             = Try(argi.next).map(s => s.toLowerCase == "true" || s == "1").getOrElse(false)
+
+    val format = Try(argi.next)
+      .map(_.toUpperCase)
+      .collect { case custom @ "BINARY_OLD" => custom }
+      .getOrElse("BINARY")
+      .intern()
 
     val config   = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
     val settings = WavesSettings.fromConfig(config)
@@ -96,8 +101,8 @@ object Importer extends ScorexLogging {
                     blocksToSkip -= 1
                   } else {
                     val Right(block) =
-                      if (legacy) Block.parseBytes(buffer).toEither
-                      else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer))
+                      if (format == "BINARY_OLD") Block.parseBytes(buffer).toEither
+                      else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer), unsafe = true)
 
                     if (blockchainUpdater.lastBlockId.contains(block.reference)) {
                       Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {

@@ -22,7 +22,7 @@ message SignedTransaction {
 }
 
 message Transaction {
-    bytes chainId = 1;
+    int32 chainId = 1;
     bytes senderPublicKey = 2;
     Amount fee = 3;
     int64 timestamp = 4;

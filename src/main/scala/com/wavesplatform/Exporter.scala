@@ -80,7 +80,7 @@ object Exporter extends ScorexLogging {
     val maybeBlockBytes = blockchain.blockBytes(height)
     maybeBlockBytes
       .map { oldBytes =>
-        val bytes       = if (legacy) oldBytes else PBBlocks.protobuf(Block.parseBytes(oldBytes).get).toByteArray
+        val bytes       = if (legacy) oldBytes else PBBlocks.clearChainId(PBBlocks.protobuf(Block.parseBytes(oldBytes).get)).toByteArray
         val bytesLength = bytes.length
 
         stream.write(Ints.toByteArray(bytesLength))

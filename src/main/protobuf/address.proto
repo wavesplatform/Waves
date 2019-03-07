@@ -2,14 +2,9 @@
 syntax = "proto3";
 option java_package = "com.wavesplatform.protobuf.account";
 
-message Alias {
-    bytes chainId = 1;
-    string name = 2;
-};
-
 message Recipient {
     oneof recipient {
         bytes address = 1;
-        Alias alias = 2;
+        string alias = 2;
     };
 };
