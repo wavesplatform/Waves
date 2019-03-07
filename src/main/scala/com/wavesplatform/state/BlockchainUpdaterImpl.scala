@@ -590,7 +590,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
 
   override def assetDistribution(assetId: Asset): AssetDistribution = readLock {
     val fromInner = blockchain.assetDistribution(assetId)
-    val fromNg    = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, portfolio(_).assets.getOrElse(assetId, 0L)))
+    val fromNg    = AssetDistribution(changedBalances(_.assets.getOrElse(assetId, 0L) != 0, balance(_, Some(assetId))))
 
     fromInner |+| fromNg
   }
@@ -602,12 +602,12 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
     blockchain.assetDistributionAtHeight(assetId, height, count, fromAddress)
   }
 
-  override def wavesDistribution(height: Int): Map[Address, Long] = readLock {
+  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readLock {
     ngState.fold(blockchain.wavesDistribution(height)) { _ =>
       val innerDistribution = blockchain.wavesDistribution(height)
       if (height < this.height) innerDistribution
       else {
-        innerDistribution ++ changedBalances(_.balance != 0, portfolio(_).balance)
+        innerDistribution.map(_ ++ changedBalances(_.balance != 0, balance(_)))
       }
     }
   }
@@ -633,7 +633,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
     ngState.fold(blockchain.collectLposPortfolios(pf)) { ng =>
       val b = Map.newBuilder[Address, A]
       for ((a, p) <- ng.bestLiquidDiff.portfolios if p.lease != LeaseBalance.empty || p.balance != 0) {
-        pf.runWith(b += a -> _)(a -> portfolio(a).copy(assets = Map.empty))
+        pf.runWith(b += a -> _)(a -> this.wavesPortfolio(a))
       }
 
       blockchain.collectLposPortfolios(pf) ++ b.result()

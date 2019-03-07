@@ -18,7 +18,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.encode.Base64
 
 class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with NoShrink with TransactionGen {
-  property("check serializion of script with all functions") {
+  property("check serialization of script with all functions") {
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", true)
     val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))

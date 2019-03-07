@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats._
+import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -18,7 +19,7 @@ import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetSc
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{smart, _}
 
-import scala.util.{Left, Right}
+import scala.util.{Left, Right, Try}
 
 object CommonValidation {
 
@@ -90,7 +91,9 @@ object CommonValidation {
                 s"${blockchain.balance(ptx.sender, Waves)} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, Waves, mtx.fee)
-        case _                            => Right(tx)
+        case citx: ContractInvocationTransaction =>
+          checkTransfer(citx.sender, citx.payment.flatMap(_.assetId), citx.payment.map(_.amount).getOrElse(0), None, citx.fee)
+        case _ => Right(tx)
       }
     } else Right(tx)
 
@@ -308,4 +311,12 @@ object CommonValidation {
   }
 
   def cond[A](c: Boolean)(a: A, b: A): A = if (c) a else b
+
+  def validateOverflow(dataList: Traversable[Long], errMsg: String): Either[ValidationError, Unit] = {
+    Try(dataList.foldLeft(0L)(Math.addExact))
+      .fold(
+        _ => GenericError(errMsg).asLeft[Unit],
+        _ => ().asRight[ValidationError]
+      )
+  }
 }

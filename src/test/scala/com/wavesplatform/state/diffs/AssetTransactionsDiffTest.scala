@@ -287,7 +287,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
           case (blockDiff, newState) =>
             val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.assets(Asset(issue.id())) shouldEqual issue.quantity
-            newState.portfolio(newState.resolveAlias(transfer.recipient).explicitGet()).assets(Asset(issue.id())) shouldEqual transfer.amount
+            newState.balance(newState.resolveAlias(transfer.recipient).explicitGet(), Some(Asset(issue.id())) shouldEqual transfer.amount
         }
     }
   }

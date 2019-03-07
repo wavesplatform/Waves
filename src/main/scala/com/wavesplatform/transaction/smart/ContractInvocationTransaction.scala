@@ -6,9 +6,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
-import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL, REF}
+import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.AssetId._
 import com.wavesplatform.transaction.ValidationError.GenericError

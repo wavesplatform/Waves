@@ -49,7 +49,7 @@ object CompilationError {
   }
 
   final case class BadFunctionSignatureSameArgNames(start: Int, end: Int, name: String) extends CompilationError {
-    val message = s"Function'$name' declared with duplicating argument names"
+    val message = s"Function '$name' declared with duplicating argument names"
   }
 
   final case class FunctionNotFound(start: Int, end: Int, name: String, argTypes: List[String]) extends CompilationError {

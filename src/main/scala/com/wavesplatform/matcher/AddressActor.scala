@@ -26,10 +26,10 @@ import scala.util.{Failure, Success}
 class AddressActor(
     owner: Address,
     spendableBalance: AssetId => Long,
-    maxTimestampDrift: FiniteDuration,
     cancelTimeout: FiniteDuration,
     time: Time,
     orderDB: OrderDB,
+    hasOrder: Order.Id => Boolean,
     storeEvent: StoreEvent,
 ) extends Actor
     with ScorexLogging {
@@ -75,8 +75,7 @@ class AddressActor(
     OrderValidator.accountStateAware(owner,
                                      tradableBalance,
                                      activeOrders.size,
-                                     latestOrderTs - maxTimestampDrift.toMillis,
-                                     id => activeOrders.contains(id) || orderDB.contains(id)) _
+                                     id => activeOrders.contains(id) || orderDB.containsInfo(id) || hasOrder(id)) _
 
   private def handleCommands: Receive = {
     case evt: BalanceUpdated =>
@@ -117,17 +116,14 @@ class AddressActor(
             Future.successful(api.OrderCancelRejected(reason))
         })(_.future) pipeTo sender()
 
-    case CancelAllOrders(maybePair, timestamp) =>
-      if ((timestamp - latestOrderTs).abs <= maxTimestampDrift.toMillis) {
-        val batchCancelFutures = for {
-          lo <- activeOrders.values
-          if maybePair.forall(_ == lo.order.assetPair)
-        } yield storeCanceled(lo.order.assetPair, lo.order.id()).map(lo.order.id() -> _)
+    case CancelAllOrders(maybePair, _) =>
+      val batchCancelFutures = for {
+        lo <- activeOrders.values
+        if maybePair.forall(_ == lo.order.assetPair)
+      } yield storeCanceled(lo.order.assetPair, lo.order.id()).map(lo.order.id() -> _)
 
-        Future.sequence(batchCancelFutures).map(_.toMap).map(api.BatchCancelCompleted).pipeTo(sender())
-      } else {
-        sender() ! api.OrderCancelRejected("Invalid timestamp")
-      }
+      Future.sequence(batchCancelFutures).map(_.toMap).map(api.BatchCancelCompleted).pipeTo(sender())
+
     case CancelExpiredOrder(id) =>
       expiration.remove(id)
       for (lo <- activeOrders.get(id)) {

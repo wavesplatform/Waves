@@ -429,4 +429,117 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe Left("test fail")
   }
 
+  property("postfix syntax (one argument)") {
+    val src =
+      """
+        |let x = true
+        |x.ensure("test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(TRUE)
+  }
+
+  property("postfix syntax (no arguments)") {
+    val src =
+      """unit.isDefined()"""
+    eval[EVALUATED](src) shouldBe Right(FALSE)
+  }
+
+  property("postfix syntax (many argument)") {
+    val src =
+      """ 5.fraction(7,2) """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(17L))
+  }
+
+  property("postfix syntax (users defined function)") {
+    val src =
+      """
+        |func dub(s:String) = { s+s }
+        |"qwe".dub()
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(CONST_STRING("qweqwe"))
+  }
+
+  property("extract UTF8 string") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toUtf8String() """
+    eval[EVALUATED](src) shouldBe Right(CONST_STRING("abcdefghi"))
+  }
+
+  property("extract Long") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0x6162636465666768l))
+  }
+
+  property("extract Long by offset") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt(1) """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0x6263646566676869l))
+  }
+
+  property("extract Long by offset (patrial)") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt(2) """
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+  }
+
+  property("extract Long by offset (out of bounds)") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt(10) """
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+  }
+
+  property("extract Long by offset (negative)") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt(-2) """
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+  }
+
+  property("indexOf") {
+    val src =
+      """ "qweqwe".indexOf("we") """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(1L))
+  }
+
+  property("indexOf with start offset") {
+    val src =
+      """ "qweqwe".indexOf("we", 2) """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(4L))
+  }
+
+  property("indexOf (not present)") {
+    val src =
+      """ "qweqwe".indexOf("ww") """
+    eval[EVALUATED](src) shouldBe Right(unit)
+  }
+
+  property("split") {
+    val src =
+      """ "q:we:.;q;we:x;q.we".split(":.;") """
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("q:we"), CONST_STRING("q;we:x;q.we"))))
+  }
+
+  property("parseInt") {
+    val src =
+      """ "42".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
+  }
+
+  property("parseIntValue") {
+    val src =
+      """ "42".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
+  }
+
+  property("parseInt fail") {
+    val src =
+      """ "x42".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(unit)
+  }
+
+  property("parseIntValue fail") {
+    val src =
+      """ "x42".parseIntValue() """
+    eval[EVALUATED](src) shouldBe 'left
+  }
 }

@@ -10,7 +10,7 @@ import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
 object StorageFactory extends ScorexLogging {
-  private val StorageVersion = 3
+  private val StorageVersion = 4
 
   def apply(settings: WavesSettings, db: DB, time: Time, spendableBalanceChanged: Observer[(Address, AssetId)]): BlockchainUpdater with NG = {
     checkVersion(db)

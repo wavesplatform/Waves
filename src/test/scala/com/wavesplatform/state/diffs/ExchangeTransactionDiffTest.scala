@@ -483,7 +483,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx)), fs) {
           case (blockDiff, state) =>
             blockDiff.portfolios(tx.sender).balance shouldBe tx.buyMatcherFee + tx.sellMatcherFee - tx.fee
-            state.portfolio(tx.sender).balance shouldBe 0L
+            state.balance(tx.sender) shouldBe 0L
         }
     }
   }

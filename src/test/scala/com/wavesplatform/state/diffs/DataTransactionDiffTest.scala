@@ -58,7 +58,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
         assertDiffAndState(Seq(genesis), blocks(0), fs) {
           case (totalDiff, state) =>
             assertBalanceInvariant(totalDiff)
-            state.portfolio(sender).balance shouldBe (ENOUGH_AMT - txs(0).fee)
+            state.balance(sender) shouldBe (ENOUGH_AMT - txs(0).fee)
             state.accountData(sender, item1.key) shouldBe Some(item1)
             state.accountData(sender).data.get(item1.key) shouldBe Some(item1)
         }
@@ -67,7 +67,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
         assertDiffAndState(Seq(genesis, blocks(0)), blocks(1), fs) {
           case (totalDiff, state) =>
             assertBalanceInvariant(totalDiff)
-            state.portfolio(sender).balance shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee).sum)
+            state.balance(sender) shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee).sum)
             state.accountData(sender, item1.key) shouldBe Some(item1)
             state.accountData(sender).data.get(item1.key) shouldBe Some(item1)
             state.accountData(sender, item2.key) shouldBe Some(item2)
@@ -78,7 +78,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
         assertDiffAndState(Seq(genesis, blocks(0), blocks(1)), blocks(2), fs) {
           case (totalDiff, state) =>
             assertBalanceInvariant(totalDiff)
-            state.portfolio(sender).balance shouldBe (ENOUGH_AMT - txs.map(_.fee).sum)
+            state.balance(sender) shouldBe (ENOUGH_AMT - txs.map(_.fee).sum)
             state.accountData(sender, item1.key) shouldBe Some(item3)
             state.accountData(sender).data.get(item1.key) shouldBe Some(item3)
             state.accountData(sender, item2.key) shouldBe Some(item2)

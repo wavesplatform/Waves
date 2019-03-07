@@ -72,7 +72,7 @@ object Dependencies {
     akkaModule("persistence"),
     akkaModule("persistence-tck") % "test",
     "com.github.dnvriend"         %% "akka-persistence-inmemory" % "2.5.15.1" % "test",
-    "com.typesafe.akka"           %% "akka-stream-kafka" % "1.0-RC1",
+    "com.typesafe.akka"           %% "akka-stream-kafka" % "1.0-RC2",
     "org.ethereum"                % "leveldbjni-all" % "1.18.3"
   )
 
@@ -114,4 +114,19 @@ object Dependencies {
   )
   lazy val kindProjector = "org.spire-math" %% "kind-projector"     % "0.9.6"
   lazy val betterFor     = "com.olegpy"     %% "better-monadic-for" % "0.3.0-M4"
+  
+  lazy val protobuf = Def.setting {
+    val version = scalapb.compiler.Version.scalapbVersion
+    Seq(
+      // "com.google.protobuf" % "protobuf-java" % "3.4.0",
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf",
+      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0"
+    )
+  }
+  
+  lazy val grpc = Seq(
+    "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion,
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+  )
 }

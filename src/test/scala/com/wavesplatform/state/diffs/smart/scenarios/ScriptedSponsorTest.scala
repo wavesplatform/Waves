@@ -54,14 +54,11 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         val sponsor = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
 
         assertDiffAndState(setupBlocks :+ TestBlock.create(Nil), transferBlock, fs) { (diff, blck) =>
-          val contractPortfolio = blck.portfolio(contract)
-          val sponsorPortfolio  = blck.portfolio(sponsor)
+          blck.balance(contract, Some(assetId)) shouldEqual ENOUGH_FEE * 2
+          blck.balance(contract) shouldEqual ENOUGH_AMT - contractSpent
 
-          contractPortfolio.balanceOf(Asset(assetId)) shouldEqual ENOUGH_FEE * 2
-          contractPortfolio.balanceOf(Waves) shouldEqual ENOUGH_AMT - contractSpent
-
-          sponsorPortfolio.balanceOf(Asset(assetId)) shouldEqual Long.MaxValue - ENOUGH_FEE * 2
-          sponsorPortfolio.balanceOf(Waves) shouldEqual ENOUGH_AMT - sponsorSpent
+          blck.balance(sponsor, Some(assetId)) shouldEqual Long.MaxValue - ENOUGH_FEE * 2
+          blck.balance(sponsor) shouldEqual ENOUGH_AMT - sponsorSpent
         }
     }
   }
@@ -80,14 +77,11 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         val recipientSpent: Long = 1
 
         assertDiffAndState(setupBlocks :+ TestBlock.create(Nil), transferBlock, fs) { (diff, blck) =>
-          val contractPortfolio  = blck.portfolio(contract)
-          val recipientPortfolio = blck.portfolio(recipient)
+          blck.balance(contract, Some(assetId)) shouldEqual Long.MaxValue - ENOUGH_FEE * 2
+          blck.balance(contract) shouldEqual ENOUGH_AMT - contractSpent
 
-          contractPortfolio.balanceOf(Asset(assetId)) shouldEqual Long.MaxValue - ENOUGH_FEE * 2
-          contractPortfolio.balanceOf(Waves) shouldEqual ENOUGH_AMT - contractSpent
-
-          recipientPortfolio.balanceOf(Asset(assetId)) shouldEqual ENOUGH_FEE * 2
-          recipientPortfolio.balanceOf(Waves) shouldEqual ENOUGH_AMT - recipientSpent
+          blck.balance(recipient, Some(assetId)) shouldEqual ENOUGH_FEE * 2
+          blck.balance(recipient) shouldEqual ENOUGH_AMT - recipientSpent
         }
     }
   }
