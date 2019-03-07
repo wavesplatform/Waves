@@ -1,16 +1,17 @@
 package com.wavesplatform.transaction
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 import play.api.libs.json._
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class DataTransaction private (sender: PublicKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
     extends ProvenTransaction
@@ -54,25 +55,21 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
   val MaxEntryCount = 100
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      val p0     = KeyLength
-      val sender = PublicKeyAccount(bytes.slice(0, p0))
-
-      val entryCount = Shorts.fromByteArray(bytes.drop(p0))
-      val (entries, p1) =
-        if (entryCount > 0) {
-          val parsed = List.iterate(DataEntry.parse(bytes, p0 + 2), entryCount) { case (e, p) => DataEntry.parse(bytes, p) }
-          (parsed.map(_._1), parsed.last._2)
-        } else (List.empty, p0 + 2)
-
-      val timestamp = Longs.fromByteArray(bytes.drop(p1))
-      val feeAmount = Longs.fromByteArray(bytes.drop(p1 + 8))
-      val txEi = for {
-        proofs <- Proofs.fromBytes(bytes.drop(p1 + 16))
-        tx     <- create(sender, entries, feeAmount, timestamp, proofs)
-      } yield tx
-      txEi.fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      (
+        if (tx.data.lengthCompare(MaxEntryCount) > 0 || tx.data.exists(!_.valid)) {
+          Left(ValidationError.TooBigArray)
+        } else if (tx.data.exists(_.key.isEmpty)) {
+          Left(ValidationError.GenericError("Empty key found"))
+        } else if (tx.data.map(_.key).distinct.lengthCompare(tx.data.size) < 0) {
+          Left(ValidationError.GenericError("Duplicate keys found"))
+        } else if (tx.fee <= 0) {
+          Left(ValidationError.InsufficientFee)
+        } else {
+          Either.cond(tx.bytes().length <= MaxBytes, tx, ValidationError.TooBigArray)
+        }
+      ).foldToTry
+    }
   }
 
   def create(sender: PublicKeyAccount,
@@ -106,5 +103,24 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
 
   def selfSigned(sender: PrivateKeyAccount, data: List[DataEntry[_]], feeAmount: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, data, feeAmount, timestamp, sender)
+  }
+
+  val byteTailDescription: ByteEntity[DataTransaction] = {
+    (
+      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      ListDataEntryBytes(tailIndex(2)),
+      LongBytes(tailIndex(3), "Timestamp"),
+      LongBytes(tailIndex(4), "Fee"),
+      ProofsBytes(tailIndex(5))
+    ) mapN {
+      case (senderPublicKey, data, timestamp, fee, proofs) =>
+        DataTransaction(
+          sender = senderPublicKey,
+          data = data,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
   }
 }
