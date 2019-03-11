@@ -3,10 +3,11 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ScriptType
+import com.wavesplatform.lang.{ContentType, ScriptType}
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -364,17 +365,23 @@ object WavesContext {
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
     )
 
+    val txVar = ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
+
     val vars = Map(
-      1 -> Map(("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))),
+      1 -> Map(txVar),
       2 -> Map(
         ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
         ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval)))),
-        ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
+        txVar
       ),
-      3 -> Map(
-        ("Sell", ((sellType.typeRef, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
-        ("Buy", ((buyType.typeRef, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
-      )
+      3 -> {
+        val v3Part1: Map[String, ((FINAL, String), LazyVal)] = Map(
+          ("Sell", ((sellType.typeRef, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
+          ("Buy", ((buyType.typeRef, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
+        )
+        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == ContentType.Expression) Map(txVar) else Map.empty
+        (v3Part1 ++ v3Part2)
+      }
     )
 
     lazy val functions = Array(
