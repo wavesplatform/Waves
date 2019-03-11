@@ -12,7 +12,7 @@ import com.wavesplatform.state.reader.CompositeBlockchain.composite
 
 final case class StateUpdate(balances: Map[(Address, Option[AssetId]), Long], leases: Map[Address, LeaseBalance])
 
-trait StateUpdateEvent
+sealed trait StateUpdateEvent
 final case class BlockAddEvent(b: Block, height: Int, blockStateUpdate: StateUpdate, transactionsStateUpdates: Seq[StateUpdate])
     extends StateUpdateEvent
 final case class MicroBlockEvent(b: MicroBlock, height: Int, microBlockStateUpdate: StateUpdate, transactionsStateUpdates: Seq[StateUpdate])
