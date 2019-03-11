@@ -224,7 +224,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
              |func sameName() = {
              |   WriteSet([DataEntry("a", sameName.contractAddress.bytes)])
              |}
-             |""") shouldBe 'right// now produce("already defined")
+             |""") shouldBe 'right // now produce("already defined")
         }
 
         "callable annotation binding and its function argument" in {

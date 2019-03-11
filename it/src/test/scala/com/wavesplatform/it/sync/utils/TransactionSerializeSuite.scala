@@ -1,27 +1,26 @@
 package com.wavesplatform.it.sync.utils
 
 import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKeyAccount}
-import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
-import com.wavesplatform.transaction.{CreateAliasTransactionV1, CreateAliasTransactionV2, DataTransaction, Proofs}
-import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.common.state.ByteStr
-import org.scalatest.prop.TableDrivenPropertyChecks
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
-import scorex.crypto.encode.Base64
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.ContractInvocationTransaction
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
+import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1, TransferTransactionV2}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1, TransferTransactionV2}
+import com.wavesplatform.transaction.{CreateAliasTransactionV1, CreateAliasTransactionV2, DataTransaction, Proofs}
+import org.scalatest.prop.TableDrivenPropertyChecks
+import scorex.crypto.encode.Base64
 
 class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
   private val publicKey         = PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get
@@ -127,7 +126,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private val aliasV1 = CreateAliasTransactionV1
     .create(
       publicKey,
-      Alias.buildWithCurrentChainId("myalias").right.get,
+      Alias.create("myalias").right.get,
       minFee,
       ts,
       ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get
@@ -138,7 +137,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private val aliasV2 = CreateAliasTransactionV2
     .create(
       publicKey,
-      Alias.buildWithCurrentChainId("myalias").right.get,
+      Alias.create("myalias").right.get,
       minFee,
       ts,
       Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get))

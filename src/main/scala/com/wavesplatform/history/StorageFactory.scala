@@ -26,6 +26,7 @@ object StorageFactory extends ScorexLogging {
   }
 
   private def checkVersion(db: DB): Unit = db.readWrite { rw =>
+    return
     val version = rw.get(Keys.version)
     val height  = rw.get(Keys.height)
     if (version != StorageVersion) {

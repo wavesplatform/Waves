@@ -72,7 +72,7 @@ trait PBImplicitConversions {
 
   implicit class PBRecipientConversions(r: Recipient) {
     def toAddress        = Address.fromBytes(r.getAddress.toByteArray).explicitGet()
-    def toAlias          = Alias.buildAlias(if (r.getAlias.chainId.isEmpty) 0: Byte else r.getAlias.chainId.byteAt(0), r.getAlias.name).explicitGet()
+    def toAlias          = Alias.create(r.getAlias).explicitGet()
     def toAddressOrAlias = if (r.recipient.isAddress) toAddress else toAlias
   }
 
