@@ -1,8 +1,8 @@
 // Transactions
 syntax = "proto3";
 option java_package = "com.wavesplatform.protobuf.transaction";
-import "scripts.proto";
-import "address.proto";
+import "script.proto";
+import "recipient.proto";
 
 message AssetAmount {
     bytes assetId = 1;

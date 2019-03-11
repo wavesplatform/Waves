@@ -1,6 +1,6 @@
 // Transactions
 syntax = "proto3";
-option java_package = "com.wavesplatform.protobuf.account";
+option java_package = "com.wavesplatform.protobuf.transaction";
 
 message Recipient {
     oneof recipient {

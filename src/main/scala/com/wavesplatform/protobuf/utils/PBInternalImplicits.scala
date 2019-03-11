@@ -2,8 +2,7 @@ package com.wavesplatform.protobuf.utils
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.account.Recipient
-import com.wavesplatform.protobuf.transaction.{Amount, AssetAmount, PBRecipients, VanillaAssetId}
+import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.ValidationError
 
 private[protobuf] object PBInternalImplicits {
@@ -16,8 +15,8 @@ private[protobuf] object PBInternalImplicits {
   implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = PBRecipients.create(addressOrAlias)
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {
-    def toAddress: Either[ValidationError, VAddress] = PBRecipients.toAddress(recipient)
-    def toAlias: Either[ValidationError, VAlias] = PBRecipients.toAlias(recipient)
+    def toAddress: Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient)
+    def toAlias: Either[ValidationError, VAlias]                  = PBRecipients.toAlias(recipient)
     def toAddressOrAlias: Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient)
   }
 

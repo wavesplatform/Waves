@@ -4,7 +4,7 @@ import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.ExchangeTransactionData.{BuySellOrders, Orders}
 import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.protobuf.transaction.smart.script.{Script => PBScript}
+import com.wavesplatform.protobuf.transaction.{Script => PBScript}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptReader

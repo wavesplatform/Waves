@@ -2,15 +2,14 @@ package com.wavesplatform.protobuf.transaction
 import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
-import com.wavesplatform.protobuf.account.Recipient
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 
 object PBRecipients {
   def create(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
     case a: Address => Recipient().withAddress(ByteString.copyFrom(a.bytes.arr.slice(2, a.bytes.arr.length - Address.ChecksumLength)))
-    case a: Alias => Recipient().withAlias(a.name)
-    case _ => sys.error("Should not happen " + addressOrAlias)
+    case a: Alias   => Recipient().withAlias(a.name)
+    case _          => sys.error("Should not happen " + addressOrAlias)
   }
 
   def toAddress(r: Recipient): Either[ValidationError, Address] = r.recipient match {
@@ -24,7 +23,7 @@ object PBRecipients {
 
   def toAlias(r: Recipient): Either[ValidationError, Alias] = r.recipient match {
     case Recipient.Recipient.Alias(alias) => Alias.create(alias)
-    case _ => Left(GenericError(s"Not an alias: $r"))
+    case _                                => Left(GenericError(s"Not an alias: $r"))
   }
 
   def toAddressOrAlias(r: Recipient): Either[ValidationError, AddressOrAlias] = {

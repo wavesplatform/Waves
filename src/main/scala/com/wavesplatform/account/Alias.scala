@@ -21,9 +21,10 @@ object Alias {
 
   val aliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
 
-  private[this] val AliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
+  private[this] val AliasPatternInfo     = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
   private[this] def currentChainId: Byte = AddressScheme.current.chainId
-  private[this] def isValidAliasChar(c: Char): Boolean = ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
+  private[this] def isValidAliasChar(c: Char): Boolean =
+    ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
   private[wavesplatform] def createWithChainId(name: String, chainId: Byte = currentChainId): Either[ValidationError, Alias] = {
     final case class AliasImpl(chainId: Byte, name: String) extends Alias
