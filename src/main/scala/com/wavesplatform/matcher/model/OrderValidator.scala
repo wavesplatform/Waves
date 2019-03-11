@@ -9,7 +9,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
-import com.wavesplatform.matcher.util._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.AssetType.AssetType
@@ -24,6 +23,7 @@ import com.wavesplatform.utils.Time
 import kamon.Kamon
 import shapeless.Coproduct
 
+import scala.math.BigDecimal.RoundingMode
 import scala.util.control.NonFatal
 
 object OrderValidator {
@@ -155,6 +155,8 @@ object OrderValidator {
 
   private[matcher] def getMinValidFee(order: Order, percentSettings: PercentSettings): Long = {
 
+    def multiplyLongByDouble(l: Long, d: Double): Long = (BigDecimal(l) * d).setScale(0, RoundingMode.HALF_UP).toLong
+
     lazy val receiveAmount = order.getReceiveAmount(order.amount, order.price).explicitGet()
     lazy val spentAmount   = order.getSpendAmount(order.amount, order.price).explicitGet()
 
@@ -172,7 +174,7 @@ object OrderValidator {
     for {
       _ <- (Right(order): ValidationResult)
         .ensure(s"Matcher's fee asset in order (${order.matcherFeeAssetId}) does not meet matcher's settings requirements") { order =>
-          val isMatcherFeeAssetValid = orderFeeSettings match {
+          lazy val isMatcherFeeAssetValid = orderFeeSettings match {
             case _: FixedWavesSettings            => order.matcherFeeAssetId.isEmpty
             case FixedSettings(defaultAssetId, _) => order.matcherFeeAssetId == defaultAssetId
             case PercentSettings(assetType, _)    => order.matcherFeeAssetId == getValidFeeAsset(order, assetType)
@@ -181,7 +183,7 @@ object OrderValidator {
         }
       _ <- (Right(order): ValidationResult)
         .ensure(s"Matcher's fee (${order.matcherFee}) is less than minimally admissible one") { order =>
-          val isMatcherFeeValid = orderFeeSettings match {
+          lazy val isMatcherFeeValid = orderFeeSettings match {
             case FixedWavesSettings(wavesMinFee)  => order.matcherFee >= wavesMinFee
             case FixedSettings(_, fixedMinFee)    => order.matcherFee >= fixedMinFee
             case percentSettings: PercentSettings => order.matcherFee >= getMinValidFee(order, percentSettings)
