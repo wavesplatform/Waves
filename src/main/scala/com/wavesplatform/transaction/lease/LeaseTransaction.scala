@@ -1,11 +1,11 @@
 package com.wavesplatform.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
-import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKeyAccount}
 import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, VersionedTransaction}
-import com.wavesplatform.crypto._
+import monix.eval.Coeval
+import play.api.libs.json.{JsObject, Json}
+
 import scala.util.Try
 
 trait LeaseTransaction extends ProvenTransaction with VersionedTransaction {
@@ -36,7 +36,11 @@ object LeaseTransaction {
     val Canceled = "canceled"
   }
 
-  def validateLeaseParams(amount: Long, fee: Long, recipient: AddressOrAlias, sender: PublicKeyAccount) =
+  def validateLeaseParams(tx: LeaseTransaction): Either[ValidationError, Unit] = {
+    validateLeaseParams(tx.amount, tx.fee, tx.recipient, tx.sender)
+  }
+
+  def validateLeaseParams(amount: Long, fee: Long, recipient: AddressOrAlias, sender: PublicKeyAccount): Either[ValidationError, Unit] =
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "waves"))
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
@@ -46,18 +50,4 @@ object LeaseTransaction {
     } else if (recipient.isInstanceOf[Address] && sender.stringRepr == recipient.stringRepr) {
       Left(ValidationError.ToSelf)
     } else Right(())
-
-  def parseBase(bytes: Array[Byte], start: Int) = {
-    val sender = PublicKeyAccount(bytes.slice(start, start + KeyLength))
-    for {
-      recRes <- AddressOrAlias.fromBytes(bytes, start + KeyLength)
-      (recipient, recipientEnd) = recRes
-      quantityStart             = recipientEnd
-      quantity                  = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
-      fee                       = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
-      end                       = quantityStart + 24
-      timestamp                 = Longs.fromByteArray(bytes.slice(quantityStart + 16, end))
-    } yield (sender, recipient, quantity, fee, timestamp, end)
-  }
-
 }

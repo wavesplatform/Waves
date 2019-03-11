@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.StdLibVersion.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.{CaseType, DefinedType, UnionType}
 
 object Types {
@@ -13,11 +12,8 @@ object Types {
   val addressOrAliasType = UNION(addressType.typeRef, aliasType.typeRef)
 
   val transfer         = CaseType("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
-  val optionByteVector = UNION(BYTESTR, UNIT)
 
   val optionAddress        = UNION(addressType.typeRef, UNIT)
-  val optionLong           = UNION(LONG, UNIT)
-  val listByteVector: LIST = LIST(BYTESTR)
   val listTransfers        = LIST(transfer.typeRef)
   val paymentType          = CaseType("AttachedPayment", List("asset" -> optionByteVector, "amount" -> LONG))
 
@@ -260,18 +256,17 @@ object Types {
     List(genesisTransactionType, buildPaymentTransactionType(proofsEnabled))
   }
 
-  def buildAssetSupportedTransactions(proofsEnabled: Boolean) = List(
+  def buildAssetSupportedTransactions(proofsEnabled: Boolean, v: StdLibVersion) = List(
     buildReissueTransactionType(proofsEnabled),
     buildBurnTransactionType(proofsEnabled),
     buildMassTransferTransactionType(proofsEnabled),
     buildExchangeTransactionType(proofsEnabled),
     buildTransferTransactionType(proofsEnabled),
-    buildSetAssetScriptTransactionType(proofsEnabled),
-    buildContractInvokationTransactionType(proofsEnabled),
-  )
+    buildSetAssetScriptTransactionType(proofsEnabled)
+  ) ++ (if (v == StdLibVersion.V3) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CaseType] = {
-    buildAssetSupportedTransactions(proofsEnabled) ++
+    buildAssetSupportedTransactions(proofsEnabled, v) ++
       List(
         buildIssueTransactionType(proofsEnabled),
         buildLeaseTransactionType(proofsEnabled),
@@ -280,7 +275,7 @@ object Types {
         buildSetScriptTransactionType(proofsEnabled),
         buildSponsorFeeTransactionType(proofsEnabled),
         buildDataTransactionType(proofsEnabled)
-      ) ++ (if (v == StdLibVersion.V3) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
+      )
   }
 
   def buildWavesTypes(proofsEnabled: Boolean, v: StdLibVersion): Seq[DefinedType] = {

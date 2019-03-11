@@ -18,6 +18,7 @@ sealed trait BaseFunction {
   @JSExport def name: String
   @JSExport def docString: String
   @JSExport def argsDoc: Array[(String, String)]
+  @JSExport def deprecated: Boolean = false
 }
 
 object BaseFunction {
@@ -60,7 +61,8 @@ case class UserFunction(@(JSExport @field) name: String,
                         @(JSExport @field) signature: FunctionTypeSignature,
                         ev: EXPR,
                         @(JSExport @field) docString: String,
-                        @(JSExport @field) argsDoc: Array[(String, String)])
+                        @(JSExport @field) argsDoc: Array[(String, String)]
+                        )
     extends BaseFunction {
 
   @(JSExport @field)
@@ -71,6 +73,9 @@ object UserFunction {
 
   def apply(name: String, cost: Long, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(ev: EXPR): UserFunction =
     UserFunction(name, name, StdLibVersion.SupportedVersions.map(_ -> cost).toMap, resultType, docString, args: _*)(ev)
+
+  def deprecated(name: String, cost: Long, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(ev: EXPR): UserFunction =
+    UserFunction.deprecated(name, name, StdLibVersion.SupportedVersions.map(_ -> cost).toMap, resultType, docString, args: _*)(ev)
 
   def apply(name: String, costByLibVersion: Map[StdLibVersion, Long], resultType: TYPE, docString: String, args: (String, TYPE, String)*)(
       ev: EXPR): UserFunction =
@@ -95,4 +100,20 @@ object UserFunction {
       docString = docString,
       argsDoc = args.map(a => (a._1 -> a._3)).toArray
     )
+
+  def deprecated(name: String,
+            internalName: String,
+            costByLibVersion: Map[StdLibVersion, Long],
+            resultType: TYPE,
+            docString: String,
+            args: (String, TYPE, String)*)(ev: EXPR): UserFunction =
+    new UserFunction(
+      name = name,
+      internalName = internalName,
+      costByLibVersion = costByLibVersion,
+      signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.User(internalName)),
+      ev = ev,
+      docString = docString,
+      argsDoc = args.map(a => (a._1 -> a._3)).toArray
+    ) { override def deprecated = true }
 }
