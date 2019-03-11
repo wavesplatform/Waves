@@ -65,6 +65,7 @@ object JsAPI {
   )
 
   private val cryptoContext = CryptoContext.build(Global)
+  private val letBLockVersions = Set(StdLibVersion.V1, StdLibVersion.V2)
 
   private def typeRepr(t: TYPE): js.Any = t match {
     case UNION(l) => l.map(typeRepr).toJSArray
@@ -147,7 +148,7 @@ object JsAPI {
           case ContentType.Expression =>
             val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset)
             Global
-              .compileScript(input, ctx.compilerContext)
+              .compileExpression(input, ctx.compilerContext, letBLockVersions contains ver)
               .fold(
                 err => {
                   js.Dynamic.literal("error" -> err)

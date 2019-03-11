@@ -10,9 +10,6 @@ import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.{functionCosts, varNames}
 import monix.eval.Coeval
 
-import scala.annotation.tailrec
-import scala.collection.mutable._
-
 object ExprScript {
   val checksumLength = 4
 
@@ -37,27 +34,9 @@ object ExprScript {
         val s = Array(stdLibVersion.toByte) ++ Serde.serialize(expr)
         ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
       }
-    override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(isExprContainsBlockV2(expr))
+    override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.сontainsBlockV2(expr))
   }
 
-  def isExprContainsBlockV2(e: EXPR): Boolean = {
-    @tailrec
-    def horTraversal(queue: MutableList[EXPR]): Boolean = {
-      queue.headOption match {
-        case Some(expr) =>
-          expr match {
-            case BLOCK(_, _)                => true
-            case GETTER(expr1, _)           => horTraversal(queue.tail += expr1)
-            case LET_BLOCK(let, body)       => horTraversal(queue.tail ++ MutableList(let.value, body))
-            case IF(expr1, expr2, expr3)    => horTraversal(queue.tail ++ MutableList(expr1, expr2, expr3))
-            case FUNCTION_CALL(_, exprList) => horTraversal(queue.tail ++ exprList)
-            case _                          => false
-          }
-        case None => false
-      }
-    }
-    horTraversal(Queue(e))
-  }
 }
 
 trait ExprScript extends Script {

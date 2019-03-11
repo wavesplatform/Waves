@@ -1,13 +1,16 @@
 package com.wavesplatform.transaction.assets
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
+import com.wavesplatform.transaction.description._
+import com.wavesplatform.transaction.smart.script.Script
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -53,25 +56,13 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
   private def currentChainId = AddressScheme.current.chainId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      val chainId                                                                                       = bytes(0)
-      val (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, scriptStart) = IssueTransaction.parseBase(bytes, 1)
-      val (scriptOptEi: Option[Either[ValidationError.ScriptParseError, Script]], scriptEnd) =
-        Deser.parseOption(bytes, scriptStart)(ScriptReader.fromBytes)
-      val scriptEiOpt: Either[ValidationError.ScriptParseError, Option[Script]] = scriptOptEi match {
-        case None            => Right(None)
-        case Some(Right(sc)) => Right(Some(sc))
-        case Some(Left(err)) => Left(err)
-      }
-
-      (for {
-        proofs <- Proofs.fromBytes(bytes.drop(scriptEnd))
-        script <- scriptEiOpt
-        tx <- IssueTransactionV2
-          .create(chainId, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
-      } yield tx).left.map(e => new Throwable(e.toString)).toTry
-
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      Either
+        .cond(tx.chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${tx.chainId.toInt}, expected: $currentChainId"))
+        .flatMap(_ => IssueTransaction.validateIssueParams(tx))
+        .map(_ => tx)
+        .foldToTry
+    }
   }
 
   def create(chainId: Byte,
@@ -119,5 +110,36 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
+  }
+
+  val byteTailDescription: ByteEntity[IssueTransactionV2] = {
+    (
+      OneByte(tailIndex(1), "Chain ID"),
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      BytesArrayUndefinedLength(tailIndex(3), "Name"),
+      BytesArrayUndefinedLength(tailIndex(4), "Description"),
+      LongBytes(tailIndex(5), "Quantity"),
+      OneByte(tailIndex(6), "Decimals"),
+      BooleanByte(tailIndex(7), "Reissuable flag (1 - True, 0 - False)"),
+      LongBytes(tailIndex(8), "Fee"),
+      LongBytes(tailIndex(9), "Timestamp"),
+      OptionBytes(index = tailIndex(10), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(10), "Script")),
+      ProofsBytes(tailIndex(11))
+    ) mapN {
+      case (chainId, senderPublicKey, name, desc, quantity, decimals, reissuable, fee, timestamp, script, proofs) =>
+        IssueTransactionV2(
+          chainId = chainId,
+          sender = senderPublicKey,
+          name = name,
+          description = desc,
+          quantity = quantity,
+          decimals = decimals,
+          reissuable = reissuable,
+          script = script,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
   }
 }
