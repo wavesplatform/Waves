@@ -2,7 +2,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, _}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.directives.DirectiveParser
-import com.wavesplatform.lang.utils.{extractContentType, extractScriptType, extractStdLibVersion}
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
@@ -127,12 +127,12 @@ object JsAPI {
   @JSExportTopLevel("scriptInfo")
   def scriptInfo(input: String): js.Dynamic = {
     val directives = DirectiveParser(input)
-    val info = for {
-      ver         <- extractStdLibVersion(directives)
-      contentType <- extractContentType(directives)
-      scriptType  <- extractScriptType(directives)
-    } yield js.Dynamic.literal("stdLibVersion" -> ver, "contentType" -> contentType, "scriptType" -> scriptType)
-
+    val info = extractDirectives(directives) map {
+      case (ver, scriptType, contentType) => js.Dynamic.literal(
+        "stdLibVersion" -> ver,
+        "contentType" -> contentType,
+        "scriptType" -> scriptType)
+    }
     info.fold(
       err => js.Dynamic.literal("error" -> err),
       identity
@@ -142,37 +142,34 @@ object JsAPI {
   @JSExportTopLevel("compile")
   def compile(input: String): js.Dynamic = {
     val directives = DirectiveParser(input)
-    val compiled = for {
-      ver         <- extractStdLibVersion(directives)
-      contentType <- extractContentType(directives)
-      scriptType  <- extractScriptType(directives)
-    } yield {
-      contentType match {
-        case ContentType.Expression =>
-          val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset)
-          Global
-            .compileExpression(input, ctx.compilerContext, letBLockVersions contains ver)
-            .fold(
-              err => {
-                js.Dynamic.literal("error" -> err)
-              }, {
-                case (bytes, ast) =>
-                  js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
-              }
-            )
-        case ContentType.Contract =>
-          // Just ignore stdlib version here
-          Global
-            .compileContract(input, fullContractContext.compilerContext)
-            .fold(
-              err => {
-                js.Dynamic.literal("error" -> err)
-              }, {
-                case (bytes, ast) =>
-                  js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
-              }
-            )
-      }
+    val compiled = extractDirectives(directives) map {
+      case (ver, scriptType, contentType) =>
+        contentType match {
+          case ContentType.Expression =>
+            val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset)
+            Global
+              .compileExpression(input, ctx.compilerContext, letBLockVersions contains ver)
+              .fold(
+                err => {
+                  js.Dynamic.literal("error" -> err)
+                }, {
+                  case (bytes, ast) =>
+                    js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
+                }
+              )
+          case ContentType.Contract =>
+            // Just ignore stdlib version here
+            Global
+              .compileContract(input, fullContractContext.compilerContext)
+              .fold(
+                err => {
+                  js.Dynamic.literal("error" -> err)
+                }, {
+                  case (bytes, ast) =>
+                    js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
+                }
+              )
+        }
     }
 
     compiled.fold(
