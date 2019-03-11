@@ -29,7 +29,8 @@ package object predef {
                                             Coeval.evalOnce(t),
                                             Coeval.evalOnce(blockchain.height),
                                             blockchain,
-                                            isTokenContext = false)
+                                            isTokenContext = false,
+                                            isContract = false)
       r <- EvaluatorV1[T](evalContext, typedExpr)
     } yield r
   }

@@ -3,7 +3,9 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ScriptType
 import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -27,7 +29,13 @@ object WavesContext {
   lazy val contractResultType =
     CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
 
-  def build(version: StdLibVersion, env: Environment, isTokenContext: Boolean): CTX = {
+  def build(ds: DirectiveSet, env: Environment): CTX = {
+
+    val version = ds.stdLibVersion
+    val isTokenContext = ds.scriptType match {
+      case ScriptType.Account => false
+      case ScriptType.Asset   => true
+    }
     val environmentFunctions = new EnvironmentFunctions(env)
 
     val proofsEnabled = !isTokenContext
@@ -109,7 +117,7 @@ object WavesContext {
 
     def withExtract(f: BaseFunction) = {
       val args = f.signature.args.zip(f.argsDoc).map {
-          case ((name, ty), (_name, doc)) => ("@" ++ name, ty, doc)
+        case ((name, ty), (_name, doc)) => ("@" ++ name, ty, doc)
       }
       UserFunction(
         f.name ++ "Value",
@@ -117,10 +125,10 @@ object WavesContext {
         f.cost,
         f.signature.result.asInstanceOf[UNION].l.find(_ != UNIT).get,
         f.docString ++ " (fail on error)",
-        args : _*
-        ) {
-          FUNCTION_CALL(PureContext.extract, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))
-        }
+        args: _*
+      ) {
+        FUNCTION_CALL(PureContext.extract, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))
+      }
     }
 
     def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
@@ -396,22 +404,23 @@ object WavesContext {
     CTX(
       types ++ (if (version == V3) {
                   List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
-               } else List.empty),
+                } else List.empty),
       commonVars ++ vars(version),
-      functions ++ List(getIntegerFromStateF,
-                        getBooleanFromStateF,
-                        getBinaryFromStateF,
-                        getStringFromStateF,
-                        getIntegerFromArrayF,
-                        getBooleanFromArrayF,
-                        getBinaryFromArrayF,
-                        getStringFromArrayF,
-                        getIntegerByIndexF,
-                        getBooleanByIndexF,
-                        getBinaryByIndexF,
-                        getStringByIndexF,
-                        addressFromStringF
-                       ).map(withExtract)
+      functions ++ List(
+        getIntegerFromStateF,
+        getBooleanFromStateF,
+        getBinaryFromStateF,
+        getStringFromStateF,
+        getIntegerFromArrayF,
+        getBooleanFromArrayF,
+        getBinaryFromArrayF,
+        getStringFromArrayF,
+        getIntegerByIndexF,
+        getBooleanByIndexF,
+        getBinaryByIndexF,
+        getStringByIndexF,
+        addressFromStringF
+      ).map(withExtract)
     )
   }
 

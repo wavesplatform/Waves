@@ -24,7 +24,8 @@ object ScriptRunner {
           Coeval.evalOnce(in),
           Coeval.evalOnce(height),
           blockchain,
-          isTokenScript
+          isTokenScript,
+          false
         )
         EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
       case ContractScript.ContractScriptImpl(_, Contract(_, _, Some(vf)), _) =>
@@ -34,7 +35,8 @@ object ScriptRunner {
           Coeval.evalOnce(in),
           Coeval.evalOnce(height),
           blockchain,
-          isTokenScript
+          isTokenScript,
+          true
         )
         val evalContract = in.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.apply(t)),
                                         _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), _ => ???))

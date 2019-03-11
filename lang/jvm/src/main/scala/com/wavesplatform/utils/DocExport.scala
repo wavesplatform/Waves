@@ -1,5 +1,6 @@
 import cats.kernel.Monoid
 import com.github.mustachejava._
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -7,7 +8,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import com.wavesplatform.lang.{Global, StdLibVersion}
+import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 
 import scala.collection.JavaConverters._
 
@@ -18,7 +19,7 @@ object DocExport {
     } else {
       val version = StdLibVersion(args(1).toInt)
       val wavesContext = WavesContext.build(
-        version,
+        DirectiveSet(version, ScriptType.Account, ContentType.Contract),
         new Environment {
           override def height: Long                                                                                    = ???
           override def chainId: Byte                                                                                   = 66
@@ -28,8 +29,7 @@ object DocExport {
           override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
           override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
           override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-        },
-        isTokenContext = false
+        }
       )
 
       val cryptoContext = CryptoContext.build(Global)
