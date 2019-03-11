@@ -1,14 +1,16 @@
 package com.wavesplatform.transaction.transfer
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
-import com.wavesplatform.crypto._
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class TransferTransactionV1 private (assetId: Option[AssetId],
                                           sender: PublicKeyAccount,
@@ -34,25 +36,12 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
   override val typeId: Byte = TransferTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      val signature = ByteStr(bytes.slice(0, SignatureLength))
-      val txId      = bytes(SignatureLength)
-      require(txId == typeId, s"Signed tx id is not match")
-
-      (for {
-        parsed <- TransferTransaction.parseBase(bytes, SignatureLength + 1)
-        (sender, assetIdOpt, feeAssetIdOpt, timestamp, amount, feeAmount, recipient, attachment, _) = parsed
-        tt <- TransferTransactionV1.create(assetIdOpt.map(ByteStr(_)),
-                                           sender,
-                                           recipient,
-                                           amount,
-                                           timestamp,
-                                           feeAssetIdOpt.map(ByteStr(_)),
-                                           feeAmount,
-                                           attachment,
-                                           signature)
-      } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      TransferTransaction
+        .validate(tx)
+        .map(_ => tx)
+        .foldToTry
+    }
   }
 
   def create(assetId: Option[AssetId],
@@ -92,5 +81,34 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
     signed(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, sender)
+  }
+
+  val byteTailDescription: ByteEntity[TransferTransactionV1] = {
+    (
+      SignatureBytes(tailIndex(1), "Signature"),
+      ConstantByte(tailIndex(2), value = typeId, name = "Transaction type"),
+      PublicKeyAccountBytes(tailIndex(3), "Sender's public key"),
+      OptionBytes[AssetId](tailIndex(4), "Asset ID", AssetIdBytes(tailIndex(4), "Asset ID"), "flag (1 - asset, 0 - Waves)"),
+      OptionBytes[AssetId](tailIndex(5), "Fee's asset ID", AssetIdBytes(tailIndex(5), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
+      LongBytes(tailIndex(6), "Timestamp"),
+      LongBytes(tailIndex(7), "Amount"),
+      LongBytes(tailIndex(8), "Fee"),
+      AddressOrAliasBytes(tailIndex(9), "Recipient"),
+      BytesArrayUndefinedLength(tailIndex(10), "Attachment")
+    ) mapN {
+      case (signature, txId, senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments) =>
+        require(txId == typeId, s"Signed tx id is not match")
+        TransferTransactionV1(
+          assetId = assetId,
+          sender = senderPublicKey,
+          recipient = recipient,
+          amount = amount,
+          timestamp = timestamp,
+          feeAssetId = feeAssetId,
+          fee = fee,
+          attachment = attachments,
+          signature = signature
+        )
+    }
   }
 }

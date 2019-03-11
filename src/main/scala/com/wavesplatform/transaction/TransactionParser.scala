@@ -1,5 +1,8 @@
 package com.wavesplatform.transaction
 
+import cats.implicits._
+import com.wavesplatform.transaction.description.{ByteEntity, ConstantByte, OneByte}
+
 import scala.reflect.ClassTag
 import scala.util.Try
 
@@ -12,11 +15,49 @@ trait TransactionParser {
   def supportedVersions: Set[Byte]
 
   def parseBytes(bytes: Array[Byte]): Try[TransactionT] =
-    parseHeader(bytes) flatMap (offset => parseTail(bytes.drop(offset)))
+    parseHeader(bytes) flatMap (offset => parseTail(bytes drop offset))
 
   /** @return offset */
   protected def parseHeader(bytes: Array[Byte]): Try[Int]
   protected def parseTail(bytes: Array[Byte]): Try[TransactionT]
+
+  /** Byte description of the header of the transaction */
+  val byteHeaderDescription: ByteEntity[Unit]
+
+  /**
+    * Byte description of the transaction. Can be used for deserialization.
+    *
+    * Implementation example:
+    * {{{
+    *   val bytesTailDescription: ByteEntity[Transaction] =
+    *   (
+    *     OneByte(1, "Transaction type"),
+    *     OneByte(2, "Version"),
+    *     LongBytes(3, "Fee")
+    *   ) mapN { case (txType, version, fee) => Transaction(txType, version, fee) }
+    *
+    *   // deserialization from buf: Array[Byte]
+    *   val tx: Try[Transaction] = byteTailDescription.deserializeFromByteArray(buf)
+    * }}}
+    */
+  val byteTailDescription: ByteEntity[TransactionT]
+
+  /**
+    * Returns index of byte entity in `byteTailDescription`
+    * taking into account the last index in `byteHeaderDescription`
+    */
+  protected def tailIndex(index: Int): Int = byteHeaderDescription.index + index
+
+  /**
+    * Full byte description of the transaction (header + tail). Can be used for deserialization and generation of the documentation.
+    *
+    * Usage example:
+    * {{{
+    *   // generation of the documentation
+    *   val txStringDocumentationForMD: String = byteDescription.getStringDocForMD
+    * }}}
+    */
+  lazy val byteDescription: ByteEntity[TransactionT] = (byteHeaderDescription, byteTailDescription) mapN { case (_, tx) => tx }
 }
 
 object TransactionParser {
@@ -34,6 +75,10 @@ object TransactionParser {
       if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
 
       1
+    }
+
+    lazy val byteHeaderDescription: ByteEntity[Unit] = {
+      ConstantByte(1, typeId, "Transaction type") map (_ => Unit)
     }
   }
 
@@ -55,6 +100,13 @@ object TransactionParser {
 
       2
     }
+
+    lazy val byteHeaderDescription: ByteEntity[Unit] = {
+      (
+        ConstantByte(1, value = typeId, name = "Transaction type"),
+        ConstantByte(2, value = version, name = "Version")
+      ) mapN ((_, _) => Unit)
+    }
   }
 
   trait MultipleVersions extends TransactionParser {
@@ -72,8 +124,15 @@ object TransactionParser {
 
       3
     }
-  }
 
+    lazy val byteHeaderDescription: ByteEntity[Unit] = {
+      (
+        ConstantByte(1, value = 0, name = "Transaction multiple version mark"),
+        ConstantByte(2, value = typeId, name = "Transaction type"),
+        OneByte(3, "Version")
+      ) mapN ((_, _, _) => Unit)
+    }
+  }
 }
 
 abstract class TransactionParserFor[T <: Transaction](implicit override val classTag: ClassTag[T]) extends TransactionParser {

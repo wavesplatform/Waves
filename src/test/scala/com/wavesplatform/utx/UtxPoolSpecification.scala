@@ -204,9 +204,9 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
       (sender, utxPool, txs)
     }).label("massTransferWithBlacklisted")
 
-  private def utxTest(utxSettings: UtxSettings =
-                        UtxSettings(20, PoolDefaultMaxBytes, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true),
-                      txCount: Int = 10)(f: (Seq[TransferTransactionV1], UtxPool, TestTime) => Unit): Unit =
+  private def utxTest(
+      utxSettings: UtxSettings = UtxSettings(20, PoolDefaultMaxBytes, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true),
+      txCount: Int = 10)(f: (Seq[TransferTransactionV1], UtxPool, TestTime) => Unit): Unit =
     forAll(stateGen, chooseNum(2, txCount).label("txCount")) {
       case ((sender, senderBalance, bcu), count) =>
         val time = new TestTime()
