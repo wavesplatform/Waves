@@ -8,9 +8,11 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
+import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
 import com.wavesplatform.matcher.util._
 import com.wavesplatform.metrics.TimerExt
+import com.wavesplatform.settings.DeviationsSettings
 import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.AssetType.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings._
@@ -192,11 +194,22 @@ object OrderValidator {
     } yield order
   }
 
+  def validateDeviations(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus]): ValidationResult = ??? /*{
+    for {
+     _ <- (Right(order): ValidationResult)
+         .ensure("") {
+           if (order.orderType == OrderType.BUY)
+         }
+    }
+  }*/
+
   def matcherSettingsAware(
       matcherPublicKey: PublicKeyAccount,
       blacklistedAddresses: Set[Address],
       blacklistedAssets: Set[Option[AssetId]],
-      orderFeeSettings: OrderFeeSettings
+      orderFeeSettings: OrderFeeSettings,
+      deviationSettings: DeviationsSettings,
+      getMarketStatus: AssetPair => Option[MarketStatus]
   )(order: Order): ValidationResult = {
     for {
       _ <- (Right(order): ValidationResult)
@@ -206,6 +219,7 @@ object OrderValidator {
         .ensure(s"Invalid price asset ${order.assetPair.priceAsset}")(_ => !blacklistedAssets(order.assetPair.priceAsset))
         .ensure(s"Invalid fee asset ${order.matcherFeeAssetId} (blacklisted)")(_ => order.version != 3 || !blacklistedAssets(order.matcherFeeAssetId))
       _ <- validateOrderFee(order, orderFeeSettings)
+      _ <- validateDeviations(order, deviationSettings, getMarketStatus(order.assetPair))
     } yield order
   }
 
