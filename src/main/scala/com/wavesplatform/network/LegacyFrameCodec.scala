@@ -27,7 +27,7 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
 
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = cause match {
     case e: DecoderException => peerDatabase.blacklistAndClose(ctx.channel(), s"Corrupted message frame: $e")
-    case _ => // Pass
+    case _ => super.exceptionCaught(ctx, cause)
   }
 
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit =
