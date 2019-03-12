@@ -124,10 +124,10 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
       """.stripMargin
 
     "positive scenarios of order placement" - {
-      "set contracts with AssetPairs/all tx fields/true/one proof and then place order" in {
-        for (i <- Seq(sc1, sc3, sc4, sc5)) {
-          log.debug(s"contract: $i")
-          setContract(Some(i), aliceAcc)
+      "set contracts with AssetPairs/all tx fields/true/one proof and then place order" - {
+        for ((sc, i) <- Seq(sc1, sc3, sc4, sc5).zip(Seq(1, 3, 4, 5))) s"$i" in {
+          log.debug(s"contract: $sc")
+          setContract(Some(sc), aliceAcc)
 
           val aliceOrd1 = matcherNode
             .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
@@ -147,13 +147,11 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           matcherNode.cancelOrder(aliceAcc, aliceWavesPair, aliceOrd2).status should be("OrderCanceled")
           matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Cancelled")
         }
-
-        setContract(None, aliceAcc)
       }
 
-      "set contracts with many proofs and then place order" in {
-        for (i <- Seq(sc5, sc6)) {
-          setContract(Some(i), aliceAcc)
+      "set contracts with many proofs and then place order" - {
+        for ((sc, i) <- Seq(sc5, sc6).zip(Seq(5, 6))) s"$i" in {
+          setContract(Some(sc), aliceAcc)
 
           val currTime = System.currentTimeMillis()
 
@@ -186,12 +184,12 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           matcherNode.waitOrderStatus(predefAssetPair, ord1, "Cancelled")
         }
 
-        setContract(None, aliceAcc)
+        "reset" in setContract(None, aliceAcc)
       }
 
-      "place order and then set contract on AssetPairs/true/all fields/one proof" in {
-        for (i <- Seq(sc1, sc3, sc4, sc5)) {
-          log.debug(s"contract: $i")
+      "place order and then set contract on AssetPairs/true/all fields/one proof" - {
+        for ((sc, i) <- Seq(sc1, sc3, sc4, sc5).zip(Seq(1, 3, 4, 5))) s"$i" in {
+          log.debug(s"contract: $sc")
           val aliceOrd1 = matcherNode
             .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, fee = smartMatcherFee, version = 2, 10.minutes)
             .message
@@ -204,7 +202,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             .id
           matcherNode.waitOrderStatus(aliceWavesPair, aliceOrd2, "Accepted", 1.minute)
 
-          setContract(Some(i), aliceAcc)
+          setContract(Some(sc), aliceAcc)
 
           val bobOrd1 = matcherNode
             .placeOrder(bobAcc, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, fee = smartMatcherFee, version = 2, 10.minutes)
@@ -229,8 +227,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           assert(exchangeTx2.fee == 300000)
 
           matcherNode.reservedBalance(bobAcc) shouldBe empty
-
-          setContract(None, aliceAcc)
         }
       }
 
@@ -240,8 +236,8 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
         val transferTx = aliceNode.transfer(aliceAcc.address, bobAcc.address, 1000, 0.005.waves, Some(aliceAsset), None, 2)
         nodes.waitForHeightAriseAndTxPresent(transferTx.id)
 
-        for ((i, step) <- Seq(sc5, sc6).zipWithIndex) {
-          markup(s"step $step started")
+        for ((sc, i) <- Seq(sc5, sc6).zip(Seq(5, 6))) {
+          markup(s"$i")
 
           for (assetP <- Seq(predefAssetPair, aliceWavesPair)) {
             val currTime = System.currentTimeMillis()
@@ -272,7 +268,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
             matcherNode.waitOrderStatus(assetP, ord, "Accepted", 1.minute)
           }
 
-          setContract(Some(i), aliceAcc)
+          setContract(Some(sc), aliceAcc)
 
           val bobOrd1 = matcherNode
             .placeOrder(bobAcc, predefAssetPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes)
@@ -302,37 +298,38 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
     }
 
     "negative scenarios of order placement" - {
-      "set contact and then place order" in {
-        for (i <- Seq(sc2, sc7, sc8)) {
-          log.debug(s"contract: $i")
-          setContract(Some(i), aliceAcc)
+      "set contact and then place order" - {
+        for ((sc, i) <- Seq(sc2, sc7, sc8).zip(Seq(2, 7, 8))) s"$i" in {
+          log.debug(s"contract: $sc")
+          setContract(Some(sc), aliceAcc)
 
           assertBadRequestAndResponse(
             matcherNode
               .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes),
-            "Order rejected by script for"
+            "The account's script of .* rejected the order"
           )
 
           assertBadRequestAndResponse(
             matcherNode
               .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes),
-            "Order rejected by script for"
+            "The account's script of .* rejected the order"
           )
         }
 
-        setContract(Some(sc9), aliceAcc)
-        assertBadRequestAndResponse(
-          matcherNode
-            .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes),
-          "Error executing script for"
-        )
+        "9" in {
+          setContract(Some(sc9), aliceAcc)
+          assertBadRequestAndResponse(
+            matcherNode
+              .placeOrder(aliceAcc, predefAssetPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartMatcherFee, version = 2, 10.minutes),
+            "The account's script of .* returned the error"
+          )
+        }
 
-        setContract(None, aliceAcc)
+        "reset" in setContract(None, aliceAcc)
       }
 
-      "place order and then set contract" in {
-        for ((contract, i) <- Seq(sc2, sc7, sc8, sc9).zip(Seq(2, 7, 8, 9))) {
-          info(s"$i")
+      "place order and then set contract" - {
+        for ((contract, i) <- Seq(sc2, sc7, sc8, sc9).zip(Seq(2, 7, 8, 9))) s"$i" in {
           log.debug(s"contract $contract")
 
           val aliceOrd1 = matcherNode
@@ -378,7 +375,6 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
 
           setContract(None, aliceAcc)
         }
-
       }
     }
   }
