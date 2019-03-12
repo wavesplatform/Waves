@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
 import net.ceedubs.ficus.readers.ValueReader
 
-case class DeviationsSettings(maxPriceDeviationProfit: Double, maxPriceDeviationLoss: Double, maxPriceDeviationFee: Double)
+case class DeviationsSettings(maxPriceProfit: Double, maxPriceLoss: Double, maxPriceDeviationFee: Double)
 
 object DeviationsSettings {
 

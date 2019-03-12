@@ -28,6 +28,7 @@ import kamon.Kamon
 import shapeless.Coproduct
 
 import scala.Either.cond
+import scala.math.BigDecimal.RoundingMode
 import scala.util.control.NonFatal
 
 object OrderValidator {
@@ -183,14 +184,35 @@ object OrderValidator {
         .ensure(MatcherError.FeeNotEnough(requiredFee, order.matcherFee, requiredFeeAssetId))(_.matcherFee >= requiredFee)
     }
 
-  def validateDeviations(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus]): ValidationResult = ??? /*{
-    for {
-     _ <- (Right(order): ValidationResult)
-         .ensure("") {
-           if (order.orderType == OrderType.BUY)
-         }
+  def validateDeviations(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus]): Result[Order] = {
+
+    def multiplyLongByDouble(l: Long, d: Double): Long = (BigDecimal(l) * d).setScale(0, RoundingMode.HALF_DOWN).toLong
+
+    val validatePrice: (Double, Double) => Boolean = (subtractedPercent, addedPercent) => {
+      val res = for {
+        ms      <- marketStatus
+        bestBid <- ms.bestBid
+        bestAsk <- ms.bestAsk
+      } yield {
+
+        val lowerBound = multiplyLongByDouble(bestBid.price, 1 - subtractedPercent)
+        val upperBound = multiplyLongByDouble(bestAsk.price, 1 + addedPercent)
+
+        lowerBound <= order.price && order.price <= upperBound
+      }
+
+      res.getOrElse(false)
     }
-  }*/
+
+    for {
+      _ <- lift(order)
+        .ensure(MatcherError.DeviantOrderPrice(order, deviationSettings)) { _ =>
+          if (order.orderType == OrderType.BUY) validatePrice(deviationSettings.maxPriceProfit, deviationSettings.maxPriceLoss)
+          else validatePrice(deviationSettings.maxPriceLoss, deviationSettings.maxPriceProfit)
+        }
+    } yield order
+
+  }
 
   def matcherSettingsAware(
       matcherPublicKey: PublicKeyAccount,

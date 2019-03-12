@@ -8,6 +8,7 @@ import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import play.api.libs.json.{JsObject, Json}
 import AssetPair.assetIdStr
+import com.wavesplatform.settings.DeviationsSettings
 
 sealed class MatcherError(val code: Int, val message: MatcherErrorMessage) {
   import message._
@@ -186,6 +187,14 @@ object MatcherError {
         e"The asset's script of ${'assetId -> assetId} is broken, please contact with the owner. The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"
       )
 
+  case class DeviantOrderPrice(ord: Order, deviationSettings: DeviationsSettings)
+      extends MatcherError(
+        order,
+        price,
+        outOfBound,
+        e"The order's price ${'price -> ord.price} is out of deviation bounds (max-price-deviation-profit: ${'maxPriceDeviationProfit -> deviationSettings.maxPriceProfit}%, max-price-deviation-loss: ${'maxPriceDeviationLoss -> deviationSettings.maxPriceLoss}%, in relation to the best-bid/ask)"
+      )
+
   sealed abstract class Entity(val code: Int)
   object Entity {
     object common  extends Entity(0)
@@ -230,6 +239,7 @@ object MatcherError {
     object timedOut     extends Class(12)
     object starting     extends Class(13)
     object stopping     extends Class(14)
+    object outOfBound   extends Class(15)
   }
 
   private def formatBalance(b: Map[Option[AssetId], Long]): String =
