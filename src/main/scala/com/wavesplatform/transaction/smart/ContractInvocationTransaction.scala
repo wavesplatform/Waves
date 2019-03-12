@@ -24,8 +24,9 @@ case class ContractInvocationTransaction private (chainId: Byte,
                                                   sender: PublicKeyAccount,
                                                   contractAddress: Address,
                                                   fc: Terms.FUNCTION_CALL,
-                                                  payment: Option[Payment],
+                                                  payment: Seq[Payment],
                                                   fee: Long,
+                                                  feeAssetId: Option[AssetId],
                                                   timestamp: Long,
                                                   proofs: Proofs)
     extends ProvenTransaction
@@ -44,13 +45,14 @@ case class ContractInvocationTransaction private (chainId: Byte,
         sender.publicKey,
         contractAddress.bytes.arr,
         Serde.serialize(fc),
-        Deser.serializeOption(payment)(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId)(_.arr)),
+        Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId)(_.arr))),
         Longs.toByteArray(fee),
+        feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte)),
         Longs.toByteArray(timestamp)
       )
     )
 
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
       jsonBase()
@@ -103,10 +105,9 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
         .cond(tx.chainId == currentChainId, (), GenericError(s"Wrong chainId ${tx.chainId.toInt}"))
         .flatMap(_ => Either.cond(tx.fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: ${tx.fee}")))
         .flatMap(_ =>
-          tx.payment match {
-            case Some(Payment(amt, token)) => Either.cond(amt > 0, (), ValidationError.NegativeAmount(0, token.toString))
-            case _                         => Right(())
-        })
+          Either.cond(tx.payment.forall(_.amount > 0),
+                      (),
+                      ValidationError.NegativeAmount(0, tx.payment.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString))))
         .flatMap(_ =>
           Either.cond(tx.fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                       (),
@@ -119,8 +120,9 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
   def create(sender: PublicKeyAccount,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
-             p: Option[Payment],
+             p: Seq[Payment],
              fee: Long,
+             feeAssetId: Option[AssetId],
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
@@ -130,15 +132,14 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
         (),
         ValidationError.GenericError(s"ContractInvocation can't have more than ${ContractLimits.MaxContractInvocationArgs} arguments")
       )
-      _ <- p match {
-        case Some(Payment(amt, token)) => Either.cond(amt > 0, (), ValidationError.NegativeAmount(0, token.toString))
-        case _                         => Right(())
-      }
+      _ <- Either.cond(p.forall(_.amount > 0), (), ValidationError.NegativeAmount(0, p.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString)))
+      _ <- Either.cond(p.length <= 1, (), ValidationError.GenericError("Multiple payment isn't allowed now"))
+      _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), ValidationError.GenericError("dublicate payments"))
 
       _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                        (),
                        GenericError("all arguments of contractInvocation must be EVALUATED"))
-      tx   = new ContractInvocationTransaction(currentChainId, sender, contractAddress, fc, p, fee, timestamp, proofs)
+      tx   = new ContractInvocationTransaction(currentChainId, sender, contractAddress, fc, p, fee, feeAssetId, timestamp, proofs)
       size = tx.bytes().length
       _ <- Either.cond(size <= ContractLimits.MaxContractInvocationSizeInBytes, (), ValidationError.TooBigArray)
     } yield tx
@@ -147,11 +148,12 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
   def signed(sender: PublicKeyAccount,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
-             p: Option[Payment],
+             p: Seq[Payment],
              fee: Long,
+             feeAssetId: Option[AssetId],
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(sender, contractAddress, fc, p, fee, timestamp, Proofs.empty).right.map { unsigned =>
+    create(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
@@ -159,10 +161,11 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
   def selfSigned(sender: PrivateKeyAccount,
                  contractAddress: Address,
                  fc: Terms.FUNCTION_CALL,
-                 p: Option[Payment],
+                 p: Seq[Payment],
                  fee: Long,
+                 feeAssetId: Option[AssetId],
                  timestamp: Long): Either[ValidationError, TransactionT] = {
-    signed(sender, contractAddress, fc, p, fee, timestamp, sender)
+    signed(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, sender)
   }
 
   val byteTailDescription: ByteEntity[ContractInvocationTransaction] = {
@@ -171,10 +174,11 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
       AddressBytes(tailIndex(3), "Contract address"),
       FunctionCallBytes(tailIndex(4), "Function call"),
-      OptionBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")),
+      SeqBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")),
       LongBytes(tailIndex(6), "Fee"),
-      LongBytes(tailIndex(7), "Timestamp"),
-      ProofsBytes(tailIndex(8))
+      OptionBytes(tailIndex(7), "Fee's asset ID", AssetIdBytes(tailIndex(7), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
+      LongBytes(tailIndex(8), "Timestamp"),
+      ProofsBytes(tailIndex(9))
     ) mapN ContractInvocationTransaction.apply
   }
 }

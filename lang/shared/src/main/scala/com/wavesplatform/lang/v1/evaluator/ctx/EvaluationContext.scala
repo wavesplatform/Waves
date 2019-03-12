@@ -30,6 +30,7 @@ object EvaluationContext {
 
   def build(typeDefs: Map[String, DefinedType], letDefs: Map[String, LazyVal], functions: Seq[BaseFunction]): EvaluationContext = {
     if (functions.distinct.size != functions.size) {
+      println(functions)
       val dups = functions.groupBy(_.header).filter(_._2.size != 1)
       throw new Exception(s"Duplicate runtime functions names: $dups")
     }

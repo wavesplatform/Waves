@@ -56,9 +56,8 @@ object Bindings {
       case OrdType.Sell => sellType
     }).typeRef, Map.empty)
 
-  def buildPayment(mpmt: Option[Tx.Pmt]): CaseObj = mpmt match {
-    case None => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-    case Some(pmt) =>
+  def buildPayment(mpmt: Seq[Tx.Pmt]): ARR = ARR(mpmt.map(
+    pmt =>
       CaseObj(
         paymentType.typeRef,
         Map(
@@ -69,8 +68,7 @@ object Bindings {
           })
         )
       )
-
-  }
+  ).toIndexedSeq)
 
   def orderObject(ord: Ord, proofsEnabled: Boolean): CaseObj =
     CaseObj(
@@ -93,7 +91,7 @@ object Bindings {
       )
     )
 
-  def buildInvocation(caller: Recipient.Address, payment: Option[Pmt], contractAddress: Recipient.Address) =
+  def buildInvocation(caller: Recipient.Address, payment: Seq[Pmt], contractAddress: Recipient.Address) =
     CaseObj(
       invocationType.typeRef,
       Map(

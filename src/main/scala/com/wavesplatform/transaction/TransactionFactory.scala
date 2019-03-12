@@ -624,6 +624,7 @@ object TransactionFactory {
         ContractInvocationRequest.buildFunctionCall(request.call),
         request.payment,
         request.fee,
+        request.feeAssetId.map(s => ByteStr.decodeBase58(s).get),
         request.timestamp.getOrElse(time.getTimestamp()),
         signer
       )
@@ -639,6 +640,7 @@ object TransactionFactory {
         fc,
         request.payment,
         request.fee,
+        request.feeAssetId.map(s => ByteStr.decodeBase58(s).get),
         request.timestamp.getOrElse(0),
         Proofs.empty
       )

@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.traits.domain.Tx.{ContractTransfer, Pmt}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 
 object ContractEvaluator {
-  case class Invocation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
+  case class Invocation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Seq[(Long, Option[ByteStr])], contractAddress: ByteStr)
 
   def eval(c: Contract, i: Invocation): EvalM[EVALUATED] = {
     val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name

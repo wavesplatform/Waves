@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction
-import com.wavesplatform.transaction.{Proofs, ValidationError}
+import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 
@@ -56,17 +56,28 @@ object ContractInvocationRequest {
 case class ContractInvocationRequest(
     sender: String,
     @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
+    @(ApiModelProperty @field)(
+      dataType = "string",
+      example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
+      required = false
+    ) feeAssetId: Option[String],
     @(ApiModelProperty @field)(required = true) call: ContractInvocationRequest.FunctionCallPart,
-    @(ApiModelProperty @field)(required = true) payment: Option[ContractInvocationTransaction.Payment],
+    @(ApiModelProperty @field)(required = true) payment: Seq[ContractInvocationTransaction.Payment],
     @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") contractAddress: String,
     timestamp: Option[Long] = None)
+
 @ApiModel(value = "Signed Data transaction")
 case class SignedContractInvocationRequest(
     @(ApiModelProperty @field)(value = "Base58 encoded sender public key", required = true) senderPublicKey: String,
     @(ApiModelProperty @field)(required = true) fee: Long,
+    @(ApiModelProperty @field)(
+      dataType = "string",
+      example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
+      required = false
+    ) feeAssetId: Option[String],
     @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") contractAddress: String,
     @(ApiModelProperty @field)(required = true) call: ContractInvocationRequest.FunctionCallPart,
-    @(ApiModelProperty @field)(required = true) payment: Option[ContractInvocationTransaction.Payment],
+    @(ApiModelProperty @field)(required = true) payment: Option[Seq[ContractInvocationTransaction.Payment]],
     @(ApiModelProperty @field)(required = true, value = "1000") timestamp: Long,
     @(ApiModelProperty @field)(required = true) proofs: List[String])
     extends BroadcastRequest {
@@ -74,14 +85,16 @@ case class SignedContractInvocationRequest(
     for {
       _sender          <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _contractAddress <- Address.fromString(contractAddress)
+      _feeAssetId      <- parseBase58ToOption(feeAssetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
       _proofBytes      <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs          <- Proofs.create(_proofBytes)
       t <- ContractInvocationTransaction.create(
         _sender,
         _contractAddress,
         ContractInvocationRequest.buildFunctionCall(call),
-        payment,
+        payment.getOrElse(Seq()),
         fee,
+        _feeAssetId,
         timestamp,
         _proofs
       )

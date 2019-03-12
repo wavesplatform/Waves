@@ -91,7 +91,7 @@ object CommonValidation {
         case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, None, mtx.fee)
         case citx: ContractInvocationTransaction =>
-          checkTransfer(citx.sender, citx.payment.flatMap(_.assetId), citx.payment.map(_.amount).getOrElse(0), None, citx.fee)
+          citx.payment.map(p => checkTransfer(citx.sender, p.assetId, p.amount, None, citx.fee)).find(_.isLeft).getOrElse(Right(tx))
         case _ => Right(tx)
       }
     } else Right(tx)
