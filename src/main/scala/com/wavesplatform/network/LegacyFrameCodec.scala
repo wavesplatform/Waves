@@ -10,7 +10,7 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled._
 import io.netty.channel.ChannelHandlerContext
-import io.netty.handler.codec.ByteToMessageCodec
+import io.netty.handler.codec.{ByteToMessageCodec, DecoderException}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
@@ -24,6 +24,11 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
     .newBuilder()
     .expireAfterWrite(receivedTxsCacheTimeout.length, receivedTxsCacheTimeout.unit)
     .build[String, Object]()
+
+  override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = cause match {
+    case e: DecoderException => peerDatabase.blacklistAndClose(ctx.channel(), s"Corrupted message frame: $e")
+    case _ => // Pass
+  }
 
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit =
     try {
