@@ -21,8 +21,12 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   property("contract compiles when uses annotation bindings and correct return type") {
-    val ctx = Monoid.combine(compilerContext,
-                             WavesContext.build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment()).compilerContext)
+    val ctx = Monoid.combine(
+      compilerContext,
+      WavesContext
+        .build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
+        .compilerContext
+    )
     val expr = {
       val script =
         """

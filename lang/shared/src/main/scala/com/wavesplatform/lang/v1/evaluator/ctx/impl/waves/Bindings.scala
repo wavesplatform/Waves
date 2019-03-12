@@ -35,7 +35,7 @@ object Bindings {
     if (proofsEnabled) combine(commonPart, Map(proofsPart(tx.proofs)))
     else commonPart
   }
-  private def mapRecipient(r: Recipient) =
+  def mapRecipient(r: Recipient) =
     "recipient" -> (r match {
       case Recipient.Alias(name) => CaseObj(aliasType.typeRef, Map("alias" -> name))
       case x: Recipient.Address  => senderObject(x)

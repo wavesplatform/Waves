@@ -15,7 +15,12 @@ import monix.eval.Coeval
 object ScriptRunner {
   type TxOrd = BlockchainContext.In
 
-  def apply(height: Int, in: TxOrd, blockchain: Blockchain, script: Script, isTokenScript: Boolean, contractAddress:Address): (Log, Either[ExecutionError, EVALUATED]) = {
+  def apply(height: Int,
+            in: TxOrd,
+            blockchain: Blockchain,
+            script: Script,
+            isTokenScript: Boolean,
+            contractAddress: Address): (Log, Either[ExecutionError, EVALUATED]) = {
     script match {
       case s: ExprScript =>
         val ctx = BlockchainContext.build(

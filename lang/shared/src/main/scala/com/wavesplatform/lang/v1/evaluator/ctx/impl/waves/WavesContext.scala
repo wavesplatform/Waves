@@ -290,12 +290,14 @@ object WavesContext {
               o => orderObject(o, proofsEnabled).asRight[String],
               _.eliminate(
                 o => Bindings.contractTransfer(o).asRight[String],
-              _ => "Expected Transaction or Order".asLeft[CaseObj]
-            ))
+                _ => "Expected Transaction or Order".asLeft[CaseObj]
+              )
+            )
           ))
     }
 
     val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Right(CONST_LONG(env.height)))
+    val thisCoeval: Coeval[Either[String, CaseObj]]      = Coeval.evalOnce(Right(Bindings.senderObject(env.tthis)))
 
     val anyTransactionType =
       UNION(
@@ -366,7 +368,8 @@ object WavesContext {
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
     )
 
-    val txVar = ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
+    val txVar   = ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
+    val thisVar = ("this", ((addressType.typeRef, "Contract address"), LazyVal(EitherT(thisCoeval))))
 
     val vars = Map(
       1 -> Map(txVar),
@@ -380,7 +383,7 @@ object WavesContext {
           ("Sell", ((sellType.typeRef, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
           ("Buy", ((buyType.typeRef, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
         )
-        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == ContentType.Expression) Map(txVar) else Map.empty
+        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == ContentType.Expression) Map(txVar) ++ Map(thisVar) else Map.empty
         (v3Part1 ++ v3Part2)
       }
     )
