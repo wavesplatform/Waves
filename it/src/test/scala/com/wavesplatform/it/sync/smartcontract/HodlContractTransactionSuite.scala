@@ -138,7 +138,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           p = Seq(ContractInvocationTransaction.Payment(1.5.waves, Waves)),
           timestamp = System.currentTimeMillis(),
           fee = 1.waves,
-          feeAssetId = None
+          feeAssetId = Waves
         )
         .explicitGet()
 
@@ -164,7 +164,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           p = Seq(),
           timestamp = System.currentTimeMillis(),
           fee = 1.waves,
-          feeAssetId = None
+          feeAssetId = Waves
         )
         .explicitGet()
 
@@ -184,7 +184,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           p = Seq(),
           timestamp = System.currentTimeMillis(),
           fee = 1.waves,
-          feeAssetId = None
+          feeAssetId = Waves
         )
         .explicitGet()
 
