@@ -13,5 +13,8 @@ class ReadErrorHandler(peerDatabase: PeerDatabase) extends ChannelInboundHandler
 
     case e: IndexOutOfBoundsException =>
       peerDatabase.blacklistAndClose(ctx.channel(), s"Index out of bounds: $e")
+
+    case _ =>
+      // Pass
   }
 }
