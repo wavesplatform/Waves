@@ -137,7 +137,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         "priceAssets" -> matcherSettings.priceAssets,
         "order-fee" -> Json.obj(
           "fixed-waves" -> Json.obj(
-            "min-fee" -> (matcherSettings.minOrderFee + minMatcherFee)
+            "base-fee" -> (matcherSettings.minOrderFee + minMatcherFee)
           )
         ),
       )
