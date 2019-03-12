@@ -54,6 +54,14 @@ class Matcher(actorSystem: ActorSystem,
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
   private var currentOffset                   = -1L // Used only for REST API
 
+  private val blacklistedAssets: Set[AssetId] = matcherSettings.blacklistedAssets
+    .map {
+      AssetPair
+        .extractAssetId(_)
+        .get
+        .getOrElse(throw new IllegalArgumentException("Can't blacklist the main coin"))
+    }
+
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
   private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings.orderFee)
@@ -98,12 +106,13 @@ class Matcher(actorSystem: ActorSystem,
 
   private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
 
-  private def validateOrder(o: Order) =
+  private def validateOrder(o: Order) = {
+    import com.wavesplatform.matcher.error._
     for {
       _ <- OrderValidator.matcherSettingsAware(
         matcherPublicKey,
         blacklistedAddresses,
-        matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get),
+        blacklistedAssets,
         matcherSettings.orderFee,
         matcherSettings.deviation,
         getMarketStatus
@@ -114,8 +123,9 @@ class Matcher(actorSystem: ActorSystem,
                                           matcherPublicKey.toAddress,
                                           time,
                                           matcherSettings.orderFee)(o)
-      _ <- pairBuilder.validateAssetPair(o.assetPair)
+      _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(x))
     } yield o
+  }
 
   lazy val matcherApiRoutes: Seq[MatcherApiRoute] = Seq(
     MatcherApiRoute(

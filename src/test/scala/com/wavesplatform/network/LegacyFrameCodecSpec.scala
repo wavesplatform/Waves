@@ -2,15 +2,15 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
+import com.wavesplatform.network.message.{MessageSpec, Message => ScorexMessage}
 import com.wavesplatform.{TransactionGen, crypto}
 import io.netty.buffer.Unpooled.wrappedBuffer
 import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.embedded.EmbeddedChannel
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import com.wavesplatform.network.message.{MessageSpec, Message => ScorexMessage}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.duration.DurationInt
 

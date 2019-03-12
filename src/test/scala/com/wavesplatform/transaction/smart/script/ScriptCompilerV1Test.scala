@@ -8,9 +8,10 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.state.diffs._
+
 class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
   property("compile script with specified version") {
