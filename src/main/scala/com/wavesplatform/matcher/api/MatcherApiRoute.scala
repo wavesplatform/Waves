@@ -14,6 +14,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.matcher.AddressActor.GetOrderStatus
 import com.wavesplatform.matcher.AddressDirectory.{Envelope => Env}
 import com.wavesplatform.matcher.Matcher.StoreEvent
+import com.wavesplatform.matcher.error.MatcherError
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetSnapshotOffsets, MarketData, SnapshotOffsetsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model._
@@ -33,7 +34,6 @@ import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.reflect.ClassTag
 import scala.util.Failure
 
@@ -46,7 +46,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            storeEvent: StoreEvent,
                            orderBook: AssetPair => Option[Either[Unit, ActorRef]],
                            getMarketStatus: AssetPair => Option[MarketStatus],
-                           orderValidator: Order => Either[String, Order],
+                           orderValidator: Order => Either[MatcherError, Order],
                            orderBookSnapshot: OrderBookSnapshotHttpCache,
                            wavesSettings: WavesSettings,
                            matcherStatus: () => Matcher.Status,
@@ -62,6 +62,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   import wavesSettings._
 
   override val settings: RestAPISettings = restAPISettings
+  private implicit val timeout: Timeout  = wavesSettings.matcherSettings.actorResponseTimeout
 
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
@@ -82,7 +83,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   }
 
   private def unavailableOrderBookBarrier(p: AssetPair): Directive0 = orderBook(p) match {
-    case Some(Left(_)) => complete(OrderBookUnavailable)
+    case Some(Left(_)) => complete(OrderBookUnavailable(MatcherError.OrderBookUnavailable(p)))
     case _             => pass
   }
 
@@ -102,7 +103,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def withCancelRequest(f: CancelOrderRequest => Route): Route =
     post {
       entity(as[CancelOrderRequest]) { req =>
-        if (req.isSignatureValid()) f(req) else complete(InvalidSignature)
+        if (req.isSignatureValid()) f(req) else complete(CancelRequestInvalidSignature)
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
 
@@ -234,7 +235,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete((timestamp, orderId) match {
       case (Some(ts), None)  => askAddressActor[MatcherResponse](sender, AddressActor.CancelAllOrders(assetPair, ts))
       case (None, Some(oid)) => askAddressActor[MatcherResponse](sender, AddressActor.CancelOrder(oid))
-      case _                 => OrderCancelRejected("Either timestamp or orderId must be specified")
+      case _                 => OrderCancelRejected(MatcherError.CancelRequestIsIncomplete)
     })
 
   private def handleCancelRequest(assetPair: Option[AssetPair]): Route =
@@ -312,7 +313,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     ))
   def historyDelete: Route = (path("orderbook" / AssetPairPM / "delete") & post) { _ =>
     json[CancelOrderRequest] { req =>
-      req.orderId.fold[MatcherResponse](NotImplemented("Batch order deletion is not supported yet"))(OrderDeleted)
+      req.orderId.fold[MatcherResponse](NotImplemented(MatcherError.FeatureNotImplemented))(OrderDeleted)
     }
   }
 
@@ -410,7 +411,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def forceCancelOrder: Route = (path("orders" / "cancel" / ByteStrPM) & post & withAuth) { orderId =>
     DBUtils.order(db, orderId) match {
       case Some(order) => handleCancelRequest(None, order.sender, Some(orderId), None)
-      case None        => complete(OrderCancelRejected("Order not found"))
+      case None        => complete(OrderCancelRejected(MatcherError.OrderNotFound(orderId)))
     }
   }
 
@@ -552,8 +553,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 }
 
 object MatcherApiRoute {
-  private implicit val timeout: Timeout = 5.seconds
-
   private def stringifyAssetIds(balances: Map[Option[AssetId], Long]): Map[String, Long] =
     balances.map { case (aid, v) => AssetPair.assetIdStr(aid) -> v }
 }

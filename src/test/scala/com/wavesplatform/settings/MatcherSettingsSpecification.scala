@@ -24,17 +24,17 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    account = 3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX
       |    bind-address = 127.0.0.1
       |    port = 6886
+      |    actor-response-timeout = 11s
       |    snapshots-interval = 999
       |    make-snapshots-at-start = yes
       |    snapshots-loading-timeout = 423s
       |    start-events-processing-timeout = 543s
       |    rest-order-limit = 100
-      |        price-assets = [
+      |    price-assets = [
       |      WAVES
       |      8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS
       |      DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J
       |    ]
-
       |    blacklisted-assets = ["a"]
       |    blacklisted-names = ["b"]
       |    blacklisted-addresses = [
@@ -100,6 +100,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
     settings.bindAddress should be("127.0.0.1")
     settings.port should be(6886)
+    settings.actorResponseTimeout should be(11.seconds)
     settings.journalDataDir should be("/waves/matcher/journal")
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(999)
