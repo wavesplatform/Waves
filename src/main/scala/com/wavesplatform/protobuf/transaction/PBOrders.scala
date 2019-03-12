@@ -43,6 +43,7 @@ object PBOrders {
 
   def protobuf(order: VanillaOrder): PBOrder = {
     PBOrder(
+      chainId = 0,
       ByteString.copyFrom(order.senderPublicKey.publicKey),
       ByteString.copyFrom(order.matcherPublicKey.publicKey),
       Some(
