@@ -33,7 +33,6 @@ import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.reflect.ClassTag
 import scala.util.Failure
 
@@ -61,6 +60,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   import wavesSettings._
 
   override val settings: RestAPISettings = restAPISettings
+  private implicit val timeout: Timeout  = wavesSettings.matcherSettings.actorResponseTimeout
 
   private val timer      = Kamon.timer("matcher.api-requests")
   private val placeTimer = timer.refine("action" -> "place")
@@ -545,8 +545,6 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
 }
 
 object MatcherApiRoute {
-  private implicit val timeout: Timeout = 5.seconds
-
   private def stringifyAssetIds(balances: Map[Option[AssetId], Long]): Map[String, Long] =
     balances.map { case (aid, v) => AssetPair.assetIdStr(aid) -> v }
 }
