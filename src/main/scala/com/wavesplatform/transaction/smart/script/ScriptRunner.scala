@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart.script
 
 import cats.implicits._
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
@@ -15,7 +15,7 @@ import monix.eval.Coeval
 object ScriptRunner {
   type TxOrd = BlockchainContext.In
 
-  def apply(height: Int, in: TxOrd, blockchain: Blockchain, script: Script, isTokenScript: Boolean): (Log, Either[ExecutionError, EVALUATED]) = {
+  def apply(height: Int, in: TxOrd, blockchain: Blockchain, script: Script, isTokenScript: Boolean, contractAddress:Address): (Log, Either[ExecutionError, EVALUATED]) = {
     script match {
       case s: ExprScript =>
         val ctx = BlockchainContext.build(
@@ -25,7 +25,8 @@ object ScriptRunner {
           Coeval.evalOnce(height),
           blockchain,
           isTokenScript,
-          false
+          false,
+          Coeval(contractAddress)
         )
         EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
       case ContractScript.ContractScriptImpl(_, Contract(_, _, Some(vf)), _) =>
@@ -36,7 +37,8 @@ object ScriptRunner {
           Coeval.evalOnce(height),
           blockchain,
           isTokenScript,
-          true
+          true,
+          Coeval(contractAddress)
         )
         val evalContract = in.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.apply(t)),
                                         _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), _ => ???))

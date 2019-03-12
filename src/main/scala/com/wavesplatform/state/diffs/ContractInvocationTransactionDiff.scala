@@ -218,7 +218,8 @@ object ContractInvocationTransactionDiff {
           )),
         CompositeBlockchain.composite(blockchain, totalDiff),
         script,
-        true
+        true,
+        tx.contractAddress
       ) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, true))
         case (log, Right(FALSE)) =>

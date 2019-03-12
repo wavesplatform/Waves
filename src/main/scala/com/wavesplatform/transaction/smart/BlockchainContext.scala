@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.kernel.Monoid
+import com.wavesplatform.account.Address
 import com.wavesplatform.lang.{ContentType, Global, ScriptType}
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.utils.DirectiveSet
@@ -19,14 +20,15 @@ object BlockchainContext {
             h: Coeval[Int],
             blockchain: Blockchain,
             isTokenContext: Boolean,
-            isContract: Boolean): EvaluationContext = {
+            isContract: Boolean,
+            tthis: Coeval[Address]): EvaluationContext = {
     Monoid
       .combineAll(
         Seq(
           PureContext.build(version),
           CryptoContext.build(Global),
           WavesContext.build(DirectiveSet(version, ScriptType.isTokenScript(isTokenContext), ContentType.isContract(isContract)),
-                             new WavesEnvironment(nByte, in, h, blockchain))
+                             new WavesEnvironment(nByte, in, h, blockchain, tthis))
         ))
       .evaluationContext
   }

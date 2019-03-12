@@ -61,7 +61,7 @@ object OrderValidator {
       if (!blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets, blockchain.height))
         MatcherError.ScriptedAssetTradingUnsupported(assetId).asLeft
       else
-        try ScriptRunner(blockchain.height, Coproduct(tx), blockchain, script, isTokenScript = true) match {
+        try ScriptRunner(blockchain.height, Coproduct(tx), blockchain, script, isTokenScript = true, tx.sender.toAddress) match {
           case (_, Left(execError)) => MatcherError.AssetScriptReturnedError(assetId, execError).asLeft
           case (_, Right(FALSE))    => MatcherError.AssetScriptDeniedOrder(assetId).asLeft
           case (_, Right(TRUE))     => success

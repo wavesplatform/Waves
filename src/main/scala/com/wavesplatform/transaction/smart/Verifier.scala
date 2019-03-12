@@ -57,7 +57,12 @@ object Verifier extends Instrumented with ScorexLogging {
     Try {
       logged(
         s"transaction ${transaction.id()}",
-        ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](transaction), blockchain, script, isTokenScript)
+        ScriptRunner(height,
+                     Coproduct[ScriptRunner.TxOrd](transaction),
+                     blockchain,
+                     script,
+                     isTokenScript,
+                     transaction.asInstanceOf[Authorized].sender.toAddress)
       ) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isTokenScript))
         case (log, Right(FALSE)) =>
@@ -73,7 +78,10 @@ object Verifier extends Instrumented with ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
     Try {
-      logged(s"order ${order.idStr()}", ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isTokenScript = false)) match {
+      logged(
+        s"order ${order.idStr()}",
+        ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isTokenScript = false, order.sender.toAddress)
+      ) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isTokenScript = false))
         case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isTokenScript = false))
         case (_, Right(TRUE))       => Right(order)
