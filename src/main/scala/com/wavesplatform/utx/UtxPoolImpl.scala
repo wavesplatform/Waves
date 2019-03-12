@@ -183,6 +183,11 @@ class UtxPoolImpl(time: Time,
           val updatedBlockchain = composite(blockchain, diff)
           val updatedRest       = currRest.put(updatedBlockchain, tx)
           if (updatedRest.isOverfilled) {
+            log.trace(s"Mining constraints overfilled: ${
+              updatedRest.constraints
+                .filter(_.isOverfilled)
+                .mkString(", ")
+            }")
             (invalid, valid, diff, currRest, isEmpty)
           } else {
             differ(updatedBlockchain, tx) match {
