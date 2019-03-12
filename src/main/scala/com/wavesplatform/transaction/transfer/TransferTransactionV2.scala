@@ -6,6 +6,7 @@ import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
@@ -101,10 +102,10 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
         TransferTransactionV2(
           sender = senderPublicKey,
           recipient = recipient,
-          assetId = assetId,
+          assetId = assetId.getOrElse(Waves),
           amount = amount,
           timestamp = timestamp,
-          feeAssetId = feeAssetId,
+          feeAssetId = feeAssetId.getOrElse(Waves),
           fee = fee,
           attachment = attachments,
           proofs = proofs

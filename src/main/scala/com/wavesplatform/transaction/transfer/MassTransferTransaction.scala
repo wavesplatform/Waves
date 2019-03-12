@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
@@ -183,7 +183,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
     ) mapN {
       case (sender, assetId, transfer, timestamp, fee, attachment, proofs) =>
         MassTransferTransaction(
-          assetId = assetId,
+          assetId = assetId.getOrElse(Waves),
           sender = sender,
           transfers = transfer,
           timestamp = timestamp,

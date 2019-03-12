@@ -6,14 +6,10 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.transaction._
-import cats.implicits._
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import scala.util.Try
 
@@ -92,7 +88,7 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
     (
       OneByte(tailIndex(1), "Chain ID"),
       PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
-      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength),
+      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength).map(IssuedAsset),
       LongBytes(tailIndex(4), "Quantity"),
       LongBytes(tailIndex(5), "Fee"),
       LongBytes(tailIndex(6), "Timestamp"),

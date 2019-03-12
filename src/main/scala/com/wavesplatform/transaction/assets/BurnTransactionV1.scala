@@ -6,9 +6,8 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction._
-import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 
@@ -69,7 +68,7 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
   val byteTailDescription: ByteEntity[BurnTransactionV1] = {
     (
       PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
-      ByteStrDefinedLength(tailIndex(2), "Asset ID", AssetIdLength),
+      ByteStrDefinedLength(tailIndex(2), "Asset ID", AssetIdLength).map(IssuedAsset),
       LongBytes(tailIndex(3), "Quantity"),
       LongBytes(tailIndex(4), "Fee"),
       LongBytes(tailIndex(5), "Timestamp"),

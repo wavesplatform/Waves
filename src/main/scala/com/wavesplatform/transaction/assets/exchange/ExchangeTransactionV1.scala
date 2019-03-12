@@ -6,7 +6,6 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
@@ -28,8 +27,8 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
     extends ExchangeTransaction
     with SignedTransaction {
 
-  override def version: Byte                     = 1
-  override val builder                           = ExchangeTransactionV1
+  override def version: Byte           = 1
+  override val builder                 = ExchangeTransactionV1
   override val assetFee: (Asset, Long) = (Waves, fee)
 
   @ApiModelProperty(hidden = true)

@@ -59,7 +59,14 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     sender.signedBroadcast(
       TransferTransactionV2
-        .selfSigned(IssuedAsset(ByteStr.decodeBase58(asset).get), acc0, pkNewAddress, 100000000, System.currentTimeMillis(), Waves, smartMinFee, Array())
+        .selfSigned(IssuedAsset(ByteStr.decodeBase58(asset).get),
+                    acc0,
+                    pkNewAddress,
+                    100000000,
+                    System.currentTimeMillis(),
+                    Waves,
+                    smartMinFee,
+                    Array())
         .explicitGet()
         .json(),
       waitForTx = true
@@ -98,7 +105,14 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     sender.signedBroadcast(
       TransferTransactionV2
-        .selfSigned(IssuedAsset(ByteStr.decodeBase58(asset).get), acc0, pkNewAddress, 800000000, System.currentTimeMillis(), Waves, smartMinFee, Array())
+        .selfSigned(IssuedAsset(ByteStr.decodeBase58(asset).get),
+                    acc0,
+                    pkNewAddress,
+                    800000000,
+                    System.currentTimeMillis(),
+                    Waves,
+                    smartMinFee,
+                    Array())
         .explicitGet()
         .json(),
       waitForTx = true

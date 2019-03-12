@@ -6,9 +6,8 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction._
-import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 
@@ -96,7 +95,7 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
         require(txId == typeId, s"Signed tx id is not match")
         ReissueTransactionV1(
           sender = sender,
-          assetId = assetId,
+          asset = IssuedAsset(assetId),
           quantity = quantity,
           reissuable = reissuable,
           fee = fee,

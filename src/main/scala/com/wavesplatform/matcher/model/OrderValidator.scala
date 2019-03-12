@@ -149,7 +149,7 @@ object OrderValidator {
     )
   }
 
-  private[matcher] def getValidFeeAsset(order: Order, assetType: AssetType): Option[AssetId] = {
+  private[matcher] def getValidFeeAsset(order: Order, assetType: AssetType): Asset = {
     assetType match {
       case AssetType.AMOUNT    => order.assetPair.amountAsset
       case AssetType.PRICE     => order.assetPair.priceAsset
@@ -178,7 +178,7 @@ object OrderValidator {
       _ <- (Right(order): ValidationResult)
         .ensure(s"Matcher's fee asset in order (${order.matcherFeeAssetId}) does not meet matcher's settings requirements") { order =>
           val isMatcherFeeAssetValid = orderFeeSettings match {
-            case _: FixedWavesSettings            => order.matcherFeeAssetId.isEmpty
+            case _: FixedWavesSettings            => order.matcherFeeAssetId == Waves
             case FixedSettings(defaultAssetId, _) => order.matcherFeeAssetId == defaultAssetId
             case PercentSettings(assetType, _)    => order.matcherFeeAssetId == getValidFeeAsset(order, assetType)
           }

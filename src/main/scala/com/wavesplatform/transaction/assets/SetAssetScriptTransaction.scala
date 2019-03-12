@@ -119,7 +119,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
         SetAssetScriptTransaction(
           chainId = chainId,
           sender = sender,
-          assetId = assetId,
+          asset = IssuedAsset(assetId),
           script = script,
           fee = fee,
           timestamp = timestamp,

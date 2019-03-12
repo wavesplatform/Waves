@@ -4,9 +4,6 @@ import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto
-import com.wavesplatform.crypto._
-import monix.eval.Coeval
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction.description._

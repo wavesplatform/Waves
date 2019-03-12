@@ -1,8 +1,6 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import monix.eval.Coeval

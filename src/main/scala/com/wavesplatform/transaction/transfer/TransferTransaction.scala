@@ -3,11 +3,8 @@ package com.wavesplatform.transaction.transfer
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressOrAlias
-import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.utils.base58Length

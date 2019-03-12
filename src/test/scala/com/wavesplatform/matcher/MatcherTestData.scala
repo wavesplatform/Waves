@@ -13,10 +13,9 @@ import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, FixedWavesSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
 import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
@@ -160,7 +159,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       matcherFee: Long   <- maxWavesAmountGen
       orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte, 3: Byte)
       arbitraryAsset     <- assetIdGen(1)
-      matcherFeeAssetId  <- Gen.oneOf(pair.amountAsset, pair.priceAsset, None, arbitraryAsset)
+      matcherFeeAssetId  <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield {
       if (orderVersion == 3)
         Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, orderVersion, matcherFeeAssetId)
@@ -206,7 +205,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       expiration: Long          <- maxTimeGen
       matcherFee: Long          <- maxWavesAmountGen
       arbitraryAsset            <- assetIdGen(1)
-      matcherFeeAssetId         <- Gen.oneOf(pair.amountAsset, pair.priceAsset, None, arbitraryAsset)
+      matcherFeeAssetId         <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield {
       OrderV3(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
     }
@@ -225,7 +224,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       matcherFeeBuy: Long           <- maxWavesAmountGen
       matcherFeeSell: Long          <- maxWavesAmountGen
       arbitraryAsset                <- assetIdGen(1)
-      matcherFeeAssetId             <- Gen.oneOf(pair.amountAsset, pair.priceAsset, None, arbitraryAsset)
+      matcherFeeAssetId             <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield {
       (
         senderBuy -> OrderV3(senderBuy,
@@ -272,7 +271,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       minFee    <- Gen.choose(0.01, 100.0)
     } yield PercentSettings(assetType, minFee)
 
-  def fixedSettingsGenerator(defaultAsset: Option[AssetId], lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
+  def fixedSettingsGenerator(defaultAsset: Asset, lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
     for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedSettings(defaultAsset, minFee) }
 
   def fixedWavesSettingsGenerator(lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedWavesSettings] =
@@ -281,7 +280,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   val orderWithMatcherSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
     for {
       arbitraryAsset   <- assetIdGen(100)
-      defaultAsset     <- Gen.oneOf(None, arbitraryAsset)
+      defaultAsset     <- Gen.oneOf(Waves, arbitraryAsset)
       orderFeeSettings <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(defaultAsset), fixedWavesSettingsGenerator())
       (order, sender)  <- orderGenerator
     } yield {
@@ -291,7 +290,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       val correctOrder = (order.version, orderFeeSettings) match {
         case (3, FixedWavesSettings(minFee)) =>
           order
-            .updateMatcherFeeAssetId(None)
+            .updateMatcherFeeAssetId(Waves)
             .updateFee(minFee + 1000L)
         case (3, FixedSettings(defaultAssetId, minFee)) =>
           order

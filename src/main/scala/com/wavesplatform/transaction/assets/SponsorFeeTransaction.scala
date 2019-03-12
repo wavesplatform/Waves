@@ -6,6 +6,7 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
@@ -124,7 +125,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
         require(bodyVersion == version, s"versions are not match ($version, $bodyVersion)")
         SponsorFeeTransaction(
           sender = sender,
-          assetId = assetId,
+          asset = IssuedAsset(assetId),
           minSponsoredAssetFee = minSponsoredAssetFee,
           fee = fee,
           timestamp = timestamp,

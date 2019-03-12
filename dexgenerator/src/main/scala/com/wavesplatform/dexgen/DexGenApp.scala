@@ -6,7 +6,6 @@ import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.api.http.assets.{SignedIssueV2Request, SignedMassTransferRequest}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dexgen.cli.ScoptImplicits
 import com.wavesplatform.dexgen.config.FicusImplicits
@@ -15,6 +14,7 @@ import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -96,7 +96,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
         .explicitGet()
     }
 
-    val tradingAssets: Seq[Asset]                    = assetsTx.map(tx => tx.id())
+    val tradingAssets: Seq[Asset]                      = assetsTx.map(tx => IssuedAsset(tx.id()))
     val signedIssueRequests: Seq[SignedIssueV2Request] = assetsTx.map(tx => api.createSignedIssueRequest(tx))
 
     val issued: Seq[Future[Transaction]] = signedIssueRequests
@@ -111,7 +111,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
     tradingAssets
   }
 
-  def parsedTransfersList(endpoint: String, assetId: Option[ByteStr], transferAmount: Long, pk: PrivateKeyAccount, accounts: Seq[PrivateKeyAccount])(
+  def parsedTransfersList(endpoint: String, assetId: Asset, transferAmount: Long, pk: PrivateKeyAccount, accounts: Seq[PrivateKeyAccount])(
       implicit tag: String): List[ParsedTransfer] = {
     val assetsTransfers = accounts.map { accountPk =>
       ParsedTransfer(AddressOrAlias.fromString(accountPk.address).right.get, transferAmount)
@@ -119,7 +119,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
     assetsTransfers.toList
   }
 
-  def massTransfer(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount], tradingAssets: Seq[Option[Asset]])(
+  def massTransfer(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount], tradingAssets: Seq[Asset])(
       implicit tag: String): Future[Seq[Transaction]] = {
     val node          = api.to(endpoint)
     val richAccountPk = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
@@ -129,7 +129,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
         .balance(richAccountPk.address, assetId)
         .flatMap { balance =>
           val transferAmount =
-            if (assetId.isEmpty)
+            if (assetId == Waves)
               30000000000l
             else
               balance / accounts.size / 1000
@@ -182,8 +182,8 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
       Thread.sleep(5000)
 
       val transfers = Seq(
-        massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, None +: tradingAssets.dropRight(2).map(Option(_))),
-        massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.fakeAccounts, None +: tradingAssets.takeRight(2).map(Option(_)))
+        massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.validAccounts, Waves +: tradingAssets.dropRight(2)),
+        massTransfer(endpoint, finalConfig.richAccounts.head, finalConfig.fakeAccounts, Waves +: tradingAssets.takeRight(2))
       )
 
       Await.ready(Future.sequence(transfers), 120.seconds)

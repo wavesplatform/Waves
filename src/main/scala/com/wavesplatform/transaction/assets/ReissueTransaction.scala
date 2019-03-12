@@ -2,9 +2,6 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, _}

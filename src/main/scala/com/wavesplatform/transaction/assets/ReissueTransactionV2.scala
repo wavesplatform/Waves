@@ -100,7 +100,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
     (
       OneByte(tailIndex(1), "Chain ID"),
       PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
-      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength),
+      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength).map(IssuedAsset),
       LongBytes(tailIndex(4), "Quantity"),
       BooleanByte(tailIndex(5), "Reissuable flag (1 - True, 0 - False)"),
       LongBytes(tailIndex(6), "Fee"),
