@@ -19,6 +19,7 @@ object ScriptCompiler extends ScorexLogging {
     for {
       ver    <- extractStdLibVersion(directives)
       tpe    <- extractContentType(directives)
+      _      <- directiveConsistency((ver, if (isAssetScript) ScriptType.Asset else ScriptType.Account, tpe))
       script <- tryCompile(scriptText, tpe, ver, isAssetScript)
     } yield (script, script.complexity)
   }

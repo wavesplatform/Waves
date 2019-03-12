@@ -60,14 +60,26 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     )
   }
 
-  property("Callables can't have more than 22 args") {
+  property("Callable can have 22 args") {
+    parseCompileAndEvaluate(
+      """
+        |@Callable(invocation)
+        |func foo(a1:Int, a2:Int, a3:Int, a4:Int, a5:Int, a6:Int, a7:Int, a8:Int, a9:Int, a10:Int,
+        |         a11:Int, a12:Int, a13:Int, a14:Int, a15:Int, a16:Int, a17:Int, a18:Int, a19:Int, a20:Int,
+        |         a21:Int, a22:Int) = { WriteSet([DataEntry(toString(a1), a22)]) }
+      """.stripMargin,
+      "foo",
+      Range(1, 23).map(i => Terms.CONST_LONG(i)).toList
+    ).explicitGet() shouldBe ContractResult(List(DataItem.Lng("1", 22)), List())
+  }
+
+  property("Callable can't have more than 22 args") {
     val src =
       """
         |@Callable(invocation)
         |func foo(a1:Int, a2:Int, a3:Int, a4:Int, a5:Int, a6:Int, a7:Int, a8:Int, a9:Int, a10:Int,
         |         a11:Int, a12:Int, a13:Int, a14:Int, a15:Int, a16:Int, a17:Int, a18:Int, a19:Int, a20:Int,
         |         a21:Int, a22:Int, a23:Int) = { throw() }
-        |
       """.stripMargin
 
     val parsed = Parser.parseContract(src).get.value
