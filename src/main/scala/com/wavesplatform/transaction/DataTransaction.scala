@@ -58,7 +58,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
     byteTailDescription
       .deserializeFromByteArray(bytes)
       .flatMap(
-        validateTxContent(_, bytes.length).foldToTry
+        validateTxContent(_, Some(bytes.length)).foldToTry
       )
   }
 
@@ -69,10 +69,10 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
              proofs: Proofs): Either[ValidationError, TransactionT] = {
 
     val tx = DataTransaction(sender, data, feeAmount, timestamp, proofs)
-    validateTxContent(tx, tx.bytes().length)
+    validateTxContent(tx)
   }
 
-  private def validateTxContent(tx: DataTransaction, txByteCount: Int): Either[ValidationError, TransactionT] = {
+  private def validateTxContent(tx: DataTransaction, txByteCountOpt: Option[Int] = None): Either[ValidationError, TransactionT] = {
     if (tx.data.lengthCompare(MaxEntryCount) > 0 || tx.data.exists(!_.valid)) {
       Left(ValidationError.TooBigArray)
     } else if (tx.data.exists(_.key.isEmpty)) {
@@ -82,7 +82,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
     } else if (tx.fee <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
-      Either.cond(txByteCount <= MaxBytes, tx, ValidationError.TooBigArray)
+      Either.cond(txByteCountOpt.getOrElse(tx.bytes().length) <= MaxBytes, tx, ValidationError.TooBigArray)
     }
   }
 
