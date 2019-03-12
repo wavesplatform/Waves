@@ -7,6 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
@@ -33,12 +34,12 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
 
   "after restarting all the nodes, the duplicate transaction cannot be put into the blockchain" in {
     val txJson = TransferTransactionV2
-      .selfSigned(None,
+      .selfSigned(Waves,
                   nodeB.privateKey,
                   AddressOrAlias.fromString(nodeA.address).explicitGet(),
                   1.waves,
                   System.currentTimeMillis(),
-                  None,
+                  Waves,
                   minFee,
                   Array[Byte]())
       .explicitGet()

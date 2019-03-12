@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -10,7 +10,7 @@ trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
 
   def chainByte: Option[Byte]
 
-  def assetId: ByteStr
+  def asset: IssuedAsset
 
   def quantity: Long
 
@@ -18,12 +18,12 @@ trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
 
   def timestamp: Long
 
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val assetFee: (Asset, Long) = (Waves, fee)
 
   override val json: Coeval[JsObject] = Coeval.evalOnce {
     jsonBase() ++ Json.obj(
       "version" -> version,
-      "assetId" -> assetId.base58,
+      "assetId" -> asset.id.base58,
       "amount"  -> quantity,
       "fee"     -> fee
     ) ++ (chainByte match {
@@ -35,13 +35,13 @@ trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
   val byteBase: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
       sender.publicKey,
-      assetId.arr,
+      asset.id.arr,
       Longs.toByteArray(quantity),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     )
   }
-  override def checkedAssets(): Seq[AssetId] = Seq(assetId)
+  override def checkedAssets(): Seq[Asset] = Seq(asset)
 }
 
 object BurnTransaction {

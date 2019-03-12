@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -44,10 +45,10 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
-            totalPortfolioDiff.assets shouldBe Map(reissue.assetId -> (reissue.quantity - burn.quantity))
+            totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity - burn.quantity))
 
             val totalAssetVolume = issue.quantity + reissue.quantity - burn.quantity
-            newState.portfolio(issue.sender).assets shouldBe Map(reissue.assetId -> totalAssetVolume)
+            newState.portfolio(issue.sender).assets shouldBe Map(reissue.asset -> totalAssetVolume)
         }
     }
   }
@@ -80,8 +81,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       reissuable2            <- Arbitrary.arbitrary[Boolean]
       fee                    <- Gen.choose(1L, 2000000L)
       timestamp              <- timestampGen
-      reissue = ReissueTransactionV1.selfSigned(other, issue.assetId(), quantity, reissuable2, fee, timestamp).explicitGet()
-      burn    = BurnTransactionV1.selfSigned(other, issue.assetId(), quantity, fee, timestamp).explicitGet()
+      reissue = ReissueTransactionV1.selfSigned(other, IssuedAsset(issue.assetId()), quantity, reissuable2, fee, timestamp).explicitGet()
+      burn    = BurnTransactionV1.selfSigned(other, IssuedAsset(issue.assetId()), quantity, fee, timestamp).explicitGet()
     } yield ((gen, issue), reissue, burn)
 
     forAll(setup) {
@@ -102,9 +103,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       timestamp <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
       (issue, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, issuer)
-      assetTransfer <- transferGeneratorP(issuer, burner, Some(issue.assetId()), None)
+      assetTransfer <- transferGeneratorP(issuer, burner, IssuedAsset(issue.assetId()), Waves)
       wavesTransfer <- wavesTransferGeneratorP(issuer, burner)
-      burn = BurnTransactionV1.selfSigned(burner, issue.assetId(), assetTransfer.amount, wavesTransfer.amount, timestamp).explicitGet()
+      burn = BurnTransactionV1.selfSigned(burner, IssuedAsset(issue.assetId()), assetTransfer.amount, wavesTransfer.amount, timestamp).explicitGet()
     } yield (genesis, issue, assetTransfer, wavesTransfer, burn)
 
     val fs =
@@ -117,7 +118,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       case (genesis, issue, assetTransfer, wavesTransfer, burn) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, issue, assetTransfer, wavesTransfer))), TestBlock.create(Seq(burn)), fs) {
           case (_, newState) =>
-            newState.portfolio(burn.sender).assets shouldBe Map(burn.assetId -> 0)
+            newState.portfolio(burn.sender).assets shouldBe Map(burn.asset -> 0)
         }
     }
   }
@@ -133,7 +134,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
-      assetId = issue.assetId()
+      assetId = IssuedAsset(issue.assetId())
       reissue = ReissueTransactionV1.selfSigned(issuer, assetId, Long.MaxValue, true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue)
 
@@ -162,7 +163,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
-      assetId = issue.assetId()
+      assetId = IssuedAsset(issue.assetId())
       reissue = ReissueTransactionV1.selfSigned(issuer, assetId, Long.MaxValue, true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue)
 
@@ -189,9 +190,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
-      assetId = issue.assetId()
+      assetId = IssuedAsset(issue.assetId())
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-      transfer = TransferTransactionV1.selfSigned(Some(assetId), issuer, holder, quantity - 1, timestamp, None, fee, attachment).explicitGet()
+      transfer = TransferTransactionV1.selfSigned(assetId, issuer, holder, quantity - 1, timestamp, Waves, fee, attachment).explicitGet()
       reissue  = ReissueTransactionV1.selfSigned(issuer, assetId, (Long.MaxValue - quantity) + 1, true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue, transfer)
 
@@ -247,9 +248,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
                     smallFee,
                     timestamp + 1)
         .explicitGet()
-      assetId = issue.id()
+      assetId = IssuedAsset(issue.id())
       transfer = TransferTransactionV1
-        .selfSigned(Some(assetId), accountA, accountB, issue.quantity, timestamp + 2, None, smallFee, Array.empty)
+        .selfSigned(assetId, accountA, accountB, issue.quantity, timestamp + 2, Waves, smallFee, Array.empty)
         .explicitGet()
       reissue = ReissueTransactionV1.selfSigned(accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
     } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue)
@@ -263,7 +264,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       case (gen, issue) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(issue)), smartEnabledFS) {
           case (blockDiff, newState) =>
-            newState.assetDescription(issue.id()) shouldBe Some(
+            newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
               AssetDescription(issue.sender,
                                issue.name,
                                issue.description,
@@ -285,8 +286,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS) {
           case (blockDiff, newState) =>
             val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
-            totalPortfolioDiff.assets(issue.id()) shouldEqual issue.quantity
-            newState.balance(newState.resolveAlias(transfer.recipient).explicitGet(), Some(issue.id())) shouldEqual transfer.amount
+            totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity
+            newState.balance(newState.resolveAlias(transfer.recipient).explicitGet(), IssuedAsset(issue.id())) shouldEqual transfer.amount
         }
     }
   }

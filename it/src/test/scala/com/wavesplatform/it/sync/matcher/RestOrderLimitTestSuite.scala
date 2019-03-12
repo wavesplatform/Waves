@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
+import com.wavesplatform.common.state.ByteStr.decodeBase58
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
@@ -9,7 +10,7 @@ import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{Node, ReportingTestName}
-import com.wavesplatform.common.state.ByteStr.decodeBase58
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
@@ -59,8 +60,8 @@ class RestOrderLimitTestSuite
       .id
     Seq(aliceAsset, bobAsset).foreach(matcher.waitForTransaction(_))
 
-    val alicePair = AssetPair(decodeBase58(aliceAsset).toOption, None)
-    val bobPair   = AssetPair(decodeBase58(bobAsset).toOption, None)
+    val alicePair = AssetPair(IssuedAsset(decodeBase58(aliceAsset).get), Waves)
+    val bobPair   = AssetPair(IssuedAsset(decodeBase58(bobAsset).get), Waves)
 
     info("'fullOrderHistory' and 'ordersByAddress' (activeOnly=false) must return no more 'rest-order-limit' orders")
 

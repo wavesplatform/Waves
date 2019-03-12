@@ -5,10 +5,11 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -23,11 +24,11 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
     issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-    maybeAsset               <- Gen.option(issue1)
-    maybeAsset2              <- Gen.option(issue2)
+    maybeAsset               <- Gen.option(issue1.id()) map Asset.fromCompatId
+    maybeAsset2              <- Gen.option(issue2.id()) map Asset.fromCompatId
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
-    transferV1               <- transferGeneratorP(master, recepient, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
-    transferV2               <- versionedTransferGeneratorP(master, recepient, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
+    transferV1               <- transferGeneratorP(master, recepient, maybeAsset, maybeFeeAsset)
+    transferV2               <- versionedTransferGeneratorP(master, recepient, maybeAsset, maybeFeeAsset)
     transfer                 <- Gen.oneOf(transferV1, transferV2)
   } yield (genesis, issue1, issue2, transfer)
 
@@ -42,8 +43,8 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
             val recipientPortfolio = newState.portfolio(recipient)
             if (transfer.sender.toAddress != recipient) {
               transfer.assetId match {
-                case Some(aid) => recipientPortfolio shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
-                case None      => recipientPortfolio shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
+                case aid @ IssuedAsset(_) => recipientPortfolio shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
+                case Waves                => recipientPortfolio shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
               }
             }
         }
@@ -58,8 +59,8 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       issue: IssueTransaction      <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
       feeIssue: IssueTransactionV2 <- smartIssueTransactionGen(master, scriptGen.map(_.some))
-      transferV1                   <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
-      transferV2                   <- transferGeneratorP(master, recepient, issue.id().some, feeIssue.id().some)
+      transferV1                   <- transferGeneratorP(master, recepient, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
+      transferV2                   <- transferGeneratorP(master, recepient, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
       transfer                     <- Gen.oneOf(transferV1, transferV2)
     } yield (genesis, issue, feeIssue, transfer)
   }

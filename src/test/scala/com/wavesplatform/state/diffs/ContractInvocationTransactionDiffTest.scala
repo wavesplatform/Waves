@@ -16,13 +16,14 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ContractScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.transaction.{AssetId, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -86,13 +87,13 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
                       recipientAmount: Long,
                       masspayment: Boolean,
                       paymentCount: Int = 11,
-                      assetId: Option[AssetId] = None) = {
+                      assetId: Asset = Waves) = {
     val oneTransfer = FUNCTION_CALL(
       User(FieldNames.ContractTransfer),
       List(
         FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes))),
         CONST_LONG(recipientAmount),
-        assetId.fold(REF("unit"): EXPR)(id => CONST_BYTESTR(id))
+        assetId.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id))
       )
     )
 
@@ -129,8 +130,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       argBinding    <- validAliasStringGen
     } yield dataContract(senderBinging, argBinding, func, bigData)
 
-  def paymentContractGen(address: Address, amount: Long, masspayment: Boolean, assetId: Option[AssetId] = None, paymentCount: Int = 11)(
-      func: String) =
+  def paymentContractGen(address: Address, amount: Long, masspayment: Boolean, assetId: Asset = Waves, paymentCount: Int = 11)(func: String) =
     for {
       senderBinging <- validAliasStringGen
       argBinding    <- validAliasStringGen
@@ -195,7 +195,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
-            newState.balance(acc, None) shouldBe amount
+            newState.balance(acc, Waves) shouldBe amount
         }
     }
   }
@@ -229,15 +229,15 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
         .explicitGet()
       r <- preconditionsAndSetContract(contractGen,
                                        invokerGen = Gen.oneOf(Seq(invoker)),
-                                       payment = Some(Payment(1, Some(asset.id()))),
+                                       payment = Some(Payment(1, IssuedAsset(asset.id()))),
                                        feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, invoker)) {
       case (acc, amount, genesis, setScript, ci, asset, invoker) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
-            newState.balance(acc, None) shouldBe amount
-            newState.balance(invoker, Some(asset.id())) shouldBe (asset.quantity - 1)
-            newState.balance(ci.contractAddress, Some(asset.id())) shouldBe 1
+            newState.balance(acc, Waves) shouldBe amount
+            newState.balance(invoker, IssuedAsset(asset.id())) shouldBe (asset.quantity - 1)
+            newState.balance(ci.contractAddress, IssuedAsset(asset.id())) shouldBe 1
         }
     }
   }
@@ -254,7 +254,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
         .explicitGet()
       r <- preconditionsAndSetContract(contractGen,
                                        invokerGen = Gen.oneOf(Seq(invoker)),
-                                       payment = Some(Payment(1, Some(asset.id()))),
+                                       payment = Some(Payment(1, IssuedAsset(asset.id()))),
                                        feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, invoker)) {
       case (acc, amount, genesis, setScript, ci, asset, invoker) =>
@@ -274,14 +274,14 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       asset = IssueTransactionV2
         .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
-      contractGen = (paymentContractGen(a, am, false, Some(asset.id())) _)
+      contractGen = paymentContractGen(a, am, false, IssuedAsset(asset.id())) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
-            newState.balance(master, Some(asset.id())) shouldBe (asset.quantity - amount)
-            newState.balance(acc, Some(asset.id())) shouldBe amount
+            newState.balance(master, IssuedAsset(asset.id())) shouldBe (asset.quantity - amount)
+            newState.balance(acc, IssuedAsset(asset.id())) shouldBe amount
         }
     }
   }
@@ -296,7 +296,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       asset = IssueTransactionV2
         .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetBanned), enoughFee, ts)
         .explicitGet()
-      contractGen = (paymentContractGen(a, am, false, Some(asset.id())) _)
+      contractGen = paymentContractGen(a, am, false, IssuedAsset(asset.id())) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
@@ -316,11 +316,14 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       asset = IssueTransactionV2
         .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetAllowed), enoughFee, ts)
         .explicitGet()
-      contractGen = (paymentContractGen(a, -1, false, Some(asset.id())) _)
+      contractGen = (paymentContractGen(a, -1, false, IssuedAsset(asset.id())) _)
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master, ts)) {
       case (acc, amount, genesis, setScript, ci, asset, master, ts) =>
-        val t = TransferTransactionV2.selfSigned(Some(asset.id()), master, acc, asset.quantity / 10, ts, None, enoughFee, Array[Byte]()).explicitGet()
+        val t =
+          TransferTransactionV2
+            .selfSigned(IssuedAsset(asset.id()), master, acc, asset.quantity / 10, ts, Waves, enoughFee, Array[Byte]())
+            .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi should produce("NegativeAmount")
         }
@@ -336,7 +339,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
-      ci = ContractInvocationTransaction.selfSigned(invoker, master, fc, Some(Payment(-1, None)), fee, ts)
+      ci = ContractInvocationTransaction.selfSigned(invoker, master, fc, Some(Payment(-1, Waves)), fee, ts)
     } yield (ci)) { _ should produce("NegativeAmount") }
   }
 
@@ -350,7 +353,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       asset = IssueTransactionV2
         .selfSigned(chainId, master, "Asset#1".getBytes, "".getBytes, quantity, 8, false, Some(assetBanned), enoughFee, ts)
         .explicitGet()
-      contractGen = (paymentContractGen(a, am, false, Some(asset.id())) _)
+      contractGen = (paymentContractGen(a, am, false, IssuedAsset(asset.id())) _)
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(0))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
@@ -372,7 +375,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
         .explicitGet()
       r <- preconditionsAndSetContract(contractGen,
                                        invokerGen = Gen.oneOf(Seq(invoker)),
-                                       payment = Some(Payment(1, Some(asset.id()))),
+                                       payment = Some(Payment(1, IssuedAsset(asset.id()))),
                                        feeGen = ciFee(0))
     } yield (a, am, r._1, r._2, r._3, asset, invoker)) {
       case (acc, amount, genesis, setScript, ci, asset, invoker) =>
@@ -391,7 +394,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       ts      <- timestampGen
       r <- preconditionsAndSetContract(contractGen,
                                        invokerGen = Gen.oneOf(Seq(invoker)),
-                                       payment = Some(Payment(Long.MaxValue, None)),
+                                       payment = Some(Payment(Long.MaxValue, Waves)),
                                        feeGen = ciFee(1))
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
@@ -405,10 +408,10 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = (paymentContractGen(a, Long.MaxValue / 2 + 2, true, None, 4) _)
+      contractGen = (paymentContractGen(a, Long.MaxValue / 2 + 2, true, Waves, 4) _)
       invoker <- accountGen
       ts      <- timestampGen
-      r       <- preconditionsAndSetContract(contractGen, invokerGen = Gen.oneOf(Seq(invoker)), payment = Some(Payment(1, None)), feeGen = ciFee(1))
+      r       <- preconditionsAndSetContract(contractGen, invokerGen = Gen.oneOf(Seq(invoker)), payment = Some(Payment(1, Waves)), feeGen = ciFee(1))
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {

@@ -13,7 +13,8 @@ import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, FixedWavesSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
 import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.{Arbitrary, Gen}
@@ -29,26 +30,28 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long]         = Gen.choose(1, Long.MaxValue)
 
-  val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
-
   private val seqNr = new AtomicLong(-1)
 
   def wrap(x: Order): QueueEventWithMeta                           = wrap(seqNr.incrementAndGet(), x)
   def wrap(n: Long, x: Order): QueueEventWithMeta                  = wrap(n, QueueEvent.Placed(x))
   private def wrap(n: Long, event: QueueEvent): QueueEventWithMeta = QueueEventWithMeta(n, System.currentTimeMillis(), event)
 
-  def assetIdGen(prefix: Byte) = Gen.listOfN(signatureSize - 1, Arbitrary.arbitrary[Byte]).map(xs => Some(ByteStr(Array(prefix, xs: _*))))
+  def assetIdGen(prefix: Byte): Gen[IssuedAsset] =
+    Gen
+      .listOfN(signatureSize - 1, Arbitrary.arbitrary[Byte])
+      .map(xs => IssuedAsset(ByteStr(Array(prefix, xs: _*))))
+
   val distinctPairGen: Gen[AssetPair] = for {
     a1 <- assetIdGen(1.toByte)
     a2 <- assetIdGen(2.toByte)
   } yield AssetPair(a1, a2)
 
-  protected def mkAssetId(prefix: String): Option[ByteStr] = {
+  protected def mkAssetId(prefix: String): IssuedAsset = {
     val prefixBytes = prefix.getBytes(Charsets.UTF_8)
-    Some(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
+    IssuedAsset(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
   }
 
-  val assetPairGen = Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, None))), (1, assetIdGen(2).map(AssetPair(None, _))))
+  val assetPairGen = Gen.frequency((18, distinctPairGen), (1, assetIdGen(1).map(AssetPair(_, Waves))), (1, assetIdGen(2).map(AssetPair(Waves, _))))
 
   val maxTimeGen: Gen[Long]     = Gen.choose(10000L, Order.MaxLiveTime).map(_ + System.currentTimeMillis())
   val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(System.currentTimeMillis() - _)
@@ -156,7 +159,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       matcherFee: Long   <- maxWavesAmountGen
       orderVersion: Byte <- Gen.oneOf(1: Byte, 2: Byte, 3: Byte)
       arbitraryAsset     <- assetIdGen(1)
-      matcherFeeAssetId  <- Gen.oneOf(pair.amountAsset, pair.priceAsset, None, arbitraryAsset)
+      matcherFeeAssetId  <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield {
       if (orderVersion == 3)
         Order(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, orderVersion, matcherFeeAssetId)
@@ -202,7 +205,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       expiration: Long          <- maxTimeGen
       matcherFee: Long          <- maxWavesAmountGen
       arbitraryAsset            <- assetIdGen(1)
-      matcherFeeAssetId         <- Gen.oneOf(pair.amountAsset, pair.priceAsset, None, arbitraryAsset)
+      matcherFeeAssetId         <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield {
       OrderV3(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
     }
@@ -221,7 +224,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       matcherFeeBuy: Long           <- maxWavesAmountGen
       matcherFeeSell: Long          <- maxWavesAmountGen
       arbitraryAsset                <- assetIdGen(1)
-      matcherFeeAssetId             <- Gen.oneOf(pair.amountAsset, pair.priceAsset, None, arbitraryAsset)
+      matcherFeeAssetId             <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
     } yield {
       (
         senderBuy -> OrderV3(senderBuy,
@@ -268,7 +271,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       minFee    <- Gen.choose(0.01, 100.0)
     } yield PercentSettings(assetType, minFee)
 
-  def fixedSettingsGenerator(defaultAsset: Option[AssetId], lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
+  def fixedSettingsGenerator(defaultAsset: Asset, lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
     for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedSettings(defaultAsset, minFee) }
 
   def fixedWavesSettingsGenerator(lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedWavesSettings] =
@@ -277,7 +280,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   val orderWithMatcherSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
     for {
       arbitraryAsset   <- assetIdGen(100)
-      defaultAsset     <- Gen.oneOf(None, arbitraryAsset)
+      defaultAsset     <- Gen.oneOf(Waves, arbitraryAsset)
       orderFeeSettings <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(defaultAsset), fixedWavesSettingsGenerator())
       (order, sender)  <- orderGenerator
     } yield {
@@ -287,7 +290,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       val correctOrder = (order.version, orderFeeSettings) match {
         case (3, FixedWavesSettings(minFee)) =>
           order
-            .updateMatcherFeeAssetId(None)
+            .updateMatcherFeeAssetId(Waves)
             .updateFee(minFee + 1000L)
         case (3, FixedSettings(defaultAssetId, minFee)) =>
           order

@@ -49,14 +49,16 @@ inThisBuild(
     scalaVersion := "2.12.8",
     organization := "com.wavesplatform",
     crossPaths := false,
-    scalacOptions ++= Seq("-feature",
-                          "-deprecation",
-                          "-language:higherKinds",
-                          "-language:implicitConversions",
-                          "-Ywarn-unused:-implicits",
-                          "-Xlint",
-                          "-Ywarn-unused-import",
-                          "-Ypartial-unification")
+    scalacOptions ++= Seq(
+      "-feature",
+      "-deprecation",
+      "-language:higherKinds",
+      "-language:implicitConversions",
+      "-Ywarn-unused:-implicits",
+      "-Xlint",
+      "-Ywarn-unused-import",
+      "-Ypartial-unification"
+    )
   ))
 
 resolvers ++= Seq(
