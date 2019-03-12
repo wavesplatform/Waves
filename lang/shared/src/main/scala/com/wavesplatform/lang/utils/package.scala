@@ -9,7 +9,6 @@ import com.wavesplatform.lang.directives.{Directive, DirectiveKey}
 import scala.util.{Failure, Success, Try}
 
 package object utils {
-  case class DirectiveSet(stdLibVersion: StdLibVersion, scriptType: ScriptType, contentType: ContentType)
 
   def directiveConsistency(t: DirectiveSet): Either[String, DirectiveSet] = t match {
     case DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract) => Right(t)
