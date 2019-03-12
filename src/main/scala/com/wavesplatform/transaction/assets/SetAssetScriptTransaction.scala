@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets
 
-import cats.data.State
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
@@ -8,12 +8,13 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
+import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class SetAssetScriptTransaction private (chainId: Byte,
                                               sender: PublicKeyAccount,
@@ -95,40 +96,34 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
     }
   }
   override def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    val readByte: State[Int, Byte] = State { from =>
-      (from + 1, bytes(from))
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      Either
+        .cond(tx.chainId == currentChainId, (), ValidationError.GenericError(s"Wrong chainId actual: ${tx.chainId.toInt}, expected: $currentChainId"))
+        .map(_ => tx)
+        .foldToTry
     }
-    def read[T](f: Array[Byte] => T, size: Int): State[Int, T] = State { from =>
-      val end = from + size
-      (end, f(bytes.slice(from, end)))
-    }
-    def readUnsized[T](f: (Array[Byte], Int) => (T, Int)): State[Int, T] = State { from =>
-      val (v, end) = f(bytes, from)
-      (end, v)
-    }
-    def readEnd[T](f: Array[Byte] => T): State[Int, T] = State { from =>
-      (from, f(bytes.drop(from)))
-    }
-
-    Try {
-      val makeTransaction = for {
-        chainId   <- readByte
-        sender    <- read(PublicKeyAccount.apply, KeyLength)
-        assetId   <- read(ByteStr.apply, AssetIdLength)
-        fee       <- read(Longs.fromByteArray _, 8)
-        timestamp <- read(Longs.fromByteArray _, 8)
-        scriptOrE <- readUnsized((b: Array[Byte], p: Int) => Deser.parseOption(b, p)(ScriptReader.fromBytes))
-        proofs    <- readEnd(Proofs.fromBytes)
-      } yield {
-        (scriptOrE match {
-          case Some(Left(err)) => Left(err)
-          case Some(Right(s))  => Right(Some(s))
-          case None            => Right(None)
-        }).flatMap(script => create(chainId, sender, assetId, script, fee, timestamp, proofs.right.get))
-          .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-      }
-      makeTransaction.run(0).value._2
-    }.flatten
   }
 
+  val byteTailDescription: ByteEntity[SetAssetScriptTransaction] = {
+    (
+      OneByte(tailIndex(1), "Chain ID"),
+      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength),
+      LongBytes(tailIndex(4), "Fee"),
+      LongBytes(tailIndex(5), "Timestamp"),
+      OptionBytes(index = tailIndex(6), name = "Script", nestedByteEntity = ScriptBytes(tailIndex(6), "Script")),
+      ProofsBytes(tailIndex(7))
+    ) mapN {
+      case (chainId, sender, assetId, fee, timestamp, script, proofs) =>
+        SetAssetScriptTransaction(
+          chainId = chainId,
+          sender = sender,
+          assetId = assetId,
+          script = script,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
+  }
 }

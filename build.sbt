@@ -15,7 +15,7 @@ val versionSource = Def.task {
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val FallbackVersion = (0, 16, 1)
+  val FallbackVersion = (0, 16, 2)
 
   val versionFile      = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
@@ -55,6 +55,7 @@ inThisBuild(
                           "-language:implicitConversions",
                           "-Ywarn-unused:-implicits",
                           "-Xlint",
+                          "-Ywarn-unused-import",
                           "-Ypartial-unification")
   ))
 
@@ -116,7 +117,9 @@ inConfig(Compile)(
     mainClass := Some("com.wavesplatform.Application"),
     publishArtifact in packageDoc := false,
     publishArtifact in packageSrc := false,
-    sourceGenerators += versionSource
+    sourceGenerators += versionSource,
+    PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged in Compile).value,
+    PB.deleteTargetDirectory := false
   ))
 
 inConfig(Test)(
@@ -219,8 +222,8 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
 
 addCommandAlias(
   "checkPR",
+  // set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
   """;
-    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
     |Global / checkPRRaw;
     |set scalacOptions in ThisBuild -= "-Xfatal-warnings";
   """.stripMargin
@@ -239,6 +242,7 @@ checkPRRaw in Global := {
 
 lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
+  .disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies ++= Dependencies.scalatest
   )
@@ -249,6 +253,7 @@ lazy val commonJVM = common.jvm
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
+    .disablePlugins(ProtocPlugin)
     .settings(
       version := "1.0.0",
       coverageExcludedPackages := ".*",
@@ -314,7 +319,7 @@ lazy val node = project
         Dependencies.http ++
         Dependencies.akka ++
         Dependencies.serialization ++
-        Dependencies.testKit.map(_ % "test") ++
+        Dependencies.testKit.map(_ % Test) ++
         Dependencies.logging ++
         Dependencies.matcher ++
         Dependencies.metrics ++
@@ -323,7 +328,9 @@ lazy val node = project
         Dependencies.ficus ++
         Dependencies.scorex ++
         Dependencies.commons_net ++
-        Dependencies.monix.value,
+        Dependencies.monix.value ++
+        Dependencies.protobuf.value ++
+        Dependencies.grpc,
     dependencyOverrides ++= Seq(
       Dependencies.AkkaActor,
       Dependencies.AkkaStream,

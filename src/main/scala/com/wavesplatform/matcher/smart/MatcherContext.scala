@@ -6,12 +6,12 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CaseObj}
-import com.wavesplatform.lang.v1.compiler.Types.FINAL
+import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{ordType, orderObject}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext, _}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.OrdType
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.transaction.assets.exchange.Order

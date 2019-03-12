@@ -1,16 +1,17 @@
 package com.wavesplatform.transaction.assets
 
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto._
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class SponsorFeeTransaction private (sender: PublicKeyAccount,
                                           assetId: ByteStr,
@@ -60,26 +61,17 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
   override val supportedVersions: Set[Byte] = Set(version)
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      val txId = bytes(0)
-      require(txId == typeId, s"Signed tx id is not match")
-      val bodyVersion = bytes(1)
-      require(bodyVersion == version, s"versions are not match ($version, $bodyVersion)")
-      val sender      = PublicKeyAccount(bytes.slice(2, KeyLength + 2))
-      val assetId     = ByteStr(bytes.slice(KeyLength + 2, KeyLength + AssetIdLength + 2))
-      val minFeeStart = KeyLength + AssetIdLength + 2
-
-      val minFee    = Longs.fromByteArray(bytes.slice(minFeeStart, minFeeStart + 8))
-      val fee       = Longs.fromByteArray(bytes.slice(minFeeStart + 8, minFeeStart + 16))
-      val timestamp = Longs.fromByteArray(bytes.slice(minFeeStart + 16, minFeeStart + 24))
-      val tx = for {
-        proofs <- Proofs.fromBytes(bytes.drop(minFeeStart + 24))
-        tx     <- SponsorFeeTransaction.create(sender, assetId, Some(minFee).filter(_ != 0), fee, timestamp, proofs)
-      } yield {
-        tx
-      }
-      tx.fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      (
+        if (tx.minSponsoredAssetFee.exists(_ < 0)) {
+          Left(ValidationError.NegativeMinFee(tx.minSponsoredAssetFee.get, "asset"))
+        } else if (tx.fee <= 0) {
+          Left(ValidationError.InsufficientFee())
+        } else {
+          Right(tx)
+        }
+      ).foldToTry
+    }
   }
 
   def create(sender: PublicKeyAccount,
@@ -114,5 +106,30 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, assetId, minSponsoredAssetFee, fee, timestamp, sender)
+  }
+
+  val byteTailDescription: ByteEntity[SponsorFeeTransaction] = {
+    (
+      OneByte(tailIndex(1), "Transaction type"),
+      OneByte(tailIndex(2), "Version"),
+      PublicKeyAccountBytes(tailIndex(3), "Sender's public key"),
+      ByteStrDefinedLength(tailIndex(4), "Asset ID", AssetIdLength),
+      SponsorFeeOptionLongBytes(tailIndex(5), "Minimal fee in assets*"),
+      LongBytes(tailIndex(6), "Fee"),
+      LongBytes(tailIndex(7), "Timestamp"),
+      ProofsBytes(tailIndex(8))
+    ) mapN {
+      case (txId, bodyVersion, sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs) =>
+        require(txId == typeId, s"Signed tx id is not match")
+        require(bodyVersion == version, s"versions are not match ($version, $bodyVersion)")
+        SponsorFeeTransaction(
+          sender = sender,
+          assetId = assetId,
+          minSponsoredAssetFee = minSponsoredAssetFee,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
   }
 }

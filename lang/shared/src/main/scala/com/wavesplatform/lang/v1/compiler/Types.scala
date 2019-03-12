@@ -79,4 +79,10 @@ object Types {
 
     def <=(l2: FINAL): Boolean = l2 >= l1
   }
+
+  val UNIT: CASETYPEREF = CASETYPEREF("Unit", List.empty)
+  val optionByteVector = UNION(BYTESTR, UNIT)
+  val optionLong           = UNION(LONG, UNIT)
+  val listByteVector: LIST = LIST(BYTESTR)
+  val listString: LIST = LIST(STRING)
 }

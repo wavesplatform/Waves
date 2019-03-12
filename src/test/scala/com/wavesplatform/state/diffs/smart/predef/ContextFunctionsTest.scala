@@ -86,10 +86,20 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                |  let bin  = extract(getBinary(d, "${bin.key}"))
                |  let str  = extract(getString(d, "${str.key}"))
                |
+               |  let intV  = getIntegerValue(d, "${int.key}")
+               |  let boolV = getBooleanValue(d, "${bool.key}")
+               |  let binV  = getBinaryValue(d, "${bin.key}")
+               |  let strV  = getStringValue(d, "${str.key}")
+               |
                |  let okInt  = int  == ${int.value}
                |  let okBool = bool == ${bool.value}
                |  let okBin  = bin  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
                |  let okStr  = str  == "${str.value}"
+               |
+               |  let okIntV  = int + 1  == ${int.value} + 1
+               |  let okBoolV = bool || true == ${bool.value} || true
+               |  let okBinV  = bin  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
+               |  let okStrV  = str + ""  == "${str.value}"
                |
                |  let badInt  = isDefined(getInteger(d, "${bool.key}"))
                |  let badBool = isDefined(getBoolean(d, "${bin.key}"))
@@ -98,7 +108,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                |
                |  let noSuchKey = isDefined(getInteger(d, "\u00a0"))
                |
-               |  let positives = okInt && okBool && okBin && okStr
+               |  let positives = okInt && okBool && okBin && okStr && okIntV && okBoolV && okBinV && okStrV
                |  let negatives = badInt || badBool || badBin || badStr || noSuchKey
                |  positives && ! negatives
                | }

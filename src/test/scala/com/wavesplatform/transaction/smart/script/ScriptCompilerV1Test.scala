@@ -8,8 +8,9 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.state.diffs._
 
 class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
@@ -42,6 +43,26 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
         | a > b
       """.stripMargin
     ScriptCompiler.compile(script) shouldBe Left("Compilation failed: A definition of 'b' is not found in 72-73")
+  }
+
+  property("fails with contract for asset") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# CONTENT_TYPE CONTRACT #-}
+        | {-# SCRIPT_TYPE ASSET #-}
+      """.stripMargin
+    ScriptCompiler.compile(script) should produce("Inconsistent set of directives")
+  }
+
+  property("fails with contract with wrong stdlib") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 2 #-}
+        | {-# CONTENT_TYPE CONTRACT #-}
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+      """.stripMargin
+    ScriptCompiler.compile(script) should produce("Inconsistent set of directives")
   }
 
   private val expectedExpr = LET_BLOCK(
