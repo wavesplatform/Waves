@@ -150,7 +150,7 @@ object ContractInvocationTransactionDiff {
               Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
                 Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
               )
-            case Wave =>
+            case Waves =>
               Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
                 .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
           }

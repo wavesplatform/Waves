@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction
-import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
 
@@ -85,7 +85,7 @@ case class SignedContractInvocationRequest(
     for {
       _sender          <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _contractAddress <- Address.fromString(contractAddress)
-      _feeAssetId      <- parseBase58ToOption(feeAssetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
+      _feeAssetId      <- parseBase58ToAssetId(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
       _proofBytes      <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs          <- Proofs.create(_proofBytes)
       t <- ContractInvocationTransaction.create(

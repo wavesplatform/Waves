@@ -27,7 +27,7 @@ case class ContractInvocationTransaction private (chainId: Byte,
                                                   fc: Terms.FUNCTION_CALL,
                                                   payment: Seq[Payment],
                                                   fee: Long,
-                                                  feeAssetId: Option[AssetId],
+                                                  feeAssetId: Asset,
                                                   timestamp: Long,
                                                   proofs: Proofs)
     extends ProvenTransaction
@@ -48,7 +48,7 @@ case class ContractInvocationTransaction private (chainId: Byte,
         Serde.serialize(fc),
         Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId.compatId)(_.arr))),
         Longs.toByteArray(fee),
-        feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte)),
+        feeAssetId.byteRepr, //.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte)),
         Longs.toByteArray(timestamp)
       )
     )
@@ -123,7 +123,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
              fee: Long,
-             feeAssetId: Option[AssetId],
+             feeAssetId: Asset,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
     for {
@@ -151,7 +151,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
              fee: Long,
-             feeAssetId: Option[AssetId],
+             feeAssetId: Asset,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     create(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).right.map { unsigned =>
@@ -164,7 +164,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
                  fc: Terms.FUNCTION_CALL,
                  p: Seq[Payment],
                  fee: Long,
-                 feeAssetId: Option[AssetId],
+                 feeAssetId: Asset,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, sender)
   }
@@ -177,7 +177,8 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       FunctionCallBytes(tailIndex(4), "Function call"),
       SeqBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")),
       LongBytes(tailIndex(6), "Fee"),
-      OptionBytes(tailIndex(7), "Fee's asset ID", AssetIdBytes(tailIndex(7), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
+      OptionBytes(tailIndex(7), "Fee's asset ID", AssetIdBytes(tailIndex(7), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)")
+        .map(_.getOrElse(Waves)),
       LongBytes(tailIndex(8), "Timestamp"),
       ProofsBytes(tailIndex(9))
     ) mapN ContractInvocationTransaction.apply
