@@ -34,7 +34,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
           CryptoContext.build(Global),
           WavesContext.build(
             DirectiveSet(StdLibVersion.V1, ScriptType.Account, ContentType.Expression),
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain),
+            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
           )
         ))
   }
@@ -99,7 +99,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
           CryptoContext.build(Global),
           WavesContext.build(
             DirectiveSet(V2, ScriptType.Account, ContentType.Expression),
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain)
+            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
   }
@@ -164,7 +164,7 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
           CryptoContext.build(Global),
           WavesContext.build(
             DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression),
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain)
+            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
   }

@@ -552,7 +552,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(DirectiveSet(V2, ScriptType.Asset, ContentType.Expression), new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain))
+          .build(DirectiveSet(V2, ScriptType.Asset, ContentType.Expression), new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain, Coeval(null)))
 
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
@@ -571,7 +571,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(DirectiveSet(StdLibVersion.V2, ScriptType.Account, ContentType.Expression), new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain))
+          .build(DirectiveSet(StdLibVersion.V2, ScriptType.Account, ContentType.Expression), new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null)))
 
     for {
       compileResult <- ExpressionCompiler(ctx.compilerContext, expr)

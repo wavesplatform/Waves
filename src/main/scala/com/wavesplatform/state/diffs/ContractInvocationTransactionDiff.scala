@@ -43,7 +43,7 @@ object ContractInvocationTransactionDiff {
             CryptoContext.build(Global),
             WavesContext.build(
               DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract),
-              new WavesEnvironment(AddressScheme.current.chainId, Coeval(tx.asInstanceOf[In]), Coeval(height), blockchain)
+              new WavesEnvironment(AddressScheme.current.chainId, Coeval(tx.asInstanceOf[In]), Coeval(height), blockchain, Coeval(tx.contractAddress))
             )
           ))
         .evaluationContext

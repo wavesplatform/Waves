@@ -17,7 +17,12 @@ object WavesEnvironment {
   type In = Transaction :+: Order :+: ContractTransfer :+: CNil
 }
 
-class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[Int], blockchain: Blockchain) extends Environment {
+class WavesEnvironment(nByte: Byte,
+                       in: Coeval[WavesEnvironment.In],
+                       h: Coeval[Int],
+                       blockchain: Blockchain,
+                       contractAdress: Coeval[com.wavesplatform.account.Address])
+    extends Environment {
   override def height: Long = h()
 
   override def inputEntity: Environment.InputEntity = {
@@ -78,4 +83,5 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
   }
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     blockchain.transactionHeight(ByteStr(id)).map(_.toLong)
+  override def tthis: Address = Recipient.Address(contractAdress().bytes)
 }

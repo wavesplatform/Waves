@@ -102,7 +102,7 @@ package object utils extends ScorexLogging {
               WavesContext
                 .build(
                   DirectiveSet(version, ScriptType.Asset, ContentType.Expression),
-                  new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain)
+                  new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
                 )
             )))
       }
@@ -118,7 +118,7 @@ package object utils extends ScorexLogging {
               PureContext.build(version),
               CryptoContext.build(Global),
               WavesContext.build(DirectiveSet(version, ScriptType.Account, ContentType.Contract), // TODO: why contract? should be DirectiveSet->Coeval[CTX]
-                                 new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain))
+                                 new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)))
             )))
       }
       .toMap
