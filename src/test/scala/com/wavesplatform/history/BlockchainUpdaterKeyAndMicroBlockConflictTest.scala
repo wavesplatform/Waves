@@ -8,7 +8,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class BlockchainUpdaterKeyAndMicroBlockConflictTest
     extends PropSpec

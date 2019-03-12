@@ -6,8 +6,8 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
 import com.wavesplatform.lang.v1.traits.domain.DataItem
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractResultTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
 

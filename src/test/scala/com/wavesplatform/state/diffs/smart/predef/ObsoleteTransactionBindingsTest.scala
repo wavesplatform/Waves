@@ -13,8 +13,8 @@ import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction}
 import com.wavesplatform.utils.compilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
