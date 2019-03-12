@@ -4,14 +4,14 @@ import com.wavesplatform.api.http.{ApiKeyNotValid, PaymentApiRoute}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state.Diff
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestWallet, TransactionGen}
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, Json}
 
 class PaymentRouteSpec
@@ -41,7 +41,7 @@ class PaymentRouteSpec
         }
 
         val sender = testWallet.privateKeyAccounts.head
-        val tx     = TransferTransactionV1.selfSigned(None, sender, recipient, amount, timestamp, None, fee, Array())
+        val tx     = TransferTransactionV1.selfSigned(Asset.Waves, sender, recipient, amount, timestamp, Asset.Waves, fee, Array())
 
         val route = PaymentApiRoute(restAPISettings, testWallet, utx, allChannels, time).route
 

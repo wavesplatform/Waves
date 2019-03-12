@@ -8,12 +8,13 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class BlockchainUpdaterSponsoredFeeBlockTest
     extends PropSpec
@@ -45,24 +46,24 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransactionV1 = TransferTransactionV1
-      .selfSigned(None,
+      .selfSigned(Waves,
                   master,
                   alice,
                   feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
                   ts + 1,
-                  None,
+                  Waves,
                   transferAssetWavesFee,
                   Array.emptyByteArray)
       .right
       .get
     aliceToBob: TransferTransactionV1 = TransferTransactionV1
       .selfSigned(
-        Some(feeAsset.id()),
+        Asset.fromCompatId(Some(feeAsset.id())),
         alice,
         bob,
         feeAsset.quantity / 2,
         ts + 2,
-        None,
+        Waves,
         transferAssetWavesFee,
         Array.emptyByteArray
       )
@@ -70,12 +71,12 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .get
     bobToMaster: TransferTransactionV1 = TransferTransactionV1
       .selfSigned(
-        Some(feeAsset.id()),
+        Asset.fromCompatId(Some(feeAsset.id())),
         bob,
         master,
         amtTx,
         ts + 3,
-        Some(feeAsset.id()),
+        Asset.fromCompatId(Some(feeAsset.id())),
         sponsorTx.minSponsoredAssetFee.get,
         Array.emptyByteArray
       )
@@ -83,12 +84,12 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .get
     bobToMaster2: TransferTransactionV1 = TransferTransactionV1
       .selfSigned(
-        Some(feeAsset.id()),
+        Asset.fromCompatId(Some(feeAsset.id())),
         bob,
         master,
         amtTx,
         ts + 4,
-        Some(feeAsset.id()),
+        Asset.fromCompatId(Some(feeAsset.id())),
         sponsorTx.minSponsoredAssetFee.get,
         Array.emptyByteArray
       )

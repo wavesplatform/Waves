@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 import play.api.libs.json._
@@ -18,8 +19,8 @@ case class DataTransaction private (sender: PublicKeyAccount, data: List[DataEnt
     with VersionedTransaction
     with FastHashId {
 
-  override val builder: TransactionParser        = DataTransaction
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val builder: TransactionParser = DataTransaction
+  override val assetFee: (Asset, Long)    = (Waves, fee)
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce {
       Bytes.concat(

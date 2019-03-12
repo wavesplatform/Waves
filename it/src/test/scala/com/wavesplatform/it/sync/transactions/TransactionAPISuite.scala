@@ -7,9 +7,11 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, NodeConfigs, ReportingTestName}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import play.api.libs.json.JsNumber
+
 import scala.concurrent.duration._
 
 class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers with ReportingTestName with CancelAfterFailure {
@@ -34,12 +36,12 @@ class TransactionAPISuite extends FreeSpec with NodesFromDocker with Matchers wi
     (for (i <- 0 to 30) yield {
       TransferTransactionV1
         .selfSigned(
-          None,
+          Asset.Waves,
           sender.privateKey,
           recipient,
           AMT,
           System.currentTimeMillis() + i,
-          None,
+          Asset.Waves,
           FEE + i * 100,
           Array.emptyByteArray
         )

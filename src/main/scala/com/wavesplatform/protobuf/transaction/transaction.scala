@@ -18,5 +18,5 @@ package object transaction {
 
   type VanillaSignedTransaction = com.wavesplatform.transaction.SignedTransaction
 
-  type VanillaAssetId = com.wavesplatform.transaction.AssetId
+  type VanillaAssetId = com.wavesplatform.transaction.Asset
 }

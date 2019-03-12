@@ -14,6 +14,7 @@ import com.wavesplatform.lang.{Global, Testing}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
@@ -21,8 +22,8 @@ import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
@@ -80,18 +81,18 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
         )
         .explicitGet()
 
-      assetId = issueTransaction.id()
+      assetId = IssuedAsset(issueTransaction.id())
 
       kingDataTransaction = DataTransaction
         .selfSigned(king, List(BinaryDataEntry("notary1PK", ByteStr(notary.publicKey))), 1000, ts + 1)
         .explicitGet()
 
       transferFromCompanyToA = TransferTransactionV1
-        .selfSigned(Some(assetId), company, accountA, 1, ts + 20, None, 1000, Array.empty)
+        .selfSigned(assetId, company, accountA, 1, ts + 20, Waves, 1000, Array.empty)
         .explicitGet()
 
       transferFromAToB = TransferTransactionV1
-        .selfSigned(Some(assetId), accountA, accountB, 1, ts + 30, None, 1000, Array.empty)
+        .selfSigned(assetId, accountA, accountB, 1, ts + 30, Waves, 1000, Array.empty)
         .explicitGet()
 
       notaryDataTransaction = DataTransaction

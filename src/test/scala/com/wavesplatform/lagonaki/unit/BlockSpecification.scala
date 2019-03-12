@@ -7,13 +7,14 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers with NoShrink {
 
@@ -24,11 +25,11 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     reference           <- byteArrayGen(Block.BlockIdLength).map(r => ByteStr(r))
     generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
     assetBytes          <- byteArrayGen(AssetIdLength)
-    assetId = Some(ByteStr(assetBytes))
+    assetId = IssuedAsset(ByteStr(assetBytes))
     sender                    <- accountGen
     recipient                 <- accountGen
     paymentTransaction        <- wavesTransferGeneratorP(time, sender, recipient)
-    transferTrancation        <- transferGeneratorP(1 + time, sender, recipient, assetId, None)
+    transferTrancation        <- transferGeneratorP(1 + time, sender, recipient, assetId, Waves)
     anotherPaymentTransaction <- wavesTransferGeneratorP(2 + time, sender, recipient)
     transactionData = Seq(paymentTransaction, transferTrancation, anotherPaymentTransaction)
   } yield (baseTarget, reference, ByteStr(generationSignature), recipient, transactionData)
