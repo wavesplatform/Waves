@@ -8,7 +8,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.JsObject
 
 class ConsensusRouteSpec

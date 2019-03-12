@@ -4,7 +4,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.{CancelAfterFailure, FunSuite}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.util._
 import scala.concurrent.duration._
 
 class FairPoSTestSuite extends FunSuite with CancelAfterFailure with NodesFromDocker {
@@ -12,18 +11,15 @@ class FairPoSTestSuite extends FunSuite with CancelAfterFailure with NodesFromDo
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private val transferFee    = 0.001.waves
-  private val transferAmount = 1000.waves
-
   test("blockchain grows with FairPoS activated") {
-    nodes.head.waitForHeight(10, 3.minutes)
+    nodes.waitForSameBlockHeadesAt(height = 10, conditionAwaitTime = 11.minutes)
 
-    val txId = nodes.head.transfer(nodes.head.address, nodes.last.address, transferAmount, transferFee).id
+    val txId = nodes.head.transfer(nodes.head.address, nodes.last.address, transferAmount, minFee).id
     nodes.last.waitForTransaction(txId)
 
     val heightAfterTransfer = nodes.head.height
 
-    nodes.head.waitForHeight(heightAfterTransfer + 20, 10.minutes)
+    nodes.waitForSameBlockHeadesAt(heightAfterTransfer + 10, conditionAwaitTime = 11.minutes)
   }
 }
 
@@ -44,5 +40,5 @@ object FairPoSTestSuite {
     |   miner.quorum = 1
     |}""".stripMargin)
 
-  val Configs: Seq[Config] = Default.map(config.withFallback(_)).take(4)
+  val Configs: Seq[Config] = Default.map(config.withFallback(_)).take(3)
 }

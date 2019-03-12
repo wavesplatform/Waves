@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTrans
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
 import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
 class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {

@@ -1,15 +1,18 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.NoShrink
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.{NoShrink, crypto}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ExchangeTransactionCreatorSpecification
     extends WordSpec
@@ -30,7 +33,7 @@ class ExchangeTransactionCreatorSpecification
 
         val bc = stub[Blockchain]
         (bc.activatedFeatures _).when().returns(Map.empty).anyNumberOfTimes()
-        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings.orderFee)
         tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()).explicitGet() shouldBe a[ExchangeTransactionV1]
       }
 
@@ -43,7 +46,7 @@ class ExchangeTransactionCreatorSpecification
 
               val bc = stub[Blockchain]
               (bc.activatedFeatures _).when().returns(Map.empty).anyNumberOfTimes()
-              val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
+              val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings.orderFee)
               tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()) should produce(
                 "SmartAccountTrading has not been activated yet")
             }
@@ -58,8 +61,62 @@ class ExchangeTransactionCreatorSpecification
 
         val bc = stub[Blockchain]
         (bc.activatedFeatures _).when().returns(Map(BlockchainFeatures.SmartAccountTrading.id -> 0)).anyNumberOfTimes()
-        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings)
+        val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings.orderFee)
         tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()).explicitGet() shouldBe a[ExchangeTransactionV2]
+      }
+    }
+  }
+
+  "ExchangeTransactionCreator" should {
+
+    val bc = stub[Blockchain]
+
+    (bc.activatedFeatures _)
+      .when()
+      .returns(Map(BlockchainFeatures.OrderV3.id -> 0, BlockchainFeatures.SmartAccountTrading.id -> 0))
+      .anyNumberOfTimes()
+
+    "calculate fees in exchange transaction which are equal to matcher fees in fully matched orders" in {
+
+      val preconditions =
+        for {
+          ((_, buyOrder), (_, sellOrder)) <- orderV3PairGenerator
+          orderSettings                   <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(buyOrder.matcherFeeAssetId), fixedWavesSettingsGenerator())
+        } yield (buyOrder, sellOrder, orderSettings)
+
+      forAll(preconditions) {
+        case (buyOrder, sellOrder, orderSettings) =>
+          val tc = new ExchangeTransactionCreator(bc, MatcherAccount, orderSettings)
+          val tx = tc.createTransaction(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis).explicitGet()
+
+          tx.buyMatcherFee shouldBe buyOrder.matcherFee
+          tx.sellMatcherFee shouldBe sellOrder.matcherFee
+      }
+    }
+
+    "create valid exchange transaction when orders are matched partially" in {
+
+      import com.wavesplatform.transaction.assets.exchange.OrderOps._
+
+      val preconditions =
+        for {
+          ((_, buyOrder), (senderSell, sellOrder)) <- orderV3PairGenerator
+          orderSettings                            <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(buyOrder.matcherFeeAssetId), fixedWavesSettingsGenerator())
+        } yield {
+
+          val sellOrderWithUpdatedAmount = sellOrder.updateAmount(sellOrder.amount / 2)
+          val newSignature               = crypto.sign(senderSell, sellOrderWithUpdatedAmount.bodyBytes())
+          val correctedSellOrder         = sellOrderWithUpdatedAmount.updateProofs(Proofs(Seq(ByteStr(newSignature))))
+
+          (buyOrder, correctedSellOrder, orderSettings)
+        }
+
+      forAll(preconditions) {
+        case (buyOrder, sellOrder, orderSettings) =>
+          val tc = new ExchangeTransactionCreator(bc, MatcherAccount, orderSettings)
+          val tx = tc.createTransaction(LimitOrder(buyOrder), LimitOrder(sellOrder), System.currentTimeMillis)
+
+          tx shouldBe 'right
       }
     }
   }

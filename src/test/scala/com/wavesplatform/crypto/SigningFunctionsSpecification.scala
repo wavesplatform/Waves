@@ -1,9 +1,9 @@
 package com.wavesplatform.crypto
 
-import com.wavesplatform.crypto
-import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Matchers, PropSpec}
 import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.crypto
+import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class SigningFunctionsSpecification extends PropSpec with PropertyChecks with Matchers {
 

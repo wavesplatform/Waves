@@ -2,18 +2,18 @@ package com.wavesplatform.http
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.RequestGen
+import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.alias.AliasBroadcastApiRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json._
 import play.api.libs.json._
-import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.alias.AliasBroadcastApiRoute
-import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.transaction.Transaction
 
 class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
   private val settings    = RestAPISettings.fromConfig(ConfigFactory.load())

@@ -54,9 +54,17 @@ class Matcher(actorSystem: ActorSystem,
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
   private var currentOffset                   = -1L // Used only for REST API
 
+  private val blacklistedAssets: Set[AssetId] = matcherSettings.blacklistedAssets
+    .map {
+      AssetPair
+        .extractAssetId(_)
+        .get
+        .getOrElse(throw new IllegalArgumentException("Can't blacklist the main coin"))
+    }
+
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
-  private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings)
+  private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings.orderFee)
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
@@ -96,19 +104,19 @@ class Matcher(actorSystem: ActorSystem,
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
 
-  private def validateOrder(o: Order) =
+  private def validateOrder(o: Order) = {
+    import com.wavesplatform.matcher.error._
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
-                                               blacklistedAddresses,
-                                               matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get))(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, matcherSettings.orderFee)(o)
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.blockchainAware(blockchain,
                                           transactionCreator.createTransaction,
-                                          settings.matcherSettings.orderMatchTxFee,
                                           matcherPublicKey.toAddress,
-                                          time)(o)
-      _ <- pairBuilder.validateAssetPair(o.assetPair)
+                                          time,
+                                          matcherSettings.orderFee)(o)
+      _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(x))
     } yield o
+  }
 
   lazy val matcherApiRoutes: Seq[MatcherApiRoute] = Seq(
     MatcherApiRoute(

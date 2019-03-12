@@ -289,8 +289,10 @@ object WavesContext {
             tx => transactionObject(tx, proofsEnabled).asRight[String],
             _.eliminate(
               o => orderObject(o, proofsEnabled).asRight[String],
+              _.eliminate(
+                o => Bindings.contractTransfer(o).asRight[String],
               _ => "Expected Transaction or Order".asLeft[CaseObj]
-            )
+            ))
           ))
     }
 
