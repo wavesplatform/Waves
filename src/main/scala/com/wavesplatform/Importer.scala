@@ -104,7 +104,15 @@ object Importer extends ScorexLogging {
                       if (format == "BINARY_OLD") Block.parseBytes(buffer).toEither
                       else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer), unsafe = true)
 
-                    counter += 1
+                    if (blockchainUpdater.lastBlockId.contains(block.reference)) {
+                      Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
+                        case Left(ve) =>
+                          log.error(s"Error appending block: $ve")
+                          quit = true
+                        case _ =>
+                          counter = counter + 1
+                      }
+                    }
                   }
                 } else {
                   println(s"$s2 != expected $len")
