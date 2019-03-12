@@ -161,6 +161,7 @@ class UtxPoolImpl(time: Time,
           val updatedBlockchain = composite(b, diff)
           val updatedRest       = currRest.put(updatedBlockchain, tx)
           if (updatedRest.isOverfilled) {
+            log.trace(s"Mining constraints overfilled: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
             (invalid, valid, diff, currRest, isEmpty)
           } else {
             differ(updatedBlockchain, tx) match {
