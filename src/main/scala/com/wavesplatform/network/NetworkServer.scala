@@ -84,7 +84,6 @@ object NetworkServer extends ScorexLogging {
     // application is terminated.
     val writeErrorHandler = new WriteErrorHandler
     val fatalErrorHandler = new FatalErrorHandler
-    val readErrorHandler  = new ReadErrorHandler(peerDatabase)
 
     val inboundConnectionFilter: PipelineInitializer.HandlerWrapper =
       new InboundConnectionFilter(peerDatabase, settings.networkSettings.maxInboundConnections, settings.networkSettings.maxConnectionsPerHost)
@@ -123,8 +122,7 @@ object NetworkServer extends ScorexLogging {
           peerSynchronizer,
           historyReplier,
           mesageObserver,
-          fatalErrorHandler,
-          readErrorHandler
+          fatalErrorHandler
         )))
         .bind(settings.networkSettings.bindAddress)
         .channel()
