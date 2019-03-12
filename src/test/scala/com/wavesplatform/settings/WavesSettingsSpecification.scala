@@ -6,16 +6,19 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 
 class WavesSettingsSpecification extends FlatSpec with Matchers {
-  private val home = System.getProperty("user.home")
-
-  private def config(configName: String) =
-    WavesSettings.fromConfig(ConfigFactory.parseFile(new File(s"waves-$configName.conf")).withFallback(ConfigFactory.load()))
+  private def config(configName: String) = {
+    WavesSettings.fromConfig(
+      com.wavesplatform.settings.loadConfig(
+        ConfigFactory.parseFile(new File(s"waves-$configName.conf"))
+      )
+    )
+  }
 
   def testConfig(configName: String)(additionalChecks: WavesSettings => Unit = _ => ()) {
     "WavesSettings" should s"read values from default config with $configName overrides" in {
       val settings = config(configName)
 
-      settings.directory should be(home + "/waves")
+      settings.directory should be(com.wavesplatform.settings.defaultDirectory)
       settings.networkSettings should not be null
       settings.walletSettings should not be null
       settings.blockchainSettings should not be null

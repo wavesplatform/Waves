@@ -2,11 +2,13 @@ package com.wavesplatform
 
 import java.io.File
 import java.net.{InetSocketAddress, URI}
+import java.util
 
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValueType}
 import com.wavesplatform.common.state.ByteStr
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
+import org.apache.commons.lang3.SystemUtils
 
 import scala.collection.JavaConverters._
 
@@ -39,11 +41,36 @@ package object settings {
   }
 
   def loadConfig(userConfig: Config): Config = {
-    ConfigFactory
-      .defaultOverrides()
-      .withFallback(userConfig)
+    loadConfig(Some(userConfig))
+  }
+
+  def loadConfig(maybeUserConfig: Option[Config]) = {
+    val directoryDefaults = ConfigFactory
+      .parseMap(new util.HashMap[String, String]() {
+        put("waves.directory", defaultDirectory)
+      })
+
+    val defaults = ConfigFactory.defaultOverrides()
+
+    maybeUserConfig
+      .fold(defaults)(defaults.withFallback)
+      .withFallback(directoryDefaults)
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
+  }
+
+  def defaultDirectory: String =
+    if (SystemUtils.IS_OS_WINDOWS) winDefaultDirectory
+    else nixDefaultDirectory
+
+  def winDefaultDirectory: String =
+    s"${sys.env("APPDATA")}\\Local\\waves"
+
+  def nixDefaultDirectory: String = {
+    val maybeXdgDir = sys.env.get("XDG_DATA_HOME").map(path => s"$path/waves")
+    val defaultDir  = s"${sys.env("HOME")}/.local/share/waves"
+
+    maybeXdgDir getOrElse defaultDir
   }
 }
