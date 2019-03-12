@@ -151,7 +151,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       script      = ContractScript(StdLibVersion.V3, contract)
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
-      ci          = ContractInvocationTransaction.selfSigned(invoker, master, fc, payment, fee, ts).explicitGet()
+      ci          = ContractInvocationTransaction.selfSigned(invoker, master, fc, payment.toSeq, fee, None, ts).explicitGet()
     } yield (List(genesis, genesis2), setContract, ci)
 
   property("invoking contract results contract's state") {
@@ -332,7 +332,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
-      ci = ContractInvocationTransaction.selfSigned(invoker, master, fc, Some(Payment(-1, None)), fee, ts)
+      ci = ContractInvocationTransaction.selfSigned(invoker, master, fc, Seq(Payment(-1, None)), fee, None, ts)
     } yield (ci)) { _ should produce("NegativeAmount") }
   }
 
