@@ -12,8 +12,8 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 

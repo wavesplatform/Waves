@@ -7,6 +7,7 @@ import akka.persistence._
 import com.google.common.base.Charsets
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{DuringShutdown, OrderBookUnavailable}
+import com.wavesplatform.matcher.error.MatcherError
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
@@ -103,7 +104,7 @@ class MatcherActor(settings: MatcherSettings,
               orderBooks.get.get(assetPair).flatMap(_.toOption).foreach(_ ! SaveSnapshot(offset))
               snapshotsState = updatedSnapshotState
           }
-        case Some(Left(_)) => s ! OrderBookUnavailable
+        case Some(Left(_)) => s ! OrderBookUnavailable(MatcherError.OrderBookUnavailable(assetPair))
         case None =>
           val ob = createOrderBook(assetPair)
           persistAsync(OrderBookCreated(assetPair))(_ => ())

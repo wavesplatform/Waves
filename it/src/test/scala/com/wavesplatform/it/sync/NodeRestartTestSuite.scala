@@ -20,7 +20,7 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
   private def nodeB = nodes(1)
 
   "node should grow up to 5 blocks together and sync" in {
-    nodes.waitForSameBlockHeadesAt(5)
+    nodes.waitForSameBlockHeadesAt(height = 5)
   }
 
   "create many addresses and check them after node restart" in {

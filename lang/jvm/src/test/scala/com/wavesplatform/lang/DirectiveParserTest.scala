@@ -2,8 +2,8 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.lang.directives.DirectiveKey._
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class DirectiveParserTest extends PropSpec with PropertyChecks with Matchers {
 

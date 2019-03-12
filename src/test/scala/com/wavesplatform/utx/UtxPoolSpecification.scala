@@ -33,8 +33,8 @@ import monix.reactive.subjects.Subject
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.duration._
 

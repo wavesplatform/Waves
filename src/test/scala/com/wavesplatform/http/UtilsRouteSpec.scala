@@ -1,20 +1,19 @@
 package com.wavesplatform.http
 
+import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.diffs.CommonValidation
-import com.wavesplatform.utils.Time
-import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
-import play.api.libs.json.{JsObject, JsValue}
-import com.wavesplatform.api.http.{TooBigArrayAllocation, UtilsApiRoute}
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import com.wavesplatform.utils.Time
+import org.scalacheck.Gen
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import play.api.libs.json.{JsObject, JsValue}
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks {
   private val route = UtilsApiRoute(

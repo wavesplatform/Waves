@@ -10,7 +10,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class BlockchainUpdaterMicroblockSunnyDayTest
     extends PropSpec

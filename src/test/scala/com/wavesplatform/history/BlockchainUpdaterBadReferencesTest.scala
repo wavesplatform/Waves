@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class BlockchainUpdaterBadReferencesTest
     extends PropSpec

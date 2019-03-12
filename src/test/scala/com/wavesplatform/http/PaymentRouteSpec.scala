@@ -11,7 +11,7 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestWallet, TransactionGen}
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, Json}
 
 class PaymentRouteSpec

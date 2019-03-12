@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, Json}
 
 class ContractInvocationTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {

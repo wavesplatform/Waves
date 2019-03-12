@@ -13,7 +13,7 @@ import com.wavesplatform.{NoShrink, crypto}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ExchangeTransactionCreatorSpecification
     extends WordSpec

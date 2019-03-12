@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class BlockchainUpdaterSponsoredFeeBlockTest
     extends PropSpec

@@ -8,6 +8,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.Matcher.StoreEvent
 import com.wavesplatform.matcher.OrderDB.orderInfoOrdering
+import com.wavesplatform.matcher.error.MatcherError
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderInfo, OrderStatus, OrderValidator}
 import com.wavesplatform.matcher.queue.QueueEvent
@@ -108,9 +109,9 @@ class AddressActor(
           case Some(lo) => storeCanceled(lo.order.assetPair, lo.order.id())
           case None =>
             val reason = orderDB.status(id) match {
-              case OrderStatus.NotFound     => "Order not found"
-              case OrderStatus.Cancelled(_) => "Order already canceled"
-              case OrderStatus.Filled(_)    => "Order already filled"
+              case OrderStatus.NotFound     => MatcherError.OrderNotFound(id)
+              case OrderStatus.Cancelled(_) => MatcherError.OrderCanceled(id)
+              case OrderStatus.Filled(_)    => MatcherError.OrderFull(id)
             }
 
             Future.successful(api.OrderCancelRejected(reason))
@@ -148,9 +149,11 @@ class AddressActor(
   }
 
   private def storeCanceled(assetPair: AssetPair, id: ByteStr): Future[Resp] =
-    store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected("Error persisting event"))
-  private def storePlaced(order: Order): Future[Resp] =
-    store(order.id(), QueueEvent.Placed(order), pendingPlacement, api.OrderRejected("Error persisting event"))
+    store(id, QueueEvent.Canceled(assetPair, id), pendingCancellation, api.OrderCancelRejected(MatcherError.CanNotPersistEvent))
+  private def storePlaced(order: Order): Future[Resp] = {
+    import com.wavesplatform.matcher.error._
+    store(order.id(), QueueEvent.Placed(order), pendingPlacement, api.OrderRejected(MatcherError.CanNotPersistEvent))
+  }
 
   private def confirmPlacement(order: Order): Unit = for (p <- pendingPlacement.remove(order.id())) {
     log.trace(s"Confirming placement for ${order.id()}")
@@ -229,7 +232,7 @@ class AddressActor(
   private def handleOrderTerminated(lo: LimitOrder, status: OrderStatus.Final): Unit = {
     log.trace(s"Order ${lo.order.id()} terminated: $status")
     orderDB.saveOrder(lo.order)
-    pendingCancellation.remove(lo.order.id()).foreach(_.success(api.OrderCancelRejected("Order already terminated")))
+    pendingCancellation.remove(lo.order.id()).foreach(_.success(api.OrderCancelRejected(MatcherError.OrderFinalized(lo.order.id()))))
     expiration.remove(lo.order.id()).foreach(_.cancel())
     activeOrders.remove(lo.order.id())
     orderDB.saveOrderInfo(
