@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, REF}
 import com.wavesplatform.lang.v1.{ContractLimits, Serde}
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
@@ -45,14 +46,14 @@ case class ContractInvocationTransaction private (chainId: Byte,
         sender.publicKey,
         contractAddress.bytes.arr,
         Serde.serialize(fc),
-        Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId)(_.arr))),
+        Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId.compatId)(_.arr))),
         Longs.toByteArray(fee),
         feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte)),
         Longs.toByteArray(timestamp)
       )
     )
 
-  override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
+  override val assetFee: (Asset, Long) = (feeAssetId, fee)
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
       jsonBase()
@@ -64,7 +65,7 @@ case class ContractInvocationTransaction private (chainId: Byte,
         )
     )
 
-  override def checkedAssets(): Seq[AssetId] = payment.toSeq.flatMap(_.assetId)
+  override def checkedAssets(): Seq[Asset] = payment.toSeq.map(_.assetId)
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
@@ -75,7 +76,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
 
   import play.api.libs.json.{Json, _}
 
-  case class Payment(amount: Long, assetId: Option[AssetId])
+  case class Payment(amount: Long, assetId: Asset)
 
   implicit val paymentPartFormat: Format[ContractInvocationTransaction.Payment] = Json.format
 

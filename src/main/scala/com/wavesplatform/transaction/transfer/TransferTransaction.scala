@@ -12,30 +12,30 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
-  def assetId: Option[AssetId]
+  def assetId: Asset
   def recipient: AddressOrAlias
   def amount: Long
-  def feeAssetId: Option[AssetId]
+  def feeAssetId: Asset
   def fee: Long
   def attachment: Array[Byte]
   def version: Byte
 
-  override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
+  override val assetFee: (Asset, Long) = (feeAssetId, fee)
 
   override final val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
       "version"    -> version,
       "recipient"  -> recipient.stringRepr,
-      "assetId"    -> assetId.map(_.base58),
-      "feeAsset"   -> feeAssetId.map(_.base58), // legacy v0.11.1 compat
+      "assetId"    -> assetId.maybeBase58Repr,
+      "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
       "attachment" -> Base58.encode(attachment)
     ))
 
   final protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes  = Longs.toByteArray(timestamp)
-    val assetIdBytes    = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
-    val feeAssetIdBytes = feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+    val assetIdBytes    = assetId.byteRepr
+    val feeAssetIdBytes = feeAssetId.byteRepr
     val amountBytes     = Longs.toByteArray(amount)
     val feeBytes        = Longs.toByteArray(fee)
 
@@ -50,7 +50,7 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
       Deser.serializeArray(attachment)
     )
   }
-  override def checkedAssets(): Seq[AssetId] = assetId.toSeq
+  override def checkedAssets(): Seq[Asset] = Seq(assetId)
 }
 
 object TransferTransaction {
@@ -64,13 +64,9 @@ object TransferTransaction {
     validate(tx.amount, tx.assetId, tx.fee, tx.feeAssetId, tx.attachment)
   }
 
-  def validate(amt: Long,
-               maybeAmtAsset: Option[AssetId],
-               feeAmt: Long,
-               maybeFeeAsset: Option[AssetId],
-               attachment: Array[Byte]): Either[ValidationError, Unit] = {
+  def validate(amt: Long, maybeAmtAsset: Asset, feeAmt: Long, maybeFeeAsset: Asset, attachment: Array[Byte]): Either[ValidationError, Unit] = {
     (
-      validateAmount(amt, maybeAmtAsset.map(_.base58).getOrElse("waves")),
+      validateAmount(amt, maybeAmtAsset.maybeBase58Repr.getOrElse("waves")),
       validateFee(feeAmt),
       validateAttachment(attachment)
     ).mapN { case _ => () }

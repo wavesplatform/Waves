@@ -5,6 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.state.diffs.smart.predef._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction}
@@ -24,8 +25,8 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
     alias              <- aliasGen
     fee                <- smallFeeGen
     aliasTx            <- createAliasGen(other, alias, fee, ts)
-    transferViaAddress <- transferGeneratorP(master, other, None, None)
-    transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).explicitGet()._1, None, None)
+    transferViaAddress <- transferGeneratorP(master, other, Waves, Waves)
+    transferViaAlias   <- transferGeneratorP(master, AddressOrAlias.fromBytes(alias.bytes.arr, 0).explicitGet()._1, Waves, Waves)
   } yield (Seq(genesis1, genesis2), aliasTx, transferViaAddress, transferViaAlias)
 
   val script = """

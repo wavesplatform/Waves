@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
@@ -27,13 +28,13 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
-    } yield TransferTransactionV1.selfSigned(None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
+    } yield TransferTransactionV1.selfSigned(Waves, from, to.toAddress, amt, ts, Waves, fee, Array.emptyByteArray).explicitGet()
 
   private def scriptedSendGen(from: PrivateKeyAccount, to: PublicKeyAccount, ts: Long): Gen[TransferTransactionV2] =
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
-    } yield TransferTransactionV2.selfSigned(None, from, to.toAddress, amt, ts, None, fee, Array.emptyByteArray).explicitGet()
+    } yield TransferTransactionV2.selfSigned(Waves, from, to.toAddress, amt, ts, Waves, fee, Array.emptyByteArray).explicitGet()
 
   private def differentTransfers(typed: EXPR) =
     for {

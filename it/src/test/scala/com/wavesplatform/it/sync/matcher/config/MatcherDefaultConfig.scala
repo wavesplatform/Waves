@@ -3,11 +3,12 @@ package com.wavesplatform.it.sync.matcher.config
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.SignedIssueV1Request
-import com.wavesplatform.transaction.assets.IssueTransactionV1
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.it.sync._
 import com.wavesplatform.matcher.market.MatcherActor
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 
 import scala.util.Random
 
@@ -82,14 +83,14 @@ object MatcherDefaultConfig {
       (createSignedIssueRequest(issueAmountAssetTx),
        createSignedIssueRequest(issuePriceAssetTx),
        AssetPair(
-         amountAsset = Some(issueAmountAssetTx.id()),
-         priceAsset = Some(issuePriceAssetTx.id())
+         amountAsset = IssuedAsset(issueAmountAssetTx.id()),
+         priceAsset = IssuedAsset(issuePriceAssetTx.id())
        ))
     } else
       issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
   }
 
-  def assetPairIssuePriceAsset(issuer: PrivateKeyAccount, amountAssetId: AssetId, priceAssetDecimals: Byte): (SignedIssueV1Request, AssetPair) = {
+  def assetPairIssuePriceAsset(issuer: PrivateKeyAccount, amountAssetId: Asset, priceAssetDecimals: Byte): (SignedIssueV1Request, AssetPair) = {
 
     val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
@@ -105,11 +106,11 @@ object MatcherDefaultConfig {
       .right
       .get
 
-    if (MatcherActor.compare(Some(issuePriceAssetTx.id().arr), Some(amountAssetId.arr)) < 0) {
+    if (MatcherActor.compare(Some(issuePriceAssetTx.id().arr), amountAssetId.compatId.map(_.arr)) < 0) {
       (createSignedIssueRequest(issuePriceAssetTx),
        AssetPair(
-         amountAsset = Some(amountAssetId),
-         priceAsset = Some(issuePriceAssetTx.id())
+         amountAsset = amountAssetId,
+         priceAsset = IssuedAsset(issuePriceAssetTx.id())
        ))
     } else
       assetPairIssuePriceAsset(issuer, amountAssetId, priceAssetDecimals)
