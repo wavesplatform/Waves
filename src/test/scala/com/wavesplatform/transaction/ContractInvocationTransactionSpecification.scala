@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.Json
 
 class ContractInvocationTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -67,7 +67,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
         Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr(Base64.decode("YWxpY2U=").get)))),
         Seq(ContractInvocationTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
         100000,
-        None,
+        Waves,
         1526910778245L,
       )
       .right
@@ -105,7 +105,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
       Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList),
       Seq(),
       1,
-      None,
+      Waves,
       1,
       Proofs.empty
     ) should produce("more than 22 arguments")
@@ -121,7 +121,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
       Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString))),
       Seq(),
       1,
-      None,
+      Waves,
       1,
       Proofs.empty
     ) should produce("TooBigArray")
