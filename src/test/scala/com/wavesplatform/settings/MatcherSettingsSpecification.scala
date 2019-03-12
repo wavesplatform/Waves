@@ -80,7 +80,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = percent
          |  fixed-waves {
-         |    min-fee = 300000
+         |    base-fee = 300000
          |  }
          |  fixed {
          |    asset-id = WAVES
@@ -127,8 +127,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     )
 
     settings.orderFee match {
-      case FixedWavesSettings(minFee) =>
-        minFee shouldBe 300000
+      case FixedWavesSettings(baseFee) =>
+        baseFee shouldBe 300000
       case FixedSettings(defaultAssetId, minFee) =>
         defaultAssetId shouldBe None
         minFee shouldBe 300000
@@ -147,7 +147,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = invalid
          |  fixed-waves {
-         |    min-fee = 300000
+         |    base-fee = 300000
          |  }
          |  fixed {
          |    asset-id = WAVES
@@ -165,7 +165,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = percent
          |  fixed-waves {
-         |    min-fee = 300000
+         |    base-fee = 300000
          |  }
          |  fixed {
          |    asset-id = WAVES
@@ -183,7 +183,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = fixed
          |  fixed-waves {
-         |    min-fee = 300000
+         |    base-fee = 300000
          |  }
          |  fixed {
          |    asset-id = ;;;;
@@ -201,7 +201,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = fixed
          |  fixed-waves {
-         |    min-fee = 300000
+         |    base-fee = 300000
          |  }
          |  fixed {
          |    asset-id = WAVES
@@ -219,7 +219,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = fixed-waves
          |  fixed-waves {
-         |    min-fee = -350000
+         |    base-fee = -350000
          |  }
          |  fixed {
          |    asset-id = ;;;;
@@ -253,6 +253,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settingsInvalidWavseAsset shouldBe
       Left("Invalid setting waves.matcher.order-fee.fixed.asset-id value: WAVES, asset must not be Waves")
 
-    settingsInvalidFeeInWaves shouldBe Left("Invalid setting waves.matcher.order-fee.fixed-waves.min-fee value: -350000, must be > 0")
+    settingsInvalidFeeInWaves shouldBe Left("Invalid setting waves.matcher.order-fee.fixed-waves.base-fee value: -350000, must be > 0")
   }
 }

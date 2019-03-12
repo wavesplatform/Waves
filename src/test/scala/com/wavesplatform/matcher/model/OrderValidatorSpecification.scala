@@ -282,7 +282,12 @@ class OrderValidatorSpecification
             val orderValidator =
               OrderValidator.blockchainAware(blockchain, transactionCreator, order.matcherPublicKey, ntpTime, orderFeeSettings) _
 
-            val minFee         = ExchangeTransactionCreator.minFee(blockchain, order.matcherPublicKey, order.assetPair)
+            val baseFee = orderFeeSettings match {
+              case FixedWavesSettings(baseFee) => baseFee
+              case _                           => CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
+            }
+
+            val minFee         = ExchangeTransactionCreator.minFee(blockchain, order.matcherPublicKey, order.assetPair, baseFee)
             val correctedOrder = Order.sign(order.updateFee(minFee - 1000L), sender)
 
             def setAssetsDescriptionAndEmptyScript(assets: Option[AssetId]*): Unit = {
@@ -314,8 +319,8 @@ class OrderValidatorSpecification
           } yield {
 
             val minFee = orderFeeSettings match {
-              case _: FixedWavesSettings => CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
-              case _                     => order.matcherFee
+              case FixedWavesSettings(baseFee) => baseFee
+              case _                           => order.matcherFee
             }
 
             val correctedOrder = Order.sign(order.updateFee(minFee), sender)

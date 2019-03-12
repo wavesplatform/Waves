@@ -21,12 +21,12 @@ object OrderFeeSettings {
   sealed trait OrderFeeSettings {
 
     /** Returns json for order fee settings taking into account fee that should be paid for matcher's account script invocation */
-    def getOrderFeeJson(minMarcherFee: Long): Coeval[JsObject] = Coeval.evalOnce {
+    def getJson(minMarcherFee: Long): Coeval[JsObject] = Coeval.evalOnce {
       Json.obj(
         this match {
-          case FixedWavesSettings(minFee) =>
+          case FixedWavesSettings(baseFee) =>
             "fixed-waves" -> Json.obj(
-              "min-fee" -> (minFee + minMarcherFee)
+              "base-fee" -> (baseFee + minMarcherFee)
             )
           case FixedSettings(defaultAssetId, minFee) =>
             "fixed" -> Json.obj(
@@ -43,7 +43,7 @@ object OrderFeeSettings {
     }
   }
 
-  case class FixedWavesSettings(minFee: Long)                             extends OrderFeeSettings
+  case class FixedWavesSettings(baseFee: Long)                            extends OrderFeeSettings
   case class FixedSettings(defaultAssetId: Option[AssetId], minFee: Long) extends OrderFeeSettings
   case class PercentSettings(assetType: AssetType, minFee: Double)        extends OrderFeeSettings
 
@@ -70,7 +70,7 @@ object OrderFeeSettings {
     }
 
     def validateFixedWavesSettings: ErrorsListOr[FixedWavesSettings] = {
-      validateByPredicate[Long](s"${getPrefixByMode(Mode.FIXED_WAVES)}.min-fee")(_ > 0, "must be > 0") map FixedWavesSettings
+      validateByPredicate[Long](s"${getPrefixByMode(Mode.FIXED_WAVES)}.base-fee")(_ > 0, "must be > 0") map FixedWavesSettings
     }
 
     def validateFixedSettings: ErrorsListOr[FixedSettings] = {

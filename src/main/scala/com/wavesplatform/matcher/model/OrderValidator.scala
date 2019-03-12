@@ -103,6 +103,13 @@ object OrderValidator {
       exchangeTx.flatMap(verifySmartToken(blockchain, assetId, _)).right.map(_ => order)
     }
 
+    val (isOrderFeeEnoughToCreateExchangeTransaction, errorMsg) = orderFeeSettings match {
+      case FixedWavesSettings(baseFee) =>
+        val mof = ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair, baseFee)
+        (order.matcherFee >= mof) -> s"Order matcherFee should be >= $mof"
+      case _ => true -> ""
+    }
+
     for {
       _ <- (Right(order): ValidationResult)
         .ensure("Orders of version 1 are only accepted, because SmartAccountTrading has not been activated yet")(
@@ -110,13 +117,7 @@ object OrderValidator {
         .ensure("Orders of version 3 have not been activated yet")(
           _.version != 3 || blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height))
         .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
-      mof = ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair)
-      _ <- (Right(order): ValidationResult).ensure(s"Order matcherFee should be >= $mof") { order =>
-        orderFeeSettings match {
-          case _: FixedWavesSettings => order.matcherFee >= mof
-          case _                     => true
-        }
-      }
+      _ <- (Right(order): ValidationResult).ensure(errorMsg)(_ => isOrderFeeEnoughToCreateExchangeTransaction)
       _ <- validateDecimals(blockchain, order)
       _ <- verifyOrderByAccountScript(blockchain, order.sender, order)
       _ <- verifyAssetScript(order.assetPair.amountAsset)
@@ -184,7 +185,7 @@ object OrderValidator {
       _ <- (Right(order): ValidationResult)
         .ensure(s"Matcher's fee (${order.matcherFee}) is less than minimally admissible one") { order =>
           lazy val isMatcherFeeValid = orderFeeSettings match {
-            case FixedWavesSettings(wavesMinFee)  => order.matcherFee >= wavesMinFee
+            case FixedWavesSettings(wavesBaseFee) => order.matcherFee >= wavesBaseFee
             case FixedSettings(_, fixedMinFee)    => order.matcherFee >= fixedMinFee
             case percentSettings: PercentSettings => order.matcherFee >= getMinValidFee(order, percentSettings)
           }

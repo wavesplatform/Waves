@@ -271,8 +271,8 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def fixedSettingsGenerator(defaultAsset: Option[AssetId], lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedSettings] =
     for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedSettings(defaultAsset, minFee) }
 
-  def fixedWavesSettingsGenerator(lowerMinFeeBound: Long = 1, upperMinFeeBound: Long = 1000000L): Gen[FixedWavesSettings] =
-    for { minFee <- Gen.choose(lowerMinFeeBound, upperMinFeeBound) } yield { FixedWavesSettings(minFee) }
+  def fixedWavesSettingsGenerator(lowerBaseFeeBound: Long = 1, upperBaseFeeBound: Long = 1000000L): Gen[FixedWavesSettings] =
+    for { baseFee <- Gen.choose(lowerBaseFeeBound, upperBaseFeeBound) } yield { FixedWavesSettings(baseFee) }
 
   val orderWithMatcherSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
     for {
@@ -285,10 +285,10 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       import com.wavesplatform.transaction.assets.exchange.OrderOps._
 
       val correctOrder = (order.version, orderFeeSettings) match {
-        case (3, FixedWavesSettings(minFee)) =>
+        case (3, FixedWavesSettings(baseFee)) =>
           order
             .updateMatcherFeeAssetId(None)
-            .updateFee(minFee + 1000L)
+            .updateFee(baseFee + 1000L)
         case (3, FixedSettings(defaultAssetId, minFee)) =>
           order
             .updateMatcherFeeAssetId(defaultAssetId)
