@@ -332,9 +332,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val massTransferGen: Gen[MassTransferTransaction] = massTransferGen(MaxTransferCount)
 
-  def massTransferGen(maxTransfersCount: Int) =
+  def massTransferGen(maxTransfersCount: Int): Gen[MassTransferTransaction] = {
     for {
-      version                                                      <- Gen.oneOf(MassTransferTransaction.supportedVersions.toSeq)
       (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
       transferCount                                                <- Gen.choose(0, maxTransfersCount)
       transferGen = for {
@@ -343,6 +342,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
     } yield MassTransferTransaction.selfSigned(assetId, sender, recipients, timestamp, feeAmount, attachment).explicitGet()
+  }
 
   val MinIssueFee = 100000000
 
@@ -412,7 +412,6 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
                     fee: Long,
                     timestamp: Long): Gen[ReissueTransaction] = {
     for {
-      version <- versionGen(ReissueTransactionV2)
       tx <- Gen.oneOf(
         ReissueTransactionV1
           .selfSigned(reissuer, assetId, quantity, reissuable, fee, timestamp)

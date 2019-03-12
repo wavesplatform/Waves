@@ -59,6 +59,10 @@ object ExchangeTransaction {
         else ExchangeTransactionV1.parseBytes(bytes)
       }
 
+  def validateExchangeParams(tx: ExchangeTransaction): Either[ValidationError, Unit] = {
+    validateExchangeParams(tx.buyOrder, tx.sellOrder, tx.amount, tx.price, tx.buyMatcherFee, tx.sellMatcherFee, tx.fee, tx.timestamp)
+  }
+
   def validateExchangeParams(buyOrder: Order,
                              sellOrder: Order,
                              amount: Long,

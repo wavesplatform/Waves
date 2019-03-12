@@ -1,13 +1,18 @@
 package com.wavesplatform.transaction
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import monix.eval.Coeval
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto
+import com.wavesplatform.transaction.description._
+import monix.eval.Coeval
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class CreateAliasTransactionV1 private (sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr)
     extends CreateAliasTransaction
@@ -26,15 +31,11 @@ object CreateAliasTransactionV1 extends TransactionParserFor[CreateAliasTransact
   override val typeId: Byte = CreateAliasTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      for {
-        (sender, alias, fee, timestamp, end) <- CreateAliasTransaction.parseBase(0, bytes)
-        signature = ByteStr(bytes.slice(end, end + SignatureLength))
-        tx <- CreateAliasTransactionV1
-          .create(sender, alias, fee, timestamp, signature)
-          .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-      } yield tx
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      Either
+        .cond(tx.fee > 0, tx, ValidationError.InsufficientFee)
+        .foldToTry
+    }
   }
 
   def create(sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] = {
@@ -53,5 +54,15 @@ object CreateAliasTransactionV1 extends TransactionParserFor[CreateAliasTransact
 
   def selfSigned(sender: PrivateKeyAccount, alias: Alias, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, alias, fee, timestamp, sender)
+  }
+
+  val byteTailDescription: ByteEntity[CreateAliasTransactionV1] = {
+    (
+      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      AliasBytes(tailIndex(2), "Alias object"),
+      LongBytes(tailIndex(3), "Fee"),
+      LongBytes(tailIndex(4), "Timestamp"),
+      SignatureBytes(tailIndex(5), "Signature")
+    ) mapN CreateAliasTransactionV1.apply
   }
 }

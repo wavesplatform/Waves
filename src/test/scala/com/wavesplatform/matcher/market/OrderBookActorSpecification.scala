@@ -25,7 +25,7 @@ import scala.util.Random
 
 class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTPTime with ImplicitSender with MatcherTestData with PathMockFactory {
 
-  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
+  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings.orderFee).createTransaction _
   private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
   private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
 

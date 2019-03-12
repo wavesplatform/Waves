@@ -298,6 +298,7 @@ object Order {
   def fromBytes(version: Byte, xs: Array[Byte]): Order = version match {
     case 1     => OrderV1.parseBytes(xs).get
     case 2     => OrderV2.parseBytes(xs).get
+    case 3     => OrderV3.parseBytes(xs).get
     case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
   }
 

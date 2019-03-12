@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -51,16 +50,8 @@ object BurnTransaction {
 
   val typeId: Byte = 6
 
-  def parseBase(start: Int, bytes: Array[Byte]): (PublicKeyAccount, IssuedAsset, Long, Long, Long, Int) = {
-    val sender        = PublicKeyAccount(bytes.slice(start, start + KeyLength))
-    val asset         = IssuedAsset(ByteStr(bytes.slice(start + KeyLength, start + KeyLength + AssetIdLength)))
-    val quantityStart = start + KeyLength + AssetIdLength
-
-    val quantity  = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
-    val fee       = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
-    val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
-
-    (sender, asset, quantity, fee, timestamp, quantityStart + 24)
+  def validateBurnParams(tx: BurnTransaction): Either[ValidationError, Unit] = {
+    validateBurnParams(tx.quantity, tx.fee)
   }
 
   def validateBurnParams(amount: Long, fee: Long): Either[ValidationError, Unit] =

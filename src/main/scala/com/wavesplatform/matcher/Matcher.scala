@@ -56,7 +56,7 @@ class Matcher(actorSystem: ActorSystem,
 
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
-  private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings)
+  private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings.orderFee)
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
@@ -100,13 +100,14 @@ class Matcher(actorSystem: ActorSystem,
     for {
       _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
                                                blacklistedAddresses,
-                                               matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get))(o)
+                                               matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get),
+                                               matcherSettings.orderFee)(o)
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.blockchainAware(blockchain,
                                           transactionCreator.createTransaction,
-                                          settings.matcherSettings.orderMatchTxFee,
                                           matcherPublicKey.toAddress,
-                                          time)(o)
+                                          time,
+                                          matcherSettings.orderFee)(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 
