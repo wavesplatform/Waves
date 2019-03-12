@@ -9,8 +9,9 @@ import com.wavesplatform.settings.fee.AssetType.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.{AssetId, ValidationError}
+import com.wavesplatform.transaction.{Asset, ValidationError}
 import com.wavesplatform.common.utils.EitherExt2
 
 class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: PrivateKeyAccount, matcherOrderFeeSettings: OrderFeeSettings) {
@@ -79,7 +80,12 @@ object ExchangeTransactionCreator {
     */
   def minFee(blockchain: Blockchain, matcherAddress: Address, assetPair: AssetPair, baseFee: Long): Long = {
 
-    def assetFee(assetId: AssetId): Long = if (blockchain.hasAssetScript(assetId)) CommonValidation.ScriptExtraFee else 0L
+    def assetFee(assetId: Asset): Long = assetId match {
+      case Waves => 0L
+      case asset @ IssuedAsset(_) =>
+        if (blockchain.hasAssetScript(asset)) CommonValidation.ScriptExtraFee
+        else 0L
+    }
 
     baseFee +
       minAccountFee(blockchain, matcherAddress) +

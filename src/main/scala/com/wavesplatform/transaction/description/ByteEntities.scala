@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange._
@@ -381,14 +382,19 @@ case class FunctionCallBytes(index: Int, name: String) extends ByteEntity[Terms.
   }
 }
 
-case class AssetIdBytes(index: Int, name: String) extends ByteEntity[AssetId] {
+case class AssetIdBytes(index: Int, name: String) extends ByteEntity[IssuedAsset] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(ByteEntityDescription(index, name, "AssetId (ByteStr = Array[Byte])", AssetIdLength.toString))
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Try[(AssetId, Int)] = {
-    Try { ByteStr(buf.slice(offset, offset + AssetIdLength)) -> (offset + AssetIdLength) }
+  def deserialize(buf: Array[Byte], offset: Int): Try[(IssuedAsset, Int)] = {
+    Try {
+      val bytes = ByteStr(buf.slice(offset, offset + AssetIdLength))
+      val off   = offset + AssetIdLength
+
+      IssuedAsset(bytes) -> off
+    }
   }
 }
 
@@ -421,12 +427,13 @@ case class PaymentBytes(index: Int, name: String) extends ByteEntity[Payment] {
   def deserialize(buf: Array[Byte], offset: Int): Try[(Payment, Int)] = {
     Try {
 
-      val paymentLength                    = Shorts.fromByteArray(buf.slice(offset, offset + 2))
-      val arr                              = buf.slice(offset + 2, offset + 2 + paymentLength)
-      val amt: Long                        = Longs.fromByteArray(arr.take(8))
-      val (maybeAsset: Option[AssetId], _) = Deser.parseOption(arr, 8)(ByteStr.apply)
+      val paymentLength     = Shorts.fromByteArray(buf.slice(offset, offset + 2))
+      val arr               = buf.slice(offset + 2, offset + 2 + paymentLength)
+      val amt: Long         = Longs.fromByteArray(arr.take(8))
+      val (maybeAssetId, _) = Deser.parseOption(arr, 8)(ByteStr.apply)
+      val asset             = maybeAssetId.fold[Asset](Waves)(IssuedAsset)
 
-      Payment(amt, maybeAsset) -> (offset + 2 + paymentLength)
+      Payment(amt, asset) -> (offset + 2 + paymentLength)
     }
   }
 }

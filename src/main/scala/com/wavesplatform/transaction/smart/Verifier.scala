@@ -7,6 +7,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.{GenericError, HasScriptType, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -46,7 +47,10 @@ object Verifier extends Instrumented with ScorexLogging {
     }).flatMap(
       tx =>
         tx.checkedAssets()
-          .flatMap(assetId => blockchain.assetDescription(assetId).flatMap(_.script))
+          .flatMap {
+            case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).flatMap(_.script)
+            case _                      => None
+          }
           .foldRight(Either.right[ValidationError, Transaction](tx)) { (script, txr) =>
             txr.right.flatMap(tx =>
               stats.assetScriptExecution
@@ -126,15 +130,17 @@ object Verifier extends Instrumented with ScorexLogging {
         })
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(buyOrder)))
 
-    def assetVerification(assetId: Option[AssetId], tx: ExchangeTransaction) =
-      assetId.fold[ValidationResult[Transaction]](Right(tx)) { assetId =>
-        blockchain.assetScript(assetId).fold[ValidationResult[Transaction]](Right(tx)) { script =>
-          verifyTx(blockchain, script, height, tx, isTokenScript = true).left.map {
-            case x: HasScriptType => x
-            case GenericError(x)  => ScriptExecutionError(x, List.empty, isTokenScript = true)
-            case x                => ScriptExecutionError(x.toString, List.empty, isTokenScript = true)
+    def assetVerification(assetId: Asset, tx: ExchangeTransaction) =
+      assetId match {
+        case Waves => Right(tx)
+        case asset @ IssuedAsset(_) =>
+          blockchain.assetScript(asset).fold[ValidationResult[Transaction]](Right(tx)) { script =>
+            verifyTx(blockchain, script, height, tx, isTokenScript = true).left.map {
+              case x: HasScriptType => x
+              case GenericError(x)  => ScriptExecutionError(x, List.empty, isTokenScript = true)
+              case x                => ScriptExecutionError(x.toString, List.empty, isTokenScript = true)
+            }
           }
-        }
       }
 
     for {

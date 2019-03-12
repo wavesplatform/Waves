@@ -9,6 +9,7 @@ import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -93,12 +94,12 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val txToSwapBC1 =
       TransferTransactionV2
         .selfSigned(
-          assetId = None,
+          assetId = Waves,
           sender = pkByAddress(AliceBC1),
           recipient = AddressOrAlias.fromString(swapBC1).explicitGet(),
           amount = transferAmount + setScriptFee + smartFee,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = setScriptFee + smartFee,
           attachment = Array.emptyByteArray
         )
@@ -114,12 +115,12 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val txToSwapBC1 =
       TransferTransactionV2
         .selfSigned(
-          assetId = None,
+          assetId = Waves,
           sender = pkByAddress(swapBC1),
           recipient = AddressOrAlias.fromString(AliceBC1).explicitGet(),
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = setScriptFee + smartFee,
           attachment = Array.emptyByteArray
         )
@@ -138,12 +139,12 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val unsigned =
       TransferTransactionV2
         .create(
-          assetId = None,
+          assetId = Waves,
           sender = pkByAddress(swapBC1),
           recipient = AddressOrAlias.fromString(BobBC1).explicitGet(),
           amount = transferAmount,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = setScriptFee + smartFee,
           attachment = Array.emptyByteArray,
           proofs = Proofs.empty
@@ -173,12 +174,12 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
     val selfSignedToAlice = TransferTransactionV2
       .selfSigned(
-        assetId = None,
+        assetId = Waves,
         sender = pkByAddress(swapBC1),
         recipient = AddressOrAlias.fromString(AliceBC1).explicitGet(),
         amount = transferAmount,
         timestamp = System.currentTimeMillis(),
-        feeAssetId = None,
+        feeAssetId = Waves,
         feeAmount = setScriptFee + smartFee,
         attachment = Array.emptyByteArray
       )

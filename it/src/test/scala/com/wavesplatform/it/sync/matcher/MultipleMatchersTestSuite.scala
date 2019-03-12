@@ -8,6 +8,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.{MatcherCommand, MatcherState, MatcherSuiteBase}
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import org.scalacheck.Gen
 
@@ -39,8 +40,8 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
   private val cancelsNumber = placesNumber / 10
 
   private val (issue1, issue2, assetPair1) = issueAssetPair(aliceAcc, 8, 8)
-  private val assetPair2                   = AssetPair(assetPair1.amountAsset, None)
-  private val assetPair3                   = AssetPair(assetPair1.priceAsset, None)
+  private val assetPair2                   = AssetPair(assetPair1.amountAsset, Waves)
+  private val assetPair3                   = AssetPair(assetPair1.priceAsset, Waves)
   private val assetPairs                   = Seq(assetPair1, assetPair2, assetPair3)
 
   // Issue assets by Alice

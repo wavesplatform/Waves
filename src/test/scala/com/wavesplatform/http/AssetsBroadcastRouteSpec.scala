@@ -11,13 +11,13 @@ import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Proofs, Transaction}
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import shapeless.Coproduct
 
@@ -170,12 +170,12 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     val transferRequest = createSignedTransferRequest(
       TransferTransactionV1
         .selfSigned(
-          assetId = None,
+          assetId = Asset.Waves,
           sender = senderPrivateKey,
           recipient = receiverPrivateKey.toAddress,
           amount = 1 * Waves,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Asset.Waves,
           feeAmount = Waves / 3,
           attachment = Array.emptyByteArray
         )
@@ -186,12 +186,12 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     val versionedTransferRequest = createSignedVersionedTransferRequest(
       TransferTransactionV2
         .create(
-          assetId = None,
+          assetId = Asset.Waves,
           sender = senderPrivateKey,
           recipient = receiverPrivateKey.toAddress,
           amount = 1 * Waves,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Asset.Waves,
           feeAmount = Waves / 3,
           attachment = Array.emptyByteArray,
           proofs = Proofs(Seq.empty)
@@ -260,11 +260,11 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     import tx._
     SignedTransferV1Request(
       Base58.encode(tx.sender.publicKey),
-      assetId.map(_.base58),
+      assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,
       fee,
-      feeAssetId.map(_.base58),
+      feeAssetId.maybeBase58Repr,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
       signature.base58
@@ -275,10 +275,10 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     import tx._
     SignedTransferV2Request(
       Base58.encode(tx.sender.publicKey),
-      assetId.map(_.base58),
+      assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,
-      feeAssetId.map(_.base58),
+      feeAssetId.maybeBase58Repr,
       fee,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),

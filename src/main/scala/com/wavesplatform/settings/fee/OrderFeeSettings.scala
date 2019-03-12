@@ -4,7 +4,8 @@ import cats.data.Validated
 import cats.implicits._
 import com.wavesplatform.settings.fee.AssetType.AssetType
 import com.wavesplatform.settings.fee.Mode.Mode
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
@@ -30,7 +31,7 @@ object OrderFeeSettings {
             )
           case FixedSettings(defaultAssetId, minFee) =>
             "fixed" -> Json.obj(
-              "assetId" -> defaultAssetId.map(_.base58),
+              "assetId" -> defaultAssetId.maybeBase58Repr,
               "minFee"  -> minFee
             )
           case PercentSettings(assetType, minFee) =>
@@ -43,9 +44,9 @@ object OrderFeeSettings {
     }
   }
 
-  case class FixedWavesSettings(baseFee: Long)                            extends OrderFeeSettings
-  case class FixedSettings(defaultAssetId: Option[AssetId], minFee: Long) extends OrderFeeSettings
-  case class PercentSettings(assetType: AssetType, minFee: Double)        extends OrderFeeSettings
+  case class FixedWavesSettings(baseFee: Long)                     extends OrderFeeSettings
+  case class FixedSettings(defaultAssetId: Asset, minFee: Long)    extends OrderFeeSettings
+  case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
 
   implicit val orderFeeSettingsReader: ValueReader[OrderFeeSettings] = { (cfg, path) =>
     def getPrefixByMode(mode: Mode): String = s"$path.$mode"
@@ -62,11 +63,11 @@ object OrderFeeSettings {
       Validated.cond(predicate(settingValue), settingValue, List(s"Invalid setting $settingName value: $settingValue$additionalInfo"))
     }
 
-    def validateAssetId(settingName: String)(assetIdStr: String): ErrorsListOr[Option[AssetId]] = {
+    def validateAssetId(settingName: String)(assetIdStr: String): ErrorsListOr[Asset] = {
       Validated
         .fromTry(AssetPair.extractAssetId(assetIdStr))
         .leftMap(_ => List(s"Invalid setting $settingName value: $assetIdStr"))
-        .ensure(List(s"Invalid setting $settingName value: $assetIdStr, asset must not be Waves"))(_.isDefined)
+        .ensure(List(s"Invalid setting $settingName value: $assetIdStr, asset must not be Waves"))(_ != Waves)
     }
 
     def validateFixedWavesSettings: ErrorsListOr[FixedWavesSettings] = {

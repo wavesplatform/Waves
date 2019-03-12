@@ -6,6 +6,7 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -31,7 +32,7 @@ class ProtoBufBenchmark {
 
       MassTransferTransaction
         .create(
-          None,
+          Waves,
           PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
           transfers,
           1518091313964L,
@@ -58,7 +59,7 @@ class ProtoBufBenchmark {
 
       MassTransferTransaction
         .create(
-          None,
+          Waves,
           PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
           transfers,
           1518091313964L,

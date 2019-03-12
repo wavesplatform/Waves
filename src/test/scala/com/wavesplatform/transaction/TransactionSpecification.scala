@@ -4,8 +4,8 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.transfer._
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class TransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 

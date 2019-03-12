@@ -2,6 +2,7 @@ package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.{OrderV1, OrderV2}
 import com.wavesplatform.{transaction => vt}
 
@@ -12,7 +13,8 @@ object PBOrders {
     VanillaOrder(
       PublicKeyAccount(order.senderPublicKey.toByteArray),
       PublicKeyAccount(order.matcherPublicKey.toByteArray),
-      vt.assets.exchange.AssetPair(Some(order.getAssetPair.amountAssetId.toByteArray), Some(order.getAssetPair.priceAssetId.toByteArray)),
+      vt.assets.exchange
+        .AssetPair(IssuedAsset(order.getAssetPair.amountAssetId.toByteArray), IssuedAsset(order.getAssetPair.priceAssetId.toByteArray)),
       order.orderSide match {
         case PBOrder.Side.BUY             => vt.assets.exchange.OrderType.BUY
         case PBOrder.Side.SELL            => vt.assets.exchange.OrderType.SELL
@@ -42,7 +44,7 @@ object PBOrders {
     PBOrder(
       ByteString.copyFrom(order.senderPublicKey.publicKey),
       ByteString.copyFrom(order.matcherPublicKey.publicKey),
-      Some(PBOrder.AssetPair(order.assetPair.amountAsset.get, order.assetPair.priceAsset.get)),
+      Some(PBOrder.AssetPair(order.assetPair.amountAsset.protoId, order.assetPair.priceAsset.protoId)),
       order.orderType match {
         case vt.assets.exchange.OrderType.BUY  => PBOrder.Side.BUY
         case vt.assets.exchange.OrderType.SELL => PBOrder.Side.SELL

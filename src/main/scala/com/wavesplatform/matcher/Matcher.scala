@@ -22,7 +22,8 @@ import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, VolumeAndFee}
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, Time, forceStopApplication}
 import com.wavesplatform.utx.UtxPool
@@ -40,7 +41,7 @@ class Matcher(actorSystem: ActorSystem,
               utx: UtxPool,
               allChannels: ChannelGroup,
               blockchain: Blockchain,
-              spendableBalanceChanged: Observable[(Address, Option[AssetId])],
+              spendableBalanceChanged: Observable[(Address, Asset)],
               settings: WavesSettings,
               matcherPrivateKey: PrivateKeyAccount)
     extends ScorexLogging {
@@ -54,12 +55,16 @@ class Matcher(actorSystem: ActorSystem,
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
   private var currentOffset                   = -1L // Used only for REST API
 
-  private val blacklistedAssets: Set[AssetId] = matcherSettings.blacklistedAssets
-    .map {
-      AssetPair
-        .extractAssetId(_)
+  private val blacklistedAssets: Set[IssuedAsset] = matcherSettings.blacklistedAssets
+    .map { assetName =>
+      val asset = AssetPair
+        .extractAssetId(assetName)
         .get
-        .getOrElse(throw new IllegalArgumentException("Can't blacklist the main coin"))
+
+      asset match {
+        case Waves              => throw new IllegalArgumentException("Can't blacklist the main coin")
+        case a @ IssuedAsset(_) => a
+      }
     }
 
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
@@ -303,7 +308,7 @@ object Matcher extends ScorexLogging {
             utx: UtxPool,
             allChannels: ChannelGroup,
             blockchain: Blockchain,
-            spendableBalanceChanged: Observable[(Address, Option[AssetId])],
+            spendableBalanceChanged: Observable[(Address, Asset)],
             settings: WavesSettings): Option[Matcher] =
     try {
       val privateKey = (for {

@@ -31,7 +31,7 @@ import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time,
                   blockchain: Blockchain,
-                  spendableBalanceChanged: Observer[(Address, Option[AssetId])],
+                  spendableBalanceChanged: Observer[(Address, Asset)],
                   fs: FunctionalitySettings,
                   utxSettings: UtxSettings)
     extends ScorexLogging
@@ -66,8 +66,8 @@ class UtxPoolImpl(time: Time,
 
   override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     def canReissue(blockchain: Blockchain, tx: Transaction) = tx match {
-      case r: ReissueTransaction if blockchain.assetDescription(r.assetId).exists(!_.reissuable) => Left(GenericError(s"Asset is not reissuable"))
-      case _                                                                                     => Right(())
+      case r: ReissueTransaction if blockchain.assetDescription(r.asset).exists(!_.reissuable) => Left(GenericError(s"Asset is not reissuable"))
+      case _                                                                                   => Right(())
     }
 
     def checkAlias(blockchain: Blockchain, tx: Transaction) = tx match {
@@ -156,7 +156,7 @@ class UtxPoolImpl(time: Time,
     Option(transactions.remove(txId))
       .foreach(afterRemove)
 
-  override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
+  override def spendableBalance(addr: Address, assetId: Asset): Long =
     blockchain.balance(addr, assetId) -
       assetId.fold(blockchain.leaseBalance(addr).out)(_ => 0L) +
       pessimisticPortfolios
@@ -183,6 +183,9 @@ class UtxPoolImpl(time: Time,
           val updatedBlockchain = composite(blockchain, diff)
           val updatedRest       = currRest.put(updatedBlockchain, tx)
           if (updatedRest.isOverfilled) {
+            log.trace(s"Mining constraints overfilled: ${updatedRest.constraints
+              .filter(_.isOverfilled)
+              .mkString(", ")}")
             (invalid, valid, diff, currRest, isEmpty)
           } else {
             differ(updatedBlockchain, tx) match {
@@ -259,7 +262,7 @@ class UtxPoolImpl(time: Time,
 }
 
 object UtxPoolImpl {
-  private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Option[AssetId])]) {
+  private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)]) {
     private type Portfolios = Map[Address, Portfolio]
     private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
     private val transactions          = new ConcurrentHashMap[Address, Set[ByteStr]]()
