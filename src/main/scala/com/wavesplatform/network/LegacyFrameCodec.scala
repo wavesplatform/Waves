@@ -5,12 +5,12 @@ import java.util
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.crypto
+import com.wavesplatform.network.message.Message._
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled._
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.ByteToMessageCodec
-import com.wavesplatform.network.message.Message._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
@@ -60,6 +60,7 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
       case NonFatal(e) =>
         log.warn(s"${id(ctx)} Malformed network message", e)
         peerDatabase.blacklistAndClose(ctx.channel(), s"Malformed network message: $e")
+        in.resetReaderIndex() // Cancels subsequent read tries, see Netty decode() documentation
     }
 
   override def encode(ctx: ChannelHandlerContext, msg: RawBytes, out: ByteBuf): Unit = {
