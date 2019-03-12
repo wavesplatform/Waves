@@ -109,13 +109,6 @@ object OrderValidator {
       exchangeTx.flatMap(verifySmartToken(blockchain, assetId, _))
     }
 
-    val baseFee = orderFeeSettings match {
-      case FixedWavesSettings(fee) => fee
-      case _                       => exchangeTransactionCreationFee
-    }
-
-    lazy val mof = ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair, baseFee)
-
     for {
       _ <- lift(order)
         .ensure(MatcherError.OrderVersionUnsupported(order.version, BlockchainFeatures.SmartAccountTrading)) {
@@ -124,12 +117,12 @@ object OrderValidator {
         .ensure(MatcherError.OrderVersionUnsupported(order.version, BlockchainFeatures.OrderV3)) {
           _.version != 3 || blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height)
         }
-        .ensure(MatcherError.FeeNotEnough(mof, order.matcherFee, None)) { o =>
-          orderFeeSettings match {
-            case _: FixedWavesSettings => o.matcherFee >= mof
-            case _                     => true
-          }
-        }
+      _ <- orderFeeSettings match {
+        case FixedWavesSettings(baseFee) =>
+          val mof = ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair, baseFee)
+          Either.cond(order.matcherFee >= mof, order, MatcherError.FeeNotEnough(mof, order.matcherFee, None))
+        case _ => lift(order)
+      }
       _ <- validateDecimals(blockchain, order)
       _ <- verifyOrderByAccountScript(blockchain, order.sender, order)
       _ <- verifyAssetScript(order.assetPair.amountAsset)

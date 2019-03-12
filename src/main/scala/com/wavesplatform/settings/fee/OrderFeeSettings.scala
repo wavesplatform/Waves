@@ -25,18 +25,18 @@ object OrderFeeSettings {
       Json.obj(
         this match {
           case FixedWavesSettings(baseFee) =>
-            "fixed-waves" -> Json.obj(
-              "base-fee" -> (baseFee + minMarcherFee)
+            "fixedWaves" -> Json.obj(
+              "baseFee" -> (baseFee + minMarcherFee)
             )
           case FixedSettings(defaultAssetId, minFee) =>
             "fixed" -> Json.obj(
-              "asset-id" -> defaultAssetId.map(_.base58),
-              "min-fee"  -> minFee
+              "assetId" -> defaultAssetId.map(_.base58),
+              "minFee"  -> minFee
             )
           case PercentSettings(assetType, minFee) =>
             "percent" -> Json.obj(
-              "type"    -> assetType,
-              "min-fee" -> minFee
+              "type"   -> assetType,
+              "minFee" -> minFee
             )
         }
       )
