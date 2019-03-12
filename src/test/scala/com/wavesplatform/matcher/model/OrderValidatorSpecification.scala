@@ -17,7 +17,6 @@ import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
-import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.utils.randomBytes
 import com.wavesplatform.{NoShrink, TestTime, WithDB}
@@ -36,8 +35,8 @@ class OrderValidatorSpecification
     with PropertyChecks
     with NoShrink {
 
-  private val wbtc          = mkAssetId("WBTC").get
-  private val pairWavesBtc  = AssetPair(None, Some(wbtc))
+  private val wbtc          = mkAssetId("WBTC")
+  private val pairWavesBtc  = AssetPair(Waves, wbtc)
   private val accountScript = ExprScript(V2, Terms.TRUE, checkSize = false).explicitGet()
 
   private val defaultPortfolio = Portfolio(0, LeaseBalance.empty, Map(wbtc -> 10 * Constants.UnitsInWave))
@@ -144,7 +143,10 @@ class OrderValidatorSpecification
       "matcher's fee asset in order is blacklisted" in forAll(orderV3WithArbitraryFeeAssetGenerator) { order =>
         val orderValidator =
           OrderValidator
-            .matcherSettingsAware(order.matcherPublicKey, Set.empty, order.matcherFeeAssetId.toSet, matcherSettings.orderFee) _
+            .matcherSettingsAware(order.matcherPublicKey,
+                                  Set.empty,
+                                  order.matcherFeeAssetId.fold(Set.empty[IssuedAsset])(Set[IssuedAsset](_)),
+                                  matcherSettings.orderFee) _
 
         orderValidator(order) should produce("FeeAssetBlacklisted")
       }
