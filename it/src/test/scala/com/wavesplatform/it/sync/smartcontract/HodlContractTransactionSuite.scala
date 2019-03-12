@@ -70,7 +70,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |
         |	@Callable(i)
         |	func deposit() = {
-        |   let pmt = if i.payment.size > 0
+        |   let pmt = if i.payment.size() > 0
         |             then i.payment[0]
         |             else throw("No payment")
         |   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
