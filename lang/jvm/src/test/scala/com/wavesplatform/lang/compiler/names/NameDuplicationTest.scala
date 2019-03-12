@@ -59,7 +59,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
             |func foo(i: Int) = WriteSet([DataEntry("a", i + 1)])
             |
             |@Callable(i)
-            |func bar(x: Int) = WriteSet([DataEntry("a", i.contractAddress.bytes)])
+            |func bar(x: Int) = WriteSet([DataEntry("a", this.bytes)])
             |""") shouldBe 'right
         }
 
@@ -182,7 +182,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
         "callable function and its callable annotation binding" in {
           compileOf("""
             |@Callable(sameName)
-            |func sameName() = WriteSet([DataEntry("a", sameName.contractAddress.bytes)])
+            |func sameName() = WriteSet([DataEntry("a", this.bytes)])
             |""") shouldBe 'right
         }
 
@@ -190,7 +190,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
           compileOf("""
             |@Callable(i)
             |func some(s: String, i: Int) =
-            |   if (i.contractAddress == "abc") then
+            |   if (this == "abc") then
             |      WriteSet([DataEntry("a", "a")])
             |   else
             |      WriteSet([DataEntry("a", "b")])

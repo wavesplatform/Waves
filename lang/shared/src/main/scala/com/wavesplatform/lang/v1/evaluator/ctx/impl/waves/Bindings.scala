@@ -98,7 +98,6 @@ object Bindings {
       invocationType.typeRef,
       Map(
         "caller"          -> mapRecipient(caller)._2,
-        "contractAddress" -> mapRecipient(contractAddress)._2,
         "payment"         -> buildPayment(payment)
       )
     )

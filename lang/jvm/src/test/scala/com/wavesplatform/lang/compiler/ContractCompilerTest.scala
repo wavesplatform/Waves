@@ -237,7 +237,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
           |   else {
           |	  	let currentKey = toBase58String(i.caller.bytes)
-          |	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+          |	  	let currentAmount = match getInteger(this, currentKey) {
           |	  		case a:Int => a
           |	  		case _ => 0
           |	  	}
@@ -250,7 +250,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | @Callable(i)
           | func withdraw(amount: Int) = {
           |	  	let currentKey = toBase58String(i.caller.bytes)
-          |	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+          |	  	let currentAmount = match getInteger(this, currentKey) {
           |	  		case a:Int => a
           |	  		case _ => 0
           |	  	}
@@ -287,7 +287,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | @Callable(i)
           | func bar() = {
           |   if (true) then WriteSet([DataEntry("entr1","entr2")])
-          |   else TransferSet([ContractTransfer(i.caller, wavesBalance(i.contractAddress), base58'somestr')])
+          |   else TransferSet([ContractTransfer(i.caller, wavesBalance(this), base58'somestr')])
           | }
           |
           | @Verifier(t)
@@ -355,7 +355,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |
           |@Callable(i)
           |func some(i: Int) = {
-          |   if (i.contractAddress == "abc") then
+          |   if (this == "abc") then
           |      WriteSet([DataEntry("a", "a")])
           |   else
           |      WriteSet([DataEntry("a", "b")])

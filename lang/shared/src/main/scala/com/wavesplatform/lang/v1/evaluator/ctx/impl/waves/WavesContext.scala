@@ -383,7 +383,7 @@ object WavesContext {
           ("Sell", ((sellType.typeRef, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
           ("Buy", ((buyType.typeRef, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
         )
-        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == ContentType.Expression) Map(txVar) ++ Map(thisVar) else Map.empty
+        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == ContentType.Expression) Map(txVar) else Map(thisVar)
         (v3Part1 ++ v3Part2)
       }
     )
