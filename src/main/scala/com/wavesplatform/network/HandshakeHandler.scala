@@ -3,6 +3,7 @@ package com.wavesplatform.network
 import java.util
 import java.util.concurrent.{ConcurrentMap, TimeUnit}
 
+import com.wavesplatform.network.Handshake.InvalidHandshakeException
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandler.Sharable
@@ -13,7 +14,6 @@ import io.netty.util.AttributeKey
 import io.netty.util.concurrent.ScheduledFuture
 
 import scala.concurrent.duration.FiniteDuration
-import scala.util.control.NonFatal
 
 class HandshakeDecoder(peerDatabase: PeerDatabase) extends ReplayingDecoder[Void] with ScorexLogging {
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit =
@@ -21,7 +21,7 @@ class HandshakeDecoder(peerDatabase: PeerDatabase) extends ReplayingDecoder[Void
       out.add(Handshake.decode(in))
       ctx.pipeline().remove(this)
     } catch {
-      case NonFatal(error) => block(ctx, error)
+      case e: InvalidHandshakeException => block(ctx, e)
     }
 
   protected def block(ctx: ChannelHandlerContext, e: Throwable): Unit = {
