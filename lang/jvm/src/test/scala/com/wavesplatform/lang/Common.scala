@@ -35,7 +35,7 @@ object Common {
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
   val multiplierFunction: NativeFunction =
-    NativeFunction("MULTIPLY", 1, 10005, LONG, "test ultiplication", ("x1", LONG, "x1"), ("x2", LONG, "x2")) {
+    NativeFunction("MULTIPLY", 1L, 10005.toShort, LONG, "test ultiplication", ("x1", LONG, "x1"), ("x2", LONG, "x2")) {
       case CONST_LONG(x1: Long) :: CONST_LONG(x2: Long) :: Nil => Try(x1 * x2).map(CONST_LONG).toEither.left.map(_.toString)
       case _                                                   => ??? // suppress pattern match warning
     }

@@ -1,6 +1,7 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.assets.{BurnTransaction, ReissueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -16,7 +17,7 @@ object TxEstimators {
 
     override def toString(): String = "sizeInBytes"
 
-    override val minEstimate = 109
+    override val minEstimate = 109L
   }
 
   object one extends Fn {
@@ -24,7 +25,7 @@ object TxEstimators {
 
     override def toString(): String = "one"
 
-    override val minEstimate = 1
+    override val minEstimate = 1L
   }
 
   object scriptRunNumber extends Fn {
@@ -35,13 +36,17 @@ object TxEstimators {
       }
 
       val assetIds = x match {
-        case x: TransferTransaction     => x.assetId.toSeq
-        case x: MassTransferTransaction => x.assetId.toSeq
-        case x: BurnTransaction         => Seq(x.assetId)
-        case x: ReissueTransaction      => Seq(x.assetId)
-        case x: SponsorFeeTransaction   => Seq(x.assetId)
-        case x: ExchangeTransaction     => Seq(x.buyOrder.assetPair.amountAsset, x.buyOrder.assetPair.priceAsset).flatten
-        case _                          => Seq.empty
+        case x: TransferTransaction     => x.assetId.fold[Seq[IssuedAsset]](Nil)(Seq(_))
+        case x: MassTransferTransaction => x.assetId.fold[Seq[IssuedAsset]](Nil)(Seq(_))
+        case x: BurnTransaction         => Seq(x.asset)
+        case x: ReissueTransaction      => Seq(x.asset)
+        case x: SponsorFeeTransaction   => Seq(x.asset)
+        case x: ExchangeTransaction =>
+          Seq(
+            x.buyOrder.assetPair.amountAsset.fold[Seq[IssuedAsset]](Nil)(Seq(_)),
+            x.buyOrder.assetPair.priceAsset.fold[Seq[IssuedAsset]](Nil)(Seq(_))
+          ).flatten
+        case _ => Seq.empty
       }
 
       val smartTokenRuns = assetIds.flatMap(blockchain.assetDescription).count(_.script.isDefined)
@@ -50,6 +55,6 @@ object TxEstimators {
 
     override def toString(): String = "scriptRunNumber"
 
-    override val minEstimate = 0
+    override val minEstimate = 0L
   }
 }

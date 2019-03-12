@@ -8,7 +8,7 @@ import com.wavesplatform.matcher.market.MatcherSpecLike
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderHistoryStub}
 import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData, _}
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.{NTPTime, WithDB}
@@ -98,10 +98,10 @@ class ReservedBalanceSpecification
       )
     ))
 
-  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]): Long =
+  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Asset): Long =
     Await
       .result(
-        (addressDir ? AddressDirectory.Envelope(senderPublicKey, AddressActor.GetReservedBalance)).mapTo[Map[Option[AssetId], Long]],
+        (addressDir ? AddressDirectory.Envelope(senderPublicKey, AddressActor.GetReservedBalance)).mapTo[Map[Asset, Long]],
         Duration.Inf
       )
       .getOrElse(assetId, 0L)

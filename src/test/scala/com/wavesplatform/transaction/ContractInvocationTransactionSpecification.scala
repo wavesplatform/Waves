@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
 import org.scalatest._
@@ -64,9 +65,9 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
         PrivateKeyAccount("test3".getBytes()),
         PrivateKeyAccount("test4".getBytes()),
         Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr(Base64.decode("YWxpY2U=").get)))),
-        Some(ContractInvocationTransaction.Payment(7, Some(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
+        Some(ContractInvocationTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
         100000,
-        1526910778245L,
+        1526910778245L
       )
       .right
       .get
@@ -83,7 +84,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
       senderPublicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
       fee = 1,
       call = ContractInvocationRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
-      payment = Some(Payment(1, None)),
+      payment = Some(Payment(1, Waves)),
       contractAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")

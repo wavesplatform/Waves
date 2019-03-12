@@ -4,6 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.Verifier
 import org.scalatest.{Matchers, PropSpec}
@@ -39,8 +40,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
       case JsSuccess(o, _) =>
         o.senderPublicKey shouldBe PublicKeyAccount(pk.publicKey)
         o.matcherPublicKey shouldBe PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
-        o.assetPair.amountAsset.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
-        o.assetPair.priceAsset.get shouldBe ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
+        o.assetPair.amountAsset.compatId.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
+        o.assetPair.priceAsset.compatId.get shouldBe ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
         o.price shouldBe 0
         o.amount shouldBe 0
         o.matcherFee shouldBe 0
@@ -74,15 +75,15 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
       case JsSuccess(o, _) =>
         o.senderPublicKey shouldBe PublicKeyAccount(pk.publicKey)
         o.matcherPublicKey shouldBe PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
-        o.assetPair.amountAsset.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
-        o.assetPair.priceAsset.get shouldBe ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
+        o.assetPair.amountAsset shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
+        o.assetPair.priceAsset shouldBe IssuedAsset(ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get)
         o.price shouldBe 0
         o.amount shouldBe 0
         o.matcherFee shouldBe 0
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
         o.signature shouldBe Base58.decode("signature").get
-        o.matcherFeeAssetId.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
+        o.matcherFeeAssetId shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
     }
   }
 
@@ -178,8 +179,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         fail("Error: " + JsError.toJson(e).toString())
       case s: JsSuccess[Order] =>
         val o = s.get
-        o.assetPair.amountAsset shouldBe empty
-        o.assetPair.priceAsset shouldBe empty
+        o.assetPair.amountAsset shouldBe Waves
+        o.assetPair.priceAsset shouldBe Waves
 
     }
   }

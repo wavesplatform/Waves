@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -17,8 +18,8 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
       val recovered = TransferTransactionV1.parseBytes(transfer.bytes()).get
 
       recovered.sender.address shouldEqual transfer.sender.address
-      recovered.assetId.map(_ == transfer.assetId.get).getOrElse(transfer.assetId.isEmpty) shouldBe true
-      recovered.feeAssetId.map(_ == transfer.feeAssetId.get).getOrElse(transfer.feeAssetId.isEmpty) shouldBe true
+      recovered.assetId shouldBe transfer.assetId
+      recovered.feeAssetId shouldBe transfer.feeAssetId
       recovered.timestamp shouldEqual transfer.timestamp
       recovered.amount shouldEqual transfer.amount
       recovered.fee shouldEqual transfer.fee
@@ -57,12 +58,12 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
 
     val tx = TransferTransactionV1
       .create(
-        None,
+        Waves,
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),
         1900000,
         1526552510868L,
-        None,
+        Waves,
         100000,
         Base58.decode("4t2Xazb2SX").get,
         ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get
@@ -78,6 +79,6 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
       (_, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
       sender                                                              <- accountGen
     } yield
-      TransferTransactionV1.selfSigned(None, sender, recipient, amount, timestamp, None, feeAmount, attachment) should produce("insufficient fee")
+      TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, timestamp, Waves, feeAmount, attachment) should produce("insufficient fee")
   }
 }

@@ -4,15 +4,16 @@ import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.AsyncNetworkApi._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.api.AsyncNetworkApi._
+import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync._
+import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.network.{RawBytes, TransactionSpec}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import org.scalatest._
-import com.wavesplatform.it.sync._
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -28,7 +29,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
 
   test("valid tx send by network to node should be in blockchain") {
     val tx = TransferTransactionV1
-      .selfSigned(None, node.privateKey, Address.fromString(node.address).explicitGet(), 1L, System.currentTimeMillis(), None, minFee, Array())
+      .selfSigned(Waves, node.privateKey, Address.fromString(node.address).explicitGet(), 1L, System.currentTimeMillis(), Waves, minFee, Array())
       .right
       .get
 
@@ -39,12 +40,12 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
     val tx = TransferTransactionV1
-      .selfSigned(None,
+      .selfSigned(Waves,
                   node.privateKey,
                   Address.fromString(node.address).explicitGet(),
                   1L,
                   System.currentTimeMillis() + (1 days).toMillis,
-                  None,
+                  Waves,
                   minFee,
                   Array())
       .right

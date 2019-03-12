@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 import play.api.libs.json._
@@ -18,8 +19,8 @@ case class DataTransaction private (sender: PublicKeyAccount, data: List[DataEnt
     with VersionedTransaction
     with FastHashId {
 
-  override val builder: TransactionParser        = DataTransaction
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val builder: TransactionParser = DataTransaction
+  override val assetFee: (Asset, Long)    = (Waves, fee)
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce {
       Bytes.concat(
@@ -55,21 +56,11 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
   val MaxEntryCount = 100
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
-      (
-        if (tx.data.lengthCompare(MaxEntryCount) > 0 || tx.data.exists(!_.valid)) {
-          Left(ValidationError.TooBigArray)
-        } else if (tx.data.exists(_.key.isEmpty)) {
-          Left(ValidationError.GenericError("Empty key found"))
-        } else if (tx.data.map(_.key).distinct.lengthCompare(tx.data.size) < 0) {
-          Left(ValidationError.GenericError("Duplicate keys found"))
-        } else if (tx.fee <= 0) {
-          Left(ValidationError.InsufficientFee)
-        } else {
-          Either.cond(tx.bytes().length <= MaxBytes, tx, ValidationError.TooBigArray)
-        }
-      ).foldToTry
-    }
+    byteTailDescription
+      .deserializeFromByteArray(bytes)
+      .flatMap(
+        validateTxContent(_, Some(bytes.length)).foldToTry
+      )
   }
 
   def create(sender: PublicKeyAccount,
@@ -77,17 +68,22 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
              feeAmount: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, TransactionT] = {
-    if (data.lengthCompare(MaxEntryCount) > 0 || data.exists(!_.valid)) {
+
+    val tx = DataTransaction(sender, data, feeAmount, timestamp, proofs)
+    validateTxContent(tx)
+  }
+
+  private def validateTxContent(tx: DataTransaction, txByteCountOpt: Option[Int] = None): Either[ValidationError, TransactionT] = {
+    if (tx.data.lengthCompare(MaxEntryCount) > 0 || tx.data.exists(!_.valid)) {
       Left(ValidationError.TooBigArray)
-    } else if (data.exists(_.key.isEmpty)) {
+    } else if (tx.data.exists(_.key.isEmpty)) {
       Left(ValidationError.GenericError("Empty key found"))
-    } else if (data.map(_.key).distinct.lengthCompare(data.size) < 0) {
+    } else if (tx.data.map(_.key).distinct.lengthCompare(tx.data.size) < 0) {
       Left(ValidationError.GenericError("Duplicate keys found"))
-    } else if (feeAmount <= 0) {
+    } else if (tx.fee <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
-      val tx = DataTransaction(sender, data, feeAmount, timestamp, proofs)
-      Either.cond(tx.bytes().length <= MaxBytes, tx, ValidationError.TooBigArray)
+      Either.cond(txByteCountOpt.getOrElse(tx.bytes().length) <= MaxBytes, tx, ValidationError.TooBigArray)
     }
   }
 

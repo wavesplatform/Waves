@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.OrderValidationError
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -26,14 +27,14 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
   val versions                             = transactionV1versions +: transactionV2versions
   val versionsGen: Gen[(Byte, Byte, Byte)] = Gen.oneOf(versions)
 
-  val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, AssetPair, Option[AssetId], Option[AssetId], (Byte, Byte, Byte))] =
+  val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, AssetPair, Asset, Asset, (Byte, Byte, Byte))] =
     for {
       sender1                 <- accountGen
       sender2                 <- accountGen
       matcher                 <- accountGen
       pair                    <- assetPairGen
-      buyerAnotherAsset       <- assetIdGen
-      sellerAnotherAsset      <- assetIdGen
+      buyerAnotherAsset       <- assetIdGen.map(Asset.fromCompatId)
+      sellerAnotherAsset      <- assetIdGen.map(Asset.fromCompatId)
       buyerMatcherFeeAssetId  <- Gen.oneOf(pair.amountAsset, pair.priceAsset, buyerAnotherAsset)
       sellerMatcherFeeAssetId <- Gen.oneOf(pair.amountAsset, pair.priceAsset, sellerAnotherAsset)
       versions                <- versionsGen
@@ -141,8 +142,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(sellOrder = sell.updateMatcher(sender2)) shouldBe an[Left[_, _]]
 
         create(
-          buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = None)),
-          sellOrder = sell.updatePair(sell.assetPair.copy(priceAsset = Some(ByteStr(Array(1: Byte)))))
+          buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = Waves)),
+          sellOrder = sell.updatePair(sell.assetPair.copy(priceAsset = IssuedAsset(ByteStr(Array(1: Byte)))))
         ) shouldBe an[Left[_, _]]
     }
   }

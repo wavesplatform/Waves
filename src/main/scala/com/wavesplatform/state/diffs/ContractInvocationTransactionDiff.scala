@@ -19,13 +19,14 @@ import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError._
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, WavesEnvironment}
+import com.wavesplatform.transaction.{Asset, ValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -49,7 +50,7 @@ object ContractInvocationTransactionDiff {
         .evaluationContext
 
       val invoker                                       = tx.sender.toAddress.bytes
-      val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.map(p => (p.amount, p.assetId))
+      val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.map(p => (p.amount, p.assetId.compatId))
       ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
     }
 
@@ -71,22 +72,22 @@ object ContractInvocationTransactionDiff {
                   }
                   for {
                     feeInfo <- (tx.assetFee._1 match {
-                      case None => Right((tx.fee, Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))))
-                      case Some(assetId) =>
+                      case Waves => Right((tx.fee, Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))))
+                      case asset @ IssuedAsset(_) =>
                         for {
                           assetInfo <- blockchain
-                            .assetDescription(assetId)
-                            .toRight(GenericError(s"Asset $assetId does not exist, cannot be used to pay fees"))
+                            .assetDescription(asset)
+                            .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
                           wavesFee <- Either.cond(
                             assetInfo.sponsorship > 0,
                             Sponsorship.toWaves(tx.fee, assetInfo.sponsorship),
-                            GenericError(s"Asset $assetId is not sponsored, cannot be used to pay fees")
+                            GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
                           )
                         } yield {
                           (wavesFee,
                            Map(
-                             tx.sender.toAddress        -> Portfolio(0, LeaseBalance.empty, Map(assetId         -> -tx.fee)),
-                             assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(assetId -> tx.fee))
+                             tx.sender.toAddress        -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -tx.fee)),
+                             assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))
                            ))
                         }
                     })
@@ -99,13 +100,16 @@ object ContractInvocationTransactionDiff {
                         .flatMap(_.values)
                         .flatMap(_.keys)
                         .flatten
-                        .forall(blockchain.assetDescription(_).isDefined),
+                        .forall(id => blockchain.assetDescription(IssuedAsset(id)).isDefined),
                       (),
                       GenericError(s"Unissued assets are not allowed")
                     )
                     _ <- {
-                      val totalScriptsInvoked = tx.checkedAssets().count(blockchain.hasAssetScript) +
-                        ps.count(_._3.fold(false)(blockchain.hasAssetScript))
+                      val totalScriptsInvoked =
+                        tx.checkedAssets()
+                          .collect { case asset @ IssuedAsset(_) => asset }
+                          .count(blockchain.hasAssetScript) +
+                          ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id))))
                       val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(ContractInvocationTransaction.typeId) * FeeUnit
                       Either.cond(
                         minWaves <= wavesFee,
@@ -118,7 +122,7 @@ object ContractInvocationTransactionDiff {
                   } yield {
                     val paymentReceiversMap: Map[Address, Portfolio] = Monoid
                       .combineAll(pmts)
-                      .mapValues(mp => mp.toList.map(x => Portfolio.build(x._1, x._2)))
+                      .mapValues(mp => mp.toList.map(x => Portfolio.build(Asset.fromCompatId(x._1), x._2)))
                       .mapValues(l => Monoid.combineAll(l))
                     val paymentFromContractMap = Map(tx.contractAddress -> Monoid.combineAll(paymentReceiversMap.values).negate)
                     val transfers              = Monoid.combineAll(Seq(paymentReceiversMap, paymentFromContractMap))
@@ -142,13 +146,13 @@ object ContractInvocationTransactionDiff {
 
     val payablePart: Map[Address, Portfolio] = tx.payment match {
       case None => Map.empty
-      case Some(ContractInvocationTransaction.Payment(amt, assetOpt)) =>
-        assetOpt match {
-          case Some(asset) =>
+      case Some(ContractInvocationTransaction.Payment(amt, assetId)) =>
+        assetId match {
+          case asset @ IssuedAsset(_) =>
             Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
               Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
             )
-          case None =>
+          case Waves =>
             Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
               .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
         }
@@ -170,22 +174,22 @@ object ContractInvocationTransactionDiff {
       ps.foldLeft(Either.right[ValidationError, Diff](dataDiff)) { (diffEi, payment) =>
         val (addressRepr, amount, asset) = payment
         val address                      = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
-        asset match {
-          case None =>
+        Asset.fromCompatId(asset) match {
+          case Waves =>
             diffEi combine Right(
               Diff.stateOps(
                 portfolios = Map(
                   address            -> Portfolio(amount, LeaseBalance.empty, Map.empty),
                   tx.contractAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)
                 )))
-          case Some(assetId) =>
+          case a @ IssuedAsset(_) =>
             diffEi combine {
               val nextDiff = Diff.stateOps(
                 portfolios = Map(
-                  address            -> Portfolio(0, LeaseBalance.empty, Map(assetId -> amount)),
-                  tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(assetId -> -amount))
+                  address            -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
+                  tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
                 ))
-              blockchain.assetScript(assetId) match {
+              blockchain.assetScript(a) match {
                 case None =>
                   Right(nextDiff)
                 case Some(script) =>

@@ -8,6 +8,7 @@ import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
 import org.scalacheck.Gen
@@ -56,7 +57,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
     val tx = SponsorFeeTransaction
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+        IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
         Some(100000),
         One,
         1520945679531L,
@@ -87,7 +88,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
     val tx = SponsorFeeTransaction
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+        IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
         None,
         One,
         1520945679531L,
@@ -98,7 +99,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
     val tx1 = SponsorFeeTransaction
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+        IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
         Some(0),
         One,
         1520945679531L,
@@ -127,7 +128,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
           .get
         minFee <- smallFeeGen
         assetId = issue.assetId()
-      } yield SponsorFeeTransaction.selfSigned(sender, assetId, Some(minFee), fee, timestamp) should produce("insufficient fee")
+      } yield SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetId), Some(minFee), fee, timestamp) should produce("insufficient fee")
     }
   }
 
@@ -142,7 +143,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
           .get
         minFee  = None
         assetId = issue.assetId()
-      } yield SponsorFeeTransaction.selfSigned(sender, assetId, minFee, fee, timestamp) should produce("insufficient fee")
+      } yield SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetId), minFee, fee, timestamp) should produce("insufficient fee")
     }
   }
 
@@ -152,8 +153,8 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
       issue   = IssueTransactionV1.selfSigned(acc, name, desc, quantity, decimals, reissuable, fee, ts).explicitGet()
       minFee <- Gen.choose(1, issue.quantity)
-      sponsor  = SponsorFeeTransaction.selfSigned(acc, issue.id(), Some(minFee), One, ts).explicitGet()
-      transfer = TransferTransactionV1.selfSigned(None, acc, acc, 1, ts, feeAssetId = Some(issue.id()), minFee, Array()).explicitGet()
+      sponsor  = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
+      transfer = TransferTransactionV1.selfSigned(Waves, acc, acc, 1, ts, feeAssetId = IssuedAsset(issue.id()), minFee, Array()).explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer)
 
     forAll(setup) {
@@ -163,8 +164,8 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
         val b2 = block(acc, Seq.empty)
 
         assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) {
-          case (diff, state) =>
-            state.balance(acc, None) - ENOUGH_AMT shouldBe 0
+          case (_, state) =>
+            state.balance(acc, Waves) - ENOUGH_AMT shouldBe 0
         }
     }
   }
@@ -175,9 +176,9 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
       issue   = IssueTransactionV1.selfSigned(acc, name, desc, quantity, decimals, reissuable, fee, ts).explicitGet()
       minFee <- Gen.choose(1000000, issue.quantity)
-      sponsor   = SponsorFeeTransaction.selfSigned(acc, issue.id(), Some(minFee), One, ts).explicitGet()
-      transfer1 = TransferTransactionV1.selfSigned(None, acc, acc, 1, ts, feeAssetId = Some(issue.id()), minFee + 7, Array()).explicitGet()
-      transfer2 = TransferTransactionV1.selfSigned(None, acc, acc, 1, ts, feeAssetId = Some(issue.id()), minFee + 9, Array()).explicitGet()
+      sponsor   = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
+      transfer1 = TransferTransactionV1.selfSigned(Waves, acc, acc, 1, ts, feeAssetId = IssuedAsset(issue.id()), minFee + 7, Array()).explicitGet()
+      transfer2 = TransferTransactionV1.selfSigned(Waves, acc, acc, 1, ts, feeAssetId = IssuedAsset(issue.id()), minFee + 9, Array()).explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer1, transfer2)
 
     forAll(setup) {
@@ -187,8 +188,8 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
         val b2 = block(acc, Seq.empty)
 
         assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) {
-          case (diff, state) =>
-            state.balance(acc, None) - ENOUGH_AMT shouldBe 0
+          case (_, state) =>
+            state.balance(acc, Waves) - ENOUGH_AMT shouldBe 0
         }
     }
   }
@@ -200,10 +201,10 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       issue   = IssueTransactionV1.selfSigned(acc, name, desc, quantity, decimals, reissuable, fee, ts).explicitGet()
       minFee <- Gen.choose(1, issue.quantity / 11)
 
-      sponsor1  = SponsorFeeTransaction.selfSigned(acc, issue.id(), Some(minFee), One, ts).explicitGet()
-      transfer1 = TransferTransactionV1.selfSigned(None, acc, acc, 1, ts, Some(issue.id()), feeAmount = minFee, Array()).explicitGet()
-      sponsor2  = SponsorFeeTransaction.selfSigned(acc, issue.id(), Some(minFee * 10), One, ts).explicitGet()
-      transfer2 = TransferTransactionV1.selfSigned(None, acc, acc, 1, ts, Some(issue.id()), feeAmount = minFee * 10, Array()).explicitGet()
+      sponsor1  = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
+      transfer1 = TransferTransactionV1.selfSigned(Waves, acc, acc, 1, ts, IssuedAsset(issue.id()), feeAmount = minFee, Array()).explicitGet()
+      sponsor2  = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee * 10), One, ts).explicitGet()
+      transfer2 = TransferTransactionV1.selfSigned(Waves, acc, acc, 1, ts, IssuedAsset(issue.id()), feeAmount = minFee * 10, Array()).explicitGet()
     } yield (acc, genesis, issue, sponsor1, transfer1, sponsor2, transfer2)
 
     forAll(setup) {
@@ -213,8 +214,8 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
         val b2 = block(acc, Seq.empty)
 
         assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) {
-          case (diff, state) =>
-            state.balance(acc, None) - ENOUGH_AMT shouldBe 0
+          case (_, state) =>
+            state.balance(acc, Waves) - ENOUGH_AMT shouldBe 0
         }
     }
   }

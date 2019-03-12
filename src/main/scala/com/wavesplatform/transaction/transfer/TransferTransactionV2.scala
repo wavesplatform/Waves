@@ -6,6 +6,7 @@ import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
@@ -14,10 +15,10 @@ import scala.util.Try
 
 case class TransferTransactionV2 private (sender: PublicKeyAccount,
                                           recipient: AddressOrAlias,
-                                          assetId: Option[AssetId],
+                                          assetId: Asset,
                                           amount: Long,
                                           timestamp: Long,
-                                          feeAssetId: Option[AssetId],
+                                          feeAssetId: Asset,
                                           fee: Long,
                                           attachment: Array[Byte],
                                           proofs: Proofs)
@@ -46,12 +47,12 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
     }
   }
 
-  def create(assetId: Option[AssetId],
+  def create(assetId: Asset,
              sender: PublicKeyAccount,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
-             feeAssetId: Option[AssetId],
+             feeAssetId: Asset,
              feeAmount: Long,
              attachment: Array[Byte],
              proofs: Proofs): Either[ValidationError, TransactionT] = {
@@ -60,12 +61,12 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
     } yield TransferTransactionV2(sender, recipient, assetId, amount, timestamp, feeAssetId, feeAmount, attachment, proofs)
   }
 
-  def signed(assetId: Option[AssetId],
+  def signed(assetId: Asset,
              sender: PublicKeyAccount,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
-             feeAssetId: Option[AssetId],
+             feeAssetId: Asset,
              feeAmount: Long,
              attachment: Array[Byte],
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
@@ -74,12 +75,12 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
     }
   }
 
-  def selfSigned(assetId: Option[AssetId],
+  def selfSigned(assetId: Asset,
                  sender: PrivateKeyAccount,
                  recipient: AddressOrAlias,
                  amount: Long,
                  timestamp: Long,
-                 feeAssetId: Option[AssetId],
+                 feeAssetId: Asset,
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
     signed(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, sender)
@@ -101,10 +102,10 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
         TransferTransactionV2(
           sender = senderPublicKey,
           recipient = recipient,
-          assetId = assetId,
+          assetId = assetId.getOrElse(Waves),
           amount = amount,
           timestamp = timestamp,
-          feeAssetId = feeAssetId,
+          feeAssetId = feeAssetId.getOrElse(Waves),
           fee = fee,
           attachment = attachments,
           proofs = proofs

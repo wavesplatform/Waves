@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, ValidationError}
+import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -50,8 +50,8 @@ case class SignedTransferV2Request(@ApiModelProperty(value = "Base58 encoded sen
   def toTx: Either[ValidationError, TransferTransactionV2] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _assetId    <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
-      _feeAssetId <- parseBase58ToOption(feeAssetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
+      _assetId    <- parseBase58ToAssetId(assetId.filter(_.length > 0), "invalid.assetId")
+      _feeAssetId <- parseBase58ToAssetId(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _recipient  <- AddressOrAlias.fromString(recipient)
