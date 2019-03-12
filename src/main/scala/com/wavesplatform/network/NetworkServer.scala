@@ -9,6 +9,7 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings._
 import com.wavesplatform.state.NG
+import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
@@ -21,7 +22,6 @@ import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepende
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
-import com.wavesplatform.transaction._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -84,6 +84,7 @@ object NetworkServer extends ScorexLogging {
     // application is terminated.
     val writeErrorHandler = new WriteErrorHandler
     val fatalErrorHandler = new FatalErrorHandler
+    val readErrorHandler = new ReadErrorHandler(peerDatabase)
 
     val inboundConnectionFilter: PipelineInitializer.HandlerWrapper =
       new InboundConnectionFilter(peerDatabase, settings.networkSettings.maxInboundConnections, settings.networkSettings.maxConnectionsPerHost)
@@ -122,7 +123,8 @@ object NetworkServer extends ScorexLogging {
           peerSynchronizer,
           historyReplier,
           mesageObserver,
-          fatalErrorHandler
+          fatalErrorHandler,
+          readErrorHandler
         )))
         .bind(settings.networkSettings.bindAddress)
         .channel()
