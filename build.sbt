@@ -55,7 +55,8 @@ inThisBuild(
                           "-language:implicitConversions",
                           "-Ywarn-unused:-implicits",
                           "-Xlint",
-                          "-Ywarn-unused-import")
+                          "-Ywarn-unused-import",
+                          "-Ypartial-unification")
   ))
 
 resolvers ++= Seq(
@@ -338,7 +339,7 @@ lazy val node = project
   )
   .dependsOn(langJVM, commonJVM)
 
-///lazy val discovery = project
+//lazy val discovery = project
 
 lazy val it = project
   .dependsOn(node)

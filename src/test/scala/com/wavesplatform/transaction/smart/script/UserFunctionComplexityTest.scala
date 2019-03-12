@@ -14,8 +14,8 @@ import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
