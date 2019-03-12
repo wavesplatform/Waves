@@ -5,7 +5,7 @@ import java.util.concurrent.TimeoutException
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedMassTransferRequest, SignedTransferV1Request}
+import com.wavesplatform.api.http.assets.{SignedIssueV2Request, SignedMassTransferRequest, SignedTransferV1Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.{
@@ -23,7 +23,7 @@ import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1}
@@ -57,7 +57,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
                 response
               } else {
                 log.info(s"[$tag] Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
-                throw UnexpectedStatusCodeException(r.getUrl, response.getStatusCode, response.getResponseBody)
+                throw UnexpectedStatusCodeException(r.getMethod, r.getUrl, response.getStatusCode, response.getResponseBody)
               }
             }
           }
@@ -74,9 +74,9 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     executeRequest
   }
 
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
+  def createSignedIssueRequest(tx: IssueTransactionV2): SignedIssueV2Request = {
     import tx._
-    SignedIssueV1Request(
+    SignedIssueV2Request(
       Base58.encode(tx.sender.publicKey),
       new String(name),
       new String(description),
@@ -85,13 +85,13 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
       reissuable,
       fee,
       timestamp,
-      signature.base58
+      proofs.proofs.map(_.base58),
+      script.map(_.toString)
     )
   }
 
   def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
     SignedMassTransferRequest(
-      MassTransferTransaction.version,
       Base58.encode(tx.sender.publicKey),
       tx.assetId.map(_.base58),
       tx.transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },
@@ -157,9 +157,6 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
       case _    => to(endpoint).assetBalance(address, asset.map(_.base58).get).map(_.balance)
     }
 
-    def signedIssue(issue: SignedIssueV1Request)(implicit tag: String): Future[Transaction] =
-      postJson("/assets/broadcast/issue", issue).as[Transaction]
-
     def orderbookByPublicKey(publicKey: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity)(
         implicit tag: String): Future[Seq[OrderbookHistory]] =
       retrying {
@@ -202,9 +199,9 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
     def unconfirmedTxInfo(txId: String)(implicit tag: String): Future[Transaction] = get(s"/transactions/unconfirmed/info/$txId").as[Transaction]
 
     def findTransactionInfo(txId: String)(implicit tag: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
-      case Success(tx)                                       => Success(Some(tx))
-      case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
-      case Failure(ex)                                       => Failure(ex)
+      case Success(tx)                                          => Success(Some(tx))
+      case Failure(UnexpectedStatusCodeException(_, _, 404, _)) => Success(None)
+      case Failure(ex)                                          => Failure(ex)
     }
 
     def ensureTxDoesntExist(txId: String)(implicit tag: String): Future[Unit] =

@@ -10,7 +10,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import cats.instances.all._
 import com.typesafe.config._
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
@@ -28,10 +28,11 @@ import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import com.wavesplatform.state.{StateUpdateEvent, StateUpdateProcessor}
+import com.wavesplatform.state.StateUpdateEvent
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, forceStopApplication}
-import com.wavesplatform.utx.{MatcherUtxPool, UtxPool, UtxPoolImpl}
+import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
@@ -43,7 +44,7 @@ import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
-import monix.reactive.subjects.{ConcurrentSubject, PublishSubject}
+import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
 
@@ -59,9 +60,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val LocalScoreBroadcastDebounce = 1.second
 
-  private val stateUpdateEvents: PublishSubject[StateUpdateEvent] = PublishSubject()
+  private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Option[AssetId])]
 
-  private val blockchainUpdater = StorageFactory(settings, db, time, Some(new StateUpdateProcessor(stateUpdateEvents)))
+  private val stateUpdateEvents = ConcurrentSubject.publish[StateUpdateEvent]
+  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, Some(stateUpdateEvents))
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -103,16 +105,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val innerUtxStorage =
-      new UtxPoolImpl(time, blockchainUpdater, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    val utxStorage =
+      new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    maybeUtx = Some(utxStorage)
 
     matcher = if (settings.matcherSettings.enable) {
-      Matcher(actorSystem, time, wallet, innerUtxStorage, allChannels, blockchainUpdater, settings)
+      Matcher(actorSystem, time, wallet, utxStorage, allChannels, blockchainUpdater, spendableBalanceChanged, settings)
     } else None
-
-    val utxStorage =
-      if (settings.matcherSettings.enable) new MatcherUtxPool(innerUtxStorage, settings.matcherSettings, actorSystem.eventStream) else innerUtxStorage
-    maybeUtx = Some(utxStorage)
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
@@ -188,11 +187,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     rxExtensionLoaderShutdown = Some(sh)
 
     UtxPoolSynchronizer.start(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
-    val microBlockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
-    val blockSink      = newBlocks.mapTask(scala.Function.tupled(processBlock))
+
+    val microBlockSink = microblockDatas
+      .mapTask(scala.Function.tupled(processMicroBlock))
+
+    val blockSink = newBlocks
+      .mapTask(scala.Function.tupled(processBlock))
 
     Observable.merge(microBlockSink, blockSink).subscribe()
     miner.scheduleMining()
+    utxStorage.cleanup.runCleanupOn(blockSink)
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)
@@ -267,7 +271,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         classOf[LeaseApiRoute],
         classOf[AliasApiRoute]
       )
-      val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).loggingCompositeRoute
+      val combinedRoute = CompositeHttpService(apiTypes, apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
@@ -288,6 +292,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (!shutdownInProgress) {
       shutdownInProgress = true
 
+      spendableBalanceChanged.onComplete()
       utx.close()
 
       shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)

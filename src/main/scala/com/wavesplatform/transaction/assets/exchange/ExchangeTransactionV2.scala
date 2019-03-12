@@ -1,16 +1,18 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import cats.data.State
+import cats.implicits._
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
+import com.wavesplatform.transaction.description._
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class ExchangeTransactionV2(buyOrder: Order,
                                  sellOrder: Order,
@@ -96,42 +98,38 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
   }
 
   override def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    def back(off: Int): State[Int, Unit] = State { from =>
-      (from - off, ())
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      ExchangeTransaction
+        .validateExchangeParams(tx)
+        .map(_ => tx)
+        .foldToTry
     }
-    val readByte: State[Int, Byte] = State { from =>
-      (from + 1, bytes(from))
-    }
-    def read[T](f: Array[Byte] => T, size: Int): State[Int, T] = State { from =>
-      val end = from + size
-      (end, f(bytes.slice(from, end)))
-    }
-    def readEnd[T](f: Array[Byte] => T): State[Int, T] = State { from =>
-      (from, f(bytes.drop(from)))
-    }
+  }
 
-    Try {
-      val makeTransaction = for {
-        o1Size         <- read(Ints.fromByteArray _, 4)
-        o1Ver          <- readByte
-        _              <- back(if (o1Ver != 1) { 1 } else { 0 })
-        o1             <- read(if (o1Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o1Size).map(_.get)
-        o2Size         <- read(Ints.fromByteArray _, 4)
-        o2Ver          <- readByte
-        _              <- back(if (o2Ver != 1) { 1 } else { 0 })
-        o2             <- read(if (o2Ver == 1) { OrderV1.parseBytes _ } else { OrderV2.parseBytes _ }, o2Size).map(_.get)
-        price          <- read(Longs.fromByteArray _, 8)
-        amount         <- read(Longs.fromByteArray _, 8)
-        buyMatcherFee  <- read(Longs.fromByteArray _, 8)
-        sellMatcherFee <- read(Longs.fromByteArray _, 8)
-        fee            <- read(Longs.fromByteArray _, 8)
-        timestamp      <- read(Longs.fromByteArray _, 8)
-        proofs         <- readEnd(Proofs.fromBytes)
-      } yield {
-        create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs.right.get)
-          .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-      }
-      makeTransaction.run(0).value._2
-    }.flatten
+  val byteTailDescription: ByteEntity[ExchangeTransactionV2] = {
+    (
+      OrderBytes(tailIndex(1), "Buy order"),
+      OrderBytes(tailIndex(2), "Sell order"),
+      LongBytes(tailIndex(3), "Price"),
+      LongBytes(tailIndex(4), "Amount"),
+      LongBytes(tailIndex(5), "Buy matcher fee"),
+      LongBytes(tailIndex(6), "Sell matcher fee"),
+      LongBytes(tailIndex(7), "Fee"),
+      LongBytes(tailIndex(8), "Timestamp"),
+      ProofsBytes(tailIndex(9))
+    ) mapN {
+      case (buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs) =>
+        ExchangeTransactionV2(
+          buyOrder = buyOrder,
+          sellOrder = sellOrder,
+          amount = amount,
+          price = price,
+          buyMatcherFee = buyMatcherFee,
+          sellMatcherFee = sellMatcherFee,
+          fee = fee,
+          timestamp = timestamp,
+          proofs = proofs
+        )
+    }
   }
 }

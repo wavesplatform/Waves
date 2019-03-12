@@ -10,7 +10,6 @@ import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
@@ -91,9 +90,9 @@ object ExpressionCompiler {
         case _      => None
       }
       ifCases <- inspectFlat[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx => {
-        mkIfCases(updatedCtx, cases, Expressions.REF(p, PART.VALID(AnyPos, refTmpKey)), allowShadowVarName).toCompileM
+        mkIfCases(updatedCtx, cases, Expressions.REF(p, PART.VALID(p, refTmpKey)), allowShadowVarName).toCompileM
       })
-      compiledMatch <- compileLetBlock(p, Expressions.LET(AnyPos, PART.VALID(AnyPos, refTmpKey), expr, Seq.empty), ifCases)
+      compiledMatch <- compileLetBlock(p, Expressions.LET(p, PART.VALID(p, refTmpKey), expr, Seq.empty), ifCases)
       _ <- cases
         .flatMap(_.types)
         .traverse[CompileM, String](handlePart)
@@ -121,11 +120,11 @@ object ExpressionCompiler {
   private def handleTypeUnion(types: List[String], f: FINAL, ctx: CompilerContext) =
     if (types.isEmpty) f else UNION.create(types.map(ctx.predefTypes).map(_.typeRef))
 
-  private def validateShadowing(p: Pos, dec: Expressions.Declaration): CompileM[String] =
+  private def validateShadowing(p: Pos, dec: Expressions.Declaration, allowedExceptions: List[String] = List.empty): CompileM[String] =
     for {
       ctx <- get[CompilerContext, CompilationError]
       letName <- handlePart(dec.name)
-        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = false))(n => !ctx.varDefs.contains(n) || dec.allowShadowing)
+        .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = false))(n => !ctx.varDefs.contains(n) || dec.allowShadowing || allowedExceptions.contains(n))
         .ensureOr(n => AlreadyDefined(p.start, p.end, n, isFunction = true))(n => !ctx.functionDefs.contains(n))
     } yield letName
 
@@ -140,9 +139,9 @@ object ExpressionCompiler {
       typeUnion = handleTypeUnion(letTypes, compiledLet._2, ctx)
     } yield (letName, typeUnion, compiledLet._1)
 
-  def compileFunc(p: Pos, func: Expressions.FUNC): CompileM[(FUNC, FINAL, List[(String, FINAL)])] = {
+  def compileFunc(p: Pos, func: Expressions.FUNC, annListVars: List[String] = List.empty): CompileM[(FUNC, FINAL, List[(String, FINAL)])] = {
     for {
-      funcName <- validateShadowing(p, func)
+      funcName <- validateShadowing(p, func, annListVars)
       _ <- func.args.toList
         .pure[CompileM]
         .ensure(BadFunctionSignatureSameArgNames(p.start, p.end, funcName)) { l =>
@@ -185,7 +184,7 @@ object ExpressionCompiler {
         updateCtx(letName, letType, p)
           .flatMap(_ => compileExpr(body))
       }
-    } yield (BLOCK(LET(letName, letExpr), compiledBody._1), compiledBody._2)
+    } yield (LET_BLOCK(LET(letName, letExpr), compiledBody._1), compiledBody._2)
   }
 
   private def compileFuncBlock(p: Pos, func: Expressions.FUNC, body: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL)] = {
@@ -305,7 +304,8 @@ object ExpressionCompiler {
       }
     }
 
-    val default: Either[CompilationError, Expressions.EXPR] = Right(Expressions.FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "throw"), List.empty))
+    val default: Either[CompilationError, Expressions.EXPR] = Right(Expressions.FUNCTION_CALL(cases.head.position, PART.VALID(cases.head.position, "throw"), List.empty))
+
     cases.foldRight(default) {
       case (mc, furtherEi) =>
         furtherEi match {
@@ -313,7 +313,6 @@ object ExpressionCompiler {
           case Left(e)        => Left(e)
         }
     }
-
   }
 
   private def mkGetter(p: Pos, ctx: CompilerContext, types: List[FINAL], fieldName: String, expr: EXPR): Either[CompilationError, (GETTER, FINAL)] = {

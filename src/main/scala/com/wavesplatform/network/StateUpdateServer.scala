@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings._
-import com.wavesplatform.state.{BlockAddEvent, StateUpdateEvent}
+import com.wavesplatform.state.{BlockEvent, StateUpdateEvent}
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.channel.nio.NioEventLoopGroup
@@ -26,7 +26,7 @@ class UpdateServerHandler(stateUpdates: Observable[StateUpdateEvent]) extends Ch
     val obs = new Observer.Sync[StateUpdateEvent] {
       override def onNext(evt: StateUpdateEvent): Ack = {
         val serialized = evt match {
-          case BlockAddEvent(b, h, blockStateUpdate, transactionsStateUpdates) =>
+          case BlockEvent(b, h, blockStateUpdate, transactionsStateUpdates) =>
             val block = Block(b.signerData.signature, h)
         }
 

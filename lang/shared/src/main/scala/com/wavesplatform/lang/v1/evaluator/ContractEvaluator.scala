@@ -11,15 +11,19 @@ import com.wavesplatform.lang.v1.task.imports.{raiseError, _}
 import com.wavesplatform.lang.v1.traits.domain.Tx.{ContractTransfer, Pmt}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 
-import scala.collection.mutable.ListBuffer
-
 object ContractEvaluator {
   case class Invocation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
 
   def eval(c: Contract, i: Invocation): EvalM[EVALUATED] = {
     val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name
     c.cfs.find(_.u.name == functionName) match {
-      case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"Callable function '$functionName doesn't exist in the contract")
+      case None =>
+        val otherFuncs = c.dec.filter(_.isInstanceOf[FUNC]).map(_.asInstanceOf[FUNC].name)
+        val message =
+          if (otherFuncs contains functionName)
+            s"function '$functionName exists in the contract but is not marked as @Callable, therefore cannot not be invoked"
+          else s"@Callable function '$functionName doesn't exist in the contract"
+        raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](message)
       case Some(f) =>
         val zeroExpr = Right(
           BLOCK(
@@ -42,29 +46,24 @@ object ContractEvaluator {
   def verify(v: VerifierFunction, tx: Tx): EvalM[EVALUATED] = {
     val t = Bindings.transactionObject(tx, proofsEnabled = true)
     val expr =
-      BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+      BLOCK(LET(v.annotation.invocationArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 
   def verify(v: VerifierFunction, ord: Ord): EvalM[EVALUATED] = {
     val t = Bindings.orderObject(ord, proofsEnabled = true)
     val expr =
-      BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+      BLOCK(LET(v.annotation.invocationArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 
   def verify(v: VerifierFunction, ct: ContractTransfer): EvalM[EVALUATED] = {
     val t = Bindings.contractTransfer(ct)
     val expr =
-      BLOCK(LET(v.annotation.txArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
+      BLOCK(LET(v.annotation.invocationArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 
-
-  def apply(ctx: EvaluationContext, c: Contract, i: Invocation): Either[ExecutionError, ContractResult] = {
-    val log = ListBuffer[LogItem]()
-    val llc = (str: String) => (v: LetExecResult) => log.append((str, v))
-    val lec = LoggedEvaluationContext(llc, ctx)
-    eval(c, i).run(lec).value._2.flatMap(ContractResult.fromObj)
-  }
+  def apply(ctx: EvaluationContext, c: Contract, i: Invocation): Either[ExecutionError, ContractResult] =
+    EvaluatorV1.evalWithLogging(ctx, eval(c, i))._2.flatMap(ContractResult.fromObj)
 }

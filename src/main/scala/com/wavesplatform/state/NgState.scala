@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
@@ -11,14 +10,15 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
+import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
+
+/* This is not thread safe, used only from BlockchainUpdaterImpl */
 class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val approvedFeatures: Set[Short]) extends ScorexLogging {
 
   private val MaxTotalDiffs = 3
 
-  private val state = new SynchronizedAppendState[MicroBlock, BlockId, (Diff, Long, Long)](_.totalResBlockSig)
-
-  private def microDiffs = state.mapping // microDiff, carryFee, timestamp
-  private def micros     = state.stack   // fresh head
+  private val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
+  private val micros: MList[MicroBlock]                     = MList.empty // fresh head
 
   private val totalBlockDiffCache = CacheBuilder
     .newBuilder()
@@ -110,48 +110,9 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   }
 
   def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
-    state.append(m, (diff, microblockCarry, timestamp))
+    microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
+    micros.prepend(m)
   }
 
   def carryFee: Long = baseBlockCarry + microDiffs.values.map(_._2).sum
-}
-
-/**
-  * Allow atomically appends to state
-  * Return internal stack and mapping state without dirty reads
-  */
-private class SynchronizedAppendState[T, K, V](toKey: T => K) {
-  private def inLock[R](l: Lock, f: => R) = {
-    try {
-      l.lock()
-      val res = f
-      res
-    } finally {
-      l.unlock()
-    }
-  }
-  private val lock                     = new ReentrantReadWriteLock
-  private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
-  private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
-
-  @volatile private var internalStack = List.empty[T]
-  @volatile private var internalMap   = Map.empty[K, V]
-
-  /**
-    * Stack state
-    */
-  def stack: List[T] = readLock(internalStack)
-
-  /**
-    * Mapping state
-    */
-  def mapping: Map[K, V] = readLock(internalMap)
-
-  /**
-    * Atomically appends to state both stack and map
-    */
-  def append(t: T, v: V): Unit = writeLock {
-    internalStack = t :: internalStack
-    internalMap = internalMap.updated(toKey(t), v)
-  }
 }

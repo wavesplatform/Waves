@@ -5,7 +5,6 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
-import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
@@ -23,14 +22,18 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.eval.Task
-import monix.execution.{CancelableFuture, Scheduler}
 import monix.execution.schedulers.SchedulerService
+import monix.execution.{Cancelable, Scheduler}
+import monix.reactive.{Observable, Observer}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration.DurationLong
 import scala.util.{Left, Right}
 
-class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings, utxSettings: UtxSettings)
+class UtxPoolImpl(time: Time,
+                  blockchain: Blockchain,
+                  spendableBalanceChanged: Observer[(Address, Option[AssetId])],
+                  fs: FunctionalitySettings,
+                  utxSettings: UtxSettings)
     extends ScorexLogging
     with Instrumented
     with AutoCloseable
@@ -39,18 +42,11 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
 
   import com.wavesplatform.utx.UtxPoolImpl._
 
-  private implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
+  // State
+  private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
+  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
 
-  private val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private val pessimisticPortfolios = new PessimisticPortfolios
-
-  private val removeInvalidTask: Task[Unit] =
-    Task.eval(removeInvalid()) >>
-      Task.sleep(utxSettings.cleanupInterval) >>
-      removeInvalidTask
-
-  private val cleanup: CancelableFuture[Unit] = removeInvalidTask.runAsyncLogErr
-
+  // Metrics
   private[this] object PoolMetrics {
     private[this] val sizeStats  = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
     private[this] val bytesStats = Kamon.rangeSampler("utx-pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
@@ -59,79 +55,115 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()
-      bytesStats.increment(tx.bytes().size)
+      bytesStats.increment(tx.bytes().length)
     }
 
     def removeTransaction(tx: Transaction): Unit = {
       sizeStats.decrement()
-      bytesStats.decrement(tx.bytes().size)
+      bytesStats.decrement(tx.bytes().length)
     }
   }
 
-  override def close(): Unit = {
-    cleanup.cancel()
-    scheduler.shutdown()
-  }
+  override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
+    def canReissue(blockchain: Blockchain, tx: Transaction) = tx match {
+      case r: ReissueTransaction if blockchain.assetDescription(r.assetId).exists(!_.reissuable) => Left(GenericError(s"Asset is not reissuable"))
+      case _                                                                                     => Right(())
+    }
 
-  private def removeExpired(currentTs: Long): Unit = {
-    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > fs.maxTransactionTimeBackOffset
+    def checkAlias(blockchain: Blockchain, tx: Transaction) = tx match {
+      case cat: CreateAliasTransaction if !blockchain.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
+      case _                                                                    => Right(())
+    }
 
-    transactions.values.asScala
-      .collect {
-        case tx if isExpired(tx) => tx.id()
-      }
-      .foreach(remove)
-  }
+    def checkScripted(blockchain: Blockchain, tx: Transaction) = tx match {
+      case _ if utxSettings.allowTransactionsFromSmartAccounts => Right(())
+      case a: AuthorizedTransaction if blockchain.hasScript(a.sender.toAddress) =>
+        Left(GenericError("transactions from scripted accounts are denied from UTX pool"))
+      case _ => Right(())
+    }
 
-  override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = putIfNew(blockchain, tx)
+    def checkNotBlacklisted(tx: Transaction) = {
+      if (utxSettings.blacklistSenderAddresses.isEmpty) {
+        Right(())
+      } else {
+        val sender: Option[String] = tx match {
+          case x: Authorized => Some(x.sender.address)
+          case _             => None
+        }
 
-  private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
-    if (utxSettings.blacklistSenderAddresses.isEmpty) {
-      Right(())
-    } else {
-      val sender: Option[String] = tx match {
-        case x: Authorized => Some(x.sender.address)
-        case _             => None
-      }
-
-      sender match {
-        case Some(addr) if utxSettings.blacklistSenderAddresses.contains(addr) =>
-          val recipients = tx match {
-            case tt: TransferTransaction      => Seq(tt.recipient)
-            case mtt: MassTransferTransaction => mtt.transfers.map(_.address)
-            case _                            => Seq()
-          }
-          val allowed =
-            recipients.nonEmpty &&
-              recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.stringRepr))
-          Either.cond(allowed, (), SenderIsBlacklisted(addr))
-        case _ => Right(())
+        sender match {
+          case Some(addr) if utxSettings.blacklistSenderAddresses.contains(addr) =>
+            val recipients = tx match {
+              case tt: TransferTransaction      => Seq(tt.recipient)
+              case mtt: MassTransferTransaction => mtt.transfers.map(_.address)
+              case _                            => Seq()
+            }
+            val allowed =
+              recipients.nonEmpty &&
+                recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.stringRepr))
+            Either.cond(allowed, (), SenderIsBlacklisted(addr))
+          case _ => Right(())
+        }
       }
     }
+
+    PoolMetrics.putRequestStats.increment()
+    val result = measureSuccessful(
+      PoolMetrics.processingTimeStats, {
+        for {
+          _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+
+          transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
+            .map(_.bytes().length)
+            .sum
+          _ <- Either.cond((transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
+                           (),
+                           GenericError("Transaction pool bytes size limit is reached"))
+
+          _    <- checkNotBlacklisted(tx)
+          _    <- checkScripted(blockchain, tx)
+          _    <- checkAlias(blockchain, tx)
+          _    <- canReissue(blockchain, tx)
+          diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
+        } yield {
+          pessimisticPortfolios.add(tx.id(), diff)
+          val isNew = Option(transactions.put(tx.id(), tx)).isEmpty
+          if (isNew) PoolMetrics.addTransaction(tx)
+          (isNew, diff)
+        }
+      }
+    )
+
+    result.fold(
+      err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err"),
+      r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}")
+    )
+
+    result
   }
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
     txs.view.map(_.id()).foreach(remove)
-    removeExpired(time.correctedTime())
+    cleanup.doExpiredCleanup()
   }
 
-  private def remove(txId: ByteStr): Unit = {
-    Option(transactions.remove(txId)).foreach(PoolMetrics.removeTransaction)
-    pessimisticPortfolios.remove(txId)
+  private[this] def afterRemove(tx: Transaction): Unit = {
+    PoolMetrics.removeTransaction(tx)
+    pessimisticPortfolios.remove(tx.id())
   }
 
-  private def removeInvalid(): Unit = {
-    val b = blockchain
-    val transactionsToRemove = transactions.values.asScala.filter { t =>
-      TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
-    }
-    removeAll(transactionsToRemove)
-  }
+  private[this] def remove(txId: ByteStr): Unit =
+    Option(transactions.remove(txId))
+      .foreach(afterRemove)
 
-  override def accountPortfolio(addr: Address): Portfolio = blockchain.portfolio(addr)
+  override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
+    blockchain.balance(addr, assetId) -
+      assetId.fold(blockchain.leaseBalance(addr).out)(_ => 0L) +
+      pessimisticPortfolios
+        .getAggregated(addr)
+        .spendableBalanceOf(assetId)
 
-  override def portfolio(addr: Address): Portfolio =
-    Monoid.combine(blockchain.portfolio(addr), pessimisticPortfolios.getAggregated(addr))
+  override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
 
   override def all: Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
 
@@ -140,16 +172,15 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
-    val currentTs = time.correctedTime()
-    removeExpired(currentTs)
-    val b      = blockchain
-    val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
+    cleanup.doExpiredCleanup()
+
+    val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .iterator
       .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
         case ((invalid, valid, diff, currRest, isEmpty), tx) =>
-          val updatedBlockchain = composite(b, diff)
+          val updatedBlockchain = composite(blockchain, diff)
           val updatedRest       = currRest.put(updatedBlockchain, tx)
           if (updatedRest.isOverfilled) {
             (invalid, valid, diff, currRest, isEmpty)
@@ -170,85 +201,83 @@ class UtxPoolImpl(time: Time, blockchain: Blockchain, fs: FunctionalitySettings,
     (txs, finalConstraint)
   }
 
-  override private[utx] def createBatchOps: UtxBatchOps = new BatchOpsImpl(blockchain)
+  //noinspection ScalaStyle
+  private[this] object TxCheck {
+    private[this] val ExpirationTime = fs.maxTransactionTimeBackOffset.toMillis
 
-  private class BatchOpsImpl(b: Blockchain) extends UtxBatchOps {
-    override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = outer.putIfNew(b, tx)
-  }
-
-  private def canReissue(b: Blockchain, tx: Transaction) = tx match {
-    case r: ReissueTransaction if b.assetDescription(r.assetId).exists(!_.reissuable) => Left(GenericError(s"Asset is not reissuable"))
-    case _                                                                            => Right(())
-  }
-
-  private def checkAlias(b: Blockchain, tx: Transaction) = tx match {
-    case cat: CreateAliasTransaction if !blockchain.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
-    case _                                                                    => Right(())
-  }
-
-  private def checkScripted(b: Blockchain, tx: Transaction) =
-    tx match {
-      case a: AuthorizedTransaction if blockchain.hasScript(a.sender.toAddress) && (!utxSettings.allowTransactionsFromSmartAccounts) =>
-        Left(GenericError("transactions from scripted accounts are denied from UTX pool"))
-      case _ => Right(())
+    def transactionIsExpired(transaction: Transaction, currentTime: Long = time.correctedTime()) = {
+      (currentTime - transaction.timestamp) > ExpirationTime
     }
 
-  private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
-    PoolMetrics.putRequestStats.increment()
-    val result = measureSuccessful(
-      PoolMetrics.processingTimeStats, {
-        for {
-          _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+    def transactionIsValid(transaction: Transaction,
+                           lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
+                           currentTime: Long = time.correctedTime(),
+                           height: Int = blockchain.height) = {
+      !transactionIsExpired(transaction) && TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).isRight
+    }
+  }
 
-          transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
-            .map(_.bytes().size)
-            .sum
-          _ <- Either.cond((transactionsBytes + tx.bytes().size) <= utxSettings.maxBytesSize,
-                           (),
-                           GenericError("Transaction pool bytes size limit is reached"))
+  //noinspection ScalaStyle
+  object cleanup {
+    private[UtxPoolImpl] implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-cleanup")
 
-          _    <- checkNotBlacklisted(tx)
-          _    <- checkScripted(b, tx)
-          _    <- checkAlias(b, tx)
-          _    <- canReissue(b, tx)
-          diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
-        } yield {
-          pessimisticPortfolios.add(tx.id(), diff)
-          val isNew = Option(transactions.put(tx.id(), tx)).isEmpty
-          if (isNew) PoolMetrics.addTransaction(tx)
-          (isNew, diff)
-        }
+    val runCleanupTask: Task[Unit] = Task
+      .eval(doCleanup())
+      .executeOn(scheduler)
+
+    def runCleanupOn(observable: Observable[_]): Cancelable = {
+      observable
+        .whileBusyDropEventsAndSignal(dropped => log.warn(s"UTX pool cleanup is too slow, $dropped cleanups skipped"))
+        .mapTask(_ => runCleanupTask)
+        .doOnComplete(() => log.debug("UTX pool cleanup stopped"))
+        .doOnError(err => log.error("UTX pool cleanup error", err))
+        .subscribe()
+    }
+
+    private[UtxPoolImpl] def doExpiredCleanup(): Unit = {
+      transactions.entrySet().removeIf { entry =>
+        val tx     = entry.getValue
+        val remove = TxCheck.transactionIsExpired(tx)
+        if (remove) UtxPoolImpl.this.afterRemove(tx)
+        remove
       }
-    )
-    result.fold(
-      err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err"),
-      r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}")
-    )
-    result
+    }
+
+    private[UtxPoolImpl] def doCleanup(): Unit = {
+      transactions.entrySet().removeIf { entry =>
+        val tx     = entry.getValue
+        val remove = !TxCheck.transactionIsValid(tx)
+        if (remove) UtxPoolImpl.this.afterRemove(tx)
+        remove
+      }
+    }
+  }
+
+  override def close(): Unit = {
+    cleanup.scheduler.shutdown()
   }
 }
 
 object UtxPoolImpl {
-
-  private class PessimisticPortfolios {
+  private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Option[AssetId])]) {
     private type Portfolios = Map[Address, Portfolio]
     private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
     private val transactions          = new ConcurrentHashMap[Address, Set[ByteStr]]()
 
     def add(txId: ByteStr, txDiff: Diff): Unit = {
-      val nonEmptyPessimisticPortfolios = txDiff.portfolios
-        .map {
-          case (addr, portfolio) => addr -> portfolio.pessimistic
-        }
-        .filterNot {
-          case (_, portfolio) => portfolio.isEmpty
-        }
+      val pessimisticPortfolios         = txDiff.portfolios.map { case (addr, portfolio)        => addr -> portfolio.pessimistic }
+      val nonEmptyPessimisticPortfolios = pessimisticPortfolios.filterNot { case (_, portfolio) => portfolio.isEmpty }
 
       if (nonEmptyPessimisticPortfolios.nonEmpty &&
           Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
         nonEmptyPessimisticPortfolios.keys.foreach { address =>
           transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
         }
+      }
+
+      // Because we need to notify about balance changes when they are applied
+      pessimisticPortfolios.foreach {
+        case (addr, p) => p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
       }
     }
 
@@ -263,12 +292,15 @@ object UtxPoolImpl {
     }
 
     def remove(txId: ByteStr): Unit = {
-      if (Option(transactionPortfolios.remove(txId)).isDefined) {
-        transactions.keySet().asScala.foreach { addr =>
-          transactions.put(addr, transactions.getOrDefault(addr, Set.empty) - txId)
-        }
+      Option(transactionPortfolios.remove(txId)) match {
+        case Some(txPortfolios) =>
+          txPortfolios.foreach {
+            case (addr, p) =>
+              transactions.computeIfPresent(addr, (_, prevTxs) => prevTxs - txId)
+              p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
+          }
+        case None =>
       }
     }
   }
-
 }

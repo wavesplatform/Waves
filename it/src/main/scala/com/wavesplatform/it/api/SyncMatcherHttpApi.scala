@@ -4,6 +4,8 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
+import com.wavesplatform.it.matcher.MatcherState
+import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
@@ -27,7 +29,7 @@ object SyncMatcherHttpApi extends Assertions {
   }
 
   def assertNotFoundAndMessage[R](f: => R, errorMessage: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
       Assertions.assert(statusCode == StatusCodes.NotFound.intValue && parse(responseBody).as[NotFoundErrorMessage].message.contains(errorMessage))
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail(s"Expecting not found error")
@@ -60,7 +62,7 @@ object SyncMatcherHttpApi extends Assertions {
     def marketStatus(assetPair: AssetPair): MarketStatusResponse =
       sync(async(m).marketStatus(assetPair), RequestAwaitTime)
 
-    def deleteOrderBook(assetPair: AssetPair): OrderBookResponse =
+    def deleteOrderBook(assetPair: AssetPair): MessageMatcherResponse =
       sync(async(m).deleteOrderBook(assetPair), RequestAwaitTime)
 
     def fullOrderHistory(sender: PrivateKeyAccount): Seq[OrderbookHistory] =
@@ -103,6 +105,29 @@ object SyncMatcherHttpApi extends Assertions {
                                  expectedFilledAmount: Option[Long],
                                  waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       sync(async(m).waitOrderStatusAndAmount(assetPair, orderId, expectedStatus, expectedFilledAmount), waitTime)
+
+    def waitOrderProcessed(assetPair: AssetPair, orderId: String, checkTimes: Int = 5, retryInterval: FiniteDuration = 1.second): Unit = {
+      val fixedStatus = sync {
+        async(m).waitFor[MatcherStatusResponse](s"$orderId processed")(
+          _.orderStatus(orderId, assetPair),
+          _.status != "NotFound",
+          retryInterval
+        )
+      }
+
+      // Wait until something changed or not :)
+      def loop(n: Int): Unit =
+        if (n == 0) m.log.debug(s"$orderId wasn't changed (tried $checkTimes times)")
+        else {
+          val currStatus = orderStatus(orderId, assetPair)
+          if (currStatus == fixedStatus) {
+            Thread.sleep(retryInterval.toMillis)
+            loop(n - 1)
+          } else m.log.debug(s"$orderId was changed on ${checkTimes - n} step")
+        }
+
+      loop(checkTimes)
+    }
 
     def waitOrderInBlockchain(orderId: String,
                               retryInterval: FiniteDuration = 1.second,
@@ -203,6 +228,22 @@ object SyncMatcherHttpApi extends Assertions {
 
     def ordersByAddress(sender: PrivateKeyAccount, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderbookHistory] =
       sync(async(m).ordersByAddress(sender, activeOnly), waitTime)
+
+    def getCurrentOffset: QueueEventWithMeta.Offset                   = sync(async(m).getCurrentOffset)
+    def getOldestSnapshotOffset: QueueEventWithMeta.Offset            = sync(async(m).getOldestSnapshotOffset)
+    def getAllSnapshotOffsets: Map[String, QueueEventWithMeta.Offset] = sync(async(m).getAllSnapshotOffsets)
+
+    def waitForStableOffset(confirmations: Int,
+                            maxTries: Int,
+                            interval: FiniteDuration,
+                            waitTime: Duration = RequestAwaitTime): QueueEventWithMeta.Offset =
+      sync(async(m).waitForStableOffset(confirmations, maxTries, interval), (maxTries + 1) * interval)
+
+    def matcherState(assetPairs: Seq[AssetPair],
+                     orders: IndexedSeq[Order],
+                     accounts: Seq[PrivateKeyAccount],
+                     waitTime: Duration = RequestAwaitTime * 5): MatcherState =
+      sync(async(m).matcherState(assetPairs, orders, accounts), waitTime)
   }
 
 }

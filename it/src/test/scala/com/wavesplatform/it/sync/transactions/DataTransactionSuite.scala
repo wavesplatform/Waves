@@ -136,7 +136,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("queries for nonexistent data") {
     def assertNotFound(url: String): Assertion = Try(sender.get(url)) match {
-      case Failure(UnexpectedStatusCodeException(_, statusCode, responseBody)) =>
+      case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
         statusCode shouldBe 404
         responseBody should include("no data for this key")
       case _ => Assertions.fail("Expected 404")
@@ -238,15 +238,15 @@ class DataTransactionSuite extends BaseTransactionSuite {
                                 "Duplicate keys found")
 
     val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1.toByte))))
-    assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, calcDataFee(extraValueData)), TooBig)
+    assertBadRequestAndResponse(sender.putData(firstAddress, extraValueData, 1.waves), TooBig)
     nodes.waitForHeightArise()
 
     val largeBinData = List.tabulate(5)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(MaxValueSize)(n.toByte))))
-    assertBadRequestAndResponse(sender.putData(firstAddress, largeBinData, calcDataFee(largeBinData)), TooBig)
+    assertBadRequestAndResponse(sender.putData(firstAddress, largeBinData, 1.waves), TooBig)
     nodes.waitForHeightArise()
 
     val largeStrData = List.tabulate(5)(n => StringDataEntry(extraKey, "A" * MaxValueSize))
-    assertBadRequestAndResponse(sender.putData(firstAddress, largeStrData, calcDataFee(largeStrData)), TooBig)
+    assertBadRequestAndResponse(sender.putData(firstAddress, largeStrData, 1.waves), TooBig)
     nodes.waitForHeightArise()
 
     val tooManyEntriesData = List.tabulate(MaxEntryCount + 1)(n => IntegerDataEntry("key", 88))

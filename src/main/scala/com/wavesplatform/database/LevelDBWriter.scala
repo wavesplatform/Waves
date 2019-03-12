@@ -25,6 +25,7 @@ import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{Paged, ScorexLogging}
+import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
@@ -68,8 +69,13 @@ object LevelDBWriter {
 
 }
 
-class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize: Int, val maxRollbackDepth: Int, val rememberBlocksInterval: Long)
-    extends Caches
+class LevelDBWriter(writableDB: DB,
+                    spendableBalanceChanged: Observer[(Address, Option[AssetId])],
+                    fs: FunctionalitySettings,
+                    val maxCacheSize: Int,
+                    val maxRollbackDepth: Int,
+                    val rememberBlocksInterval: Long)
+    extends Caches(spendableBalanceChanged)
     with ScorexLogging {
 
   private val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
@@ -182,9 +188,14 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     db.fromHistory(Keys.filledVolumeAndFeeHistory(orderId), Keys.filledVolumeAndFee(orderId)).getOrElse(VolumeAndFee.empty)
   }
 
-  override protected def loadApprovedFeatures(): Map[Short, Int] = readOnly(_.get(Keys.approvedFeatures))
+  override protected def loadApprovedFeatures(): Map[Short, Int] = {
+    readOnly(_.get(Keys.approvedFeatures))
+  }
 
-  override protected def loadActivatedFeatures(): Map[Short, Int] = fs.preActivatedFeatures ++ readOnly(_.get(Keys.activatedFeatures))
+  override protected def loadActivatedFeatures(): Map[Short, Int] = {
+    val stateFeatures = readOnly(_.get(Keys.activatedFeatures))
+    stateFeatures ++ fs.preActivatedFeatures
+  }
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)
@@ -353,7 +364,7 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
         (tx.builder.typeId, num)
       }
-      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq)))
+      rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
       rw.put(kk, nextSeqNr)
     }
 
@@ -369,9 +380,9 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
     val activationWindowSize = fs.activationWindowSize(height)
     if (height % activationWindowSize == 0) {
       val minVotes = fs.blocksForFeatureActivation(height)
-      val newlyApprovedFeatures = featureVotes(height).collect {
-        case (featureId, voteCount) if voteCount + (if (block.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height
-      }
+      val newlyApprovedFeatures = featureVotes(height)
+        .filterNot { case (featureId, _) => fs.preActivatedFeatures.contains(featureId) }
+        .collect { case (featureId, voteCount) if voteCount + (if (block.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
 
       if (newlyApprovedFeatures.nonEmpty) {
         approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
@@ -587,61 +598,47 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
     readOnly { db =>
-      def takeTypes(s: Stream[(Height, Type, TxNum)], maybeTypes: Set[Type]) = {
-        if (maybeTypes.nonEmpty) {
-          s.filter { case (_, tp, _) => maybeTypes.contains(tp) }
-        } else s
+      def takeTypes(txNums: Stream[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
+        if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
+
+      def takeAfter(txNums: Stream[(Height, Type, TxNum)], maybeAfter: Option[(Height, TxNum)]): Stream[(Height, Type, TxNum)] = maybeAfter match {
+        case None => txNums
+        case Some((afterHeight, filterHeight)) =>
+          txNums
+            .dropWhile { case (streamHeight, _, _) => streamHeight > afterHeight }
+            .dropWhile { case (streamHeight, _, streamNum) => streamNum >= filterHeight && streamHeight >= afterHeight }
       }
 
-      def takeAfter(s: Stream[(Height, Type, TxNum)], maybeAfter: Option[(Height, TxNum)]): Stream[(Height, Type, TxNum)] = {
-        maybeAfter match {
-          case None => s
-          case Some((h, num)) =>
-            s.dropWhile {
-                case (s_h, _, s_n) => s_h != h ^ s_n != num
-              }
-              .drop(1)
+      def readTransactions(): Seq[(Int, Transaction)] = {
+        val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
-        }
-      }
-
-      val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
-
-      lazy val transactions: Seq[(Int, Transaction)] =
         db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { id =>
           val addressId = AddressId(id)
 
-          val hnSeq =
-            (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toStream
-              .flatMap { seqNr =>
-                val maybeHNSeq = db.get(Keys.addressTransactionHN(addressId, seqNr))
+          val heightNumStream = (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toStream
+            .flatMap(seqNr =>
+              db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
+                case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
+                case None                   => Nil
+            })
 
-                maybeHNSeq match {
-                  case Some((h, seq)) =>
-                    seq.map { case (tp, num) => (h, tp, num) }.toStream
-                  case None => Stream.empty
-                }
-              }
-
-          takeAfter(takeTypes(hnSeq, types), maybeAfter)
-            .flatMap {
-              case (h, _, num) =>
-                db.get(Keys.transactionAt(h, num))
-                  .map((h, _))
-            }
+          takeAfter(takeTypes(heightNumStream, types), maybeAfter)
+            .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, _)) }
             .take(count)
-            .toList
+            .toVector
         }
+      }
 
       fromId match {
-        case None => Right(transactions)
+        case None =>
+          Right(readTransactions())
+
         case Some(id) =>
           db.get(Keys.transactionHNById(TransactionId(id))) match {
             case None => Left(s"Transaction $id does not exist")
-            case _    => Right(transactions)
+            case _    => Right(readTransactions())
           }
       }
-
     }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
@@ -957,15 +954,24 @@ class LevelDBWriter(writableDB: DB, fs: FunctionalitySettings, val maxCacheSize:
       )
   }
 
-  override def wavesDistribution(height: Int): Map[Address, Long] = readOnly { db =>
-    (for {
-      seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
-      addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-      history = db.get(Keys.wavesBalanceHistory(addressId))
-      actualHeight <- history.partition(_ > height)._2.headOption
-      balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
-      if balance > 0
-    } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = readOnly { db =>
+    val canGetAfterHeight = db.get(Keys.safeRollbackHeight)
+
+    def createMap() =
+      (for {
+        seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
+        addressId <- db.get(Keys.addressesForWaves(seqNr)).par
+        history = db.get(Keys.wavesBalanceHistory(addressId))
+        actualHeight <- history.partition(_ > height)._2.headOption
+        balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
+        if balance > 0
+      } yield db.get(Keys.idToAddress(addressId)) -> balance).toMap.seq
+
+    Either.cond(
+      height > canGetAfterHeight,
+      createMap(),
+      GenericError(s"Cannot get waves distribution at height less than ${canGetAfterHeight + 1}")
+    )
   }
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>

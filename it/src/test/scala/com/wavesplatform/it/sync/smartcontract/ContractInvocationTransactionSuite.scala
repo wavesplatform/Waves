@@ -66,10 +66,12 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
   test("set contract to contract account") {
     val scriptText =
       """
+        |{-# STDLIB_VERSION 3 #-}
+        |{-# CONTENT_TYPE CONTRACT #-}
         |
         | @Callable(inv)
-        | func foo(a:ByteStr) = {
-        |  WriteSet(List(DataEntry("a", a), DataEntry("sender", inv.caller.bytes)))
+        | func foo(a:ByteVector) = {
+        |  WriteSet([DataEntry("a", a), DataEntry("sender", inv.caller.bytes)])
         | }
         | 
         | @Verifier(t)
@@ -80,7 +82,7 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
         |
         """.stripMargin
 
-    val script = ScriptCompiler.contract(scriptText).explicitGet()
+    val script = ScriptCompiler.compile(scriptText).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(contract, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()

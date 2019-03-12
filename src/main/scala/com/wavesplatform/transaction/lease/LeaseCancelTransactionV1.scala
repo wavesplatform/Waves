@@ -1,14 +1,16 @@
 package com.wavesplatform.transaction.lease
 
+import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.crypto
-import monix.eval.Coeval
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto
 import com.wavesplatform.transaction._
-import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.description._
+import monix.eval.Coeval
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 case class LeaseCancelTransactionV1 private (sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr)
     extends LeaseCancelTransaction
@@ -32,13 +34,12 @@ object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransact
   override val typeId: Byte = LeaseCancelTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    Try {
-      val (sender, fee, timestamp, leaseId, end) = LeaseCancelTransaction.parseBase(bytes, 0)
-      val signature                              = ByteStr(bytes.slice(end, KeyLength + 16 + crypto.DigestSize + SignatureLength))
-      LeaseCancelTransactionV1
-        .create(sender, leaseId, fee, timestamp, signature)
-        .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
+      LeaseCancelTransaction
+        .validateLeaseCancelParams(tx)
+        .map(_ => tx)
+        .foldToTry
+    }
   }
 
   def create(sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] = {
@@ -57,5 +58,24 @@ object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransact
 
   def selfSigned(sender: PrivateKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, leaseId, fee, timestamp, sender)
+  }
+
+  val byteTailDescription: ByteEntity[LeaseCancelTransactionV1] = {
+    (
+      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      LongBytes(tailIndex(2), "Fee"),
+      LongBytes(tailIndex(3), "Timestamp"),
+      ByteStrDefinedLength(tailIndex(4), "Lease ID", crypto.DigestSize),
+      SignatureBytes(tailIndex(5), "Signature")
+    ) mapN {
+      case (sender, fee, timestamp, leaseId, signature) =>
+        LeaseCancelTransactionV1(
+          sender = sender,
+          leaseId = leaseId,
+          fee = fee,
+          timestamp = timestamp,
+          signature = signature
+        )
+    }
   }
 }

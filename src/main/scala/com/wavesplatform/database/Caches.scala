@@ -3,7 +3,7 @@ package com.wavesplatform.database
 import java.util
 
 import cats.syntax.monoid._
-import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -11,12 +11,14 @@ import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.{AssetId, Transaction}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
+import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import scala.reflect.ClassTag
 
-trait Caches extends Blockchain with ScorexLogging {
+abstract class Caches(spendableBalanceChanged: Observer[(Address, Option[AssetId])]) extends Blockchain with ScorexLogging {
   import Caches._
 
   protected def maxCacheSize: Int
@@ -49,7 +51,7 @@ trait Caches extends Blockchain with ScorexLogging {
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
     val c = current
     if (height == c._1) {
-      c._3.map(b => (b, b.bytes().size))
+      c._3.map(b => (b, b.bytes().length))
     } else {
       loadBlockHeaderAndSize(height)
     }
@@ -59,7 +61,7 @@ trait Caches extends Blockchain with ScorexLogging {
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
     val c = current
     if (c._3.exists(_.uniqueId == blockId)) {
-      c._3.map(b => (b, b.bytes().size))
+      c._3.map(b => (b, b.bytes().length))
     } else {
       loadBlockHeaderAndSize(blockId)
     }
@@ -135,9 +137,10 @@ trait Caches extends Blockchain with ScorexLogging {
     portfolioCache.get(a)
   }
 
-  private val balancesCache: LoadingCache[(Address, Option[AssetId]), java.lang.Long] = cache(maxCacheSize * 16, loadBalance)
-  protected def discardBalance(key: (Address, Option[AssetId]))                       = balancesCache.invalidate(key)
-  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long         = balancesCache.get(address -> mayBeAssetId)
+  private val balancesCache: LoadingCache[(Address, Option[AssetId]), java.lang.Long] =
+    observedCache(maxCacheSize * 16, spendableBalanceChanged, loadBalance)
+  protected def discardBalance(key: (Address, Option[AssetId]))               = balancesCache.invalidate(key)
+  override def balance(address: Address, mayBeAssetId: Option[AssetId]): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Option[AssetId])): Long
 
   private val assetDescriptionCache: LoadingCache[AssetId, Option[AssetDescription]] = cache(maxCacheSize, loadAssetDescription)
@@ -264,23 +267,30 @@ trait Caches extends Blockchain with ScorexLogging {
       (orderId, fillInfo) <- diff.orderFills
     } yield orderId -> volumeAndFeeCache.get(orderId).combine(fillInfo)
 
+    val transactionList = diff.transactions.toList
+
+    transactionList.foreach {
+      case (_, (_, tx, _)) =>
+        transactionIds.put(tx.id(), newHeight)
+    }
+
     val addressTransactions: Map[AddressId, List[TransactionId]] =
-      diff.transactions.toList
+      transactionList
         .flatMap {
           case (_, (h, tx, addrs)) =>
+            transactionIds.put(tx.id(), newHeight) // be careful here!
+
             addrs.map { addr =>
               val addrId = AddressId(addressId(addr))
-              val htx    = (h, tx)
-              addrId -> htx
+              addrId -> TransactionId(tx.id())
             }
         }
         .groupBy(_._1)
-        .mapValues { txs =>
-          val sorted = txs.sortBy { case (_, (h, tx)) => (-h, -tx.timestamp) }
-          sorted.map { case (_, (_, tx)) => TransactionId(tx.id()) }
-        }
+        .mapValues(_.map {
+          case (_, txId) => txId
+        })
 
-    current = (newHeight, (current._2 + block.blockScore()), Some(block))
+    current = (newHeight, current._2 + block.blockScore(), Some(block))
 
     doAppend(
       block,
@@ -341,6 +351,9 @@ object Caches {
       .newBuilder()
       .maximumSize(maximumSize)
       .build(new CacheLoader[K, V] {
-        override def load(key: K) = loader(key)
+        override def load(key: K): V = loader(key)
       })
+
+  def observedCache[K <: AnyRef, V <: AnyRef](maximumSize: Int, changed: Observer[K], loader: K => V)(implicit ct: ClassTag[K]): LoadingCache[K, V] =
+    new ObservedLoadingCache(cache(maximumSize, loader), changed)
 }

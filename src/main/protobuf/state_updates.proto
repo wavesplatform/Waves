@@ -1,8 +1,9 @@
+// State update notifications
 syntax = "proto3";
+option java_package = "com.wavesplatform.protobuf.state_updates";
 
-package serialization;
-
-option java_package = "com.wavesplatform.serialization.protobuf";
+import "block.proto";
+import "transactions.proto";
 
 message Update {
     bytes id = 1;
@@ -15,22 +16,21 @@ message Update {
     }
 
     message MicroBlockUpdate {
-        MicroBlock block = 1;
+        SignedMicroBlock micro_block = 1;
         repeated StateUpdate transaction_state_update = 2;
     }
 
     oneof update {
         BlockUpdate block = 3;
-        MicroBlockUpdate microblock = 4;
-        Rollback rollback = 5;
+        MicroBlockUpdate micro_block = 4;
+        bytes rollback_to = 5;
     }
 }
 
 message StateUpdate {
     message BalanceUpdate {
         bytes address = 1;
-        bytes asset_id = 2;
-        int64 amount = 3;
+        Amount amount = 2;
     }
     repeated BalanceUpdate balances = 1;
 
@@ -40,29 +40,4 @@ message StateUpdate {
         int64 out = 3;
     }
     repeated LeasingUpdate leases = 2;
-}
-
-message Transaction {
-    bytes id = 1;
-    int32 type = 2;
-}
-
-message Block {
-    bytes signature = 1;
-    int32 height = 2;
-    bytes generator = 3;
-
-    repeated Transaction transactions = 4;
-}
-
-message MicroBlock {
-    bytes signature = 1;
-    int32 height = 2;
-    bytes generator = 3;
-
-    repeated Transaction transactions = 4;
-}
-
-message Rollback {
-    bytes to = 1;
 }

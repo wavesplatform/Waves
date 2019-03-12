@@ -5,14 +5,6 @@ import com.wavesplatform.common.utils.{Base58, Base64}
 import scala.util.Try
 
 case class ByteStr(arr: Array[Byte]) {
-
-  override def equals(a: Any): Boolean = a match {
-    case other: ByteStr => arr.sameElements(other.arr)
-    case _              => false
-  }
-
-  override def hashCode(): Int = java.util.Arrays.hashCode(arr)
-
   lazy val base58: String = Base58.encode(arr)
 
   lazy val base64: String = "base64:" + Base64.encode(arr)
@@ -52,23 +44,27 @@ case class ByteStr(arr: Array[Byte]) {
 
   def dropRight(n: Long): ByteStr = take(arr.length.toLong - n.max(0))
 
+  override def equals(a: Any): Boolean = a match {
+    case other: ByteStr => arr.sameElements(other.arr)
+    case _              => false
+  }
+
+  override def hashCode(): Int = java.util.Arrays.hashCode(arr)
 }
 
 object ByteStr {
-
   val empty: ByteStr = ByteStr(Array.emptyByteArray)
 
+  implicit def fromByteArray(arr: Array[Byte]): ByteStr = {
+    new ByteStr(arr)
+  }
+
+  implicit def toByteArray(bs: ByteStr): Array[Byte] = {
+    bs.arr
+  }
+
   def fromBytes(bytes: Byte*): ByteStr = {
-
-    val buf = new Array[Byte](bytes.size)
-    var i   = 0
-
-    bytes.foreach { b =>
-      buf(i) = b
-      i += 1
-    }
-
-    ByteStr(buf)
+    ByteStr(bytes.toArray)
   }
 
   def fromLong(l: Long): ByteStr = {
@@ -89,5 +85,25 @@ object ByteStr {
   def decodeBase58(s: String): Try[ByteStr] = Base58.decode(s).map(ByteStr(_))
 
   def decodeBase64(s: String): Try[ByteStr] = Base64.decode(s).map(ByteStr(_))
+
+  implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => compare(x.arr, y.arr)
+
+  // scorex.utils.ByteArray.compare
+  private def compare(buffer1: Array[Byte], buffer2: Array[Byte]): Int =
+    if (buffer1 sameElements buffer2) {
+      0
+    } else {
+      val end1: Int = if (buffer1.length < buffer2.length) buffer1.length else buffer2.length
+      var i: Int    = 0
+      while (i < end1) {
+        val a: Int = buffer1(i) & 0xff
+        val b: Int = buffer2(i) & 0xff
+        if (a != b) {
+          return a - b
+        }
+        i = i + 1
+      }
+      buffer1.length - buffer2.length
+    }
 
 }

@@ -1,9 +1,9 @@
 package com.wavesplatform.utx
 
-import com.wavesplatform.mining.MultiDimensionalMiningConstraint
-import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.mining.MultiDimensionalMiningConstraint
+import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.transaction._
 
 trait UtxPool extends AutoCloseable {
@@ -13,9 +13,9 @@ trait UtxPool extends AutoCloseable {
 
   def removeAll(txs: Traversable[Transaction]): Unit
 
-  def accountPortfolio(addr: Address): Portfolio
+  def spendableBalance(addr: Address, assetId: Option[AssetId]): Long
 
-  def portfolio(addr: Address): Portfolio
+  def pessimisticPortfolio(addr: Address): Portfolio
 
   def all: Seq[Transaction]
 
@@ -25,14 +25,4 @@ trait UtxPool extends AutoCloseable {
 
   def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint)
 
-  def batched[Result](f: UtxBatchOps => Result): Result = f(createBatchOps)
-
-  private[utx] def createBatchOps: UtxBatchOps = new UtxBatchOps {
-    override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = self.putIfNew(tx)
-  }
-
-}
-
-trait UtxBatchOps {
-  def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)]
 }

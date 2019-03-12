@@ -7,15 +7,14 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.StdLibVersion._
-import com.wavesplatform.lang.v1.compiler.CompilerContext
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
@@ -124,11 +123,11 @@ package object utils extends ScorexLogging {
   def dummyEvalContext(version: StdLibVersion): EvaluationContext = lazyContexts(version)().evaluationContext
 
   private val lazyFunctionCosts: Map[StdLibVersion, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
-    lazyContexts.mapValues(_.map(ctx => estimate(ctx.evaluationContext)))
+    lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1, ctx.evaluationContext))))
 
   def functionCosts(version: StdLibVersion): Map[FunctionHeader, Coeval[Long]] = lazyFunctionCosts(version)()
 
-  def estimate(ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
+  def estimate(version: StdLibVersion, ctx: EvaluationContext): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
       case (typeName, CaseType(_, fields)) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
     }(collection.breakOut)
@@ -136,11 +135,10 @@ package object utils extends ScorexLogging {
     ctx.functions.values.foreach { func =>
       val cost = func match {
         case f: UserFunction =>
-          import f.signature.args
-          Coeval.evalOnce(ScriptEstimator(ctx.letDefs.keySet ++ args.map(_._1), costs, f.ev).explicitGet() + args.size * 5)
-        case f: NativeFunction => Coeval.now(f.cost)
+          f.costByLibVersion(version)
+        case f: NativeFunction => f.cost
       }
-      costs += func.header -> cost
+      costs += func.header -> Coeval.now(cost)
     }
 
     costs.toMap
@@ -149,6 +147,8 @@ package object utils extends ScorexLogging {
   def compilerContext(version: StdLibVersion, isAssetScript: Boolean): CompilerContext =
     if (isAssetScript) lazyAssetContexts(version)().compilerContext
     else lazyContexts(version)().compilerContext
+
+  val defaultDecompilerContext: DecompilerContext = lazyContexts(V3)().decompilerContext
 
   def varNames(version: StdLibVersion): Set[String] = compilerContext(version, isAssetScript = false).varDefs.keySet
 
@@ -179,6 +179,8 @@ package object utils extends ScorexLogging {
     val obj           = runtimeMirror.reflectModule(module)
     obj.instance.asInstanceOf[T]
   }
+
+  @tailrec def doWhile[T](z: T)(cond: T => Boolean)(f: T => T): T = if (cond(z)) doWhile(f(z))(cond)(f) else z
 
   implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
 

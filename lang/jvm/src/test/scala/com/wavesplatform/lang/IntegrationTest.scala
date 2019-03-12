@@ -222,7 +222,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |let a = if (true) then 1 else ""
         |
         |match a {
-        | case x: Int => x 
+        | case x: Int => x
         | case y: String => 2
         |}""".stripMargin) shouldBe evaluated(1)
   }
@@ -319,7 +319,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("context won't change after execution of a user function") {
-    val doubleFst = UserFunction("ID", LONG, "D", ("x", LONG, "X")) {
+    val doubleFst = UserFunction("ID", 0, LONG, "D", ("x", LONG, "X")) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
     }
 
@@ -359,12 +359,28 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     ev[CONST_LONG](context, expr) shouldBe evaluated(8)
   }
 
-  property("list constructor primitive") {
+  property("listN constructor primitive") {
     val src =
       """
-        |List(1,2)
+        |cons(1, cons(2, cons(3, cons(4, cons(5, nil)))))
       """.stripMargin
-    eval[EVALUATED](src) shouldBe evaluated(List(1, 2))
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
+  }
+
+  property("listN constructor binary op") {
+    val src =
+      """
+        |1::2::3::4::5::nil
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
+  }
+
+  property("list syntax sugar") {
+    val src =
+      """
+        |[1,2,3, 4, 5]
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe evaluated(List(1, 2, 3, 4, 5))
   }
 
   property("list constructor for different data entries") {
@@ -373,7 +389,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |let x = DataEntry("foo",1)
         |let y = DataEntry("bar","2")
         |let z = DataEntry("baz","2")
-        |List(x,y,z)
+        |[x,y,z]
       """.stripMargin
     eval[EVALUATED](src) shouldBe Right(
       ARR(Vector(
@@ -383,4 +399,147 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       )))
   }
 
+  property("allow 'throw' in '==' arguments") {
+    val src =
+      """true == throw("test passed")"""
+    eval[EVALUATED](src) shouldBe Left("test passed")
+  }
+
+  property("ban to compare different types") {
+    val src =
+      """true == "test passed" """
+    eval[EVALUATED](src) should produce("Compilation failed: Can't match inferred types")
+  }
+
+  property("ensure user function: success") {
+    val src =
+      """
+        |let x = true
+        |ensure(x, "test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(TRUE)
+  }
+
+  property("ensure user function: fail") {
+    val src =
+      """
+        |let x = false
+        |ensure(x, "test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Left("test fail")
+  }
+
+  property("postfix syntax (one argument)") {
+    val src =
+      """
+        |let x = true
+        |x.ensure("test fail")
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(TRUE)
+  }
+
+  property("postfix syntax (no arguments)") {
+    val src =
+      """unit.isDefined()"""
+    eval[EVALUATED](src) shouldBe Right(FALSE)
+  }
+
+  property("postfix syntax (many argument)") {
+    val src =
+      """ 5.fraction(7,2) """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(17L))
+  }
+
+  property("postfix syntax (users defined function)") {
+    val src =
+      """
+        |func dub(s:String) = { s+s }
+        |"qwe".dub()
+      """.stripMargin
+    eval[EVALUATED](src) shouldBe Right(CONST_STRING("qweqwe"))
+  }
+
+  property("extract UTF8 string") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toUtf8String() """
+    eval[EVALUATED](src) shouldBe Right(CONST_STRING("abcdefghi"))
+  }
+
+  property("extract Long") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0x6162636465666768l))
+  }
+
+  property("extract Long by offset") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt(1) """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(0x6263646566676869l))
+  }
+
+  property("extract Long by offset (patrial)") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt(2) """
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+  }
+
+  property("extract Long by offset (out of bounds)") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt(10) """
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+  }
+
+  property("extract Long by offset (negative)") {
+    val src =
+      """ base58'2EtvziXsJaBRS'.toInt(-2) """
+    eval[EVALUATED](src) should produce("IndexOutOfBounds")
+  }
+
+  property("indexOf") {
+    val src =
+      """ "qweqwe".indexOf("we") """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(1L))
+  }
+
+  property("indexOf with start offset") {
+    val src =
+      """ "qweqwe".indexOf("we", 2) """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(4L))
+  }
+
+  property("indexOf (not present)") {
+    val src =
+      """ "qweqwe".indexOf("ww") """
+    eval[EVALUATED](src) shouldBe Right(unit)
+  }
+
+  property("split") {
+    val src =
+      """ "q:we:.;q;we:x;q.we".split(":.;") """
+    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(CONST_STRING("q:we"), CONST_STRING("q;we:x;q.we"))))
+  }
+
+  property("parseInt") {
+    val src =
+      """ "42".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
+  }
+
+  property("parseIntValue") {
+    val src =
+      """ "42".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(CONST_LONG(42L))
+  }
+
+  property("parseInt fail") {
+    val src =
+      """ "x42".parseInt() """
+    eval[EVALUATED](src) shouldBe Right(unit)
+  }
+
+  property("parseIntValue fail") {
+    val src =
+      """ "x42".parseIntValue() """
+    eval[EVALUATED](src) shouldBe 'left
+  }
 }

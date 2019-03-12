@@ -12,11 +12,13 @@ import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{AssetId, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
-import monix.execution.Scheduler
+import monix.execution.{Scheduler, UncaughtExceptionReporter}
+import monix.reactive.Observer
 import org.slf4j.bridge.SLF4JBridgeHandler
 
 import scala.concurrent.Await
@@ -48,15 +50,15 @@ object Importer extends ScorexLogging {
 
     implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
     val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction)                               = ???
-      override def removeAll(txs: Traversable[Transaction]): Unit          = {}
-      override def accountPortfolio(addr: Address)                         = ???
-      override def portfolio(addr: Address)                                = ???
-      override def all                                                     = ???
-      override def size                                                    = ???
-      override def transactionById(transactionId: ByteStr)                 = ???
-      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint) = ???
-      override def close(): Unit                                           = {}
+      override def putIfNew(tx: Transaction)                                       = ???
+      override def removeAll(txs: Traversable[Transaction]): Unit                  = {}
+      override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long = ???
+      override def pessimisticPortfolio(addr: Address): Portfolio                  = ???
+      override def all                                                             = ???
+      override def size                                                            = ???
+      override def transactionById(transactionId: ByteStr)                         = ???
+      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint)         = ???
+      override def close(): Unit                                                   = {}
     }
 
     val time = new NTP(settings.ntpServer)
@@ -67,7 +69,7 @@ object Importer extends ScorexLogging {
         createInputStream(filename) match {
           case Success(inputStream) =>
             val db                = openDB(settings.dataDirectory)
-            val blockchainUpdater = StorageFactory(settings, db, time)
+            val blockchainUpdater = StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr))
             val pos               = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
             val extAppender       = BlockAppender(blockchainUpdater, time, utxPoolStub, pos, settings, scheduler, verifyTransactions) _
             checkGenesis(settings, blockchainUpdater)

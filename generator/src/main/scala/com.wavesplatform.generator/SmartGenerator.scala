@@ -20,8 +20,6 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[Privat
   private def r                                   = ThreadLocalRandom.current
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
 
-  def ts = System.currentTimeMillis()
-
   override def next(): Iterator[Transaction] = {
     generate(settings).toIterator
   }
@@ -38,13 +36,16 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[Privat
         SetScriptTransaction.selfSigned(i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
       })
 
+    val now = System.currentTimeMillis()
     val txs = Range(0, settings.transfers).map { i =>
       TransferTransactionV2
-        .selfSigned(None, bank, bank, 1.waves - 2 * fee, System.currentTimeMillis(), None, fee, Array.emptyByteArray)
+        .selfSigned(None, bank, bank, 1.waves - 2 * fee, now + i, None, fee, Array.emptyByteArray)
         .explicitGet()
     }
 
     val extxs = Range(0, settings.exchange).map { i =>
+      val ts = now + i
+
       val matcher         = randomFrom(accounts).get
       val seller          = randomFrom(accounts).get
       val buyer           = randomFrom(accounts).get

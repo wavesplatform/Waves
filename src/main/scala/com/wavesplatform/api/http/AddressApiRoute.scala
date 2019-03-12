@@ -13,12 +13,14 @@ import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.TransactionFactory
+import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
+
 import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
@@ -348,13 +350,13 @@ case class AddressApiRoute(settings: RestAPISettings,
             Balance(
               acc.address,
               0,
-              blockchain.portfolio(acc).balance
+              blockchain.balance(acc)
             )))
       .getOrElse(InvalidAddress)
   }
 
   private def balancesDetailsJson(account: Address): BalanceDetails = {
-    val portfolio = blockchain.portfolio(account)
+    val portfolio = blockchain.wavesPortfolio(account)
     BalanceDetails(
       account.address,
       portfolio.balance,
@@ -365,13 +367,13 @@ case class AddressApiRoute(settings: RestAPISettings,
   }
 
   private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
-    val script = blockchain
+    val script: Option[Script] = blockchain
       .accountScript(account)
 
     AddressScriptInfo(
       address = account.address,
       script = script.map(_.bytes().base64),
-      scriptText = script.map(_.text),
+      scriptText = script.map(_.expr.toString), // [WAIT] script.map(Script.decompile),
       complexity = script.map(_.complexity).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else CommonValidation.ScriptExtraFee
     )

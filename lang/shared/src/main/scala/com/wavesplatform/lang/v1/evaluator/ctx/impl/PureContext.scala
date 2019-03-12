@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import cats.data.EitherT
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -13,10 +13,17 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import scala.collection.mutable.ArrayBuffer
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.ByteBuffer
 
-import scala.util.Try
+import scala.util.{Try, Success}
 
 object PureContext {
+
+  import StdLibVersion._
+
+  implicit def intToLong(num: Int): Long = num.toLong
 
   private lazy val defaultThrowMessage = "Explicit script termination"
   lazy val MaxStringResult             = Short.MaxValue
@@ -59,7 +66,12 @@ object PureContext {
     }
 
   lazy val ne: BaseFunction =
-    UserFunction(NE_OP.func, BOOLEAN, "Inequality", ("@a", TYPEPARAM('T'), "value"), ("@b", TYPEPARAM('T'), "value")) {
+    UserFunction(NE_OP.func,
+                 Map[StdLibVersion, Long](V1 -> 26, V2 -> 26, V3 -> 1),
+                 BOOLEAN,
+                 "Inequality",
+                 ("@a", TYPEPARAM('T'), "value"),
+                 ("@b", TYPEPARAM('T'), "value")) {
       FUNCTION_CALL(uNot, List(FUNCTION_CALL(eq, List(REF("@a"), REF("@b")))))
     }
 
@@ -68,12 +80,13 @@ object PureContext {
     case _                              => Left(defaultThrowMessage)
   }
 
-  lazy val throwNoMessage: BaseFunction = UserFunction("throw", NOTHING, "Fail script") {
+  lazy val throwNoMessage: BaseFunction = UserFunction("throw", Map[StdLibVersion, Long](V1 -> 2, V2 -> 2, V3 -> 1), NOTHING, "Fail script") {
     FUNCTION_CALL(throwWithMessage, List(CONST_STRING(defaultThrowMessage)))
   }
 
   lazy val extract: BaseFunction =
-    UserFunction("extract",
+    UserFunction.deprecated("extract",
+                 13,
                  TYPEPARAM('T'),
                  "Extract value from option or fail",
                  ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value")) {
@@ -85,7 +98,13 @@ object PureContext {
     }
 
   lazy val isDefined: BaseFunction =
-    UserFunction("isDefined", BOOLEAN, "Check the value is defined", ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Option value")) {
+    UserFunction(
+      "isDefined",
+      Map[StdLibVersion, Long](V1 -> 35, V2 -> 35, V3 -> 1),
+      BOOLEAN,
+      "Check the value is defined",
+      ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Option value")
+    ) {
       FUNCTION_CALL(ne, List(REF("@a"), REF("unit")))
     }
 
@@ -123,7 +142,7 @@ object PureContext {
     case _                                                     => Right(FALSE)
   }
 
-  lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes str", ("byteStr", BYTESTR, "vector")) {
+  lazy val sizeBytes: BaseFunction = NativeFunction("size", 1, SIZE_BYTES, LONG, "Size of bytes str", ("byteVector", BYTESTR, "vector")) {
     case CONST_BYTESTR(bv) :: Nil => Right(CONST_LONG(bv.arr.length))
     case xs                       => notImplemented("size(byte[])", xs)
   }
@@ -176,7 +195,7 @@ object PureContext {
     }
 
   lazy val dropRightBytes: BaseFunction =
-    UserFunction("dropRight", "dropRightBytes", BYTESTR, "Cut vectors tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "cuting size")) {
+    UserFunction("dropRight", "dropRightBytes", 19, BYTESTR, "Cut vectors tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "cuting size")) {
       FUNCTION_CALL(
         takeBytes,
         List(
@@ -193,7 +212,7 @@ object PureContext {
     }
 
   lazy val takeRightBytes: BaseFunction =
-    UserFunction("takeRight", "takeRightBytes", BYTESTR, "Take vector tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "taking size")) {
+    UserFunction("takeRight", "takeRightBytes", 19, BYTESTR, "Take vector tail", ("@xs", BYTESTR, "vector"), ("@number", LONG, "taking size")) {
       FUNCTION_CALL(
         dropBytes,
         List(
@@ -217,28 +236,19 @@ object PureContext {
       case xs                                            => notImplemented("take(xs: String, number: Long)", xs)
     }
 
-  lazy val listConstructor1 =
-    NativeFunction("List", 1, CREATE_LIST1, PARAMETERIZEDLIST(TYPEPARAM('T')), "Construct a new List[T]", ("arg1", TYPEPARAM('T'), "arg1"))(xs =>
-      Right(ARR(xs.toIndexedSeq)))
-
-  lazy val listConstructor2 = NativeFunction("List",
-                                             1,
-                                             CREATE_LIST2,
-                                             PARAMETERIZEDLIST(TYPEPARAM('T')),
-                                             "Construct a new List[T]",
-                                             ("arg1", TYPEPARAM('T'), "arg1"),
-                                             ("arg2", TYPEPARAM('T'), "arg2"))(xs => Right(ARR(xs.toIndexedSeq)))
-
-  lazy val listConstructor3 = NativeFunction(
-    "List",
-    1,
-    CREATE_LIST3,
-    PARAMETERIZEDLIST(TYPEPARAM('T')),
-    "Construct a new List[T]",
-    ("arg1", TYPEPARAM('T'), "arg1"),
-    ("arg2", TYPEPARAM('T'), "arg2"),
-    ("arg3", TYPEPARAM('T'), "arg3")
-  )(xs => Right(ARR(xs.toIndexedSeq)))
+  lazy val listConstructor: NativeFunction =
+    NativeFunction(
+      "cons",
+      2,
+      CREATE_LIST,
+      PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
+      "Construct a new List[T]",
+      ("head", TYPEPARAM('A'), "head"),
+      ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')), "tail")
+    ) {
+      case h :: ARR(t) :: Nil => Right(ARR(h +: t))
+      case xs                 => notImplemented("cons(head: T, tail: LIST[T]", xs)
+    }
 
   lazy val dropString: BaseFunction =
     NativeFunction("drop", 1, DROP_STRING, STRING, "Remmove sring prefix", ("xs", STRING, "string"), ("number", LONG, "prefix size")) {
@@ -247,7 +257,7 @@ object PureContext {
     }
 
   lazy val takeRightString: BaseFunction =
-    UserFunction("takeRight", STRING, "Take string suffix", ("@xs", STRING, "String"), ("@number", LONG, "suffix size in characters")) {
+    UserFunction("takeRight", 19, STRING, "Take string suffix", ("@xs", STRING, "String"), ("@number", LONG, "suffix size in characters")) {
       FUNCTION_CALL(
         dropString,
         List(
@@ -264,7 +274,7 @@ object PureContext {
     }
 
   lazy val dropRightString: BaseFunction =
-    UserFunction("dropRight", STRING, "Remove string suffix", ("@xs", STRING, "string"), ("@number", LONG, "suffix size in characters")) {
+    UserFunction("dropRight", 19, STRING, "Remove string suffix", ("@xs", STRING, "string"), ("@number", LONG, "suffix size in characters")) {
       FUNCTION_CALL(
         takeString,
         List(
@@ -278,6 +288,87 @@ object PureContext {
           )
         )
       )
+    }
+
+  val UTF8Decoder = UTF_8.newDecoder
+
+  lazy val toUtf8String: BaseFunction =
+    NativeFunction("toUtf8String", 20, UTF8STRING, STRING, "Convert UTF8 bytes to string", ("u", BYTESTR, "utf8")) {
+      case CONST_BYTESTR(u) :: Nil => Try(CONST_STRING(UTF8Decoder.decode(ByteBuffer.wrap(u.arr)).toString)).toEither.left.map(_.toString)
+      case xs                      => notImplemented("toUtf8String(u: byte[])", xs)
+    }
+
+  lazy val toLong: BaseFunction =
+    NativeFunction("toInt", 10, BININT, LONG, "Deserialize big endian 8-bytes value", ("bin", BYTESTR, "8-bytes BE binaries")) {
+      case CONST_BYTESTR(u) :: Nil => Try(CONST_LONG(ByteBuffer.wrap(u.arr).getLong())).toEither.left.map(_.toString)
+      case xs                      => notImplemented("toInt(u: byte[])", xs)
+    }
+
+  lazy val toLongOffset: BaseFunction =
+    NativeFunction("toInt", 10, BININT_OFF, LONG, "Deserialize big endian 8-bytes value", ("bin", BYTESTR, "8-bytes BE binaries"), ("offet", LONG, "bytes offset")) {
+      case CONST_BYTESTR(ByteStr(u)) :: CONST_LONG(o) :: Nil => if( o >= 0 && o <= u.size - 8) {
+          Try(CONST_LONG(ByteBuffer.wrap(u).getLong(o.toInt))).toEither.left.map(_.toString)
+      } else {
+        Left("IndexOutOfBounds")
+      }
+      case xs                      => notImplemented("toInt(u: byte[], off: int)", xs)
+    }
+
+  lazy val indexOf: BaseFunction =
+    NativeFunction("indexOf", 20, INDEXOF, optionLong, "index of substring", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching")) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: Nil => Right({
+        val i = m.indexOf(sub)
+         if( i != -1 ) {
+           CONST_LONG(i.toLong)
+         } else {
+           unit
+         }
+      })
+      case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
+    }
+
+  lazy val indexOfN: BaseFunction =
+    NativeFunction("indexOf", 20, INDEXOFN, optionLong, "index of substring after offset", ("str", STRING, "String for analize"), ("substr", STRING, "String for searching"), ("offset", LONG, "offset")) {
+      case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil => Right( if(off >= 0 && off <= m.length) {
+         val i = m.indexOf(sub, off.toInt)
+         if( i != -1 ) {
+           CONST_LONG(i.toLong)
+         } else {
+           unit
+         }
+      } else {
+        unit
+      } )
+      case xs                      => notImplemented("indexOf(STRING, STRING)", xs)
+    }
+
+  def split(m: String, sep: String, buffer: ArrayBuffer[CONST_STRING] =  ArrayBuffer[CONST_STRING](), start: Int = 0): IndexedSeq[CONST_STRING] = {
+    m.indexOf(sep, start) match {
+      case -1 =>
+        buffer += CONST_STRING(m.substring(start))
+        buffer.result
+      case n =>
+        buffer += CONST_STRING(m.substring(0, n))
+        split(m, sep, buffer, n + sep.length)
+    }
+  }
+
+  lazy val splitStr: BaseFunction =
+    NativeFunction("split", 100, SPLIT, listString, "split string by separator", ("str", STRING, "String for splitting"), ("separator", STRING, "separator")) {
+      case CONST_STRING(m) :: CONST_STRING(sep) :: Nil => Right( ARR(split(m, sep)))
+      case xs                      => notImplemented("split(STRING, STRING)", xs)
+    }
+
+  lazy val parseInt: BaseFunction =
+    NativeFunction("parseInt", 20, PARSEINT, optionLong, "parse string to integer", ("str", STRING, "String for parsing")) {
+      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toInt)).orElse(Success(unit)).toEither.left.map(_.toString)
+      case xs                      => notImplemented("parseInt(STRING)", xs)
+    }
+
+  lazy val parseIntVal: BaseFunction =
+    NativeFunction("parseIntValue", 20, PARSEINTV, LONG, "parse string to integer with fail on errors", ("str", STRING, "String for parsing")) {
+      case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toInt)).toEither.left.map(_.toString)
+      case xs                      => notImplemented("parseInt(STRING)", xs)
     }
 
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, docString: String, arg1Doc: String, arg2Doc: String, complicity: Int = 1)(
@@ -326,13 +417,20 @@ object PureContext {
       case _               => ???
     }
 
-  lazy val uMinus: BaseFunction = UserFunction("-", LONG, "Change integer sign", ("@n", LONG, "value")) {
-    FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
-  }
+  lazy val uMinus: BaseFunction =
+    UserFunction("-", Map[StdLibVersion, Long](V1 -> 9, V2 -> 9, V3 -> 1), LONG, "Change integer sign", ("@n", LONG, "value")) {
+      FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
+    }
 
-  lazy val uNot: BaseFunction = UserFunction("!", BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
-    IF(FUNCTION_CALL(eq, List(REF("@p"), FALSE)), TRUE, FALSE)
-  }
+  lazy val uNot: BaseFunction =
+    UserFunction("!", Map[StdLibVersion, Long](V1 -> 11, V2 -> 11, V3 -> 1), BOOLEAN, "unary negation", ("@p", BOOLEAN, "boolean")) {
+      IF(REF("@p"), FALSE, TRUE)
+    }
+
+  lazy val ensure: BaseFunction =
+    UserFunction("ensure", 16, BOOLEAN, "Ensure parameter is true", ("@b", BOOLEAN, "condition"), ("@msg", STRING, "error message")) {
+      IF(REF("@b"), TRUE, FUNCTION_CALL(throwWithMessage, List(REF("@msg"))))
+    }
 
   private lazy val operators: Array[BaseFunction] = Array(
     mulLong,
@@ -352,7 +450,9 @@ object PureContext {
     uNot
   )
 
-  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit)))))
+  private lazy val vars: Map[String, ((FINAL, String), LazyVal)] = Map(
+    ("unit", ((UNIT, "Single instance value"), LazyVal(EitherT.pure(unit))))
+  )
   private lazy val functions = Array(
     fraction,
     sizeBytes,
@@ -379,11 +479,11 @@ object PureContext {
 
   private lazy val ctx = CTX(
     Seq(
-      new DefinedType { lazy val name = "Unit"; lazy val typeRef    = UNIT    },
-      new DefinedType { lazy val name = "Int"; lazy val typeRef     = LONG    },
-      new DefinedType { lazy val name = "Boolean"; lazy val typeRef = BOOLEAN },
-      new DefinedType { lazy val name = "ByteStr"; lazy val typeRef = BYTESTR },
-      new DefinedType { lazy val name = "String"; lazy val typeRef  = STRING  }
+      new DefinedType { lazy val name = "Unit"; lazy val typeRef       = UNIT    },
+      new DefinedType { lazy val name = "Int"; lazy val typeRef        = LONG    },
+      new DefinedType { lazy val name = "Boolean"; lazy val typeRef    = BOOLEAN },
+      new DefinedType { lazy val name = "ByteVector"; lazy val typeRef = BYTESTR },
+      new DefinedType { lazy val name = "String"; lazy val typeRef     = STRING  }
     ),
     vars,
     functions
@@ -392,7 +492,15 @@ object PureContext {
   def build(version: StdLibVersion): CTX =
     version match {
       case V1 | V2 => ctx
-      case V3       => Monoid.combine(ctx, CTX(Seq.empty, Map.empty, Array(listConstructor1, listConstructor2, listConstructor3)))
+      case V3 =>
+        Monoid.combine(
+          ctx,
+          CTX(
+            Seq.empty,
+            Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
+            Array(listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal)
+          )
+        )
     }
 
 }

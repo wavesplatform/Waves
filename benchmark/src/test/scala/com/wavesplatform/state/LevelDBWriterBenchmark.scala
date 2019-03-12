@@ -5,11 +5,15 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.LevelDBFactory
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
-import com.wavesplatform.utils.Base58
+import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.utils.Implicits.SubjectOps
+import monix.reactive.subjects.Subject
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -32,12 +36,12 @@ import scala.io.Codec
 @Measurement(iterations = 100)
 class LevelDBWriterBenchmark {
   @Benchmark
-  def readFullBlock_test(st: BlocksByIdSt, bh: Blackhole): Unit ={
+  def readFullBlock_test(st: BlocksByIdSt, bh: Blackhole): Unit = {
     bh.consume(st.db.blockById(st.allBlocks.random).get)
   }
 
   @Benchmark
-  def readBlockHeader_test(st: BlocksByIdSt, bh: Blackhole): Unit ={
+  def readBlockHeader_test(st: BlocksByIdSt, bh: Blackhole): Unit = {
     bh.consume(st.db.blockHeaderAndSize(st.allBlocks.random).get)
   }
 
@@ -88,7 +92,10 @@ object LevelDBWriterBenchmark {
       LevelDBFactory.factory.open(dir, new Options)
     }
 
-    val db = new LevelDBWriter(rawDB, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000)
+    private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Option[AssetId])]
+
+    val db =
+      new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000)
 
     @TearDown
     def close(): Unit = {
@@ -108,4 +115,3 @@ object LevelDBWriterBenchmark {
     def random: T = self(ThreadLocalRandom.current().nextInt(self.size))
   }
 }
-

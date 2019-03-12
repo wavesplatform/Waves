@@ -1,25 +1,32 @@
 package com.wavesplatform.history
 
+import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{BlockchainUpdaterImpl, NG, StateUpdateProcessor}
-import com.wavesplatform.transaction.BlockchainUpdater
+import com.wavesplatform.state.{BlockchainUpdaterImpl, NG, StateUpdateEvent}
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
+import monix.reactive.Observer
 import org.iq80.leveldb.DB
+import com.wavesplatform.transaction.{AssetId, BlockchainUpdater}
 
 object StorageFactory extends ScorexLogging {
-  private val StorageVersion = 3
+  private val StorageVersion = 4
 
-  def apply(settings: WavesSettings, db: DB, time: Time, stateUpdateProcessor: Option[StateUpdateProcessor] = None): BlockchainUpdater with NG = {
+  def apply(settings: WavesSettings,
+            db: DB,
+            time: Time,
+            spendableBalanceChanged: Observer[(Address, Option[AssetId])],
+            stateUpdates: Option[Observer[StateUpdateEvent]] = None): BlockchainUpdater with NG = {
     checkVersion(db)
     val levelDBWriter = new LevelDBWriter(
       db,
+      spendableBalanceChanged,
       settings.blockchainSettings.functionalitySettings,
       settings.maxCacheSize,
       settings.maxRollbackDepth,
       settings.rememberBlocks.toMillis
     )
-    new BlockchainUpdaterImpl(levelDBWriter, settings, time, stateUpdateProcessor)
+    new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, stateUpdates)
   }
 
   private def checkVersion(db: DB): Unit = db.readWrite { rw =>

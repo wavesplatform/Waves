@@ -1,25 +1,24 @@
 package com.wavesplatform.state
 
 import cats.implicits._
-import monix.reactive.subjects.PublishSubject
-
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
+import monix.reactive.Observer
 
 final case class StateUpdate(balances: Map[(Address, Option[AssetId]), Long], leases: Map[Address, LeaseBalance])
 
 sealed trait StateUpdateEvent
-final case class BlockAddEvent(b: Block, height: Int, blockStateUpdate: StateUpdate, transactionsStateUpdates: Seq[StateUpdate])
+final case class BlockEvent(b: Block, height: Int, blockStateUpdate: StateUpdate, transactionsStateUpdates: Seq[StateUpdate])
     extends StateUpdateEvent
 final case class MicroBlockEvent(b: MicroBlock, height: Int, microBlockStateUpdate: StateUpdate, transactionsStateUpdates: Seq[StateUpdate])
     extends StateUpdateEvent
 final case class RollbackEvent(eventId: ByteStr, height: Int) extends StateUpdateEvent
 
-class StateUpdateProcessor(events: PublishSubject[StateUpdateEvent]) {
+object StateUpdateProcessor {
 
   private def stateUpdateFromDiff(blockchain: Blockchain, diff: Diff): StateUpdate = {
     val balances = Map.newBuilder[(Address, Option[AssetId]), Long]
@@ -60,15 +59,18 @@ class StateUpdateProcessor(events: PublishSubject[StateUpdateEvent]) {
     (blockStateUpdate, txsStateUpdates._1)
   }
 
-  def onProcessBlock(block: Block, diff: DetailedDiff, blockchain: Blockchain): Unit = {
-    val (blockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
-    events.onNext(BlockAddEvent(block, blockchain.height + 1, blockStateUpdate, txsStateUpdates))
-  }
+  def onProcessBlock(events: Option[Observer[StateUpdateEvent]], block: Block, diff: DetailedDiff, blockchain: Blockchain): Unit =
+    events foreach { es =>
+      val (blockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
+      es.onNext(BlockEvent(block, blockchain.height + 1, blockStateUpdate, txsStateUpdates))
+    }
 
-  def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchain: Blockchain): Unit = {
-    val (microBlockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
-    events.onNext(MicroBlockEvent(microBlock, blockchain.height, microBlockStateUpdate, txsStateUpdates))
-  }
+  def onProcessMicroBlock(events: Option[Observer[StateUpdateEvent]], microBlock: MicroBlock, diff: DetailedDiff, blockchain: Blockchain): Unit =
+    events foreach { es =>
+      val (microBlockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
+      es.onNext(MicroBlockEvent(microBlock, blockchain.height, microBlockStateUpdate, txsStateUpdates))
+    }
 
-  def onRollback(blockId: ByteStr, height: Int): Unit = events.onNext(RollbackEvent(blockId, height))
+  def onRollback(events: Option[Observer[StateUpdateEvent]], blockId: ByteStr, height: Int): Unit =
+    events foreach (_.onNext(RollbackEvent(blockId, height)))
 }

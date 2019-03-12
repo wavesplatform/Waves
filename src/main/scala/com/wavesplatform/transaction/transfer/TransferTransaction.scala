@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
+import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction._
@@ -10,7 +10,6 @@ import com.wavesplatform.transaction.validation._
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import com.wavesplatform.crypto._
 
 trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
   def assetId: Option[AssetId]
@@ -62,30 +61,21 @@ object TransferTransaction {
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
-  def validate(amount: Long, feeAmount: Long, attachment: Array[Byte]): Either[ValidationError, Unit] = {
+  def validate(tx: TransferTransaction): Either[ValidationError, Unit] = {
+    validate(tx.amount, tx.assetId, tx.fee, tx.feeAssetId, tx.attachment)
+  }
+
+  def validate(amt: Long,
+               maybeAmtAsset: Option[AssetId],
+               feeAmt: Long,
+               maybeFeeAsset: Option[AssetId],
+               attachment: Array[Byte]): Either[ValidationError, Unit] = {
     (
-      validateAmount(amount, "waves"),
-      validateFee(feeAmount),
-      validateAttachment(attachment),
-      validateSum(Seq(amount, feeAmount))
+      validateAmount(amt, maybeAmtAsset.map(_.base58).getOrElse("waves")),
+      validateFee(feeAmt),
+      validateAttachment(attachment)
     ).mapN { case _ => () }
       .toEither
       .leftMap(_.head)
   }
-
-  def parseBase(bytes: Array[Byte], start: Int) = {
-    val sender              = PublicKeyAccount(bytes.slice(start, start + KeyLength))
-    val (assetIdOpt, s0)    = Deser.parseByteArrayOption(bytes, start + KeyLength, AssetIdLength)
-    val (feeAssetIdOpt, s1) = Deser.parseByteArrayOption(bytes, s0, AssetIdLength)
-    val timestamp           = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
-    val amount              = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
-    val feeAmount           = Longs.fromByteArray(bytes.slice(s1 + 16, s1 + 24))
-    for {
-      recRes <- AddressOrAlias.fromBytes(bytes, s1 + 24)
-      (recipient, recipientEnd) = recRes
-      (attachment, end)         = Deser.parseArraySize(bytes, recipientEnd)
-    } yield (sender, assetIdOpt, feeAssetIdOpt, timestamp, amount, feeAmount, recipient, attachment, end)
-
-  }
-
 }

@@ -3,15 +3,19 @@ import sbt._
 
 object Dependencies {
 
-  def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.5.16"
+  def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.5.20"
 
   def swaggerModule(module: String) = ("io.swagger.core.v3" % s"swagger-$module" % "2.0.5").exclude("com.google.guava", "guava")
 
-  def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.1.4"
+  def akkaHttpModule(module: String = "") = "com.typesafe.akka" %% s"akka-http${if (module.isEmpty) "" else s"-$module"}" % "10.1.7"
 
   def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.24.Final"
 
   def kamonModule(module: String, v: String) = "io.kamon" %% s"kamon-$module" % v
+  
+  val AkkaActor = akkaModule("actor")
+  val AkkaStream = akkaModule("stream")
+  val AkkaHTTP = akkaHttpModule()
 
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.4.7"
 
@@ -27,7 +31,7 @@ object Dependencies {
     "org.mockito"    % "mockito-all"                  % "1.10.19",
     "org.scalamock"  %% "scalamock-scalatest-support" % "3.6.0",
     ("org.iq80.leveldb" % "leveldb" % "0.9").exclude("com.google.guava", "guava"),
-    akkaHttpModule("akka-http-testkit")
+    akkaHttpModule("testkit")
   )
 
   lazy val itKit = scalatest ++ Seq(
@@ -43,7 +47,7 @@ object Dependencies {
     "com.typesafe.play"        %% "play-json" % "2.6.10"
   )
 
-  lazy val akka = Seq("actor", "slf4j").map(akkaModule)
+  lazy val akka = Seq(AkkaActor, akkaModule("slf4j"))
 
   lazy val db = Seq(
     "org.ethereum" % "leveldbjni-all" % "1.18.3"
@@ -61,21 +65,21 @@ object Dependencies {
     "com.github.swagger-akka-http" %% "swagger-akka-http"    % "1.0.0",
     "com.fasterxml.jackson.core"   % "jackson-databind"      % "2.9.6",
     "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.6",
-    akkaHttpModule("akka-http")
+    AkkaHTTP
   )
 
   lazy val matcher = Seq(
     akkaModule("persistence"),
     akkaModule("persistence-tck") % "test",
     "com.github.dnvriend"         %% "akka-persistence-inmemory" % "2.5.15.1" % "test",
-    "com.typesafe.akka"           %% "akka-stream-kafka" % "1.0-RC1",
+    "com.typesafe.akka"           %% "akka-stream-kafka" % "1.0-RC2",
     "org.ethereum"                % "leveldbjni-all" % "1.18.3"
   )
 
   lazy val metrics = Seq(
     kamonModule("core", "1.1.3"),
     kamonModule("system-metrics", "1.0.0").exclude("io.kamon", "kamon-core_2.12"),
-    kamonModule("akka-2.5", "1.1.1").exclude("io.kamon", "kamon-core_2.12"),
+    kamonModule("akka-2.5", "1.1.3").exclude("io.kamon", "kamon-core_2.12"),
     kamonModule("influxdb", "1.0.2"),
     "org.influxdb" % "influxdb-java" % "2.11"
   ).map(_.exclude("org.asynchttpclient", "async-http-client"))
@@ -110,6 +114,7 @@ object Dependencies {
   )
   lazy val kindProjector = "org.spire-math" %% "kind-projector"     % "0.9.6"
   lazy val betterFor     = "com.olegpy"     %% "better-monadic-for" % "0.3.0-M4"
+  
   lazy val protobuf = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(
@@ -119,4 +124,9 @@ object Dependencies {
       "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0"
     )
   }
+  
+  lazy val grpc = Seq(
+    "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion,
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+  )
 }

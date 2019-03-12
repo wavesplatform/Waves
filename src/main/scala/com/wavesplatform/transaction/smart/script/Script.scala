@@ -3,8 +3,10 @@ package com.wavesplatform.transaction.smart.script
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
 import monix.eval.Coeval
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 
 trait Script {
   type Expr
@@ -12,7 +14,7 @@ trait Script {
   val stdLibVersion: StdLibVersion
 
   val expr: Expr
-  val text: String
+
   val bytes: Coeval[ByteStr]
   val complexity: Long
 
@@ -36,4 +38,9 @@ object Script {
       script <- ScriptReader.fromBytes(bytes)
     } yield script
 
+  def decompile(s: Script): String = s match {
+    case e: ExprScript => Decompiler(e.expr, com.wavesplatform.utils.defaultDecompilerContext)
+    case com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl(_, contract, _) =>
+      Decompiler(contract, com.wavesplatform.utils.defaultDecompilerContext)
+  }
 }

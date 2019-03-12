@@ -33,7 +33,18 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
     ScriptCompiler(script, isAssetScript = false) shouldBe Left("Can't parse language version")
   }
 
-  private val expectedExpr = BLOCK(
+  property("fails with right error position") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# STDLIB_VERSION 3 #-}
+        | let a = 1000
+        | a > b
+      """.stripMargin
+    ScriptCompiler.compile(script) shouldBe Left("Compilation failed: A definition of 'b' is not found in 72-73")
+  }
+
+  private val expectedExpr = LET_BLOCK(
     LET("x", CONST_LONG(10)),
     FUNCTION_CALL(
       PureContext.eq.header,

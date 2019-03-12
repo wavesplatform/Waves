@@ -1,19 +1,22 @@
 package com.wavesplatform.matcher.matching
 
-import com.google.common.base.Charsets.UTF_8
-import com.wavesplatform.WithDB
+import akka.actor.Props
+import akka.pattern.ask
+import akka.util.Timeout
 import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher.api.DBUtils
+import com.wavesplatform.matcher.market.MatcherSpecLike
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
-import com.wavesplatform.matcher.model.LimitOrder.{Filled, PartiallyFilled}
-import com.wavesplatform.matcher.model.{LimitOrder, OrderHistory}
-import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData}
+import com.wavesplatform.matcher.model.{LimitOrder, OrderHistoryStub}
+import com.wavesplatform.matcher.{AssetPairDecimals, MatcherTestData, _}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import com.wavesplatform.{NTPTime, WithDB}
+import org.scalatest.PropSpecLike
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{BeforeAndAfterEach, Matchers, PropSpec}
+
+import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.{Await, Future}
 
 /**
   * Tests for reserved balance
@@ -61,35 +64,61 @@ import org.scalatest.{BeforeAndAfterEach, Matchers, PropSpec}
   * Sell        | A_c > A_s | A_corr < A      | P_c = P_s  | A_min             | A_min - 1
   */
 class ReservedBalanceSpecification
-    extends PropSpec
-    with BeforeAndAfterEach
+    extends PropSpecLike
+    with MatcherSpecLike
     with WithDB
     with MatcherTestData
-    with Matchers
-    with TableDrivenPropertyChecks {
+    with TableDrivenPropertyChecks
+    with NTPTime {
 
-  private def mkAssetId(prefix: String) = {
-    val prefixBytes = prefix.getBytes(UTF_8)
-    Some(ByteStr((prefixBytes ++ Array.fill[Byte](32 - prefixBytes.length)(0.toByte)).take(32)))
-  }
+  override protected def actorSystemName: String = "ReservedBalanceSpecification" // getClass.getSimpleName
+
+  private implicit val timeout: Timeout = 5.seconds
 
   val pair = AssetPair(mkAssetId("WAVES"), mkAssetId("USD"))
   val p    = new AssetPairDecimals(8, 2)
 
-  var oh = new OrderHistory(db, matcherSettings)
+  var oh = new OrderHistoryStub(system, ntpTime)
+  private val addressDir = system.actorOf(
+    Props(
+      new AddressDirectory(
+        ignoreSpendableBalanceChanged,
+        matcherSettings,
+        address =>
+          Props(
+            new AddressActor(
+              address,
+              _ => 0L,
+              5.seconds,
+              ntpTime,
+              new TestOrderDB(100),
+              _ => false,
+              _ => Future.failed(new IllegalStateException("Should not be used in the test"))
+            ))
+      )
+    ))
 
-  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]) = DBUtils.openVolume(db, senderPublicKey, assetId)
+  private def openVolume(senderPublicKey: PublicKeyAccount, assetId: Option[AssetId]): Long =
+    Await
+      .result(
+        (addressDir ? AddressDirectory.Envelope(senderPublicKey, AddressActor.GetReservedBalance)).mapTo[Map[Option[AssetId], Long]],
+        Duration.Inf
+      )
+      .getOrElse(assetId, 0L)
 
   def execute(counter: Order, submitted: Order): OrderExecuted = {
+    addressDir ! OrderAdded(LimitOrder(submitted))
+    addressDir ! OrderAdded(LimitOrder(counter))
+
     oh.process(OrderAdded(LimitOrder(counter)))
-    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter))
-    oh.process(exec)
+    val exec = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), submitted.timestamp)
+    addressDir ! exec
     exec
   }
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    oh = new OrderHistory(db, matcherSettings)
+    oh = new OrderHistoryStub(system, ntpTime)
   }
 
   forAll(
@@ -107,8 +136,6 @@ class ReservedBalanceSpecification
 
       withClue("Both orders should be filled") {
         exec.executedAmount shouldBe counter.amount
-        oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-        oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
       }
 
       withClue("All remains should be 0") {
@@ -117,7 +144,7 @@ class ReservedBalanceSpecification
       }
 
       withClue(s"Counter sender should not have reserves") {
-        DBUtils.openVolume(db, counter.senderPublicKey, pair.amountAsset) shouldBe 0
+        openVolume(counter.senderPublicKey, pair.amountAsset) shouldBe 0
         openVolume(counter.senderPublicKey, pair.priceAsset) shouldBe 0
       }
 
@@ -144,8 +171,6 @@ class ReservedBalanceSpecification
 
       withClue("Both orders should be filled") {
         exec.executedAmount shouldBe submittedAmount
-        oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-        oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
       }
 
       withClue("Counter remain should be (minAmount - 1):") {
@@ -181,8 +206,6 @@ class ReservedBalanceSpecification
 
       withClue("Both orders should be filled") {
         exec.executedAmount shouldBe counterAmount
-        oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-        oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
       }
 
       withClue("Submitted remain should be (minAmount - 1):") {
@@ -218,8 +241,6 @@ class ReservedBalanceSpecification
 
       withClue("Counter should be partially filled:") {
         exec.executedAmount shouldBe submittedAmount
-        oh.orderInfo(counter.id()).status shouldBe PartiallyFilled(exec.executedAmount)
-        oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
       }
 
       withClue("Counter remain should be minAmount:") {
@@ -256,8 +277,6 @@ class ReservedBalanceSpecification
 
       withClue("Submitted should be partially filled:") {
         exec.executedAmount shouldBe counterAmount
-        oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-        oh.orderInfo(submitted.id()).status shouldBe PartiallyFilled(exec.executedAmount)
       }
 
       withClue("Submitted remain should be minAmount:") {
@@ -291,8 +310,6 @@ class ReservedBalanceSpecification
       val exec      = execute(counter, submitted)
 
       exec.executedAmount shouldBe p.amount(2)
-      oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-      oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
 
       exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice) - 1
       exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice) - 1
@@ -322,8 +339,6 @@ class ReservedBalanceSpecification
       val exec      = execute(counter, submitted)
 
       exec.executedAmount shouldBe p.amount(2)
-      oh.orderInfo(counter.id()).status shouldBe Filled(exec.executedAmount)
-      oh.orderInfo(submitted.id()).status shouldBe PartiallyFilled(exec.executedAmount)
 
       exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice) - 1
       exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice)
@@ -354,8 +369,6 @@ class ReservedBalanceSpecification
       val exec      = execute(counter, submitted)
 
       exec.executedAmount shouldBe p.amount(2)
-      oh.orderInfo(counter.id()).status shouldBe PartiallyFilled(exec.executedAmount)
-      oh.orderInfo(submitted.id()).status shouldBe Filled(exec.executedAmount)
 
       exec.counterRemainingAmount shouldBe p.minAmountFor(counterPrice)
       exec.submittedRemainingAmount shouldBe p.minAmountFor(submittedPrice) - 1
