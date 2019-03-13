@@ -103,7 +103,7 @@ object ContractCompiler {
           (),
           Generic(contract.position.start,
                   contract.position.end,
-                  s"Contract functions can have no more than ${ContractLimits.MaxContractInvocationArgs} arguments")
+                  s"Script functions can have no more than ${ContractLimits.MaxContractInvocationArgs} arguments")
         )
         .toCompileM
       verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
@@ -140,7 +140,7 @@ object ContractCompiler {
         .ensure(Generic(contract.position.start, contract.position.start, "Annotation bindings overrides already defined var"))(aVs =>
           aVs.forall(!ctx.varDefs.contains(_)))
       _ <- annAndFuncArgsIntersection
-        .ensure(Generic(contract.position.start, contract.position.start, "Contract func args override annotation bindings")) { is =>
+        .ensure(Generic(contract.position.start, contract.position.start, "Script func args override annotation bindings")) { is =>
           !(is contains true)
         }
     } yield ()
