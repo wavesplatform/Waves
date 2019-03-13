@@ -113,7 +113,7 @@ package object grpc extends PBImplicitConversions {
     }
   }
 
-  implicit class EitherToFutureConversionOps[E, T](either: Either[E, T])(implicit ev: E => Exception) {
+  implicit class EitherToFutureConversionOps[E, T](either: Either[E, T])(implicit ev: E => Throwable) {
     def toFuture: Future[T] = {
       Future.fromTry(either.left.map(ev).toTry)
     }

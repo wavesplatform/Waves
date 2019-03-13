@@ -3,12 +3,11 @@ import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransaction}
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
-import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.grpc.stub.StreamObserver
@@ -20,13 +19,7 @@ import monix.reactive.Observable
 import scala.concurrent.Future
 import scala.util.Try
 
-class TransactionsApiGrpcImpl(settings: RestAPISettings,
-                              functionalitySettings: FunctionalitySettings,
-                              wallet: Wallet,
-                              blockchain: Blockchain,
-                              utx: UtxPool,
-                              allChannels: ChannelGroup,
-                              time: Time)
+class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup)
     extends TransactionsApiGrpc.TransactionsApi {
 
   private[this] val TransactionsBatchLimit = 100

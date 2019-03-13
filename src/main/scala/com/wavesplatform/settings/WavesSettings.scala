@@ -20,6 +20,7 @@ case class WavesSettings(directory: String,
                          matcherSettings: MatcherSettings,
                          minerSettings: MinerSettings,
                          restAPISettings: RestAPISettings,
+                         grpcSettings: GRPCSettings,
                          synchronizationSettings: SynchronizationSettings,
                          utxSettings: UtxSettings,
                          featuresSettings: FeaturesSettings,
@@ -46,6 +47,7 @@ object WavesSettings {
     val restAPISettings         = RestAPISettings.fromConfig(config)
     val synchronizationSettings = SynchronizationSettings.fromConfig(config)
     val utxSettings             = config.as[UtxSettings]("waves.utx")
+    val grpcSettings             = config.as[GRPCSettings]("waves.grpc")
     val featuresSettings        = config.as[FeaturesSettings]("waves.features")
     val metrics                 = config.as[Metrics.Settings]("metrics")
 
@@ -62,6 +64,7 @@ object WavesSettings {
       matcherSettings,
       minerSettings,
       restAPISettings,
+      grpcSettings,
       synchronizationSettings,
       utxSettings,
       featuresSettings,

@@ -2,9 +2,9 @@ package com.wavesplatform
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 
-import _root_.io.grpc.ServerBuilder
+import _root_.io.grpc.{Server, ServerBuilder}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -200,40 +200,19 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     implicit val as: ActorSystem                 = actorSystem
     implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-    // TODO: gRPC enable/disable setting
-    // TODO: Refactor Impls parameter lists
+    if (settings.grpcSettings.enable) {
+      this.grpcServer = ServerBuilder
+        .forPort(settings.grpcSettings.port)
+        .addService(TransactionsApiGrpc.bindService(
+          new TransactionsApiGrpcImpl(settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels),
+          global
+        ))
+        .addService(BlocksApiGrpc.bindService(new BlocksApiGrpcImpl(blockchainUpdater), global))
+        .build()
+        .start()
 
-    val transactionsService = TransactionsApiGrpc.bindService(
-      new TransactionsApiGrpcImpl(settings.restAPISettings,
-                                  settings.blockchainSettings.functionalitySettings,
-                                  wallet,
-                                  blockchainUpdater,
-                                  utxStorage,
-                                  allChannels,
-                                  time),
-      global
-    )
-
-    val blocksService = BlocksApiGrpc.bindService(
-      new BlocksApiGrpcImpl(settings.restAPISettings,
-                            settings.blockchainSettings.functionalitySettings,
-                            wallet,
-                            blockchainUpdater,
-                            utxStorage,
-                            allChannels,
-                            time),
-      global
-    )
-
-    val grpcPort = 1234
-    val grpcServer = ServerBuilder
-      .forPort(grpcPort)
-      .addService(transactionsService)
-      .addService(blocksService)
-      .build()
-      .start()
-
-    Runtime.getRuntime.addShutdownHook(new Thread(() => grpcServer.shutdown()))
+      log.info(s"gRPC API was bound to ${settings.grpcSettings.port}")
+    }
 
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
@@ -317,6 +296,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   @volatile var shutdownInProgress           = false
   @volatile var serverBinding: ServerBinding = _
+  @volatile var grpcServer: Server = _
 
   def shutdown(utx: UtxPool, network: NS): Unit = {
     if (!shutdownInProgress) {
@@ -328,11 +308,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)
 
       log.info("Closing REST API")
-      if (settings.restAPISettings.enable) {
-        Try(Await.ready(serverBinding.unbind(), 2.minutes)).failed.map(e => log.error("Failed to unbind REST API port", e))
-      }
-      for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
-        upnp.deletePort(addr.getPort)
+      if (settings.restAPISettings.enable) Try(Await.ready(serverBinding.unbind(), 2.minutes)).failed.map(e => log.error("Failed to unbind REST API port", e))
+      for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) upnp.deletePort(addr.getPort)
+
+      log.info("Closing gRPC API")
+      if (settings.grpcSettings.enable) Try {
+        grpcServer.shutdown()
+        grpcServer.awaitTermination(2, TimeUnit.MINUTES)
       }
 
       matcher.foreach(_.shutdown())

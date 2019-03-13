@@ -9,7 +9,7 @@ class ByteStrTest extends Matchers with WordSpecLike {
   "ByteStr" should {
 
     "correctly serialize int/boolean values" in {
-      ByteStr.    fromBytes(1).arr shouldBe Array[Byte](1)               // ByteVector(1)
+      ByteStr.fromBytes(1).arr shouldBe Array[Byte](1)               // ByteVector(1)
       ByteStr.fromBytes(-100).arr shouldBe Array[Byte](-100)         // ByteVector(-100)
       ByteStr.fromBytes(Byte.MaxValue).arr shouldBe Array[Byte](127) // ByteVector(Byte.MaxValue.toInt)
     }

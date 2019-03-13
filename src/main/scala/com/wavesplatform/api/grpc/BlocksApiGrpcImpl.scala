@@ -5,25 +5,14 @@ import com.google.protobuf.wrappers.{UInt32Value, UInt64Value}
 import com.wavesplatform.api.http.{ApiError, BlockDoesNotExist}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.block.PBBlock
-import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.utils.Time
-import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.wallet.Wallet
 import io.grpc.stub.StreamObserver
-import io.netty.channel.group.ChannelGroup
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observable
 
 import scala.concurrent.Future
 
-class BlocksApiGrpcImpl(settings: RestAPISettings,
-                        functionalitySettings: FunctionalitySettings,
-                        wallet: Wallet,
-                        blockchain: Blockchain,
-                        utx: UtxPool,
-                        allChannels: ChannelGroup,
-                        time: Time)
+class BlocksApiGrpcImpl(blockchain: Blockchain)
     extends BlocksApiGrpc.BlocksApi {
 
   override def blocksByAddress(request: BlocksByAddressRequest, responseObserver: StreamObserver[BlockAndHeight]): Unit = {
