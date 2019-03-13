@@ -73,7 +73,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     forAll(preconditionsAndExchange) {
       case (gen1, gen2, gen3, issue1, issue2, exchange) =>
         assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange)), fs) { blockDiffEi =>
-          blockDiffEi should produce("Order Version 3 has not been activated yet")
+          blockDiffEi should produce("Order Version 3")
         }
     }
   }

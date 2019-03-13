@@ -106,6 +106,7 @@ object CommonValidation {
       val id = tx.id()
       Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
   }
+  val ride4DAppsActivationMessage = "Ride4DApps has not been activated yet"
 
   def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, height: Int, tx: T): Either[ValidationError, T] = {
 
@@ -113,12 +114,12 @@ object CommonValidation {
       Either.cond(
         blockchain.isFeatureActivated(b, height),
         tx,
-        ValidationError.ActivationError(msg.getOrElse(tx.getClass.getSimpleName) + " has not been activated yet")
+        ValidationError.ActivationError(msg.getOrElse(tx.getClass.getSimpleName + " has not been activated yet"))
       )
 
     def scriptActivation(sc: Script): Either[ActivationError, T] = {
 
-      val ab = activationBarrier(BlockchainFeatures.Ride4DApps, Some("Ride4DApps has not been activated yet"))
+      val ab = activationBarrier(BlockchainFeatures.Ride4DApps, Some(ride4DAppsActivationMessage))
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
         case V1 | V2 if sc.containsBlockV2.value => ab
@@ -168,7 +169,11 @@ object CommonValidation {
         }
 
       case _: TransferTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
+      case it: IssueTransactionV2 =>
+        it.script match {
+          case None     => Right(tx)
+          case Some(sc) => scriptActivation(sc)
+        }
 
       case it: SetAssetScriptTransaction =>
         it.script match {
@@ -182,7 +187,7 @@ object CommonValidation {
       case _: LeaseCancelTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: CreateAliasTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction         => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _: ContractInvocationTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
+      case _: ContractInvocationTransaction => activationBarrier(BlockchainFeatures.Ride4DApps, Some(ride4DAppsActivationMessage))
       case _                                => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
