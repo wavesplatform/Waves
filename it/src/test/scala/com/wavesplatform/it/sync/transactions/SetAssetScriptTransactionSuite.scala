@@ -8,6 +8,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{script, someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -159,8 +160,9 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
-    def sastx(fee: Long = setAssetScriptFee, timestamp: Long = System.currentTimeMillis, assetId: ByteStr = ByteStr.decodeBase58(assetWScript).get,
-    ): SetAssetScriptTransaction =
+    def sastx(fee: Long = setAssetScriptFee,
+              timestamp: Long = System.currentTimeMillis,
+              assetId: IssuedAsset = IssuedAsset(ByteStr.decodeBase58(assetWScript).get)): SetAssetScriptTransaction =
       SetAssetScriptTransaction
         .signed(AddressScheme.current.chainId, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)
         .right
@@ -171,8 +173,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val invalidTxs = Seq(
       (sastx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
       (sastx(fee = 9999999), "Fee .* does not exceed minimal value"),
-      (sastx(assetId = ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz9ekQuYn92natMnMq8").get), "invalid.assetId"),
-      (sastx(assetId = ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get), "Referenced assetId not found")
+      (sastx(assetId = IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz9ekQuYn92natMnMq8").get)), "invalid.assetId"),
+      (sastx(assetId = IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get)), "Referenced assetId not found")
     )
 
     for ((tx, diag) <- invalidTxs) {
@@ -273,7 +275,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val nonIssuerUnsignedTx = SetAssetScriptTransaction(
       AddressScheme.current.chainId,
       accountA,
-      ByteStr.decodeBase58(assetWScript).get,
+      IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
       Some(unchangeableScript),
       setAssetScriptFee + 0.004.waves,
       System.currentTimeMillis,
@@ -294,7 +296,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(
       AddressScheme.current.chainId,
       accountA,
-      ByteStr.decodeBase58(assetWScript).get,
+      IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
       Some(script),
       setAssetScriptFee + 0.004.waves,
       System.currentTimeMillis,

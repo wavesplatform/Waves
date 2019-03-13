@@ -4,24 +4,29 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler
-import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.{Common, StdLibVersion}
-import org.scalatest.prop.PropertyChecks
+import com.wavesplatform.lang.{Common, ContentType, ScriptType, StdLibVersion}
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   property("contract compiles when uses annotation bindings and correct return type") {
-    val ctx = Monoid.combine(compilerContext,
-                             WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), isTokenContext = false).compilerContext)
+    val ctx = Monoid.combine(
+      compilerContext,
+      WavesContext
+        .build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
+        .compilerContext
+    )
     val expr = {
       val script =
         """
@@ -73,8 +78,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) shouldBe expectedResult
   }
 
+  private val cmpCtx: CompilerContext =
+    WavesContext.build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment()).compilerContext
   property("contract compiles callable functions independently") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
         """
@@ -98,7 +105,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract can access declarations") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
         """
@@ -217,7 +224,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         Seq(
           PureContext.build(StdLibVersion.V3),
           CryptoContext.build(com.wavesplatform.lang.Global),
-          WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false)
+          WavesContext.build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
         ))
       .compilerContext
     val expr = {
@@ -230,7 +237,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
           |   else {
           |	  	let currentKey = toBase58String(i.caller.bytes)
-          |	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+          |	  	let currentAmount = match getInteger(this, currentKey) {
           |	  		case a:Int => a
           |	  		case _ => 0
           |	  	}
@@ -243,7 +250,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | @Callable(i)
           | func withdraw(amount: Int) = {
           |	  	let currentKey = toBase58String(i.caller.bytes)
-          |	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+          |	  	let currentAmount = match getInteger(this, currentKey) {
           |	  		case a:Int => a
           |	  		case _ => 0
           |	  	}
@@ -267,7 +274,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract functions could return parent type values") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
         """
@@ -280,7 +287,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | @Callable(i)
           | func bar() = {
           |   if (true) then WriteSet([DataEntry("entr1","entr2")])
-          |   else TransferSet([ContractTransfer(i.caller, wavesBalance(i.contractAddress), base58'somestr')])
+          |   else TransferSet([ContractTransfer(i.caller, wavesBalance(this), base58'somestr')])
           | }
           |
           | @Verifier(t)
@@ -295,7 +302,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compilation fails if functions has the same name") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
         """
@@ -322,7 +329,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compilation fails if declaration and annotation bindings has the same name") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
         """
@@ -341,14 +348,14 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compilation fails if annotation bindings and func args has the same name") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
         """
           |
           |@Callable(i)
           |func some(i: Int) = {
-          |   if (i.contractAddress == "abc") then
+          |   if (this == "abc") then
           |      WriteSet([DataEntry("a", "a")])
           |   else
           |      WriteSet([DataEntry("a", "b")])
@@ -361,7 +368,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compiles if annotation bindings and another func args has the same name") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
         """
@@ -383,7 +390,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compiles if declaration vars and func args has the same name") {
-    val ctx = Monoid.combine(compilerContext, WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false).compilerContext)
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
         """

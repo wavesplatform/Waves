@@ -10,6 +10,7 @@ import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.matcher.model.MatcherModel.Price
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.util.Random
@@ -35,24 +36,24 @@ class TradersTestSuite extends MatcherSuiteBase {
     val bobNewAsset      = bobNode.issue(bobAcc.address, "BobCoin3", "Bob's asset", bobAssetQuantity, 0, reissuable = false, smartIssueFee, 2).id
     matcherNode.waitForTransaction(bobNewAsset)
 
-    val bobAssetId   = ByteStr.decodeBase58(bobNewAsset).get
-    val aliceAssetId = ByteStr.decodeBase58(aliceAsset).get
+    val bobAssetId   = IssuedAsset(ByteStr.decodeBase58(bobNewAsset).get)
+    val aliceAssetId = IssuedAsset(ByteStr.decodeBase58(aliceAsset).get)
 
     val bobWavesPair = AssetPair(
-      amountAsset = Some(bobAssetId),
-      priceAsset = None
+      amountAsset = bobAssetId,
+      priceAsset = Waves
     )
 
     val twoAssetsPair =
-      if (MatcherActor.compare(Some(bobAssetId.arr), Some(aliceAssetId.arr)) < 0)
+      if (MatcherActor.compare(Some(bobAssetId.id.arr), Some(aliceAssetId.id.arr)) < 0)
         AssetPair(
-          amountAsset = Some(aliceAssetId),
-          priceAsset = Some(bobAssetId)
+          amountAsset = aliceAssetId,
+          priceAsset = bobAssetId
         )
       else
         AssetPair(
-          amountAsset = Some(bobAssetId),
-          priceAsset = Some(aliceAssetId)
+          amountAsset = bobAssetId,
+          priceAsset = aliceAssetId
         )
 
     matcherNode.assertAssetBalance(bobAcc.address, bobNewAsset, bobAssetQuantity)
@@ -210,8 +211,8 @@ class TradersTestSuite extends MatcherSuiteBase {
   }
 
   def bobPlacesAssetOrder(bobCoinAmount: Int, twoAssetsPair: AssetPair, assetId: String): String = {
-    val decodedAsset = ByteStr.decodeBase58(assetId).get
-    val bobOrder = if (twoAssetsPair.amountAsset.contains(decodedAsset)) {
+    val decodedAsset = IssuedAsset(ByteStr.decodeBase58(assetId).get)
+    val bobOrder = if (twoAssetsPair.amountAsset == decodedAsset) {
       matcherNode.prepareOrder(bobAcc, twoAssetsPair, OrderType.SELL, bobCoinAmount, 1 * Order.PriceConstant, exTxFee, orderVersion)
     } else {
       matcherNode.prepareOrder(bobAcc, twoAssetsPair, OrderType.BUY, 1, bobCoinAmount * Order.PriceConstant, exTxFee, orderVersion)

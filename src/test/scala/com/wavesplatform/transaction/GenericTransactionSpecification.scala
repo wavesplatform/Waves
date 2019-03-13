@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.TransactionGen
 import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 abstract class GenericTransactionSpecification[T <: com.wavesplatform.transaction.Transaction]

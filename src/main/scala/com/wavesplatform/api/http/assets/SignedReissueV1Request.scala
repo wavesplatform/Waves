@@ -1,12 +1,12 @@
 package com.wavesplatform.api.http.assets
 
-import io.swagger.annotations.ApiModelProperty
-import play.api.libs.json.{Format, Json}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
+import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.assets.ReissueTransactionV1
-import com.wavesplatform.transaction.{AssetIdStringLength, ValidationError}
+import io.swagger.annotations.ApiModelProperty
+import play.api.libs.json.{Format, Json}
 
 object SignedReissueV1Request {
   implicit val assetReissueRequestReads: Format[SignedReissueV1Request] = Json.format
@@ -31,7 +31,7 @@ case class SignedReissueV1Request(@ApiModelProperty(value = "Base58 encoded Issu
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      _assetId   <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
+      _assetId   <- parseBase58ToAsset(assetId)
       _t         <- ReissueTransactionV1.create(_sender, _assetId, quantity, reissuable, fee, timestamp, _signature)
     } yield _t
 }

@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.{AssetId, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -24,7 +24,7 @@ case class OrderV3(senderPublicKey: PublicKeyAccount,
                    timestamp: Long,
                    expiration: Long,
                    matcherFee: Long,
-                   override val matcherFeeAssetId: Option[AssetId],
+                   override val matcherFeeAssetId: Asset,
                    proofs: Proofs)
     extends Order {
 
@@ -66,7 +66,7 @@ case class OrderV3(senderPublicKey: PublicKeyAccount,
           "timestamp"         -> timestamp,
           "expiration"        -> expiration,
           "matcherFee"        -> matcherFee,
-          "matcherFeeAssetId" -> matcherFeeAssetId.map(_.base58),
+          "matcherFeeAssetId" -> matcherFeeAssetId.maybeBase58Repr,
           "signature"         -> sig,
           "proofs"            -> proofs.proofs
         )
@@ -86,7 +86,7 @@ object OrderV3 {
           timestamp: Long,
           expiration: Long,
           matcherFee: Long,
-          matcherFeeAssetId: Option[AssetId]): Order = {
+          matcherFeeAssetId: Asset): Order = {
 
     val unsigned = OrderV3(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
@@ -102,7 +102,7 @@ object OrderV3 {
            timestamp: Long,
            expiration: Long,
            matcherFee: Long,
-           matcherFeeAssetId: Option[AssetId]): Order = {
+           matcherFeeAssetId: Asset): Order = {
 
     val unsigned = OrderV3(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
@@ -119,7 +119,7 @@ object OrderV3 {
             timestamp: Long,
             expiration: Long,
             matcherFee: Long,
-            matcherFeeAssetId: Option[AssetId]): Order = {
+            matcherFeeAssetId: Asset): Order = {
 
     val unsigned = OrderV3(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
@@ -154,28 +154,28 @@ object OrderV3 {
       _ = if (version != 3) { throw new Exception(s"Incorrect order version: expect 3 but found $version") }
       sender            <- read(PublicKeyAccount.apply, KeyLength)
       matcher           <- read(PublicKeyAccount.apply, KeyLength)
-      amountAssetId     <- parse(Deser.parseByteArrayOption, AssetIdLength)
-      priceAssetId      <- parse(Deser.parseByteArrayOption, AssetIdLength)
+      amountAssetId     <- parse(Deser.parseByteArrayOption, AssetIdLength).map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
+      priceAssetId      <- parse(Deser.parseByteArrayOption, AssetIdLength).map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
       orderType         <- readByte
       amount            <- read(Longs.fromByteArray, longLength)
       price             <- read(Longs.fromByteArray, longLength)
       timestamp         <- read(Longs.fromByteArray, longLength)
       expiration        <- read(Longs.fromByteArray, longLength)
       matcherFee        <- read(Longs.fromByteArray, longLength)
-      matcherFeeAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
+      matcherFeeAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength).map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
       maybeProofs       <- readEnd(Proofs.fromBytes)
     } yield {
       OrderV3(
         senderPublicKey = sender,
         matcherPublicKey = matcher,
-        assetPair = AssetPair(amountAssetId.map(ByteStr.apply), priceAssetId.map(ByteStr.apply)),
+        assetPair = AssetPair(amountAssetId, priceAssetId),
         orderType = OrderType(orderType),
         amount = amount,
         price = price,
         timestamp = timestamp,
         expiration = expiration,
         matcherFee = matcherFee,
-        matcherFeeAssetId = matcherFeeAssetId.map(ByteStr.apply),
+        matcherFeeAssetId = matcherFeeAssetId,
         proofs = maybeProofs.right.get
       )
     }

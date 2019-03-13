@@ -6,6 +6,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TransactionParsers._
 import com.wavesplatform.transaction.description.{AddressBytes, ByteEntity, LongBytes}
 import monix.eval.Coeval
@@ -17,9 +18,9 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
 
   import GenesisTransaction._
 
-  override val builder: TransactionParser        = GenesisTransaction
-  override val assetFee: (Option[AssetId], Long) = (None, 0)
-  override val id: Coeval[AssetId]               = Coeval.evalOnce(signature)
+  override val builder: TransactionParser = GenesisTransaction
+  override val assetFee: (Asset, Long)    = (Waves, 0)
+  override val id: Coeval[ByteStr]        = Coeval.evalOnce(signature)
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj(

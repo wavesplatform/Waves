@@ -8,6 +8,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
@@ -23,12 +24,12 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx =
       TransferTransactionV2
         .selfSigned(
-          assetId = None,
+          assetId = Waves,
           sender = sender.privateKey,
           recipient = contract,
           amount = 5.waves,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = minFee,
           attachment = Array.emptyByteArray
         )
@@ -44,12 +45,12 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx =
       TransferTransactionV2
         .selfSigned(
-          assetId = None,
+          assetId = Waves,
           sender = sender.privateKey,
           recipient = caller,
           amount = 10.waves,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = minFee,
           attachment = Array.emptyByteArray
         )
@@ -73,7 +74,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
         |   else {
         |	  	let currentKey = toBase58String(i.caller.bytes)
-        |	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+        |	  	let currentAmount = match getInteger(this, currentKey) {
         |	  		case a:Int => a
         |	  		case _ => 0
         |	  	}
@@ -86,7 +87,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         | @Callable(i)
         | func withdraw(amount: Int) = {
         |	  	let currentKey = toBase58String(i.caller.bytes)
-        |	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+        |	  	let currentAmount = match getInteger(this, currentKey) {
         |	  		case a:Int => a
         |	  		case _ => 0
         |	  	}
@@ -134,7 +135,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty),
-          p = Some(ContractInvocationTransaction.Payment(1.5.waves, None)),
+          p = Some(ContractInvocationTransaction.Payment(1.5.waves, Waves)),
           timestamp = System.currentTimeMillis(),
           fee = 1.waves
         )

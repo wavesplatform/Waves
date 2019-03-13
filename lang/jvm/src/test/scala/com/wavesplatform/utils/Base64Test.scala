@@ -3,7 +3,7 @@ package com.wavesplatform.utils
 import com.wavesplatform.common.utils.Base64
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class Base64Test extends PropSpec with PropertyChecks with Matchers {
 

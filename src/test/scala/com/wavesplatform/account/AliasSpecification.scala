@@ -1,8 +1,8 @@
 package com.wavesplatform.account
 
 import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class AliasSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 

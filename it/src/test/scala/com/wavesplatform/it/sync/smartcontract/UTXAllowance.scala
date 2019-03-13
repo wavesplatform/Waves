@@ -8,6 +8,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
@@ -49,12 +50,12 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
     val txA =
       TransferTransactionV2
         .selfSigned(
-          assetId = None,
+          assetId = Waves,
           sender = accounts(0),
           recipient = accounts(0),
           amount = 1.waves,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = minFee + 0.004.waves,
           attachment = Array.emptyByteArray
         )
@@ -68,12 +69,12 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
     val txB =
       TransferTransactionV2
         .selfSigned(
-          assetId = None,
+          assetId = Waves,
           sender = accounts(1),
           recipient = accounts(1),
           amount = 1.waves,
           timestamp = System.currentTimeMillis(),
-          feeAssetId = None,
+          feeAssetId = Waves,
           feeAmount = minFee + 0.004.waves,
           attachment = Array.emptyByteArray
         )

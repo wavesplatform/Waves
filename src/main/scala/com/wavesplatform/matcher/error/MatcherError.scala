@@ -4,10 +4,11 @@ import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.matcher.error.MatcherError._
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import play.api.libs.json.{JsObject, Json}
-import AssetPair.assetIdStr
 
 sealed class MatcherError(val code: Int, val message: MatcherErrorMessage) {
   import message._
@@ -62,19 +63,19 @@ object MatcherError {
       extends MatcherError(order, signature, commonClass, e"The signature of order ${'id -> id} is invalid: ${'details -> details}")
   case class PriceLastDecimalsMustBeZero(insignificantDecimals: Int)
       extends MatcherError(order, price, denied, e"Invalid price, last ${'insignificantDecimals -> insignificantDecimals} digits must be 0")
-  case class UnexpectedFeeAsset(required: Option[AssetId], given: Option[AssetId])
+  case class UnexpectedFeeAsset(required: Asset, given: Asset)
       extends MatcherError(order,
                            fee,
                            unexpected,
                            e"Required ${'required -> assetIdStr(required)} as asset fee, but given ${'given -> assetIdStr(given)}")
-  case class FeeNotEnough(required: Long, given: Long, assetId: Option[AssetId])
+  case class FeeNotEnough(required: Long, given: Long, assetId: Asset)
       extends MatcherError(
         order,
         fee,
         notEnough,
         e"Required ${'required -> required} ${'assetId -> assetIdStr(assetId)} as fee for this order, but given ${'given -> given} ${'assetId -> assetIdStr(assetId)}"
       )
-  case class AssetNotFound(assetId: AssetId) extends MatcherError(asset, commonEntity, notFound, e"The asset ${'assetId -> assetId} not found")
+  case class AssetNotFound(assetId: Asset) extends MatcherError(asset, commonEntity, notFound, e"The asset ${'assetId -> assetId} not found")
   case class CanNotCreateExchangeTransaction(details: String)
       extends MatcherError(exchangeTx, order, commonClass, e"Can't verify the order by an exchange transaction: ${'details -> details}")
   case class WrongExpiration(currentTs: Long, minExpirationOffset: Long, givenExpiration: Long)
@@ -89,15 +90,14 @@ object MatcherError {
   case class AssetPairCommonValidationFailed(details: String)
       extends MatcherError(assetPair, commonEntity, commonClass, e"The asset pair is invalid: ${'details -> details}")
 
-  case class AmountAssetBlacklisted(assetId: AssetId)
+  case class AmountAssetBlacklisted(assetId: Asset)
       extends MatcherError(asset, amount, blacklisted, e"The amount asset ${'assetId -> assetId} is blacklisted")
-  case class PriceAssetBlacklisted(assetId: AssetId)
+  case class PriceAssetBlacklisted(assetId: Asset)
       extends MatcherError(asset, price, blacklisted, e"The price asset ${'assetId -> assetId} is blacklisted")
-  case class FeeAssetBlacklisted(assetId: AssetId)
-      extends MatcherError(asset, fee, blacklisted, e"The fee asset ${'assetId -> assetId} is blacklisted")
+  case class FeeAssetBlacklisted(assetId: Asset) extends MatcherError(asset, fee, blacklisted, e"The fee asset ${'assetId -> assetId} is blacklisted")
   case class AddressIsBlacklisted(address: Address)
       extends MatcherError(account, commonEntity, blacklisted, e"The account ${'address -> address} is blacklisted")
-  case class BalanceNotEnough(required: Map[Option[AssetId], Long], actual: Map[Option[AssetId], Long])
+  case class BalanceNotEnough(required: Map[Asset, Long], actual: Map[Asset, Long])
       extends MatcherError(
         account,
         balance,
@@ -157,28 +157,28 @@ object MatcherError {
         e"The account's script of ${'address -> address} is broken, please contact with the owner. The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"
       )
 
-  case class ScriptedAssetTradingUnsupported(assetId: AssetId)
+  case class ScriptedAssetTradingUnsupported(assetId: IssuedAsset)
       extends MatcherError(
         feature,
         commonEntity,
         unsupported,
         e"The trading with scripted asset ${'assetId -> assetId} isn't yet supported, see the activation status of '${'featureName -> BlockchainFeatures.SmartAssets.description}'"
       )
-  case class AssetScriptReturnedError(assetId: AssetId, scriptMessage: String)
+  case class AssetScriptReturnedError(assetId: IssuedAsset, scriptMessage: String)
       extends MatcherError(account,
                            script,
                            commonClass,
                            e"The asset's script of ${'assetId -> assetId} returned the error: ${'scriptError -> scriptMessage}")
-  case class AssetScriptDeniedOrder(assetId: AssetId)
+  case class AssetScriptDeniedOrder(assetId: IssuedAsset)
       extends MatcherError(account, script, denied, e"The asset's script of ${'assetId -> assetId} rejected the order")
-  case class AssetScriptUnexpectResult(assetId: AssetId, returnedObject: String)
+  case class AssetScriptUnexpectResult(assetId: IssuedAsset, returnedObject: String)
       extends MatcherError(
         account,
         script,
         broken,
         e"The asset's script of ${'assetId -> assetId} is broken, please contact with the owner. The returned object is '${'invalidObject -> returnedObject}'"
       )
-  case class AssetScriptException(assetId: AssetId, errorName: String, errorText: String)
+  case class AssetScriptException(assetId: IssuedAsset, errorName: String, errorText: String)
       extends MatcherError(
         account,
         script,
@@ -232,6 +232,6 @@ object MatcherError {
     object stopping     extends Class(14)
   }
 
-  private def formatBalance(b: Map[Option[AssetId], Long]): String =
+  private def formatBalance(b: Map[Asset, Long]): String =
     b.map { case (k, v) => s"${assetIdStr(k)}:$v" } mkString ("{", ", ", "}")
 }

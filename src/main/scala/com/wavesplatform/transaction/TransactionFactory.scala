@@ -11,6 +11,7 @@ import com.wavesplatform.api.http.{ContractInvocationRequest, DataRequest, Signe
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
@@ -35,12 +36,12 @@ object TransactionFactory {
       signer       <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- TransferTransactionV1.signed(
-        request.assetId.map(s => ByteStr.decodeBase58(s).get),
+        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
         sender,
         recipientAcc,
         request.amount,
         request.timestamp.getOrElse(time.getTimestamp()),
-        request.feeAssetId.map(s => ByteStr.decodeBase58(s).get),
+        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
         request.fee,
         request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
         signer
@@ -51,12 +52,12 @@ object TransactionFactory {
     for {
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- TransferTransactionV1.create(
-        request.assetId.map(s => ByteStr.decodeBase58(s).get),
+        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
         sender,
         recipientAcc,
         request.amount,
         0,
-        request.feeAssetId.map(s => ByteStr.decodeBase58(s).get),
+        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
         request.fee,
         request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
         EmptySignature
@@ -72,12 +73,12 @@ object TransactionFactory {
       signer       <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- TransferTransactionV2.signed(
-        request.assetId.map(s => ByteStr.decodeBase58(s).get),
+        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
         sender,
         recipientAcc,
         request.amount,
         request.timestamp.getOrElse(time.getTimestamp()),
-        request.feeAssetId.map(s => ByteStr.decodeBase58(s).get),
+        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
         request.fee,
         request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
         signer
@@ -88,12 +89,12 @@ object TransactionFactory {
     for {
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- TransferTransactionV2.create(
-        request.assetId.map(s => ByteStr.decodeBase58(s).get),
+        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
         sender,
         recipientAcc,
         request.amount,
         0,
-        request.feeAssetId.map(s => ByteStr.decodeBase58(s).get),
+        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
         request.fee,
         request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
         Proofs.empty
@@ -112,7 +113,7 @@ object TransactionFactory {
       signer    <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.signed(
-        request.assetId.map(s => ByteStr.decodeBase58(s).get),
+        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
         sender,
         transfers,
         request.timestamp.getOrElse(time.getTimestamp()),
@@ -126,7 +127,7 @@ object TransactionFactory {
     for {
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.create(
-        request.assetId.map(s => ByteStr.decodeBase58(s).get),
+        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
         sender,
         transfers,
         0,
@@ -185,7 +186,7 @@ object TransactionFactory {
       tx <- SetAssetScriptTransaction.signed(
         AddressScheme.current.chainId,
         sender,
-        ByteStr.decodeBase58(request.assetId).get,
+        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
         script,
         request.fee,
         request.timestamp.getOrElse(time.getTimestamp()),
@@ -202,7 +203,7 @@ object TransactionFactory {
       tx <- SetAssetScriptTransaction.create(
         AddressScheme.current.chainId,
         sender,
-        ByteStr.decodeBase58(request.assetId).get,
+        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
         script,
         request.fee,
         request.timestamp.getOrElse(0),
@@ -476,7 +477,7 @@ object TransactionFactory {
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       tx <- ReissueTransactionV1.signed(
         sender,
-        ByteStr.decodeBase58(request.assetId).get,
+        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
         request.quantity,
         request.reissuable,
         request.fee,
@@ -488,7 +489,7 @@ object TransactionFactory {
   def reissueAssetV1(request: ReissueV1Request, sender: PublicKeyAccount): Either[ValidationError, ReissueTransactionV1] =
     ReissueTransactionV1.create(
       sender,
-      ByteStr.decodeBase58(request.assetId).get,
+      IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
       request.quantity,
       request.reissuable,
       request.fee,
@@ -506,7 +507,7 @@ object TransactionFactory {
       tx <- ReissueTransactionV2.signed(
         AddressScheme.current.chainId,
         sender,
-        ByteStr.decodeBase58(request.assetId).get,
+        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
         request.quantity,
         request.reissuable,
         request.fee,
@@ -519,7 +520,7 @@ object TransactionFactory {
     ReissueTransactionV2.create(
       AddressScheme.current.chainId,
       sender,
-      ByteStr.decodeBase58(request.assetId).get,
+      IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
       request.quantity,
       request.reissuable,
       request.fee,
@@ -536,7 +537,7 @@ object TransactionFactory {
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       tx <- BurnTransactionV1.signed(
         sender,
-        ByteStr.decodeBase58(request.assetId).get,
+        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
         request.quantity,
         request.fee,
         request.timestamp.getOrElse(time.getTimestamp()),
@@ -546,7 +547,7 @@ object TransactionFactory {
 
   def burnAssetV1(request: BurnV1Request, sender: PublicKeyAccount): Either[ValidationError, BurnTransactionV1] = BurnTransactionV1.create(
     sender,
-    ByteStr.decodeBase58(request.assetId).get,
+    IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
     request.quantity,
     request.fee,
     request.timestamp.getOrElse(0),
@@ -563,7 +564,7 @@ object TransactionFactory {
       tx <- BurnTransactionV2.signed(
         AddressScheme.current.chainId,
         sender,
-        ByteStr.decodeBase58(request.assetId).get,
+        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
         request.quantity,
         request.fee,
         request.timestamp.getOrElse(time.getTimestamp()),
@@ -574,7 +575,7 @@ object TransactionFactory {
   def burnAssetV2(request: BurnV2Request, sender: PublicKeyAccount): Either[ValidationError, BurnTransactionV2] = BurnTransactionV2.create(
     AddressScheme.current.chainId,
     sender,
-    ByteStr.decodeBase58(request.assetId).get,
+    IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
     request.quantity,
     request.fee,
     request.timestamp.getOrElse(0),
@@ -650,9 +651,15 @@ object TransactionFactory {
 
   def sponsor(request: SponsorFeeRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, SponsorFeeTransaction] =
     for {
-      sender  <- wallet.findPrivateKey(request.sender)
-      signer  <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      assetId <- ByteStr.decodeBase58(request.assetId).toEither.left.map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
+      sender <- wallet.findPrivateKey(request.sender)
+      signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+      assetId <- ByteStr
+        .decodeBase58(request.assetId)
+        .toEither
+        .right
+        .map(IssuedAsset)
+        .left
+        .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
       tx <- SponsorFeeTransaction.signed(
         sender,
         assetId,
@@ -665,7 +672,13 @@ object TransactionFactory {
 
   def sponsor(request: SponsorFeeRequest, sender: PublicKeyAccount): Either[ValidationError, SponsorFeeTransaction] =
     for {
-      assetId <- ByteStr.decodeBase58(request.assetId).toEither.left.map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
+      assetId <- ByteStr
+        .decodeBase58(request.assetId)
+        .toEither
+        .right
+        .map(IssuedAsset)
+        .left
+        .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
       tx <- SponsorFeeTransaction.create(
         sender,
         assetId,
