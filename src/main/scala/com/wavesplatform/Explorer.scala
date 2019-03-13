@@ -9,7 +9,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{Keys, LevelDBWriter}
+import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{Height, TxNum}
@@ -21,6 +21,7 @@ import monix.reactive.Observer
 import org.slf4j.bridge.SLF4JBridgeHandler
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
@@ -260,6 +261,64 @@ object Explorer extends ScorexLogging {
           println(txs.length)
           txs.foreach(println)
 
+        case "AP" =>
+          val address   = Address.fromString(args(2)).explicitGet()
+          val portfolio = reader.portfolio(address)
+          log.info(s"$address : ${portfolio.balance} WAVES, ${portfolio.lease}, ${portfolio.assets.size} assets")
+          portfolio.assets.toSeq.sortBy(_._1.toString) foreach {
+            case (assetId, balance) => log.info(s"$assetId : $balance")
+          }
+
+        case "APS" =>
+          val addrs = mutable.Set[Address]()
+
+          println(s"\nWAVES balances\n")
+          for {
+            seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
+            addressId <- db.get(Keys.addressesForWaves(seqNr)).par
+            history = db.get(Keys.wavesBalanceHistory(addressId))
+            actualHeight <- history.headOption
+            balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
+            if balance > 0
+          } yield {
+            val addr = db.get(Keys.idToAddress(addressId))
+            println(s"$addr : $balance")
+            addrs += addr
+          }
+
+          val assets = mutable.ListBuffer[ByteStr]()
+          db.iterateOver(10: Short) { e => // iterate over Keys.assetInfoHistory
+            assets += ByteStr(e.getKey.drop(2))
+          }
+
+          println(s"\nAssets balances (${assets.size} assets)")
+          for {
+            assetId <- assets.sorted
+            asset = IssuedAsset(assetId)
+            seqNr <- {
+              println(s"\n$assetId:")
+              1 to db.get(Keys.addressesForAssetSeqNr(asset))
+            }
+            addressId    <- db.get(Keys.addressesForAsset(asset, seqNr))
+            actualHeight <- db.get(Keys.assetBalanceHistory(addressId, asset)).headOption
+            balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
+            if balance > 0
+          } yield {
+            val addr = db.get(Keys.idToAddress(addressId))
+            println(s"$addr : $balance")
+            addrs += addr
+          }
+
+          println(s"\nAddress balances (${addrs.size} addresses)")
+          addrs.toSeq.sortBy(_.toString).foreach { addr =>
+            val p = reader.portfolio(addr)
+            println(s"\n$addr : ${p.balance} ${p.lease}:")
+            p.assets.toSeq.sortBy(_._1.id).foreach {
+              case (IssuedAsset(assetId), bal) =>
+                if (bal > 0)
+                  println(s"$assetId : $bal")
+            }
+          }
       }
     } finally db.close()
   }
