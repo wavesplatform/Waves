@@ -177,7 +177,7 @@ object Bindings {
         )
       case CI(p, address, maybePayment) =>
         CaseObj(
-          buildContractInvokationTransactionType(proofsEnabled).typeRef,
+          buildInvokeScriptTransactionType(proofsEnabled).typeRef,
           combine(Map(
                     "contractAddress" -> mapRecipient(address)._2,
                     "paymentInfo"     -> buildPayment(maybePayment)
