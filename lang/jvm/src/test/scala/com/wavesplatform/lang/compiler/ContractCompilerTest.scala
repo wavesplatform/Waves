@@ -233,7 +233,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |
           |	@Callable(i)
           |	func deposit() = {
-          |   let pmt = extract(i.payment)
+          |   let pmt = i.payment.value()
           |   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
           |   else {
           |	  	let currentKey = toBase58String(i.caller.bytes)
