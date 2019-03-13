@@ -27,7 +27,6 @@ trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
       "version"    -> version,
       "recipient"  -> recipient.stringRepr,
       "assetId"    -> assetId.maybeBase58Repr,
-      "feeAssetId" -> feeAssetId.maybeBase58Repr,
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
       "attachment" -> Base58.encode(attachment)

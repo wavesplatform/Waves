@@ -38,7 +38,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
       new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
     ))
   def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
-    val result = Alias.buildWithCurrentChainId(aliasName) match {
+    val result = Alias.create(aliasName) match {
       case Right(alias) =>
         blockchain.resolveAlias(alias) match {
           case Right(addr) => Right(Address(addr.stringRepr))

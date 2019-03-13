@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedWavesSettings, OrderFeeSettings, PercentSettings}
-import com.wavesplatform.state.diffs.{CommonValidation, produce}
+import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -279,7 +279,12 @@ class OrderValidatorSpecification
             val orderValidator =
               OrderValidator.blockchainAware(blockchain, transactionCreator, order.matcherPublicKey, ntpTime, orderFeeSettings) _
 
-            val minFee         = ExchangeTransactionCreator.minFee(blockchain, order.matcherPublicKey, order.assetPair)
+            val baseFee = orderFeeSettings match {
+              case FixedWavesSettings(fee) => fee
+              case _                       => OrderValidator.exchangeTransactionCreationFee
+            }
+
+            val minFee         = ExchangeTransactionCreator.minFee(blockchain, order.matcherPublicKey, order.assetPair, baseFee)
             val correctedOrder = Order.sign(order.updateFee(minFee - 1000L), sender)
 
             def setAssetsDescriptionAndEmptyScript(assets: Asset*): Unit = {
@@ -311,8 +316,8 @@ class OrderValidatorSpecification
           } yield {
 
             val minFee = orderFeeSettings match {
-              case _: FixedWavesSettings => CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
-              case _                     => order.matcherFee
+              case FixedWavesSettings(baseFee) => baseFee
+              case _                           => order.matcherFee
             }
 
             val correctedOrder = Order.sign(order.updateFee(minFee), sender)

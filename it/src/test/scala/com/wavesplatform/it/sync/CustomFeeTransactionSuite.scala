@@ -22,9 +22,9 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   private val assetToken  = 100
 
   test("make transfer with sponsored asset") {
-    val (balance1, eff1) = notMiner.accountBalances(senderAddress)
-    val (balance2, eff2) = notMiner.accountBalances(secondAddress)
-    val (balance3, eff3) = notMiner.accountBalances(minerAddress)
+    val (balance1, eff1) = miner.accountBalances(senderAddress)
+    val (balance2, eff2) = miner.accountBalances(secondAddress)
+    val (balance3, eff3) = miner.accountBalances(minerAddress)
 
     val req           = createSignedIssueRequest(assetTx)
     val issuedAssetId = sender.signedIssue(req).id
@@ -35,19 +35,19 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
 
     val fees = 2 * assetFee
-    notMiner.assertBalances(senderAddress, balance1 - fees, eff1 - fees)
-    notMiner.assertAssetBalance(senderAddress, issuedAssetId, defaultAssetQuantity)
+    miner.assertBalances(senderAddress, balance1 - fees, eff1 - fees)
+    miner.assertAssetBalance(senderAddress, issuedAssetId, defaultAssetQuantity)
 
     // until `feature-check-blocks-period` blocks have been mined, sponsorship does not occur
     val unsponsoredId = sender.transfer(senderAddress, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(unsponsoredId)
-    notMiner.assertBalances(senderAddress, balance1 - fees, eff1 - fees)
-    notMiner.assertBalances(secondAddress, balance2, eff2)
-    notMiner.assertBalances(minerAddress, balance3 + fees, eff3 + fees)
+    miner.assertBalances(senderAddress, balance1 - fees, eff1 - fees)
+    miner.assertBalances(secondAddress, balance2, eff2)
+    miner.assertBalances(minerAddress, balance3 + fees, eff3 + fees)
 
-    notMiner.assertAssetBalance(senderAddress, issuedAssetId, defaultAssetQuantity - transferFee - 1)
-    notMiner.assertAssetBalance(secondAddress, issuedAssetId, 1)
-    notMiner.assertAssetBalance(minerAddress, issuedAssetId, transferFee)
+    miner.assertAssetBalance(senderAddress, issuedAssetId, defaultAssetQuantity - transferFee - 1)
+    miner.assertAssetBalance(secondAddress, issuedAssetId, 1)
+    miner.assertAssetBalance(minerAddress, issuedAssetId, transferFee)
 
     // after `feature-check-blocks-period` asset fees should be sponsored
     nodes.waitForSameBlockHeadesAt(featureCheckBlocksPeriod)
@@ -55,13 +55,13 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     nodes.waitForHeightAriseAndTxPresent(sponsoredId)
 
     val sponsorship = Sponsorship.toWaves(transferFee, assetToken)
-    notMiner.assertBalances(senderAddress, balance1 - fees - sponsorship, eff1 - fees - sponsorship)
-    notMiner.assertBalances(secondAddress, balance2, eff2)
-    notMiner.assertBalances(minerAddress, balance3 + fees + sponsorship, balance3 + fees + sponsorship)
+    miner.assertBalances(senderAddress, balance1 - fees - sponsorship, eff1 - fees - sponsorship)
+    miner.assertBalances(secondAddress, balance2, eff2)
+    miner.assertBalances(minerAddress, balance3 + fees + sponsorship, balance3 + fees + sponsorship)
 
-    notMiner.assertAssetBalance(senderAddress, issuedAssetId, defaultAssetQuantity - transferFee - 2)
-    notMiner.assertAssetBalance(secondAddress, issuedAssetId, 2)
-    notMiner.assertAssetBalance(minerAddress, issuedAssetId, transferFee)
+    miner.assertAssetBalance(senderAddress, issuedAssetId, defaultAssetQuantity - transferFee - 2)
+    miner.assertAssetBalance(secondAddress, issuedAssetId, 2)
+    miner.assertAssetBalance(minerAddress, issuedAssetId, transferFee)
   }
 
 }
