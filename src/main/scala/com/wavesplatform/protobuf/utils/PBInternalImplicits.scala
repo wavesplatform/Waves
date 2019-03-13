@@ -2,8 +2,7 @@ package com.wavesplatform.protobuf.utils
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.account.{Alias, Recipient}
-import com.wavesplatform.protobuf.transaction.{Amount, AssetAmount, VanillaAssetId}
+import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, ValidationError}
 
