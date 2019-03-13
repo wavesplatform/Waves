@@ -49,7 +49,7 @@ object JsAPI {
     toJs(TRUE) // later
   }
 
-  private def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean = false, isContract: Boolean = false) =
+  private def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
     WavesContext.build(
       DirectiveSet(v, ScriptType.isTokenScript(isTokenContext), if (isContract) ContentType.Contract else ContentType.Expression),
       new Environment {
@@ -84,7 +84,7 @@ object JsAPI {
   }
 
   private def buildContractContext(v: StdLibVersion): CTX = {
-    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext, wavesContext(V3)))
+    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext, wavesContext(V3,false,true)))
   }
 
   @JSExportTopLevel("getTypes")
