@@ -530,7 +530,7 @@ object PBTransactions {
         )
 
       case Data.SponsorFee(SponsorFeeTransactionData(Some(AssetAmount(assetId, minFee)))) =>
-        vt.assets.SponsorFeeTransaction(sender, assetId.toByteArray, Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
+        vt.assets.SponsorFeeTransaction(sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
       case data =>
         throw new IllegalArgumentException(s"Unsupported transaction data: $data")
