@@ -19,10 +19,8 @@ class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi 
     val blocks = Observable
       .fromIterable(request.fromHeight to request.toHeight)
       .map(height => (blockchain.blockAt(height), height))
-      .filter(_._1.isDefined)
-      .map(pair => (pair._1.get, pair._2))
-      .filter(_._1.signerData.generator.toAddress == address)
-      .map(pair => BlockAndHeight(Some(pair._1.toPB), pair._2))
+      .collect { case (Some(block), height) if block.signerData.generator.toAddress == address => BlockAndHeight(Some(block.toPB), height) }
+
     responseObserver.completeWith(blocks)
   }
 

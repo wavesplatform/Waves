@@ -1,6 +1,6 @@
 package com.wavesplatform.api.grpc
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, Alias, PublicKeyAccount}
+import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -70,9 +70,9 @@ trait PBImplicitConversions {
   }
 
   implicit class PBRecipientConversions(r: Recipient) {
-    def toAddress        = Address.fromBytes(r.getAddress.toByteArray).explicitGet()
-    def toAlias          = Alias.create(r.getAlias).explicitGet()
-    def toAddressOrAlias = if (r.recipient.isAddress) toAddress else toAlias
+    def toAddress        = PBRecipients.toAddress(r).explicitGet()
+    def toAlias          = PBRecipients.toAlias(r).explicitGet()
+    def toAddressOrAlias = PBRecipients.toAddressOrAlias(r).explicitGet()
   }
 
   implicit class VanillaByteStrConversions(bs: ByteStr) {
