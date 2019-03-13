@@ -10,7 +10,8 @@ case class RestAPISettings(enable: Boolean,
                            cors: Boolean,
                            apiKeyDifferentHost: Boolean,
                            transactionByAddressLimit: Int,
-                           distributionAddressLimit: Int)
+                           distributionAddressLimit: Int,
+                           utilsThreadsLimit: Int)
 
 object RestAPISettings {
   val configPath: String = "waves.rest-api"
@@ -24,7 +25,8 @@ object RestAPISettings {
       cors = config.as[Boolean](s"$configPath.cors"),
       apiKeyDifferentHost = config.as[Boolean](s"$configPath.api-key-different-host"),
       transactionByAddressLimit = config.as[Int](s"$configPath.transactions-by-address-limit"),
-      distributionAddressLimit = config.as[Int](s"$configPath.distribution-address-limit")
+      distributionAddressLimit = config.as[Int](s"$configPath.distribution-address-limit"),
+      utilsThreadsLimit = config.as[Int](s"$configPath.utils-threads-limit"),
     )
   }
 }

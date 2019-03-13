@@ -16,6 +16,7 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
         |    api-key-different-host: yes
         |    transactions-by-address-limit = 10000
         |    distribution-address-limit = 10000
+        |    utils-threads-limit = 1
         |  }
         |}
       """.stripMargin)

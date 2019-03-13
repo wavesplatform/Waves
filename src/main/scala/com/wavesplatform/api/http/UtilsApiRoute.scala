@@ -16,16 +16,14 @@ import play.api.libs.json._
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
 case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute {
-
   import UtilsApiRoute._
 
-  private def seed(length: Int) = {
-    val seed = new Array[Byte](length)
-    new SecureRandom().nextBytes(seed) //seed mutated here!
-    Json.obj("seed" -> Base58.encode(seed))
+  private[this] val setLimitedExecutionContext = {
+    lazy val customExecutionContext = ExecutionContext.fromExecutorService(Executors.newWorkStealingPool(settings.utilsThreadsLimit))
+    if (settings.utilsThreadsLimit <= 0) pass else withExecutionContext(customExecutionContext)
   }
 
-  override val route: Route = pathPrefix("utils") {
+  override val route: Route = (pathPrefix("utils") & setLimitedExecutionContext) {
     decompile ~ compile ~ compileCode ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
   }
 
@@ -193,7 +191,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
       new ApiResponse(code = 200, message = "Json with peer list or error")
     ))
   def seedRoute: Route = (path("seed") & get) {
-    complete(seed(DefaultSeedSize))
+    complete(generateSeed(DefaultSeedSize))
   }
 
   @Path("/seed/{length}")
@@ -204,7 +202,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     ))
   @ApiResponse(code = 200, message = "Json with error message")
   def length: Route = (path("seed" / IntNumber) & get) { length =>
-    if (length <= MaxSeedSize) complete(seed(length))
+    if (length <= MaxSeedSize) complete(generateSeed(length))
     else complete(TooBigArrayAllocation)
   }
 
@@ -302,6 +300,12 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
         parseOrCreateTransaction(jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
       }
     }
+  }
+
+  private[this] def generateSeed(length: Int) = {
+    val seed = new Array[Byte](length)
+    new SecureRandom().nextBytes(seed) //seed mutated here!
+    Json.obj("seed" -> Base58.encode(seed))
   }
 }
 
