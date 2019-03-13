@@ -6,7 +6,7 @@ import "transactions.proto";
 message Block {
     message SignedHeader {
         Header header = 1;
-        bytes signature = 8;
+        bytes signature = 2;
     }
 
     message Header {
