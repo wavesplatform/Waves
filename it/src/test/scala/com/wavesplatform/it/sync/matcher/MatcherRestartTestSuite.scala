@@ -9,6 +9,7 @@ import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
@@ -26,7 +27,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
         .id
     matcherNode.waitForTransaction(aliceAsset)
 
-    val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
+    val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
     // check assets's balances
     matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
     matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)

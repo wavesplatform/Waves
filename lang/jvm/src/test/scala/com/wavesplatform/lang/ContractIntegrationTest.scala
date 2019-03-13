@@ -14,8 +14,8 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.domain.DataItem
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
 

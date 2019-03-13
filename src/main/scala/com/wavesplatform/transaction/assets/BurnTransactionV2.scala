@@ -6,6 +6,7 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
@@ -14,7 +15,7 @@ import scala.util.Try
 
 final case class BurnTransactionV2 private (chainId: Byte,
                                             sender: PublicKeyAccount,
-                                            assetId: ByteStr,
+                                            asset: IssuedAsset,
                                             quantity: Long,
                                             fee: Long,
                                             timestamp: Long,
@@ -51,43 +52,43 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
 
   def create(chainId: Byte,
              sender: PublicKeyAccount,
-             assetId: ByteStr,
+             asset: IssuedAsset,
              quantity: Long,
              fee: Long,
              timestamp: Long,
              proofs: Proofs): Either[ValidationError, BurnTransactionV2] = {
     BurnTransaction
       .validateBurnParams(quantity, fee)
-      .map(_ => BurnTransactionV2(chainId, sender, assetId, quantity, fee, timestamp, proofs))
+      .map(_ => BurnTransactionV2(chainId, sender, asset, quantity, fee, timestamp, proofs))
   }
 
   def signed(chainId: Byte,
              sender: PublicKeyAccount,
-             assetId: ByteStr,
+             asset: IssuedAsset,
              quantity: Long,
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     for {
-      unsigned <- create(chainId, sender, assetId, quantity, fee, timestamp, Proofs.empty)
+      unsigned <- create(chainId, sender, asset, quantity, fee, timestamp, Proofs.empty)
       proofs   <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes()))))
     } yield unsigned.copy(proofs = proofs)
   }
 
   def selfSigned(chainId: Byte,
                  sender: PrivateKeyAccount,
-                 assetId: ByteStr,
+                 asset: IssuedAsset,
                  quantity: Long,
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
-    signed(chainId, sender, assetId, quantity, fee, timestamp, sender)
+    signed(chainId, sender, asset, quantity, fee, timestamp, sender)
   }
 
   val byteTailDescription: ByteEntity[BurnTransactionV2] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
       PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
-      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength),
+      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength).map(IssuedAsset),
       LongBytes(tailIndex(4), "Quantity"),
       LongBytes(tailIndex(5), "Fee"),
       LongBytes(tailIndex(6), "Timestamp"),

@@ -3,7 +3,8 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction._
-import com.wavesplatform.transaction.ValidationError
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, ValidationError}
 
 private[protobuf] object PBInternalImplicits {
   import com.google.protobuf.{ByteString => PBByteString}
@@ -20,16 +21,12 @@ private[protobuf] object PBInternalImplicits {
     def toAddressOrAlias: Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient)
   }
 
-  implicit def fromAssetIdOptionAndAmount(v: (Option[VanillaAssetId], Long)): Amount = v match {
-    case (Some(assetId), amount) =>
+  implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = v match {
+    case (IssuedAsset(assetId), amount) =>
       Amount.defaultInstance.withAssetAmount(AssetAmount(assetId, amount))
 
-    case (None, amount) =>
+    case (Waves, amount) =>
       Amount.defaultInstance.withWavesAmount(amount)
-  }
-
-  implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = {
-    fromAssetIdOptionAndAmount((Option(v._1).filterNot(_.isEmpty), v._2))
   }
 
   implicit class AmountImplicitConversions(a: Amount) {
@@ -39,9 +36,9 @@ private[protobuf] object PBInternalImplicits {
       case Amount.Amount.AssetAmount(value) => value.amount
     }
 
-    def assetId: ByteStr = a.amount match {
-      case Amount.Amount.WavesAmount(_) | Amount.Amount.Empty => ByteStr.empty
-      case Amount.Amount.AssetAmount(AssetAmount(assetId, _)) => ByteStr(assetId.toByteArray)
+    def assetId: Asset = a.amount match {
+      case Amount.Amount.WavesAmount(_) | Amount.Amount.Empty => Waves
+      case Amount.Amount.AssetAmount(AssetAmount(assetId, _)) => IssuedAsset(assetId)
     }
   }
 
@@ -57,7 +54,4 @@ private[protobuf] object PBInternalImplicits {
   implicit def byteToByteString(chainId: Byte): ByteString = {
     if (chainId == 0) ByteString.EMPTY else ByteString.copyFrom(Array(chainId))
   }
-
-  implicit def assetIdToAssetIdOption(assetId: VanillaAssetId): Option[VanillaAssetId] = Option(assetId).filterNot(_.isEmpty)
-  implicit def assetIdOptionToAssetId(assetId: Option[VanillaAssetId]): VanillaAssetId = assetId.getOrElse(ByteStr.empty)
 }

@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
@@ -34,8 +35,8 @@ case class SetScriptTransaction private (chainId: Byte, sender: PublicKeyAccount
       )
     )
 
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val json                              = Coeval.evalOnce(jsonBase() ++ Json.obj("chainId" -> chainId, "version" -> version, "script" -> script.map(_.bytes().base64)))
+  override val assetFee: (Asset, Long) = (Waves, fee)
+  override val json                    = Coeval.evalOnce(jsonBase() ++ Json.obj("chainId" -> chainId, "version" -> version, "script" -> script.map(_.bytes().base64)))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
   override def version: Byte              = 1

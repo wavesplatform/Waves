@@ -15,7 +15,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.transaction.{AssetId, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
@@ -57,15 +57,15 @@ object Importer extends ScorexLogging {
 
     implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
     val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction)                                       = ???
-      override def removeAll(txs: Traversable[Transaction]): Unit                  = {}
-      override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long = ???
-      override def pessimisticPortfolio(addr: Address): Portfolio                  = ???
-      override def all                                                             = ???
-      override def size                                                            = ???
-      override def transactionById(transactionId: ByteStr)                         = ???
-      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint)         = ???
-      override def close(): Unit                                                   = {}
+      override def putIfNew(tx: Transaction)                               = ???
+      override def removeAll(txs: Traversable[Transaction]): Unit          = {}
+      override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
+      override def pessimisticPortfolio(addr: Address): Portfolio          = ???
+      override def all                                                     = ???
+      override def size                                                    = ???
+      override def transactionById(transactionId: ByteStr)                 = ???
+      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint) = ???
+      override def close(): Unit                                           = {}
     }
 
     val time = new NTP(settings.ntpServer)

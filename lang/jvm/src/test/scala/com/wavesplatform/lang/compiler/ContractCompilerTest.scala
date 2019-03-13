@@ -14,8 +14,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.{Common, StdLibVersion}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 

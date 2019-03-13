@@ -6,7 +6,7 @@ import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.{NoShrink, crypto}
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.scalatest.{Inside, Matchers, PropSpec}
 
 class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with TypedScriptGen with Inside with NoShrink {

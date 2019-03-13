@@ -31,7 +31,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, forceStopApplication}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
@@ -61,7 +61,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val LocalScoreBroadcastDebounce = 1.second
 
-  private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Option[AssetId])]
+  private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
   private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged)
 

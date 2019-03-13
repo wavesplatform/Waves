@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.OrdType
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.RealTransactionWrapper
 import monix.eval.Coeval
@@ -55,7 +56,7 @@ object MatcherContext {
       val msg = s"Function $name is inaccessible when running script on matcher"
       NativeFunction(
         name,
-        1,
+        StdLibVersion.SupportedVersions.map(_ -> 1L).toMap,
         FunctionTypeSignature(UNIT, Seq.empty, FunctionHeader.User(name)),
         _ => msg.asLeft,
         msg,

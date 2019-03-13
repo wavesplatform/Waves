@@ -23,8 +23,8 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 

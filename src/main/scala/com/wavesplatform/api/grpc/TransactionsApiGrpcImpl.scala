@@ -75,7 +75,7 @@ class TransactionsApiGrpcImpl(settings: RestAPISettings,
   override def calculateFee(request: PBTransaction): Future[CalculateFeeResponse] = {
     CommonValidation
       .getMinFee(blockchain, functionalitySettings, blockchain.height, request.toVanilla)
-      .map { case (assetId, assetAmount, _) => CalculateFeeResponse(assetId.getOrElse(ByteStr.empty).toPBByteString, assetAmount) }
+      .map { case (assetId, assetAmount, _) => CalculateFeeResponse(assetId.protoId, assetAmount) }
       .toFuture
   }
 
