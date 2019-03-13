@@ -41,6 +41,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
                          "senderPublicKey": "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
                          "fee": 100000,
+                         "feeAssetId": null,
                          "timestamp": 1526910778245,
                          "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
                          "version": 1,
