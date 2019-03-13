@@ -471,6 +471,37 @@ object OptionBytes {
     new OptionBytes(index, name, nestedByteEntity, firstByteInterpretation)
 }
 
+class SeqBytes[U](val index: Int, name: String, nestedByteEntity: ByteEntity[U]) extends ByteEntity[Seq[U]] {
+
+  def generateDoc: Seq[ByteEntityDescription] = {
+    ByteEntityDescription(index, s"$name", UnimportantType, "1", subIndex = 1) +:
+      nestedByteEntity.generateDoc.map { desc =>
+      desc.copy(
+        length = desc.length + s"/0 (depends on short in $index.1)",
+        subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
+      )
+    }
+  }
+
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Seq[U], Int)] = {
+    Try {
+      val entryCount = Shorts.fromByteArray(buf.slice(offset, offset + 2))
+
+      if (entryCount > 0) {
+        val parsed = List.iterate(nestedByteEntity.deserialize(buf, offset + 2).get, entryCount) {
+          case (_, p) => nestedByteEntity.deserialize(buf, p).get
+        }
+        parsed.map(_._1) -> parsed.last._2
+      } else
+        List.empty -> (offset + 2)
+    }
+  }
+}
+
+object SeqBytes {
+  def apply[U](index: Int, name: String, nestedByteEntity: ByteEntity[U]): ByteEntity[Seq[U]] =
+    new SeqBytes[U](index, name, nestedByteEntity)
+}
 case class Composition[T1, T2](e1: ByteEntity[T1], e2: ByteEntity[T2]) extends ByteEntity[(T1, T2)] {
 
   val index: Int = e2.index // use last index in composition

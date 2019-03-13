@@ -361,8 +361,9 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
         function = FunctionHeader.User("testfunc"),
         args = List(TRUE)
       ),
-      Some(ContractInvocationTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
+      Seq(ContractInvocationTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
       smartMinFee,
+      Waves,
       ts,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
     )

@@ -31,7 +31,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
   def jsonRepr: Seq[(JsValue, SetAssetScriptTransaction)] =
     Seq(
       (Json.parse(
-         s"""{"type":15,"id":"3GdaFxG3JDdUnGDoFNs2MoGwZYivYkkAHFcZe3T2yu72","sender":"3NBKqNonmitNjGJNS3HRKxAhJVRKiFw4PLu","senderPublicKey":"5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr","fee":78311891,"timestamp":1868142423132802425,"proofs":["5sRtXKcdDa","9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn","","3C","24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",""],"version":1,"chainId":${AddressScheme.current.chainId},"assetId":"DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n","script":"base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg=="}"""),
+         s"""{"type":15,"id":"3GdaFxG3JDdUnGDoFNs2MoGwZYivYkkAHFcZe3T2yu72","sender":"3NBKqNonmitNjGJNS3HRKxAhJVRKiFw4PLu","senderPublicKey":"5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr","fee":78311891,"feeAssetId":null,"timestamp":1868142423132802425,"proofs":["5sRtXKcdDa","9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn","","3C","24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",""],"version":1,"chainId":${AddressScheme.current.chainId},"assetId":"DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n","script":"base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg=="}"""),
        SetAssetScriptTransaction
          .create(
            AddressScheme.current.chainId,

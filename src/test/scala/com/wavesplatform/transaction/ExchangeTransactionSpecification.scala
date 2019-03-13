@@ -211,6 +211,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
          "sender":"3N22UCTvst8N1i1XDvGHzyqdgmZgwDKbp44",
          "senderPublicKey":"Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP",
          "fee":1,
+         "feeAssetId": null,
          "timestamp":1526992336241,
          "signature":"5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa",
          "proofs":["5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa"],
@@ -304,6 +305,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
          "sender":"3N22UCTvst8N1i1XDvGHzyqdgmZgwDKbp44",
          "senderPublicKey":"Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP",
          "fee":1,
+         "feeAssetId": null,
          "timestamp":1526992336241,
          "proofs":["5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa"],
          "order1":{
@@ -396,6 +398,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
          "sender":"3N22UCTvst8N1i1XDvGHzyqdgmZgwDKbp44",
          "senderPublicKey":"Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP",
          "fee":1,
+         "feeAssetId": null,
          "timestamp":1526992336241,
          "proofs":["5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa"],
          "order1":{

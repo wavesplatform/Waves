@@ -82,6 +82,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
                        "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                        "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                        "fee": 200000,
+                       "feeAssetId": null,
                        "timestamp": 1518091313964,
                        "proofs": [
                        "FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ"],

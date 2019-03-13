@@ -135,9 +135,10 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty),
-          p = Some(ContractInvocationTransaction.Payment(1.5.waves, Waves)),
+          p = Seq(ContractInvocationTransaction.Payment(1.5.waves, Waves)),
           timestamp = System.currentTimeMillis(),
-          fee = 1.waves
+          fee = 1.waves,
+          feeAssetId = Waves
         )
         .explicitGet()
 
@@ -160,9 +161,10 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.51.waves))),
-          p = None,
+          p = Seq(),
           timestamp = System.currentTimeMillis(),
-          fee = 1.waves
+          fee = 1.waves,
+          feeAssetId = Waves
         )
         .explicitGet()
 
@@ -179,9 +181,10 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.49.waves))),
-          p = None,
+          p = Seq(),
           timestamp = System.currentTimeMillis(),
-          fee = 1.waves
+          fee = 1.waves,
+          feeAssetId = Waves
         )
         .explicitGet()
 
