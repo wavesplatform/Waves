@@ -1,4 +1,6 @@
 package com.wavesplatform.protobuf.block
+import cats.instances.all._
+import cats.syntax.traverse._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.block.SignerData
@@ -24,13 +26,7 @@ object PBBlocks {
     for {
       signedHeader <- block.header.toRight(GenericError("No block header"))
       header       <- signedHeader.header.toRight(GenericError("No block header"))
-      transactions <- {
-        val eithers = block.transactions.map(PBTransactions.vanilla(_, unsafe))
-        (eithers.find(_.isLeft): @unchecked) match { // TODO: Use cats .traverse
-          case None              => Right(eithers.map(_.right.get))
-          case Some(Left(error)) => Left(error)
-        }
-      }
+      transactions <- block.transactions.map(PBTransactions.vanilla(_, unsafe)).toVector.sequence
       result = create(
         header.version,
         header.timestamp,
