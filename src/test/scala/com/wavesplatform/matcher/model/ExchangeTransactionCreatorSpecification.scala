@@ -6,6 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.{NoShrink, crypto}
@@ -23,7 +24,7 @@ class ExchangeTransactionCreatorSpecification
     with PropertyChecks
     with NoShrink {
 
-  private val pair = AssetPair(None, mkAssetId("BTC"))
+  private val pair = AssetPair(Waves, mkAssetId("BTC"))
 
   "ExchangeTransactionCreator" when {
     "SmartAccountTrading hasn't been activated yet" should {

@@ -109,7 +109,7 @@ object WavesContext {
 
     def withExtract(f: BaseFunction) = {
       val args = f.signature.args.zip(f.argsDoc).map {
-          case ((name, ty), (_name, doc)) => ("@" ++ name, ty, doc)
+        case ((name, ty), (_name, doc)) => ("@" ++ name, ty, doc)
       }
       UserFunction(
         f.name ++ "Value",
@@ -117,10 +117,10 @@ object WavesContext {
         f.cost,
         f.signature.result.asInstanceOf[UNION].l.find(_ != UNIT).get,
         f.docString ++ " (fail on error)",
-        args : _*
-        ) {
-          FUNCTION_CALL(PureContext.extract, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))
-        }
+        args: _*
+      ) {
+        FUNCTION_CALL(PureContext.extract, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))
+      }
     }
 
     def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
@@ -280,8 +280,10 @@ object WavesContext {
             tx => transactionObject(tx, proofsEnabled).asRight[String],
             _.eliminate(
               o => orderObject(o, proofsEnabled).asRight[String],
+              _.eliminate(
+                o => Bindings.contractTransfer(o).asRight[String],
               _ => "Expected Transaction or Order".asLeft[CaseObj]
-            )
+            ))
           ))
     }
 
@@ -294,7 +296,12 @@ object WavesContext {
 
     val txByIdF: BaseFunction = {
       val returnType = com.wavesplatform.lang.v1.compiler.Types.UNION.create(UNIT +: anyTransactionType.l)
-      NativeFunction("transactionById", 100, GETTRANSACTIONBYID, returnType, "Lookup transaction", ("id", BYTESTR, "transaction Id")) {
+      NativeFunction("transactionById",
+                     Map[StdLibVersion, Long](V1 -> 100, V2 -> 100, V3 -> 500),
+                     GETTRANSACTIONBYID,
+                     returnType,
+                     "Lookup transaction",
+                     ("id", BYTESTR, "transaction Id")) {
         case CONST_BYTESTR(id: ByteStr) :: Nil =>
           val maybeDomainTx: Option[CaseObj] = env.transactionById(id.arr).map(transactionObject(_, proofsEnabled))
           Right(fromOptionCO(maybeDomainTx))
@@ -396,22 +403,23 @@ object WavesContext {
     CTX(
       types ++ (if (version == V3) {
                   List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
-               } else List.empty),
+                } else List.empty),
       commonVars ++ vars(version),
-      functions ++ List(getIntegerFromStateF,
-                        getBooleanFromStateF,
-                        getBinaryFromStateF,
-                        getStringFromStateF,
-                        getIntegerFromArrayF,
-                        getBooleanFromArrayF,
-                        getBinaryFromArrayF,
-                        getStringFromArrayF,
-                        getIntegerByIndexF,
-                        getBooleanByIndexF,
-                        getBinaryByIndexF,
-                        getStringByIndexF,
-                        addressFromStringF
-                       ).map(withExtract)
+      functions ++ List(
+        getIntegerFromStateF,
+        getBooleanFromStateF,
+        getBinaryFromStateF,
+        getStringFromStateF,
+        getIntegerFromArrayF,
+        getBooleanFromArrayF,
+        getBinaryFromArrayF,
+        getStringFromArrayF,
+        getIntegerByIndexF,
+        getBooleanByIndexF,
+        getBinaryByIndexF,
+        getStringByIndexF,
+        addressFromStringF
+      ).map(withExtract)
     )
   }
 

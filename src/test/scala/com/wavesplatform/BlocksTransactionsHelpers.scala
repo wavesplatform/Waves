@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.history.DefaultBaseTarget
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
@@ -17,7 +18,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def transfer(from: PrivateKeyAccount, to: AddressOrAlias = accountGen.sample.get, amount: Long = smallFeeGen.sample.get): Gen[Transaction] =
       for {
         timestamp <- timestampGen
-      } yield TransferTransactionV1.selfSigned(None, from, to, amount, timestamp, None, FeeAmount, Array.empty).explicitGet()
+      } yield TransferTransactionV1.selfSigned(Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
 
     def lease(from: PrivateKeyAccount, to: AddressOrAlias = accountGen.sample.get, amount: Long = smallFeeGen.sample.get): Gen[LeaseTransactionV1] =
       for {

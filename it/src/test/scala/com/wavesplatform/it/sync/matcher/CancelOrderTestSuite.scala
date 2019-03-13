@@ -7,6 +7,7 @@ import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
 import scala.concurrent.duration._
@@ -15,7 +16,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private val wavesBtcPair = AssetPair(None, Some(BtcId))
+  private val wavesBtcPair = AssetPair(Waves, IssuedAsset(BtcId))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

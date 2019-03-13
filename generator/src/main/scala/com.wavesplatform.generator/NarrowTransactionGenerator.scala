@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
 import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
@@ -62,12 +63,12 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
     val tradeAssetDistribution = {
       tradeAssetIssue +: accounts.map(acc => {
         TransferTransactionV1
-          .selfSigned(Some(tradeAssetIssue.id()),
+          .selfSigned(IssuedAsset(tradeAssetIssue.id()),
                       issueTransactionSender,
                       acc,
                       5,
                       System.currentTimeMillis(),
-                      None,
+                      Waves,
                       100000,
                       Array.fill(r.nextInt(100))(r.nextInt().toByte))
           .right
@@ -115,12 +116,12 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
               case (sender, asset) =>
                 logOption(
                   TransferTransactionV1
-                    .selfSigned(asset,
+                    .selfSigned(Asset.fromCompatId(asset),
                                 sender,
                                 recipient,
                                 r.nextInt(500000),
                                 ts,
-                                None,
+                                Waves,
                                 moreThatStandartFee,
                                 Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
@@ -128,17 +129,17 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
             val reissuable = r.nextBoolean()
             randomFrom(reissuableIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(ReissueTransactionV1.selfSigned(sender, assetTx.id(), Random.nextInt(Int.MaxValue), reissuable, 100000000L, ts))
+              logOption(ReissueTransactionV1.selfSigned(sender, IssuedAsset(assetTx.id()), Random.nextInt(Int.MaxValue), reissuable, 100000000L, ts))
             })
           case BurnTransactionV1 =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(BurnTransactionV1.selfSigned(sender, assetTx.id(), Random.nextInt(1000), 100000000L, ts))
+              logOption(BurnTransactionV1.selfSigned(sender, IssuedAsset(assetTx.id()), Random.nextInt(1000), 100000000L, ts))
             })
           case ExchangeTransactionV1 =>
             val matcher   = randomFrom(accounts).get
             val seller    = randomFrom(accounts).get
-            val pair      = AssetPair(None, Some(tradeAssetIssue.id()))
+            val pair      = AssetPair(Waves, IssuedAsset(tradeAssetIssue.id()))
             val sellOrder = OrderV1.sell(seller, matcher, pair, 1, 100000000, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
             val buyer     = randomFrom(accounts).get
             val buyOrder  = OrderV1.buy(buyer, matcher, pair, 1, 100000000, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
@@ -146,7 +147,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
           case ExchangeTransactionV2 =>
             val matcher = randomFrom(accounts).get
             val seller  = randomFrom(accounts).get
-            val pair    = AssetPair(None, Some(tradeAssetIssue.id()))
+            val pair    = AssetPair(Waves, IssuedAsset(tradeAssetIssue.id()))
             // XXX generate order version
             val sellOrder = OrderV1.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
             val buyer     = randomFrom(accounts).get
@@ -188,7 +189,12 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
               case (sender, asset) =>
                 logOption(
                   MassTransferTransaction
-                    .selfSigned(asset, sender, transfers.toList, ts, 200000 + 50000 * transferCount, Array.fill(r.nextInt(100))(r.nextInt().toByte)))
+                    .selfSigned(Asset.fromCompatId(asset),
+                                sender,
+                                transfers.toList,
+                                ts,
+                                200000 + 50000 * transferCount,
+                                Array.fill(r.nextInt(100))(r.nextInt().toByte)))
             }
           case DataTransaction =>
             val sender = randomFrom(accounts).get
@@ -214,7 +220,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKe
           case SponsorFeeTransaction =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(SponsorFeeTransaction.selfSigned(sender, assetTx.id(), Some(Random.nextInt(1000)), 100000000L, ts))
+              logOption(SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetTx.id()), Some(Random.nextInt(1000)), 100000000L, ts))
             })
         }
 

@@ -5,9 +5,10 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{BurnTransactionV1, IssueTransactionV1, ReissueTransactionV1}
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -27,11 +28,13 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransactionV1 = TransferTransactionV1
-      .selfSigned(None, master, alice, 3 * Waves, ts + 1, None, transferAssetWavesFee, Array.emptyByteArray)
+      .selfSigned(Asset.Waves, master, alice, 3 * Waves, ts + 1, Asset.Waves, transferAssetWavesFee, Array.emptyByteArray)
       .explicitGet()
-    issue: IssueTransactionV1     = IssueTransactionV1.selfSigned(alice, assetName, description, quantity, decimals, false, Waves, ts + 100).explicitGet()
-    burn: BurnTransactionV1       = BurnTransactionV1.selfSigned(alice, issue.assetId(), quantity / 2, Waves, ts + 200).explicitGet()
-    reissue: ReissueTransactionV1 = ReissueTransactionV1.selfSigned(alice, issue.assetId(), burn.quantity, true, Waves, ts + 300).explicitGet()
+    issue: IssueTransactionV1 = IssueTransactionV1.selfSigned(alice, assetName, description, quantity, decimals, false, Waves, ts + 100).explicitGet()
+    burn: BurnTransactionV1   = BurnTransactionV1.selfSigned(alice, IssuedAsset(issue.assetId()), quantity / 2, Waves, ts + 200).explicitGet()
+    reissue: ReissueTransactionV1 = ReissueTransactionV1
+      .selfSigned(alice, IssuedAsset(issue.assetId()), burn.quantity, true, Waves, ts + 300)
+      .explicitGet()
   } yield (ts, genesis, masterToAlice, issue, burn, reissue)
 
   val localBlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
@@ -56,12 +59,12 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
         domain.appendBlock(block1)
 
         domain.appendBlock(block2)
-        val assetDescription1 = domain.blockchainUpdater.assetDescription(issue.assetId()).get
+        val assetDescription1 = domain.blockchainUpdater.assetDescription(IssuedAsset(issue.assetId())).get
         assetDescription1.reissuable should be(false)
         assetDescription1.totalVolume should be(issue.quantity)
 
         domain.appendBlock(block3)
-        val assetDescription2 = domain.blockchainUpdater.assetDescription(issue.assetId()).get
+        val assetDescription2 = domain.blockchainUpdater.assetDescription(IssuedAsset(issue.assetId())).get
         assetDescription2.reissuable should be(false)
         assetDescription2.totalVolume should be(issue.quantity - burn.quantity)
 
@@ -81,7 +84,7 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
         domain.appendBlock(block1)
 
         domain.appendBlock(block2)
-        val assetDescription1 = domain.blockchainUpdater.assetDescription(issue.assetId()).get
+        val assetDescription1 = domain.blockchainUpdater.assetDescription(IssuedAsset(issue.assetId())).get
         assetDescription1.reissuable should be(false)
         assetDescription1.totalVolume should be(issue.quantity)
 

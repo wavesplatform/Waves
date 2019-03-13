@@ -7,8 +7,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -82,8 +83,13 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     alias                    <- aliasGen
     fee                      <- smallFeeGen
     aliasTx = CreateAliasTransactionV1.selfSigned(aliasedRecipient, alias, fee, ts).explicitGet()
-    transfer <- transferGeneratorP(master, alias, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
-    lease    <- leaseAndCancelGeneratorP(master, alias, master).map(_._1)
+    transfer <- transferGeneratorP(
+      master,
+      alias,
+      Asset.fromCompatId(maybeAsset.map(_.id())),
+      Asset.fromCompatId(maybeFeeAsset.map(_.id()))
+    )
+    lease <- leaseAndCancelGeneratorP(master, alias, master).map(_._1)
   } yield (gen, gen2, issue1, issue2, aliasTx, transfer, lease)
 
   property("Can transfer to alias") {
@@ -94,8 +100,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
             if (transfer.sender.toAddress != aliasTx.sender.toAddress) {
               val recipientPortfolioDiff = blockDiff.portfolios(aliasTx.sender)
               transfer.assetId match {
-                case Some(aid) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
-                case None      => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
+                case aid @ IssuedAsset(_) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
+                case Waves                => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
               }
             }
         }

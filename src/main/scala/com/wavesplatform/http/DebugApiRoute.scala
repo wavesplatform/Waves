@@ -20,14 +20,13 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio}
+import com.wavesplatform.state.{Blockchain, LeaseBalance, NG}
 import com.wavesplatform.transaction.ValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.utils.byteStrWrites
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -380,7 +379,6 @@ object DebugApiRoute {
     m => Json.toJson(m.map { case (assetId, count) => assetId.base58 -> count })
   )
   implicit val leaseInfoFormat: Format[LeaseBalance] = Json.format
-  implicit val portfolioFormat: Format[Portfolio]    = Json.format
 
   case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)
 
@@ -394,7 +392,14 @@ object DebugApiRoute {
 
   case class HistoryInfo(lastBlockIds: Seq[BlockId], microBlockIds: Seq[BlockId])
 
-  implicit val historyInfoFormat: Format[HistoryInfo] = Json.format
+  implicit val historyInfoFormat: Format[HistoryInfo] = Format(
+    Reads { json =>
+      ???
+    },
+    Writes { info =>
+      ???
+    }
+  )
 
   implicit val hrCacheSizesFormat: Format[HistoryReplier.CacheSizes]          = Json.format
   implicit val mbsCacheSizesFormat: Format[MicroBlockSynchronizer.CacheSizes] = Json.format

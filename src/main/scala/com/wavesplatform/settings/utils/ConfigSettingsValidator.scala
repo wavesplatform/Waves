@@ -2,7 +2,7 @@ package com.wavesplatform.settings.utils
 
 import cats.data.Validated
 import com.typesafe.config.Config
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
@@ -30,7 +30,7 @@ class ConfigSettingsValidator(config: Config) {
     Validated.fromTry(Try(config.as[T](settingName))).leftMap(_ => List(s"Invalid setting $settingName value: ${config.getString(settingName)}"))
   }
 
-  def validateAssetId(settingName: String)(assetIdStr: String): ErrorsListOr[Option[AssetId]] = {
+  def validateAsset(settingName: String)(assetIdStr: String): ErrorsListOr[Asset] = {
     Validated
       .fromTry(AssetPair.extractAssetId(assetIdStr))
       .leftMap(_ => List(s"Invalid setting $settingName value: $assetIdStr"))

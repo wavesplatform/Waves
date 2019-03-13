@@ -53,9 +53,10 @@ object EvaluatorV1 {
 
   private def evalGetter(expr: EXPR, field: String): EvalM[EVALUATED] = {
     evalExpr(expr).flatMap { exprResult =>
-      exprResult.asInstanceOf[CaseObj].fields.get(field) match {
+      val fields = exprResult.asInstanceOf[CaseObj].fields
+fields.get(field) match {
         case Some(f) => f.pure[EvalM]
-        case None    => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$field' not found")
+        case None    => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$field' not found amongst ${fields.keys}")
       }
     }
   }

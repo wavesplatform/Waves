@@ -1229,6 +1229,23 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     )
   }
 
+  property("comments - in func and around") {
+    val code =
+      """
+        |
+        | # comment 1
+        | func foo() = # comment 2
+        | { # more comments
+        |   throw()
+        | } # comment 3
+        |
+        | foo()
+        |
+        """.stripMargin
+
+    parse(code)
+  }
+
   property("operations priority") {
     parse("a-b+c") shouldBe BINARY_OP(AnyPos,
                                       BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), SUB_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),

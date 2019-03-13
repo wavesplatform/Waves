@@ -218,4 +218,20 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
       )
     )
   }
+
+  property("functions with comment after first body bracket") {
+    val code =
+      """
+        |
+        | #@Callable(i)
+        | func foo() = 42 + 42 - 1
+        |
+        | @Ann(x)
+        | func bar(arg:ArgType) = { # more comments
+        |   foo() # comment
+        | }
+        |
+        |""".stripMargin
+    parse(code)
+  }
 }
