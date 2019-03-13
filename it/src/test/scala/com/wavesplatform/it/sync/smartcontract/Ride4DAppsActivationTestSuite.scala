@@ -10,8 +10,9 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.{IssueTransactionV2, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
@@ -88,10 +89,6 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
     )
   }
 
-  test("can't use V3 context before Ride4DApps activation") {
-    //скомпилить v3 context -> и чо?
-  }
-
   test("can't add user function to account script before Ride4DApps activation") {
     val script = ScriptCompiler.compile("""
         |func isTrue() = true
@@ -106,7 +103,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
     )
   }
 
-  test("can't add user function to asset script before Ride4DApps activation") {
+  test("can't issue asset with user function in script before Ride4DApps activation") {
     val script = ScriptCompiler.compile("""
         |func isTrue() = true
         |isTrue()
@@ -125,6 +122,26 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
       .explicitGet()
     assertBadRequestAndMessage(
       sender.signedBroadcast(issueTransaction.json() + ("type" -> JsNumber(IssueTransactionV2.typeId.toInt))),
+      "Ride4DApps has not been activated yet"
+    )
+  }
+
+  test("can't reissue asset with user function in script before Ride4DApps activation") {
+    val script = ScriptCompiler.compile("""
+        |func isTrue() = true
+        |isTrue()
+      """.stripMargin).explicitGet()._1
+    val issueTransaction = SetAssetScriptTransaction
+      .signed(AddressScheme.current.chainId,
+              smartAcc,
+              Asset.IssuedAsset("Test".getBytes),
+              Some(script),
+              issueFee,
+              System.currentTimeMillis(),
+              smartAcc)
+      .explicitGet()
+    assertBadRequestAndMessage(
+      sender.signedBroadcast(issueTransaction.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))),
       "Ride4DApps has not been activated yet"
     )
   }
