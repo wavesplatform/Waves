@@ -125,7 +125,8 @@ class Matcher(actorSystem: ActorSystem,
       () => status.get(),
       db,
       time,
-      () => currentOffset
+      () => currentOffset,
+      ExchangeTransactionCreator.minAccountFee(blockchain, matcherPublicKey.toAddress)
     )
   )
 

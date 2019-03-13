@@ -52,7 +52,8 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            matcherStatus: () => Matcher.Status,
                            db: DB,
                            time: Time,
-                           currentOffset: () => QueueEventWithMeta.Offset)
+                           currentOffset: () => QueueEventWithMeta.Offset,
+                           minMatcherFee: Long)
     extends ApiRoute
     with ScorexLogging {
 
@@ -131,7 +132,16 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @Path("/settings")
   @ApiOperation(value = "Matcher Settings", notes = "Get matcher settings", httpMethod = "GET")
   def getSettings: Route = (path("settings") & get) {
-    complete(StatusCodes.OK -> Json.obj("priceAssets" -> matcherSettings.priceAssets))
+    complete(
+      StatusCodes.OK -> Json.obj(
+        "priceAssets" -> matcherSettings.priceAssets,
+        "orderFee" -> Json.obj(
+          "fixedWaves" -> Json.obj(
+            "baseFee" -> (matcherSettings.minOrderFee + minMatcherFee)
+          )
+        ),
+      )
+    )
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}")
