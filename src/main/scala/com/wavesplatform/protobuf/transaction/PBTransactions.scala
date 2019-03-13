@@ -54,7 +54,7 @@ object PBTransactions {
             parsedTx.chainId.toByte,
             sender,
             feeAmount._1,
-            feeAmount._2.compatId,
+            feeAmount._2,
             parsedTx.timestamp,
             Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
             parsedTx.data
@@ -65,7 +65,7 @@ object PBTransactions {
           parsedTx.chainId.toByte,
           sender,
           feeAmount._1,
-          feeAmount._2.compatId,
+          feeAmount._2,
           parsedTx.timestamp,
           Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
           parsedTx.data
@@ -77,7 +77,7 @@ object PBTransactions {
                                   chainId: Byte,
                                   sender: PublicKeyAccount,
                                   feeAmount: Long,
-                                  feeAssetId: Option[ByteStr],
+                                  feeAssetId: VanillaAssetId,
                                   timestamp: Long,
                                   proofs: Proofs,
                                   data: PBTransaction.Data): Either[ValidationError, VanillaTransaction] = {
@@ -101,7 +101,7 @@ object PBTransactions {
                 address,
                 amount.longAmount,
                 timestamp,
-                Asset.fromCompatId(feeAssetId),
+                feeAssetId,
                 feeAmount,
                 attachment.toByteArray,
                 signature
@@ -117,7 +117,7 @@ object PBTransactions {
                 address,
                 amount.longAmount,
                 timestamp,
-                Asset.fromCompatId(feeAssetId),
+                feeAssetId,
                 feeAmount,
                 attachment.toByteArray,
                 proofs
@@ -314,7 +314,7 @@ object PBTransactions {
                                         chainId: Byte,
                                         sender: PublicKeyAccount,
                                         feeAmount: Long,
-                                        feeAssetId: Option[ByteStr],
+                                        feeAssetId: VanillaAssetId,
                                         timestamp: Long,
                                         proofs: Proofs,
                                         data: PBTransaction.Data): VanillaTransaction = {
@@ -414,16 +414,16 @@ object PBTransactions {
       case Data.Reissue(ReissueTransactionData(Some(AssetAmount(assetId, amount)), reissuable)) =>
         version match {
           case 1 =>
-            vt.assets.ReissueTransactionV1(sender, ByteStr(assetId.toByteArray), amount, reissuable, feeAmount, timestamp, signature)
+            vt.assets.ReissueTransactionV1(sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, signature)
           case 2 =>
-            vt.assets.ReissueTransactionV2(chainId, sender, assetId, amount, reissuable, feeAmount, timestamp, proofs)
+            vt.assets.ReissueTransactionV2(chainId, sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
       case Data.Burn(BurnTransactionData(Some(AssetAmount(assetId, amount)))) =>
         version match {
-          case 1 => vt.assets.BurnTransactionV1(sender, assetId, amount, feeAmount, timestamp, signature)
-          case 2 => vt.assets.BurnTransactionV2(chainId, sender, assetId, amount, feeAmount, timestamp, proofs)
+          case 1 => vt.assets.BurnTransactionV1(sender, IssuedAsset(assetId), amount, feeAmount, timestamp, signature)
+          case 2 => vt.assets.BurnTransactionV2(chainId, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
@@ -431,7 +431,7 @@ object PBTransactions {
         vt.assets.SetAssetScriptTransaction(
           chainId,
           sender,
-          assetId,
+          IssuedAsset(assetId),
           script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
           feeAmount,
           timestamp,
@@ -520,7 +520,7 @@ object PBTransactions {
 
       case Data.MassTransfer(MassTransferTransactionData(assetId, transfers, attachment)) =>
         vt.transfer.MassTransferTransaction(
-          Some(assetId.toByteArray: ByteStr).filterNot(_.isEmpty),
+          Asset.fromProtoId(assetId),
           sender,
           transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           timestamp,
