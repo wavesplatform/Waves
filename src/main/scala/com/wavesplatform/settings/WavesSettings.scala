@@ -47,7 +47,7 @@ object WavesSettings {
     val restAPISettings         = RestAPISettings.fromConfig(config)
     val synchronizationSettings = SynchronizationSettings.fromConfig(config)
     val utxSettings             = config.as[UtxSettings]("waves.utx")
-    val grpcSettings             = config.as[GRPCSettings]("waves.grpc")
+    val grpcSettings            = config.as[GRPCSettings]("waves.grpc")
     val featuresSettings        = config.as[FeaturesSettings]("waves.features")
     val metrics                 = config.as[Metrics.Settings]("metrics")
 

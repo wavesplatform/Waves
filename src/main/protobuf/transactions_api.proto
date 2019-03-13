@@ -1,7 +1,7 @@
 syntax = "proto3";
 package com.wavesplatform.api.grpc;
 import "recipient.proto";
-import "transactions.proto";
+import "transaction.proto";
 import "google/protobuf/empty.proto";
 
 service TransactionsApi {

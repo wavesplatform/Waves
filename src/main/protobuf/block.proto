@@ -1,7 +1,7 @@
 // Transactions
 syntax = "proto3";
 option java_package = "com.wavesplatform.protobuf.block";
-import "transactions.proto";
+import "transaction.proto";
 
 message Block {
     message SignedHeader {

@@ -12,8 +12,7 @@ import monix.reactive.Observable
 
 import scala.concurrent.Future
 
-class BlocksApiGrpcImpl(blockchain: Blockchain)
-    extends BlocksApiGrpc.BlocksApi {
+class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi {
 
   override def blocksByAddress(request: BlocksByAddressRequest, responseObserver: StreamObserver[BlockAndHeight]): Unit = {
     val address = request.getAddress.toAddress

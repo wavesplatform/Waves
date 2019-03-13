@@ -203,10 +203,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (settings.grpcSettings.enable) {
       this.grpcServer = ServerBuilder
         .forPort(settings.grpcSettings.port)
-        .addService(TransactionsApiGrpc.bindService(
-          new TransactionsApiGrpcImpl(settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels),
-          global
-        ))
+        .addService(
+          TransactionsApiGrpc.bindService(
+            new TransactionsApiGrpcImpl(settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels),
+            global
+          ))
         .addService(BlocksApiGrpc.bindService(new BlocksApiGrpcImpl(blockchainUpdater), global))
         .build()
         .start()
@@ -296,7 +297,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   @volatile var shutdownInProgress           = false
   @volatile var serverBinding: ServerBinding = _
-  @volatile var grpcServer: Server = _
+  @volatile var grpcServer: Server           = _
 
   def shutdown(utx: UtxPool, network: NS): Unit = {
     if (!shutdownInProgress) {
@@ -308,7 +309,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)
 
       log.info("Closing REST API")
-      if (settings.restAPISettings.enable) Try(Await.ready(serverBinding.unbind(), 2.minutes)).failed.map(e => log.error("Failed to unbind REST API port", e))
+      if (settings.restAPISettings.enable)
+        Try(Await.ready(serverBinding.unbind(), 2.minutes)).failed.map(e => log.error("Failed to unbind REST API port", e))
       for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) upnp.deletePort(addr.getPort)
 
       log.info("Closing gRPC API")

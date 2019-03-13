@@ -19,7 +19,11 @@ import monix.reactive.Observable
 import scala.concurrent.Future
 import scala.util.Try
 
-class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup)
+class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
+                              wallet: Wallet,
+                              blockchain: Blockchain,
+                              utx: UtxPool,
+                              allChannels: ChannelGroup)
     extends TransactionsApiGrpc.TransactionsApi {
 
   private[this] val TransactionsBatchLimit = 100
