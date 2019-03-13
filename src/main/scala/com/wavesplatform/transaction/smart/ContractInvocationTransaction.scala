@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, REF}
-import com.wavesplatform.lang.v1.{ContractLimits, Serde}
+import com.wavesplatform.lang.v1.{FunctionHeader, ContractLimits, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.ValidationError.GenericError
@@ -48,7 +48,7 @@ case class ContractInvocationTransaction private (chainId: Byte,
         Serde.serialize(fc),
         Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId.compatId)(_.arr))),
         Longs.toByteArray(fee),
-        feeAssetId.byteRepr, //.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte)),
+        feeAssetId.byteRepr,
         Longs.toByteArray(timestamp)
       )
     )
@@ -132,6 +132,14 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
         fc.args.size <= ContractLimits.MaxContractInvocationArgs,
         (),
         ValidationError.GenericError(s"ContractInvocation can't have more than ${ContractLimits.MaxContractInvocationArgs} arguments")
+      )
+      _ <- Either.cond(
+        fc.function match {
+          case FunctionHeader.User(name) => name.length <= ContractLimits.MaxFunctionName
+          case _                         => true
+        },
+        (),
+        ValidationError.GenericError(s"Callable function name must be less than ${ContractLimits.MaxFunctionName}")
       )
       _ <- Either.cond(p.forall(_.amount > 0), (), ValidationError.NegativeAmount(0, p.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString)))
       _ <- Either.cond(p.length <= 1, (), ValidationError.GenericError("Multiple payment isn't allowed now"))

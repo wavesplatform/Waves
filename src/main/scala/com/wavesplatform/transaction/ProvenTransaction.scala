@@ -16,5 +16,5 @@ trait ProvenTransaction extends Transaction with Proven {
       "fee"             -> assetFee._2,
       "feeAssetId"      -> assetFee._1.maybeBase58Repr,
       "timestamp"       -> timestamp
-    ) ++ JsObject(proofField) // ++ assetFee._1.maybeBase58Repr.fold(Json.obj())(assetId => Json.obj("feeAssetId" -> assetId))
+    ) ++ JsObject(proofField)
 }
