@@ -36,7 +36,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi 
   }
 
   override def blocksDelay(request: BlocksDelayRequest): Future[UInt64Value] = {
-    val result = withBlock(request.blockId).flatMap { block =>
+    val result = getBlockById(request.blockId).flatMap { block =>
       blockchain
         .parent(block.toVanilla, request.blockNum)
         .map(parent => UInt64Value((block.getHeader.getHeader.timestamp - parent.timestamp) / request.blockNum))
@@ -98,10 +98,10 @@ class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi 
   }
 
   override def blockBySignature(request: BlockIdRequest): Future[PBBlock] = {
-    withBlock(request.blockId).toFuture
+    getBlockById(request.blockId).toFuture
   }
 
-  private[this] def withBlock(signature: ByteStr): Either[ApiError, PBBlock] = {
+  private[this] def getBlockById(signature: ByteStr): Either[ApiError, PBBlock] = {
     blockchain
       .blockById(signature)
       .toRight(BlockDoesNotExist)
