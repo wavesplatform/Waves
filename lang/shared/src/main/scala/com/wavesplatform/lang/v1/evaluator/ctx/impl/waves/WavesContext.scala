@@ -3,7 +3,9 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.{ContentType, ScriptType}
 import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LONG, STRING, _}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -27,7 +29,13 @@ object WavesContext {
   lazy val contractResultType =
     CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
 
-  def build(version: StdLibVersion, env: Environment, isTokenContext: Boolean): CTX = {
+  def build(ds: DirectiveSet, env: Environment): CTX = {
+
+    val version = ds.stdLibVersion
+    val isTokenContext = ds.scriptType match {
+      case ScriptType.Account => false
+      case ScriptType.Asset   => true
+    }
     val environmentFunctions = new EnvironmentFunctions(env)
 
     val proofsEnabled = !isTokenContext
@@ -282,12 +290,14 @@ object WavesContext {
               o => orderObject(o, proofsEnabled).asRight[String],
               _.eliminate(
                 o => Bindings.contractTransfer(o).asRight[String],
-              _ => "Expected Transaction or Order".asLeft[CaseObj]
-            ))
+                _ => "Expected Transaction or Order".asLeft[CaseObj]
+              )
+            )
           ))
     }
 
     val heightCoeval: Coeval[Either[String, CONST_LONG]] = Coeval.evalOnce(Right(CONST_LONG(env.height)))
+    val thisCoeval: Coeval[Either[String, CaseObj]]      = Coeval.evalOnce(Right(Bindings.senderObject(env.tthis)))
 
     val anyTransactionType =
       UNION(
@@ -363,17 +373,24 @@ object WavesContext {
       ("height", ((com.wavesplatform.lang.v1.compiler.Types.LONG, "Current blockchain height"), LazyVal(EitherT(heightCoeval)))),
     )
 
+    val txVar   = ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
+    val thisVar = ("this", ((addressType.typeRef, "Contract address"), LazyVal(EitherT(thisCoeval))))
+
     val vars = Map(
-      1 -> Map(("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))),
+      1 -> Map(txVar),
       2 -> Map(
         ("Sell", ((ordTypeType, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
         ("Buy", ((ordTypeType, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval)))),
-        ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
+        txVar
       ),
-      3 -> Map(
-        ("Sell", ((sellType.typeRef, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
-        ("Buy", ((buyType.typeRef, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
-      )
+      3 -> {
+        val v3Part1: Map[String, ((FINAL, String), LazyVal)] = Map(
+          ("Sell", ((sellType.typeRef, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
+          ("Buy", ((buyType.typeRef, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
+        )
+        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == ContentType.Expression) Map(txVar) else Map(thisVar)
+        (v3Part1 ++ v3Part2)
+      }
     )
 
     lazy val functions = Array(
