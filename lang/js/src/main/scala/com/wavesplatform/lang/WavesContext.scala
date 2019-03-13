@@ -15,5 +15,6 @@ object WavesContext {
     override def resolveAlias(name: String): Either[String, Recipient.Address] = impl.Environment.resolveAddress(name)
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] =
       impl.Environment.accountBalanceOf(addressOrAlias, assetId)
+    override def tthis: Recipient.Address = ???
   }
 }

@@ -129,9 +129,10 @@ object WavesEnvironmentBenchmark {
       val state            = new LevelDBWriter(db, portfolioChanges, wavesSettings.blockchainSettings.functionalitySettings, 100000, 2000, 120 * 60 * 1000)
       new WavesEnvironment(
         AddressScheme.current.chainId,
-        Coeval.raiseError(new NotImplementedError("tx is not implemented")),
+        Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
         Coeval(state.height),
-        state
+        state,
+        Coeval.raiseError(new NotImplementedError("`this` is not implemented"))
       )
     }
 

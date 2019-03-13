@@ -9,11 +9,10 @@ import com.wavesplatform.lang.directives.{Directive, DirectiveKey}
 import scala.util.{Failure, Success, Try}
 
 package object utils {
-  type DirectiveSet = (StdLibVersion, ScriptType, ContentType)
 
   def directiveConsistency(t: DirectiveSet): Either[String, DirectiveSet] = t match {
-    case (StdLibVersion.V3, ScriptType.Account, ContentType.Contract) => Right(t)
-    case (_, _, ContentType.Expression)                               => Right(t)
+    case DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract) => Right(t)
+    case DirectiveSet(_, _, ContentType.Expression)                               => Right(t)
     case _ =>
       Left(
         s"Inconsistent set of directives $t," +
@@ -83,7 +82,7 @@ package object utils {
       v <- extractStdLibVersion(directives)
       c <- extractContentType(directives)
       t <- extractScriptType(directives)
-      r <- directiveConsistency((v, t, c))
+      r <- directiveConsistency(DirectiveSet(v, t, c))
     } yield r
 
 }

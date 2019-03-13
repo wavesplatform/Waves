@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, sampleTypes}
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -22,7 +23,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
   val ctx: CTX =
     PureContext.build(StdLibVersion.V3) |+|
       CTX(sampleTypes, Map.empty, Array.empty) |+|
-      WavesContext.build(StdLibVersion.V3, Common.emptyBlockchainEnvironment(), false)
+      WavesContext.build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
 
   property("Simple call") {
     parseCompileAndEvaluate(

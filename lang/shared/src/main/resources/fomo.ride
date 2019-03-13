@@ -17,7 +17,7 @@ func fearmissing() = {
 
 	   case _ => throw("payment must be attached")
    }
-	let lastPayment = match getInteger(i.contractAddress, "lastPayment") {
+	let lastPayment = match getInteger(this, "lastPayment") {
 		case p:Int => p
 		case _ => 0
 	}
@@ -34,11 +34,11 @@ func fearmissing() = {
 
 @Callable(i)
 func withdraw() = {
-	let callerCorrect = i.caller.bytes == extract(getBinary(i.contractAddress, liKey))
-	let heightCorrect = extract(getInteger(i.contractAddress, lhKey)) - height >= day
+	let callerCorrect = i.caller.bytes == extract(getBinary(this, liKey))
+	let heightCorrect = extract(getInteger(this, lhKey)) - height >= day
 	let canWithdraw = heightCorrect && callerCorrect
 
 	if (canWithdraw)
-		then TransferSet([ContractTransfer(i.caller, wavesBalance(i.contractAddress), unit)])
+		then TransferSet([ContractTransfer(i.caller, wavesBalance(this), unit)])
 		else throw("behold")
 }

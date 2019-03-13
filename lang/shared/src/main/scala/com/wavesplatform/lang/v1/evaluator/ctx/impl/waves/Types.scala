@@ -20,7 +20,7 @@ object Types {
   val optionPayment = UNION(paymentType.typeRef, UNIT)
 
   val invocationType =
-    CaseType("Invocation", List("caller" -> addressType.typeRef, "contractAddress" -> addressType.typeRef, "payment" -> optionPayment))
+    CaseType("Invocation", List("caller" -> addressType.typeRef, "payment" -> optionPayment))
 
   private val header = List(
     "id"        -> BYTESTR,
