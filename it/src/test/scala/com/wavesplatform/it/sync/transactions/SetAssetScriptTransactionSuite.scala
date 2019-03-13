@@ -56,7 +56,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("issuer cannot change script on asset w/o initial script") {
-    val (balance, eff) = notMiner.accountBalances(firstAddress)
+    val (balance, eff) = miner.accountBalances(firstAddress)
     assertBadRequestAndMessage(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(scriptBase64)),
       "Reason: Cannot set script on an asset issued without a script"
@@ -67,7 +67,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
       "Reason: Cannot set empty script"
     )
-    notMiner.assertBalances(firstAddress, balance, eff)
+    miner.assertBalances(firstAddress, balance, eff)
   }
 
   test("non-issuer cannot change script") {
@@ -104,8 +104,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("non-issuer cannot change script on asset w/o script") {
-    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-    val (balance2, eff2) = notMiner.accountBalances(secondAddress)
+    val (balance1, eff1) = miner.accountBalances(firstAddress)
+    val (balance2, eff2) = miner.accountBalances(secondAddress)
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
     assertBadRequestAndMessage(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee), "Reason: Cannot set empty script")
@@ -114,8 +114,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       "Reason: Cannot set empty script"
     )
 
-    notMiner.assertBalances(firstAddress, balance1, eff1)
-    notMiner.assertBalances(secondAddress, balance2, eff2)
+    miner.assertBalances(firstAddress, balance1, eff1)
+    miner.assertBalances(secondAddress, balance2, eff2)
   }
 
   test("sender's waves balance is decreased by fee") {
@@ -129,25 +129,25 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       isAssetScript = true
     ).explicitGet()._1.bytes.value.base64
 
-    val (balance, eff) = notMiner.accountBalances(firstAddress)
-    val details        = notMiner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
+    val (balance, eff) = miner.accountBalances(firstAddress)
+    val details        = miner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
     assert(details.scriptComplexity == 1)
     assert(details.scriptText == "TRUE") // [WAIT] true
     assert(details.script == scriptBase64)
 
     val txId = sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(script2)).id
     nodes.waitForHeightAriseAndTxPresent(txId)
-    notMiner.assertBalances(firstAddress, balance - setAssetScriptFee, eff - setAssetScriptFee)
-    val details2 = notMiner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
+    miner.assertBalances(firstAddress, balance - setAssetScriptFee, eff - setAssetScriptFee)
+    val details2 = miner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
     assert(details2.scriptComplexity == 18)
     assert(details2.script == script2)
   }
 
   test("cannot transact without having enough waves") {
-    val (balance, eff) = notMiner.accountBalances(firstAddress)
+    val (balance, eff) = miner.accountBalances(firstAddress)
     assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, balance + 1, Some(scriptBase64)), "negative waves balance")
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance, eff)
+    miner.assertBalances(firstAddress, balance, eff)
 
     val leaseAmount = 1.waves
     val leaseId     = sender.lease(firstAddress, secondAddress, leaseAmount, minFee).id
@@ -156,7 +156,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     assertBadRequestAndResponse(sender.setAssetScript(assetWScript, firstAddress, balance - leaseAmount, Some(scriptBase64)),
                                 "negative effective balance")
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance - minFee, eff - leaseAmount - minFee)
+    miner.assertBalances(firstAddress, balance - minFee, eff - leaseAmount - minFee)
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
@@ -168,7 +168,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         .right
         .get
 
-    val (balance, eff) = notMiner.accountBalances(firstAddress)
+    val (balance, eff) = miner.accountBalances(firstAddress)
 
     val invalidTxs = Seq(
       (sastx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
@@ -183,7 +183,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     }
 
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance, eff)
+    miner.assertBalances(firstAddress, balance, eff)
   }
 
   test("transaction requires a valid proof") {
@@ -320,14 +320,14 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       .id
     nodes.waitForHeightAriseAndTxPresent(assetV1)
 
-    val (balance1, eff1) = notMiner.accountBalances(thirdAddress)
-    val (balance2, eff2) = notMiner.accountBalances(secondAddress)
+    val (balance1, eff1) = miner.accountBalances(thirdAddress)
+    val (balance2, eff2) = miner.accountBalances(secondAddress)
     assertBadRequestAndMessage(sender.setAssetScript(assetV1, thirdAddress, setAssetScriptFee, Some(scriptBase64)).id,
                                "Reason: Cannot set script on an asset issued without a script")
     assertBadRequestAndMessage(sender.setAssetScript(assetV1, secondAddress, setAssetScriptFee, Some(scriptBase64)),
                                "Reason: Asset was issued by other address")
-    notMiner.assertBalances(thirdAddress, balance1, eff1)
-    notMiner.assertBalances(secondAddress, balance2, eff2)
+    miner.assertBalances(thirdAddress, balance1, eff1)
+    miner.assertBalances(secondAddress, balance2, eff2)
 
   }
 
