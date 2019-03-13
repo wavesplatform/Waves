@@ -100,7 +100,8 @@ object RealTransactionWrapper {
             case BinaryDataEntry(key, value)  => DataItem.Bin(key, value)
           }.toIndexedSeq
         )
-      case ci: ContractInvocationTransaction => Tx.CI(proven(ci), ci.contractAddress, ci.payment.map(p => Tx.Pmt(p.assetId.compatId, p.amount)))
+      case ci: ContractInvocationTransaction =>
+        Tx.CI(proven(ci), ci.contractAddress, ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)))
     }
   }
 }
