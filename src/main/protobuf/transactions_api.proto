@@ -1,6 +1,6 @@
 syntax = "proto3";
 package com.wavesplatform.api.grpc;
-import "address.proto";
+import "recipient.proto";
 import "transactions.proto";
 import "google/protobuf/empty.proto";
 
