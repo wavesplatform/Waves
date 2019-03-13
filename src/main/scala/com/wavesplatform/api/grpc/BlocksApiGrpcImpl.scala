@@ -14,7 +14,7 @@ import scala.concurrent.Future
 
 class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi {
 
-  override def blocksByAddress(request: BlocksByAddressRequest, responseObserver: StreamObserver[BlockAndHeight]): Unit = {
+  override def getBlocksByAddress(request: BlocksByAddressRequest, responseObserver: StreamObserver[BlockAndHeight]): Unit = {
     val address = request.getAddress.toAddress
     val blocks = Observable
       .fromIterable(request.fromHeight to request.toHeight)
@@ -24,7 +24,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi 
     responseObserver.completeWith(blocks)
   }
 
-  override def childBlock(request: BlockIdRequest): Future[PBBlock] = {
+  override def getChildBlock(request: BlockIdRequest): Future[PBBlock] = {
     val childBlock = for {
       h <- blockchain.heightOf(request.blockId)
       b <- blockchain.blockAt(h + 1)
@@ -33,7 +33,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi 
     childBlock.toFuture
   }
 
-  override def blocksDelay(request: BlocksDelayRequest): Future[UInt64Value] = {
+  override def calcBlocksDelay(request: BlocksDelayRequest): Future[UInt64Value] = {
     val result = getBlockById(request.blockId).flatMap { block =>
       blockchain
         .parent(block.toVanilla, request.blockNum)
@@ -44,26 +44,26 @@ class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi 
     result.toFuture
   }
 
-  override def blockHeight(request: BlockIdRequest): Future[UInt32Value] = {
+  override def getBlockHeight(request: BlockIdRequest): Future[UInt32Value] = {
     blockchain
       .heightOf(request.blockId)
       .map(UInt32Value(_))
       .toFuture
   }
 
-  override def currentHeight(request: Empty): Future[UInt32Value] = {
+  override def getCurrentHeight(request: Empty): Future[UInt32Value] = {
     Future.successful(UInt32Value(blockchain.height))
   }
 
-  override def blockAtHeight(request: UInt32Value): Future[PBBlock] = {
+  override def getBlockAtHeight(request: UInt32Value): Future[PBBlock] = {
     blockchain.blockAt(request.value).map(_.toPB).toFuture
   }
 
-  override def blockHeaderAtHeight(request: UInt32Value): Future[PBBlock.SignedHeader] = {
+  override def getBlockHeaderAtHeight(request: UInt32Value): Future[PBBlock.SignedHeader] = {
     blockchain.blockHeaderAndSize(request.value).map { case (header, _) => header.toPBHeader }.toFuture
   }
 
-  override def blocksRange(request: BlocksRangeRequest, responseObserver: StreamObserver[PBBlock]): Unit = {
+  override def getBlocksRange(request: BlocksRangeRequest, responseObserver: StreamObserver[PBBlock]): Unit = {
     val stream = Observable
       .fromIterable(request.fromHeight to request.toHeight)
       .map(height => blockchain.blockAt(height))
@@ -72,7 +72,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi 
     responseObserver.completeWith(stream)
   }
 
-  override def blockHeadersRange(request: BlocksRangeRequest, responseObserver: StreamObserver[PBBlock.SignedHeader]): Unit = {
+  override def getBlockHeadersRange(request: BlocksRangeRequest, responseObserver: StreamObserver[PBBlock.SignedHeader]): Unit = {
     val stream = Observable
       .fromIterable(request.fromHeight to request.toHeight)
       .map(height => blockchain.blockHeaderAndSize(height))
@@ -81,21 +81,21 @@ class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi 
     responseObserver.completeWith(stream)
   }
 
-  override def lastBlock(request: Empty): Future[PBBlock] = {
+  override def getLastBlock(request: Empty): Future[PBBlock] = {
     blockchain.lastBlock.map(_.toPB).toFuture
   }
 
-  override def lastBlockHeader(request: Empty): Future[PBBlock.SignedHeader] = {
+  override def getLastBlockHeader(request: Empty): Future[PBBlock.SignedHeader] = {
     blockchain.lastBlockHeaderAndSize
       .map(_._1.toPBHeader)
       .toFuture
   }
 
-  override def firstBlock(request: Empty): Future[PBBlock] = {
+  override def getFirstBlock(request: Empty): Future[PBBlock] = {
     Future.successful(blockchain.genesis.toPB)
   }
 
-  override def blockBySignature(request: BlockIdRequest): Future[PBBlock] = {
+  override def getBlockBySignature(request: BlockIdRequest): Future[PBBlock] = {
     getBlockById(request.blockId).toFuture
   }
 

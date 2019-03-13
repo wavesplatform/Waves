@@ -87,8 +87,8 @@ trait PBImplicitConversions {
     def toAddress          = Address.fromBytes(bs.toByteArray).explicitGet()
   }
 
-  implicit def vanillaByteStrToPBByteString(bs: ByteStr)    = bs.toPBByteString
-  implicit def pbByteStringToVanillaByteStr(bs: ByteString) = bs.toByteStr
+  implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString
+  implicit def pbByteStringToVanillaByteStr(bs: ByteString): ByteStr = bs.toByteStr
 
   private[this] implicit def shortToInt(s: Short): Int = {
     java.lang.Short.toUnsignedInt(s)

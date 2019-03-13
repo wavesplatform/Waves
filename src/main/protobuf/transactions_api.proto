@@ -5,10 +5,10 @@ import "transaction.proto";
 import "google/protobuf/empty.proto";
 
 service TransactionsApi {
-    rpc TransactionsByAddress (TransactionsByAddressRequest) returns (stream SignedTransaction);
-    rpc TransactionById (TransactionByIdRequest) returns (SignedTransaction);
-    rpc UnconfirmedTransactions (google.protobuf.Empty) returns (stream SignedTransaction);
-    rpc UnconfirmedTransactionById (TransactionByIdRequest) returns (SignedTransaction);
+    rpc GetTransactionsByAddress (TransactionsByAddressRequest) returns (stream SignedTransaction);
+    rpc GetTransactionById (TransactionByIdRequest) returns (SignedTransaction);
+    rpc GetUnconfirmedTransactions (google.protobuf.Empty) returns (stream SignedTransaction);
+    rpc GetUnconfirmedTransactionById (TransactionByIdRequest) returns (SignedTransaction);
     rpc CalculateFee (Transaction) returns (CalculateFeeResponse);
     rpc SignTransaction (TransactionSignRequest) returns (SignedTransaction);
     rpc BroadcastTransaction (SignedTransaction) returns (SignedTransaction);

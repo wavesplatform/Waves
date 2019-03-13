@@ -6,19 +6,19 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
 service BlocksApi {
-    rpc BlocksByAddress (BlocksByAddressRequest) returns (stream BlockAndHeight);
-    rpc ChildBlock (BlockIdRequest) returns (Block);
-    rpc BlocksDelay (BlocksDelayRequest) returns (google.protobuf.UInt64Value);
-    rpc BlockHeight (BlockIdRequest) returns (google.protobuf.UInt32Value);
-    rpc CurrentHeight (google.protobuf.Empty) returns (google.protobuf.UInt32Value);
-    rpc BlockAtHeight (google.protobuf.UInt32Value) returns (Block);
-    rpc BlockHeaderAtHeight (google.protobuf.UInt32Value) returns (Block.SignedHeader);
-    rpc BlocksRange (BlocksRangeRequest) returns (stream Block);
-    rpc BlockHeadersRange (BlocksRangeRequest) returns (stream Block.SignedHeader);
-    rpc LastBlock (google.protobuf.Empty) returns (Block);
-    rpc LastBlockHeader (google.protobuf.Empty) returns (Block.SignedHeader);
-    rpc FirstBlock (google.protobuf.Empty) returns (Block);
-    rpc BlockBySignature (BlockIdRequest) returns (Block);
+    rpc GetBlocksByAddress (BlocksByAddressRequest) returns (stream BlockAndHeight);
+    rpc GetChildBlock (BlockIdRequest) returns (Block);
+    rpc CalcBlocksDelay (BlocksDelayRequest) returns (google.protobuf.UInt64Value);
+    rpc GetBlockHeight (BlockIdRequest) returns (google.protobuf.UInt32Value);
+    rpc GetCurrentHeight (google.protobuf.Empty) returns (google.protobuf.UInt32Value);
+    rpc GetBlockAtHeight (google.protobuf.UInt32Value) returns (Block);
+    rpc GetBlockHeaderAtHeight (google.protobuf.UInt32Value) returns (Block.SignedHeader);
+    rpc GetBlocksRange (BlocksRangeRequest) returns (stream Block);
+    rpc GetBlockHeadersRange (BlocksRangeRequest) returns (stream Block.SignedHeader);
+    rpc GetLastBlock (google.protobuf.Empty) returns (Block);
+    rpc GetLastBlockHeader (google.protobuf.Empty) returns (Block.SignedHeader);
+    rpc GetFirstBlock (google.protobuf.Empty) returns (Block);
+    rpc GetBlockBySignature (BlockIdRequest) returns (Block);
 }
 
 message BlockIdRequest {

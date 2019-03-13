@@ -28,7 +28,7 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
 
   private[this] val TransactionsBatchLimit = 100
 
-  override def transactionsByAddress(request: TransactionsByAddressRequest, responseObserver: StreamObserver[PBSignedTransaction]): Unit = {
+  override def getTransactionsByAddress(request: TransactionsByAddressRequest, responseObserver: StreamObserver[PBSignedTransaction]): Unit = {
     def getTransactionsFromId(address: Address, fromId: Option[ByteStr]): Observable[PBSignedTransaction] = {
       def getResponse(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, Seq[PBSignedTransaction]] = {
         blockchain
@@ -50,19 +50,19 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
     responseObserver.completeWith(stream)
   }
 
-  override def transactionById(request: TransactionByIdRequest): Future[PBSignedTransaction] = {
+  override def getTransactionById(request: TransactionByIdRequest): Future[PBSignedTransaction] = {
     blockchain
       .transactionInfo(request.transactionId)
       .map(_._2.toPB)
       .toFuture
   }
 
-  override def unconfirmedTransactions(request: Empty, responseObserver: StreamObserver[PBSignedTransaction]): Unit = {
+  override def getUnconfirmedTransactions(request: Empty, responseObserver: StreamObserver[PBSignedTransaction]): Unit = {
     val stream = Observable(utx.all: _*).map(_.toPB)
     responseObserver.completeWith(stream)
   }
 
-  override def unconfirmedTransactionById(request: TransactionByIdRequest): Future[PBSignedTransaction] = {
+  override def getUnconfirmedTransactionById(request: TransactionByIdRequest): Future[PBSignedTransaction] = {
     utx
       .transactionById(request.transactionId)
       .map(_.toPB)
