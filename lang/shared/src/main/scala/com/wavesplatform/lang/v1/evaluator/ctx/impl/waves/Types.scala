@@ -77,8 +77,8 @@ object Types {
     )
   )
 
-  def buildContractInvokationTransactionType(proofsEnabled: Boolean) = CaseType(
-    "ContractInvocationTransaction",
+  def buildInvokeScriptTransactionType(proofsEnabled: Boolean) = CaseType(
+    "InvokeScriptTransaction",
     addProofsIfNeeded(
       List(
         "contractAddress" -> addressType.typeRef,
@@ -263,7 +263,7 @@ object Types {
     buildExchangeTransactionType(proofsEnabled),
     buildTransferTransactionType(proofsEnabled),
     buildSetAssetScriptTransactionType(proofsEnabled)
-  ) ++ (if (v == StdLibVersion.V3) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
+  ) ++ (if (v == StdLibVersion.V3) List(buildInvokeScriptTransactionType(proofsEnabled)) else List.empty)
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CaseType] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++
