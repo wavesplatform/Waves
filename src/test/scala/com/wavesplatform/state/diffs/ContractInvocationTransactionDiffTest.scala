@@ -448,6 +448,8 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
                            fs) {
           case (blockDiff, newState) =>
             newState.balance(acc, Waves) shouldBe amount
+            newState.balance(ci.sender, IssuedAsset(sponsoredAsset.id())) shouldBe (sponsoredAsset.quantity / 10 - ci.fee)
+            newState.balance(master, IssuedAsset(sponsoredAsset.id())) shouldBe (sponsoredAsset.quantity - sponsoredAsset.quantity / 10 + ci.fee)
         }
     }
   }
