@@ -11,15 +11,15 @@ message Block {
 
     message Header {
         bytes reference = 1;
-        int64 baseTarget = 2;
-        bytes generationSignature = 3;
-        repeated uint32 featureVotes = 4;
+        int64 base_target = 2;
+        bytes generation_signature = 3;
+        repeated uint32 feature_votes = 4;
         int64 timestamp = 5;
         int32 version = 6;
         bytes generator = 7;
     }
 
-    int32 chainId = 1;
+    int32 chain_id = 1;
     SignedHeader header = 2;
     repeated SignedTransaction transactions = 3;
 }

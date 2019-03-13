@@ -22,23 +22,23 @@ service BlocksApi {
 }
 
 message BlockIdRequest {
-    bytes blockId = 1;
+    bytes block_id = 1;
 }
 
 message BlocksRangeRequest {
-    uint32 fromHeight = 2;
-    uint32 toHeight = 3;
+    uint32 from_height = 2;
+    uint32 to_height = 3;
 }
 
 message BlocksByAddressRequest {
     Recipient address = 1;
-    uint32 fromHeight = 2;
-    uint32 toHeight = 3;
+    uint32 from_height = 2;
+    uint32 to_height = 3;
 }
 
 message BlocksDelayRequest {
-    bytes blockId = 1;
-    uint32 blockNum = 2;
+    bytes block_id = 1;
+    uint32 block_num = 2;
 }
 
 message BlockAndHeight {
