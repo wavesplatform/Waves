@@ -18,8 +18,7 @@ object MiningConstraint {
   }
 }
 
-case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn, description: String = "")
-    extends MiningConstraint {
+case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn, description: String = "") extends MiningConstraint {
   override def isEmpty: Boolean = {
     rest < estimator.minEstimate
   }

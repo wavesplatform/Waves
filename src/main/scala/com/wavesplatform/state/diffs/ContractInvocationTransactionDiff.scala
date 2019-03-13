@@ -47,8 +47,8 @@ object ContractInvocationTransactionDiff {
           ))
         .evaluationContext
 
-      val invoker                                    = tx.sender.toAddress.bytes
-      val maybePayment: Seq[(Long, Option[ByteStr])] = tx.payment.map(p => (p.amount, p.assetId.compatId))
+      val invoker                                       = tx.sender.toAddress.bytes
+      val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
       ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
     }
 
