@@ -168,7 +168,10 @@ object CommonValidation {
         }
 
       case _: TransferTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case it: IssueTransactionV2   => activationBarrier(if (it.script.isEmpty) BlockchainFeatures.SmartAccounts else BlockchainFeatures.SmartAssets)
+      case it: IssueTransactionV2   => it.script match {
+        case None     => Right(tx)
+        case Some(sc) => scriptActivation(sc)
+      }
 
       case it: SetAssetScriptTransaction =>
         it.script match {
