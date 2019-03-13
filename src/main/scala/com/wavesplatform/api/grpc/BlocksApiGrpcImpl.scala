@@ -2,107 +2,91 @@ package com.wavesplatform.api.grpc
 
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.{UInt32Value, UInt64Value}
-import com.wavesplatform.api.http.{ApiError, BlockDoesNotExist}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.state.Blockchain
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler.Implicits.global
-import monix.reactive.Observable
 
 import scala.concurrent.Future
 
 class BlocksApiGrpcImpl(blockchain: Blockchain) extends BlocksApiGrpc.BlocksApi {
+  private[this] val commonApi = new CommonBlocksApi(blockchain)
 
   override def getBlocksByAddress(request: BlocksByAddressRequest, responseObserver: StreamObserver[BlockAndHeight]): Unit = {
-    val address = request.getAddress.toAddress
-    val blocks = Observable
-      .fromIterable(request.fromHeight to request.toHeight)
-      .map(height => (blockchain.blockAt(height), height))
-      .collect { case (Some(block), height) if block.signerData.generator.toAddress == address => BlockAndHeight(Some(block.toPB), height) }
+    val blocks = commonApi.getBlocksByAddress(request.getAddress.toAddress, request.fromHeight, request.toHeight)
+      .map { case (block, height) => BlockAndHeight(Some(block.toPB), height) }
 
     responseObserver.completeWith(blocks)
   }
 
   override def getChildBlock(request: BlockIdRequest): Future[PBBlock] = {
-    val childBlock = for {
-      h <- blockchain.heightOf(request.blockId)
-      b <- blockchain.blockAt(h + 1)
-    } yield b.toPB
-
-    childBlock.toFuture
+    commonApi.getChildBlock(request.blockId)
+      .map(_.toPB)
+      .toFuture
   }
 
   override def calcBlocksDelay(request: BlocksDelayRequest): Future[UInt64Value] = {
-    val result = getBlockById(request.blockId).flatMap { block =>
-      blockchain
-        .parent(block.toVanilla, request.blockNum)
-        .map(parent => UInt64Value((block.getHeader.getHeader.timestamp - parent.timestamp) / request.blockNum))
-        .toRight(BlockDoesNotExist)
-    }
-
-    result.toFuture
+    commonApi.calcBlocksDelay(request.blockId, request.blockNum)
+      .map(UInt64Value(_))
+      .toFuture
   }
 
   override def getBlockHeight(request: BlockIdRequest): Future[UInt32Value] = {
-    blockchain
-      .heightOf(request.blockId)
+    commonApi.getBlockHeight(request.blockId)
       .map(UInt32Value(_))
       .toFuture
   }
 
   override def getCurrentHeight(request: Empty): Future[UInt32Value] = {
-    Future.successful(UInt32Value(blockchain.height))
+    Future.successful(UInt32Value(commonApi.getCurrentHeight()))
   }
 
   override def getBlockAtHeight(request: UInt32Value): Future[PBBlock] = {
-    blockchain.blockAt(request.value).map(_.toPB).toFuture
+    commonApi.getBlockAtHeight(request.value)
+      .map(_.toPB)
+      .toFuture
   }
 
   override def getBlockHeaderAtHeight(request: UInt32Value): Future[PBBlock.SignedHeader] = {
-    blockchain.blockHeaderAndSize(request.value).map { case (header, _) => header.toPBHeader }.toFuture
+    commonApi.getBlockHeaderAtHeight(request.value)
+      .map { case (header, _) => header.toPBHeader }
+      .toFuture
   }
 
   override def getBlocksRange(request: BlocksRangeRequest, responseObserver: StreamObserver[PBBlock]): Unit = {
-    val stream = Observable
-      .fromIterable(request.fromHeight to request.toHeight)
-      .map(height => blockchain.blockAt(height))
-      .collect { case Some(block) => block.toPB }
+    val stream = commonApi.getBlocksRange(request.fromHeight, request.toHeight)
+      .map { case (_, block) => block.toPB }
 
     responseObserver.completeWith(stream)
   }
 
   override def getBlockHeadersRange(request: BlocksRangeRequest, responseObserver: StreamObserver[PBBlock.SignedHeader]): Unit = {
-    val stream = Observable
-      .fromIterable(request.fromHeight to request.toHeight)
-      .map(height => blockchain.blockHeaderAndSize(height))
-      .collect { case Some((header, _)) => header.toPBHeader }
+    val stream = commonApi.getBlockHeadersRange(request.fromHeight, request.toHeight)
+      .map { case (_, bh, _) => bh.toPBHeader }
 
     responseObserver.completeWith(stream)
   }
 
   override def getLastBlock(request: Empty): Future[PBBlock] = {
-    blockchain.lastBlock.map(_.toPB).toFuture
+    commonApi.getLastBlock()
+      .map(_.toPB)
+      .toFuture
   }
 
   override def getLastBlockHeader(request: Empty): Future[PBBlock.SignedHeader] = {
-    blockchain.lastBlockHeaderAndSize
+    commonApi.getLastBlockHeader()
       .map(_._1.toPBHeader)
       .toFuture
   }
 
   override def getFirstBlock(request: Empty): Future[PBBlock] = {
-    Future.successful(blockchain.genesis.toPB)
+    Future.successful(commonApi.getFirstBlock().toPB)
   }
 
   override def getBlockBySignature(request: BlockIdRequest): Future[PBBlock] = {
-    getBlockById(request.blockId).toFuture
-  }
-
-  private[this] def getBlockById(signature: ByteStr): Either[ApiError, PBBlock] = {
-    blockchain
-      .blockById(signature)
-      .toRight(BlockDoesNotExist)
+    commonApi.getBlockBySignature(request.blockId)
       .map(_.toPB)
+      .toFuture
   }
 }
