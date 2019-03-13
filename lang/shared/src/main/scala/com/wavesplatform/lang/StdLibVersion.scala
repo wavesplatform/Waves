@@ -22,7 +22,7 @@ object ContentType extends TaggedType[Int] {
   type ContentType = ContentType.Type
 
   val Expression: ContentType = 1 @@ ContentType
-  val Contract: ContentType = 2 @@ ContentType
+  val Contract: ContentType   = 2 @@ ContentType
 
   val SupportedTypes: Set[ContentType] = Set(Expression, Contract)
 
@@ -31,9 +31,11 @@ object ContentType extends TaggedType[Int] {
     case 2 => Contract
   }
 
+  def isContract(isContract: Boolean) = if (isContract) Contract else Expression
+
   def parseString(s: String) = s match {
     case "EXPRESSION" => Expression
-    case "CONTRACT" => Contract
+    case "CONTRACT"   => Contract
   }
 }
 
@@ -41,7 +43,7 @@ object ScriptType extends TaggedType[Int] {
   type ScriptType = ScriptType.Type
 
   val Account: ScriptType = 1 @@ ScriptType
-  val Asset: ScriptType = 2 @@ ScriptType
+  val Asset: ScriptType   = 2 @@ ScriptType
 
   val SupportedTypes: Set[ScriptType] = Set(Account, Asset)
 
@@ -50,9 +52,10 @@ object ScriptType extends TaggedType[Int] {
     case 2 => Asset
   }
 
+  def isTokenScript(b: Boolean) = if (b) Asset else Account
+
   def parseString(s: String) = s match {
     case "ACCOUNT" => Account
-    case "ASSET" => Asset
+    case "ASSET"   => Asset
   }
 }
-

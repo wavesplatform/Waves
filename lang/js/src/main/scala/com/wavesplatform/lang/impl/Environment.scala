@@ -10,8 +10,9 @@ import scala.scalajs.{js => platform}
 @JSGlobalScope
 object Environment extends scalajs.js.Object {
   type InputEntity = com.wavesplatform.lang.v1.traits.Environment.InputEntity
-  def height: Long  = platform.native
-  def chainId: Byte = platform.native
+  def height: Long             = platform.native
+  def chainId: Byte            = platform.native
+  def tthis: Recipient.Address = platform.native
 
   def inputEntity: InputEntity                             = platform.native
   def transactionById(id: Array[Byte]): Option[Tx]         = platform.native

@@ -7,6 +7,7 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -14,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.traits.domain.Tx.ContractTransfer
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
-import com.wavesplatform.lang.{Global, StdLibVersion}
+import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -41,9 +42,10 @@ object ContractInvocationTransactionDiff {
           Seq(
             PureContext.build(StdLibVersion.V3),
             CryptoContext.build(Global),
-            WavesContext.build(StdLibVersion.V3,
-                               new WavesEnvironment(AddressScheme.current.chainId, Coeval(tx.asInstanceOf[In]), Coeval(height), blockchain),
-                               false)
+            WavesContext.build(
+              DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract),
+              new WavesEnvironment(AddressScheme.current.chainId, Coeval(tx.asInstanceOf[In]), Coeval(height), blockchain, Coeval(tx.contractAddress))
+            )
           ))
         .evaluationContext
 
@@ -220,7 +222,8 @@ object ContractInvocationTransactionDiff {
           )),
         CompositeBlockchain.composite(blockchain, totalDiff),
         script,
-        true
+        true,
+        tx.contractAddress
       ) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, true))
         case (log, Right(FALSE)) =>
