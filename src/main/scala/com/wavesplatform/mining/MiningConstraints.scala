@@ -30,7 +30,8 @@ object MiningConstraints {
     new MiningConstraints(
       total =
         if (isScriptEnabled)
-          MultiDimensionalMiningConstraint(NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total))
+          MultiDimensionalMiningConstraint(
+            NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total))
         else total,
       keyBlock =
         if (isNgEnabled)

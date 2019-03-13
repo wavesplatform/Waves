@@ -66,10 +66,7 @@ sealed trait ByteEntity[T] { self =>
 
   /** Generates documentation ready for pasting into .md files */
   def getStringDocForMD: String = {
-
-    val docs = generateDoc
-
-    docs
+    generateDoc
       .map {
         case ByteEntityDescription(idx, name, tpe, length, subIndex, additionalInfo) =>
           s"| $idx${Option(subIndex).filter(_ != 0).fold("")(si => s".$si")} | $name | $tpe | $length $additionalInfo\n"
@@ -84,11 +81,11 @@ sealed trait ByteEntity[T] { self =>
 
 object ByteEntity {
 
-  implicit def byteEntityFunctor: Functor[ByteEntity] = new Functor[ByteEntity] {
+  implicit val byteEntityFunctor: Functor[ByteEntity] = new Functor[ByteEntity] {
     def map[A, B](fa: ByteEntity[A])(f: A => B): ByteEntity[B] = fa map f
   }
 
-  implicit def byteEntitySemigroupal: Semigroupal[ByteEntity] = new Semigroupal[ByteEntity] {
+  implicit val byteEntitySemigroupal: Semigroupal[ByteEntity] = new Semigroupal[ByteEntity] {
     def product[A, B](fa: ByteEntity[A], fb: ByteEntity[B]): ByteEntity[(A, B)] = Composition(fa, fb)
   }
 }
