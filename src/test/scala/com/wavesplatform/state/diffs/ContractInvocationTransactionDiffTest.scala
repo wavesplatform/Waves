@@ -162,7 +162,9 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
       ci = ContractInvocationTransaction
-        .selfSigned(invoker, master, fc, payment.toSeq, fee, if (sponsored) { IssuedAsset(issueTx.id()) } else { Waves }, ts)
+        .selfSigned(invoker, master, fc, payment.toSeq, if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee }, if (sponsored) {
+          IssuedAsset(issueTx.id())
+        } else { Waves }, ts)
         .explicitGet()
     } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
@@ -433,10 +435,15 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       a  <- accountGen
       am <- smallFeeGen
       contractGen = (paymentContractGen(a, am, false) _)
-      r <- preconditionsAndSetContract(contractGen)
-    } yield (a, am, r._1, r._2, r._3, r._5, r._6)) {
-      case (acc, amount, genesis, setScript, ci, sponsoredAsset, setSponsorship) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq[Transaction](sponsoredAsset, setSponsorship, setScript))),
+      r  <- preconditionsAndSetContract(contractGen, sponsored = true)
+      ts <- timestampGen
+    } yield (ts, a, am, r._1, r._2, r._3, r._4, r._5, r._6)) {
+      case (ts, acc, amount, genesis, setScript, ci, master, sponsoredAsset, setSponsorship) =>
+        val t =
+          TransferTransactionV2
+            .selfSigned(IssuedAsset(sponsoredAsset.id()), master, ci.sender, sponsoredAsset.quantity / 10, ts, Waves, enoughFee, Array[Byte]())
+            .explicitGet()
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq[Transaction](sponsoredAsset, t, setSponsorship, setScript))),
                            TestBlock.create(Seq(ci)),
                            fs) {
           case (blockDiff, newState) =>
