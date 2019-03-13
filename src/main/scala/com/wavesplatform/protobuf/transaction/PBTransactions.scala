@@ -54,7 +54,7 @@ object PBTransactions {
             parsedTx.chainId.toByte,
             sender,
             feeAmount._1,
-            feeAmount._2.compatId,
+            feeAmount._2,
             parsedTx.timestamp,
             Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
             parsedTx.data
@@ -65,7 +65,7 @@ object PBTransactions {
           parsedTx.chainId.toByte,
           sender,
           feeAmount._1,
-          feeAmount._2.compatId,
+          feeAmount._2,
           parsedTx.timestamp,
           Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
           parsedTx.data
@@ -77,7 +77,7 @@ object PBTransactions {
                                   chainId: Byte,
                                   sender: PublicKeyAccount,
                                   feeAmount: Long,
-                                  feeAssetId: Option[ByteStr],
+                                  feeAssetId: VanillaAssetId,
                                   timestamp: Long,
                                   proofs: Proofs,
                                   data: PBTransaction.Data): Either[ValidationError, VanillaTransaction] = {
@@ -101,7 +101,7 @@ object PBTransactions {
                 address,
                 amount.longAmount,
                 timestamp,
-                Asset.fromCompatId(feeAssetId),
+                feeAssetId,
                 feeAmount,
                 attachment.toByteArray,
                 signature
@@ -117,7 +117,7 @@ object PBTransactions {
                 address,
                 amount.longAmount,
                 timestamp,
-                Asset.fromCompatId(feeAssetId),
+                feeAssetId,
                 feeAmount,
                 attachment.toByteArray,
                 proofs
@@ -314,7 +314,7 @@ object PBTransactions {
                                         chainId: Byte,
                                         sender: PublicKeyAccount,
                                         feeAmount: Long,
-                                        feeAssetId: Option[ByteStr],
+                                        feeAssetId: VanillaAssetId,
                                         timestamp: Long,
                                         proofs: Proofs,
                                         data: PBTransaction.Data): VanillaTransaction = {
@@ -337,7 +337,7 @@ object PBTransactions {
               recipient.toAddressOrAlias.explicitGet(),
               amount.longAmount,
               timestamp,
-              Asset.fromCompatId(feeAssetId),
+              feeAssetId,
               feeAmount,
               attachment.toByteArray,
               signature
@@ -350,7 +350,7 @@ object PBTransactions {
               amount.assetId,
               amount.longAmount,
               timestamp,
-              Asset.fromCompatId(feeAssetId),
+              feeAssetId,
               feeAmount,
               attachment.toByteArray,
               proofs
@@ -431,7 +431,7 @@ object PBTransactions {
         vt.assets.SetAssetScriptTransaction(
           chainId,
           sender,
-          IssuedAsset(assetId.toByteArray),
+          IssuedAsset(assetId),
           script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
           feeAmount,
           timestamp,

@@ -50,7 +50,7 @@ object ContractInvocationTransactionDiff {
         .evaluationContext
 
       val invoker                                       = tx.sender.toAddress.bytes
-      val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.map(p => (p.amount, p.assetId.compatId))
+      val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
       ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
     }
 
@@ -144,19 +144,20 @@ object ContractInvocationTransactionDiff {
     }
     val totalDataBytes = r.map(_.toBytes.size).sum
 
-    val payablePart: Map[Address, Portfolio] = tx.payment match {
-      case None => Map.empty
-      case Some(ContractInvocationTransaction.Payment(amt, assetId)) =>
-        assetId match {
-          case asset @ IssuedAsset(_) =>
-            Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
-              Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
-            )
-          case Waves =>
-            Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
-              .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
-        }
-    }
+    val payablePart: Map[Address, Portfolio] = (tx.payment
+      .map {
+        case ContractInvocationTransaction.Payment(amt, assetId) =>
+          assetId match {
+            case asset @ IssuedAsset(_) =>
+              Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
+                Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+              )
+            case Waves =>
+              Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
+                .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
+          }
+      })
+      .foldLeft(Map[Address, Portfolio]())(_ combine _)
     if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes)
       Right(
         Diff(

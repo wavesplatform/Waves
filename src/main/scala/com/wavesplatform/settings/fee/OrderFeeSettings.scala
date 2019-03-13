@@ -7,9 +7,11 @@ import com.wavesplatform.settings.fee.Mode.Mode
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
 import net.ceedubs.ficus.readers.ValueReader
+import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
@@ -17,9 +19,32 @@ object OrderFeeSettings {
 
   type ErrorsListOr[A] = Validated[List[String], A]
 
-  sealed trait OrderFeeSettings
+  sealed trait OrderFeeSettings {
 
-  case class FixedWavesSettings(minFee: Long)                      extends OrderFeeSettings
+    /** Returns json for order fee settings taking into account fee that should be paid for matcher's account script invocation */
+    def getJson(minMarcherFee: Long): Coeval[JsObject] = Coeval.evalOnce {
+      Json.obj(
+        this match {
+          case FixedWavesSettings(baseFee) =>
+            "fixedWaves" -> Json.obj(
+              "baseFee" -> (baseFee + minMarcherFee)
+            )
+          case FixedSettings(defaultAssetId, minFee) =>
+            "fixed" -> Json.obj(
+              "assetId" -> defaultAssetId.maybeBase58Repr,
+              "minFee"  -> minFee
+            )
+          case PercentSettings(assetType, minFee) =>
+            "percent" -> Json.obj(
+              "type"   -> assetType,
+              "minFee" -> minFee
+            )
+        }
+      )
+    }
+  }
+
+  case class FixedWavesSettings(baseFee: Long)                     extends OrderFeeSettings
   case class FixedSettings(defaultAssetId: Asset, minFee: Long)    extends OrderFeeSettings
   case class PercentSettings(assetType: AssetType, minFee: Double) extends OrderFeeSettings
 
@@ -46,7 +71,7 @@ object OrderFeeSettings {
     }
 
     def validateFixedWavesSettings: ErrorsListOr[FixedWavesSettings] = {
-      validateByPredicate[Long](s"${getPrefixByMode(Mode.FIXED_WAVES)}.min-fee")(_ > 0, "must be > 0") map FixedWavesSettings
+      validateByPredicate[Long](s"${getPrefixByMode(Mode.FIXED_WAVES)}.base-fee")(_ > 0, "must be > 0") map FixedWavesSettings
     }
 
     def validateFixedSettings: ErrorsListOr[FixedSettings] = {

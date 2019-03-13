@@ -530,7 +530,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     chainId = AddressScheme.current.chainId
     fee       <- smallFeeGen
     timestamp <- timestampGen
-  } yield ContractInvocationTransaction.selfSigned(sender, contractAddress, fc, po, fee, timestamp).explicitGet()
+  } yield ContractInvocationTransaction.selfSigned(sender, contractAddress, fc, po.toSeq, fee, Waves, timestamp).explicitGet()
 
   val priceGen: Gen[Long]            = Gen.choose(1, 3 * 100000L * 100000000L)
   val matcherAmountGen: Gen[Long]    = Gen.choose(1, 3 * 100000L * 100000000L)

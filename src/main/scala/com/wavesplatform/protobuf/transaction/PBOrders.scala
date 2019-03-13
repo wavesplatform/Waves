@@ -13,8 +13,7 @@ object PBOrders {
     VanillaOrder(
       PublicKeyAccount(order.senderPublicKey.toByteArray),
       PublicKeyAccount(order.matcherPublicKey.toByteArray),
-      vt.assets.exchange
-        .AssetPair(Asset.fromProtoId(order.getAssetPair.amountAssetId), Asset.fromProtoId(order.getAssetPair.priceAssetId)),
+      vt.assets.exchange.AssetPair(Asset.fromProtoId(order.getAssetPair.amountAssetId), Asset.fromProtoId(order.getAssetPair.priceAssetId)),
       order.orderSide match {
         case PBOrder.Side.BUY             => vt.assets.exchange.OrderType.BUY
         case PBOrder.Side.SELL            => vt.assets.exchange.OrderType.SELL
