@@ -402,7 +402,7 @@ class LevelDBWriter(writableDB: DB,
     }
 
     rw.put(Keys.carryFee(height), carry)
-    expiredKeys ++= updateHistory(rw, Keys.carryFeeHistory, threshold, Keys.carryFee)
+    expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
     expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
@@ -529,7 +529,6 @@ class LevelDBWriter(writableDB: DB,
           rw.delete(Keys.blockHeaderAndSizeAt(h))
           rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
-          rw.filterHistory(Keys.carryFeeHistory, currentHeight)
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
             DisableHijackedAliases.revert(rw)
