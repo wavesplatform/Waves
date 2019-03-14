@@ -39,35 +39,31 @@ trait PBImplicitConversions {
     def toVanilla = PBBlocks.vanilla(block).explicitGet()
   }
 
-  implicit class PBBlockSignedHeaderConversionOps(header: PBBlock.SignedHeader) {
-    def toVanilla: vb.BlockHeader = {
+  implicit class PBBlockSignedHeaderConversionOps(header: PBBlock.Header) {
+    def toVanilla(signature: ByteStr): vb.BlockHeader = {
       new vb.BlockHeader(
-        header.getHeader.timestamp,
-        header.getHeader.version.toByte,
-        header.getHeader.reference.toByteStr,
-        vb.SignerData(header.getHeader.generator.toPublicKeyAccount, header.signature.toByteStr),
-        NxtLikeConsensusBlockData(header.getHeader.baseTarget, header.getHeader.generationSignature.toByteStr),
+        header.timestamp,
+        header.version.toByte,
+        header.reference.toByteStr,
+        vb.SignerData(header.generator.toPublicKeyAccount, signature),
+        NxtLikeConsensusBlockData(header.baseTarget, header.generationSignature.toByteStr),
         0,
-        header.getHeader.featureVotes.map(intToShort).toSet
+        header.featureVotes.map(intToShort).toSet
       )
     }
   }
 
   implicit class VanillaHeaderConversionOps(header: vb.BlockHeader) {
-    def toPBHeader: PBBlock.SignedHeader = {
-      val unsignedHeader = PBBlock.Header(
-        0: Byte,
-        header.reference.toPBByteString,
-        header.consensusData.baseTarget,
-        header.consensusData.generationSignature.toPBByteString,
-        header.featureVotes.map(shortToInt).toSeq,
-        header.timestamp,
-        header.version,
-        ByteString.copyFrom(header.signerData.generator.publicKey)
-      )
-
-      PBBlock.SignedHeader(Some(unsignedHeader), header.signerData.signature.toPBByteString)
-    }
+    def toPBHeader: PBBlock.Header = PBBlock.Header(
+      0: Byte,
+      header.reference.toPBByteString,
+      header.consensusData.baseTarget,
+      header.consensusData.generationSignature.toPBByteString,
+      header.featureVotes.map(shortToInt).toSeq,
+      header.timestamp,
+      header.version,
+      ByteString.copyFrom(header.signerData.generator.publicKey)
+    )
   }
 
   implicit class PBRecipientConversions(r: Recipient) {

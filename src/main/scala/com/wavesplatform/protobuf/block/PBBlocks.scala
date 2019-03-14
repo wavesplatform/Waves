@@ -24,8 +24,7 @@ object PBBlocks {
     }
 
     for {
-      signedHeader <- block.header.toRight(GenericError("No block header"))
-      header       <- signedHeader.header.toRight(GenericError("No block header"))
+      header       <- block.header.toRight(GenericError("No block header"))
       transactions <- block.transactions.map(PBTransactions.vanilla(_, unsafe)).toVector.sequence
       result = create(
         header.version,
@@ -35,7 +34,7 @@ object PBBlocks {
         transactions,
         header.featureVotes.map(intToShort).toSet,
         PublicKeyAccount(header.generator.toByteArray),
-        ByteStr(signedHeader.signature.toByteArray)
+        ByteStr(block.signature.toByteArray)
       )
     } yield result
   }
@@ -46,28 +45,25 @@ object PBBlocks {
     import signerData._
 
     new PBBlock(
-      0: Byte,
       Some(
-        PBBlock.SignedHeader(
-          Some(PBBlock.Header(
-            0: Byte,
-            ByteString.copyFrom(reference),
-            baseTarget,
-            ByteString.copyFrom(generationSignature),
-            featureVotes.map(shortToInt).toSeq,
-            timestamp,
-            version,
-            ByteString.copyFrom(generator.publicKey)
-          )),
-          ByteString.copyFrom(signature)
+        PBBlock.Header(
+          0: Byte,
+          ByteString.copyFrom(reference),
+          baseTarget,
+          ByteString.copyFrom(generationSignature),
+          featureVotes.map(shortToInt).toSeq,
+          timestamp,
+          version,
+          ByteString.copyFrom(generator.publicKey)
         )),
+      ByteString.copyFrom(signature),
       transactionData.map(PBTransactions.protobuf)
     )
   }
 
   def clearChainId(block: PBBlock): PBBlock = {
     block.update(
-      _.chainId := 0,
+      _.header.chainId := 0,
       _.transactions.foreach(_.transaction.chainId := 0)
     )
   }

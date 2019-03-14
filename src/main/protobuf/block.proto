@@ -4,11 +4,6 @@ option java_package = "com.wavesplatform.protobuf.block";
 import "transaction.proto";
 
 message Block {
-    message SignedHeader {
-        Header header = 1;
-        bytes signature = 2;
-    }
-
     message Header {
         int32 chain_id = 1;
         bytes reference = 2;
@@ -20,7 +15,7 @@ message Block {
         bytes generator = 8;
     }
 
-    int32 chain_id = 1;
-    SignedHeader header = 2;
+    Header header = 1;
+    bytes signature = 2;
     repeated SignedTransaction transactions = 3;
 }

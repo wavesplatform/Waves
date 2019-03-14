@@ -10,12 +10,8 @@ service BlocksApi {
     rpc GetBlocksRange (BlocksRangeRequest) returns (stream BlockAndHeight);
     rpc CalcBlocksDelay (BlocksDelayRequest) returns (google.protobuf.UInt64Value);
     rpc GetCurrentHeight (google.protobuf.Empty) returns (google.protobuf.UInt32Value);
-    rpc GetBlockAtHeight (google.protobuf.UInt32Value) returns (Block);
-    rpc GetBlockHeaderAtHeight (google.protobuf.UInt32Value) returns (Block.SignedHeader);
-    rpc GetBlockHeadersRange (BlocksRangeRequest) returns (stream Block.SignedHeader);
-    rpc GetLastBlock (google.protobuf.Empty) returns (Block);
-    rpc GetLastBlockHeader (google.protobuf.Empty) returns (Block.SignedHeader);
-    rpc GetFirstBlock (google.protobuf.Empty) returns (Block);
+    rpc GetLastBlock (BlockRequest) returns (Block);
+    rpc GetFirstBlock (BlockRequest) returns (Block);
 }
 
 message BlockRequest {
@@ -24,6 +20,8 @@ message BlockRequest {
         int32 height = 2;
         bytes parent_id = 3;
     }
+
+    bool include_transactions = 100;
 }
 
 message BlocksRangeRequest {
@@ -32,6 +30,8 @@ message BlocksRangeRequest {
     oneof filter {
         bytes generator = 3;
     }
+
+    bool include_transactions = 100;
 }
 
 message BlocksDelayRequest {
