@@ -4,6 +4,7 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.DataRequest._
 import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
@@ -13,7 +14,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -26,8 +26,10 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import monix.execution.Scheduler
 import play.api.libs.json._
 
+import scala.concurrent.Future
 import scala.util.Success
 
 @Path("/transactions")
@@ -38,10 +40,12 @@ case class TransactionsApiRoute(settings: RestAPISettings,
                                 blockchain: Blockchain,
                                 utx: UtxPool,
                                 allChannels: ChannelGroup,
-                                time: Time)
+                                time: Time)(implicit sc: Scheduler)
     extends ApiRoute
     with BroadcastRoute
     with CommonApiFunctions {
+
+  private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, allChannels)
 
   override lazy val route =
     pathPrefix("transactions") {
@@ -81,7 +85,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       path(Segment) { encoded =>
         ByteStr.decodeBase58(encoded) match {
           case Success(id) =>
-            blockchain.transactionInfo(id) match {
+            commonApi.transactionById(id) match {
               case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
               case None          => complete(StatusCodes.NotFound             -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
             }
@@ -94,7 +98,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   @ApiOperation(value = "Unconfirmed transactions", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
-      complete(JsArray(utx.all.map(txToExtendedJson)))
+      complete(JsArray(commonApi.unconfirmedTransactions().map(txToExtendedJson)))
     } ~ utxSize ~ utxTransactionInfo
   }
 
@@ -119,7 +123,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       path(Segment) { encoded =>
         ByteStr.decodeBase58(encoded) match {
           case Success(id) =>
-            utx.transactionById(id) match {
+            commonApi.unconfirmedTransactionById(id) match {
               case Some(tx) =>
                 complete(txToExtendedJson(tx))
               case None =>
@@ -148,13 +152,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           )
 
           createTransaction(senderPk, enrichedJsv) { tx =>
-            CommonValidation.getMinFee(blockchain, functionalitySettings, blockchain.height, tx).map {
-              case (assetId, assetAmount, wavesAmount) =>
-                Json.obj(
-                  "feeAssetId" -> assetId,
-                  "feeAmount"  -> assetAmount
-                )
-            }
+            commonApi.calculateFee(tx)
+              .map { case (assetId, assetAmount, _) => Json.obj("feeAssetId" -> assetId, "feeAmount"  -> assetAmount) }
           }
         }
       }
@@ -259,7 +258,9 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   def broadcast: Route = (pathPrefix("broadcast") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
-        doBroadcast(TransactionFactory.fromSignedRequest(jsv))
+        TransactionFactory.fromSignedRequest(jsv)
+          .map(commonApi.broadcastTransaction)
+          .left.map(ApiError.fromValidationError)
       }
     }
   }
@@ -276,24 +277,13 @@ case class TransactionsApiRoute(settings: RestAPISettings,
     }
   }
 
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, JsArray] = {
-    def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Either[String, JsArray] = {
-      lazy val addressesCached = concurrent.blocking((blockchain.aliasesOfAddress(address) :+ address).toSet)
-
-      /**
-        * Produces compact representation for large transactions by stripping unnecessary data.
-        * Currently implemented for MassTransfer transaction only.
-        */
-      def txToCompactJson(address: Address, tx: Transaction): JsObject = {
-        import com.wavesplatform.transaction.transfer._
-        tx match {
-          case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
-          case _                                                               => txToExtendedJson(tx)
-        }
-      }
-
-      val txs = concurrent.blocking(blockchain.addressTransactions(address, Set.empty, limit, fromId))
-      txs.map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) })))
+  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, Future[JsArray]] = {
+    def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
+      commonApi.transactionsByAddress(address, fromId)
+        .take(limit)
+        .toListL
+        .map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToExtendedJson(tx) + ("height" -> JsNumber(height)) })))
+        .runAsync
     }
 
     for {
@@ -309,10 +299,6 @@ case class TransactionsApiRoute(settings: RestAPISettings,
             )
         case None => Right(None)
       }
-      result <- createTransactionsJsonArray(address, limit, maybeAfter).fold(
-        err => Left(CustomValidationError(err)),
-        arr => Right(arr)
-      )
-    } yield result
+    } yield createTransactionsJsonArray(address, limit, maybeAfter)
   }
 }

@@ -42,6 +42,7 @@ import kamon.Kamon
 import kamon.influxdb.CustomInfluxDBReporter
 import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
+import monix.execution.Scheduler
 import monix.execution.Scheduler._
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
@@ -56,15 +57,12 @@ import scala.util.Try
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
+  private[this] val apiScheduler = Scheduler(actorSystem.dispatcher)
 
   private val db = openDB(settings.dataDirectory)
-
   private val LocalScoreBroadcastDebounce = 1.second
-
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
-
   private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged)
-
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
   private val wallet: Wallet = try {
@@ -205,10 +203,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         .forPort(settings.grpcSettings.port)
         .addService(
           TransactionsApiGrpc.bindService(
-            new TransactionsApiGrpcImpl(settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels),
-            global
+            new TransactionsApiGrpcImpl(settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels)(apiScheduler),
+            apiScheduler
           ))
-        .addService(BlocksApiGrpc.bindService(new BlocksApiGrpcImpl(blockchainUpdater), global))
+        .addService(BlocksApiGrpc.bindService(new BlocksApiGrpcImpl(blockchainUpdater)(apiScheduler), apiScheduler))
         .build()
         .start()
 
@@ -218,14 +216,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, allChannels),
+        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, allChannels)(apiScheduler),
         TransactionsApiRoute(settings.restAPISettings,
                              settings.blockchainSettings.functionalitySettings,
                              wallet,
                              blockchainUpdater,
                              utxStorage,
                              allChannels,
-                             time),
+                             time)(apiScheduler),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
         PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),

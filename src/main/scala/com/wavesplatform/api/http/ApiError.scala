@@ -79,7 +79,7 @@ object ApiError {
       })()
   }
 
-  implicit class ApiErrorException(e: ApiError) extends IllegalArgumentException(e.message) {
+  implicit class ApiErrorException(val error: ApiError) extends IllegalArgumentException(error.message) {
     def toException = this
   }
 }

@@ -1,12 +1,13 @@
 package com.wavesplatform.api
 import java.util.concurrent.atomic.AtomicReference
 
+import com.wavesplatform.api.http.ApiError
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
+import io.grpc.{Status, StatusException}
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
 
 package object grpc extends PBImplicitConversions {
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
@@ -82,7 +83,7 @@ package object grpc extends PBImplicitConversions {
           }
         }
 
-        override def onError(t: Throwable): Unit = streamObserver.onError(t)
+        override def onError(t: Throwable): Unit = streamObserver.onError(GRPCErrors.toStatusException(t))
         override def onComplete(): Unit          = streamObserver.onCompleted()
         def cancel(): Unit                       = Option(subscription).foreach(_.cancel())
       }
@@ -90,18 +91,16 @@ package object grpc extends PBImplicitConversions {
       monix.reactive.observers.Subscriber.fromReactiveSubscriber(rxs, rxs)
     }
 
-    def completeWith(obs: Observable[T]): Unit = {
+    def completeWith(obs: Observable[T]): Cancelable = {
       streamObserver match {
-        case cso: CallStreamObserver[T] =>
+        case _: CallStreamObserver[T] =>
           obs.subscribe(this.toSubscriber)
 
         case _ => // No back-pressure
           obs
+            .doOnError(exception => streamObserver.onError(GRPCErrors.toStatusException(exception)))
+            .doOnComplete(() => streamObserver.onCompleted())
             .foreach(value => streamObserver.onNext(value))
-            .onComplete {
-              case Success(_)         => streamObserver.onCompleted()
-              case Failure(exception) => streamObserver.onError(exception)
-            }
       }
     }
   }
@@ -109,13 +108,22 @@ package object grpc extends PBImplicitConversions {
   implicit class OptionToFutureConversionOps[T](opt: Option[T]) {
     def toFuture: Future[T] = opt match {
       case Some(value) => Future.successful(value)
-      case None        => Future.failed(new NoSuchElementException)
+      case None        => Future.failed(new StatusException(Status.NOT_FOUND))
+    }
+
+    def toFuture(apiError: ApiError): Future[T] = opt match {
+      case Some(value) => Future.successful(value)
+    case None        => Future.failed(GRPCErrors.toStatusException(apiError))
     }
   }
 
-  implicit class EitherToFutureConversionOps[E, T](either: Either[E, T])(implicit ev: E => Throwable) {
+  implicit class EitherToFutureConversionOps[E, T](either: Either[E, T])(implicit toThrowable: E => Throwable) {
     def toFuture: Future[T] = {
-      Future.fromTry(either.left.map(ev).toTry)
+      val result = either.left
+      .map(e => GRPCErrors.toStatusException(toThrowable(e)))
+      .toTry
+
+      Future.fromTry(result)
     }
   }
 

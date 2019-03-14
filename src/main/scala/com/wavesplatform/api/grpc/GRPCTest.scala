@@ -5,7 +5,7 @@ import io.grpc.ManagedChannelBuilder
 
 object GRPCTest extends App {
   val channel = ManagedChannelBuilder
-    .forAddress("localhost", 1234)
+    .forAddress("localhost", 6870)
     .usePlaintext()
     .build()
 

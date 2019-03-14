@@ -31,7 +31,7 @@ message BlocksRangeRequest {
 }
 
 message BlocksByAddressRequest {
-    Recipient address = 1;
+    bytes address = 1;
     uint32 from_height = 2;
     uint32 to_height = 3;
 }
