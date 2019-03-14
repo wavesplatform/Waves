@@ -1,5 +1,7 @@
 package com.wavesplatform.network
 
+import java.util
+
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings._
@@ -14,11 +16,17 @@ import monix.execution.Ack
 import monix.execution.Ack.Continue
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.{Observable, Observer}
-import com.wavesplatform.protobuf.events.PBEvents
+import com.wavesplatform.protobuf.events.{PBBlockchainUpdated, PBEvents}
+import io.netty.handler.codec.MessageToMessageEncoder
+import io.netty.handler.codec.protobuf.{ProtobufEncoder, ProtobufVarint32LengthFieldPrepender}
 
-class StateUpdateHandler
+private object PBScalaToJava extends MessageToMessageEncoder[PBBlockchainUpdated] {
+  override def encode(ctx: ChannelHandlerContext, msg: PBBlockchainUpdated, out: util.List[AnyRef]): Unit = {
+    out.add(PBBlockchainUpdated.toJavaProto(msg))
+  }
+}
 
-class UpdateServerHandler(stateUpdates: Observable[BlockchainUpdated]) extends ChannelInboundHandlerAdapter {
+private class StateUpdateHandler(stateUpdates: Observable[BlockchainUpdated]) extends ChannelInboundHandlerAdapter {
   implicit def toByteString(bs: ByteStr): ByteString =
     ByteString.copyFrom(bs.arr)
 
@@ -56,7 +64,12 @@ class StateUpdateServer(settings: WavesSettings, stateUpdates: Observable[Blockc
     .channel(classOf[NioServerSocketChannel])
     .childHandler(
       new PipelineInitializer[SocketChannel](
-        Seq(new UpdateServerHandler(stateUpdates))
+        Seq(
+          new ProtobufVarint32LengthFieldPrepender,
+          new ProtobufEncoder,
+          PBScalaToJava,
+          new StateUpdateHandler(stateUpdates)
+        )
       )
     )
     .bind(settings.networkSettings.stateUpdatesAddress)
