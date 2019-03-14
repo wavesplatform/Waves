@@ -88,7 +88,7 @@ object Keys {
   def aliasIsDisabled(alias: Alias): Key[Boolean] =
     Key("alias-is-disabled", bytes(AliasIsDisabledPrefix, alias.bytes.arr), Option(_).exists(_(0) == 1), if (_) Array[Byte](1) else Array[Byte](0))
 
-  val carryFeeHistory: Key[Seq[Int]]   = historyKey("carry-fee-history", 44, Array())
+  /* 44: carryFeeHistory, obsolete */
   def carryFee(height: Int): Key[Long] = Key("carry-fee", h(45, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetScriptHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey("asset-script-history", 46, asset.id.arr)

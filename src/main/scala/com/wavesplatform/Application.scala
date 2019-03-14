@@ -32,7 +32,7 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, forceStopApplication}
+import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -364,26 +364,9 @@ object Application extends ScorexLogging {
       maybeFilename <- userConfigPath
       file = new File(maybeFilename)
       if file.exists
-    } yield file
+    } yield ConfigFactory.parseFile(file)
 
-    val config = maybeConfigFile match {
-      // if no user config is supplied, the library will handle overrides/application/reference automatically
-      case None =>
-        log.warn("NO CONFIGURATION FILE WAS PROVIDED. STARTING WITH DEFAULT SETTINGS FOR TESTNET!")
-        ConfigFactory.load()
-      // application config needs to be resolved wrt both system properties *and* user-supplied config.
-      case Some(file) =>
-        val cfg = ConfigFactory.parseFile(file)
-        if (!cfg.hasPath("waves")) {
-          log.error("Malformed configuration file was provided! Aborting!")
-          log.error("Please, read following article about configuration file format:")
-          log.error("https://github.com/wavesplatform/Waves/wiki/Waves-Node-configuration-file")
-          forceStopApplication()
-        }
-        loadConfig(cfg)
-    }
-
-    config
+    loadConfig(maybeConfigFile)
   }
 
   def main(args: Array[String]): Unit = {
