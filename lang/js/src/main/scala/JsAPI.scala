@@ -49,7 +49,7 @@ object JsAPI {
     toJs(TRUE) // later
   }
 
-  private def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean = false, isContract: Boolean = false) =
+  private def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
     WavesContext.build(
       DirectiveSet(v, ScriptType.isTokenScript(isTokenContext), if (isContract) ContentType.Contract else ContentType.Expression),
       new Environment {
@@ -84,7 +84,7 @@ object JsAPI {
   }
 
   private def buildContractContext(v: StdLibVersion): CTX = {
-    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext, wavesContext(V3)))
+    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext, wavesContext(V3, false, true)))
   }
 
   @JSExportTopLevel("getTypes")
@@ -147,7 +147,7 @@ object JsAPI {
           case ContentType.Expression =>
             val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset, contentType == ContentType.Contract)
             Global
-              .compileExpression(input, ctx.compilerContext, letBLockVersions contains ver)
+              .compileExpression(input, ctx.compilerContext, letBLockVersions contains ver, ver)
               .fold(
                 err => {
                   js.Dynamic.literal("error" -> err)
@@ -159,7 +159,7 @@ object JsAPI {
           case ContentType.Contract =>
             // Just ignore stdlib version here
             Global
-              .compileContract(input, fullContractContext.compilerContext)
+              .compileContract(input, fullContractContext.compilerContext, ver)
               .fold(
                 err => {
                   js.Dynamic.literal("error" -> err)

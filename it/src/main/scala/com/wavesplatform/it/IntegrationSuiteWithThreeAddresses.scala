@@ -22,9 +22,9 @@ trait IntegrationSuiteWithThreeAddresses
     with ScorexLogging {
   this: Suite =>
 
-  def notMiner: Node
+  def miner: Node
 
-  protected def sender: Node = notMiner
+  protected def sender: Node = miner
 
   protected lazy val firstAddress: String  = sender.createAddress()
   protected lazy val secondAddress: String = sender.createAddress()
@@ -39,7 +39,7 @@ trait IntegrationSuiteWithThreeAddresses
 
     def dumpBalances(node: Node, accounts: Seq[String], label: String): Unit = {
       accounts.foreach(acc => {
-        val (balance, eff) = notMiner.accountBalances(acc)
+        val (balance, eff) = miner.accountBalances(acc)
 
         val formatted = s"$acc: balance = $balance, effective = $eff"
         log.debug(s"$label account balance:\n$formatted")
@@ -57,6 +57,7 @@ trait IntegrationSuiteWithThreeAddresses
 
     def makeTransfers(accounts: Seq[String]): Seq[String] = accounts.map { acc =>
       sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransferTransactionV1.typeId)).id
+
     }
 
     def correctStartBalancesFuture(): Unit = {
@@ -77,7 +78,7 @@ trait IntegrationSuiteWithThreeAddresses
       }
 
       dumpBalances(sender, accounts, "after transfer")
-      accounts.foreach(notMiner.assertBalances(_, defaultBalance, defaultBalance))
+      accounts.foreach(miner.assertBalances(_, defaultBalance, defaultBalance))
     }
 
     withClue("beforeAll") {
