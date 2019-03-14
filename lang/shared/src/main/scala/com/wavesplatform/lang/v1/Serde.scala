@@ -58,7 +58,14 @@ object Serde {
       case DEC_FUNC =>
         for {
           name <- Coeval.now(bb.getString)
-          args <- Coeval.now(for (_ <- 1 to bb.getInt) yield bb.getString)
+          args <- ({
+            val argsCnt = bb.getInt
+            if (argsCnt <= (bb.limit() - bb.position())/2) {
+              Coeval.now(for (_ <- 1 to bb.getInt) yield bb.getString)
+            } else {
+              Coeval.raiseError(new Exception(s"At position ${bb.position()} array of arguments names too big."))
+            }
+          })
           body <- aux
         } yield FUNC(name, args.toList, body)
     }
@@ -95,8 +102,12 @@ object Serde {
           .now((bb.getFunctionHeader, bb.getInt))
           .flatMap {
             case (header, argc) =>
-              val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAux(bb))(collection.breakOut)
-              args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
+              if (argc <= (bb.limit() - bb.position())/2) {
+                val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAux(bb))(collection.breakOut)
+                args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
+              } else {
+                Coeval.raiseError(new Exception(s"At position ${bb.position()} array of arguments too big."))
+              }
           }
     }
   }
