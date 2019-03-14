@@ -4,7 +4,7 @@ import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.{UInt32Value, UInt64Value}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.http.{ApiError, BlockDoesNotExist}
+import com.wavesplatform.api.http.BlockDoesNotExist
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.state.Blockchain
 import io.grpc.stub.StreamObserver
@@ -24,8 +24,8 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
     } yield blocks
 
     result match {
-      case Right(value) => responseObserver.completeWith(value)
-      case Left(error)  => responseObserver.onError(GRPCErrors.toStatusException(ApiError.fromValidationError(error)))
+      case Right(stream) => responseObserver.completeWith(stream)
+      case Left(error)   => responseObserver.failWith(error)
     }
   }
 

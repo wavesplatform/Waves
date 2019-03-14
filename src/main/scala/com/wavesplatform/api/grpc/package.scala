@@ -103,6 +103,10 @@ package object grpc extends PBImplicitConversions {
             .foreach(value => streamObserver.onNext(value))
       }
     }
+
+    def failWith(error: ApiError): Unit = {
+      streamObserver.onError(GRPCErrors.toStatusException(error))
+    }
   }
 
   implicit class OptionToFutureConversionOps[T](opt: Option[T]) {

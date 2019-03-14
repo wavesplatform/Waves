@@ -13,7 +13,7 @@ object GRPCErrors {
 
   val ErrorCodeKey = Metadata.Key.of("Error-Code", IntMarshaller)
 
-  def toStatusException(api: ApiError): StatusException = {
+  private[this] def errorToStatusException(api: ApiError): StatusException = {
     val code = api match {
       case WalletNotExist | WalletAddressNotExists | TransactionNotExists => Status.NOT_FOUND
       case WalletAlreadyExists                                            => Status.ALREADY_EXISTS
@@ -27,8 +27,8 @@ object GRPCErrors {
   }
 
   def toStatusException(exc: Throwable): StatusException = exc match {
-    case a: ApiErrorException        => toStatusException(a.error)
-    case v: ValidationErrorException => toStatusException(ApiError.fromValidationError(v.error))
+    case a: ApiErrorException        => errorToStatusException(a.error)
+    case v: ValidationErrorException => errorToStatusException(ApiError.fromValidationError(v.error))
     case _                           => new StatusException(Status.fromThrowable(exc).withDescription(exc.getMessage))
   }
 }

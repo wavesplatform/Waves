@@ -23,7 +23,7 @@ trait ApiError {
 }
 
 object ApiError {
-  def fromValidationError(e: ValidationError): ApiError = {
+  implicit def fromValidationError(e: ValidationError): ApiError = {
     e match {
       case ValidationError.InvalidAddress(_)       => InvalidAddress
       case ValidationError.NegativeAmount(x, of)   => NegativeAmount(s"$x of $of")
