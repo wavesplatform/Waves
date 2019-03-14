@@ -15,6 +15,7 @@ import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, FixedWave
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV3}
 import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.{Arbitrary, Gen}
@@ -210,6 +211,20 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       OrderV3(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
     }
 
+  val orderV3WithFeeInWavesGenerator: Gen[Order] =
+    for {
+      sender: PrivateKeyAccount <- accountGen
+      pair                      <- assetPairGen
+      orderType                 <- orderTypeGenerator
+      amount: Long              <- maxWavesAmountGen
+      price: Long               <- Gen.choose(1, (Long.MaxValue / amount) - 100)
+      timestamp: Long           <- createdTimeGen
+      expiration: Long          <- maxTimeGen
+      matcherFee: Long          <- maxWavesAmountGen
+    } yield {
+      OrderV3(sender, MatcherAccount, pair, orderType, amount, price, timestamp, expiration, matcherFee, Waves)
+    }
+
   def orderV3PairGenerator: Gen[((PrivateKeyAccount, Order), (PrivateKeyAccount, Order))] =
     for {
       senderBuy: PrivateKeyAccount  <- accountGen
@@ -277,6 +292,13 @@ trait MatcherTestData extends NTPTime { _: Suite =>
   def fixedWavesSettingsGenerator(lowerBaseFeeBound: Long = 1, upperBaseFeeBound: Long = 1000000L): Gen[FixedWavesSettings] =
     for { baseFee <- Gen.choose(lowerBaseFeeBound, upperBaseFeeBound) } yield { FixedWavesSettings(baseFee) }
 
+  def orderFeeSettingsGenerator(defaultAssetForFixedSettings: Option[Asset] = None): Gen[OrderFeeSettings] = {
+    for {
+      defaultAsset     <- defaultAssetForFixedSettings.fold(assetIdGen(1))(asset => Gen.const(IssuedAsset(asset.compatId.get)))
+      orderFeeSettings <- Gen.oneOf(fixedWavesSettingsGenerator(), fixedSettingsGenerator(defaultAsset), percentSettingsGenerator)
+    } yield orderFeeSettings
+  }
+
   val orderWithMatcherSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
     for {
       arbitraryAsset   <- assetIdGen(100)
@@ -284,26 +306,52 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       orderFeeSettings <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(defaultAsset), fixedWavesSettingsGenerator())
       (order, sender)  <- orderGenerator
     } yield {
-
-      import com.wavesplatform.transaction.assets.exchange.OrderOps._
-
-      val correctOrder = (order.version, orderFeeSettings) match {
-        case (3, FixedWavesSettings(baseFee)) =>
-          order
-            .updateMatcherFeeAssetId(Waves)
-            .updateFee(baseFee + 1000L)
-        case (3, FixedSettings(defaultAssetId, minFee)) =>
-          order
-            .updateMatcherFeeAssetId(defaultAssetId)
-            .updateFee(minFee + 1000L)
-        case (3, percentSettings: PercentSettings) =>
-          order
-            .updateMatcherFeeAssetId(OrderValidator.getValidFeeAssetForSettings(order, percentSettings))
-            .updateFee(OrderValidator.getMinValidFeeForSettings(order, percentSettings, order.price) + 1000L)
-        case _ => order
-      }
-
-      (correctOrder, sender, orderFeeSettings)
+      val correctedOrder = correctOrderByFeeSettings(order, sender, orderFeeSettings)
+      (correctedOrder, sender, orderFeeSettings)
     }
+  }
+
+  def orderWithMatcherSettingsGenerator(tpe: OrderType, price: Long): Gen[(Order, OrderFeeSettings)] =
+    for {
+      sender: PrivateKeyAccount <- accountGen
+      pair                      <- assetPairGen
+      amount: Long              <- maxWavesAmountGen
+      timestamp: Long           <- createdTimeGen
+      expiration: Long          <- maxTimeGen
+      matcherFee: Long          <- maxWavesAmountGen
+      orderVersion: Byte        <- Gen.oneOf(1: Byte, 2: Byte, 3: Byte)
+      arbitraryAsset            <- assetIdGen(1)
+      matcherFeeAssetId         <- Gen.oneOf(pair.amountAsset, pair.priceAsset, Waves, arbitraryAsset)
+      orderFeeSettings          <- orderFeeSettingsGenerator(Some(arbitraryAsset))
+    } yield {
+
+      val order =
+        if (orderVersion == 3)
+          Order(sender, MatcherAccount, pair, tpe, amount, price, timestamp, expiration, matcherFee, orderVersion, matcherFeeAssetId)
+        else Order(sender, MatcherAccount, pair, tpe, amount, price, timestamp, expiration, matcherFee, orderVersion)
+
+      val correctedOrder = correctOrderByFeeSettings(order, sender, orderFeeSettings)
+
+      correctedOrder -> orderFeeSettings
+    }
+
+  def correctOrderByFeeSettings(order: Order, sender: PrivateKeyAccount, orderFeeSettings: OrderFeeSettings): Order = {
+    val correctedOrder = (order.version, orderFeeSettings) match {
+      case (3, FixedWavesSettings(baseFee)) =>
+        order
+          .updateMatcherFeeAssetId(Waves)
+          .updateFee(baseFee + 1000L)
+      case (3, FixedSettings(defaultAssetId, minFee)) =>
+        order
+          .updateMatcherFeeAssetId(defaultAssetId)
+          .updateFee(minFee + 1000L)
+      case (3, percentSettings: PercentSettings) =>
+        order
+          .updateMatcherFeeAssetId(OrderValidator.getValidFeeAssetForSettings(order, percentSettings))
+          .updateFee(OrderValidator.getMinValidFeeForSettings(order, percentSettings, order.price) + 1000L)
+      case _ => order
+    }
+
+    Order.sign(correctedOrder, sender)
   }
 }

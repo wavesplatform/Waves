@@ -178,80 +178,23 @@ object OrderValidator {
     }
   }
 
-  def validateOrderFeeWithDeviations(order: Order,
-                                     orderFeeSettings: OrderFeeSettings,
-                                     deviationSettings: DeviationsSettings,
-                                     marketStatus: Option[MarketStatus]): Result[Order] = {
+  def validateOrderFee(order: Order, orderFeeSettings: OrderFeeSettings): Result[Order] = {
     if (order.version < 3) lift(order)
     else {
 
-      lazy val requiredFeeAsset: Asset = getValidFeeAssetForSettings(order, orderFeeSettings)
-      lazy val requiredFee: Long       = getMinValidFeeForSettings(order, orderFeeSettings, order.price)
+      lazy val requiredFeeAssetId = getValidFeeAssetForSettings(order, orderFeeSettings)
+      lazy val requiredFee        = getMinValidFeeForSettings(order, orderFeeSettings, order.price)
 
-      lazy val validateFeeWithoutDeviation =
-        lift(order).ensure(MatcherError.FeeNotEnough(requiredFee, order.matcherFee, requiredFeeAsset))(_.matcherFee >= requiredFee)
-
-      lazy val validateFeeWithDeviation = orderFeeSettings match {
-        case percentSettings: PercentSettings =>
-          (for {
-            ms      <- marketStatus
-            bestBid <- ms.bestBid
-            bestAsk <- ms.bestAsk
-          } yield {
-
-            val minValidFeeWithDeviation = {
-              val matchedPrice = if (order.orderType == OrderType.BUY) bestAsk.price else bestBid.price
-              getMinValidFeeForSettings(order, percentSettings, matchedPrice, 1 - (deviationSettings.maxPriceFee / 100))
-            }
-
-            Either.cond(order.matcherFee >= minValidFeeWithDeviation, order, MatcherError.DeviantOrderMatcherFee(order, deviationSettings))
-
-          }) getOrElse validateFeeWithoutDeviation
-        case _ => validateFeeWithoutDeviation
-      }
-
-      for {
-        _ <- lift(order).ensure(MatcherError.UnexpectedFeeAsset(requiredFeeAsset, order.matcherFeeAssetId))(_.matcherFeeAssetId == requiredFeeAsset)
-        _ <- validateFeeWithDeviation
-      } yield order
+      lift(order)
+        .ensure(MatcherError.UnexpectedFeeAsset(requiredFeeAssetId, order.matcherFeeAssetId))(_.matcherFeeAssetId == requiredFeeAssetId)
+        .ensure(MatcherError.FeeNotEnough(requiredFee, order.matcherFee, requiredFeeAssetId))(_.matcherFee >= requiredFee)
     }
   }
 
-  def validatePriceDeviation(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus]): Result[Order] = {
-
-    def multiplyLongByDoubleRoundDown(l: Long, d: Double): Long = (BigDecimal(l) * d).setScale(0, RoundingMode.HALF_DOWN).toLong
-
-    val validatePrice: (Double, Double) => Boolean = (subtractedPercent, addedPercent) => {
-
-      val res = for {
-        ms      <- marketStatus
-        bestBid <- ms.bestBid
-        bestAsk <- ms.bestAsk
-      } yield {
-
-        val lowerBound = multiplyLongByDoubleRoundDown(bestBid.price, 1 - (subtractedPercent / 100))
-        val upperBound = multiplyLongByDoubleRoundDown(bestAsk.price, 1 + (addedPercent / 100))
-
-        lowerBound <= order.price && order.price <= upperBound
-      }
-
-      res getOrElse true
-    }
-
-    lift(order).ensure(MatcherError.DeviantOrderPrice(order, deviationSettings)) { _ =>
-      if (order.orderType == OrderType.BUY) validatePrice(deviationSettings.maxPriceProfit, deviationSettings.maxPriceLoss)
-      else validatePrice(deviationSettings.maxPriceLoss, deviationSettings.maxPriceProfit)
-    }
-  }
-
-  def matcherSettingsAware(
-      matcherPublicKey: PublicKeyAccount,
-      blacklistedAddresses: Set[Address],
-      blacklistedAssets: Set[IssuedAsset],
-      orderFeeSettings: OrderFeeSettings,
-      deviationSettings: DeviationsSettings,
-      getMarketStatus: AssetPair => Option[MarketStatus]
-  )(order: Order): Result[Order] = {
+  def matcherSettingsAware(matcherPublicKey: PublicKeyAccount,
+                           blacklistedAddresses: Set[Address],
+                           blacklistedAssets: Set[IssuedAsset],
+                           orderFeeSettings: OrderFeeSettings)(order: Order): Result[Order] = {
 
     def validateBlacklistedAsset(assetId: Asset, e: IssuedAsset => MatcherError): Result[Unit] =
       assetId.fold(success)(x => cond(!blacklistedAssets(x), (), e(x)))
@@ -263,8 +206,59 @@ object OrderValidator {
       _ <- validateBlacklistedAsset(order.assetPair.amountAsset, MatcherError.AmountAssetBlacklisted)
       _ <- validateBlacklistedAsset(order.assetPair.priceAsset, MatcherError.PriceAssetBlacklisted)
       _ <- validateBlacklistedAsset(order.matcherFeeAssetId, MatcherError.FeeAssetBlacklisted)
-      _ <- validateOrderFeeWithDeviations(order, orderFeeSettings, deviationSettings, getMarketStatus(order.assetPair))
-      _ <- validatePriceDeviation(order, deviationSettings, getMarketStatus(order.assetPair))
+      _ <- validateOrderFee(order, orderFeeSettings)
+    } yield order
+  }
+
+  def validatePriceDeviation(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus]): Result[Order] = {
+
+    def multiplyLongByDoubleRoundDown(l: Long, d: Double): Long = (BigDecimal(l) * d).setScale(0, RoundingMode.HALF_DOWN).toLong
+
+    def isPriceInDeviationBounds(subtractedPercent: Double, addedPercent: Double): Boolean = marketStatus forall { ms =>
+      lazy val isPriceHigherThanMinDeviation = ms.bestBid forall { bestBid =>
+        multiplyLongByDoubleRoundDown(bestBid.price, 1 - (subtractedPercent / 100)) <= order.price
+      }
+
+      lazy val isPriceLessThanMaxDeviation = ms.bestAsk forall { bestAsk =>
+        order.price <= multiplyLongByDoubleRoundDown(bestAsk.price, 1 + (addedPercent / 100))
+      }
+
+      isPriceHigherThanMinDeviation && isPriceLessThanMaxDeviation
+    }
+
+    lift(order).ensure(MatcherError.DeviantOrderPrice(order, deviationSettings)) { _ =>
+      if (order.orderType == OrderType.BUY) isPriceInDeviationBounds(deviationSettings.maxPriceProfit, deviationSettings.maxPriceLoss)
+      else isPriceInDeviationBounds(deviationSettings.maxPriceLoss, deviationSettings.maxPriceProfit)
+    }
+  }
+
+  def validateFeeDeviation(order: Order,
+                           deviationSettings: DeviationsSettings,
+                           orderFeeSettings: OrderFeeSettings,
+                           marketStatus: Option[MarketStatus]): Result[Order] = {
+
+    def isFeeInDeviationBoundsForMatchedPrice(matchedPrice: Long): Boolean = orderFeeSettings match {
+      case percentSettings: PercentSettings =>
+        order.matcherFee >= getMinValidFeeForSettings(order, percentSettings, matchedPrice, 1 - (deviationSettings.maxPriceFee / 100))
+      case _ => true
+    }
+
+    val isFeeInDeviationBounds = marketStatus forall { ms =>
+      (order.orderType, ms.bestAsk.isDefined, ms.bestBid.isDefined) match {
+        case (OrderType.BUY, true, _)  => isFeeInDeviationBoundsForMatchedPrice(ms.bestAsk.get.price)
+        case (OrderType.SELL, _, true) => isFeeInDeviationBoundsForMatchedPrice(ms.bestBid.get.price)
+        case _                         => true
+      }
+    }
+
+    Either.cond(isFeeInDeviationBounds, order, MatcherError.DeviantOrderMatcherFee(order, deviationSettings))
+  }
+
+  def marketAware(orderFeeSettings: OrderFeeSettings, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(
+      order: Order): Result[Order] = {
+    for {
+      _ <- validatePriceDeviation(order, deviationSettings, marketStatus)
+      _ <- validateFeeDeviation(order, deviationSettings, orderFeeSettings, marketStatus)
     } yield order
   }
 

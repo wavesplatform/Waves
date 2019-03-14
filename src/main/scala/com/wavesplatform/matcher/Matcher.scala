@@ -114,15 +114,9 @@ class Matcher(actorSystem: ActorSystem,
   private def validateOrder(o: Order) = {
     import com.wavesplatform.matcher.error._
     for {
-      _ <- OrderValidator.matcherSettingsAware(
-        matcherPublicKey,
-        blacklistedAddresses,
-        blacklistedAssets,
-        matcherSettings.orderFee,
-        matcherSettings.deviation,
-        getMarketStatus
-      )(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, matcherSettings.orderFee)(o)
       _ <- OrderValidator.timeAware(time)(o)
+      _ <- OrderValidator.marketAware(matcherSettings.orderFee, matcherSettings.deviation, getMarketStatus(o.assetPair))(o)
       _ <- OrderValidator.blockchainAware(blockchain,
                                           transactionCreator.createTransaction,
                                           matcherPublicKey.toAddress,
