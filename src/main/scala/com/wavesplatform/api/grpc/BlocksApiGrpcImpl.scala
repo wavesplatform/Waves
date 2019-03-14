@@ -44,17 +44,6 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
     responseObserver.completeWith(stream)
   }
 
-  override def getLastBlock(request: BlockRequest): Future[PBBlock] = {
-    commonApi.lastBlock()
-      .map(block => if (request.includeTransactions) block.toPB else block.toPB.withTransactions(Nil))
-      .toFuture
-  }
-
-  override def getFirstBlock(request: BlockRequest): Future[PBBlock] = {
-    val pbBlock = commonApi.firstBlock().toPB
-    Future.successful(if (request.includeTransactions) pbBlock else pbBlock.withTransactions(Nil))
-  }
-
   override def getBlock(request: BlockRequest): Future[BlockAndHeight] = {
     val result = request.request match {
       case Request.BlockId(blockId) =>
@@ -63,8 +52,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           .map(block => BlockAndHeight(Some(block.toPB), blockchain.heightOf(block.uniqueId).get))
 
       case Request.Height(height) =>
-        commonApi
-          .blockAtHeight(height)
+        commonApi.blockAtHeight(if (height > 0) height else blockchain.height + height)
           .toRight(BlockDoesNotExist)
           .map(block => BlockAndHeight(Some(block.toPB), height))
 

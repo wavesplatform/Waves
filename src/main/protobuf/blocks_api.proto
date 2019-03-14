@@ -10,8 +10,6 @@ service BlocksApi {
     rpc GetBlocksRange (BlocksRangeRequest) returns (stream BlockAndHeight);
     rpc CalcBlocksDelay (BlocksDelayRequest) returns (google.protobuf.UInt64Value);
     rpc GetCurrentHeight (google.protobuf.Empty) returns (google.protobuf.UInt32Value);
-    rpc GetLastBlock (BlockRequest) returns (Block);
-    rpc GetFirstBlock (BlockRequest) returns (Block);
 }
 
 message BlockRequest {
