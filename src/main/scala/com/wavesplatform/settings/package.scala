@@ -2,7 +2,6 @@ package com.wavesplatform
 
 import java.io.File
 import java.net.{InetSocketAddress, URI}
-import java.util
 
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValueType}
 import com.wavesplatform.common.state.ByteStr
@@ -46,9 +45,7 @@ package object settings {
 
   def loadConfig(maybeUserConfig: Option[Config]) = {
     val directoryDefaults = ConfigFactory
-      .parseMap(new util.HashMap[String, String]() {
-        put("waves.directory", defaultDirectory)
-      })
+      .parseString(s"waves.directory = $defaultDirectory")
 
     val defaults = ConfigFactory.defaultOverrides()
 
