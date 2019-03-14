@@ -177,7 +177,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       } else {
         commonApi
           .blockHeadersRange(start, end)
-          .map { case (height, bh, s) => BlockHeader.json(bh, s) + ("height" -> Json.toJson(height)) }
+          .map { case (bh, size, height) => BlockHeader.json(bh, size) + ("height" -> Json.toJson(height)) }
       }
 
       complete(blocks.toListL.map(JsArray(_)).runAsync)

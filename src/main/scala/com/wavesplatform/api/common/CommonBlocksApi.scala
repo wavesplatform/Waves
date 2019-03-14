@@ -51,11 +51,11 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
     blockchain.blockHeaderAndSize(height)
   }
 
-  def blockHeadersRange(fromHeight: Int, toHeight: Int): Observable[(Int, BlockHeader, Int)] = {
+  def blockHeadersRange(fromHeight: Int, toHeight: Int): Observable[(BlockHeader, Int, Int)] = {
     Observable
       .fromIterable(fromHeight to toHeight)
       .map(height => (height, blockchain.blockHeaderAndSize(height)))
-      .collect { case (height, Some((header, size))) => (height, header, size) }
+      .collect { case (height, Some((header, size))) => (header, size, height) }
   }
 
   def lastBlock(): Option[VanillaBlock] = {

@@ -28,20 +28,28 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
   }
 
   override def getBlocksRange(request: BlocksRangeRequest, responseObserver: StreamObserver[BlockAndHeight]): Unit = {
-    val stream = commonApi
-      .blocksRange(request.fromHeight, request.toHeight)
-      .map { case (block, height) => BlockAndHeight(Some(if (request.includeTransactions) block.toPB else block.toPB.withTransactions(Nil)), height) }
-      .filter {
-        case BlockAndHeight(Some(PBBlock(Some(header), _, _)), _) =>
-          request.filter match {
-            case BlocksRangeRequest.Filter.Generator(generator) => header.generator == generator || PublicKeyAccount(header.generator.toByteArray).toAddress.bytes == generator.toByteStr
-            case BlocksRangeRequest.Filter.Empty => true
-          }
+    val stream = if (request.includeTransactions) {
+      commonApi
+        .blocksRange(request.fromHeight, request.toHeight)
+        .map { case (block, height) => BlockAndHeight(Some(block.toPB), height) }
+    } else {
+      commonApi
+        .blockHeadersRange(request.fromHeight, request.toHeight)
+        .map { case (header, _, height) => BlockAndHeight(Some(PBBlock(Some(header.toPBHeader), header.signerData.signature)), height) }
+    }
 
-        case _ => true
-      }
+    val filteredStream = stream.filter {
+      case BlockAndHeight(Some(PBBlock(Some(header), _, _)), _) =>
+        request.filter match {
+          case BlocksRangeRequest.Filter.Generator(generator) =>
+            header.generator == generator || PublicKeyAccount(header.generator.toByteArray).toAddress.bytes == generator.toByteStr
+          case BlocksRangeRequest.Filter.Empty => true
+        }
 
-    responseObserver.completeWith(stream)
+      case _ => true
+    }
+
+    responseObserver.completeWith(filteredStream)
   }
 
   override def getBlock(request: BlockRequest): Future[BlockAndHeight] = {
@@ -52,7 +60,8 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           .map(block => BlockAndHeight(Some(block.toPB), blockchain.heightOf(block.uniqueId).get))
 
       case Request.Height(height) =>
-        commonApi.blockAtHeight(if (height > 0) height else blockchain.height + height)
+        commonApi
+          .blockAtHeight(if (height > 0) height else blockchain.height + height)
           .toRight(BlockDoesNotExist)
           .map(block => BlockAndHeight(Some(block.toPB), height))
 
