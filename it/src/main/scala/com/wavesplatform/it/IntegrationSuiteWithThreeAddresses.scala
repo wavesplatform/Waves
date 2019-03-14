@@ -22,7 +22,7 @@ trait IntegrationSuiteWithThreeAddresses
     with ScorexLogging {
   this: Suite =>
 
-  def miner: Node
+  def miner: Node = nodes.head
 
   protected def sender: Node = miner
 
