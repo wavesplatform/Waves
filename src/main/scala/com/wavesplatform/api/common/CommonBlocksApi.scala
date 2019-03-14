@@ -4,20 +4,21 @@ import com.wavesplatform.api.http.{ApiError, BlockDoesNotExist, CustomValidation
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.block.VanillaBlock
 import com.wavesplatform.state.Blockchain
 import monix.reactive.Observable
 
 private[api] class CommonBlocksApi(blockchain: Blockchain) {
-  def blocksByAddress(address: Address, fromHeight: Int, toHeight: Int): Observable[(Block, Int)] = {
+  def blocksByAddress(address: Address, fromHeight: Int, toHeight: Int): Observable[(VanillaBlock, Int)] = {
     Observable
       .fromIterable(fromHeight to toHeight)
       .map(height => (blockchain.blockAt(height), height))
       .collect { case (Some(block), height) if block.signerData.generator.toAddress == address => (block, height) }
   }
 
-  def childBlock(blockId: BlockId): Option[Block] = {
+  def childBlock(blockId: BlockId): Option[VanillaBlock] = {
     val childBlock = for {
-      height <- blockchain.heightOf(blockId)
+      height     <- blockchain.heightOf(blockId)
       childBlock <- blockchain.blockAt(height + 1)
     } yield childBlock
 
@@ -41,7 +42,7 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
     blockchain.height
   }
 
-  def blockAtHeight(height: Int): Option[Block] = {
+  def blockAtHeight(height: Int): Option[VanillaBlock] = {
     blockchain.blockAt(height)
   }
 
@@ -63,23 +64,23 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
       .collect { case (height, Some((header, size))) => (height, header, size) }
   }
 
-  def lastBlock(): Option[Block] = {
+  def lastBlock(): Option[VanillaBlock] = {
     blockchain.lastBlock
   }
 
-  def lastBlockHeader(): Option[(Block, Int)] = {
+  def lastBlockHeader(): Option[(VanillaBlock, Int)] = {
     blockchain.lastBlockHeaderAndSize
   }
 
-  def firstBlock(): Block = {
+  def firstBlock(): VanillaBlock = {
     blockchain.genesis
   }
 
-  def blockBySignature(blockId: BlockId): Either[ApiError, Block] = {
+  def blockBySignature(blockId: BlockId): Either[ApiError, VanillaBlock] = {
     getBlockById(blockId)
   }
 
-  private[this] def getBlockById(signature: ByteStr): Either[ApiError, Block] = {
+  private[this] def getBlockById(signature: ByteStr): Either[ApiError, VanillaBlock] = {
     blockchain
       .blockById(signature)
       .toRight(BlockDoesNotExist)

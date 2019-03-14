@@ -26,7 +26,6 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
     extends TransactionsApiGrpc.TransactionsApi {
 
   private[this] val commonApi = new CommonTransactionsApi(functionalitySettings, wallet, blockchain, utx, allChannels)
-  private[this] val TransactionsBatchLimit = 100
 
   override def getTransactionsByAddress(request: TransactionsByAddressRequest, responseObserver: StreamObserver[PBSignedTransaction]): Unit = {
     val stream = commonApi
@@ -56,9 +55,7 @@ class TransactionsApiGrpcImpl(functionalitySettings: FunctionalitySettings,
   }
 
   override def calculateFee(request: PBTransaction): Future[CalculateFeeResponse] = {
-    commonApi.calculateFee(request.toVanilla)
-      .map { case (assetId, assetAmount, _) => CalculateFeeResponse(assetId.protoId, assetAmount) }
-      .toFuture
+    commonApi.calculateFee(request.toVanilla).map { case (assetId, assetAmount, _) => CalculateFeeResponse(assetId.protoId, assetAmount) }.toFuture
   }
 
   override def signTransaction(request: TransactionSignRequest): Future[PBSignedTransaction] = {

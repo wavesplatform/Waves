@@ -2,8 +2,9 @@ package com.wavesplatform.api.grpc
 
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.{UInt32Value, UInt64Value}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.http.BlockDoesNotExist
+import com.wavesplatform.api.http.{ApiError, BlockDoesNotExist}
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.state.Blockchain
 import io.grpc.stub.StreamObserver
@@ -15,11 +16,17 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
   private[this] val commonApi = new CommonBlocksApi(blockchain)
 
   override def getBlocksByAddress(request: BlocksByAddressRequest, responseObserver: StreamObserver[BlockAndHeight]): Unit = {
-    val blocks = commonApi
-      .blocksByAddress(request.getAddress.toAddress, request.fromHeight, request.toHeight)
-      .map { case (block, height) => BlockAndHeight(Some(block.toPB), height) }
+    val result = for {
+      address <- Address.fromBytes(request.address.toByteArray)
+      blocks = commonApi
+        .blocksByAddress(address, request.fromHeight, request.toHeight)
+        .map { case (block, height) => BlockAndHeight(Some(block.toPB), height) }
+    } yield blocks
 
-    responseObserver.completeWith(blocks)
+    result match {
+      case Right(value) => responseObserver.completeWith(value)
+      case Left(error)  => responseObserver.onError(GRPCErrors.toStatusException(ApiError.fromValidationError(error)))
+    }
   }
 
   override def getChildBlock(request: BlockIdRequest): Future[PBBlock] = {
@@ -30,7 +37,8 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
   }
 
   override def calcBlocksDelay(request: BlocksDelayRequest): Future[UInt64Value] = {
-    commonApi.calcBlocksDelay(request.blockId, request.blockNum)
+    commonApi
+      .calcBlocksDelay(request.blockId, request.blockNum)
       .map(UInt64Value(_))
       .toFuture
   }

@@ -40,7 +40,9 @@ private[api] class CommonTransactionsApi(functionalitySettings: FunctionalitySet
     val observableTask = Task(getResponse(address, TransactionsBatchLimit, fromId)) map {
       case Right(transactions) =>
         if (transactions.isEmpty) Observable.empty
-        else Observable(transactions: _*).map(ht => (ht._1, filterTxByAliases(ht._2))) ++ Observable.defer(transactionsByAddress(address, Some(transactions.last._2.id())))
+        else
+          Observable(transactions: _*).map(ht => (ht._1, filterTxByAliases(ht._2))) ++ Observable.defer(
+            transactionsByAddress(address, Some(transactions.last._2.id())))
 
       case Left(err) =>
         Observable.raiseError(new IllegalArgumentException(err))

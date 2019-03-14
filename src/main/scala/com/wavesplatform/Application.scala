@@ -59,11 +59,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   import monix.execution.Scheduler.Implicits.{global => scheduler}
   private[this] val apiScheduler = Scheduler(actorSystem.dispatcher)
 
-  private val db = openDB(settings.dataDirectory)
+  private val db                          = openDB(settings.dataDirectory)
   private val LocalScoreBroadcastDebounce = 1.second
-  private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
-  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged)
-  private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
+  private val spendableBalanceChanged     = ConcurrentSubject.publish[(Address, Asset)]
+  private val blockchainUpdater           = StorageFactory(settings, db, time, spendableBalanceChanged)
+  private lazy val upnp                   = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
   private val wallet: Wallet = try {
     Wallet(settings.walletSettings)
@@ -201,11 +201,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     if (settings.grpcSettings.enable) {
       this.grpcServer = ServerBuilder
         .forPort(settings.grpcSettings.port)
-        .addService(
-          TransactionsApiGrpc.bindService(
-            new TransactionsApiGrpcImpl(settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels)(apiScheduler),
-            apiScheduler
-          ))
+        .addService(TransactionsApiGrpc.bindService(
+          new TransactionsApiGrpcImpl(settings.blockchainSettings.functionalitySettings, wallet, blockchainUpdater, utxStorage, allChannels)(
+            apiScheduler),
+          apiScheduler
+        ))
         .addService(BlocksApiGrpc.bindService(new BlocksApiGrpcImpl(blockchainUpdater)(apiScheduler), apiScheduler))
         .build()
         .start()

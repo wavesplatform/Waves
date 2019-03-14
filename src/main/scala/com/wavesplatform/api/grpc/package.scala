@@ -113,15 +113,15 @@ package object grpc extends PBImplicitConversions {
 
     def toFuture(apiError: ApiError): Future[T] = opt match {
       case Some(value) => Future.successful(value)
-    case None        => Future.failed(GRPCErrors.toStatusException(apiError))
+      case None        => Future.failed(GRPCErrors.toStatusException(apiError))
     }
   }
 
   implicit class EitherToFutureConversionOps[E, T](either: Either[E, T])(implicit toThrowable: E => Throwable) {
     def toFuture: Future[T] = {
       val result = either.left
-      .map(e => GRPCErrors.toStatusException(toThrowable(e)))
-      .toTry
+        .map(e => GRPCErrors.toStatusException(toThrowable(e)))
+        .toTry
 
       Future.fromTry(result)
     }

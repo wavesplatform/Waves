@@ -20,7 +20,7 @@ import scala.concurrent._
 @Api(value = "/blocks")
 case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, allChannels: ChannelGroup)(implicit sc: Scheduler) extends ApiRoute {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
-  private[this] val commonApi = new CommonBlocksApi(blockchain)
+  private[this] val commonApi           = new CommonBlocksApi(blockchain)
 
   override lazy val route =
     pathPrefix("blocks") {
@@ -40,9 +40,9 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
         val result = for {
           address <- Address.fromString(address)
-          pairs = commonApi.blocksByAddress(address, start, end)
+          pairs     = commonApi.blocksByAddress(address, start, end)
           jsonPairs = pairs.map(pair => pair._1.json() + ("height" -> Json.toJson(pair._2)))
-          result = jsonPairs.toListL.map(JsArray(_))
+          result    = jsonPairs.toListL.map(JsArray(_))
         } yield result.runAsync
 
         complete(result)
@@ -80,7 +80,8 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       val result = if (count <= 0) {
         Left(CustomValidationError("Block count should be positive"))
       } else {
-        commonApi.calcBlocksDelay(block.uniqueId, count)
+        commonApi
+          .calcBlocksDelay(block.uniqueId, count)
           .map(delay => Json.obj("delay" -> delay))
       }
 
@@ -136,9 +137,9 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   private def at(height: Int, includeTransactions: Boolean): StandardRoute = {
 
     (if (includeTransactions) {
-      commonApi.blockAtHeight(height).map(_.json())
+       commonApi.blockAtHeight(height).map(_.json())
      } else {
-      commonApi.blockHeaderAtHeight(height).map { case (bh, s) => BlockHeader.json(bh, s) }
+       commonApi.blockHeaderAtHeight(height).map { case (bh, s) => BlockHeader.json(bh, s) }
      }) match {
       case Some(json) => complete(json + ("height" -> JsNumber(height)))
       case None       => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
@@ -170,10 +171,12 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   private def seq(start: Int, end: Int, includeTransactions: Boolean): StandardRoute = {
     if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
       val blocks = if (includeTransactions) {
-        commonApi.blocksRange(start, end)
+        commonApi
+          .blocksRange(start, end)
           .map(bh => bh._2.json() + ("height" -> Json.toJson(bh._1)))
       } else {
-        commonApi.blockHeadersRange(start, end)
+        commonApi
+          .blockHeadersRange(start, end)
           .map { case (height, bh, s) => BlockHeader.json(bh, s) + ("height" -> Json.toJson(height)) }
       }
 
@@ -195,10 +198,10 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
     complete(Future {
       val height = blockchain.height
       (if (includeTransactions) {
-        commonApi.lastBlock().map(_.json())
-      } else {
-        commonApi.lastBlockHeader().map(bhs => BlockHeader.json(bhs._1, bhs._2))
-      }).map(_ + ("height" -> Json.toJson(height)))
+         commonApi.lastBlock().map(_.json())
+       } else {
+         commonApi.lastBlockHeader().map(bhs => BlockHeader.json(bhs._1, bhs._2))
+       }).map(_ + ("height" -> Json.toJson(height)))
     })
   }
 

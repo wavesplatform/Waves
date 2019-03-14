@@ -152,8 +152,9 @@ case class TransactionsApiRoute(settings: RestAPISettings,
           )
 
           createTransaction(senderPk, enrichedJsv) { tx =>
-            commonApi.calculateFee(tx)
-              .map { case (assetId, assetAmount, _) => Json.obj("feeAssetId" -> assetId, "feeAmount"  -> assetAmount) }
+            commonApi
+              .calculateFee(tx)
+              .map { case (assetId, assetAmount, _) => Json.obj("feeAssetId" -> assetId, "feeAmount" -> assetAmount) }
           }
         }
       }
@@ -258,9 +259,11 @@ case class TransactionsApiRoute(settings: RestAPISettings,
   def broadcast: Route = (pathPrefix("broadcast") & post) {
     handleExceptions(jsonExceptionHandler) {
       json[JsObject] { jsv =>
-        TransactionFactory.fromSignedRequest(jsv)
+        TransactionFactory
+          .fromSignedRequest(jsv)
           .map(commonApi.broadcastTransaction)
-          .left.map(ApiError.fromValidationError)
+          .left
+          .map(ApiError.fromValidationError)
       }
     }
   }
@@ -279,7 +282,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
 
   def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, Future[JsArray]] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
-      commonApi.transactionsByAddress(address, fromId)
+      commonApi
+        .transactionsByAddress(address, fromId)
         .take(limit)
         .toListL
         .map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToExtendedJson(tx) + ("height" -> JsNumber(height)) })))
