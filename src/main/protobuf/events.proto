@@ -1,0 +1,42 @@
+// State update notifications
+syntax = "proto3";
+option java_package = "com.wavesplatform.protobuf.events";
+
+import "block.proto";
+import "transactions.proto";
+
+message BlockchainUpdated {
+    bytes id = 1;
+    int32 height = 2;
+
+    repeated StateUpdated state_updates = 3;
+
+    oneof reason {
+        Block block = 4;
+        SignedMicroBlock micro_block = 5;
+    }
+}
+
+message StateUpdated {
+    enum ReasonType {
+        BLOCK = 0;
+        TRANSACTION = 1;
+        MICROBLOCK = 2;
+    }
+
+    ReasonType reason_type = 1;
+    bytes reason_id = 2;
+
+    message BalanceUpdated {
+        bytes address = 1;
+        Amount amount = 2;
+    }
+    repeated BalanceUpdated balances = 3;
+
+    message LeasingUpdated {
+        bytes address = 1;
+        int64 in = 2;
+        int64 out = 3;
+    }
+    repeated LeasingUpdated leases = 4;
+}

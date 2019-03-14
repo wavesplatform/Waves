@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings._
-import com.wavesplatform.state.{BlockEvent, StateUpdateEvent}
+import com.wavesplatform.state.BlockchainUpdated
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.channel.nio.NioEventLoopGroup
@@ -14,25 +14,18 @@ import monix.execution.Ack
 import monix.execution.Ack.Continue
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.{Observable, Observer}
-import com.wavesplatform.serialization.protobuf.Block
+import com.wavesplatform.protobuf.events.PBEvents
 
 class StateUpdateHandler
 
-class UpdateServerHandler(stateUpdates: Observable[StateUpdateEvent]) extends ChannelInboundHandlerAdapter {
+class UpdateServerHandler(stateUpdates: Observable[BlockchainUpdated]) extends ChannelInboundHandlerAdapter {
   implicit def toByteString(bs: ByteStr): ByteString =
     ByteString.copyFrom(bs.arr)
 
   override def channelActive(ctx: ChannelHandlerContext): Unit = {
-    val obs = new Observer.Sync[StateUpdateEvent] {
-      override def onNext(evt: StateUpdateEvent): Ack = {
-        val serialized = evt match {
-          case BlockEvent(b, h, blockStateUpdate, transactionsStateUpdates) =>
-            val block = Block(b.signerData.signature, h)
-        }
-
-        // @todo serialize event
-        val b: ByteStr = ByteStr.empty
-        ctx.writeAndFlush(b).await().sync()
+    val obs = new Observer.Sync[BlockchainUpdated] {
+      override def onNext(evt: BlockchainUpdated): Ack = {
+        ctx.writeAndFlush(PBEvents.protobuf(evt)).await().sync()
         Continue
       }
 
@@ -54,7 +47,7 @@ class UpdateServerHandler(stateUpdates: Observable[StateUpdateEvent]) extends Ch
   }
 }
 
-class StateUpdateServer(settings: WavesSettings, stateUpdates: Observable[StateUpdateEvent]) {
+class StateUpdateServer(settings: WavesSettings, stateUpdates: Observable[BlockchainUpdated]) {
   private val bossGroup   = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-boss-group", true))
   private val workerGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-worker-group", true))
 

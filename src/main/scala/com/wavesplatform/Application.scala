@@ -28,7 +28,7 @@ import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import com.wavesplatform.state.StateUpdateEvent
+import com.wavesplatform.state.BlockchainUpdated
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.AssetId
 import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, forceStopApplication}
@@ -62,7 +62,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Option[AssetId])]
 
-  private val stateUpdateEvents = ConcurrentSubject.publish[StateUpdateEvent]
+  private val stateUpdateEvents = ConcurrentSubject.publish[BlockchainUpdated]
   private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, Some(stateUpdateEvents))
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled

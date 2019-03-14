@@ -3,7 +3,7 @@ package com.wavesplatform.history
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{BlockchainUpdaterImpl, NG, StateUpdateEvent}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, NG, BlockchainUpdated}
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
@@ -16,7 +16,7 @@ object StorageFactory extends ScorexLogging {
             db: DB,
             time: Time,
             spendableBalanceChanged: Observer[(Address, Option[AssetId])],
-            stateUpdates: Option[Observer[StateUpdateEvent]] = None): BlockchainUpdater with NG = {
+            stateUpdates: Option[Observer[BlockchainUpdated]] = None): BlockchainUpdater with NG = {
     checkVersion(db)
     val levelDBWriter = new LevelDBWriter(
       db,

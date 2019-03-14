@@ -30,7 +30,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
                             spendableBalanceChanged: Observer[(Address, Option[AssetId])],
                             settings: WavesSettings,
                             time: Time,
-                            stateUpdates: Option[Observer[StateUpdateEvent]] = None)
+                            stateUpdates: Option[Observer[BlockchainUpdated]] = None)
     extends BlockchainUpdater
     with NG
     with ScorexLogging
@@ -152,7 +152,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
                 val height            = blockchain.unsafeHeightOf(ng.base.reference)
                 val miningConstraints = MiningConstraints(blockchain, height)
 
-                StateUpdateProcessor.onRollback(stateUpdates, block.reference, height)
+                BlockchainUpdateNotifier.notifyRollback(stateUpdates, block.reference, height)
 
                 BlockDiffer
                   .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
@@ -170,7 +170,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
                   val height            = blockchain.unsafeHeightOf(ng.base.reference)
                   val miningConstraints = MiningConstraints(blockchain, height)
 
-                  StateUpdateProcessor.onRollback(stateUpdates, block.reference, height)
+                  BlockchainUpdateNotifier.notifyRollback(stateUpdates, block.reference, height)
 
                   BlockDiffer
                     .fromBlock(functionalitySettings, blockchain, blockchain.lastBlock, block, miningConstraints.total, verify)
@@ -188,7 +188,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
                     val height = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(0)
 
                     if (discarded.nonEmpty) {
-                      StateUpdateProcessor.onRollback(stateUpdates, referencedForgedBlock.uniqueId, height)
+                      BlockchainUpdateNotifier.notifyRollback(stateUpdates, referencedForgedBlock.uniqueId, height)
                       microBlockForkStats.increment()
                       microBlockForkHeightStats.record(discarded.size)
                     }
@@ -234,7 +234,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
                 log.info(s"New height: $height")
               }
 
-              StateUpdateProcessor.onProcessBlock(stateUpdates, block, detailedDiff, blockchain)
+              BlockchainUpdateNotifier.notifyProcessBlock(stateUpdates, block, detailedDiff, blockchain)
 
               discarded
           }
@@ -247,7 +247,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
     val prevNgState = ngState
     val r = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
-      StateUpdateProcessor.onRollback(stateUpdates, blockId, blockchain.height)
+      BlockchainUpdateNotifier.notifyRollback(stateUpdates, blockId, blockchain.height)
       Right(Seq.empty)
     } else {
       val discardedNgBlock = prevNgState.map(_.bestLiquidBlock).toSeq
@@ -255,7 +255,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
       blockchain
         .rollbackTo(blockId)
         .map { bs =>
-          StateUpdateProcessor.onRollback(stateUpdates, blockId, blockchain.height)
+          BlockchainUpdateNotifier.notifyRollback(stateUpdates, blockId, blockchain.height)
           bs ++ discardedNgBlock
         }
         .leftMap(err => GenericError(err))
@@ -313,7 +313,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
               }
             } yield {
               val (diff, carry, updatedMdConstraint, detailedDiff) = r
-              StateUpdateProcessor.onProcessMicroBlock(stateUpdates, microBlock, detailedDiff, blockchain)
+              BlockchainUpdateNotifier.notifyProcessMicroBlock(stateUpdates, microBlock, detailedDiff, blockchain)
               restTotalConstraint = updatedMdConstraint.constraints.head
               ng.append(microBlock, diff, carry, System.currentTimeMillis)
               log.info(s"$microBlock appended")

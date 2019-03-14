@@ -12,6 +12,10 @@ private[protobuf] object PBInternalImplicits {
 
   implicit def byteStringToByteStr(bs: PBByteString): ByteStr = bs.toByteArray
   implicit def byteStrToByteString(bs: ByteStr): PBByteString = PBByteString.copyFrom(bs)
+  implicit def optionByteStrToByteString(bs: Option[ByteStr]): PBByteString = bs match {
+    case Some(b) => PBByteString.copyFrom(b)
+    case None    => PBByteString.EMPTY
+  }
 
   implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
     case a: VAddress => fromAddress(a)
@@ -21,6 +25,9 @@ private[protobuf] object PBInternalImplicits {
   implicit def fromAddress(address: VAddress): Recipient = {
     Recipient.defaultInstance.withAddress(address.bytes)
   }
+
+  implicit def addressToByteString(address: VAddress): PBByteString =
+    address.toByteString
 
   implicit def fromAlias(alias: VAlias): Recipient = {
     Recipient.defaultInstance.withAlias(Alias(alias.chainId: Byte, alias.name))
