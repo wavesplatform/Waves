@@ -8,6 +8,7 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings => TFS}
+import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.{Transaction, ValidationError}
 import org.scalatest.Matchers
@@ -29,7 +30,7 @@ package object diffs extends WithState with Matchers {
 
   private def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings, withNg: Boolean)(
       assertion: (Diff, Blockchain) => Unit): Unit = withStateAndHistory(fs) { state =>
-    def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, (Diff, Long, MiningConstraint)] =
+    def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, (Diff, Long, MiningConstraint, DetailedDiff)] =
       BlockDiffer.fromBlock(fs, blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited)
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
