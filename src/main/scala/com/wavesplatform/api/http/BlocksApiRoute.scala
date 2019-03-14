@@ -40,7 +40,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
         val result = for {
           address <- Address.fromString(address)
-          pairs     = commonApi.blocksByAddress(address, start, end)
+          pairs     = commonApi.blocksRange(start, end).filter(_._1.signerData.generator.toAddress == address)
           jsonPairs = pairs.map(pair => pair._1.json() + ("height" -> Json.toJson(pair._2)))
           result    = jsonPairs.toListL.map(JsArray(_))
         } yield result.runAsync
@@ -173,7 +173,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       val blocks = if (includeTransactions) {
         commonApi
           .blocksRange(start, end)
-          .map(bh => bh._2.json() + ("height" -> Json.toJson(bh._1)))
+          .map(bh => bh._1.json() + ("height" -> Json.toJson(bh._2)))
       } else {
         commonApi
           .blockHeadersRange(start, end)

@@ -1,19 +1,20 @@
 package com.wavesplatform.api.common
-import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.{ApiError, BlockDoesNotExist, CustomValidationError}
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.block.VanillaBlock
 import com.wavesplatform.state.Blockchain
 import monix.reactive.Observable
 
 private[api] class CommonBlocksApi(blockchain: Blockchain) {
-  def blocksByAddress(address: Address, fromHeight: Int, toHeight: Int): Observable[(VanillaBlock, Int)] = {
+  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(VanillaBlock, Int)] = {
+    def fixHeight(h: Int) = if (h <= 0) blockchain.height + h else h
+
     Observable
-      .fromIterable(fromHeight to toHeight)
+      .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
       .map(height => (blockchain.blockAt(height), height))
-      .collect { case (Some(block), height) if block.signerData.generator.toAddress == address => (block, height) }
+      .collect { case (Some(block), height) => (block, height) }
   }
 
   def childBlock(blockId: BlockId): Option[VanillaBlock] = {
@@ -48,13 +49,6 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
 
   def blockHeaderAtHeight(height: Int): Option[(BlockHeader, Int)] = {
     blockchain.blockHeaderAndSize(height)
-  }
-
-  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(Int, Block)] = {
-    Observable
-      .fromIterable(fromHeight to toHeight)
-      .map(height => (height, blockchain.blockAt(height)))
-      .collect { case (height, Some(block)) => (height, block) }
   }
 
   def blockHeadersRange(fromHeight: Int, toHeight: Int): Observable[(Int, BlockHeader, Int)] = {

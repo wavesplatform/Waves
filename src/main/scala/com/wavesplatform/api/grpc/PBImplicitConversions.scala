@@ -56,6 +56,7 @@ trait PBImplicitConversions {
   implicit class VanillaHeaderConversionOps(header: vb.BlockHeader) {
     def toPBHeader: PBBlock.SignedHeader = {
       val unsignedHeader = PBBlock.Header(
+        0: Byte,
         header.reference.toPBByteString,
         header.consensusData.baseTarget,
         header.consensusData.generationSignature.toPBByteString,

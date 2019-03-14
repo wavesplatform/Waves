@@ -6,34 +6,32 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
 service BlocksApi {
-    rpc GetBlocksByAddress (BlocksByAddressRequest) returns (stream BlockAndHeight);
-    rpc GetChildBlock (BlockIdRequest) returns (Block);
+    rpc GetBlock (BlockRequest) returns (BlockAndHeight);
+    rpc GetBlocksRange (BlocksRangeRequest) returns (stream BlockAndHeight);
     rpc CalcBlocksDelay (BlocksDelayRequest) returns (google.protobuf.UInt64Value);
-    rpc GetBlockHeight (BlockIdRequest) returns (google.protobuf.UInt32Value);
     rpc GetCurrentHeight (google.protobuf.Empty) returns (google.protobuf.UInt32Value);
     rpc GetBlockAtHeight (google.protobuf.UInt32Value) returns (Block);
     rpc GetBlockHeaderAtHeight (google.protobuf.UInt32Value) returns (Block.SignedHeader);
-    rpc GetBlocksRange (BlocksRangeRequest) returns (stream Block);
     rpc GetBlockHeadersRange (BlocksRangeRequest) returns (stream Block.SignedHeader);
     rpc GetLastBlock (google.protobuf.Empty) returns (Block);
     rpc GetLastBlockHeader (google.protobuf.Empty) returns (Block.SignedHeader);
     rpc GetFirstBlock (google.protobuf.Empty) returns (Block);
-    rpc GetBlockBySignature (BlockIdRequest) returns (Block);
 }
 
-message BlockIdRequest {
-    bytes block_id = 1;
+message BlockRequest {
+    oneof request {
+        bytes block_id = 1;
+        int32 height = 2;
+        bytes parent_id = 3;
+    }
 }
 
 message BlocksRangeRequest {
-    uint32 from_height = 2;
-    uint32 to_height = 3;
-}
-
-message BlocksByAddressRequest {
-    bytes address = 1;
-    uint32 from_height = 2;
-    uint32 to_height = 3;
+    uint32 from_height = 1;
+    uint32 to_height = 2;
+    oneof filter {
+        bytes generator = 3;
+    }
 }
 
 message BlocksDelayRequest {

@@ -50,6 +50,7 @@ object PBBlocks {
       Some(
         PBBlock.SignedHeader(
           Some(PBBlock.Header(
+            0: Byte,
             ByteString.copyFrom(reference),
             baseTarget,
             ByteString.copyFrom(generationSignature),
