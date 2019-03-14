@@ -7,11 +7,9 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
-import com.wavesplatform.utils.mtree.{ProvableBytes, _}
+import com.wavesplatform.utils.Merkle._
 import org.openjdk.jmh.annotations._
 import org.scalacheck.Gen
-import scorex.crypto.authds.merkle.{MerkleProof, MerkleTree}
-import scorex.crypto.hash.{CryptographicHash, Digest32}
 
 import scala.util.Random
 
@@ -27,7 +25,7 @@ class MerkleTreeBenchmark {
 
   @Benchmark
   def computeTree_test(st: St): Unit = {
-    computeTree(st.transactions(Random.nextInt(st.transactions.length)))
+    mkTxTree(st.transactions(Random.nextInt(st.transactions.length)))
   }
 
   @Benchmark
@@ -38,7 +36,7 @@ class MerkleTreeBenchmark {
     val tree = st.trees(rnd)
 
     txs foreach { tx =>
-      assert(getProofFor(tx, tree).isDefined)
+      assert(tree.getProofForTx(tx).isDefined)
     }
   }
 
@@ -68,20 +66,20 @@ object MerkleTreeBenchmark {
       v
     }
 
-    lazy val trees: Vector[MerkleTree[Digest32]] = {
+    lazy val trees: Vector[TxTree] = {
       println("\nGenerating test data")
       val v = transactions.map { txs =>
-        computeTree(txs)
+        mkTxTree(txs)
       }
       println("\nTest data generated")
       v
     }
 
-    lazy val proofs: Vector[Vector[MerkleProof[Digest32]]] = {
+    lazy val proofs: Vector[Vector[TxProof]] = {
       println("\nGenerating test data")
       val v = (transactions zip trees) map {
         case (txs, tree) =>
-          txs.map(getProofFor(_, tree).get)
+          txs.map(tree.getProofForTx(_).get)
       }
       println("\nTest data generated")
       v
@@ -102,13 +100,4 @@ object MerkleTreeBenchmark {
         .get
     }
   }
-
-  implicit val cryptoHashF: CryptographicHash[Digest32] = new CryptographicHash[Digest32] {
-    override val DigestSize: Int = 32
-
-    override def hash(input: Array[Byte]): Digest32 = Digest32 @@ com.wavesplatform.crypto.secureHash(input)
-  }
-
-  implicit val txProvable: ProvableBytes[Transaction] =
-    (a: Transaction) => a.bytes()
 }
