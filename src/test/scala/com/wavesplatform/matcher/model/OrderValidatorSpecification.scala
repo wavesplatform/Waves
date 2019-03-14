@@ -11,6 +11,7 @@ import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
+import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedWavesSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.settings.{Constants, DeviationsSettings}
 import com.wavesplatform.state.diffs.produce
@@ -424,6 +425,42 @@ class OrderValidatorSpecification
 
         orderValidator(tooHighPriceOrder) should produce("DeviantOrderPrice")
         orderValidator(highButValidPriceOrder) shouldBe 'right
+      }
+
+      "order's fee is out of deviation bounds" in {
+
+        val percentSettings   = PercentSettings(AssetType.PRICE, 10)
+        val deviationSettings = DeviationsSettings(100, 100, maxPriceFee = 10)
+
+        val bestAsk = LevelAgg(1000L, 4000L)
+
+        val assetPair2MarketStatus = new ConcurrentHashMap[AssetPair, MarketStatus]
+        assetPair2MarketStatus.put(pairWavesBtc, MarketStatus(None, None, Some(bestAsk)))
+        val nonEmptyMarketStatus = assetPair2MarketStatus.get(pairWavesBtc)
+
+        val order =
+          Order(
+            sender = PrivateKeyAccount("seed".getBytes),
+            matcher = MatcherAccount,
+            pair = pairWavesBtc,
+            orderType = OrderType.BUY,
+            amount = 1000,
+            price = 1000,
+            timestamp = System.currentTimeMillis() - 10000L,
+            expiration = System.currentTimeMillis() + 10000L,
+            matcherFee = 1000L,
+            version = 3: Byte,
+            matcherFeeAssetId = wbtc
+          )
+
+        val validFee     = OrderValidator.getMinValidFeeForSettings(order, percentSettings, bestAsk.price, 1 - (deviationSettings.maxPriceFee / 100))
+        val validOrder   = order.updateFee(validFee)
+        val invalidOrder = order.updateFee(validFee - 100L)
+
+        val orderValidator = OrderValidator.marketAware(percentSettings, deviationSettings, Option(nonEmptyMarketStatus)) _
+
+        orderValidator(invalidOrder) should produce("DeviantOrderMatcherFee")
+        orderValidator(validOrder) shouldBe 'right
       }
     }
 
