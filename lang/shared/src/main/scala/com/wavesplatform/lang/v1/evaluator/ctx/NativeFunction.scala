@@ -14,7 +14,7 @@ import scala.scalajs.js.annotation._
 sealed trait BaseFunction {
   @JSExport def signature: FunctionTypeSignature
   @JSExport def header: FunctionHeader = signature.header
-  @JSExport def cost: Long
+  def costByLibVersion: Map[StdLibVersion, Long]
   @JSExport def name: String
   @JSExport def docString: String
   @JSExport def argsDoc: Array[(String, String)]
@@ -37,9 +37,6 @@ case class NativeFunction(@(JSExport @field) name: String,
                           @(JSExport @field) argsDoc: Array[(String, String)])
     extends BaseFunction {
   def eval(args: List[EVALUATED]): TrampolinedExecResult[EVALUATED] = EitherT.fromEither[Coeval](ev(args))
-
-  @(JSExport @field)
-  def cost: Long = costByLibVersion.get(StdLibVersion.SupportedVersions.last).get
 }
 
 object NativeFunction {
@@ -80,11 +77,7 @@ case class UserFunction(@(JSExport @field) name: String,
                         ev: EXPR,
                         @(JSExport @field) docString: String,
                         @(JSExport @field) argsDoc: Array[(String, String)])
-    extends BaseFunction {
-
-  @(JSExport @field)
-  def cost: Long = costByLibVersion.get(StdLibVersion.SupportedVersions.last).get
-}
+    extends BaseFunction
 
 object UserFunction {
 
