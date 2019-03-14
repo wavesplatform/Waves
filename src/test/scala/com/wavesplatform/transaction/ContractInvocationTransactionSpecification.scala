@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 
 class ContractInvocationTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -37,7 +37,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val js = Json.parse("""{
                          "type": 16,
-                         "id": "3RRmhhMxbD9SUGUEokaBFmdWqT42vKRiM94tqxuXHE9q",
+                         "id": "AkoaZ4TvxxDcdDXKKfYetpZEaiAVdvdoRmDQYojiARzq",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
                          "senderPublicKey": "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
                          "fee": 100000,
@@ -74,8 +74,7 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
       .right
       .get
 
-    // XXX
-    // (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
+    (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
 
     TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
     AddressScheme.current = DefaultAddressScheme
