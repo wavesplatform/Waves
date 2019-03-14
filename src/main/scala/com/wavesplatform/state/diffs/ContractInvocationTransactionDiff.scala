@@ -7,6 +7,7 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -14,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.traits.domain.Tx.ContractTransfer
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
-import com.wavesplatform.lang.{Global, StdLibVersion}
+import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -41,14 +42,15 @@ object ContractInvocationTransactionDiff {
           Seq(
             PureContext.build(StdLibVersion.V3),
             CryptoContext.build(Global),
-            WavesContext.build(StdLibVersion.V3,
-                               new WavesEnvironment(AddressScheme.current.chainId, Coeval(tx.asInstanceOf[In]), Coeval(height), blockchain),
-                               false)
+            WavesContext.build(
+              DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract),
+              new WavesEnvironment(AddressScheme.current.chainId, Coeval(tx.asInstanceOf[In]), Coeval(height), blockchain, Coeval(tx.contractAddress))
+            )
           ))
         .evaluationContext
 
       val invoker                                       = tx.sender.toAddress.bytes
-      val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.map(p => (p.amount, p.assetId.compatId))
+      val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
       ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
     }
 
@@ -140,30 +142,37 @@ object ContractInvocationTransactionDiff {
       case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
       case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
     }
-    val totalDataBytes = r.map(_.toBytes.size).sum
+    if (r.length > ContractLimits.MaxWriteSetSize) {
+      Left(GenericError(s"WriteSec cann't content more than ${ContractLimits.MaxWriteSetSize} entries"))
+    } else if (r.exists(_.key.getBytes().length > ContractLimits.MaxKeySize)) {
+      Left(GenericError(s"Key size must be less than ${ContractLimits.MaxKeySize}"))
+    } else {
+      val totalDataBytes = r.map(_.toBytes.size).sum
 
-    val payablePart: Map[Address, Portfolio] = tx.payment match {
-      case None => Map.empty
-      case Some(ContractInvocationTransaction.Payment(amt, assetId)) =>
-        assetId match {
-          case asset @ IssuedAsset(_) =>
-            Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
-              Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
-            )
-          case Waves =>
-            Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
-              .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
-        }
+      val payablePart: Map[Address, Portfolio] = (tx.payment
+        .map {
+          case ContractInvocationTransaction.Payment(amt, assetId) =>
+            assetId match {
+              case asset @ IssuedAsset(_) =>
+                Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
+                  Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                )
+              case Waves =>
+                Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
+                  .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
+            }
+        })
+        .foldLeft(Map[Address, Portfolio]())(_ combine _)
+      if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes)
+        Right(
+          Diff(
+            height = height,
+            tx = tx,
+            portfolios = feePart combine payablePart,
+            accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
+          ))
+      else Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))
     }
-    if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes)
-      Right(
-        Diff(
-          height = height,
-          tx = tx,
-          portfolios = feePart combine payablePart,
-          accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
-        ))
-    else Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))
   }
 
   private def foldContractTransfers(blockchain: Blockchain, tx: ContractInvocationTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
@@ -220,7 +229,8 @@ object ContractInvocationTransactionDiff {
           )),
         CompositeBlockchain.composite(blockchain, totalDiff),
         script,
-        true
+        true,
+        tx.contractAddress
       ) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, true))
         case (log, Right(FALSE)) =>

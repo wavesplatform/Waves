@@ -17,13 +17,13 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ContractScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.transaction.{Asset, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, Transaction, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -38,8 +38,12 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
     )
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures =
-      Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.SmartAssets.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0))
+    preActivatedFeatures = Map(
+      BlockchainFeatures.SmartAccounts.id  -> 0,
+      BlockchainFeatures.SmartAssets.id    -> 0,
+      BlockchainFeatures.Ride4DApps.id     -> 0,
+      BlockchainFeatures.FeeSponsorship.id -> 0
+    ))
 
   val assetAllowed = ExprScript(
     FUNCTION_CALL(FunctionHeader.Native(FunctionIds.GT_LONG), List(GETTER(REF("tx"), "fee"), CONST_LONG(-1)))
@@ -136,12 +140,13 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       argBinding    <- validAliasStringGen
     } yield paymentContract(senderBinging, argBinding, func, address, amount, masspayment, paymentCount, assetId)
 
-  def preconditionsAndSetContract(
-      senderBindingToContract: String => Gen[Contract],
-      invokerGen: Gen[PrivateKeyAccount] = accountGen,
-      masterGen: Gen[PrivateKeyAccount] = accountGen,
-      payment: Option[Payment] = None,
-      feeGen: Gen[Long] = ciFee(0)): Gen[(List[GenesisTransaction], SetScriptTransaction, ContractInvocationTransaction)] =
+  def preconditionsAndSetContract(senderBindingToContract: String => Gen[Contract],
+                                  invokerGen: Gen[PrivateKeyAccount] = accountGen,
+                                  masterGen: Gen[PrivateKeyAccount] = accountGen,
+                                  payment: Option[Payment] = None,
+                                  feeGen: Gen[Long] = ciFee(0),
+                                  sponsored: Boolean = false): Gen[
+    (List[GenesisTransaction], SetScriptTransaction, ContractInvocationTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -154,9 +159,14 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       contract    <- senderBindingToContract(funcBinding)
       script      = ContractScript(StdLibVersion.V3, contract)
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
-      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
-      ci          = ContractInvocationTransaction.selfSigned(invoker, master, fc, payment, fee, ts).explicitGet()
-    } yield (List(genesis, genesis2), setContract, ci)
+      (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
+      fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
+      ci = ContractInvocationTransaction
+        .selfSigned(invoker, master, fc, payment.toSeq, if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee }, if (sponsored) {
+          IssuedAsset(issueTx.id())
+        } else { Waves }, ts)
+        .explicitGet()
+    } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
   property("invoking contract results contract's state") {
     forAll(for {
@@ -339,7 +349,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
-      ci = ContractInvocationTransaction.selfSigned(invoker, master, fc, Some(Payment(-1, Waves)), fee, ts)
+      ci = ContractInvocationTransaction.selfSigned(invoker, master, fc, Seq(Payment(-1, Waves)), fee, Waves, ts)
     } yield (ci)) { _ should produce("NegativeAmount") }
   }
 
@@ -419,4 +429,29 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
         }
     }
   }
+
+  property("invoking contract with sponsored fee") {
+    forAll(for {
+      a  <- accountGen
+      am <- smallFeeGen
+      contractGen = (paymentContractGen(a, am, false) _)
+      r  <- preconditionsAndSetContract(contractGen, sponsored = true)
+      ts <- timestampGen
+    } yield (ts, a, am, r._1, r._2, r._3, r._4, r._5, r._6)) {
+      case (ts, acc, amount, genesis, setScript, ci, master, sponsoredAsset, setSponsorship) =>
+        val t =
+          TransferTransactionV2
+            .selfSigned(IssuedAsset(sponsoredAsset.id()), master, ci.sender, sponsoredAsset.quantity / 10, ts, Waves, enoughFee, Array[Byte]())
+            .explicitGet()
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq[Transaction](sponsoredAsset, t, setSponsorship, setScript))),
+                           TestBlock.create(Seq(ci)),
+                           fs) {
+          case (blockDiff, newState) =>
+            newState.balance(acc, Waves) shouldBe amount
+            newState.balance(ci.sender, IssuedAsset(sponsoredAsset.id())) shouldBe (sponsoredAsset.quantity / 10 - ci.fee)
+            newState.balance(master, IssuedAsset(sponsoredAsset.id())) shouldBe (sponsoredAsset.quantity - sponsoredAsset.quantity / 10 + ci.fee)
+        }
+    }
+  }
+
 }

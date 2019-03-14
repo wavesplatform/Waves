@@ -2,8 +2,7 @@ package com.wavesplatform.protobuf.utils
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.account.{Alias, Recipient}
-import com.wavesplatform.protobuf.transaction.{Amount, AssetAmount, VanillaAssetId}
+import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, ValidationError}
 
@@ -14,34 +13,12 @@ private[protobuf] object PBInternalImplicits {
   implicit def byteStringToByteStr(bs: PBByteString): ByteStr = bs.toByteArray
   implicit def byteStrToByteString(bs: ByteStr): PBByteString = PBByteString.copyFrom(bs)
 
-  implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
-    case a: VAddress => fromAddress(a)
-    case al: VAlias  => fromAlias(al)
-  }
-
-  implicit def fromAddress(address: VAddress): Recipient = {
-    Recipient.defaultInstance.withAddress(address.bytes)
-  }
-
-  implicit def fromAlias(alias: VAlias): Recipient = {
-    Recipient.defaultInstance.withAlias(Alias(alias.chainId: Byte, alias.name))
-  }
+  implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = PBRecipients.create(addressOrAlias)
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {
-    def toAddress: Either[ValidationError, VAddress] = {
-      VAddress.fromBytes(recipient.getAddress.toByteArray)
-    }
-
-    def toAlias: Either[ValidationError, VAlias] = {
-      val alias = recipient.getAlias
-      VAlias.buildAlias(if (alias.chainId.isEmpty) 0: Byte else alias.chainId.byteAt(0), alias.name)
-    }
-
-    def toAddressOrAlias: Either[ValidationError, AddressOrAlias] = recipient.recipient match {
-      case Recipient.Recipient.Alias(_)   => this.toAlias
-      case Recipient.Recipient.Address(_) => this.toAddress
-      case Recipient.Recipient.Empty      => throw new IllegalArgumentException("Empty address not supported")
-    }
+    def toAddress: Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient)
+    def toAlias: Either[ValidationError, VAlias]                  = PBRecipients.toAlias(recipient)
+    def toAddressOrAlias: Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient)
   }
 
   implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = v match {

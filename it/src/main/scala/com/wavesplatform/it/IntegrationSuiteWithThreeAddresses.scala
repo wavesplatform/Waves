@@ -22,7 +22,8 @@ trait IntegrationSuiteWithThreeAddresses
     with ScorexLogging {
   this: Suite =>
 
-  def miner: Node = nodes.head
+  def miner: Node    = nodes.head
+  def notMiner: Node = nodes.last
 
   protected def sender: Node = miner
 

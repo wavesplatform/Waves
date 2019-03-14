@@ -74,7 +74,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
         |   else {
         |	  	let currentKey = toBase58String(i.caller.bytes)
-        |	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+        |	  	let currentAmount = match getInteger(this, currentKey) {
         |	  		case a:Int => a
         |	  		case _ => 0
         |	  	}
@@ -87,7 +87,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         | @Callable(i)
         | func withdraw(amount: Int) = {
         |	  	let currentKey = toBase58String(i.caller.bytes)
-        |	  	let currentAmount = match getInteger(i.contractAddress, currentKey) {
+        |	  	let currentAmount = match getInteger(this, currentKey) {
         |	  		case a:Int => a
         |	  		case _ => 0
         |	  	}
@@ -135,9 +135,10 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty),
-          p = Some(ContractInvocationTransaction.Payment(1.5.waves, Waves)),
+          p = Seq(ContractInvocationTransaction.Payment(1.5.waves, Waves)),
           timestamp = System.currentTimeMillis(),
-          fee = 1.waves
+          fee = 1.waves,
+          feeAssetId = Waves
         )
         .explicitGet()
 
@@ -160,9 +161,10 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.51.waves))),
-          p = None,
+          p = Seq(),
           timestamp = System.currentTimeMillis(),
-          fee = 1.waves
+          fee = 1.waves,
+          feeAssetId = Waves
         )
         .explicitGet()
 
@@ -179,9 +181,10 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.49.waves))),
-          p = None,
+          p = Seq(),
           timestamp = System.currentTimeMillis(),
-          fee = 1.waves
+          fee = 1.waves,
+          feeAssetId = Waves
         )
         .explicitGet()
 
