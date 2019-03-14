@@ -2,7 +2,7 @@ package com.wavesplatform.consensus
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
@@ -274,6 +274,7 @@ object FPPoSSelectorTest {
           forkChain.head.uniqueId,
           NxtLikeConsensusBlockData(bt, ByteStr(gs)),
           Seq.empty,
+          BlockHeader.EMPTY_TRANSACTION_HASH,
           miner,
           Set.empty
         )
@@ -316,7 +317,14 @@ object FPPoSSelectorTest {
     val updatedCData = cData.copy(updateBT(cData.baseTarget), updateGS(cData.generationSignature))
 
     Block
-      .buildAndSign(3: Byte, lastBlock.timestamp + delay, lastBlock.uniqueId, updatedCData, Seq.empty, miner, Set.empty)
+      .buildAndSign(3: Byte,
+                    lastBlock.timestamp + delay,
+                    lastBlock.uniqueId,
+                    updatedCData,
+                    Seq.empty,
+                    BlockHeader.EMPTY_TRANSACTION_HASH,
+                    miner,
+                    Set.empty)
       .explicitGet()
   }
 

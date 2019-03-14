@@ -1,6 +1,6 @@
 package com.wavesplatform
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount}
-import com.wavesplatform.block.{Block, MicroBlock, SignerData}
+import com.wavesplatform.block.{Block, BlockHeader, MicroBlock, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -77,6 +77,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
           generationSignature = com.wavesplatform.history.generationSignature
         ),
         transactionData = txs,
+        transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
         signerData = SignerData(
           generator = signer,
           signature = ByteStr.empty

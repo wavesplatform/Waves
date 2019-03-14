@@ -27,6 +27,7 @@ object TestBlock {
         reference = b.reference,
         consensusData = b.consensusData,
         transactionData = b.transactionData,
+        transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
         signer = signer,
         featureVotes = b.featureVotes
       )
@@ -60,6 +61,7 @@ object TestBlock {
         signerData = SignerData(signer, ByteStr.empty),
         consensusData = NxtLikeConsensusBlockData(2L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
         transactionData = txs,
+        transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
         featureVotes = features
       )
     )
@@ -67,24 +69,30 @@ object TestBlock {
   def withReference(ref: ByteStr): Block =
     sign(
       defaultSigner,
-      Block(0,
-            1,
-            ref,
-            SignerData(defaultSigner, ByteStr.empty),
-            NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
-            Seq.empty,
-            Set.empty)
+      Block(
+        0,
+        1,
+        ref,
+        SignerData(defaultSigner, ByteStr.empty),
+        NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
+        BlockHeader.EMPTY_TRANSACTION_HASH,
+        Seq.empty,
+        Set.empty
+      )
     )
 
   def withReferenceAndFeatures(ref: ByteStr, features: Set[Short]): Block =
     sign(
       defaultSigner,
-      Block(0,
-            3,
-            ref,
-            SignerData(defaultSigner, ByteStr.empty),
-            NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
-            Seq.empty,
-            features)
+      Block(
+        0,
+        3,
+        ref,
+        SignerData(defaultSigner, ByteStr.empty),
+        NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
+        BlockHeader.EMPTY_TRANSACTION_HASH,
+        Seq.empty,
+        features
+      )
     )
 }

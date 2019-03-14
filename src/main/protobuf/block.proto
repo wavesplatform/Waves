@@ -17,6 +17,7 @@ message Block {
         int64 timestamp = 5;
         int32 version = 6;
         bytes generator = 7;
+        bytes transactionTreeHash = 8;
     }
 
     bytes chainId = 1;

@@ -291,13 +291,16 @@ package object database {
     val generator         = ndi.readPublicKey
     val signature         = ndi.readSignature
 
-    val header = new BlockHeader(timestamp,
-                                 version,
-                                 reference,
-                                 SignerData(generator, signature),
-                                 NxtLikeConsensusBlockData(baseTarget, genSig),
-                                 transactionCount,
-                                 featureVotes)
+    val header = new BlockHeader(
+      timestamp,
+      version,
+      reference,
+      SignerData(generator, signature),
+      NxtLikeConsensusBlockData(baseTarget, genSig),
+      transactionCount,
+      BlockHeader.EMPTY_TRANSACTION_HASH,
+      featureVotes
+    )
 
     (header, size)
   }

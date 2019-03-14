@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.block.{Block, SignerData}
+import com.wavesplatform.block.{Block, BlockHeader, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.consensus.FairPoSCalculator
@@ -254,6 +254,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         reference = ByteStr(lastBlockId),
         consensusData = cData,
         transactionData = Nil,
+        transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
         signer = signerPK,
         featureVotes = Set.empty
       )

@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
 import com.wavesplatform.transaction.Transaction
+import scorex.crypto.hash.Digest32
 
 abstract class BlockField[T] extends BytesSerializable with JsonSerializable {
   val name: String
@@ -26,6 +27,12 @@ case class ByteBlockField(override val name: String, override val value: Byte) e
   protected override def j: JsObject = Json.obj(name -> value.toInt)
 
   protected override def b = Array(value)
+}
+
+case class HashBlockField(override val name: String, override val value: Digest32) extends BlockField[Digest32] {
+  override protected def j: JsObject = Json.obj(name -> Base58.encode(value))
+
+  override protected def b: Array[Byte] = value
 }
 
 case class LongBlockField(override val name: String, override val value: Long) extends BlockField[Long] {

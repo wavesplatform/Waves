@@ -4,7 +4,7 @@ import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.Block._
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.BlockchainFeatures
@@ -15,7 +15,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
 import com.wavesplatform.transaction._
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{Merkle, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
@@ -24,6 +24,7 @@ import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
+import scorex.crypto.hash.Digest32
 
 import scala.concurrent.duration._
 
@@ -157,11 +158,18 @@ class MinerImpl(allChannels: ChannelGroup,
         mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
         (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint)
         _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+        transactionHash                    = computeHashIfNeeded(height, unconfirmed)
         block <- Block
-          .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version))
+          .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, transactionHash, account, blockFeatures(version))
           .leftMap(_.err)
       } yield (estimators, block, updatedMdConstraint.constraints.head)
     )
+  }
+
+  private def computeHashIfNeeded(h: Int, txs: Seq[Transaction]): Digest32 = {
+    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.DummyFeature, h))
+      Merkle.mkTxTree(txs).rootHash
+    else BlockHeader.EMPTY_TRANSACTION_HASH
   }
 
   private def checkQuorumAvailable(): Either[String, Unit] = {
@@ -214,6 +222,7 @@ class MinerImpl(allChannels: ChannelGroup,
               reference = accumulatedBlock.reference,
               consensusData = accumulatedBlock.consensusData,
               transactionData = accumulatedBlock.transactionData ++ unconfirmed,
+              BlockHeader.EMPTY_TRANSACTION_HASH,
               signer = account,
               featureVotes = accumulatedBlock.featureVotes
             ))

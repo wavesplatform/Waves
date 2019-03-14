@@ -19,6 +19,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
+import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Try}
 
@@ -28,13 +29,15 @@ class BlockHeader(val timestamp: Long,
                   val signerData: SignerData,
                   val consensusData: NxtLikeConsensusBlockData,
                   val transactionCount: Int,
+                  val transactionTreeHash: Digest32,
                   val featureVotes: Set[Short]) {
-  protected val versionField: ByteBlockField      = ByteBlockField("version", version)
-  protected val timestampField: LongBlockField    = LongBlockField("timestamp", timestamp)
-  protected val referenceField: BlockIdField      = BlockIdField("reference", reference.arr)
-  protected val signerField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
-  protected val consensusField                    = NxtConsensusBlockField(consensusData)
-  protected val supportedFeaturesField            = FeaturesBlockField(version, featureVotes)
+  protected val versionField: ByteBlockField             = ByteBlockField("version", version)
+  protected val timestampField: LongBlockField           = LongBlockField("timestamp", timestamp)
+  protected val referenceField: BlockIdField             = BlockIdField("reference", reference.arr)
+  protected val signerField: SignerDataBlockField        = SignerDataBlockField("signature", signerData)
+  protected val consensusField                           = NxtConsensusBlockField(consensusData)
+  protected val transactionTreeHashField: HashBlockField = HashBlockField("transactionTreeHash", transactionTreeHash)
+  protected val supportedFeaturesField                   = FeaturesBlockField(version, featureVotes)
 
   val headerJson: Coeval[JsObject] = Coeval.evalOnce(
     versionField.json() ++
@@ -46,6 +49,9 @@ class BlockHeader(val timestamp: Long,
 }
 
 object BlockHeader extends ScorexLogging {
+
+  val EMPTY_TRANSACTION_HASH: Digest32 = Digest32 @@ Array.emptyByteArray
+
   def parseBytes(bytes: Array[Byte]): Try[(BlockHeader, Array[Byte])] =
     Try {
 
@@ -97,7 +103,14 @@ object BlockHeader extends ScorexLogging {
       position += SignatureLength
 
       val blockHeader =
-        new BlockHeader(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txCount, supportedFeaturesIds)
+        new BlockHeader(timestamp,
+                        version,
+                        reference,
+                        SignerData(PublicKeyAccount(genPK), signature),
+                        consData,
+                        txCount,
+                        EMPTY_TRANSACTION_HASH,
+                        supportedFeaturesIds)
       (blockHeader, tBytes)
     }.recoverWith {
       case t: Throwable =>
@@ -119,9 +132,10 @@ case class Block private[block] (override val timestamp: Long,
                                  override val reference: ByteStr,
                                  override val signerData: SignerData,
                                  override val consensusData: NxtLikeConsensusBlockData,
+                                 override val transactionTreeHash: Digest32,
                                  transactionData: Seq[Transaction],
                                  override val featureVotes: Set[Short])
-    extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes)
+    extends BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, transactionTreeHash, featureVotes)
     with Signed {
 
   import Block._
@@ -243,6 +257,7 @@ object Block extends ScorexLogging {
         blockHeader.reference,
         blockHeader.consensusData,
         transactionsData,
+        BlockHeader.EMPTY_TRANSACTION_HASH,
         blockHeader.signerData,
         blockHeader.featureVotes
       ).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
@@ -259,6 +274,7 @@ object Block extends ScorexLogging {
       h.reference,
       h.consensusData,
       txs,
+      BlockHeader.EMPTY_TRANSACTION_HASH,
       h.signerData,
       h.featureVotes
     )
@@ -269,6 +285,7 @@ object Block extends ScorexLogging {
             reference: ByteStr,
             consensusData: NxtLikeConsensusBlockData,
             transactionData: Seq[Transaction],
+            transactionTreeHash: Digest32,
             signerData: SignerData,
             featureVotes: Set[Short]): Either[GenericError, Block] = {
     (for {
@@ -277,7 +294,8 @@ object Block extends ScorexLogging {
       _ <- Either.cond(signerData.generator.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")
       _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
       _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
-    } yield Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)).left.map(GenericError(_))
+    } yield Block(timestamp, version, reference, signerData, consensusData, transactionTreeHash, transactionData, featureVotes)).left
+      .map(GenericError(_))
   }
 
   def buildAndSign(version: Byte,
@@ -285,10 +303,11 @@ object Block extends ScorexLogging {
                    reference: ByteStr,
                    consensusData: NxtLikeConsensusBlockData,
                    transactionData: Seq[Transaction],
+                   transactionTreeHash: Digest32,
                    signer: PrivateKeyAccount,
                    featureVotes: Set[Short]): Either[GenericError, Block] =
-    build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes).right.map(unsigned =>
-      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
+    build(version, timestamp, reference, consensusData, transactionData, transactionTreeHash, SignerData(signer, ByteStr.empty), featureVotes).right
+      .map(unsigned => unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
@@ -340,6 +359,7 @@ object Block extends ScorexLogging {
         reference = ByteStr(reference),
         signerData = SignerData(genesisSigner, ByteStr(signature)),
         consensusData = consensusGenesisData,
+        transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
         transactionData = transactionGenesisData,
         featureVotes = Set.empty
       )

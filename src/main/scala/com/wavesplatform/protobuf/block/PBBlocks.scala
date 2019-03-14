@@ -7,6 +7,7 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.protobuf.transaction.{PBTransactions, VanillaTransaction}
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
+import scorex.crypto.hash.Digest32
 
 object PBBlocks {
   def vanilla(block: PBBlock): Either[ValidationError, VanillaBlock] = {
@@ -15,10 +16,18 @@ object PBBlocks {
                reference: ByteStr,
                consensusData: NxtLikeConsensusBlockData,
                transactionData: Seq[VanillaTransaction],
+               transactionTreeHash: Digest32,
                featureVotes: Set[Short],
                generator: PublicKeyAccount,
                signature: ByteStr): VanillaBlock = {
-      VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes)
+      VanillaBlock(timestamp,
+                   version.toByte,
+                   reference,
+                   SignerData(generator, signature),
+                   consensusData,
+                   transactionTreeHash,
+                   transactionData,
+                   featureVotes)
     }
 
     for {
@@ -37,6 +46,7 @@ object PBBlocks {
         ByteStr(header.reference.toByteArray),
         NxtLikeConsensusBlockData(header.baseTarget, ByteStr(header.generationSignature.toByteArray)),
         transactions,
+        Digest32 @@ header.transactionTreeHash.toByteArray,
         header.featureVotes.map(intToShort).toSet,
         PublicKeyAccount(header.generator.toByteArray),
         ByteStr(signedHeader.signature.toByteArray)

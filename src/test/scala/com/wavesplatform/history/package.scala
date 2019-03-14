@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -51,6 +51,7 @@ package object history {
         reference = refTo,
         consensusData = NxtLikeConsensusBlockData(baseTarget = bTarget, generationSignature = generationSignature),
         transactionData = txs,
+        transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
         signer = signer,
         Set.empty
       )

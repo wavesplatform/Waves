@@ -1,7 +1,7 @@
 package com.wavesplatform.lagonaki.unit
 
 import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.block.{Block, SignerData}
+import com.wavesplatform.block.{Block, BlockHeader, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -46,13 +46,16 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       paymentTransaction: TransferTransactionV1 <- wavesTransferGeneratorP(time, sender, recipient)
     } yield
       Block
-        .buildAndSign(3,
-                      time,
-                      reference,
-                      NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
-                      Seq.fill(amt)(paymentTransaction),
-                      recipient,
-                      Set.empty)
+        .buildAndSign(
+          3,
+          time,
+          reference,
+          NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
+          Seq.fill(amt)(paymentTransaction),
+          transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
+          recipient,
+          Set.empty
+        )
         .explicitGet()
 
   property(" block with txs bytes/parse roundtrip version 1,2") {
@@ -60,7 +63,16 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       forAll(blockGen) {
         case (baseTarget, reference, generationSignature, recipient, transactionData) =>
           val block = Block
-            .buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, Set.empty)
+            .buildAndSign(
+              version,
+              time,
+              reference,
+              NxtLikeConsensusBlockData(baseTarget, generationSignature),
+              transactionData,
+              BlockHeader.EMPTY_TRANSACTION_HASH,
+              recipient,
+              Set.empty
+            )
             .explicitGet()
           val parsedBlock = Block.parseBytes(block.bytes()).get
           assert(block.signaturesValid().isRight)
@@ -76,8 +88,14 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     Seq[Byte](1, 2).foreach { version =>
       forAll(blockGen) {
         case (baseTarget, reference, generationSignature, recipient, transactionData) =>
-          Block.buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, Set(1)) should produce(
-            "could not contain feature votes")
+          Block.buildAndSign(version,
+                             time,
+                             reference,
+                             NxtLikeConsensusBlockData(baseTarget, generationSignature),
+                             transactionData,
+                             BlockHeader.EMPTY_TRANSACTION_HASH,
+                             recipient,
+                             Set(1)) should produce("could not contain feature votes")
       }
     }
   }
@@ -88,13 +106,16 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
 
     forAll(blockGen) {
       case (baseTarget, reference, generationSignature, recipient, transactionData) =>
-        Block.buildAndSign(version,
-                           time,
-                           reference,
-                           NxtLikeConsensusBlockData(baseTarget, generationSignature),
-                           transactionData,
-                           recipient,
-                           supportedFeatures) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature votes")
+        Block.buildAndSign(
+          version,
+          time,
+          reference,
+          NxtLikeConsensusBlockData(baseTarget, generationSignature),
+          transactionData,
+          BlockHeader.EMPTY_TRANSACTION_HASH,
+          recipient,
+          supportedFeatures
+        ) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature votes")
     }
   }
   property(" block with txs bytes/parse roundtrip version 3") {
@@ -105,13 +126,16 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(blockGen, faetureSetGen) {
       case ((baseTarget, reference, generationSignature, recipient, transactionData), featureVotes) =>
         val block = Block
-          .buildAndSign(version,
-                        time,
-                        reference,
-                        NxtLikeConsensusBlockData(baseTarget, generationSignature),
-                        transactionData,
-                        recipient,
-                        featureVotes)
+          .buildAndSign(
+            version,
+            time,
+            reference,
+            NxtLikeConsensusBlockData(baseTarget, generationSignature),
+            transactionData,
+            BlockHeader.EMPTY_TRANSACTION_HASH,
+            recipient,
+            featureVotes
+          )
           .explicitGet()
         val parsedBlock = Block.parseBytes(block.bytes()).get
         assert(block.signaturesValid().isRight)
@@ -134,6 +158,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             reference,
             NxtLikeConsensusBlockData(baseTarget, generationSignature),
             transactionData,
+            BlockHeader.EMPTY_TRANSACTION_HASH,
             SignerData(weakAccount, ByteStr(Array.fill(64)(0: Byte))),
             Set.empty
           )
@@ -146,7 +171,10 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) {
       case ((txs, acc, ref, gs)) =>
         val (block, t0) =
-          Instrumented.withTime(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty).explicitGet())
+          Instrumented.withTime(
+            Block
+              .buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, BlockHeader.EMPTY_TRANSACTION_HASH, acc, Set.empty)
+              .explicitGet())
         val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature())
         val (hash, t2)  = Instrumented.withTime(crypto.fastHash(bytes))
         val (sig, t3)   = Instrumented.withTime(crypto.sign(acc, hash))
