@@ -9,10 +9,7 @@ import scala.util.Success
 
 sealed trait Asset
 object Asset {
-  final case class IssuedAsset(id: ByteStr) extends Asset {
-    require(!id.isEmpty, "Asset id should not be empty")
-  }
-
+  final case class IssuedAsset(id: ByteStr) extends Asset
   case object Waves extends Asset
 
   implicit val assetReads: Reads[IssuedAsset] = Reads {
@@ -42,9 +39,7 @@ object Asset {
   implicit val assetIdJsonFormat: Format[Asset]     = Format(assetIdReads, assetIdWrites)
 
   def fromCompatId(maybeBStr: Option[ByteStr]): Asset = {
-    maybeBStr
-      .filterNot(_.isEmpty)
-      .fold[Asset](Waves)(IssuedAsset)
+    maybeBStr.fold[Asset](Waves)(IssuedAsset)
   }
 
   def fromProtoId(byteStr: ByteString): Asset = {
