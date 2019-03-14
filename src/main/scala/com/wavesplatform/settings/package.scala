@@ -62,15 +62,16 @@ package object settings {
     else if (SystemUtils.IS_OS_MAC) osxDefaultDirectory
     else nixDefaultDirectory
 
+  // No actual interpolation here, `s` to suppress warnings
   def osxDefaultDirectory: String =
-    "${user.home}/Library/Application Support/waves"
+    s"$${user.home}/Library/Application Support/waves"
 
   def winDefaultDirectory: String =
-    "${LOCALAPPDATA}/waves"
+    s"$${LOCALAPPDATA}/waves"
 
   def nixDefaultDirectory: String = {
     val maybeXdgDir = sys.env.get("XDG_DATA_HOME").map(path => s"$path/waves")
-    val defaultDir  = "${user.home}/.local/share/waves"
+    val defaultDir  = s"$${user.home}/.local/share/waves"
 
     maybeXdgDir getOrElse defaultDir
   }
