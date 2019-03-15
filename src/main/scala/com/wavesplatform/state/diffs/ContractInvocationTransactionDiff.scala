@@ -143,7 +143,7 @@ object ContractInvocationTransactionDiff {
       case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
     }
     if (r.length > ContractLimits.MaxWriteSetSize) {
-      Left(GenericError(s"WriteSec cann't content more than ${ContractLimits.MaxWriteSetSize} entries"))
+      Left(GenericError(s"WriteSec can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
     } else if (r.exists(_.key.getBytes().length > ContractLimits.MaxKeySizeInBytes)) {
       Left(GenericError(s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"))
     } else {

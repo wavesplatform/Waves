@@ -55,7 +55,7 @@ object ContractCompiler {
            _ <- Either.cond(
              func.name.getBytes().size <= ContractLimits.MaxCallableFunctionNameInBytes,
              (),
-             Generic(af.f.name.position.start, af.f.name.position.end, s"Callable function name ize in bytes must be less than ${ContractLimits.MaxCallableFunctionNameInBytes}"))
+             Generic(af.f.name.position.start, af.f.name.position.end, s"Callable function name size in bytes must be less than ${ContractLimits.MaxCallableFunctionNameInBytes}"))
             .toCompileM
         } yield CallableFunction(c, func)
       case (List(c: VerifierAnnotation), (func, tpe, _)) =>
