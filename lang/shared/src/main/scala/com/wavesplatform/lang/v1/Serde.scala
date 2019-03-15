@@ -102,7 +102,7 @@ object Serde {
           .now((bb.getFunctionHeader, bb.getInt))
           .flatMap {
             case (header, argc) =>
-              if (argc <= (bb.limit() - bb.position())/2) {
+              if (argc <= (bb.limit() - bb.position())) {
                 val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAux(bb))(collection.breakOut)
                 args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
               } else {
