@@ -71,9 +71,9 @@ object BlockchainUpdateNotifier {
   def notifyProcessMicroBlock(events: Option[Observer[BlockchainUpdated]], microBlock: MicroBlock, diff: DetailedDiff, blockchain: Blockchain): Unit =
     events foreach { es =>
       val (microBlockStateUpdate, txsStateUpdates) = stateUpdatesFromDetailedDiff(blockchain, diff)
-      es.onNext(MicroBlockAdded(microBlock, blockchain.height, microBlockStateUpdate, txsStateUpdates))
+      es.onNext(MicroBlockAdded(microBlock, blockchain.height + 1, microBlockStateUpdate, txsStateUpdates))
     }
 
   def notifyRollback(events: Option[Observer[BlockchainUpdated]], blockId: ByteStr, height: Int): Unit =
-    events foreach (_.onNext(RollbackCompleted(blockId, height)))
+    events foreach (_.onNext(RollbackCompleted(blockId, height + 1)))
 }

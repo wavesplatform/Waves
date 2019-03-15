@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -26,23 +27,25 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
   private val FEE_AMT = 1000000L
 
+  // default settings, no NG
+  private val functionalitySettings = TestFunctionalitySettings.Stub
+  private val wavesSettings         = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
+
+  // to settings with NG enabled
   private def withNg(settings: FunctionalitySettings): FunctionalitySettings =
     settings.copy(
       blockVersion3AfterHeight = 0,
       preActivatedFeatures = settings.preActivatedFeatures ++ Map(BlockchainFeatures.NG.id -> 0)
     )
-
   private def withNg(settings: WavesSettings): WavesSettings =
     settings.copy(
       blockchainSettings = settings.blockchainSettings.copy(functionalitySettings = withNg(settings.blockchainSettings.functionalitySettings)))
 
   def baseTest(gen: Time => Gen[(PrivateKeyAccount, Seq[Block])], enableNg: Boolean = false, events: Option[Observer[BlockchainUpdated]] = None)(
       f: (BlockchainUpdaterImpl, PrivateKeyAccount) => Unit): Unit = {
-    val (fs, settings) = {
-      val defaultFs       = TestFunctionalitySettings.Stub
-      val defaultSettings = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
-      if (enableNg) (withNg(defaultFs), withNg(defaultSettings)) else (defaultFs, defaultSettings)
-    }
+    val (fs, settings) =
+      if (enableNg) (withNg(functionalitySettings), withNg(wavesSettings)) else (functionalitySettings, wavesSettings)
+
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, fs, maxCacheSize, 2000, 120 * 60 * 1000)
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, events)
     try {
@@ -213,6 +216,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               block.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
+            case _ => fail()
           }
 
           // first transfers block
@@ -224,6 +228,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               // miner reward, with NG — 40% of all txs fees
               blockStateUpdate.balances.length shouldBe 1
               blockStateUpdate.balances.head._3 shouldBe FEE_AMT * 5 * 0.4
+            case _ => fail()
           }
 
           // second transfers block, with carryFee
@@ -239,11 +244,87 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
                   + FEE_AMT * 4 * 0.4 // carry from prev block
                   + FEE_AMT * 5 * 0.6 // current block reward
               )
+            case _ => fail()
           }
         }
       }
 
-      // @todo write process microblock and rollback tests
+      "block, then 2 microblocks, then block referencing previous microblock" in {
+        def preconditions(ts: Long): Gen[(Transaction, Seq[Transaction])] =
+          for {
+            master    <- accountGen
+            recipient <- accountGen
+            genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+            transfers = Seq(
+              createTransfer(master, recipient.toAddress, ts + 1),
+              createTransfer(master, recipient.toAddress, ts + 2),
+              createTransfer(master, recipient.toAddress, ts + 3),
+              createTransfer(recipient, master.toAddress, ts + 4),
+              createTransfer(master, recipient.toAddress, ts + 5),
+            )
+          } yield (genesis, transfers)
+
+        val events        = ReplaySubject[BlockchainUpdated]()
+        val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, withNg(functionalitySettings), maxCacheSize, 2000, 120 * 60 * 1000)
+        val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, withNg(wavesSettings), ntpTime, Some(events))
+
+        try {
+          val (genesis, transfers)       = preconditions(0).sample.get
+          val (block1, microBlocks1And2) = chainBaseAndMicro(randomSig, genesis, Seq(transfers.take(2), Seq(transfers(2))))
+          val (block2, microBlock3)      = chainBaseAndMicro(microBlocks1And2.head.totalResBlockSig, transfers(3), Seq(Seq(transfers(4))))
+
+          bcu.processBlock(block1).explicitGet()
+          bcu.processMicroBlock(microBlocks1And2.head).explicitGet()
+          bcu.processMicroBlock(microBlocks1And2.last).explicitGet()
+          bcu.processBlock(block2).explicitGet() // this should remove previous microblock
+          bcu.processMicroBlock(microBlock3.head).explicitGet()
+          bcu.shutdown()
+
+          // test goes here
+          val updates = events.toListL
+            .runSyncUnsafe(5.seconds)
+
+          updates.length shouldBe 6
+          updates.head match {
+            case BlockAdded(b, height, blockStateUpdate, transactionsStateUpdates) =>
+              height shouldBe 1
+              b.transactionData.length shouldBe 1
+              blockStateUpdate.balances.length shouldBe 0
+              transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
+            case _ => fail()
+          }
+
+          updates(1) match {
+            case MicroBlockAdded(microBlock, height, microBlockStateUpdate, _) =>
+              height shouldBe 1
+              microBlock.transactionData.length shouldBe 2
+              // microBlock transactions miner reward
+              microBlockStateUpdate.balances.length shouldBe 1
+              microBlockStateUpdate.balances.head._3 shouldBe FEE_AMT * 2 * 0.4
+            case _ => fail()
+          }
+
+          updates(2) match {
+            case MicroBlockAdded(microBlock, height, microBlockStateUpdate, _) =>
+              height shouldBe 1
+              microBlock.transactionData.length shouldBe 1
+              // microBlock transactions miner reward
+              microBlockStateUpdate.balances.length shouldBe 1
+              microBlockStateUpdate.balances.head._3 shouldBe FEE_AMT * 0.4
+            case _ => fail()
+          }
+
+          updates(3) match {
+            case RollbackCompleted(to, height) =>
+              height shouldBe 1
+              to shouldBe microBlocks1And2.head.totalResBlockSig
+            case _ => fail()
+          }
+        } finally {
+          bcu.shutdown()
+          db.close()
+        }
+      }
     }
   }
 }
