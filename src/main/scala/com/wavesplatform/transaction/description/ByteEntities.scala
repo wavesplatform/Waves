@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 

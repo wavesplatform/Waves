@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
 import scala.util.{Left, Right, Try}
@@ -42,7 +42,7 @@ object CommonValidation {
     SetScriptTransaction.typeId                -> 10,
     SponsorFeeTransaction.typeId               -> 1000,
     SetAssetScriptTransaction.typeId           -> (1000 - 4),
-    smart.ContractInvocationTransaction.typeId -> 5
+    smart.InvokeScriptTransaction.typeId -> 5
   )
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain,
@@ -91,7 +91,7 @@ object CommonValidation {
                 s"${blockchain.balance(ptx.sender, Waves)} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, Waves, mtx.fee)
-        case citx: ContractInvocationTransaction =>
+        case citx: InvokeScriptTransaction =>
           citx.payment.map(p => checkTransfer(citx.sender, p.assetId, p.amount, citx.feeAssetId, citx.fee)).find(_.isLeft).getOrElse(Right(tx))
         case _ => Right(tx)
       }
@@ -186,7 +186,7 @@ object CommonValidation {
       case _: LeaseCancelTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: CreateAliasTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction         => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _: ContractInvocationTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
+      case _: InvokeScriptTransaction       => activationBarrier(BlockchainFeatures.Ride4DApps)
       case _                                => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
