@@ -158,18 +158,12 @@ class MinerImpl(allChannels: ChannelGroup,
         mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
         (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint)
         _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-        transactionHash                    = computeHashIfNeeded(height, unconfirmed)
+        transactionHash                    = Merkle.mkTxTree(unconfirmed).rootHash
         block <- Block
           .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, transactionHash, account, blockFeatures(version))
           .leftMap(_.err)
       } yield (estimators, block, updatedMdConstraint.constraints.head)
     )
-  }
-
-  private def computeHashIfNeeded(h: Int, txs: Seq[Transaction]): Digest32 = {
-    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.DummyFeature, h))
-      Merkle.mkTxTree(txs).rootHash
-    else BlockHeader.EMPTY_TRANSACTION_HASH
   }
 
   private def checkQuorumAvailable(): Either[String, Unit] = {
@@ -213,7 +207,8 @@ class MinerImpl(allChannels: ChannelGroup,
         Task.now(Stop)
       } else {
         log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
-        val start = System.currentTimeMillis()
+        val start        = System.currentTimeMillis()
+        val transactions = accumulatedBlock.transactionData ++ unconfirmed
         (for {
           signedBlock <- EitherT.fromEither[Task](
             Block.buildAndSign(
@@ -221,8 +216,8 @@ class MinerImpl(allChannels: ChannelGroup,
               timestamp = accumulatedBlock.timestamp,
               reference = accumulatedBlock.reference,
               consensusData = accumulatedBlock.consensusData,
-              transactionData = accumulatedBlock.transactionData ++ unconfirmed,
-              BlockHeader.EMPTY_TRANSACTION_HASH,
+              transactionData = transactions,
+              transactionTreeHash = Merkle.mkTxTree(transactions).rootHash,
               signer = account,
               featureVotes = accumulatedBlock.featureVotes
             ))
