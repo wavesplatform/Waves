@@ -25,7 +25,7 @@ import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, WavesEnvironment}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.{Asset, ValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -33,7 +33,7 @@ import shapeless.Coproduct
 import scala.util.{Failure, Success, Try}
 
 object ContractInvocationTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int)(tx: ContractInvocationTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): Either[ValidationError, Diff] = {
     val sc = blockchain.accountScript(tx.contractAddress)
 
     def evalContract(contract: Contract) = {
@@ -110,7 +110,7 @@ object ContractInvocationTransactionDiff {
                           .collect { case asset @ IssuedAsset(_) => asset }
                           .count(blockchain.hasAssetScript) +
                           ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id))))
-                      val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(ContractInvocationTransaction.typeId) * FeeUnit
+                      val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
                       Either.cond(
                         minWaves <= wavesFee,
                         (),
@@ -135,7 +135,7 @@ object ContractInvocationTransactionDiff {
 
   }
 
-  private def payableAndDataPart(height: Int, tx: ContractInvocationTransaction, ds: List[DataItem[_]], feePart: Map[Address, Portfolio]) = {
+  private def payableAndDataPart(height: Int, tx: InvokeScriptTransaction, ds: List[DataItem[_]], feePart: Map[Address, Portfolio]) = {
     val r: Seq[DataEntry[_]] = ds.map {
       case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
       case DataItem.Str(k, b)  => StringDataEntry(k, b)
@@ -151,7 +151,7 @@ object ContractInvocationTransactionDiff {
 
       val payablePart: Map[Address, Portfolio] = (tx.payment
         .map {
-          case ContractInvocationTransaction.Payment(amt, assetId) =>
+          case InvokeScriptTransaction.Payment(amt, assetId) =>
             assetId match {
               case asset @ IssuedAsset(_) =>
                 Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
@@ -175,7 +175,7 @@ object ContractInvocationTransactionDiff {
     }
   }
 
-  private def foldContractTransfers(blockchain: Blockchain, tx: ContractInvocationTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
+  private def foldContractTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
                                                                                                dataDiff: Diff): Either[ValidationError, Diff] = {
     if (ps.length <= ContractLimits.MaxPaymentAmount)
       ps.foldLeft(Either.right[ValidationError, Diff](dataDiff)) { (diffEi, payment) =>
@@ -208,7 +208,7 @@ object ContractInvocationTransactionDiff {
       Left(GenericError(s"Too many ContractTransfers: max: ${ContractLimits.MaxPaymentAmount}, actual: ${ps.length}"))
   }
 
-  private def validateContractTransferWithSmartAssetScript(blockchain: Blockchain, tx: ContractInvocationTransaction)(
+  private def validateContractTransferWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
       totalDiff: Diff,
       addressRepr: Recipient.Address,
       amount: Long,

@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{IssueTransactionV2, SetAssetScriptTransaction}
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.scalatest.CancelAfterFailure
@@ -147,7 +147,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   }
 
   test("can't invoke script before Ride4DApps activation") {
-    val invokeScriptTransaction = ContractInvocationTransaction
+    val invokeScriptTransaction = InvokeScriptTransaction
       .selfSigned(callerAcc,
                   smartAcc.toAddress,
                   Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty),
@@ -157,7 +157,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
                   System.currentTimeMillis())
       .explicitGet()
     assertBadRequestAndMessage(
-      sender.signedBroadcast(invokeScriptTransaction.json() + ("type" -> JsNumber(ContractInvocationTransaction.typeId.toInt))),
+      sender.signedBroadcast(invokeScriptTransaction.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt))),
       "Ride4DApps has not been activated yet"
     )
   }

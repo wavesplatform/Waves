@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
@@ -66,7 +66,7 @@ package object http extends ApiMarshallers {
                   case CreateAliasTransactionV1      => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], senderPk)
                   case CreateAliasTransactionV2      => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], senderPk)
                   case DataTransaction               => TransactionFactory.data(txJson.as[DataRequest], senderPk)
-                  case ContractInvocationTransaction => TransactionFactory.contractInvocation(txJson.as[ContractInvocationRequest], senderPk)
+                  case InvokeScriptTransaction => TransactionFactory.contractInvocation(txJson.as[ContractInvocationRequest], senderPk)
                   case SetScriptTransaction          => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
                   case SetAssetScriptTransaction     => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
                   case SponsorFeeTransaction         => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)

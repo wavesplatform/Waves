@@ -8,7 +8,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction, Verifier}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 
@@ -76,7 +76,7 @@ object TransactionDiffer extends Instrumented with ScorexLogging {
         case sstx: SetAssetScriptTransaction =>
           AssetTransactionsDiff.setAssetScript(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(sstx)
         case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
-        case ci: ContractInvocationTransaction => ContractInvocationTransactionDiff.apply(blockchain, currentBlockHeight)(ci)
+        case ci: InvokeScriptTransaction => ContractInvocationTransactionDiff.apply(blockchain, currentBlockHeight)(ci)
         case _                                 => Left(UnsupportedTransactionType)
       }
     }

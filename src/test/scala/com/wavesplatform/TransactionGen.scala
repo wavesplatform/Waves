@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
 import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
@@ -526,11 +526,11 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     po <- Gen.option(for {
       asset <- Gen.option(bytes32gen.map(ByteStr(_))).map(Asset.fromCompatId)
       amt   <- positiveLongGen
-    } yield ContractInvocationTransaction.Payment(amt, asset))
+    } yield InvokeScriptTransaction.Payment(amt, asset))
     chainId = AddressScheme.current.chainId
     fee       <- smallFeeGen
     timestamp <- timestampGen
-  } yield ContractInvocationTransaction.selfSigned(sender, contractAddress, fc, po.toSeq, fee, Waves, timestamp).explicitGet()
+  } yield InvokeScriptTransaction.selfSigned(sender, contractAddress, fc, po.toSeq, fee, Waves, timestamp).explicitGet()
 
   val priceGen: Gen[Long]            = Gen.choose(1, 3 * 100000L * 100000000L)
   val matcherAmountGen: Gen[Long]    = Gen.choose(1, 3 * 100000L * 100000000L)

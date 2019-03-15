@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.account.{Address, PublicKeyAccount}
-import com.wavesplatform.transaction.smart.ContractInvocationTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
@@ -62,7 +62,7 @@ case class ContractInvocationRequest(
       required = false
     ) feeAssetId: Option[String],
     @(ApiModelProperty @field)(required = true) call: ContractInvocationRequest.FunctionCallPart,
-    @(ApiModelProperty @field)(required = true) payment: Seq[ContractInvocationTransaction.Payment],
+    @(ApiModelProperty @field)(required = true) payment: Seq[InvokeScriptTransaction.Payment],
     @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") contractAddress: String,
     timestamp: Option[Long] = None)
 
@@ -77,18 +77,18 @@ case class SignedContractInvocationRequest(
     ) feeAssetId: Option[String],
     @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") contractAddress: String,
     @(ApiModelProperty @field)(required = true) call: ContractInvocationRequest.FunctionCallPart,
-    @(ApiModelProperty @field)(required = true) payment: Option[Seq[ContractInvocationTransaction.Payment]],
+    @(ApiModelProperty @field)(required = true) payment: Option[Seq[InvokeScriptTransaction.Payment]],
     @(ApiModelProperty @field)(required = true, value = "1000") timestamp: Long,
     @(ApiModelProperty @field)(required = true) proofs: List[String])
     extends BroadcastRequest {
-  def toTx: Either[ValidationError, ContractInvocationTransaction] =
+  def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
       _sender          <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _contractAddress <- Address.fromString(contractAddress)
       _feeAssetId      <- parseBase58ToAssetId(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
       _proofBytes      <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs          <- Proofs.create(_proofBytes)
-      t <- ContractInvocationTransaction.create(
+      t <- InvokeScriptTransaction.create(
         _sender,
         _contractAddress,
         ContractInvocationRequest.buildFunctionCall(call),

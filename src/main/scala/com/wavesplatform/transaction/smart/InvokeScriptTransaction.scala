@@ -14,14 +14,14 @@ import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
-import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class ContractInvocationTransaction private (chainId: Byte,
+case class InvokeScriptTransaction private (chainId: Byte,
                                                   sender: PublicKeyAccount,
                                                   contractAddress: Address,
                                                   fc: Terms.FUNCTION_CALL,
@@ -34,10 +34,10 @@ case class ContractInvocationTransaction private (chainId: Byte,
     with VersionedTransaction
     with FastHashId {
 
-  import ContractInvocationTransaction.paymentPartFormat
+  import InvokeScriptTransaction.paymentPartFormat
   import play.api.libs.json.Json
 
-  override val builder: TransactionParser = ContractInvocationTransaction
+  override val builder: TransactionParser = InvokeScriptTransaction
 
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
@@ -60,7 +60,7 @@ case class ContractInvocationTransaction private (chainId: Byte,
         ++ Json.obj(
           "version"         -> version,
           "contractAddress" -> contractAddress.bytes,
-          "call"            -> ContractInvocationTransaction.functionCallToJson(fc),
+          "call"            -> InvokeScriptTransaction.functionCallToJson(fc),
           "payment"         -> payment
         )
     )
@@ -72,13 +72,13 @@ case class ContractInvocationTransaction private (chainId: Byte,
   override def version: Byte = 1
 }
 
-object ContractInvocationTransaction extends TransactionParserFor[ContractInvocationTransaction] with TransactionParser.MultipleVersions {
+object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransaction] with TransactionParser.MultipleVersions {
 
   import play.api.libs.json.{Json, _}
 
   case class Payment(amount: Long, assetId: Asset)
 
-  implicit val paymentPartFormat: Format[ContractInvocationTransaction.Payment] = Json.format
+  implicit val paymentPartFormat: Format[InvokeScriptTransaction.Payment] = Json.format
 
   def functionCallToJson(fc: Terms.FUNCTION_CALL): JsObject = {
     Json.obj(
@@ -148,7 +148,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
       _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                        (),
                        GenericError("all arguments of contractInvocation must be EVALUATED"))
-      tx   = new ContractInvocationTransaction(currentChainId, sender, contractAddress, fc, p, fee, feeAssetId, timestamp, proofs)
+      tx   = new InvokeScriptTransaction(currentChainId, sender, contractAddress, fc, p, fee, feeAssetId, timestamp, proofs)
       size = tx.bytes().length
       _ <- Either.cond(size <= ContractLimits.MaxContractInvocationSizeInBytes, (), ValidationError.TooBigArray)
     } yield tx
@@ -177,7 +177,7 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
     signed(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, sender)
   }
 
-  val byteTailDescription: ByteEntity[ContractInvocationTransaction] = {
+  val byteTailDescription: ByteEntity[InvokeScriptTransaction] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
       PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
@@ -189,6 +189,6 @@ object ContractInvocationTransaction extends TransactionParserFor[ContractInvoca
         .map(_.getOrElse(Waves)),
       LongBytes(tailIndex(8), "Timestamp"),
       ProofsBytes(tailIndex(9))
-    ) mapN ContractInvocationTransaction.apply
+    ) mapN InvokeScriptTransaction.apply
   }
 }
