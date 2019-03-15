@@ -4,7 +4,7 @@ import cats.data.EitherT
 import cats.implicits._
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.Block._
-import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.BlockchainFeatures
@@ -24,7 +24,6 @@ import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
-import scorex.crypto.hash.Digest32
 
 import scala.concurrent.duration._
 
@@ -160,7 +159,15 @@ class MinerImpl(allChannels: ChannelGroup,
         _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
         transactionHash                    = Merkle.mkTxTree(unconfirmed).rootHash
         block <- Block
-          .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, transactionHash, account, blockFeatures(version))
+          .buildAndSign(version.toByte,
+                        currentTime,
+                        refBlockID,
+                        consensusData,
+                        unconfirmed,
+                        transactionHash,
+                        Merkle.EMPTY_ROOT_HASH,
+                        account,
+                        blockFeatures(version))
           .leftMap(_.err)
       } yield (estimators, block, updatedMdConstraint.constraints.head)
     )
@@ -218,6 +225,7 @@ class MinerImpl(allChannels: ChannelGroup,
               consensusData = accumulatedBlock.consensusData,
               transactionData = transactions,
               transactionTreeHash = Merkle.mkTxTree(transactions).rootHash,
+              minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
               signer = account,
               featureVotes = accumulatedBlock.featureVotes
             ))

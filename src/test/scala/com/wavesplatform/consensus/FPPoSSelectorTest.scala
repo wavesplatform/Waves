@@ -2,7 +2,7 @@ package com.wavesplatform.consensus
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
@@ -14,7 +14,7 @@ import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{Merkle, Time}
 import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
@@ -274,7 +274,8 @@ object FPPoSSelectorTest {
           forkChain.head.uniqueId,
           NxtLikeConsensusBlockData(bt, ByteStr(gs)),
           Seq.empty,
-          BlockHeader.EMPTY_TRANSACTION_HASH,
+          Merkle.EMPTY_ROOT_HASH,
+          Merkle.EMPTY_ROOT_HASH,
           miner,
           Set.empty
         )
@@ -322,7 +323,8 @@ object FPPoSSelectorTest {
                     lastBlock.uniqueId,
                     updatedCData,
                     Seq.empty,
-                    BlockHeader.EMPTY_TRANSACTION_HASH,
+                    Merkle.EMPTY_ROOT_HASH,
+                    Merkle.EMPTY_ROOT_HASH,
                     miner,
                     Set.empty)
       .explicitGet()

@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.utils.Merkle
 
 import scala.util.{Random, Try}
 
@@ -27,7 +28,8 @@ object TestBlock {
         reference = b.reference,
         consensusData = b.consensusData,
         transactionData = b.transactionData,
-        transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
+        transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         signer = signer,
         featureVotes = b.featureVotes
       )
@@ -61,7 +63,8 @@ object TestBlock {
         signerData = SignerData(signer, ByteStr.empty),
         consensusData = NxtLikeConsensusBlockData(2L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
         transactionData = txs,
-        transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
+        transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         featureVotes = features
       )
     )
@@ -75,7 +78,8 @@ object TestBlock {
         ref,
         SignerData(defaultSigner, ByteStr.empty),
         NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
-        BlockHeader.EMPTY_TRANSACTION_HASH,
+        Merkle.EMPTY_ROOT_HASH,
+        Merkle.EMPTY_ROOT_HASH,
         Seq.empty,
         Set.empty
       )
@@ -90,7 +94,8 @@ object TestBlock {
         ref,
         SignerData(defaultSigner, ByteStr.empty),
         NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
-        BlockHeader.EMPTY_TRANSACTION_HASH,
+        Merkle.EMPTY_ROOT_HASH,
+        Merkle.EMPTY_ROOT_HASH,
         Seq.empty,
         features
       )

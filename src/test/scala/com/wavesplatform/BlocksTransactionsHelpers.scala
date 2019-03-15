@@ -1,6 +1,6 @@
 package com.wavesplatform
 import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount}
-import com.wavesplatform.block.{Block, BlockHeader, MicroBlock, SignerData}
+import com.wavesplatform.block.{Block, MicroBlock, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -9,6 +9,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.utils.Merkle
 import org.scalacheck.Gen
 
 trait BlocksTransactionsHelpers { self: TransactionGen =>
@@ -77,7 +78,8 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
           generationSignature = com.wavesplatform.history.generationSignature
         ),
         transactionData = txs,
-        transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
+        transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         signerData = SignerData(
           generator = signer,
           signature = ByteStr.empty

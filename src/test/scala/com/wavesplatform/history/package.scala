@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -11,6 +11,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{BlockchainSettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.utils.Merkle
 
 package object history {
   val MaxTransactionsPerBlockDiff = 10
@@ -51,7 +52,8 @@ package object history {
         reference = refTo,
         consensusData = NxtLikeConsensusBlockData(baseTarget = bTarget, generationSignature = generationSignature),
         transactionData = txs,
-        transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
+        transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         signer = signer,
         Set.empty
       )

@@ -1,11 +1,12 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
+import com.wavesplatform.utils.Merkle
 import org.scalacheck.Gen
 import org.scalatest.Suite
 
@@ -35,7 +36,8 @@ trait BlockGen extends TransactionGen { _: Suite =>
           reference,
           NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
           txs,
-          BlockHeader.EMPTY_TRANSACTION_HASH,
+          Merkle.EMPTY_ROOT_HASH,
+          Merkle.EMPTY_ROOT_HASH,
           signer,
           Set.empty
         )

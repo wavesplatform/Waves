@@ -16,6 +16,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.utils.Merkle
 import org.iq80.leveldb.{DB, ReadOptions}
 
 package object database {
@@ -298,7 +299,8 @@ package object database {
       SignerData(generator, signature),
       NxtLikeConsensusBlockData(baseTarget, genSig),
       transactionCount,
-      BlockHeader.EMPTY_TRANSACTION_HASH,
+      Merkle.EMPTY_ROOT_HASH,
+      Merkle.EMPTY_ROOT_HASH,
       featureVotes
     )
 

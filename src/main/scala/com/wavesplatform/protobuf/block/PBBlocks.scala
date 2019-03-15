@@ -17,17 +17,21 @@ object PBBlocks {
                consensusData: NxtLikeConsensusBlockData,
                transactionData: Seq[VanillaTransaction],
                transactionTreeHash: Digest32,
+               minerBalancesTreeHash: Digest32,
                featureVotes: Set[Short],
                generator: PublicKeyAccount,
                signature: ByteStr): VanillaBlock = {
-      VanillaBlock(timestamp,
-                   version.toByte,
-                   reference,
-                   SignerData(generator, signature),
-                   consensusData,
-                   transactionTreeHash,
-                   transactionData,
-                   featureVotes)
+      VanillaBlock(
+        timestamp,
+        version.toByte,
+        reference,
+        SignerData(generator, signature),
+        consensusData,
+        transactionTreeHash,
+        minerBalancesTreeHash,
+        transactionData,
+        featureVotes
+      )
     }
 
     for {
@@ -47,6 +51,7 @@ object PBBlocks {
         NxtLikeConsensusBlockData(header.baseTarget, ByteStr(header.generationSignature.toByteArray)),
         transactions,
         Digest32 @@ header.transactionTreeHash.toByteArray,
+        Digest32 @@ header.minerBalancesTreeHash.toByteArray,
         header.featureVotes.map(intToShort).toSet,
         PublicKeyAccount(header.generator.toByteArray),
         ByteStr(signedHeader.signature.toByteArray)
@@ -70,7 +75,9 @@ object PBBlocks {
             featureVotes.map(shortToInt).toSeq,
             timestamp,
             version,
-            ByteString.copyFrom(generator.publicKey)
+            ByteString.copyFrom(generator.publicKey),
+            ByteString.copyFrom(transactionTreeHash),
+            ByteString.copyFrom(minerBalancesTreeHash)
           )),
           ByteString.copyFrom(signature)
         )),

@@ -10,6 +10,9 @@ import scorex.crypto.hash.{CryptographicHash32, Digest32}
 import supertagged._
 
 object Merkle {
+
+  val EMPTY_ROOT_HASH: Digest32 = Digest32 @@ Array.emptyByteArray
+
   object FastHash extends CryptographicHash32 {
     override def hash(input: FastHash.Message): Digest32 = Digest32 @@ com.wavesplatform.crypto.fastHash(input)
   }

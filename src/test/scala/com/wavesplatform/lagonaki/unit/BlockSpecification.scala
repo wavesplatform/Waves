@@ -1,7 +1,7 @@
 package com.wavesplatform.lagonaki.unit
 
 import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.block.{Block, BlockHeader, SignerData}
+import com.wavesplatform.block.{Block, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -10,6 +10,7 @@ import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.utils.Merkle
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
@@ -52,7 +53,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           reference,
           NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
           Seq.fill(amt)(paymentTransaction),
-          transactionTreeHash = BlockHeader.EMPTY_TRANSACTION_HASH,
+          transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
+          minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
           recipient,
           Set.empty
         )
@@ -69,7 +71,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
               reference,
               NxtLikeConsensusBlockData(baseTarget, generationSignature),
               transactionData,
-              BlockHeader.EMPTY_TRANSACTION_HASH,
+              Merkle.EMPTY_ROOT_HASH,
+              Merkle.EMPTY_ROOT_HASH,
               recipient,
               Set.empty
             )
@@ -88,14 +91,17 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     Seq[Byte](1, 2).foreach { version =>
       forAll(blockGen) {
         case (baseTarget, reference, generationSignature, recipient, transactionData) =>
-          Block.buildAndSign(version,
-                             time,
-                             reference,
-                             NxtLikeConsensusBlockData(baseTarget, generationSignature),
-                             transactionData,
-                             BlockHeader.EMPTY_TRANSACTION_HASH,
-                             recipient,
-                             Set(1)) should produce("could not contain feature votes")
+          Block.buildAndSign(
+            version,
+            time,
+            reference,
+            NxtLikeConsensusBlockData(baseTarget, generationSignature),
+            transactionData,
+            Merkle.EMPTY_ROOT_HASH,
+            Merkle.EMPTY_ROOT_HASH,
+            recipient,
+            Set(1)
+          ) should produce("could not contain feature votes")
       }
     }
   }
@@ -112,7 +118,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           reference,
           NxtLikeConsensusBlockData(baseTarget, generationSignature),
           transactionData,
-          BlockHeader.EMPTY_TRANSACTION_HASH,
+          Merkle.EMPTY_ROOT_HASH,
+          Merkle.EMPTY_ROOT_HASH,
           recipient,
           supportedFeatures
         ) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature votes")
@@ -132,7 +139,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             reference,
             NxtLikeConsensusBlockData(baseTarget, generationSignature),
             transactionData,
-            BlockHeader.EMPTY_TRANSACTION_HASH,
+            Merkle.EMPTY_ROOT_HASH,
+            Merkle.EMPTY_ROOT_HASH,
             recipient,
             featureVotes
           )
@@ -158,7 +166,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             reference,
             NxtLikeConsensusBlockData(baseTarget, generationSignature),
             transactionData,
-            BlockHeader.EMPTY_TRANSACTION_HASH,
+            Merkle.EMPTY_ROOT_HASH,
+            Merkle.EMPTY_ROOT_HASH,
             SignerData(weakAccount, ByteStr(Array.fill(64)(0: Byte))),
             Set.empty
           )
@@ -173,7 +182,15 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
         val (block, t0) =
           Instrumented.withTime(
             Block
-              .buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, BlockHeader.EMPTY_TRANSACTION_HASH, acc, Set.empty)
+              .buildAndSign(3,
+                            1,
+                            ByteStr(ref),
+                            NxtLikeConsensusBlockData(1, ByteStr(gs)),
+                            txs,
+                            Merkle.EMPTY_ROOT_HASH,
+                            Merkle.EMPTY_ROOT_HASH,
+                            acc,
+                            Set.empty)
               .explicitGet())
         val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature())
         val (hash, t2)  = Instrumented.withTime(crypto.fastHash(bytes))

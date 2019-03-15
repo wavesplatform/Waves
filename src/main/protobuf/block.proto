@@ -18,6 +18,7 @@ message Block {
         int32 version = 6;
         bytes generator = 7;
         bytes transactionTreeHash = 8;
+        bytes minerBalancesTreeHash = 9;
     }
 
     bytes chainId = 1;
