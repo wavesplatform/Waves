@@ -21,7 +21,7 @@ trait TypedScriptGen {
 
   private def funcGen =
     for {
-      name <- Gen.alphaStr.filter(_.length <= ContractLimits.MaxFunctionName)
+      name <- Gen.alphaStr.filter(_.getBytes.length <= ContractLimits.MaxCallableFunctionNameInBytes)
       arg0 <- Gen.alphaStr
       args <- Gen.listOf(Gen.alphaStr)
       allArgs = arg0 +: args

@@ -74,7 +74,7 @@ object ContractSerDe {
     for {
       ca <- deserializeCallableAnnotation(bb)
       cf <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
-      _  <- Either.cond(cf.name.getBytes().size <= ContractLimits.MaxFunctionName, (), s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxFunctionName}")
+      _  <- Either.cond(cf.name.getBytes().size <= ContractLimits.MaxCallableFunctionNameInBytes, (), s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxCallableFunctionNameInBytes}")
     } yield CallableFunction(ca, cf)
   }
 
