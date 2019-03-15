@@ -186,7 +186,7 @@ class OrderValidatorSpecification
 
       "matcher's fee asset in order doesn't meet matcher's settings requirements (fixed-waves mode and incorrect asset)" in {
         val preconditions = for {
-          order              <- orderV3WithFeeInArbitraryAssetGenerator
+          order              <- orderV3WithFeeInPredefinedAssetGenerator()
           fixedWavesSettings <- Gen.const(FixedWavesSettings(order.matcherFee - 1000L))
         } yield order -> fixedWavesSettings
 
@@ -251,7 +251,7 @@ class OrderValidatorSpecification
 
         val preconditions =
           for {
-            order                 <- orderV3WithFeeInWavesGenerator
+            order                 <- orderV3WithFeeInPredefinedAssetGenerator(Some(Waves))
             fixedWavesFeeSettings <- Gen.const(FixedWavesSettings(order.matcherFee + 1000L))
           } yield (order, fixedWavesFeeSettings)
 
