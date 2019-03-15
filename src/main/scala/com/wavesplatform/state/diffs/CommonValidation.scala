@@ -113,7 +113,7 @@ object CommonValidation {
       Either.cond(
         blockchain.isFeatureActivated(b, height),
         tx,
-        ValidationError.ActivationError(msg.getOrElse(b.description + " has not been activated yet"))
+        ValidationError.ActivationError(msg.getOrElse(b.description + " feature has not been activated yet"))
       )
 
     def scriptActivation(sc: Script): Either[ActivationError, T] = {

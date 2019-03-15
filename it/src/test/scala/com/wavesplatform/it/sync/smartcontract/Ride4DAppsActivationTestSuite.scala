@@ -91,7 +91,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
     assertBadRequestAndMessage(
       sender
         .signedBroadcast(setScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt))),
-      "Ride4DApps has not been activated yet"
+      "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
 
@@ -102,7 +102,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
     assertBadRequestAndMessage(
       sender
         .signedBroadcast(setFuncScriptTransaction.json() + ("type" -> JsNumber(SetScriptTransaction.typeId.toInt))),
-      "Ride4DApps has not been activated yet"
+      "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
 
@@ -118,7 +118,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
       .explicitGet()
     assertBadRequestAndMessage(
       sender.signedBroadcast(invokeScriptTransaction.json() + ("type" -> JsNumber(ContractInvocationTransaction.typeId.toInt))),
-      "Ride4DApps has not been activated yet"
+      "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
 
@@ -139,7 +139,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
       .explicitGet()
     assertBadRequestAndMessage(
       sender.signedBroadcast(issueTransaction.json() + ("type" -> JsNumber(IssueTransactionV2.typeId.toInt))),
-      "Ride4DApps has not been activated yet"
+      "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
 
@@ -155,7 +155,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
       .explicitGet()
     assertBadRequestAndMessage(
       sender.signedBroadcast(setAssetScriptTransaction.json() + ("type" -> JsNumber(SetAssetScriptTransaction.typeId.toInt))),
-      "Ride4DApps has not been activated yet"
+      "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
 
