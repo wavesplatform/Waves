@@ -49,7 +49,7 @@ class ExchangeTransactionCreatorSpecification
               (bc.activatedFeatures _).when().returns(Map.empty).anyNumberOfTimes()
               val tc = new ExchangeTransactionCreator(bc, MatcherAccount, matcherSettings.orderFee)
               tc.createTransaction(LimitOrder(submitted), LimitOrder(counter), System.currentTimeMillis()) should produce(
-                "SmartAccountTrading has not been activated yet")
+                "Smart Account Trading feature has not been activated yet")
             }
         }
       }
