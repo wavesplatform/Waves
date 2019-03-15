@@ -246,7 +246,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       senderSell: PrivateKeyAccount <- accountGen
       pair                          <- assetPairGen
       amount: Long                  <- maxWavesAmountGen
-      price: Long                   <- Gen.choose(1, 1000).map(_ * Order.PriceConstant)
+      price: Long                   <- Gen.choose(1, (Long.MaxValue / amount) - 100)
       timestampBuy: Long            <- createdTimeGen
       timestampSell: Long           <- createdTimeGen
       expirationBuy: Long           <- maxTimeGen
