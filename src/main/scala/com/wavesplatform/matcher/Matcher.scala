@@ -102,11 +102,14 @@ class Matcher(actorSystem: ActorSystem,
                                                blacklistedAddresses,
                                                matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get))(o)
       _ <- OrderValidator.timeAware(time)(o)
-      _ <- OrderValidator.blockchainAware(blockchain,
-                                          transactionCreator.createTransaction,
-                                          settings.matcherSettings.orderMatchTxFee,
-                                          matcherPublicKey.toAddress,
-                                          time)(o)
+      _ <- OrderValidator.blockchainAware(
+        blockchain,
+        transactionCreator.createTransaction,
+        settings.matcherSettings.orderMatchTxFee,
+        matcherPublicKey.toAddress,
+        time,
+        matcherSettings.disableExtraFeeForScript
+      )(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 

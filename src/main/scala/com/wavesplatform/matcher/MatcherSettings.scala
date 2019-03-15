@@ -37,7 +37,8 @@ case class MatcherSettings(enable: Boolean,
                            blacklistedAddresses: Set[String],
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
                            balanceWatchingBufferInterval: FiniteDuration,
-                           eventsQueue: EventsQueueSettings)
+                           eventsQueue: EventsQueueSettings,
+                           disableExtraFeeForScript: Boolean)
 
 object MatcherSettings {
 
@@ -80,8 +81,9 @@ object MatcherSettings {
 
     val balanceWatchingBufferInterval = config.as[FiniteDuration](s"$configPath.balance-watching-buffer-interval")
 
-    val eventsQueue         = config.as[EventsQueueSettings](s"$configPath.events-queue")
-    val recoverOrderHistory = !new File(dataDirectory).exists()
+    val eventsQueue              = config.as[EventsQueueSettings](s"$configPath.events-queue")
+    val recoverOrderHistory      = !new File(dataDirectory).exists()
+    val disableExtraFeeForScript = config.as[Boolean](s"$configPath.disable-extra-fee-for-script")
 
     MatcherSettings(
       enabled,
@@ -105,7 +107,8 @@ object MatcherSettings {
       blacklistedAddresses,
       orderBookSnapshotHttpCache,
       balanceWatchingBufferInterval,
-      eventsQueue
+      eventsQueue,
+      disableExtraFeeForScript
     )
   }
 }

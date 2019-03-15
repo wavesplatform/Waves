@@ -26,7 +26,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) = calculateMatcherFee(buy, sell, executedAmount)
 
-    val txFee = minFee(blockchain, settings.orderMatchTxFee, matcherPrivateKey, counter.order.assetPair)
+    val txFee = minFee(blockchain, settings.orderMatchTxFee, matcherPrivateKey, counter.order.assetPair, settings.disableExtraFeeForScript)
     if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
       ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
     else
@@ -50,13 +50,20 @@ object ExchangeTransactionCreator {
   /**
     * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
-  def minFee(blockchain: Blockchain, orderMatchTxFee: Long, matcherAddress: Address, assetPair: AssetPair): Long = {
+  def minFee(blockchain: Blockchain,
+             orderMatchTxFee: Long,
+             matcherAddress: Address,
+             assetPair: AssetPair,
+             disableExtraFeeForScript: Boolean): Long = {
     def assetFee(assetId: AssetId): Long = if (blockchain.hasAssetScript(assetId)) CommonValidation.ScriptExtraFee else 0L
 
-    orderMatchTxFee +
-      minAccountFee(blockchain, matcherAddress) +
-      assetPair.amountAsset.fold(0L)(assetFee) +
-      assetPair.priceAsset.fold(0L)(assetFee)
+    if (disableExtraFeeForScript) orderMatchTxFee
+    else {
+      orderMatchTxFee +
+        minAccountFee(blockchain, matcherAddress) +
+        assetPair.amountAsset.fold(0L)(assetFee) +
+        assetPair.priceAsset.fold(0L)(assetFee)
+    }
   }
 
   def minAccountFee(blockchain: Blockchain, address: Address): Long = {
