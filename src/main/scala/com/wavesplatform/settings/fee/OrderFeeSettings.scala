@@ -2,6 +2,7 @@ package com.wavesplatform.settings.fee
 
 import cats.data.Validated
 import cats.implicits._
+import com.wavesplatform.settings.Constants
 import com.wavesplatform.settings.fee.AssetType.AssetType
 import com.wavesplatform.settings.fee.Mode.Mode
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
@@ -58,7 +59,10 @@ object OrderFeeSettings {
     }
 
     def validateFixedWavesSettings: ErrorsListOr[FixedWavesSettings] = {
-      cfgValidator.validateByPredicate[Long](s"${getPrefixByMode(Mode.FIXED_WAVES)}.base-fee")(_ > 0, "must be > 0") map FixedWavesSettings
+      cfgValidator.validateByPredicate[Long](s"${getPrefixByMode(Mode.FIXED_WAVES)}.base-fee")(
+        predicate = fee => 0 < fee && fee <= (Constants.UnitsInWave * Constants.TotalWaves),
+        errorMsg = s"required 0 < base fee <= ${Constants.UnitsInWave * Constants.TotalWaves}"
+      ) map FixedWavesSettings
     }
 
     def validateFixedSettings: ErrorsListOr[FixedSettings] = {

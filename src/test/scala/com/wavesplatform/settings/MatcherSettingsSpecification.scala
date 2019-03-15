@@ -68,9 +68,9 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    }
       |    $orderFeeSettings
       |    max-price-deviations {
-      |      profit = 10
-      |      loss = 10
-      |      fee = 10
+      |      profit = 1000000
+      |      loss = 1000000
+      |      fee = 1000000
       |    }
       |  }
       |}""".stripMargin
@@ -241,7 +241,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val settingsInvalidMode           = getSettingByConfig(configStrWithOrderFeeSettings(invalidMode))
     val settingsInvalidTypeAndPercent = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetTypeAndPercent))
     val settingsInvalidAssetAndFee    = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetAndFee))
-    val settingsInvalidWavseAsset     = getSettingByConfig(configStrWithOrderFeeSettings(invalidWavesAsset))
+    val settingsInvalidWavesAsset     = getSettingByConfig(configStrWithOrderFeeSettings(invalidWavesAsset))
     val settingsInvalidFeeInWaves     = getSettingByConfig(configStrWithOrderFeeSettings(invalidFeeInWaves))
 
     settingsInvalidMode shouldBe Left("Invalid setting waves.matcher.order-fee.mode value: invalid")
@@ -256,9 +256,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         "Invalid setting waves.matcher.order-fee.fixed.asset-id value: ;;;;\n" +
           "Invalid setting waves.matcher.order-fee.fixed.min-fee value: -300000, must be > 0")
 
-    settingsInvalidWavseAsset shouldBe
+    settingsInvalidWavesAsset shouldBe
       Left("Invalid setting waves.matcher.order-fee.fixed.asset-id value: WAVES, asset must not be Waves")
 
-    settingsInvalidFeeInWaves shouldBe Left("Invalid setting waves.matcher.order-fee.fixed-waves.base-fee value: -350000, must be > 0")
+    settingsInvalidFeeInWaves shouldBe Left(
+      s"Invalid setting waves.matcher.order-fee.fixed-waves.base-fee value: -350000, required 0 < base fee <= ${Constants.UnitsInWave * Constants.TotalWaves}"
+    )
   }
 }
