@@ -159,7 +159,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
     )
   }
 
-  test(s"wait height from ${sender.height} to $activationHeight for feature activation") {
+  test(s"wait height from to $activationHeight for feature activation") {
     sender.waitForHeight(activationHeight, 5.minutes)
   }
 
