@@ -514,12 +514,12 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val funcCallGen = for {
     functionName <- genBoundedString(1, 32).map(_.toString)
-    amt          <- Gen.choose(0, ContractLimits.MaxContractInvocationArgs)
+    amt          <- Gen.choose(0, ContractLimits.MaxInvokeScriptArgs)
     args         <- Gen.listOfN(amt, argGen)
 
   } yield FUNCTION_CALL(FunctionHeader.User(functionName), args)
 
-  val contractInvocationGen = for {
+  val invokeScriptGen = for {
     sender          <- accountGen
     contractAddress <- accountGen
     fc              <- funcCallGen

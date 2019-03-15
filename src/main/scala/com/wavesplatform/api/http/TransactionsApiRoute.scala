@@ -234,7 +234,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case CreateAliasTransactionV2 => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], wallet, signerAddress, time)
               case DataTransaction          => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
               case InvokeScriptTransaction =>
-                TransactionFactory.contractInvocation(txJson.as[ContractInvocationRequest], wallet, signerAddress, time)
+                TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
               case SetScriptTransaction      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
               case SetAssetScriptTransaction => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
               case SponsorFeeTransaction     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)

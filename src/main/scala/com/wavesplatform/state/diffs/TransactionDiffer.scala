@@ -76,7 +76,7 @@ object TransactionDiffer extends Instrumented with ScorexLogging {
         case sstx: SetAssetScriptTransaction =>
           AssetTransactionsDiff.setAssetScript(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(sstx)
         case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
-        case ci: InvokeScriptTransaction => ContractInvocationTransactionDiff.apply(blockchain, currentBlockHeight)(ci)
+        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff.apply(blockchain, currentBlockHeight)(ci)
         case _                                 => Left(UnsupportedTransactionType)
       }
     }

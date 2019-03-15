@@ -32,7 +32,7 @@ import shapeless.Coproduct
 
 import scala.util.{Failure, Success, Try}
 
-object ContractInvocationTransactionDiff {
+object InvokeScriptTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): Either[ValidationError, Diff] = {
     val sc = blockchain.accountScript(tx.contractAddress)
 

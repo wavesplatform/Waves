@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{AddressScheme, DefaultAddressScheme, PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.api.http.{ContractInvocationRequest, SignedContractInvocationRequest}
+import com.wavesplatform.api.http.{InvokeScriptRequest, SignedInvokeScriptRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
@@ -17,7 +17,7 @@ import play.api.libs.json.{JsObject, Json}
 class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("ContractInvocationTransaction serialization roundtrip") {
-    forAll(contractInvocationGen) { transaction: InvokeScriptTransaction =>
+    forAll(invokeScriptGen) { transaction: InvokeScriptTransaction =>
       val bytes = transaction.bytes()
       val deser = InvokeScriptTransaction.parseBytes(bytes).get
       deser.sender shouldEqual transaction.sender
@@ -82,11 +82,11 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
   property("Signed ContractInvocationTransactionRequest parser") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
-    val req = SignedContractInvocationRequest(
+    val req = SignedInvokeScriptRequest(
       senderPublicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
       fee = 1,
       feeAssetId = None,
-      call = ContractInvocationRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
+      call = InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
       payment = Some(Seq(Payment(1, Waves))),
       contractAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
@@ -96,7 +96,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     AddressScheme.current = DefaultAddressScheme
   }
 
-  property(s"can't have more than ${ContractLimits.MaxContractInvocationArgs} args") {
+  property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKeyAccount.fromBase58String("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").explicitGet()
     InvokeScriptTransaction.create(

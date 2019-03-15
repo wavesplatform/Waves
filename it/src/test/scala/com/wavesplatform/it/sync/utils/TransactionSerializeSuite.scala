@@ -353,7 +353,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val contractInvocation = InvokeScriptTransaction
+  private val invokeScript = InvokeScriptTransaction
     .create(
       PublicKeyAccount.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
       PublicKeyAccount.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
@@ -394,7 +394,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       (sponsor, "sponsor"),
       (transferV1, "transferV1"),
       (transferV2, "transferV2"),
-      (contractInvocation, "contractInvocation")
+      (invokeScript, "contractInvocation")
     )) { (tx, name) =>
     test(s"Serialize check of $name transaction") {
       val r = sender.transactionSerializer(tx.json()).bytes.map(_.toByte)

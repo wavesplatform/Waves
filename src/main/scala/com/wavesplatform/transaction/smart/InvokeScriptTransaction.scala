@@ -129,9 +129,9 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     for {
       _ <- Either.cond(fee > 0, (), ValidationError.InsufficientFee(s"insufficient fee: $fee"))
       _ <- Either.cond(
-        fc.args.size <= ContractLimits.MaxContractInvocationArgs,
+        fc.args.size <= ContractLimits.MaxInvokeScriptArgs,
         (),
-        ValidationError.GenericError(s"ContractInvocation can't have more than ${ContractLimits.MaxContractInvocationArgs} arguments")
+        ValidationError.GenericError(s"ContractInvocation can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
       )
       _ <- Either.cond(
         fc.function match {
@@ -150,7 +150,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
                        GenericError("all arguments of contractInvocation must be EVALUATED"))
       tx   = new InvokeScriptTransaction(currentChainId, sender, contractAddress, fc, p, fee, feeAssetId, timestamp, proofs)
       size = tx.bytes().length
-      _ <- Either.cond(size <= ContractLimits.MaxContractInvocationSizeInBytes, (), ValidationError.TooBigArray)
+      _ <- Either.cond(size <= ContractLimits.MaxInvokeScriptSizeInBytes, (), ValidationError.TooBigArray)
     } yield tx
   }
 

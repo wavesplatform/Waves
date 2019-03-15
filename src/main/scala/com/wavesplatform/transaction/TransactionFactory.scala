@@ -7,7 +7,7 @@ import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Requ
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request, _}
-import com.wavesplatform.api.http.{ContractInvocationRequest, DataRequest, SignedContractInvocationRequest, SignedDataRequest, versionReads}
+import com.wavesplatform.api.http.{InvokeScriptRequest, DataRequest, SignedInvokeScriptRequest, SignedDataRequest, versionReads}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
@@ -607,10 +607,10 @@ object TransactionFactory {
       Proofs.empty
     )
 
-  def contractInvocation(request: ContractInvocationRequest, wallet: Wallet, time: Time): Either[ValidationError, InvokeScriptTransaction] =
-    contractInvocation(request, wallet, request.sender, time)
+  def invokeScript(request: InvokeScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, InvokeScriptTransaction] =
+    invokeScript(request, wallet, request.sender, time)
 
-  def contractInvocation(request: ContractInvocationRequest,
+  def invokeScript(request: InvokeScriptRequest,
                          wallet: Wallet,
                          signerAddress: String,
                          time: Time): Either[ValidationError, InvokeScriptTransaction] =
@@ -622,7 +622,7 @@ object TransactionFactory {
       tx <- InvokeScriptTransaction.signed(
         sender,
         contract,
-        ContractInvocationRequest.buildFunctionCall(request.call),
+        InvokeScriptRequest.buildFunctionCall(request.call),
         request.payment,
         request.fee,
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
@@ -631,10 +631,10 @@ object TransactionFactory {
       )
     } yield tx
 
-  def contractInvocation(request: ContractInvocationRequest, sender: PublicKeyAccount): Either[ValidationError, InvokeScriptTransaction] =
+  def invokeScript(request: InvokeScriptRequest, sender: PublicKeyAccount): Either[ValidationError, InvokeScriptTransaction] =
     for {
       contract <- Address.fromString(request.contractAddress)
-      fc = ContractInvocationRequest.buildFunctionCall(request.call)
+      fc = InvokeScriptRequest.buildFunctionCall(request.call)
       tx <- InvokeScriptTransaction.create(
         sender,
         contract,
@@ -734,7 +734,7 @@ object TransactionFactory {
   }
 
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
-    import ContractInvocationRequest._
+    import InvokeScriptRequest._
     val typeId  = (jsv \ "type").as[Byte]
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
     TransactionParsers.by(typeId, version) match {
@@ -757,7 +757,7 @@ object TransactionFactory {
           case CreateAliasTransactionV1      => jsv.as[SignedCreateAliasV1Request].toTx
           case CreateAliasTransactionV2      => jsv.as[SignedCreateAliasV2Request].toTx
           case DataTransaction               => jsv.as[SignedDataRequest].toTx
-          case InvokeScriptTransaction => jsv.as[SignedContractInvocationRequest].toTx
+          case InvokeScriptTransaction => jsv.as[SignedInvokeScriptRequest].toTx
           case SetScriptTransaction          => jsv.as[SignedSetScriptRequest].toTx
           case SetAssetScriptTransaction     => jsv.as[SignedSetAssetScriptRequest].toTx
           case SponsorFeeTransaction         => jsv.as[SignedSponsorFeeRequest].toTx
