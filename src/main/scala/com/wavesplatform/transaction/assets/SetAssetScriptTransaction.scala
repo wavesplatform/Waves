@@ -77,7 +77,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
     for {
       _ <- Either.cond(script.fold(true)(_.isInstanceOf[ExprScript]),
                        (),
-                       ValidationError.GenericError(s"Asset can oly be assigned with Expression script, not Contract"))
+                       ValidationError.GenericError(s"Asset can only be assigned with Expression script, not Contract"))
       _ <- Either.cond(chainId == currentChainId,
                        (),
                        ValidationError.GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
