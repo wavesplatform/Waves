@@ -331,6 +331,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
   def shutdown(): Unit = {
     internalLastBlockInfo.onComplete()
     service.shutdown()
+    stateUpdates foreach (_.onComplete)
   }
 
   private def newlyApprovedFeatures = ngState.fold(Map.empty[Short, Int])(_.approvedFeatures.map(_ -> height).toMap)
