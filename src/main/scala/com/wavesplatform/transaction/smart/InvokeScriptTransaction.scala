@@ -135,11 +135,11 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
       )
       _ <- Either.cond(
         fc.function match {
-          case FunctionHeader.User(name) => name.length <= ContractLimits.MaxFunctionName
+          case FunctionHeader.User(name) => name.getBytes.length <= ContractLimits.MaxCallableFunctionNameInBytes
           case _                         => true
         },
         (),
-        ValidationError.GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxFunctionName}")
+        ValidationError.GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxCallableFunctionNameInBytes} bytes")
       )
       _ <- Either.cond(p.forall(_.amount > 0), (), ValidationError.NegativeAmount(0, p.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString)))
       _ <- Either.cond(p.length <= 1, (), ValidationError.GenericError("Multiple payment isn't allowed now"))

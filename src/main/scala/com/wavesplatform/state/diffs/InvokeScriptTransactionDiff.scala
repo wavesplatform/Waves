@@ -144,8 +144,8 @@ object InvokeScriptTransactionDiff {
     }
     if (r.length > ContractLimits.MaxWriteSetSize) {
       Left(GenericError(s"WriteSec can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
-    } else if (r.exists(_.key.getBytes().length > ContractLimits.MaxKeySize)) {
-      Left(GenericError(s"Key size must be less than ${ContractLimits.MaxKeySize}"))
+    } else if (r.exists(_.key.getBytes().length > ContractLimits.MaxKeySizeInBytes)) {
+      Left(GenericError(s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"))
     } else {
       val totalDataBytes = r.map(_.toBytes.size).sum
 
