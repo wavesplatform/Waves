@@ -256,10 +256,12 @@ object OrderValidator {
 
   def marketAware(orderFeeSettings: OrderFeeSettings, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus])(
       order: Order): Result[Order] = {
-    for {
-      _ <- validatePriceDeviation(order, deviationSettings, marketStatus)
-      _ <- validateFeeDeviation(order, deviationSettings, orderFeeSettings, marketStatus)
-    } yield order
+    if (deviationSettings.enabled) {
+      for {
+        _ <- validatePriceDeviation(order, deviationSettings, marketStatus)
+        _ <- validateFeeDeviation(order, deviationSettings, orderFeeSettings, marketStatus)
+      } yield order
+    } else lift(order)
   }
 
   def timeAware(time: Time)(order: Order): Result[Order] = {

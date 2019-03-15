@@ -6,7 +6,7 @@ import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorsListOr
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
-case class DeviationsSettings(maxPriceProfit: Double, maxPriceLoss: Double, maxPriceFee: Double)
+case class DeviationsSettings(enabled: Boolean, maxPriceProfit: Double, maxPriceLoss: Double, maxPriceFee: Double)
 
 object DeviationsSettings {
 
@@ -18,6 +18,7 @@ object DeviationsSettings {
     }
 
     (
+      cfgValidator.validateSafe[Boolean](s"$path.enable"),
       validateDeviationPercent(s"$path.profit"),
       validateDeviationPercent(s"$path.loss"),
       validateDeviationPercent(s"$path.fee")

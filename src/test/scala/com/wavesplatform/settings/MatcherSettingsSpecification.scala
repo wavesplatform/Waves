@@ -68,6 +68,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    }
       |    $orderFeeSettings
       |    max-price-deviations {
+      |      enable = yes
       |      profit = 1000000
       |      loss = 1000000
       |      fee = 1000000

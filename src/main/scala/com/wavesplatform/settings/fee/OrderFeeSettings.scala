@@ -96,7 +96,7 @@ object OrderFeeSettings {
       case Mode.PERCENT     => validatePercentSettings
     }
 
-    cfgValidator.validateSafe[Mode](s"$path.mode").toEither.flatMap(mode => getSettingsByMode(mode).toEither) match {
+    cfgValidator.validateSafe[Mode](s"$path.mode").toEither flatMap (mode => getSettingsByMode(mode).toEither) match {
       case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString("\n"))
       case Right(orderFeeSettings) => orderFeeSettings
     }

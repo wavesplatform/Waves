@@ -362,7 +362,7 @@ class OrderValidatorSpecification
             bestPrice  <- Gen.choose(1, (Long.MaxValue / bestAmount) - 100)
 
             bestAsk                = LevelAgg(bestAmount, bestPrice)
-            deviationSettings      = DeviationsSettings(50, 70, 50)
+            deviationSettings      = DeviationsSettings(true, 50, 70, 50)
             tooHighPriceInBuyOrder = (bestAsk.price * (1 + (deviationSettings.maxPriceLoss / 100))).toLong + 50L
 
             (order, orderFeeSettings) <- orderWithMatcherSettingsGenerator(OrderType.BUY, tooHighPriceInBuyOrder)
@@ -385,7 +385,7 @@ class OrderValidatorSpecification
         //   1. less than 50% of best bid (sell order price must be >= 2500)
         //   2. higher than 170% of best ask (sell order price must be <= 6800)
 
-        val deviationSettings = DeviationsSettings(maxPriceProfit = 70, maxPriceLoss = 50, 50)
+        val deviationSettings = DeviationsSettings(true, maxPriceProfit = 70, maxPriceLoss = 50, 50)
         val bestBid           = LevelAgg(1000L, 5000L)
         val bestAsk           = LevelAgg(1000L, 4000L)
 
@@ -430,7 +430,7 @@ class OrderValidatorSpecification
       "order's fee is out of deviation bounds" in {
 
         val percentSettings   = PercentSettings(AssetType.PRICE, 10)
-        val deviationSettings = DeviationsSettings(100, 100, maxPriceFee = 10)
+        val deviationSettings = DeviationsSettings(true, 100, 100, maxPriceFee = 10)
 
         val bestAsk = LevelAgg(1000L, 4000L)
 
@@ -455,7 +455,7 @@ class OrderValidatorSpecification
 
         val validFee     = OrderValidator.getMinValidFeeForSettings(order, percentSettings, bestAsk.price, 1 - (deviationSettings.maxPriceFee / 100))
         val validOrder   = order.updateFee(validFee)
-        val invalidOrder = order.updateFee(validFee - 100L)
+        val invalidOrder = order.updateFee(validFee - 1L)
 
         val orderValidator = OrderValidator.marketAware(percentSettings, deviationSettings, Option(nonEmptyMarketStatus)) _
 
