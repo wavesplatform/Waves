@@ -122,7 +122,7 @@ object WavesContext {
       UserFunction(
         f.name ++ "Value",
         "@extr" ++ f.header.toString,
-        f.cost,
+        f.costByLibVersion,
         f.signature.result.asInstanceOf[UNION].l.find(_ != UNIT).get,
         f.docString ++ " (fail on error)",
         args: _*
