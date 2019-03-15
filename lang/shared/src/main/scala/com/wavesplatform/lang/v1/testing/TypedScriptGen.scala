@@ -43,9 +43,9 @@ trait TypedScriptGen {
 
   def contractGen =
     for {
-      nLets      <- Gen.chooseNum(0, 10)
-      nFuncs     <- Gen.chooseNum(0, 10)
-      nCallables <- Gen.chooseNum(0, 10)
+      nLets      <- Gen.chooseNum(0, 5)
+      nFuncs     <- Gen.chooseNum(0, 5)
+      nCallables <- Gen.chooseNum(0, 5)
       lets       <- Gen.listOfN(nLets, letGen)
       funcs      <- Gen.listOfN(nFuncs, funcGen)
       callables  <- Gen.listOfN(nCallables, callableGen)
