@@ -32,10 +32,10 @@ object Script {
 
   val checksumLength = 4
 
-  def fromBase64String(str: String): Either[ScriptParseError, Script] =
+  def fromBase64String(str: String, checks: Boolean = true): Either[ScriptParseError, Script] =
     for {
       bytes  <- Base64.decode(str).toEither.left.map(ex => ScriptParseError(s"Unable to decode base64: ${ex.getMessage}"))
-      script <- ScriptReader.fromBytes(bytes)
+      script <- ScriptReader.fromBytes(bytes, checks = checks)
     } yield script
 
   def decompile(s: Script): String = s match {
