@@ -37,7 +37,7 @@ case class NetworkSettings(file: Option[File],
                            receivedTxsCacheTimeout: FiniteDuration,
                            uPnPSettings: UPnPSettings,
                            trafficLogger: TrafficLogger.Settings,
-                           stateUpdatesAddress: InetSocketAddress)
+                           blockchainUpdatesAddress: InetSocketAddress)
 
 object NetworkSettings {
   private val MaxNodeNameBytesLength = 127
@@ -53,7 +53,7 @@ object NetworkSettings {
   private def fromConfig(config: Config): NetworkSettings = {
     val file                = config.getAs[File]("file")
     val bindAddress         = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
-    val stateUpdatesAddress = new InetSocketAddress(config.as[String]("state-update-address"), config.as[Int]("state-update-port"))
+    val blockchainUpdatesAddress = new InetSocketAddress(config.as[String]("blockchain-updates-address"), config.as[Int]("blockchain-updates-port"))
     val nonce               = config.getOrElse("nonce", randomNonce)
     val nodeName            = config.getOrElse("node-name", s"Node-$nonce")
     require(nodeName.getBytes(Charsets.UTF_8).length <= MaxNodeNameBytesLength,
@@ -104,7 +104,7 @@ object NetworkSettings {
       receivedTxsCacheTimeout,
       uPnPSettings,
       trafficLogger,
-      stateUpdatesAddress
+      blockchainUpdatesAddress
     )
   }
 

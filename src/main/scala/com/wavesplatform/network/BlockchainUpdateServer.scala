@@ -72,7 +72,7 @@ class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observa
         )
       )
     )
-    .bind(settings.networkSettings.stateUpdatesAddress)
+    .bind(settings.networkSettings.blockchainUpdatesAddress)
     .channel()
 
   def shutdown(): Unit =
