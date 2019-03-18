@@ -16,7 +16,7 @@ import play.api.libs.json.{JsObject, Json}
 
 class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
-  property("ContractInvocationTransaction serialization roundtrip") {
+  property("InvokeScriptTransaction serialization roundtrip") {
     forAll(invokeScriptGen) { transaction: InvokeScriptTransaction =>
       val bytes = transaction.bytes()
       val deser = InvokeScriptTransaction.parseBytes(bytes).get
@@ -33,7 +33,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     }
   }
 
-  property("JSON format validation for ContractInvocationTransaction") {
+  property("JSON format validation for InvokeScriptTransaction") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val js = Json.parse("""{
                          "type": 16,
@@ -80,7 +80,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     AddressScheme.current = DefaultAddressScheme
   }
 
-  property("Signed ContractInvocationTransactionRequest parser") {
+  property("Signed InvokeScriptTransactionRequest parser") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
       senderPublicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
