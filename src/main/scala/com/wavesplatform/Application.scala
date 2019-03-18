@@ -293,6 +293,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownInProgress = true
 
       spendableBalanceChanged.onComplete()
+      blockchainUpdated.onComplete()
       utx.close()
 
       shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)
