@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
+import com.google.common.collect.MapMaker
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
@@ -27,7 +28,6 @@ import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.{Observable, Observer}
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time,
@@ -121,7 +121,7 @@ class UtxPoolImpl(time: Time,
       }
     }
 
-    def checkIsMostProfitable(newTx: Transaction) =
+    def checkIsMostProfitable(newTx: Transaction): Boolean =
       !transactions.values().asScala.exists(poolTx => TransactionsOrdering.InUTXPool.compare(poolTx, newTx) >= 0)
 
     PoolMetrics.putRequestStats.increment()
@@ -139,10 +139,10 @@ class UtxPoolImpl(time: Time,
                            (),
                            GenericError("Transaction pool bytes size limit is reached"))
 
+          _    <- checkScripted(blockchain, tx, skipSizeCheck)
           _    <- checkNotBlacklisted(tx)
           _    <- checkAlias(blockchain, tx)
           _    <- canReissue(blockchain, tx)
-          _    <- checkScripted(blockchain, tx, skipSizeCheck)
           diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
         } yield {
           pessimisticPortfolios.add(tx.id(), diff)
@@ -226,7 +226,13 @@ class UtxPoolImpl(time: Time,
   //noinspection ScalaStyle
   private[this] object TxCheck {
     private[this] val ExpirationTime = fs.maxTransactionTimeBackOffset.toMillis
-    private[this] val scriptedCache  = mutable.WeakHashMap.empty[TransactionId, Boolean]
+    private[this] val scriptedCache = {
+      new MapMaker()
+        .concurrencyLevel(Runtime.getRuntime.availableProcessors())
+        .weakKeys()
+        .makeMap[TransactionId, Boolean]()
+        .asScala
+    }
 
     def isExpired(transaction: Transaction, currentTime: Long = time.correctedTime()) = {
       (currentTime - transaction.timestamp) > ExpirationTime
