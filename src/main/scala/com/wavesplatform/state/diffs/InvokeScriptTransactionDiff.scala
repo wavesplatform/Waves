@@ -8,13 +8,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.utils.DirectiveSet
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.traits.domain.Tx.ContractTransfer
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
@@ -176,7 +176,7 @@ object InvokeScriptTransactionDiff {
   }
 
   private def foldContractTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
-                                                                                               dataDiff: Diff): Either[ValidationError, Diff] = {
+                                                                                         dataDiff: Diff): Either[ValidationError, Diff] = {
     if (ps.length <= ContractLimits.MaxPaymentAmount)
       ps.foldLeft(Either.right[ValidationError, Diff](dataDiff)) { (diffEi, payment) =>
         val (addressRepr, amount, asset) = payment

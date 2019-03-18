@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, REF}
-import com.wavesplatform.lang.v1.{FunctionHeader, ContractLimits, Serde}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.ValidationError.GenericError
@@ -22,14 +22,14 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class InvokeScriptTransaction private (chainId: Byte,
-                                                  sender: PublicKeyAccount,
-                                                  contractAddress: Address,
-                                                  fc: Terms.FUNCTION_CALL,
-                                                  payment: Seq[Payment],
-                                                  fee: Long,
-                                                  feeAssetId: Asset,
-                                                  timestamp: Long,
-                                                  proofs: Proofs)
+                                            sender: PublicKeyAccount,
+                                            contractAddress: Address,
+                                            fc: Terms.FUNCTION_CALL,
+                                            payment: Seq[Payment],
+                                            fee: Long,
+                                            feeAssetId: Asset,
+                                            timestamp: Long,
+                                            proofs: Proofs)
     extends ProvenTransaction
     with VersionedTransaction
     with FastHashId {
