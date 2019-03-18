@@ -17,22 +17,22 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
 
     def transfer(from: PrivateKeyAccount, to: AddressOrAlias = accountGen.sample.get, amount: Long = smallFeeGen.sample.get): Gen[Transaction] =
       for {
-        timestamp <- timestampGen
+        timestamp <- ntpTimestampGen
       } yield TransferTransactionV1.selfSigned(Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
 
     def transferV2(from: PrivateKeyAccount, to: AddressOrAlias = accountGen.sample.get, amount: Long = smallFeeGen.sample.get): Gen[Transaction] =
       for {
-        timestamp <- timestampGen
+        timestamp <- ntpTimestampGen
       } yield TransferTransactionV2.selfSigned(Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
 
     def lease(from: PrivateKeyAccount, to: AddressOrAlias = accountGen.sample.get, amount: Long = smallFeeGen.sample.get): Gen[LeaseTransactionV1] =
       for {
-        timestamp <- timestampGen
+        timestamp <- ntpTimestampGen
       } yield LeaseTransactionV1.selfSigned(from, amount, FeeAmount, timestamp, to).explicitGet()
 
     def leaseCancel(from: PrivateKeyAccount, leaseId: ByteStr): Gen[LeaseCancelTransactionV1] =
       for {
-        timestamp <- timestampGen
+        timestamp <- ntpTimestampGen
       } yield LeaseCancelTransactionV1.selfSigned(from, leaseId, FeeAmount, timestamp).explicitGet()
   }
 
