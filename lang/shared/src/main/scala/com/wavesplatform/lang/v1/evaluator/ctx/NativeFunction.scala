@@ -42,12 +42,12 @@ case class NativeFunction(@(JSExport @field) name: String,
 object NativeFunction {
 
   def apply(name: String, cost: Long, internalName: Short, resultType: TYPE, docString: String, args: (String, TYPE, String)*)(
-      ev: List[EVALUATED] => Either[String, EVALUATED]) =
+      ev: PartialFunction[List[EVALUATED], Either[String, EVALUATED]]) =
     new NativeFunction(
       name = name,
       costByLibVersion = StdLibVersion.SupportedVersions.map(_ -> cost).toMap,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.Native(internalName)),
-      ev = ev,
+      ev = ev.orElse{ case _ => Left("Passed argument with wrong type").asInstanceOf[Either[String, EVALUATED]]},
       docString = docString,
       argsDoc = args.map(a => (a._1 -> a._3)).toArray
     )
