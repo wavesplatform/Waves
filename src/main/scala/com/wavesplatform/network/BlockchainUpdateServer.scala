@@ -12,9 +12,9 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioServerSocketChannel
 import io.netty.util.concurrent.DefaultThreadFactory
-import monix.execution.Ack
+import monix.execution.{Ack, Scheduler}
 import monix.execution.Ack.Continue
-import monix.execution.Scheduler.Implicits.global
+import monix.execution.Scheduler.singleThread
 import monix.reactive.{Observable, Observer}
 import com.wavesplatform.protobuf.events.{PBBlockchainUpdated, PBEvents}
 import io.netty.handler.codec.MessageToMessageEncoder
@@ -26,7 +26,7 @@ private object PBScalaToJava extends MessageToMessageEncoder[PBBlockchainUpdated
   }
 }
 
-private class BlockchainUpdateHandler(stateUpdates: Observable[BlockchainUpdated]) extends ChannelInboundHandlerAdapter {
+private class BlockchainUpdateHandler(blockchainUpdated: Observable[BlockchainUpdated], scheduler: Scheduler) extends ChannelInboundHandlerAdapter {
   implicit def toByteString(bs: ByteStr): ByteString =
     ByteString.copyFrom(bs.arr)
 
@@ -45,8 +45,7 @@ private class BlockchainUpdateHandler(stateUpdates: Observable[BlockchainUpdated
       override def onComplete(): Unit = ctx.close
     }
 
-    // @todo proper scheduler
-    stateUpdates.subscribe(obs)
+    blockchainUpdated.subscribe(obs)(scheduler)
   }
 
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = {
@@ -56,8 +55,10 @@ private class BlockchainUpdateHandler(stateUpdates: Observable[BlockchainUpdated
 }
 
 class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observable[BlockchainUpdated]) {
-  private val bossGroup   = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-boss-group", true))
-  private val workerGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-worker-group", true))
+  private val bossGroup   = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-updates-boss-group", true))
+  private val workerGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-updates-worker-group", true))
+
+  private val blockchainUpdatedScheduler = singleThread("blockchain-updated")
 
   private val serverChannel = new ServerBootstrap()
     .group(bossGroup, workerGroup)
@@ -68,7 +69,7 @@ class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observa
           new ProtobufVarint32LengthFieldPrepender,
           new ProtobufEncoder,
           PBScalaToJava,
-          new BlockchainUpdateHandler(blockchainUpdates)
+          new BlockchainUpdateHandler(blockchainUpdates, blockchainUpdatedScheduler)
         )
       )
     )
