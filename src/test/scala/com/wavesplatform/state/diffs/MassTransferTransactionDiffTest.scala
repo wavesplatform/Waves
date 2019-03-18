@@ -131,7 +131,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
     forAll(setup) {
       case (genesis, transfer) =>
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), settings) { blockDiffEi =>
-          blockDiffEi should produce("MassTransferTransaction has not been activated yet")
+          blockDiffEi should produce("Mass Transfer Transaction feature has not been activated yet")
         }
     }
   }

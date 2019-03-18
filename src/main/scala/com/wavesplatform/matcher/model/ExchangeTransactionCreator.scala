@@ -54,7 +54,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) = calculateMatcherFee(buy, sell, executedAmount, price)
 
-    val txFee = minFee(blockchain, matcherPrivateKey, counter.order.assetPair)
+    val txFee = minFee(blockchain, matcherPrivateKey, counter.order.assetPair, OrderValidator.exchangeTransactionCreationFee)
     if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
       ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
     else
@@ -67,7 +67,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
 
   private def toV1(order: Order): Either[ValidationError, OrderV1] = order match {
     case x: OrderV1 => Right(x)
-    case _          => Left(ValidationError.ActivationError("SmartAccountTrading has not been activated yet"))
+    case _          => Left(ValidationError.ActivationError("Smart Account Trading feature has not been activated yet"))
   }
 }
 
@@ -78,20 +78,22 @@ object ExchangeTransactionCreator {
   /**
     * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
-  def minFee(blockchain: Blockchain, matcherAddress: Address, assetPair: AssetPair): Long = {
-    def assetFee(assetId: Asset): Long = {
-      assetId match {
-        case Waves => 0L
-        case asset @ IssuedAsset(_) =>
-          if (blockchain.hasAssetScript(asset)) CommonValidation.ScriptExtraFee
-          else 0L
-      }
-    }
-    def accountFee(address: Address): Long = if (blockchain.hasScript(address)) CommonValidation.ScriptExtraFee else 0L
+  def minFee(blockchain: Blockchain, matcherAddress: Address, assetPair: AssetPair, baseFee: Long): Long = {
 
-    CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit +
-      accountFee(matcherAddress) +
+    def assetFee(assetId: Asset): Long = assetId match {
+      case Waves => 0L
+      case asset @ IssuedAsset(_) =>
+        if (blockchain.hasAssetScript(asset)) CommonValidation.ScriptExtraFee
+        else 0L
+    }
+
+    baseFee +
+      minAccountFee(blockchain, matcherAddress) +
       assetPair.amountAsset.fold(0L)(assetFee) +
       assetPair.priceAsset.fold(0L)(assetFee)
+  }
+
+  def minAccountFee(blockchain: Blockchain, address: Address): Long = {
+    if (blockchain hasScript address) CommonValidation.ScriptExtraFee else 0L
   }
 }

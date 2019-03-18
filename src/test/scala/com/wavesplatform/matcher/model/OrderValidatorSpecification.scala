@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedWavesSettings, OrderFeeSettings, PercentSettings}
-import com.wavesplatform.state.diffs.{CommonValidation, produce}
+import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -186,7 +186,7 @@ class OrderValidatorSpecification
 
       "matcher's fee asset in order doesn't meet matcher's settings requirements (fixed-waves mode and incorrect asset)" in {
         val preconditions = for {
-          order              <- orderV3Generator.filter(_.matcherFeeAssetId != Waves)
+          order              <- orderV3WithFeeInPredefinedAssetGenerator()
           fixedWavesSettings <- Gen.const(FixedWavesSettings(order.matcherFee - 1000L))
         } yield order -> fixedWavesSettings
 
@@ -251,7 +251,7 @@ class OrderValidatorSpecification
 
         val preconditions =
           for {
-            order                 <- orderV3Generator filter (_.matcherFeeAssetId == Waves)
+            order                 <- orderV3WithFeeInPredefinedAssetGenerator(Some(Waves))
             fixedWavesFeeSettings <- Gen.const(FixedWavesSettings(order.matcherFee + 1000L))
           } yield (order, fixedWavesFeeSettings)
 
@@ -267,7 +267,6 @@ class OrderValidatorSpecification
       }
 
       "matcher's fee is less than calculated by ExchangeTransactionCreator one" in {
-
         forAll(orderWithMatcherSettingsGenerator) {
           case (order, sender, orderFeeSettings) =>
             val blockchain = stub[Blockchain]
@@ -279,7 +278,12 @@ class OrderValidatorSpecification
             val orderValidator =
               OrderValidator.blockchainAware(blockchain, transactionCreator, order.matcherPublicKey, ntpTime, orderFeeSettings) _
 
-            val minFee         = ExchangeTransactionCreator.minFee(blockchain, order.matcherPublicKey, order.assetPair)
+            val baseFee = orderFeeSettings match {
+              case FixedWavesSettings(fee) => fee
+              case _                       => OrderValidator.exchangeTransactionCreationFee
+            }
+
+            val minFee         = ExchangeTransactionCreator.minFee(blockchain, order.matcherPublicKey, order.assetPair, baseFee)
             val correctedOrder = Order.sign(order.updateFee(minFee - 1000L), sender)
 
             def setAssetsDescriptionAndEmptyScript(assets: Asset*): Unit = {
@@ -302,26 +306,8 @@ class OrderValidatorSpecification
       }
 
       "matcher's fee in order in insufficient in case of scripted account or asset" in {
-
-        val preconditions =
-          for {
-            (order, sender, orderFeeSettings) <- orderWithMatcherSettingsGenerator.filter {
-              case (order, _, _) => (order.assetPair.amountAsset != Waves) && (order.assetPair.priceAsset != Waves)
-            }
-          } yield {
-
-            val minFee = orderFeeSettings match {
-              case _: FixedWavesSettings => CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
-              case _                     => order.matcherFee
-            }
-
-            val correctedOrder = Order.sign(order.updateFee(minFee), sender)
-
-            correctedOrder -> orderFeeSettings
-          }
-
-        forAll(preconditions) {
-          case (order, orderFeeSettings) =>
+        forAll(orderWithoutWavesInPairAndWithMatcherSettingsGenerator) {
+          case (order, _, orderFeeSettings) =>
             val trueScript                       = ExprScript(Terms.TRUE).explicitGet()
             val setScriptAndValidateWithSettings = setScriptsAndValidate(orderFeeSettings) _
 
@@ -543,7 +529,7 @@ class OrderValidatorSpecification
       assetsAndScripts.foreach {
         case (assetOption, scriptOption) =>
           assetOption match {
-            case asset @ IssuedAsset(_) =>
+            case asset: IssuedAsset =>
               (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(8))
               (blockchain.assetScript _).when(asset).returns(scriptOption)
               (blockchain.hasAssetScript _).when(asset).returns(scriptOption.isDefined)

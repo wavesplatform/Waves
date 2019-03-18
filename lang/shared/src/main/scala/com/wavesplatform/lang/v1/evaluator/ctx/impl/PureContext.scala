@@ -97,6 +97,19 @@ object PureContext {
       )
     }
 
+  lazy val value: BaseFunction =
+    UserFunction("value",
+      13,
+      TYPEPARAM('T'),
+      "Extract value from option or fail",
+      ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)), "Optional value")) {
+      IF(
+        FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
+        FUNCTION_CALL(throwWithMessage, List(CONST_STRING("value() called on unit value"))),
+        REF("@a")
+      )
+    }
+
   lazy val isDefined: BaseFunction =
     UserFunction(
       "isDefined",
@@ -498,7 +511,7 @@ object PureContext {
           CTX(
             Seq.empty,
             Map(("nil", ((LIST(NOTHING), "empty list of any type"), LazyVal(EitherT.pure(ARR(IndexedSeq.empty[EVALUATED])))))),
-            Array(listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal)
+            Array(value, listConstructor, ensure, toUtf8String, toLong, toLongOffset, indexOf, indexOfN, splitStr, parseInt, parseIntVal)
           )
         )
     }

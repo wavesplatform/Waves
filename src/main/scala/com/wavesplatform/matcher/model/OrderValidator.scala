@@ -10,13 +10,13 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.v1.compiler.Terms.{FALSE, TRUE}
 import com.wavesplatform.matcher.error._
 import com.wavesplatform.matcher.smart.MatcherScriptRunner
-import com.wavesplatform.matcher.util._
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.AssetType.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange._
@@ -27,6 +27,7 @@ import kamon.Kamon
 import shapeless.Coproduct
 
 import scala.Either.cond
+import scala.math.BigDecimal.RoundingMode
 import scala.util.control.NonFatal
 
 object OrderValidator {
@@ -37,6 +38,8 @@ object OrderValidator {
 
   val MinExpiration: Long   = 60 * 1000L
   val MaxActiveOrders: Long = 200
+
+  val exchangeTransactionCreationFee: Long = CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
 
   private def verifySignature(order: Order): Result[Order] =
     Verifier.verifyAsEllipticCurveSignature(order).leftMap(x => MatcherError.OrderInvalidSignature(order.id(), x.toString))
@@ -107,7 +110,6 @@ object OrderValidator {
       exchangeTx.flatMap(verifySmartToken(blockchain, assetId, _))
     }
 
-    lazy val mof = ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair)
     for {
       _ <- lift(order)
         .ensure(MatcherError.OrderVersionUnsupported(order.version, BlockchainFeatures.SmartAccountTrading)) {
@@ -116,12 +118,12 @@ object OrderValidator {
         .ensure(MatcherError.OrderVersionUnsupported(order.version, BlockchainFeatures.OrderV3)) {
           _.version != 3 || blockchain.isFeatureActivated(BlockchainFeatures.OrderV3, blockchain.height)
         }
-        .ensure(MatcherError.FeeNotEnough(mof, order.matcherFee, Waves)) { o =>
-          orderFeeSettings match {
-            case _: FixedWavesSettings => o.matcherFee >= mof
-            case _                     => true
-          }
-        }
+      _ <- orderFeeSettings match {
+        case FixedWavesSettings(baseFee) =>
+          val mof = ExchangeTransactionCreator.minFee(blockchain, matcherAddress, order.assetPair, baseFee)
+          Either.cond(order.matcherFee >= mof, order, MatcherError.FeeNotEnough(mof, order.matcherFee, Waves))
+        case _ => lift(order)
+      }
       _ <- validateDecimals(blockchain, order)
       _ <- verifyOrderByAccountScript(blockchain, order.sender, order)
       _ <- verifyAssetScript(order.assetPair.amountAsset)
@@ -149,6 +151,9 @@ object OrderValidator {
   }
 
   private[matcher] def getMinValidFee(order: Order, percentSettings: PercentSettings): Long = {
+
+    def multiplyLongByDouble(l: Long, d: Double): Long = (BigDecimal(l) * d).setScale(0, RoundingMode.HALF_UP).toLong
+
     lazy val receiveAmount = order.getReceiveAmount(order.amount, order.price).explicitGet()
     lazy val spentAmount   = order.getSpendAmount(order.amount, order.price).explicitGet()
 
@@ -172,7 +177,7 @@ object OrderValidator {
       }
 
       lazy val requiredFee: Long = orderFeeSettings match {
-        case FixedWavesSettings(wavesMinFee)  => wavesMinFee
+        case FixedWavesSettings(baseFee)      => baseFee
         case FixedSettings(_, fixedMinFee)    => fixedMinFee
         case percentSettings: PercentSettings => getMinValidFee(order, percentSettings)
       }

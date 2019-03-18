@@ -21,7 +21,7 @@ message Block {
         bytes minerBalancesTreeHash = 9;
     }
 
-    bytes chainId = 1;
+    int32 chainId = 1;
     SignedHeader header = 2;
     repeated SignedTransaction transactions = 3;
 }

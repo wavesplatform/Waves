@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.testing
 
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -20,7 +21,7 @@ trait TypedScriptGen {
 
   private def funcGen =
     for {
-      name <- Gen.alphaStr
+      name <- Gen.alphaStr.filter(_.getBytes.length <= ContractLimits.MaxCallableFunctionNameInBytes)
       arg0 <- Gen.alphaStr
       args <- Gen.listOf(Gen.alphaStr)
       allArgs = arg0 +: args
@@ -42,9 +43,9 @@ trait TypedScriptGen {
 
   def contractGen =
     for {
-      nLets      <- Gen.chooseNum(0, 10)
-      nFuncs     <- Gen.chooseNum(0, 10)
-      nCallables <- Gen.chooseNum(0, 10)
+      nLets      <- Gen.chooseNum(0, 5)
+      nFuncs     <- Gen.chooseNum(0, 5)
+      nCallables <- Gen.chooseNum(0, 5)
       lets       <- Gen.listOfN(nLets, letGen)
       funcs      <- Gen.listOfN(nFuncs, funcGen)
       callables  <- Gen.listOfN(nCallables, callableGen)

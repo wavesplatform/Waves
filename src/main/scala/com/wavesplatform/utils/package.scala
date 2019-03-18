@@ -138,11 +138,7 @@ package object utils extends ScorexLogging {
     }(collection.breakOut)
 
     ctx.functions.values.foreach { func =>
-      val cost = func match {
-        case f: UserFunction =>
-          f.costByLibVersion(version)
-        case f: NativeFunction => f.cost
-      }
+      val cost = func.costByLibVersion(version)
       costs += func.header -> Coeval.now(cost)
     }
 

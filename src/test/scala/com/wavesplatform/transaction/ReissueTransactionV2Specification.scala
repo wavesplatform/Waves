@@ -49,6 +49,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
                        "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                        "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                        "fee": 100000000,
+                       "feeAssetId": null,
                        "timestamp": 1526287561757,
                        "proofs": [
                        "4DFEtUwJ9gjMQMuEXipv2qK7rnhhWEBqzpC3ZQesW1Kh8D822t62e3cRGWNU3N21r7huWnaty95wj2tZxYSvCfro"

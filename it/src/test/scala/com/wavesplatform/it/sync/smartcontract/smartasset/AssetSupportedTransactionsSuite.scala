@@ -41,8 +41,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     sender.transfer(firstAddress, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
-    notMiner.assertAssetBalance(firstAddress, asset, firstAssetBalance - 100)
-    notMiner.assertAssetBalance(secondAddress, asset, secondAssetBalance + 100)
+    miner.assertAssetBalance(firstAddress, asset, firstAssetBalance - 100)
+    miner.assertAssetBalance(secondAddress, asset, secondAssetBalance + 100)
 
     sender.transfer(secondAddress, thirdAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
@@ -65,8 +65,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     sender.transfer(thirdAddress, secondAddress, 99, smartMinFee, Some(asset), waitForTx = true)
 
-    notMiner.assertAssetBalance(secondAddress, asset, secondAssetBalance + 99)
-    notMiner.assertAssetBalance(thirdAddress, asset, thirdAssetBalance + 1)
+    miner.assertAssetBalance(secondAddress, asset, secondAssetBalance + 99)
+    miner.assertAssetBalance(thirdAddress, asset, thirdAssetBalance + 1)
   }
 
   test("transfer goes only to addresses from list (white or black)") {

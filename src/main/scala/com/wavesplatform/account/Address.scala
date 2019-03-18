@@ -30,7 +30,7 @@ object Address extends ScorexLogging {
 
   private class AddressImpl(val bytes: ByteStr) extends Address
 
-  private[this] def createUnsafe(address: ByteStr): Address = new AddressImpl(address)
+  private[wavesplatform] def createUnsafe(address: ByteStr): Address = new AddressImpl(address)
 
   def fromPublicKey(publicKey: Array[Byte], chainId: Byte = scheme.chainId): Address = {
     val publicKeyHash   = crypto.secureHash(publicKey)
@@ -65,6 +65,5 @@ object Address extends ScorexLogging {
     } yield address
   }
 
-  private def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = crypto.secureHash(withoutChecksum).take(ChecksumLength)
-
+  def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = crypto.secureHash(withoutChecksum).take(ChecksumLength)
 }
