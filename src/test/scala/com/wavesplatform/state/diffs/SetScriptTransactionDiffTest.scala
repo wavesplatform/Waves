@@ -17,8 +17,8 @@ import com.wavesplatform.transaction.smart.script.ContractScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -93,7 +93,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
     forAll(setup) {
       case (genesis, tx) =>
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsUnactivated) { blockDiffEi =>
-          blockDiffEi should produce("Ride4DApps has not been activated yet")
+          blockDiffEi should produce("RIDE 4 DAPPS feature has not been activated yet")
         }
 
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsActivated) { blockDiffEi =>

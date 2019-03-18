@@ -8,8 +8,9 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{ContentType, Global, ScriptType}
 import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -99,7 +100,10 @@ package object utils extends ScorexLogging {
               PureContext.build(version),
               CryptoContext.build(Global),
               WavesContext
-                .build(version, new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain), isTokenContext = true)
+                .build(
+                  DirectiveSet(version, ScriptType.Asset, ContentType.Expression),
+                  new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+                )
             )))
       }
       .toMap
@@ -113,9 +117,10 @@ package object utils extends ScorexLogging {
             .combineAll(Seq(
               PureContext.build(version),
               CryptoContext.build(Global),
-              WavesContext.build(version,
-                                 new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain),
-                                 isTokenContext = false)
+              WavesContext.build(
+                DirectiveSet(version, ScriptType.Account, ContentType.Contract), // TODO: why contract? should be DirectiveSet->Coeval[CTX]
+                new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+              )
             )))
       }
       .toMap
@@ -133,11 +138,7 @@ package object utils extends ScorexLogging {
     }(collection.breakOut)
 
     ctx.functions.values.foreach { func =>
-      val cost = func match {
-        case f: UserFunction =>
-          f.costByLibVersion(version)
-        case f: NativeFunction => f.cost
-      }
+      val cost = func.costByLibVersion(version)
       costs += func.header -> Coeval.now(cost)
     }
 

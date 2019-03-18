@@ -3,7 +3,7 @@ package com.wavesplatform.utils
 import com.wavesplatform.common.utils.Base58
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.encode.{Base58 => scorexBase58}
 
 class Base58Test extends PropSpec with PropertyChecks with Matchers {

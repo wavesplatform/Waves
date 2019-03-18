@@ -12,13 +12,13 @@ class BurnTransactionSuite extends BaseTransactionSuite {
 
   test("burning assets changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     for (v <- supportedVersions) {
-      val (balance, effectiveBalance) = notMiner.accountBalances(firstAddress)
+      val (balance, effectiveBalance) = miner.accountBalances(firstAddress)
       val issuedAssetId               = sender.issue(firstAddress, s"name+$v", "description", issueAmount, decimals, reissuable = false, fee = issueFee).id
 
-      notMiner.waitForTransaction(issuedAssetId)
-      notMiner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
-      notMiner.assertAssetBalance(firstAddress, issuedAssetId, issueAmount)
-      val details1 = notMiner.assetsDetails(issuedAssetId)
+      miner.waitForTransaction(issuedAssetId)
+      miner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
+      miner.assertAssetBalance(firstAddress, issuedAssetId, issueAmount)
+      val details1 = miner.assetsDetails(issuedAssetId)
       assert(!details1.reissuable)
       assert(details1.quantity == issueAmount)
       assert(details1.minSponsoredAssetFee.isEmpty)
@@ -26,27 +26,27 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       // burn half of the coins and check balance
       val burnId = sender.burn(firstAddress, issuedAssetId, issueAmount / 2, minFee, version = v).id
 
-      notMiner.waitForTransaction(burnId)
-      notMiner.assertBalances(firstAddress, balance - minFee - issueFee, effectiveBalance - minFee - issueFee)
-      notMiner.assertAssetBalance(firstAddress, issuedAssetId, issueAmount / 2)
-      val details2 = notMiner.assetsDetails(issuedAssetId)
+      miner.waitForTransaction(burnId)
+      miner.assertBalances(firstAddress, balance - minFee - issueFee, effectiveBalance - minFee - issueFee)
+      miner.assertAssetBalance(firstAddress, issuedAssetId, issueAmount / 2)
+      val details2 = miner.assetsDetails(issuedAssetId)
       assert(!details2.reissuable)
       assert(details2.quantity == issueAmount - issueAmount / 2)
 
-      val assetOpt = notMiner.assetsBalance(firstAddress).balances.find(_.assetId == issuedAssetId)
+      val assetOpt = miner.assetsBalance(firstAddress).balances.find(_.assetId == issuedAssetId)
       assert(assetOpt.exists(_.balance == issueAmount / 2))
 
       // burn the rest and check again
       val burnIdRest = sender.burn(firstAddress, issuedAssetId, issueAmount / 2, minFee, version = v).id
 
-      notMiner.waitForTransaction(burnIdRest)
-      notMiner.assertAssetBalance(firstAddress, issuedAssetId, 0)
-      val details3 = notMiner.assetsDetails(issuedAssetId)
+      miner.waitForTransaction(burnIdRest)
+      miner.assertAssetBalance(firstAddress, issuedAssetId, 0)
+      val details3 = miner.assetsDetails(issuedAssetId)
       assert(!details3.reissuable)
       assert(details3.quantity == 0)
       assert(details1.minSponsoredAssetFee.isEmpty)
 
-      val assetOptRest = notMiner.assetsBalance(firstAddress).balances.find(_.assetId == issuedAssetId)
+      val assetOptRest = miner.assetsBalance(firstAddress).balances.find(_.assetId == issuedAssetId)
       assert(assetOptRest.isEmpty)
     }
   }
@@ -58,21 +58,21 @@ class BurnTransactionSuite extends BaseTransactionSuite {
 
       val issuedAssetId = sender.issue(firstAddress, s"name+$v", "description", issuedQuantity, decimals, reissuable = false, issueFee).id
 
-      notMiner.waitForTransaction(issuedAssetId)
+      miner.waitForTransaction(issuedAssetId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
 
       val transferId = sender.transfer(firstAddress, secondAddress, transferredQuantity, minFee, issuedAssetId.some).id
 
-      notMiner.waitForTransaction(transferId)
+      miner.waitForTransaction(transferId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity - transferredQuantity)
       sender.assertAssetBalance(secondAddress, issuedAssetId, transferredQuantity)
 
       val burnId = sender.burn(secondAddress, issuedAssetId, transferredQuantity, minFee, v).id
 
-      notMiner.waitForTransaction(burnId)
+      miner.waitForTransaction(burnId)
       sender.assertAssetBalance(secondAddress, issuedAssetId, 0)
 
-      val details = notMiner.assetsDetails(issuedAssetId)
+      val details = miner.assetsDetails(issuedAssetId)
       assert(!details.reissuable)
       assert(details.quantity == issuedQuantity - transferredQuantity)
       assert(details.minSponsoredAssetFee.isEmpty)
@@ -89,7 +89,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
 
       val issuedAssetId = sender.issue(firstAddress, s"name+$v", "description", issuedQuantity, decimals, reissuable = false, issueFee).id
 
-      notMiner.waitForTransaction(issuedAssetId)
+      miner.waitForTransaction(issuedAssetId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
 
       assertBadRequestAndMessage(sender.burn(secondAddress, issuedAssetId, burnedQuantity, minFee, v).id, "negative asset balance")
@@ -104,12 +104,12 @@ class BurnTransactionSuite extends BaseTransactionSuite {
 
       val issuedAssetId = sender.issue(firstAddress, s"name+$v", "description", issuedQuantity, decimals, reissuable = false, issueFee).id
 
-      notMiner.waitForTransaction(issuedAssetId)
+      miner.waitForTransaction(issuedAssetId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
 
       val transferId = sender.transfer(firstAddress, secondAddress, transferredQuantity, minFee, issuedAssetId.some).id
 
-      notMiner.waitForTransaction(transferId)
+      miner.waitForTransaction(transferId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity - transferredQuantity)
       sender.assertAssetBalance(secondAddress, issuedAssetId, transferredQuantity)
 
@@ -124,38 +124,38 @@ class BurnTransactionSuite extends BaseTransactionSuite {
 
       val issuedAssetId = sender.issue(firstAddress, s"name+$v", "description", issuedQuantity, decimals, reissuable = true, issueFee).id
 
-      notMiner.waitForTransaction(issuedAssetId)
+      miner.waitForTransaction(issuedAssetId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
 
       val transferId = sender.transfer(firstAddress, secondAddress, transferredQuantity, minFee, issuedAssetId.some).id
-      notMiner.waitForTransaction(transferId)
+      miner.waitForTransaction(transferId)
 
       val burnOwnerTxTd = sender.burn(firstAddress, issuedAssetId, transferredQuantity, minFee, v).id
-      notMiner.waitForTransaction(burnOwnerTxTd)
+      miner.waitForTransaction(burnOwnerTxTd)
 
       sender.assertAssetBalance(firstAddress, issuedAssetId, 0)
       sender.assertAssetBalance(secondAddress, issuedAssetId, transferredQuantity)
 
-      val details = notMiner.assetsDetails(issuedAssetId)
+      val details = miner.assetsDetails(issuedAssetId)
       assert(details.reissuable)
       assert(details.quantity == transferredQuantity)
       assert(details.minSponsoredAssetFee.isEmpty)
 
       val reissueId = sender.reissue(firstAddress, issuedAssetId, issuedQuantity, false, issueFee).id
-      notMiner.waitForTransaction(reissueId)
+      miner.waitForTransaction(reissueId)
 
-      val details1 = notMiner.assetsDetails(issuedAssetId)
+      val details1 = miner.assetsDetails(issuedAssetId)
       assert(!details1.reissuable)
       assert(details1.quantity == transferredQuantity + issuedQuantity)
       assert(details1.minSponsoredAssetFee.isEmpty)
 
       val burn1 = sender.burn(firstAddress, issuedAssetId, issuedQuantity, minFee, v).id
-      notMiner.waitForTransaction(burn1)
+      miner.waitForTransaction(burn1)
 
       val burn2 = sender.burn(secondAddress, issuedAssetId, transferredQuantity, minFee, v).id
-      notMiner.waitForTransaction(burn2)
+      miner.waitForTransaction(burn2)
 
-      val details2 = notMiner.assetsDetails(issuedAssetId)
+      val details2 = miner.assetsDetails(issuedAssetId)
       assert(!details2.reissuable)
       assert(details2.quantity == 0)
       assert(details2.minSponsoredAssetFee.isEmpty)

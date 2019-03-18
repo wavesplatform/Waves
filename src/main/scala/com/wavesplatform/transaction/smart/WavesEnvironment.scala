@@ -8,8 +8,8 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain.Tx.ContractTransfer
 import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
 
@@ -17,7 +17,12 @@ object WavesEnvironment {
   type In = Transaction :+: Order :+: ContractTransfer :+: CNil
 }
 
-class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[Int], blockchain: Blockchain) extends Environment {
+class WavesEnvironment(nByte: Byte,
+                       in: Coeval[WavesEnvironment.In],
+                       h: Coeval[Int],
+                       blockchain: Blockchain,
+                       contractAdress: Coeval[com.wavesplatform.account.Address])
+    extends Environment {
   override def height: Long = h()
 
   override def inputEntity: Environment.InputEntity = {
@@ -40,7 +45,7 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
             .toOption
         case Alias(name) =>
           com.wavesplatform.account.Alias
-            .buildWithCurrentChainId(name)
+            .create(name)
             .flatMap(blockchain.resolveAlias)
             .toOption
       }
@@ -58,7 +63,7 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
   }
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
     blockchain
-      .resolveAlias(com.wavesplatform.account.Alias.buildWithCurrentChainId(name).explicitGet())
+      .resolveAlias(com.wavesplatform.account.Alias.create(name).explicitGet())
       .left
       .map(_.toString)
       .right
@@ -70,12 +75,13 @@ class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[I
     (for {
       aoa <- addressOrAlias match {
         case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr, position = 0).map(_._1)
-        case Alias(name)    => com.wavesplatform.account.Alias.buildWithCurrentChainId(name)
+        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
       }
       address <- blockchain.resolveAlias(aoa)
-      balance = blockchain.balance(address, maybeAssetId.map(ByteStr(_)))
+      balance = blockchain.balance(address, Asset.fromCompatId(maybeAssetId.map(ByteStr(_))))
     } yield balance).left.map(_.toString)
   }
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     blockchain.transactionHeight(ByteStr(id)).map(_.toLong)
+  override def tthis: Address = Recipient.Address(contractAdress().bytes)
 }

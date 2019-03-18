@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Transaction
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.Suite
@@ -112,12 +113,12 @@ trait TransferSending extends ScorexLogging {
           createSignedTransferRequest(
             TransferTransactionV2
               .selfSigned(
-                assetId = None,
+                assetId = Waves,
                 sender = PrivateKeyAccount.fromSeed(x.senderSeed).explicitGet(),
                 recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
                 amount = x.amount,
                 timestamp = start + i,
-                feeAssetId = None,
+                feeAssetId = Waves,
                 feeAmount = x.fee,
                 attachment = if (includeAttachment) {
                   Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
@@ -138,10 +139,10 @@ trait TransferSending extends ScorexLogging {
     import tx._
     SignedTransferV2Request(
       Base58.encode(tx.sender.publicKey),
-      assetId.map(_.base58),
+      assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,
-      feeAssetId.map(_.base58),
+      feeAssetId.maybeBase58Repr,
       fee,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),

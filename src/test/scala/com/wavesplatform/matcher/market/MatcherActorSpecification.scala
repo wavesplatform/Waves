@@ -17,7 +17,8 @@ import com.wavesplatform.matcher.market.OrderBookActor.OrderBookSnapshotUpdated
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.state.{AssetDescription, Blockchain}
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.{EmptyBlockchain, randomBytes}
 import org.scalamock.scalatest.PathMockFactory
@@ -190,8 +191,8 @@ class MatcherActorSpecification
     "forward new orders to order books" is pending
 
     // snapshotOffset == 17
-    val pair23 = AssetPair(Some(ByteStr(Array(1))), Some(ByteStr(Array(2)))) // key = 2-3, snapshot offset = 9: 9, 26, 43, ...
-    val pair45 = AssetPair(Some(ByteStr(Array(3))), Some(ByteStr(Array(4)))) // key = 4-5, snapshot offset = 12: 12, 29, 46, ...
+    val pair23 = AssetPair(IssuedAsset(ByteStr(Array(1))), IssuedAsset(ByteStr(Array(2)))) // key = 2-3, snapshot offset = 9: 9, 26, 43, ...
+    val pair45 = AssetPair(IssuedAsset(ByteStr(Array(3))), IssuedAsset(ByteStr(Array(4)))) // key = 4-5, snapshot offset = 12: 12, 29, 46, ...
 
     "force an order book to create a snapshot" when {
       "it didn't do snapshots for a long time" when {
@@ -326,8 +327,8 @@ class MatcherActorSpecification
 
   private def doNothingOnRecovery(x: Either[String, (ActorRef, QueueEventWithMeta.Offset)]): Unit = {}
 
-  private def emptyOrderBookRefs             = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
-  private def randomAssetId: Option[AssetId] = Some(ByteStr(randomBytes()))
+  private def emptyOrderBookRefs   = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
+  private def randomAssetId: Asset = IssuedAsset(ByteStr(randomBytes()))
 }
 
 object MatcherActorSpecification {

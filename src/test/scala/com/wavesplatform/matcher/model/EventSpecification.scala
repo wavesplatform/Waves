@@ -3,12 +3,13 @@ package com.wavesplatform.matcher.model
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.OrderExecuted
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import org.scalatest.{FreeSpec, Matchers}
 
 class EventSpecification extends FreeSpec with Matchers with MatcherTestData {
   "Proper rounding scenario 1" in {
-    val pair      = AssetPair(None, mkAssetId("BTC"))
+    val pair      = AssetPair(Waves, mkAssetId("BTC"))
     val counter   = sell(pair, 840340L, 0.00000238, matcherFee = Some(300000L))
     val submitted = buy(pair, 425532L, 0.00000238, matcherFee = Some(300000L))
     val exec      = OrderExecuted(LimitOrder(submitted), LimitOrder(counter), 0L)
@@ -25,7 +26,7 @@ class EventSpecification extends FreeSpec with Matchers with MatcherTestData {
   }
 
   "Remaining fee and amount checks" in {
-    val pair      = AssetPair(None, mkAssetId("BTC"))
+    val pair      = AssetPair(Waves, mkAssetId("BTC"))
     val counter   = sell(pair, 100000000, 0.0008, matcherFee = Some(2000L))
     val submitted = buy(pair, 120000000, 0.00085, matcherFee = Some(1000L))
 

@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TransactionParsers._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
@@ -17,10 +18,10 @@ import scala.util.Try
 case class PaymentTransaction private (sender: PublicKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends SignedTransaction {
 
-  override val builder: TransactionParser        = PaymentTransaction
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val id: Coeval[AssetId]               = Coeval.evalOnce(signature)
-  override val json: Coeval[JsObject]            = Coeval.evalOnce(jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount))
+  override val builder: TransactionParser = PaymentTransaction
+  override val assetFee: (Asset, Long)    = (Waves, fee)
+  override val id: Coeval[ByteStr]        = Coeval.evalOnce(signature)
+  override val json: Coeval[JsObject]     = Coeval.evalOnce(jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount))
 
   private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(Array(builder.typeId),

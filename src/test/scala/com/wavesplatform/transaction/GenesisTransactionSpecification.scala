@@ -4,7 +4,7 @@ import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class GenesisTransactionSpecification extends PropSpec with PropertyChecks with Matchers {
 

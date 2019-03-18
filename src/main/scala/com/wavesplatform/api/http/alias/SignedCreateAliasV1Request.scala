@@ -1,11 +1,11 @@
 package com.wavesplatform.api.http.alias
 
-import io.swagger.annotations.ApiModelProperty
-import play.api.libs.json.{Format, Json}
 import com.wavesplatform.account.{Alias, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.{CreateAliasTransactionV1, ValidationError}
+import io.swagger.annotations.ApiModelProperty
+import play.api.libs.json.{Format, Json}
 
 case class SignedCreateAliasV1Request(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                       senderPublicKey: String,
@@ -22,7 +22,7 @@ case class SignedCreateAliasV1Request(@ApiModelProperty(value = "Base58 encoded 
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      _alias     <- Alias.buildWithCurrentChainId(alias)
+      _alias     <- Alias.create(alias)
       _t         <- CreateAliasTransactionV1.create(_sender, _alias, fee, timestamp, _signature)
     } yield _t
 }

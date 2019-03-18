@@ -9,7 +9,7 @@ import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.transaction.{AssetId, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.transaction.transfer._
 import shapeless.{:+:, CNil, Coproduct}
 
@@ -89,12 +89,12 @@ package object http {
   )
 
   implicit val transferTransactionFormat: Format[TransferTransactionV1] = (
-    (JsPath \ "assetId").formatNullable[AssetId] and
+    (JsPath \ "assetId").format[Asset] and
       (JsPath \ "sender").format[PublicKeyAccount] and
       (JsPath \ "recipient").format[AddressOrAlias] and
       (JsPath \ "amount").format[Long] and
       (JsPath \ "timestamp").format[Long] and
-      (JsPath \ "feeAsset").formatNullable[AssetId] and
+      (JsPath \ "feeAsset").format[Asset] and
       (JsPath \ "fee").format[Long] and
       (JsPath \ "attachment")
         .format[String]
@@ -108,10 +108,10 @@ package object http {
   implicit val versionedTransferTransactionFormat: Format[TransferTransactionV2] = (
     (JsPath \ "sender").format[PublicKeyAccount] and
       (JsPath \ "recipient").format[AddressOrAlias] and
-      (JsPath \ "assetId").formatNullable[AssetId] and
+      (JsPath \ "assetId").format[Asset] and
       (JsPath \ "amount").format[Long] and
       (JsPath \ "timestamp").format[Long] and
-      (JsPath \ "feeAssetId").formatNullable[AssetId] and
+      (JsPath \ "feeAssetId").format[Asset] and
       (JsPath \ "fee").format[Long] and
       (JsPath \ "attachment")
         .format[String]

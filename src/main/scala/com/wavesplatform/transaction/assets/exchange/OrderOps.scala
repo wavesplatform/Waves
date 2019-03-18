@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.transaction.{AssetId, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs}
 
 class OrderOps(val o: Order) extends AnyVal {
   @inline def copy(withV1: OrderV1 => OrderV1, withV2: OrderV2 => OrderV2, withV3: OrderV3 => OrderV3): Order = {
@@ -83,7 +83,7 @@ class OrderOps(val o: Order) extends AnyVal {
       _.copy(orderType = t)
     )
   }
-  @inline def updateMatcherFeeAssetId(a: Option[AssetId]): Order = {
+  @inline def updateMatcherFeeAssetId(a: Asset): Order = {
     copy(
       identity,
       identity,

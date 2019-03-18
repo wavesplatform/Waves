@@ -4,6 +4,7 @@ import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
 
 import scala.util.Failure
@@ -22,7 +23,7 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
   def timestamp: Long
   def version: Byte
 
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val assetFee: (Asset, Long) = (Waves, fee)
 
   @ApiModelProperty(hidden = true)
   override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
@@ -41,9 +42,9 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
       "buyMatcherFee"  -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
     ))
-  override def checkedAssets(): Seq[AssetId] = {
+  override def checkedAssets(): Seq[Asset] = {
     val pair = buyOrder.assetPair
-    (pair.priceAsset ++ pair.amountAsset).toSeq
+    Seq(pair.priceAsset, pair.amountAsset)
   }
 }
 

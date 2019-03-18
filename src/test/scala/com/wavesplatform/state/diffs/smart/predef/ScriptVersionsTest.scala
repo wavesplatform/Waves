@@ -14,8 +14,8 @@ import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.utils.{EmptyBlockchain, compilerContext}
 import fastparse.core.Parsed.Success
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import shapeless.Coproduct
 
 class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with TransactionGen {
@@ -28,7 +28,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
       compileResult <- ExpressionCompiler(compilerContext(version, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
       s <- ExprScript(version, typedExpr, checkSize = false)
-      r <- ScriptRunner(blockchain.height, Coproduct(tx), blockchain, s, isTokenScript = false)._2
+      r <- ScriptRunner(blockchain.height, Coproduct(tx), blockchain, s, isTokenScript = false, null)._2
     } yield r
 
   }

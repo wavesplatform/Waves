@@ -320,7 +320,7 @@ object ExpressionCompiler {
       .traverse[Option, FINAL](ctr => {
         ctr.fields.find(_._1 == fieldName).map(_._2)
       })
-      .fold((FieldNotFound(p.start, p.end, fieldName, s"Union($types)"): CompilationError).asLeft[(GETTER, FINAL)])(ts => {
+      .fold((FieldNotFound(p.start, p.end, fieldName, if(types.length == 1) { types.head.toString } else { s"""Union(${types.mkString("|")})"""}): CompilationError).asLeft[(GETTER, FINAL)])(ts => {
         val ct = TypeInferrer.findCommonType(ts)
         (GETTER(expr, fieldName), ct).asRight[CompilationError]
       })

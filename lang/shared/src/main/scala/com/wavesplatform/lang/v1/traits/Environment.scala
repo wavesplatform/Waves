@@ -12,6 +12,7 @@ trait Environment {
   def height: Long
   def chainId: Byte
   def inputEntity: Environment.InputEntity
+  def tthis : Recipient.Address
   def transactionById(id: Array[Byte]): Option[Tx]
   def transactionHeightById(id: Array[Byte]): Option[Long]
   def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]
