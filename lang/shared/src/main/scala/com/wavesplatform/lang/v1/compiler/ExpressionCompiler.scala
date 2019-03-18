@@ -67,12 +67,12 @@ object ExpressionCompiler {
   }
 
   def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[FINAL] =
-    tl.flatMap(typeName =>
+    tl.flatTraverse(typeName =>
       typeDefs.get(typeName) match {
-        case Some(UnionType(_, unionTypes)) => unionTypes
-        case Some(realType)                 => List(realType.typeRef)
-        case None                           => List.empty
-    })
+        case Some(UnionType(_, unionTypes)) => unionTypes.some
+        case Some(realType)                 => List(realType.typeRef).some
+        case None                           => none
+    }).getOrElse(Nil)
 
   private def compileMatch(p: Pos, expr: Expressions.EXPR, cases: List[Expressions.MATCH_CASE]): CompileM[(Terms.EXPR, FINAL)] = {
     for {
@@ -89,9 +89,15 @@ object ExpressionCompiler {
         case REF(k) => Some(k)
         case _      => None
       }
-      ifCases <- inspectFlat[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx => {
-        mkIfCases(updatedCtx, cases, Expressions.REF(p, PART.VALID(p, refTmpKey)), allowShadowVarName).toCompileM
-      })
+      ifCases <- inspectFlat[CompilerContext, CompilationError, Expressions.EXPR](updatedCtx =>
+        mkIfCases(
+          updatedCtx,
+          cases,
+          Expressions.REF(p, PART.VALID(p, refTmpKey)),
+          allowShadowVarName,
+          exprTypes
+        ).toCompileM
+      )
       compiledMatch <- compileLetBlock(p, Expressions.LET(p, PART.VALID(p, refTmpKey), expr, Seq.empty), ifCases)
       _ <- cases
         .flatMap(_.types)
@@ -272,7 +278,8 @@ object ExpressionCompiler {
   def mkIfCases(ctx: CompilerContext,
                 cases: List[MATCH_CASE],
                 refTmp: Expressions.REF,
-                allowShadowVarName: Option[String]): Either[CompilationError, Expressions.EXPR] = {
+                allowShadowVarName: Option[String],
+                exprTypes: UNION): Either[CompilationError, Expressions.EXPR] = {
 
     def f(mc: MATCH_CASE, further: Expressions.EXPR): Either[CompilationError, Expressions.EXPR] = {
       val blockWithNewVar = mc.newVarName.fold(mc.expr) { nv =>
@@ -295,7 +302,15 @@ object ExpressionCompiler {
 
           val flatTypes = flat(ctx.predefTypes, types.map(_.asInstanceOf[PART.VALID[String]].v)).map(_.name)
           flatTypes match {
-            case Nil => Left(NonExistingType(mc.position.start, mc.position.end, mc.types.toString(), List.empty))
+            case Nil =>
+              Left(
+                NonExistingType(
+                  mc.position.start,
+                  mc.position.end,
+                  mc.types.toString(),
+                  exprTypes.l.map(_.name)
+                )
+              )
             case hType :: tTypes =>
               val typeIf =
                 tTypes.foldLeft(isInst(hType))((other, matchType) => BINARY_OP(mc.position, isInst(matchType), BinaryOperation.OR_OP, other))
