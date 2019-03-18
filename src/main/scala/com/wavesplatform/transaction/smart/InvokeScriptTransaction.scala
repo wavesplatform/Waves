@@ -22,14 +22,14 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class InvokeScriptTransaction private (chainId: Byte,
-                                                  sender: PublicKeyAccount,
-                                                  contractAddress: Address,
-                                                  fc: Terms.FUNCTION_CALL,
-                                                  payment: Seq[Payment],
-                                                  fee: Long,
-                                                  feeAssetId: Asset,
-                                                  timestamp: Long,
-                                                  proofs: Proofs)
+                                            sender: PublicKeyAccount,
+                                            contractAddress: Address,
+                                            fc: Terms.FUNCTION_CALL,
+                                            payment: Seq[Payment],
+                                            fee: Long,
+                                            feeAssetId: Asset,
+                                            timestamp: Long,
+                                            proofs: Proofs)
     extends ProvenTransaction
     with VersionedTransaction
     with FastHashId {

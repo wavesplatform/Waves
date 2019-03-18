@@ -177,8 +177,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                                         masterGen: Gen[PrivateKeyAccount] = accountGen,
                                         payment: Option[Payment] = None,
                                         feeGen: Gen[Long] = ciFee(0),
-                                        sponsored: Boolean = false): Gen[
-    (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] = {
+                                        sponsored: Boolean = false)
+    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] = {
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -218,8 +218,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                                   masterGen: Gen[PrivateKeyAccount] = accountGen,
                                   payment: Option[Payment] = None,
                                   feeGen: Gen[Long] = ciFee(0),
-                                  sponsored: Boolean = false): Gen[
-    (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] =
+                                  sponsored: Boolean = false)
+    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -527,7 +527,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
   }
 
-  property("argument passed in callable function has wrong type") {
+  property("argument passed to callable function has wrong type") {
     forAll(for {
       r <- simplePreconditionsAndSetContract()
     } yield (r._1, r._2, r._3)) {
