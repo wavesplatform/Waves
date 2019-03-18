@@ -51,7 +51,7 @@ object JsAPI {
 
   private def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
     WavesContext.build(
-      DirectiveSet(v, ScriptType.isTokenScript(isTokenContext), if (isContract) ContentType.Contract else ContentType.Expression),
+      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) ContentType.Contract else ContentType.Expression),
       new Environment {
         override def height: Long                                                                                    = 0
         override def chainId: Byte                                                                                   = 1: Byte

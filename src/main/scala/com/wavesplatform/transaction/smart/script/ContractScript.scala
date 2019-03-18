@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.smart.script
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{ContentType, Global}
 import com.wavesplatform.lang.StdLibVersion.StdLibVersion
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.v1.ContractLimits._
@@ -42,7 +42,9 @@ object ContractScript {
       (contract.cfs.map(func => (func.annotation.invocationArgName, func.u)) ++ contract.vf.map(func => (func.annotation.invocationArgName, func.u)))
         .map {
           case (annotationArgName, funcExpr) =>
-            ScriptEstimator(varNames(version), functionCosts(version), constructExprFromFuncAndContext(contract.dec, annotationArgName, funcExpr))
+            ScriptEstimator(varNames(version, ContentType.Contract),
+                            functionCosts(version),
+                            constructExprFromFuncAndContext(contract.dec, annotationArgName, funcExpr))
               .map(complexity => (funcExpr.name, complexity))
         }
     val funcsWithComplexityEi: E[Vector[(String, Long)]] = funcsWithComplexity.toVector.sequence

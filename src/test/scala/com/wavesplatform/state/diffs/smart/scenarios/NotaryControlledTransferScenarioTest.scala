@@ -5,12 +5,14 @@ import java.nio.charset.StandardCharsets
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, V1}
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.{Global, Testing}
+import com.wavesplatform.lang.{ContentType, Global, ScriptType, Testing}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
@@ -64,7 +66,8 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
       untypedScript = Parser.parseExpr(assetScript).get.value
 
-      typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
+      typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedScript).explicitGet()._1)
+        .explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -111,9 +114,12 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
        accountBDataTransaction,
        transferFromAToB)
 
+  def dummyEvalContext(version: StdLibVersion): EvaluationContext =
+    lazyContexts(DirectiveSet(V1, ScriptType.Asset, ContentType.Expression))().evaluationContext
+
   private def eval(code: String) = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed   = ExpressionCompiler(compilerContext(V1, isAssetScript = false), untyped).map(_._1)
+    val typed   = ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untyped).map(_._1)
     typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(V1), _))
   }
 
