@@ -80,6 +80,8 @@ class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observa
     try {
       serverChannel.close().await()
     } finally {
+      // @todo proper shutdown
+      blockchainUpdatedScheduler.shutdown()
       workerGroup.shutdownGracefully().await()
       bossGroup.shutdownGracefully().await()
     }
