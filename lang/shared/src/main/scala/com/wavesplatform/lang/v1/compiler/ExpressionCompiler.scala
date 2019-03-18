@@ -67,12 +67,12 @@ object ExpressionCompiler {
   }
 
   def flat(typeDefs: Map[String, DefinedType], tl: List[String]): List[FINAL] =
-    tl.flatTraverse(typeName =>
+    tl.flatMap(typeName =>
       typeDefs.get(typeName) match {
-        case Some(UnionType(_, unionTypes)) => unionTypes.some
-        case Some(realType)                 => List(realType.typeRef).some
-        case None                           => none
-    }).getOrElse(Nil)
+        case Some(UnionType(_, unionTypes)) => unionTypes
+        case Some(realType)                 => List(realType.typeRef)
+        case None                           => List.empty
+    })
 
   private def compileMatch(p: Pos, expr: Expressions.EXPR, cases: List[Expressions.MATCH_CASE]): CompileM[(Terms.EXPR, FINAL)] = {
     for {

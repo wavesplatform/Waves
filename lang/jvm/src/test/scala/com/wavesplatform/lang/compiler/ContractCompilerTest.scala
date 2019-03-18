@@ -476,7 +476,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
   }
 
-  property("matching case with union type containing non-existing type should produce error message with suitable types") {
+  ignore("matching case with union type containing non-existing type should produce error message with suitable types") {
     val ctx = Monoid.combine(compilerContext, cmpCtx)
     val verifierTypes = WavesContext.verifierInput.types.map(_.name)
 
