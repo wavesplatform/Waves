@@ -77,7 +77,7 @@ class ProtoBufBenchmark {
   }
 
   @Benchmark
-  def readCachedTest(st: ExchangeTransactionSt, bh: Blackhole): Unit = {
+  def readCachedTx_test(st: ExchangeTransactionSt, bh: Blackhole): Unit = {
     val cached = PBCachedTransaction(st.exchangeTransaction)
     bh.consume(cached.id)
     bh.consume(cached.bytes)
@@ -85,7 +85,7 @@ class ProtoBufBenchmark {
   }
 
   @Benchmark
-  def readUncachedTest(st: ExchangeTransactionSt, bh: Blackhole): Unit = {
+  def readUncachedTx_test(st: ExchangeTransactionSt, bh: Blackhole): Unit = {
     bh.consume(st.exchangeTransaction.toByteArray)
     bh.consume(FastHashId.create(st.exchangeTransaction.getTransaction.toByteArray))
     bh.consume(st.exchangeTransaction.withProofs(st.exchangeTransaction.proofs.reverse).toByteArray)

@@ -1,10 +1,9 @@
 package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.{ByteString, CodedInputStream, CodedOutputStream}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.utils.PBUtils
+import com.wavesplatform.protobuf.PBSerializable
 import com.wavesplatform.transaction.{FastHashId, Proofs}
 import monix.eval.Coeval
-import scalapb.GeneratedMessage
 
 trait PBCachedTransaction {
   def transaction: SignedTransaction
@@ -22,10 +21,10 @@ trait PBCachedTransaction {
 }
 
 object PBCachedTransaction {
-  implicit def apply(tx: PBTransaction): PBCachedTransaction = new PBCachedTransactionImplWithBodyBytes(tx, Nil)
+  implicit def apply(tx: PBTransaction): PBCachedTransaction       = new PBCachedTransactionImplWithBodyBytes(tx, Nil)
   implicit def apply(tx: PBSignedTransaction): PBCachedTransaction = new PBCachedTransactionImplWithBytes(tx)
-  def fromBytes(bytes: Array[Byte]): PBCachedTransaction = new PBCachedTransactionImplWithBytes(bytes)
-  def fromBodyBytes(bodyBytes: Array[Byte]): PBCachedTransaction = new PBCachedTransactionImplWithBodyBytes(bodyBytes, Nil)
+  def fromBytes(bytes: Array[Byte]): PBCachedTransaction           = new PBCachedTransactionImplWithBytes(bytes)
+  def fromBodyBytes(bodyBytes: Array[Byte]): PBCachedTransaction   = new PBCachedTransactionImplWithBodyBytes(bodyBytes, Nil)
 
   implicit class PBCachedTransactionImplicitOps(private val tx: PBCachedTransaction) extends AnyVal {
     def withProofs(proofs: ByteString*): PBCachedTransaction = tx match {
@@ -49,26 +48,6 @@ object PBCachedTransaction {
 
       case _ =>
         new PBCachedTransactionImplWithBodyBytes(body, tx.transaction.proofs)
-    }
-  }
-
-  private sealed trait PBSerializable {
-    def serializedSize: Int
-    def toBytes: Array[Byte]
-  }
-
-  private object PBSerializable {
-    implicit class PBRawBytesSerializable(private val underlyingBytes: Array[Byte]) extends PBSerializable {
-      override def serializedSize: Int =
-        _root_.com.google.protobuf.CodedOutputStream.computeUInt32SizeNoTag(underlyingBytes.length) + underlyingBytes.length
-      override def toBytes: Array[Byte] = underlyingBytes
-    }
-
-    implicit class PBMessageSerializable(val underlyingMessage: GeneratedMessage) extends PBSerializable {
-      private[this] val bytesCoeval = Coeval.evalOnce(PBUtils.encodeDeterministic(underlyingMessage))
-      override def serializedSize: Int =
-        _root_.com.google.protobuf.CodedOutputStream.computeUInt32SizeNoTag(underlyingMessage.serializedSize) + underlyingMessage.serializedSize
-      override def toBytes: Array[Byte] = bytesCoeval()
     }
   }
 
