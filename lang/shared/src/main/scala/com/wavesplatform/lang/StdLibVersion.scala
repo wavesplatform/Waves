@@ -52,7 +52,7 @@ object ScriptType extends TaggedType[Int] {
     case 2 => Asset
   }
 
-  def isTokenScript(b: Boolean) = if (b) Asset else Account
+  def isAssetScript(b: Boolean) = if (b) Asset else Account
 
   def parseString(s: String) = s match {
     case "ACCOUNT" => Account
