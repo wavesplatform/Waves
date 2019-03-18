@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -115,7 +115,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                | case _ => throw()
                |}
                |""".stripMargin,
-          Coproduct(tx)
+          Coproduct(tx), StdLibVersion.V3
         )
         result shouldBe evaluated(true)
     }
