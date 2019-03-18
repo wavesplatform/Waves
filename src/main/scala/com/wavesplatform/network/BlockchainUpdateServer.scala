@@ -26,7 +26,7 @@ private object PBScalaToJava extends MessageToMessageEncoder[PBBlockchainUpdated
   }
 }
 
-private class StateUpdateHandler(stateUpdates: Observable[BlockchainUpdated]) extends ChannelInboundHandlerAdapter {
+private class BlockchainUpdateHandler(stateUpdates: Observable[BlockchainUpdated]) extends ChannelInboundHandlerAdapter {
   implicit def toByteString(bs: ByteStr): ByteString =
     ByteString.copyFrom(bs.arr)
 
@@ -55,7 +55,7 @@ private class StateUpdateHandler(stateUpdates: Observable[BlockchainUpdated]) ex
   }
 }
 
-class StateUpdateServer(settings: WavesSettings, stateUpdates: Observable[BlockchainUpdated]) {
+class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observable[BlockchainUpdated]) {
   private val bossGroup   = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-boss-group", true))
   private val workerGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-worker-group", true))
 
@@ -68,7 +68,7 @@ class StateUpdateServer(settings: WavesSettings, stateUpdates: Observable[Blockc
           new ProtobufVarint32LengthFieldPrepender,
           new ProtobufEncoder,
           PBScalaToJava,
-          new StateUpdateHandler(stateUpdates)
+          new BlockchainUpdateHandler(blockchainUpdates)
         )
       )
     )

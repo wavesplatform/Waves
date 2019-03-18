@@ -62,8 +62,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Option[AssetId])]
 
-  private val stateUpdateEvents = ConcurrentSubject.publish[BlockchainUpdated]
-  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, Some(stateUpdateEvents))
+  private val blockchainUpdated = ConcurrentSubject.publish[BlockchainUpdated]
+  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, Some(blockchainUpdated))
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -87,13 +87,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
   private var maybeNetwork: Option[NS]                                         = None
-  private var maybeStateUpdateServer: Option[StateUpdateServer]                = None
+  private var maybeBlockchainUpdateServer: Option[BlockchainUpdateServer]                = None
 
   def apiShutdown(): Unit = {
     for {
       u <- maybeUtx
       n <- maybeNetwork
-      s <- maybeStateUpdateServer
+      s <- maybeBlockchainUpdateServer
     } yield shutdown(u, n, s)
   }
 
@@ -149,8 +149,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = network.messages
 
-    val stateUpdateServer = new StateUpdateServer(settings, stateUpdateEvents)
-    maybeStateUpdateServer = Some(stateUpdateServer)
+    val blockchainUpdateServer = new BlockchainUpdateServer(settings, blockchainUpdated)
+    maybeBlockchainUpdateServer = Some(blockchainUpdateServer)
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
@@ -281,14 +281,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     sys.addShutdownHook {
       Await.ready(Kamon.stopAllReporters(), 20.seconds)
       Metrics.shutdown()
-      shutdown(utxStorage, network, stateUpdateServer)
+      shutdown(utxStorage, network, blockchainUpdateServer)
     }
   }
 
   @volatile var shutdownInProgress           = false
   @volatile var serverBinding: ServerBinding = _
 
-  def shutdown(utx: UtxPool, network: NS, stateUpdateServer: StateUpdateServer): Unit = {
+  def shutdown(utx: UtxPool, network: NS, blockchainUpdateServer: BlockchainUpdateServer): Unit = {
     if (!shutdownInProgress) {
       shutdownInProgress = true
 
@@ -318,7 +318,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       log.info("Stopping network services")
       network.shutdown()
-      stateUpdateServer.shutdown()
+      blockchainUpdateServer.shutdown()
 
       shutdownAndWait(minerScheduler, "Miner")
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
