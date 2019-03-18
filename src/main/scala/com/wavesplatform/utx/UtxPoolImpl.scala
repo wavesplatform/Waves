@@ -107,16 +107,20 @@ class UtxPoolImpl(time: Time,
       }
     }
 
+    def checkIsMostProfitable(newTx: Transaction) = !transactions.values().asScala.exists(poolTx => TransactionsOrdering.InUTXPool.compare(poolTx, newTx) >= 0)
+
     PoolMetrics.putRequestStats.increment()
     val result = measureSuccessful(
       PoolMetrics.processingTimeStats, {
+        val skipSizeCheck = checkIsMostProfitable(tx)
+
         for {
-          _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+          _ <- Either.cond(skipSizeCheck || transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
 
           transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
             .map(_.bytes().length)
             .sum
-          _ <- Either.cond((transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
+          _ <- Either.cond(skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
                            (),
                            GenericError("Transaction pool bytes size limit is reached"))
 
