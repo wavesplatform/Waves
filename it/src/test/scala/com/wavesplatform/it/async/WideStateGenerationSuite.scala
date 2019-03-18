@@ -33,6 +33,8 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matcher
         |    max-buffer-size = 500
         |    max-buffer-time = 100ms
         |  }
+        |  utx.allow-skip-checks = false
+        |  utx.max-scripted-size = 1000000
         |}""".stripMargin
     ),
     tag = getClass.getSimpleName,
