@@ -4,7 +4,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.assets.{BurnTransaction, ReissueTransaction, SponsorFeeTransaction}
-import com.wavesplatform.transaction.smart.ContractInvocationTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Authorized, Transaction}
 
@@ -52,7 +52,7 @@ object TxEstimators {
       val smartTokenRuns = assetIds.flatMap(blockchain.assetDescription).count(_.script.isDefined)
 
       val invokeScriptRun = x match {
-        case tx: ContractInvocationTransaction => 1
+        case tx: InvokeScriptTransaction => 1
         case _                                 => 0
       }
 

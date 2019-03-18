@@ -82,7 +82,8 @@ object Types {
     addProofsIfNeeded(
       List(
         "contractAddress" -> addressType.typeRef,
-        "paymentInfo"     -> optionPayment
+        "payment"     -> optionPayment,
+        "feeAssetId" -> optionByteVector
       ) ++ header ++ proven,
       proofsEnabled
     )

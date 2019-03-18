@@ -7,7 +7,7 @@ import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Requ
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseCancelV2Request, LeaseV1Request, LeaseV2Request, _}
-import com.wavesplatform.api.http.{ContractInvocationRequest, DataRequest, SignedContractInvocationRequest, SignedDataRequest, versionReads}
+import com.wavesplatform.api.http.{InvokeScriptRequest, DataRequest, SignedInvokeScriptRequest, SignedDataRequest, versionReads}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
@@ -607,22 +607,22 @@ object TransactionFactory {
       Proofs.empty
     )
 
-  def contractInvocation(request: ContractInvocationRequest, wallet: Wallet, time: Time): Either[ValidationError, ContractInvocationTransaction] =
-    contractInvocation(request, wallet, request.sender, time)
+  def invokeScript(request: InvokeScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, InvokeScriptTransaction] =
+    invokeScript(request, wallet, request.sender, time)
 
-  def contractInvocation(request: ContractInvocationRequest,
+  def invokeScript(request: InvokeScriptRequest,
                          wallet: Wallet,
                          signerAddress: String,
-                         time: Time): Either[ValidationError, ContractInvocationTransaction] =
+                         time: Time): Either[ValidationError, InvokeScriptTransaction] =
     for {
       sender   <- wallet.findPrivateKey(request.sender)
       signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       contract <- Address.fromString(request.contractAddress)
 
-      tx <- ContractInvocationTransaction.signed(
+      tx <- InvokeScriptTransaction.signed(
         sender,
         contract,
-        ContractInvocationRequest.buildFunctionCall(request.call),
+        InvokeScriptRequest.buildFunctionCall(request.call),
         request.payment,
         request.fee,
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
@@ -631,11 +631,11 @@ object TransactionFactory {
       )
     } yield tx
 
-  def contractInvocation(request: ContractInvocationRequest, sender: PublicKeyAccount): Either[ValidationError, ContractInvocationTransaction] =
+  def invokeScript(request: InvokeScriptRequest, sender: PublicKeyAccount): Either[ValidationError, InvokeScriptTransaction] =
     for {
       contract <- Address.fromString(request.contractAddress)
-      fc = ContractInvocationRequest.buildFunctionCall(request.call)
-      tx <- ContractInvocationTransaction.create(
+      fc = InvokeScriptRequest.buildFunctionCall(request.call)
+      tx <- InvokeScriptTransaction.create(
         sender,
         contract,
         fc,
@@ -734,7 +734,7 @@ object TransactionFactory {
   }
 
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
-    import ContractInvocationRequest._
+    import InvokeScriptRequest._
     val typeId  = (jsv \ "type").as[Byte]
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
     TransactionParsers.by(typeId, version) match {
@@ -757,7 +757,7 @@ object TransactionFactory {
           case CreateAliasTransactionV1      => jsv.as[SignedCreateAliasV1Request].toTx
           case CreateAliasTransactionV2      => jsv.as[SignedCreateAliasV2Request].toTx
           case DataTransaction               => jsv.as[SignedDataRequest].toTx
-          case ContractInvocationTransaction => jsv.as[SignedContractInvocationRequest].toTx
+          case InvokeScriptTransaction => jsv.as[SignedInvokeScriptRequest].toTx
           case SetScriptTransaction          => jsv.as[SignedSetScriptRequest].toTx
           case SetAssetScriptTransaction     => jsv.as[SignedSetAssetScriptRequest].toTx
           case SponsorFeeTransaction         => jsv.as[SignedSponsorFeeRequest].toTx
