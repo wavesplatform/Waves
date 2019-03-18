@@ -53,7 +53,7 @@ object TxEstimators {
 
       val invokeScriptRun = x match {
         case tx: InvokeScriptTransaction => 1
-        case _                                 => 0
+        case _                           => 0
       }
 
       smartAccountRun + smartTokenRuns + invokeScriptRun

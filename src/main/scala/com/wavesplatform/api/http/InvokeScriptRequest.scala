@@ -1,10 +1,10 @@
 package com.wavesplatform.api.http
 
 import cats.implicits._
+import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
@@ -45,7 +45,7 @@ object InvokeScriptRequest {
     }
   }
 
-  implicit val functionCallReads                      = Json.reads[FunctionCallPart]
+  implicit val functionCallReads                = Json.reads[FunctionCallPart]
   implicit val unsignedInvokeScriptRequestReads = Json.reads[InvokeScriptRequest]
   implicit val signedInvokeScriptRequestReads   = Json.reads[SignedInvokeScriptRequest]
 
