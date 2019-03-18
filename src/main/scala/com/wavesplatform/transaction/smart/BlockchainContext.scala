@@ -27,7 +27,7 @@ object BlockchainContext {
         Seq(
           PureContext.build(version),
           CryptoContext.build(Global),
-          WavesContext.build(DirectiveSet(version, ScriptType.isTokenScript(isTokenContext), ContentType.isContract(isContract)),
+          WavesContext.build(DirectiveSet(version, ScriptType.isAssetScript(isTokenContext), ContentType.isContract(isContract)),
                              new WavesEnvironment(nByte, in, h, blockchain, tthis))
         ))
       .evaluationContext

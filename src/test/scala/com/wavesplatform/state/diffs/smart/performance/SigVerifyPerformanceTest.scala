@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.smart.performance
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ContentType
 import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -54,7 +55,7 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
   ignore("parallel native signature verification vs sequential scripted signature verification") {
     val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
     val untypedScript = Parser.parseExpr(textScript).get.value
-    val typedScript   = ExpressionCompiler(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
+    val typedScript   = ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedScript).explicitGet()._1
 
     forAll(differentTransfers(typedScript)) {
       case (gen, setScript, transfers, scriptTransfers) =>

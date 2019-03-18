@@ -611,9 +611,9 @@ object TransactionFactory {
     invokeScript(request, wallet, request.sender, time)
 
   def invokeScript(request: InvokeScriptRequest,
-                         wallet: Wallet,
-                         signerAddress: String,
-                         time: Time): Either[ValidationError, InvokeScriptTransaction] =
+                   wallet: Wallet,
+                   signerAddress: String,
+                   time: Time): Either[ValidationError, InvokeScriptTransaction] =
     for {
       sender   <- wallet.findPrivateKey(request.sender)
       signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
@@ -741,28 +741,28 @@ object TransactionFactory {
       case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
       case Some(x) =>
         x match {
-          case IssueTransactionV1            => jsv.as[SignedIssueV1Request].toTx
-          case IssueTransactionV2            => jsv.as[SignedIssueV2Request].toTx
-          case TransferTransactionV1         => jsv.as[SignedTransferV1Request].toTx
-          case TransferTransactionV2         => jsv.as[SignedTransferV2Request].toTx
-          case MassTransferTransaction       => jsv.as[SignedMassTransferRequest].toTx
-          case ReissueTransactionV1          => jsv.as[SignedReissueV1Request].toTx
-          case ReissueTransactionV2          => jsv.as[SignedReissueV2Request].toTx
-          case BurnTransactionV1             => jsv.as[SignedBurnV1Request].toTx
-          case BurnTransactionV2             => jsv.as[SignedBurnV2Request].toTx
-          case LeaseTransactionV1            => jsv.as[SignedLeaseV1Request].toTx
-          case LeaseTransactionV2            => jsv.as[SignedLeaseV2Request].toTx
-          case LeaseCancelTransactionV1      => jsv.as[SignedLeaseCancelV1Request].toTx
-          case LeaseCancelTransactionV2      => jsv.as[SignedLeaseCancelV2Request].toTx
-          case CreateAliasTransactionV1      => jsv.as[SignedCreateAliasV1Request].toTx
-          case CreateAliasTransactionV2      => jsv.as[SignedCreateAliasV2Request].toTx
-          case DataTransaction               => jsv.as[SignedDataRequest].toTx
-          case InvokeScriptTransaction => jsv.as[SignedInvokeScriptRequest].toTx
-          case SetScriptTransaction          => jsv.as[SignedSetScriptRequest].toTx
-          case SetAssetScriptTransaction     => jsv.as[SignedSetAssetScriptRequest].toTx
-          case SponsorFeeTransaction         => jsv.as[SignedSponsorFeeRequest].toTx
-          case ExchangeTransactionV1         => jsv.as[SignedExchangeRequest].toTx
-          case ExchangeTransactionV2         => jsv.as[SignedExchangeRequestV2].toTx
+          case IssueTransactionV1        => jsv.as[SignedIssueV1Request].toTx
+          case IssueTransactionV2        => jsv.as[SignedIssueV2Request].toTx
+          case TransferTransactionV1     => jsv.as[SignedTransferV1Request].toTx
+          case TransferTransactionV2     => jsv.as[SignedTransferV2Request].toTx
+          case MassTransferTransaction   => jsv.as[SignedMassTransferRequest].toTx
+          case ReissueTransactionV1      => jsv.as[SignedReissueV1Request].toTx
+          case ReissueTransactionV2      => jsv.as[SignedReissueV2Request].toTx
+          case BurnTransactionV1         => jsv.as[SignedBurnV1Request].toTx
+          case BurnTransactionV2         => jsv.as[SignedBurnV2Request].toTx
+          case LeaseTransactionV1        => jsv.as[SignedLeaseV1Request].toTx
+          case LeaseTransactionV2        => jsv.as[SignedLeaseV2Request].toTx
+          case LeaseCancelTransactionV1  => jsv.as[SignedLeaseCancelV1Request].toTx
+          case LeaseCancelTransactionV2  => jsv.as[SignedLeaseCancelV2Request].toTx
+          case CreateAliasTransactionV1  => jsv.as[SignedCreateAliasV1Request].toTx
+          case CreateAliasTransactionV2  => jsv.as[SignedCreateAliasV2Request].toTx
+          case DataTransaction           => jsv.as[SignedDataRequest].toTx
+          case InvokeScriptTransaction   => jsv.as[SignedInvokeScriptRequest].toTx
+          case SetScriptTransaction      => jsv.as[SignedSetScriptRequest].toTx
+          case SetAssetScriptTransaction => jsv.as[SignedSetAssetScriptRequest].toTx
+          case SponsorFeeTransaction     => jsv.as[SignedSponsorFeeRequest].toTx
+          case ExchangeTransactionV1     => jsv.as[SignedExchangeRequest].toTx
+          case ExchangeTransactionV2     => jsv.as[SignedExchangeRequestV2].toTx
         }
     }
   }
