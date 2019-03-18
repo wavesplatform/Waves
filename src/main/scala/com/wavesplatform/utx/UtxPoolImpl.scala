@@ -13,7 +13,7 @@ import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio, TransactionId}
 import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
@@ -27,6 +27,7 @@ import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.{Observable, Observer}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time,
@@ -49,17 +50,20 @@ class UtxPoolImpl(time: Time,
   // Metrics
   private[this] object PoolMetrics {
     private[this] val sizeStats  = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
+    private[this] val scriptedSizeStats  = Kamon.rangeSampler("utx-pool-scripted-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
     private[this] val bytesStats = Kamon.rangeSampler("utx-pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
     val processingTimeStats      = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
     val putRequestStats          = Kamon.counter("utx-pool-put-if-new")
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()
+      if (TxCheck.isScripted(tx)) scriptedSizeStats.increment()
       bytesStats.increment(tx.bytes().length)
     }
 
     def removeTransaction(tx: Transaction): Unit = {
       sizeStats.decrement()
+      if (TxCheck.isScripted(tx)) scriptedSizeStats.decrement()
       bytesStats.decrement(tx.bytes().length)
     }
   }
@@ -75,11 +79,17 @@ class UtxPoolImpl(time: Time,
       case _                                                                    => Right(())
     }
 
-    def checkScripted(blockchain: Blockchain, tx: Transaction) = tx match {
-      case _ if utxSettings.allowTransactionsFromSmartAccounts => Right(())
-      case a: AuthorizedTransaction if blockchain.hasScript(a.sender.toAddress) =>
-        Left(GenericError("transactions from scripted accounts are denied from UTX pool"))
-      case _ => Right(())
+    def checkScripted(blockchain: Blockchain, tx: Transaction, skipSizeCheck: Boolean) = tx match {
+      case scripted if TxCheck.isScripted(scripted) =>
+        for {
+          _ <- Either.cond(utxSettings.allowTransactionsFromSmartAccounts, (), GenericError("transactions from scripted accounts are denied from UTX pool"))
+
+          scriptedCount = transactions.values().asScala.count(TxCheck.isScripted)
+          _ <- Either.cond(skipSizeCheck || scriptedCount < utxSettings.maxScriptedSize, (), GenericError("Transaction pool scripted txs size limit is reached"))
+        } yield tx
+
+      case _ =>
+        Right(tx)
     }
 
     def checkNotBlacklisted(tx: Transaction) = {
@@ -125,9 +135,9 @@ class UtxPoolImpl(time: Time,
                            GenericError("Transaction pool bytes size limit is reached"))
 
           _    <- checkNotBlacklisted(tx)
-          _    <- checkScripted(blockchain, tx)
           _    <- checkAlias(blockchain, tx)
           _    <- canReissue(blockchain, tx)
+          _    <- checkScripted(blockchain, tx, skipSizeCheck)
           diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
         } yield {
           pessimisticPortfolios.add(tx.id(), diff)
@@ -208,16 +218,24 @@ class UtxPoolImpl(time: Time,
   //noinspection ScalaStyle
   private[this] object TxCheck {
     private[this] val ExpirationTime = fs.maxTransactionTimeBackOffset.toMillis
+    private[this] val scriptedCache = mutable.WeakHashMap.empty[TransactionId, Boolean]
 
-    def transactionIsExpired(transaction: Transaction, currentTime: Long = time.correctedTime()) = {
+    def isExpired(transaction: Transaction, currentTime: Long = time.correctedTime()) = {
       (currentTime - transaction.timestamp) > ExpirationTime
     }
 
-    def transactionIsValid(transaction: Transaction,
+    def isValid(transaction: Transaction,
                            lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
                            currentTime: Long = time.correctedTime(),
                            height: Int = blockchain.height) = {
-      !transactionIsExpired(transaction) && TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).isRight
+      !isExpired(transaction) && TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).isRight
+    }
+
+    def isScripted(transaction: Transaction) = {
+      scriptedCache.getOrElseUpdate(TransactionId @@ transaction.id(), transaction match {
+        case a: AuthorizedTransaction if blockchain.hasScript(a.sender.toAddress) => true
+        case _ => false
+      })
     }
   }
 
@@ -241,7 +259,7 @@ class UtxPoolImpl(time: Time,
     private[UtxPoolImpl] def doExpiredCleanup(): Unit = {
       transactions.entrySet().removeIf { entry =>
         val tx     = entry.getValue
-        val remove = TxCheck.transactionIsExpired(tx)
+        val remove = TxCheck.isExpired(tx)
         if (remove) UtxPoolImpl.this.afterRemove(tx)
         remove
       }
@@ -250,7 +268,7 @@ class UtxPoolImpl(time: Time,
     private[UtxPoolImpl] def doCleanup(): Unit = {
       transactions.entrySet().removeIf { entry =>
         val tx     = entry.getValue
-        val remove = !TxCheck.transactionIsValid(tx)
+        val remove = !TxCheck.isValid(tx)
         if (remove) UtxPoolImpl.this.afterRemove(tx)
         remove
       }
