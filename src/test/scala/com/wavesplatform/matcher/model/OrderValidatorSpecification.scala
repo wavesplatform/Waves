@@ -186,7 +186,7 @@ class OrderValidatorSpecification
 
       "matcher's fee asset in order doesn't meet matcher's settings requirements (fixed-waves mode and incorrect asset)" in {
         val preconditions = for {
-          order              <- orderV3Generator.filter(_.matcherFeeAssetId != Waves)
+          order              <- orderV3WithFeeInPredefinedAssetGenerator()
           fixedWavesSettings <- Gen.const(FixedWavesSettings(order.matcherFee - 1000L))
         } yield order -> fixedWavesSettings
 
@@ -251,7 +251,7 @@ class OrderValidatorSpecification
 
         val preconditions =
           for {
-            order                 <- orderV3Generator filter (_.matcherFeeAssetId == Waves)
+            order                 <- orderV3WithFeeInPredefinedAssetGenerator(Some(Waves))
             fixedWavesFeeSettings <- Gen.const(FixedWavesSettings(order.matcherFee + 1000L))
           } yield (order, fixedWavesFeeSettings)
 
@@ -267,7 +267,6 @@ class OrderValidatorSpecification
       }
 
       "matcher's fee is less than calculated by ExchangeTransactionCreator one" in {
-
         forAll(orderWithMatcherSettingsGenerator) {
           case (order, sender, orderFeeSettings) =>
             val blockchain = stub[Blockchain]
@@ -307,26 +306,8 @@ class OrderValidatorSpecification
       }
 
       "matcher's fee in order in insufficient in case of scripted account or asset" in {
-
-        val preconditions =
-          for {
-            (order, sender, orderFeeSettings) <- orderWithMatcherSettingsGenerator.filter {
-              case (order, _, _) => (order.assetPair.amountAsset != Waves) && (order.assetPair.priceAsset != Waves)
-            }
-          } yield {
-
-            val minFee = orderFeeSettings match {
-              case FixedWavesSettings(baseFee) => baseFee
-              case _                           => order.matcherFee
-            }
-
-            val correctedOrder = Order.sign(order.updateFee(minFee), sender)
-
-            correctedOrder -> orderFeeSettings
-          }
-
-        forAll(preconditions) {
-          case (order, orderFeeSettings) =>
+        forAll(orderWithoutWavesInPairAndWithMatcherSettingsGenerator) {
+          case (order, _, orderFeeSettings) =>
             val trueScript                       = ExprScript(Terms.TRUE).explicitGet()
             val setScriptAndValidateWithSettings = setScriptsAndValidate(orderFeeSettings) _
 
@@ -548,7 +529,7 @@ class OrderValidatorSpecification
       assetsAndScripts.foreach {
         case (assetOption, scriptOption) =>
           assetOption match {
-            case asset @ IssuedAsset(_) =>
+            case asset: IssuedAsset =>
               (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(8))
               (blockchain.assetScript _).when(asset).returns(scriptOption)
               (blockchain.hasAssetScript _).when(asset).returns(scriptOption.isDefined)

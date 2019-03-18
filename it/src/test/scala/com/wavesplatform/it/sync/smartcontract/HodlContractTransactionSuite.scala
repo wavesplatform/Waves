@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, Json}
@@ -130,12 +130,12 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("caller deposits waves") {
     val balanceBefore = sender.accountBalances(contract.address)._1
     val tx =
-      ContractInvocationTransaction
+      InvokeScriptTransaction
         .selfSigned(
           sender = caller,
           contractAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty),
-          p = Seq(ContractInvocationTransaction.Payment(1.5.waves, Waves)),
+          p = Seq(InvokeScriptTransaction.Payment(1.5.waves, Waves)),
           timestamp = System.currentTimeMillis(),
           fee = 1.waves,
           feeAssetId = Waves
@@ -143,7 +143,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         .explicitGet()
 
     val contractInvocationId = sender
-      .signedBroadcast(tx.json() + ("type" -> JsNumber(ContractInvocationTransaction.typeId.toInt)))
+      .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
       .id
 
     nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
@@ -156,7 +156,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
 
   test("caller can't withdraw more than owns") {
     val tx =
-      ContractInvocationTransaction
+      InvokeScriptTransaction
         .selfSigned(
           sender = caller,
           contractAddress = contract,
@@ -169,14 +169,14 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         .explicitGet()
 
     assertBadRequestAndMessage(sender
-                                 .signedBroadcast(tx.json() + ("type" -> JsNumber(ContractInvocationTransaction.typeId.toInt))),
+                                 .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt))),
                                "Not enough balance")
   }
 
   test("caller can withdraw less than he owns") {
     val balanceBefore = sender.accountBalances(contract.address)._1
     val tx =
-      ContractInvocationTransaction
+      InvokeScriptTransaction
         .selfSigned(
           sender = caller,
           contractAddress = contract,
@@ -189,7 +189,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         .explicitGet()
 
     val contractInvocationId = sender
-      .signedBroadcast(tx.json() + ("type" -> JsNumber(ContractInvocationTransaction.typeId.toInt)))
+      .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
       .id
 
     nodes.waitForHeightAriseAndTxPresent(contractInvocationId)

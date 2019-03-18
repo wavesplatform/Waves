@@ -104,11 +104,11 @@ object ContractCompiler {
 
       _ <- Either
         .cond(
-          l.forall(_.u.args.size <= ContractLimits.MaxContractInvocationArgs),
+          l.forall(_.u.args.size <= ContractLimits.MaxInvokeScriptArgs),
           (),
           Generic(contract.position.start,
                   contract.position.end,
-                  s"Script functions can have no more than ${ContractLimits.MaxContractInvocationArgs} arguments")
+                  s"Script functions can have no more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
         )
         .toCompileM
       verifierFunctions = l.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])

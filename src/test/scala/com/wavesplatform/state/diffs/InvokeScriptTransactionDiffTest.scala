@@ -22,10 +22,10 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ContractScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction, WavesEnvironment}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
 import com.wavesplatform.utils.EmptyBlockchain
@@ -35,12 +35,12 @@ import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   def ciFee(sc: Int = 0): Gen[Long] =
     Gen.choose(
-      CommonValidation.FeeUnit * CommonValidation.FeeConstants(ContractInvocationTransaction.typeId) + sc * CommonValidation.ScriptExtraFee,
-      CommonValidation.FeeUnit * CommonValidation.FeeConstants(ContractInvocationTransaction.typeId) + (sc + 1) * CommonValidation.ScriptExtraFee - 1
+      CommonValidation.FeeUnit * CommonValidation.FeeConstants(InvokeScriptTransaction.typeId) + sc * CommonValidation.ScriptExtraFee,
+      CommonValidation.FeeUnit * CommonValidation.FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * CommonValidation.ScriptExtraFee - 1
     )
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
@@ -178,7 +178,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
                                         payment: Option[Payment] = None,
                                         feeGen: Gen[Long] = ciFee(0),
                                         sponsored: Boolean = false): Gen[
-    (List[GenesisTransaction], SetScriptTransaction, ContractInvocationTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] = {
+    (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] = {
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -193,7 +193,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_STRING("Not-a-Number")))
-      ci = ContractInvocationTransaction
+      ci = InvokeScriptTransaction
         .selfSigned(invoker, master, fc, payment.toSeq, if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee }, if (sponsored) {
           IssuedAsset(issueTx.id())
         } else { Waves }, ts)
@@ -219,7 +219,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
                                   payment: Option[Payment] = None,
                                   feeGen: Gen[Long] = ciFee(0),
                                   sponsored: Boolean = false): Gen[
-    (List[GenesisTransaction], SetScriptTransaction, ContractInvocationTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] =
+    (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -234,7 +234,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
-      ci = ContractInvocationTransaction
+      ci = InvokeScriptTransaction
         .selfSigned(invoker, master, fc, payment.toSeq, if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee }, if (sponsored) {
           IssuedAsset(issueTx.id())
         } else { Waves }, ts)
@@ -422,7 +422,7 @@ class ContractInvocationTransactionDiffTest extends PropSpec with PropertyChecks
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
-      ci = ContractInvocationTransaction.selfSigned(invoker, master, fc, Seq(Payment(-1, Waves)), fee, Waves, ts)
+      ci = InvokeScriptTransaction.selfSigned(invoker, master, fc, Seq(Payment(-1, Waves)), fee, Waves, ts)
     } yield (ci)) { _ should produce("NegativeAmount") }
   }
 
