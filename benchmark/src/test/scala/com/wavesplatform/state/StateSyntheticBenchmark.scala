@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.ContentType
 import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
@@ -76,7 +77,7 @@ object StateSyntheticBenchmark {
 
       val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPublicKey)"
       val untypedScript = Parser.parseExpr(textScript).get.value
-      val typedScript   = ExpressionCompiler(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
+      val typedScript   = ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedScript).explicitGet()._1
 
       val setScriptBlock = nextBlock(
         Seq(

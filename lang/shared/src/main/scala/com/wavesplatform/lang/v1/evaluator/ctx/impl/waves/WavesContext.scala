@@ -422,21 +422,25 @@ object WavesContext {
                   List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
                 } else List.empty),
       commonVars ++ vars(version),
-      functions ++ List(
-        getIntegerFromStateF,
-        getBooleanFromStateF,
-        getBinaryFromStateF,
-        getStringFromStateF,
-        getIntegerFromArrayF,
-        getBooleanFromArrayF,
-        getBinaryFromArrayF,
-        getStringFromArrayF,
-        getIntegerByIndexF,
-        getBooleanByIndexF,
-        getBinaryByIndexF,
-        getStringByIndexF,
-        addressFromStringF
-      ).map(withExtract)
+      functions ++ (if (version == V3) {
+        List(
+          getIntegerFromStateF,
+          getBooleanFromStateF,
+          getBinaryFromStateF,
+          getStringFromStateF,
+          getIntegerFromArrayF,
+          getBooleanFromArrayF,
+          getBinaryFromArrayF,
+          getStringFromArrayF,
+          getIntegerByIndexF,
+          getBooleanByIndexF,
+          getBinaryByIndexF,
+          getStringByIndexF,
+          addressFromStringF
+        ).map(withExtract)
+      } else {
+        List()
+      })
     )
   }
 

@@ -49,7 +49,7 @@ object MatcherContext {
 
     def inaccessibleFunction(name: String, internalName: Short): BaseFunction = {
       val msg = s"Function $name is inaccessible when running script on matcher"
-      NativeFunction(name, 1, internalName, UNIT, msg, Seq.empty: _*)(_ => msg.asLeft)
+      NativeFunction(name, 1, internalName, UNIT, msg, Seq.empty: _*) { case _ => msg.asLeft }
     }
 
     def inaccessibleUserFunction(name: String): BaseFunction = {
