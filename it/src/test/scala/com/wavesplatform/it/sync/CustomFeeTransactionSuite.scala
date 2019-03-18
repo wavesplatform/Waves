@@ -27,10 +27,10 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val (balance3, eff3) = notMiner.accountBalances(minerAddress)
 
     val req           = createSignedIssueRequest(assetTx)
-    val issuedAssetId = sender.signedIssue(req).id
+    val issuedAssetId = notMiner.signedIssue(req).id
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
-    val sponsorAssetId = sender.sponsorAsset(senderAddress, issuedAssetId, assetToken, assetFee).id
+    val sponsorAssetId = notMiner.sponsorAsset(senderAddress, issuedAssetId, assetToken, assetFee).id
     assert(!sponsorAssetId.isEmpty)
     nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
 
@@ -39,7 +39,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     notMiner.assertAssetBalance(senderAddress, issuedAssetId, defaultAssetQuantity)
 
     // until `feature-check-blocks-period` blocks have been mined, sponsorship does not occur
-    val unsponsoredId = sender.transfer(senderAddress, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
+    val unsponsoredId = notMiner.transfer(senderAddress, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(unsponsoredId)
     notMiner.assertBalances(senderAddress, balance1 - fees, eff1 - fees)
     notMiner.assertBalances(secondAddress, balance2, eff2)
@@ -51,7 +51,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     // after `feature-check-blocks-period` asset fees should be sponsored
     nodes.waitForSameBlockHeadesAt(featureCheckBlocksPeriod)
-    val sponsoredId = sender.transfer(senderAddress, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
+    val sponsoredId = notMiner.transfer(senderAddress, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(sponsoredId)
 
     val sponsorship = Sponsorship.toWaves(transferFee, assetToken)

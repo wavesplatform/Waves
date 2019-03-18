@@ -24,17 +24,17 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |    account = 3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX
       |    bind-address = 127.0.0.1
       |    port = 6886
+      |    actor-response-timeout = 11s
       |    snapshots-interval = 999
       |    make-snapshots-at-start = yes
       |    snapshots-loading-timeout = 423s
       |    start-events-processing-timeout = 543s
       |    rest-order-limit = 100
-      |        price-assets = [
+      |    price-assets = [
       |      WAVES
       |      8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS
       |      DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J
       |    ]
-
       |    blacklisted-assets = ["a"]
       |    blacklisted-names = ["b"]
       |    blacklisted-addresses = [
@@ -80,7 +80,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = percent
          |  fixed-waves {
-         |    min-fee = 300000
+         |    base-fee = 300000
          |  }
          |  fixed {
          |    asset-id = WAVES
@@ -100,6 +100,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
     settings.bindAddress should be("127.0.0.1")
     settings.port should be(6886)
+    settings.actorResponseTimeout should be(11.seconds)
     settings.journalDataDir should be("/waves/matcher/journal")
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(999)
@@ -127,8 +128,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     )
 
     settings.orderFee match {
-      case FixedWavesSettings(minFee) =>
-        minFee shouldBe 300000
+      case FixedWavesSettings(baseFee) =>
+        baseFee shouldBe 300000
       case FixedSettings(defaultAssetId, minFee) =>
         defaultAssetId shouldBe None
         minFee shouldBe 300000
@@ -147,7 +148,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = invalid
          |  fixed-waves {
-         |    min-fee = 300000
+         |    base-fee = 300000
          |  }
          |  fixed {
          |    asset-id = WAVES
@@ -165,7 +166,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = percent
          |  fixed-waves {
-         |    min-fee = 300000
+         |    base-fee = 300000
          |  }
          |  fixed {
          |    asset-id = WAVES
@@ -183,7 +184,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = fixed
          |  fixed-waves {
-         |    min-fee = 300000
+         |    base-fee = 300000
          |  }
          |  fixed {
          |    asset-id = ;;;;
@@ -201,7 +202,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = fixed
          |  fixed-waves {
-         |    min-fee = 300000
+         |    base-fee = 300000
          |  }
          |  fixed {
          |    asset-id = WAVES
@@ -219,7 +220,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |order-fee {
          |  mode = fixed-waves
          |  fixed-waves {
-         |    min-fee = -350000
+         |    base-fee = -350000
          |  }
          |  fixed {
          |    asset-id = ;;;;
@@ -253,6 +254,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settingsInvalidWavseAsset shouldBe
       Left("Invalid setting waves.matcher.order-fee.fixed.asset-id value: WAVES, asset must not be Waves")
 
-    settingsInvalidFeeInWaves shouldBe Left("Invalid setting waves.matcher.order-fee.fixed-waves.min-fee value: -350000, must be > 0")
+    settingsInvalidFeeInWaves shouldBe Left("Invalid setting waves.matcher.order-fee.fixed-waves.base-fee value: -350000, must be > 0")
   }
 }

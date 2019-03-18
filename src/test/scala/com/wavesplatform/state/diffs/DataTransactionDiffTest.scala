@@ -10,8 +10,8 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, In
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
@@ -115,7 +115,7 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
     forAll(setup) {
       case (genesis, data) =>
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(data)), settings) { blockDiffEi =>
-          blockDiffEi should produce("DataTransaction has not been activated")
+          blockDiffEi should produce("Data Transaction feature has not been activated")
         }
     }
   }

@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
-import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}
+import org.scalatestplus.scalacheck.{ScalaCheckDrivenPropertyChecks => GeneratorDrivenPropertyChecks}
 
 class StateWriterSpec extends FunSuite with Matchers with GeneratorDrivenPropertyChecks {
   ignore("increase height when applying block diff") {

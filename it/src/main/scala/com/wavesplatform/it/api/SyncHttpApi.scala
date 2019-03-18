@@ -348,8 +348,10 @@ object SyncHttpApi extends Assertions {
     def waitForHeightArise(): Int =
       sync(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)
 
-    def waitForSameBlockHeadesAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Boolean =
-      sync(async(nodes).waitForSameBlockHeadesAt(height, retryInterval), ConditionAwaitTime)
+    def waitForSameBlockHeadesAt(height: Int,
+                                 retryInterval: FiniteDuration = 5.seconds,
+                                 conditionAwaitTime: FiniteDuration = ConditionAwaitTime): Boolean =
+      sync(async(nodes).waitForSameBlockHeadesAt(height, retryInterval), conditionAwaitTime)
 
     def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => A, cond: Iterable[A] => Boolean): Boolean =
       sync(async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),

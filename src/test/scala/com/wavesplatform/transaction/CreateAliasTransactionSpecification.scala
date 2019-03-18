@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Alias, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
 class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -40,6 +40,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
                          "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                          "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                          "fee": 100000,
+                         "feeAssetId": null,
                          "timestamp": 1526910778245,
                          "signature": "CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T",
                          "proofs": ["CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T"],
@@ -51,7 +52,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
     val tx = CreateAliasTransactionV1
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        Alias.buildWithCurrentChainId("myalias").explicitGet(),
+        Alias.create("myalias").explicitGet(),
         100000,
         1526910778245L,
         ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get
@@ -69,6 +70,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
                        "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                        "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                        "fee": 100000,
+                       "feeAssetId": null,
                        "timestamp": 1526910778245,
                        "proofs": [
                        "26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k"
@@ -81,7 +83,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
     val tx = CreateAliasTransactionV2
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        Alias.buildWithCurrentChainId("myalias").explicitGet(),
+        Alias.create("myalias").explicitGet(),
         100000,
         1526910778245L,
         Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get))

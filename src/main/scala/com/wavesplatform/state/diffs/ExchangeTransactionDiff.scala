@@ -5,9 +5,10 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{AssetId, ValidationError}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderV3}
+import com.wavesplatform.transaction.{Asset, ValidationError}
 
 import scala.util.Right
 
@@ -18,12 +19,9 @@ object ExchangeTransactionDiff {
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
     val buyer   = tx.buyOrder.senderPublicKey.toAddress
     val seller  = tx.sellOrder.senderPublicKey.toAddress
-
-    val assetIds = Set(tx.buyOrder.assetPair.amountAsset,
-                       tx.buyOrder.assetPair.priceAsset,
-                       tx.sellOrder.assetPair.amountAsset,
-                       tx.sellOrder.assetPair.priceAsset).flatten
-
+    val assetIds =
+      Set(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset, tx.sellOrder.assetPair.amountAsset, tx.sellOrder.assetPair.priceAsset)
+        .collect { case asset @ IssuedAsset(_) => asset }
     val assets             = assetIds.map(blockchain.assetDescription)
     val smartTradesEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAccountTrading.id)
     val smartAssetsEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAssets.id)
@@ -52,7 +50,7 @@ object ExchangeTransactionDiff {
       sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.amount, t.price).liftValidationError(tx).map(-_)
     } yield {
 
-      def getAssetDiff(asset: Option[AssetId], buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
+      def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
         Monoid.combine(
           Map(buyer  → getAssetPortfolio(asset, buyAssetChange)),
           Map(seller → getAssetPortfolio(asset, sellAssetChange)),
@@ -138,7 +136,7 @@ object ExchangeTransactionDiff {
 
   def wavesPortfolio(amt: Long) = Portfolio(amt, LeaseBalance.empty, Map.empty)
 
-  def getAssetPortfolio(asset: Option[AssetId], amt: Long): Portfolio = {
+  def getAssetPortfolio(asset: Asset, amt: Long): Portfolio = {
     asset.fold(wavesPortfolio(amt))(assetId => Portfolio(0, LeaseBalance.empty, Map(assetId -> amt)))
   }
 

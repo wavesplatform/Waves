@@ -3,19 +3,21 @@ package com.wavesplatform.transaction.smart.script
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.StdLibVersion.V2
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader, ScriptEstimator}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
-import com.wavesplatform.lang.{Global, StdLibVersion}
+import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
 
@@ -31,9 +33,8 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
           PureContext.build(StdLibVersion.V1),
           CryptoContext.build(Global),
           WavesContext.build(
-            StdLibVersion.V1,
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain),
-            isTokenContext = false
+            DirectiveSet(StdLibVersion.V1, ScriptType.Account, ContentType.Expression),
+            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
           )
         ))
   }
@@ -97,9 +98,8 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
           PureContext.build(StdLibVersion.V2),
           CryptoContext.build(Global),
           WavesContext.build(
-            StdLibVersion.V2,
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain),
-            isTokenContext = false
+            DirectiveSet(V2, ScriptType.Account, ContentType.Expression),
+            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
   }
@@ -163,9 +163,8 @@ class UserFunctionComplexityTest extends PropSpec with PropertyChecks with Match
           PureContext.build(StdLibVersion.V3),
           CryptoContext.build(Global),
           WavesContext.build(
-            StdLibVersion.V3,
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain),
-            isTokenContext = false
+            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression),
+            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
   }

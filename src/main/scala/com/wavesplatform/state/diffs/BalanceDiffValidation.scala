@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
 import com.wavesplatform.utils.ScorexLogging
 
@@ -20,14 +21,14 @@ object BalanceDiffValidation extends ScorexLogging with Instrumented {
       val portfolioDiff = d.portfolios(acc)
 
       val balance       = portfolioDiff.balance
-      lazy val oldWaves = b.balance(acc, None)
+      lazy val oldWaves = b.balance(acc, Waves)
       lazy val oldLease = b.leaseBalance(acc)
       lazy val lease    = cats.Monoid.combine(oldLease, portfolioDiff.lease)
       (if (balance < 0) {
          val newB = oldWaves + balance
 
          if (newB < 0) {
-           Some(acc -> s"negative waves balance: $acc, old: ${oldWaves}, new: ${newB}")
+           Some(acc -> s"negative waves balance: $acc, old: $oldWaves, new: $newB")
          } else if (newB < lease.out && currentHeight > fs.allowLeasedBalanceTransferUntilHeight) {
            Some(acc -> (if (newB + lease.in - lease.out < 0) {
                           s"negative effective balance: $acc, old: ${(oldWaves, oldLease)}, new: ${(newB, lease)}"
@@ -44,7 +45,7 @@ object BalanceDiffValidation extends ScorexLogging with Instrumented {
        }) orElse (portfolioDiff.assets find {
         case (a, c) =>
           // Tokens it can produce overflow are exist.
-          val oldB = b.balance(acc, Some(a))
+          val oldB = b.balance(acc, a)
           val newB = oldB + c
           newB < 0
       } map { _ =>
@@ -61,5 +62,8 @@ object BalanceDiffValidation extends ScorexLogging with Instrumented {
     }
   }
 
-  private def negativeAssetsInfo(p: Portfolio): Map[ByteStr, Long] = p.assets.filter(_._2 < 0)
+  private def negativeAssetsInfo(p: Portfolio): Map[ByteStr, Long] =
+    p.assets.collect {
+      case (asset, balance) if balance < 0 => (asset.id, balance)
+    }
 }

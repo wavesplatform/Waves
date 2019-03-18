@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 
 object PBBlocks {
-  def vanilla(block: PBBlock): Either[ValidationError, VanillaBlock] = {
+  def vanilla(block: PBBlock, unsafe: Boolean = false): Either[ValidationError, VanillaBlock] = {
     def create(version: Int,
                timestamp: Long,
                reference: ByteStr,
@@ -25,8 +25,8 @@ object PBBlocks {
       signedHeader <- block.header.toRight(GenericError("No block header"))
       header       <- signedHeader.header.toRight(GenericError("No block header"))
       transactions <- {
-        val eithers = block.transactions.map(PBTransactions.vanilla(_))
-        (eithers.find(_.isLeft): @unchecked) match {
+        val eithers = block.transactions.map(PBTransactions.vanilla(_, unsafe))
+        (eithers.find(_.isLeft): @unchecked) match { // TODO: Use cats .traverse
           case None              => Right(eithers.map(_.right.get))
           case Some(Left(error)) => Left(error)
         }
@@ -50,7 +50,7 @@ object PBBlocks {
     import signerData._
 
     new PBBlock(
-      ByteString.EMPTY,
+      0: Byte,
       Some(
         PBBlock.SignedHeader(
           Some(PBBlock.Header(
@@ -65,6 +65,13 @@ object PBBlocks {
           ByteString.copyFrom(signature)
         )),
       transactionData.map(PBTransactions.protobuf)
+    )
+  }
+
+  def clearChainId(block: PBBlock): PBBlock = {
+    block.update(
+      _.chainId := 0,
+      _.transactions.foreach(_.transaction.chainId := 0)
     )
   }
 

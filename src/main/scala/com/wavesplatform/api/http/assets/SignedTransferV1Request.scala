@@ -1,13 +1,13 @@
 package com.wavesplatform.api.http.assets
 
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.functional.syntax._
-import play.api.libs.json._
 import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
+import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{AssetIdStringLength, ValidationError}
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
 object SignedTransferV1Request {
   implicit val reads: Reads[SignedTransferV1Request] = (
@@ -48,8 +48,8 @@ case class SignedTransferV1Request(@ApiModelProperty(value = "Base58 encoded sen
   def toTx: Either[ValidationError, TransferTransactionV1] =
     for {
       _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _assetId    <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
-      _feeAssetId <- parseBase58ToOption(feeAssetId.filter(_.length > 0), "invalid.feeAssetId", AssetIdStringLength)
+      _assetId    <- parseBase58ToAssetId(assetId, "invalid.assetId") //parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", transaction.AssetIdStringLength).map(AssetId.fromCompatId)
+      _feeAssetId <- parseBase58ToAssetId(feeAssetId, "invalid.feeAssetId") //parseBase58ToOption(feeAssetId.filter(_.length > 0), "invalid.feeAssetId", transaction.AssetIdStringLength).map(AssetId.fromCompatId)
       _signature  <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
       _account    <- AddressOrAlias.fromString(recipient)

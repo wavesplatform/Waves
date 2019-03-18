@@ -4,9 +4,10 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.dexgen.utils.Implicits._
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransactionV1}
-import com.wavesplatform.transaction.{Proofs, Transaction}
 import scorex.crypto.signatures.Curve25519.KeyLength
 
 object Gen {
@@ -28,7 +29,7 @@ object Gen {
       .zipWithIndex
       .map {
         case (((src, dst), fee), i) =>
-          TransferTransactionV1.selfSigned(None, src, dst, fee, now + i, None, fee, Array.emptyByteArray)
+          TransferTransactionV1.selfSigned(Waves, src, dst, fee, now + i, Waves, fee, Array.emptyByteArray)
       }
       .collect { case Right(x) => x }
   }
@@ -41,7 +42,7 @@ object Gen {
         case (sender, count) =>
           val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), amountGen.next()))
           val fee       = 100000 + count * 50000
-          MassTransferTransaction.selfSigned(None, sender, transfers, System.currentTimeMillis, fee, Array.emptyByteArray)
+          MassTransferTransaction.selfSigned(Waves, sender, transfers, System.currentTimeMillis, fee, Array.emptyByteArray)
       }
       .collect { case Right(tx) => tx }
   }

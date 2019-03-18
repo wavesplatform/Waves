@@ -2,26 +2,26 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.validation._
-import com.wavesplatform.transaction.{AssetId, ProvenTransaction, ValidationError, _}
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, _}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
-  def assetId: ByteStr
+  def asset: IssuedAsset
   def quantity: Long
   def reissuable: Boolean
   def fee: Long
   def chainByte: Option[Byte]
 
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val assetFee: (Asset, Long) = (Waves, fee)
 
   override final val json: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
       "version"    -> version,
       "chainId"    -> chainByte,
-      "assetId"    -> assetId.base58,
+      "assetId"    -> asset.id.base58,
       "quantity"   -> quantity,
       "reissuable" -> reissuable
     ))
@@ -29,14 +29,14 @@ trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
   protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
       sender.publicKey,
-      assetId.arr,
+      asset.id.arr,
       Longs.toByteArray(quantity),
       if (reissuable) Array(1: Byte) else Array(0: Byte),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     )
   }
-  override def checkedAssets(): Seq[AssetId] = Seq(assetId)
+  override def checkedAssets(): Seq[Asset] = Seq(asset)
 }
 
 object ReissueTransaction {

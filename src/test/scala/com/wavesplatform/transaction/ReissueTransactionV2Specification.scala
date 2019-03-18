@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV2}
 import org.scalacheck.Gen
 import play.api.libs.json._
@@ -22,7 +23,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
     first.version shouldEqual second.version
     first.quantity shouldEqual second.quantity
     first.reissuable shouldEqual second.reissuable
-    first.assetId shouldEqual second.assetId
+    first.asset shouldEqual second.asset
     first.proofs shouldEqual second.proofs
     first.bytes() shouldEqual second.bytes()
   }
@@ -35,7 +36,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
     } yield {
       val issue = IssueTransactionV1.selfSigned(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).explicitGet()
       val reissue1 = ReissueTransactionV2
-        .selfSigned(AddressScheme.current.chainId, sender, issue.assetId(), quantity, reissuable = reissuable, fee, timestamp)
+        .selfSigned(AddressScheme.current.chainId, sender, IssuedAsset(issue.assetId()), quantity, reissuable = reissuable, fee, timestamp)
         .explicitGet()
       (Seq(issue), reissue1)
     }
@@ -48,6 +49,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
                        "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                        "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                        "fee": 100000000,
+                       "feeAssetId": null,
                        "timestamp": 1526287561757,
                        "proofs": [
                        "4DFEtUwJ9gjMQMuEXipv2qK7rnhhWEBqzpC3ZQesW1Kh8D822t62e3cRGWNU3N21r7huWnaty95wj2tZxYSvCfro"
@@ -63,7 +65,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
          .create(
            'T',
            PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-           ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+           IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
            100000000L,
            true,
            100000000L,

@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Implicits._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.{Script, ScriptCompiler}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -120,7 +121,7 @@ object Gen {
       .zipWithIndex
       .map {
         case (((src, dst), fee), i) =>
-          TransferTransactionV1.selfSigned(None, src, dst, fee, now + i, None, fee, Array.emptyByteArray)
+          TransferTransactionV1.selfSigned(Waves, src, dst, fee, now + i, Waves, fee, Array.emptyByteArray)
       }
       .collect { case Right(x) => x }
   }
@@ -135,7 +136,7 @@ object Gen {
         case ((sender, count), i) =>
           val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), amountGen.next()))
           val fee       = 100000 + count * 50000
-          MassTransferTransaction.selfSigned(None, sender, transfers, now + i, fee, Array.emptyByteArray)
+          MassTransferTransaction.selfSigned(Waves, sender, transfers, now + i, fee, Array.emptyByteArray)
       }
       .collect { case Right(tx) => tx }
   }
