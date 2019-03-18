@@ -23,13 +23,12 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError.SenderIsBlacklisted
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.utils.Implicits.SubjectOps
 import com.wavesplatform.utils.Time
 import monix.reactive.subjects.Subject
@@ -370,8 +369,8 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
               version = 3,
               timestamp = ntpNow
             )
-            val scripted = (1 to 100).flatMap(_ => QuickTX.transferV2(richAccount, randomAccount.toAddress).sample)
-            val unscripted = (1 to 100).flatMap(_ => QuickTX.transfer(randomAccount).sample)
+            val scripted = (1 to 100).flatMap(_ => QuickTX.transferV2(richAccount, randomAccount.toAddress, timestamp = ntpTimestampGen).sample)
+            val unscripted = (1 to 100).flatMap(_ => QuickTX.transfer(randomAccount, timestamp = ntpTimestampGen).sample)
             (richAccount, genesisBlock, scripted, unscripted)
           }
 
