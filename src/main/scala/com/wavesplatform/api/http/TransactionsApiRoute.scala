@@ -282,11 +282,25 @@ case class TransactionsApiRoute(settings: RestAPISettings,
 
   def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String]): Either[ApiError, Future[JsArray]] = {
     def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
+      lazy val addressesCached = (concurrent.blocking(blockchain.aliasesOfAddress(address) :+ address)).toSet
+
+      /**
+        * Produces compact representation for large transactions by stripping unnecessary data.
+        * Currently implemented for MassTransfer transaction only.
+        */
+      def txToCompactJson(address: Address, tx: Transaction): JsObject = {
+        import com.wavesplatform.transaction.transfer._
+        tx match {
+          case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
+          case _                                                               => txToExtendedJson(tx)
+        }
+      }
+
       commonApi
         .transactionsByAddress(address, fromId)
         .take(limit)
         .toListL
-        .map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToExtendedJson(tx) + ("height" -> JsNumber(height)) })))
+        .map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) })))
         .runAsync
     }
 
