@@ -119,8 +119,8 @@ object JsAPI {
     "MaxExprSizeInBytes"               -> ContractLimits.MaxExprSizeInBytes,
     "MaxContractComplexity"            -> ContractLimits.MaxContractComplexity,
     "MaxContractSizeInBytes"           -> ContractLimits.MaxContractSizeInBytes,
-    "MaxContractInvocationArgs"        -> ContractLimits.MaxContractInvocationArgs,
-    "MaxContractInvocationSizeInBytes" -> ContractLimits.MaxContractInvocationSizeInBytes,
+    "MaxContractInvocationArgs"        -> ContractLimits.MaxInvokeScriptArgs,
+    "MaxContractInvocationSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
     "MaxWriteSetSizeInBytes"           -> ContractLimits.MaxWriteSetSizeInBytes,
     "MaxPaymentAmount"                 -> ContractLimits.MaxPaymentAmount
   )
