@@ -10,7 +10,7 @@ import scala.util.Success
 sealed trait Asset
 object Asset {
   final case class IssuedAsset(id: ByteStr) extends Asset
-  case object Waves extends Asset
+  case object Waves                         extends Asset
 
   implicit val assetReads: Reads[IssuedAsset] = Reads {
     case JsString(str) if str.length > AssetIdStringLength => JsError("invalid.feeAssetId")
