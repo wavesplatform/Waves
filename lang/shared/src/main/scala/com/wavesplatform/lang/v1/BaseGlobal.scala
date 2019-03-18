@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v1
 
+import com.wavesplatform.lang.ContentType
+import com.wavesplatform.lang.StdLibVersion.StdLibVersion
 import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
@@ -32,30 +34,34 @@ trait BaseGlobal {
 
   def checksum(arr: Array[Byte]): Array[Byte] = secureHash(arr).take(4)
 
-  def compileExpression(input: String, context: CompilerContext, restrictToLetBlockOnly: Boolean): Either[String, (Array[Byte], Terms.EXPR)] = {
+  def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion): Array[Byte] = {
+    val s = Array(stdLibVersion.toByte) ++ Serde.serialize(expr)
+    s ++ checksum(s)
+  }
 
-    def serialize(expr: EXPR): Either[String, Array[Byte]] = {
-      val s = 1.toByte +: Serde.serialize(expr)
-      Right(s ++ checksum(s))
-    }
+  def serializeContract(c: Contract, stdLibVersion: StdLibVersion): Array[Byte] = {
+    val s = Array(0: Byte, ContentType.Contract.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(c)
+    s ++ checksum(s)
+  }
 
+  def compileExpression(input: String,
+                        context: CompilerContext,
+                        restrictToLetBlockOnly: Boolean,
+                        stdLibVersion: StdLibVersion): Either[String, (Array[Byte], Terms.EXPR)] = {
     for {
       ex <- ExpressionCompiler.compile(input, context)
       illegalBlockVersionUsage = restrictToLetBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(ex)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
-      x <- serialize(ex)
+      x = serializeExpression(ex, stdLibVersion)
     } yield (x, ex)
   }
 
-  def compileContract(input: String, ctx: CompilerContext): Either[String, (Array[Byte], Contract)] = {
-
-    def serialize(expr: Contract): Either[String, Array[Byte]] = {
-      val s = 3.toByte +: ContractSerDe.serialize(expr)
-      Right(s ++ checksum(s))
-    }
-
+  def compileContract(input: String, ctx: CompilerContext, stdLibVersion: StdLibVersion): Either[String, (Array[Byte], Contract)] = {
     ContractCompiler
       .compile(input, ctx)
-      .flatMap(ast => serialize(ast).map(x => (x, ast)))
+      .map { ast =>
+        val ser = serializeContract(ast, stdLibVersion)
+        (ser, ast)
+      }
   }
 }

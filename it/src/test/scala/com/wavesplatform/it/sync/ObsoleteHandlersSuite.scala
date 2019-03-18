@@ -66,22 +66,22 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
   }
 
   test("leasing lease and cancel") {
-    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-    val (balance2, eff2) = notMiner.accountBalances(secondAddress)
+    val (balance1, eff1) = miner.accountBalances(firstAddress)
+    val (balance2, eff2) = miner.accountBalances(secondAddress)
 
     val leaseJson = sender.postJson("/leasing/lease", LeaseV1Request(firstAddress, leasingAmount, minFee, secondAddress))
     val leaseId   = Json.parse(leaseJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(leaseId)
 
-    notMiner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
-    notMiner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
+    miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
+    miner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
 
     val leaseCancelJson = sender.postJson("/leasing/cancel", LeaseCancelV1Request(firstAddress, leaseId, minFee))
     val leaseCancel     = Json.parse(leaseCancelJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(leaseCancel)
 
-    notMiner.assertBalances(firstAddress, balance1 - 2 * minFee, eff1 - 2 * minFee)
-    notMiner.assertBalances(secondAddress, balance2, eff2)
+    miner.assertBalances(firstAddress, balance1 - 2 * minFee, eff1 - 2 * minFee)
+    miner.assertBalances(secondAddress, balance2, eff2)
   }
 
   test("addresses data") {

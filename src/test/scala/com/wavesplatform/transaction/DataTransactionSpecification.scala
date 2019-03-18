@@ -147,6 +147,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
                        "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                        "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                        "fee": 100000,
+                       "feeAssetId": null,
                        "timestamp": 1526911531530,
                        "proofs": [
                        "32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94"

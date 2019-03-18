@@ -25,15 +25,15 @@ import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.{Script, ScriptRunner}
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, WavesEnvironment}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.{Asset, ValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
 import scala.util.{Failure, Success, Try}
 
-object ContractInvocationTransactionDiff {
-  def apply(blockchain: Blockchain, height: Int)(tx: ContractInvocationTransaction): Either[ValidationError, Diff] = {
+object InvokeScriptTransactionDiff {
+  def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): Either[ValidationError, Diff] = {
     val sc = blockchain.accountScript(tx.contractAddress)
 
     def evalContract(contract: Contract) = {
@@ -50,7 +50,7 @@ object ContractInvocationTransactionDiff {
         .evaluationContext
 
       val invoker                                       = tx.sender.toAddress.bytes
-      val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.map(p => (p.amount, p.assetId.compatId))
+      val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
       ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
     }
 
@@ -110,7 +110,7 @@ object ContractInvocationTransactionDiff {
                           .collect { case asset @ IssuedAsset(_) => asset }
                           .count(blockchain.hasAssetScript) +
                           ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id))))
-                      val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(ContractInvocationTransaction.typeId) * FeeUnit
+                      val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
                       Either.cond(
                         minWaves <= wavesFee,
                         (),
@@ -135,41 +135,48 @@ object ContractInvocationTransactionDiff {
 
   }
 
-  private def payableAndDataPart(height: Int, tx: ContractInvocationTransaction, ds: List[DataItem[_]], feePart: Map[Address, Portfolio]) = {
+  private def payableAndDataPart(height: Int, tx: InvokeScriptTransaction, ds: List[DataItem[_]], feePart: Map[Address, Portfolio]) = {
     val r: Seq[DataEntry[_]] = ds.map {
       case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
       case DataItem.Str(k, b)  => StringDataEntry(k, b)
       case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
       case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
     }
-    val totalDataBytes = r.map(_.toBytes.size).sum
+    if (r.length > ContractLimits.MaxWriteSetSize) {
+      Left(GenericError(s"WriteSec can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
+    } else if (r.exists(_.key.getBytes().length > ContractLimits.MaxKeySizeInBytes)) {
+      Left(GenericError(s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"))
+    } else {
+      val totalDataBytes = r.map(_.toBytes.size).sum
 
-    val payablePart: Map[Address, Portfolio] = tx.payment match {
-      case None => Map.empty
-      case Some(ContractInvocationTransaction.Payment(amt, assetId)) =>
-        assetId match {
-          case asset @ IssuedAsset(_) =>
-            Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
-              Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
-            )
-          case Waves =>
-            Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
-              .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
-        }
+      val payablePart: Map[Address, Portfolio] = (tx.payment
+        .map {
+          case InvokeScriptTransaction.Payment(amt, assetId) =>
+            assetId match {
+              case asset @ IssuedAsset(_) =>
+                Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
+                  Map(tx.contractAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                )
+              case Waves =>
+                Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
+                  .combine(Map(tx.contractAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
+            }
+        })
+        .foldLeft(Map[Address, Portfolio]())(_ combine _)
+      if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes)
+        Right(
+          Diff(
+            height = height,
+            tx = tx,
+            portfolios = feePart combine payablePart,
+            accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
+          ))
+      else Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))
     }
-    if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes)
-      Right(
-        Diff(
-          height = height,
-          tx = tx,
-          portfolios = feePart combine payablePart,
-          accountData = Map(tx.contractAddress -> AccountDataInfo(r.map(d => d.key -> d).toMap))
-        ))
-    else Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))
   }
 
-  private def foldContractTransfers(blockchain: Blockchain, tx: ContractInvocationTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
-                                                                                               dataDiff: Diff): Either[ValidationError, Diff] = {
+  private def foldContractTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
+                                                                                         dataDiff: Diff): Either[ValidationError, Diff] = {
     if (ps.length <= ContractLimits.MaxPaymentAmount)
       ps.foldLeft(Either.right[ValidationError, Diff](dataDiff)) { (diffEi, payment) =>
         val (addressRepr, amount, asset) = payment
@@ -201,7 +208,7 @@ object ContractInvocationTransactionDiff {
       Left(GenericError(s"Too many ContractTransfers: max: ${ContractLimits.MaxPaymentAmount}, actual: ${ps.length}"))
   }
 
-  private def validateContractTransferWithSmartAssetScript(blockchain: Blockchain, tx: ContractInvocationTransaction)(
+  private def validateContractTransferWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
       totalDiff: Diff,
       addressRepr: Recipient.Address,
       amount: Long,

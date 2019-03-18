@@ -23,7 +23,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{Paged, ScorexLogging}
 import monix.reactive.Observer
@@ -402,7 +402,7 @@ class LevelDBWriter(writableDB: DB,
     }
 
     rw.put(Keys.carryFee(height), carry)
-    expiredKeys ++= updateHistory(rw, Keys.carryFeeHistory, threshold, Keys.carryFee)
+    expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
     expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
@@ -512,7 +512,7 @@ class LevelDBWriter(writableDB: DB,
                   rw.delete(Keys.assetScript(asset)(currentHeight))
                   rw.filterHistory(Keys.assetScriptHistory(asset), currentHeight)
 
-                case _: DataTransaction | _: ContractInvocationTransaction => // see changed data keys removal
+                case _: DataTransaction | _: InvokeScriptTransaction => // see changed data keys removal
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
@@ -529,7 +529,6 @@ class LevelDBWriter(writableDB: DB,
           rw.delete(Keys.blockHeaderAndSizeAt(h))
           rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
-          rw.filterHistory(Keys.carryFeeHistory, currentHeight)
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
             DisableHijackedAliases.revert(rw)

@@ -32,6 +32,7 @@ class IssueTransactionV1Specification extends PropSpec with PropertyChecks with 
                        "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                        "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                        "fee": 100000000,
+                       "feeAssetId": null,
                        "timestamp": 1526287561757,
                        "version": 1,
                        "signature": "28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ",

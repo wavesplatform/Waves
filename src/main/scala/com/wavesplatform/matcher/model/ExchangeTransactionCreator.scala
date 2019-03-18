@@ -67,7 +67,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
 
   private def toV1(order: Order): Either[ValidationError, OrderV1] = order match {
     case x: OrderV1 => Right(x)
-    case _          => Left(ValidationError.ActivationError("SmartAccountTrading has not been activated yet"))
+    case _          => Left(ValidationError.ActivationError("Smart Account Trading feature has not been activated yet"))
   }
 }
 

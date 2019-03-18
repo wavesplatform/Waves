@@ -11,13 +11,13 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.{JsNumber, Json}
 
-class ContractInvocationTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
+class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   private val contract = pkByAddress(firstAddress)
   private val caller   = pkByAddress(secondAddress)
@@ -109,19 +109,20 @@ class ContractInvocationTransactionSuite extends BaseTransactionSuite with Cance
     val fc: FUNCTION_CALL = FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_BYTESTR(arg)))
 
     val tx =
-      ContractInvocationTransaction
+      InvokeScriptTransaction
         .selfSigned(
           sender = caller,
           contractAddress = contract,
           fc = fc,
-          p = None,
+          p = Seq(),
           timestamp = System.currentTimeMillis(),
-          fee = 1.waves
+          fee = 1.waves,
+          feeAssetId = Waves
         )
         .explicitGet()
 
     val contractInvocationId = sender
-      .signedBroadcast(tx.json() + ("type" -> JsNumber(ContractInvocationTransaction.typeId.toInt)))
+      .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
       .id
 
     nodes.waitForHeightAriseAndTxPresent(contractInvocationId)

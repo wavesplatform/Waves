@@ -45,7 +45,7 @@ class WavesEnvironment(nByte: Byte,
             .toOption
         case Alias(name) =>
           com.wavesplatform.account.Alias
-            .buildWithCurrentChainId(name)
+            .create(name)
             .flatMap(blockchain.resolveAlias)
             .toOption
       }
@@ -63,7 +63,7 @@ class WavesEnvironment(nByte: Byte,
   }
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
     blockchain
-      .resolveAlias(com.wavesplatform.account.Alias.buildWithCurrentChainId(name).explicitGet())
+      .resolveAlias(com.wavesplatform.account.Alias.create(name).explicitGet())
       .left
       .map(_.toString)
       .right
@@ -75,7 +75,7 @@ class WavesEnvironment(nByte: Byte,
     (for {
       aoa <- addressOrAlias match {
         case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr, position = 0).map(_._1)
-        case Alias(name)    => com.wavesplatform.account.Alias.buildWithCurrentChainId(name)
+        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
       }
       address <- blockchain.resolveAlias(aoa)
       balance = blockchain.balance(address, Asset.fromCompatId(maybeAssetId.map(ByteStr(_))))
