@@ -14,7 +14,7 @@ import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio, TransactionId}
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
@@ -237,7 +237,7 @@ class UtxPoolImpl(time: Time,
         new MapMaker()
           .concurrencyLevel(Runtime.getRuntime.availableProcessors())
           .weakKeys()
-          .makeMap[TransactionId, Boolean]()
+          .makeMap[Address, Boolean]()
           .asScala
       }
 
@@ -265,29 +265,29 @@ class UtxPoolImpl(time: Time,
     }
 
 
-    def isExpired(transaction: Transaction, currentTime: Long = time.correctedTime()) = {
+    def isExpired(transaction: Transaction, currentTime: Long = time.correctedTime()): Boolean = {
       (currentTime - transaction.timestamp) > ExpirationTime
     }
 
     def isValid(transaction: Transaction,
                 lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
                 currentTime: Long = time.correctedTime(),
-                height: Int = blockchain.height) = {
+                height: Int = blockchain.height): Boolean = {
       !isExpired(transaction) && TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).isRight
     }
 
-    def isScripted(transaction: Transaction) = {
-      Caches.scriptedCache.getOrElseUpdate(TransactionId @@ transaction.id(), transaction match {
-        case a: AuthorizedTransaction if blockchain.hasScript(a.sender.toAddress) => true
-        case _                                                                    => false
-      })
+    def isScripted(transaction: Transaction): Boolean = {
+      transaction match {
+        case a: AuthorizedTransaction => Caches.scriptedCache.getOrElseUpdate(a.sender.toAddress, blockchain.hasScript(a.sender.toAddress))
+        case _                        => false
+      }
     }
 
-    def canCreateAlias(alias: Alias) = {
+    def canCreateAlias(alias: Alias): Boolean = {
       Caches.createAliasCache.getOrElseUpdate(alias.name, blockchain.canCreateAlias(alias))
     }
 
-    def canReissue(asset: IssuedAsset) = {
+    def canReissue(asset: IssuedAsset): Boolean = {
       Caches.reissueCache.getOrElseUpdate(asset.id, blockchain.assetDescription(asset).forall(_.reissuable))
     }
 
