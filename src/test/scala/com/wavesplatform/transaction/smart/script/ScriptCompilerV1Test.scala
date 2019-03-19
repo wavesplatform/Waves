@@ -65,6 +65,19 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
     ScriptCompiler.compile(script) should produce("Inconsistent set of directives")
   }
 
+  property("default V3 (+account+expression) contains `tx`") {
+    ScriptCompiler
+      .compile(
+        s"""
+           |
+           |{-# STDLIB_VERSION 3 #-}
+           |match tx {
+           |  case tx:TransferTransaction => true
+           |  case _ => false
+           |}""".stripMargin,
+      ) shouldBe 'right
+  }
+
   private val expectedExpr = LET_BLOCK(
     LET("x", CONST_LONG(10)),
     FUNCTION_CALL(

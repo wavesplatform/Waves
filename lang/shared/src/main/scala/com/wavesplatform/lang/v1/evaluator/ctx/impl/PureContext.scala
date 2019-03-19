@@ -407,7 +407,6 @@ object PureContext {
         } catch {
           case e: Throwable => Left(e.getMessage)
         }
-      case _ => ???
     }
 
   lazy val getElement: BaseFunction =

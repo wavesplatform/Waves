@@ -27,21 +27,21 @@ object CommonValidation {
   val FeeUnit        = 100000
 
   val FeeConstants: Map[Byte, Long] = Map(
-    GenesisTransaction.typeId                  -> 0,
-    PaymentTransaction.typeId                  -> 1,
-    IssueTransaction.typeId                    -> 1000,
-    ReissueTransaction.typeId                  -> 1000,
-    BurnTransaction.typeId                     -> 1,
-    TransferTransaction.typeId                 -> 1,
-    MassTransferTransaction.typeId             -> 1,
-    LeaseTransaction.typeId                    -> 1,
-    LeaseCancelTransaction.typeId              -> 1,
-    ExchangeTransaction.typeId                 -> 3,
-    CreateAliasTransaction.typeId              -> 1,
-    DataTransaction.typeId                     -> 1,
-    SetScriptTransaction.typeId                -> 10,
-    SponsorFeeTransaction.typeId               -> 1000,
-    SetAssetScriptTransaction.typeId           -> (1000 - 4),
+    GenesisTransaction.typeId            -> 0,
+    PaymentTransaction.typeId            -> 1,
+    IssueTransaction.typeId              -> 1000,
+    ReissueTransaction.typeId            -> 1000,
+    BurnTransaction.typeId               -> 1,
+    TransferTransaction.typeId           -> 1,
+    MassTransferTransaction.typeId       -> 1,
+    LeaseTransaction.typeId              -> 1,
+    LeaseCancelTransaction.typeId        -> 1,
+    ExchangeTransaction.typeId           -> 3,
+    CreateAliasTransaction.typeId        -> 1,
+    DataTransaction.typeId               -> 1,
+    SetScriptTransaction.typeId          -> 10,
+    SponsorFeeTransaction.typeId         -> 1000,
+    SetAssetScriptTransaction.typeId     -> (1000 - 4),
     smart.InvokeScriptTransaction.typeId -> 5
   )
 
@@ -180,14 +180,14 @@ object CommonValidation {
           case Some(sc) => scriptActivation(sc)
         }
 
-      case _: ReissueTransactionV2          => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: BurnTransactionV2             => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: LeaseTransactionV2            => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: LeaseCancelTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: CreateAliasTransactionV2      => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SponsorFeeTransaction         => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _: InvokeScriptTransaction       => activationBarrier(BlockchainFeatures.Ride4DApps)
-      case _                                => Left(GenericError("Unknown transaction must be explicitly activated"))
+      case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: LeaseCancelTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: CreateAliasTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _: InvokeScriptTransaction  => activationBarrier(BlockchainFeatures.Ride4DApps)
+      case _                           => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
 

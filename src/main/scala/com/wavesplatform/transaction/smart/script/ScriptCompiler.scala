@@ -31,10 +31,10 @@ object ScriptCompiler extends ScorexLogging {
     } yield result
   }
 
-  private def tryCompile(src: String, tpe: ContentType, version: StdLibVersion, isAssetScript: Boolean): Either[String, Script] = {
-    val ctx = compilerContext(version, isAssetScript)
+  private def tryCompile(src: String, cType: ContentType, version: StdLibVersion, isAssetScript: Boolean): Either[String, Script] = {
+    val ctx = compilerContext(version, cType, isAssetScript)
     try {
-      tpe match {
+      cType match {
         case ContentType.Expression => ExpressionCompiler.compile(src, ctx).flatMap(expr => ExprScript.apply(version, expr))
         case ContentType.Contract   => ContractCompiler.compile(src, ctx).flatMap(expr => ContractScript.apply(version, expr))
       }
@@ -48,7 +48,7 @@ object ScriptCompiler extends ScorexLogging {
   }
 
   def estimate(script: Script, version: StdLibVersion): Either[String, Long] = script match {
-    case s: ExprScript         => ScriptEstimator(varNames(version), functionCosts(version), s.expr)
+    case s: ExprScript         => ScriptEstimator(varNames(version, ContentType.Expression), functionCosts(version), s.expr)
     case s: ContractScriptImpl => ContractScript.estimateComplexity(version, s.expr).map(_._2)
     case _                     => ???
   }
