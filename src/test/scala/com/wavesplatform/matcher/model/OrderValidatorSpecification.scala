@@ -361,18 +361,18 @@ class OrderValidatorSpecification
         val fixedWavesFeeSettings = FixedWavesSettings(300000L)
 
         // seller cannot sell with price which:
-        //   1. less than 50% of best bid (sell order price must be >= 2500)
-        //   2. higher than 170% of best ask (sell order price must be <= 6800)
+        //   1. less than 50% of best bid (sell order price must be >= 2000)
+        //   2. higher than 170% of best ask (sell order price must be <= 8500)
 
         val deviationSettings = DeviationsSettings(true, maxPriceProfit = 70, maxPriceLoss = 50, 50)
-        val bestBid           = LevelAgg(1000L, 5000L)
-        val bestAsk           = LevelAgg(1000L, 4000L)
+        val bestBid           = LevelAgg(1000L, 4000L)
+        val bestAsk           = LevelAgg(1000L, 5000L)
 
-        val tooLowPrice      = 2499L // = 50% of best bid (5000) - 1, hence invalid
-        val lowButValidPrice = 2500L // = 50% of best bid (5000)
+        val tooLowPrice      = 1999L // = 50% of best bid (4000) - 1, hence invalid
+        val lowButValidPrice = 2000L // = 50% of best bid (4000)
 
-        val tooHighPrice      = 6801L // = 170% of best ask (4000) + 1, hence invalid
-        val highButValidPrice = 6800L // = 170% of best ask (4000)
+        val tooHighPrice      = 8501L // = 170% of best ask (5000) + 1, hence invalid
+        val highButValidPrice = 8500L // = 170% of best ask (5000)
 
         val assetPair2MarketStatus = new ConcurrentHashMap[AssetPair, MarketStatus]
         assetPair2MarketStatus.put(pairWavesBtc, MarketStatus(None, Some(bestBid), Some(bestAsk)))
