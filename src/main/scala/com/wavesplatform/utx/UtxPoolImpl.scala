@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats._
 import com.google.common.collect.MapMaker
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.metrics.Instrumented
@@ -15,6 +15,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain.composite
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio, TransactionId}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
@@ -70,13 +71,13 @@ class UtxPoolImpl(time: Time,
 
   override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     def canReissue(blockchain: Blockchain, tx: Transaction) = tx match {
-      case r: ReissueTransaction if blockchain.assetDescription(r.asset).exists(!_.reissuable) => Left(GenericError(s"Asset is not reissuable"))
-      case _                                                                                   => Right(())
+      case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
+      case _                                                     => Right(())
     }
 
     def checkAlias(blockchain: Blockchain, tx: Transaction) = tx match {
-      case cat: CreateAliasTransaction if !blockchain.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
-      case _                                                                    => Right(())
+      case cat: CreateAliasTransaction if !TxCheck.canCreateAlias(cat.alias) => Left(GenericError("Alias already claimed"))
+      case _                                                                 => Right(())
     }
 
     def checkScripted(blockchain: Blockchain, tx: Transaction, skipSizeCheck: Boolean) = tx match {
@@ -230,13 +231,39 @@ class UtxPoolImpl(time: Time,
   //noinspection ScalaStyle
   private[this] object TxCheck {
     private[this] val ExpirationTime = fs.maxTransactionTimeBackOffset.toMillis
-    private[this] val scriptedCache = {
-      new MapMaker()
-        .concurrencyLevel(Runtime.getRuntime.availableProcessors())
-        .weakKeys()
-        .makeMap[TransactionId, Boolean]()
-        .asScala
+
+    private[this] object Caches {
+      val scriptedCache = {
+        new MapMaker()
+          .concurrencyLevel(Runtime.getRuntime.availableProcessors())
+          .weakKeys()
+          .makeMap[TransactionId, Boolean]()
+          .asScala
+      }
+
+      val createAliasCache = {
+        new MapMaker()
+          .concurrencyLevel(Runtime.getRuntime.availableProcessors())
+          .weakKeys()
+          .makeMap[String, Boolean]()
+          .asScala
+      }
+
+      val reissueCache = {
+        new MapMaker()
+          .concurrencyLevel(Runtime.getRuntime.availableProcessors())
+          .weakKeys()
+          .makeMap[ByteStr, Boolean]()
+          .asScala
+      }
+
+      def clear(): Unit = {
+        scriptedCache.clear()
+        createAliasCache.clear()
+        reissueCache.clear()
+      }
     }
+
 
     def isExpired(transaction: Transaction, currentTime: Long = time.correctedTime()) = {
       (currentTime - transaction.timestamp) > ExpirationTime
@@ -250,14 +277,22 @@ class UtxPoolImpl(time: Time,
     }
 
     def isScripted(transaction: Transaction) = {
-      scriptedCache.getOrElseUpdate(TransactionId @@ transaction.id(), transaction match {
+      Caches.scriptedCache.getOrElseUpdate(TransactionId @@ transaction.id(), transaction match {
         case a: AuthorizedTransaction if blockchain.hasScript(a.sender.toAddress) => true
         case _                                                                    => false
       })
     }
 
+    def canCreateAlias(alias: Alias) = {
+      Caches.createAliasCache.getOrElseUpdate(alias.name, blockchain.canCreateAlias(alias))
+    }
+
+    def canReissue(asset: IssuedAsset) = {
+      Caches.reissueCache.getOrElseUpdate(asset.id, blockchain.assetDescription(asset).forall(_.reissuable))
+    }
+
     def clearCaches(): Unit = {
-      scriptedCache.clear()
+      Caches.clear()
     }
   }
 
