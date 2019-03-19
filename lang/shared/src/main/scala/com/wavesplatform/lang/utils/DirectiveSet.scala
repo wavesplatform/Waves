@@ -23,7 +23,7 @@ object DirectiveSet {
   ): Either[ExecutionError, DirectiveSet] =
     (stdLibVersion, scriptType, contentType) match {
       case (V3, Account, Contract)      => Right(contractDirectiveSet)
-      case (version, sType, Expression) => Right(new DirectiveSet(version, sType, ContentType.Expression))
+      case (version, sType, Expression) => Right(new DirectiveSet(version, sType, Expression))
       case wrongSet                     =>  Left(errorMsg(wrongSet))
     }
 
