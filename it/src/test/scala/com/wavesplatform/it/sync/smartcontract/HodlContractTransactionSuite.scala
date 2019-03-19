@@ -71,7 +71,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |	@Callable(i)
         |	func deposit() = {
         |   let pmt = extract(i.payment)
-        |   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
+        |   if (isDefined(pmt.assetId)) then throw("can hodl waves only at the moment")
         |   else {
         |	  	let currentKey = toBase58String(i.caller.bytes)
         |	  	let currentAmount = match getInteger(this, currentKey) {
