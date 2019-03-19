@@ -304,7 +304,7 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
 
           val gen = for {
             headTransaction <- transfer(sender, senderBalance / 2, time)
-            vipTransaction <- transfer(sender, senderBalance / 2, time).suchThat(tx => TransactionsOrdering.InUTXPool.compare(tx, headTransaction) < 0)
+            vipTransaction <- transfer(sender, senderBalance / 2, time).suchThat(TransactionsOrdering.InUTXPool.compare(_, headTransaction) < 0)
           } yield (headTransaction, vipTransaction)
 
           forAll(gen, Gen.choose(0, 1).label("allowSkipChecks")) { case ((headTransaction, vipTransaction), allowSkipChecks) =>

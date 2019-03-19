@@ -122,7 +122,8 @@ class UtxPoolImpl(time: Time,
     }
 
     def checkIsMostProfitable(newTx: Transaction): Boolean = {
-      transactions.values()
+      transactions
+        .values()
         .asScala
         .forall(poolTx => TransactionsOrdering.InUTXPool.compare(newTx, poolTx) < 0)
     }
