@@ -112,7 +112,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
         .flatMap(_ =>
           Either.cond(tx.fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                       (),
-                      GenericError("all arguments of contractInvocation must be EVALUATED")))
+                      GenericError("all arguments of invokeScript must be EVALUATED")))
         .map(_ => tx)
         .foldToTry
     }
@@ -131,7 +131,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
       _ <- Either.cond(
         fc.args.size <= ContractLimits.MaxInvokeScriptArgs,
         (),
-        ValidationError.GenericError(s"ContractInvocation can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
+        ValidationError.GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
       )
       _ <- Either.cond(
         fc.function match {
@@ -147,7 +147,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
 
       _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                        (),
-                       GenericError("all arguments of contractInvocation must be EVALUATED"))
+                       GenericError("all arguments of invokeScript must be EVALUATED"))
       tx   = new InvokeScriptTransaction(currentChainId, sender, contractAddress, fc, p, fee, feeAssetId, timestamp, proofs)
       size = tx.bytes().length
       _ <- Either.cond(size <= ContractLimits.MaxInvokeScriptSizeInBytes, (), ValidationError.TooBigArray)

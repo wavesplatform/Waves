@@ -394,7 +394,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       (sponsor, "sponsor"),
       (transferV1, "transferV1"),
       (transferV2, "transferV2"),
-      (invokeScript, "contractInvocation")
+      (invokeScript, "invokeScript")
     )) { (tx, name) =>
     test(s"Serialize check of $name transaction") {
       val r = sender.transactionSerializer(tx.json()).bytes.map(_.toByte)

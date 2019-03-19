@@ -142,11 +142,11 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    val contractInvocationId = sender
+    val invokeScriptId = sender
       .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
       .id
 
-    nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
+    nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
 
     sender.getData(contract.address, caller.address) shouldBe IntegerDataEntry(caller.address, 1.5.waves)
     val balanceAfter = sender.accountBalances(contract.address)._1
@@ -188,11 +188,11 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    val contractInvocationId = sender
+    val invokeScriptId = sender
       .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
       .id
 
-    nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
+    nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
 
     val balanceAfter = sender.accountBalances(contract.address)._1
 

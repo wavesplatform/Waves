@@ -121,11 +121,11 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    val contractInvocationId = sender
+    val invokeScriptId = sender
       .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
       .id
 
-    nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
+    nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
 
     sender.getData(contract.address, "a") shouldBe BinaryDataEntry("a", arg)
     sender.getData(contract.address, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)

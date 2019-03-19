@@ -115,14 +115,14 @@ object JsAPI {
 
   @JSExportTopLevel("contractLimits")
   def contractLimits(): js.Dynamic = js.Dynamic.literal(
-    "MaxExprComplexity"                -> ContractLimits.MaxExprComplexity,
-    "MaxExprSizeInBytes"               -> ContractLimits.MaxExprSizeInBytes,
-    "MaxContractComplexity"            -> ContractLimits.MaxContractComplexity,
-    "MaxContractSizeInBytes"           -> ContractLimits.MaxContractSizeInBytes,
-    "MaxContractInvocationArgs"        -> ContractLimits.MaxInvokeScriptArgs,
-    "MaxContractInvocationSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
-    "MaxWriteSetSizeInBytes"           -> ContractLimits.MaxWriteSetSizeInBytes,
-    "MaxPaymentAmount"                 -> ContractLimits.MaxPaymentAmount
+    "MaxExprComplexity"          -> ContractLimits.MaxExprComplexity,
+    "MaxExprSizeInBytes"         -> ContractLimits.MaxExprSizeInBytes,
+    "MaxContractComplexity"      -> ContractLimits.MaxContractComplexity,
+    "MaxContractSizeInBytes"     -> ContractLimits.MaxContractSizeInBytes,
+    "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
+    "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
+    "MaxWriteSetSizeInBytes"     -> ContractLimits.MaxWriteSetSizeInBytes,
+    "MaxPaymentAmount"           -> ContractLimits.MaxPaymentAmount
   )
 
   @JSExportTopLevel("scriptInfo")
