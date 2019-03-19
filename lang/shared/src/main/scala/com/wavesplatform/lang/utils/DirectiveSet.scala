@@ -1,11 +1,8 @@
 package com.wavesplatform.lang.utils
-import com.wavesplatform.lang.ContentType.ContentType
-import com.wavesplatform.lang.ContentType.{Contract, Expression}
-import com.wavesplatform.lang.ScriptType.ScriptType
-import com.wavesplatform.lang.ScriptType.Account
-import com.wavesplatform.lang.{ContentType, ExecutionError, ScriptType, StdLibVersion}
-import com.wavesplatform.lang.StdLibVersion.V3
-import com.wavesplatform.lang.StdLibVersion.StdLibVersion
+import com.wavesplatform.lang.ContentType.{ContentType, Contract, Expression}
+import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.ScriptType.{Account, ScriptType}
+import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, V3}
 
 case class DirectiveSet private (
   stdLibVersion: StdLibVersion,
@@ -14,7 +11,7 @@ case class DirectiveSet private (
 )
 
 object DirectiveSet {
-  val contractDirectiveSet = new DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract)
+  val contractDirectiveSet = new DirectiveSet(V3, Account, Contract)
 
   def apply(
       stdLibVersion: StdLibVersion,

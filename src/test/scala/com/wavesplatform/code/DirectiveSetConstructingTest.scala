@@ -1,6 +1,6 @@
 package com.wavesplatform.code
 
-import com.wavesplatform.lang.Common.produce
+import com.wavesplatform.common.state.diffs.ProduceError.produce
 import com.wavesplatform.lang.ContentType.{Contract, Expression}
 import com.wavesplatform.lang.ScriptType.{Account, Asset}
 import com.wavesplatform.lang.StdLibVersion.{V1, V2, V3}
