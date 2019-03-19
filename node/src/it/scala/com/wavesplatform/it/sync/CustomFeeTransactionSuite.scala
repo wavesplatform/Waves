@@ -68,11 +68,11 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
 object CustomFeeTransactionSuite {
   val minerAddress             = Default.head.getString("address")
-  val senderAddress            = Default(2).getString("address")
+  val senderAddress            = minerAddress //Default(2).getString("address")
   val defaultAssetQuantity     = 999999999999l
   val featureCheckBlocksPeriod = 13
 
-  private val seed = Default(2).getString("account-seed")
+  private val seed = Default.head.getString("account-seed") //Default(2).getString("account-seed")
   private val pk   = PrivateKeyAccount.fromSeed(seed).explicitGet()
   val assetTx = IssueTransactionV1
     .selfSigned(
@@ -102,8 +102,8 @@ object CustomFeeTransactionSuite {
 
   val Configs: Seq[Config] = Seq(
     minerConfig.withFallback(Default.head),
-    notMinerConfig.withFallback(Default(1)),
-    notMinerConfig.withFallback(Default(2))
+//    notMinerConfig.withFallback(Default(1)),
+//    notMinerConfig.withFallback(Default(2))
   )
 
 }

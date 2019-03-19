@@ -306,10 +306,16 @@ lazy val `node-it` = project
   .settings(
     description := "NODE integration tests",
     target := (node / Compile / target).value / "it", // see ItSettings
-    libraryDependencies ++= Dependencies.itKit,
+    libraryDependencies ++= Dependencies.itTest,
     dependencyOverrides ++= Dependencies.EnforcedVersions.value,
-    docker / imageNames := Seq(ImageName("com.wavesplatform/node-it")),
-    scriptClasspath := Seq("*") // +=
+    inTask(docker)(
+      Seq(
+        imageNames := Seq(ImageName("com.wavesplatform/node-it")),
+        DockerSettings.additionalFiles ++= (node / Universal / stage).value +: Seq(
+          (Test / resourceDirectory).value / "template.conf",
+          sourceDirectory.value / "container" / "start-waves.sh"
+        )
+      ))
   )
   .dependsOn(node)
 
@@ -328,12 +334,17 @@ lazy val `dex-it` = project
   .settings(
     description := "DEX integration tests",
     target := (dex / Compile / target).value / "it", // see ItSettings
-    libraryDependencies ++= Dependencies.test,
-    // dependencyOverrides ++= Dependencies.EnforcedVersions.value,
-    docker / imageNames := Seq(ImageName("com.wavesplatform/dex-it")),
-    docker / DockerSettings.additionalFiles += (dex / Universal / stage).value,
-    Test / fork := true
-    // scriptClasspath := Seq("*") // +=
+    libraryDependencies ++= Dependencies.itTest,
+    dependencyOverrides ++= Dependencies.EnforcedVersions.value,
+    inTask(docker)(
+      Seq(
+        imageNames := Seq(ImageName("com.wavesplatform/dex-it")),
+        DockerSettings.additionalFiles ++= (`node-it` / docker / DockerSettings.additionalFiles).value ++ Seq(
+          (dex / Universal / stage).value,
+          (Test / resourceDirectory).value / "template.conf",
+          sourceDirectory.value / "container" / "wallet.dat"
+        )
+      ))
   )
   .dependsOn(
     dex,

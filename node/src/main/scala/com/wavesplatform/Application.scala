@@ -197,6 +197,21 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     implicit val as: ActorSystem                 = actorSystem
     implicit val materializer: ActorMaterializer = ActorMaterializer()
 
+    extensions = settings.extensions.map { extensionClassName =>
+      val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
+      val ctor           = extensionClass.getConstructor(classOf[Context])
+      ctor.newInstance(new Context {
+        override def settings: WavesSettings                                  = app.settings
+        override def blockchain: Blockchain                                   = app.blockchainUpdater
+        override def time: Time                                               = app.time
+        override def wallet: Wallet                                           = app.wallet
+        override def spendableBalanceChanged: Observable[(Address, Asset)]    = app.spendableBalanceChanged
+        override def spendableBalance(address: Address, assetId: Asset): Long = utxStorage.spendableBalance(address, assetId)
+        override def addToUtx(tx: Transaction): Unit                          = utxStorage.putIfNew(tx)
+        override def actorSystem: ActorSystem                                 = app.actorSystem
+      })
+    }
+
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
@@ -263,26 +278,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         classOf[LeaseApiRoute],
         classOf[AliasApiRoute]
       )
+
       val combinedRoute = CompositeHttpService(apiTypes, apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
-    extensions = settings.extensions.map { extensionClassName =>
-      val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
-      val ctor           = extensionClass.getConstructor(classOf[Context])
-      ctor.newInstance(new Context {
-        override def settings: WavesSettings                                  = app.settings
-        override def blockchain: Blockchain                                   = app.blockchainUpdater
-        override def time: Time                                               = app.time
-        override def wallet: Wallet                                           = app.wallet
-        override def spendableBalanceChanged: Observable[(Address, Asset)]    = app.spendableBalanceChanged
-        override def spendableBalance(address: Address, assetId: Asset): Long = utxStorage.spendableBalance(address, assetId)
-        override def addToUtx(tx: Transaction): Unit                          = utxStorage.putIfNew(tx)
-        override def actorSystem: ActorSystem                                 = app.actorSystem
-      })
-    }
+    extensions.foreach(_.start())
 
     // on unexpected shutdown
     sys.addShutdownHook {

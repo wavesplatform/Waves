@@ -13,21 +13,21 @@ trait MatcherNode extends BeforeAndAfterAll with Nodes with ScorexLogging {
   this: Suite =>
 
   def matcherNode: Node = nodes.head
-  def aliceNode: Node   = nodes(1)
-  def bobNode: Node     = nodes(2)
+  def aliceNode: Node   = nodes.head //(1)
+  def bobNode: Node     = nodes.head //(2)
 
-  protected lazy val matcherAddress: String = matcherNode.createAddress()
-  protected lazy val aliceAddress: String   = aliceNode.createAddress()
-  protected lazy val bobAddress: String     = bobNode.createAddress()
+  protected lazy val matcherAddress: String = ??? // matcherNode.createAddress()
+  protected lazy val aliceAddress: String   = ??? // aliceNode.createAddress()
+  protected lazy val bobAddress: String     = ??? /// bobNode.createAddress()
 
-  protected lazy val matcherAcc = PrivateKeyAccount.fromSeed(matcherNode.seed(matcherAddress)).right.get
-  protected lazy val aliceAcc   = PrivateKeyAccount.fromSeed(aliceNode.seed(aliceAddress)).right.get
-  protected lazy val bobAcc     = PrivateKeyAccount.fromSeed(bobNode.seed(bobAddress)).right.get
+  protected lazy val matcherAcc: PrivateKeyAccount = ??? // PrivateKeyAccount("1".getBytes) // .fromSeed(matcherNode.seed(matcherAddress)).right.get
+  protected lazy val aliceAcc: PrivateKeyAccount   = ??? // PrivateKeyAccount("2".getBytes) //.fromSeed(aliceNode.seed(aliceAddress)).right.get
+  protected lazy val bobAcc: PrivateKeyAccount     = ??? // PrivateKeyAccount("3".getBytes) //.fromSeed(bobNode.seed(bobAddress)).right.get
 
-  private val addresses = Seq(matcherAddress, aliceAddress, bobAddress)
+  private lazy val addresses = Seq(matcherAddress, aliceAddress, bobAddress)
 
   //really before all tests, because FreeSpec issue with "-" and "in"
-  initialBalances()
+//  initialBalances()
 
   def initialBalances(): Unit = {
     List(matcherAddress, aliceAddress, bobAddress)

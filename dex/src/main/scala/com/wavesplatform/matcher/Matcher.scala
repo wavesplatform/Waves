@@ -11,7 +11,7 @@ import akka.pattern.{AskTimeoutException, gracefulStop}
 import akka.stream.ActorMaterializer
 import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.api.http.CompositeHttpService
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.db._
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.matcher.Matcher.Status
@@ -20,6 +20,7 @@ import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderBookActor}
 import com.wavesplatform.matcher.model.{ExchangeTransactionCreator, OrderBook, OrderValidator}
 import com.wavesplatform.matcher.queue._
+import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.state.VolumeAndFee
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -32,9 +33,10 @@ import scala.util.{Failure, Success}
 class Matcher(context: Context) extends Extension with ScorexLogging {
 
   private val settings = MatcherSettings.fromConfig(context.settings.config)
+
   private val matcherPrivateKey = (for {
     address <- Address.fromString(settings.account)
-    pk      <- context.wallet.privateKeyAccount(address)
+    pk      <- context.wallet.privateKeyAccount(address) // TODO: generate wallet file and copy it to the node
   } yield pk).explicitGet()
 
   private implicit val as: ActorSystem                 = context.actorSystem
@@ -108,7 +110,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
                                           matcherPublicKey.toAddress,
                                           context.time,
                                           settings.orderFee)(o)
-      _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(x))
+      _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(o.assetPair, x))
     } yield o
   }
 
@@ -128,7 +130,8 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       db,
       context.time,
       () => currentOffset,
-      ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress)
+      ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
+      Base58.decode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
     )
   )
 
@@ -219,7 +222,7 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     sys.exit(1)
   }
 
-  def runMatcher(): Unit = {
+  override def start(): Unit = {
     val journalDir  = new File(settings.journalDataDir)
     val snapshotDir = new File(settings.snapshotsDataDir)
     journalDir.mkdirs()

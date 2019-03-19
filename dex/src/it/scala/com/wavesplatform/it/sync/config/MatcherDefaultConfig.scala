@@ -27,11 +27,7 @@ object MatcherDefaultConfig {
   val matcherConfig = parseString(s"""
                                      |waves.miner.enable = no
                                      |waves.matcher {
-                                     |  enable = yes
-                                     |  account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
-                                     |  bind-address = "0.0.0.0"
                                      |  blacklisted-assets = ["$ForbiddenAssetId"]
-                                     |  balance-watching.enable = yes
                                      |  rest-order-limit=$orderLimit
                                      |}""".stripMargin)
 

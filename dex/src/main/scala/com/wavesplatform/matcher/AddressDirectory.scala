@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef, Props, SupervisorStrategy, Terminated}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.model.Events
+import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler

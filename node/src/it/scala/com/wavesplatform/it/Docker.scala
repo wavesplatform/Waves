@@ -18,7 +18,7 @@ import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
-import com.typesafe.config.{Config, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -41,7 +41,9 @@ import scala.concurrent.{Await, Future, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
 
-class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boolean = false, imageName: String = Docker.NodeImageName) extends AutoCloseable with ScorexLogging {
+class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boolean = false, imageName: String = Docker.NodeImageName)
+    extends AutoCloseable
+    with ScorexLogging {
 
   import Docker._
 
@@ -206,7 +208,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
       val restApiPort    = actualConfig.getString("waves.rest-api.port")
       val networkPort    = actualConfig.getString("waves.network.port")
-      val matcherApiPort = actualConfig.getString("waves.matcher.port")
+      val matcherApiPort = actualConfig.getString("waves.matcher.port") // <-------- TODO!!!!1
 
       val portBindings = new ImmutableMap.Builder[String, java.util.List[PortBinding]]()
         .put(s"$ProfilerPort", singletonList(PortBinding.randomPort("0.0.0.0")))
@@ -231,7 +233,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         val kafkaServer = Option(System.getenv("KAFKA_SERVER")).fold("") { x =>
           val prefix = "-Dwaves.matcher.events-queue"
           val topic  = s"dex-$networkSeed-${System.currentTimeMillis() / 1000 / 60}"
-          s"$prefix.type=kafka $prefix.kafka.topic=$topic -Dakka.kafka.consumer.kafka-clients.bootstrap.servers=$x "
+          s"$prefix.type=kafka $prefix.kafka.topic=$topic -Dakka.kafka.consumer.kafka-clients.bootstrap.servers=$x " // todo
         }
 
         var config = s"$javaOptions ${renderProperties(asProperties(overrides))} " +
@@ -251,7 +253,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
-        .exposedPorts(s"$ProfilerPort", restApiPort, networkPort, matcherApiPort)
+        .exposedPorts(s"$ProfilerPort", restApiPort, networkPort, matcherApiPort) // <---
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
           wavesNetwork.name() -> endpointConfigFor(nodeName)
         ).asJava))
@@ -343,7 +345,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       log.debug("Set new config directly in the script for starting node")
       val shPath = "/opt/waves/start-waves.sh"
       val scriptCmd: Array[String] =
-        Array("sh", "-c", s"sed -i 's|$$WAVES_OPTS.*-jar|$$WAVES_OPTS $renderedConfig -jar|' $shPath && chmod +x $shPath")
+        Array("sh", "-c", s"sed -i 's|$$WAVES_OPTS.*-cp|$$WAVES_OPTS $renderedConfig -cp|' $shPath && chmod +x $shPath")
 
       val execScriptCmd = client.execCreate(node.containerId, scriptCmd).id()
       client.execStart(execScriptCmd)
@@ -571,11 +573,14 @@ object Docker {
 
   val configTemplate = parseResources("template.conf")
   def genesisOverride = {
-    val genesisTs          = System.currentTimeMillis()
-    val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
-                                            |  timestamp = $genesisTs
-                                            |  block-timestamp = $genesisTs
-                                            |}""".stripMargin)
+    val genesisTs = System.currentTimeMillis()
+
+    // TODO
+//    val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
+//                                            |  timestamp = $genesisTs
+//                                            |  block-timestamp = $genesisTs
+//                                            |}""".stripMargin)
+    val timestampOverrides = ConfigFactory.empty()
 
     val genesisConfig    = configTemplate.withFallback(timestampOverrides)
     val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")

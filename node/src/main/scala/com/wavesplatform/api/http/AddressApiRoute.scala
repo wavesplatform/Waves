@@ -20,7 +20,6 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
-
 import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
@@ -35,6 +34,7 @@ case class AddressApiRoute(settings: RestAPISettings,
                            time: Time,
                            functionalitySettings: FunctionalitySettings)
     extends ApiRoute
+    with WithSettings
     with BroadcastRoute {
 
   import AddressApiRoute._

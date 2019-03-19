@@ -2,10 +2,10 @@ package com.wavesplatform.settings
 
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
+import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings._
 import org.scalatest.{FlatSpec, Matchers}

@@ -1,13 +1,13 @@
-package com.wavesplatform.matcher
+package com.wavesplatform.matcher.settings
 
 import java.io.File
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.matcher.settings.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.settings.fee.OrderFeeSettings._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader

@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.config
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.config.ConfigFactory.{empty, parseString}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.it.NodeConfigs.Default
@@ -11,20 +11,21 @@ import com.wavesplatform.matcher.AssetPairBuilder
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.wallet.Wallet
 
 import scala.util.Random
 
 // TODO: Make it trait
 object MatcherPriceAssetConfig {
 
-  private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(2))
-    .zip(Seq(matcherConfig.withFallback(minerDisabled), minerDisabled, empty()))
-    .map { case (n, o) => o.withFallback(n) }
+  private val Default: Config = ConfigFactory.parseResources("nodes.conf")
 
-  private val aliceSeed = _Configs(1).getString("account-seed")
-  private val bobSeed   = _Configs(2).getString("account-seed")
-  private val alicePk   = PrivateKeyAccount.fromSeed(aliceSeed).right.get
-  private val bobPk     = PrivateKeyAccount.fromSeed(bobSeed).right.get
+//  private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(2))
+//    .zip(Seq(matcherConfig.withFallback(minerDisabled), minerDisabled, empty()))
+//    .map { case (n, o) => o.withFallback(n) }
+
+  val alicePk = Wallet.generateNewAccount("seed".getBytes(), 808464434)
+  val bobPk   = Wallet.generateNewAccount("seed".getBytes(), 808464435)
 
   val Decimals: Byte = 2
 
@@ -139,12 +140,12 @@ object MatcherPriceAssetConfig {
 
   val orderLimit = 10
 
-  private val updatedMatcherConfig = parseString(s"""waves.matcher {
+  val updatedMatcherConfig = parseString(s"""waves.matcher {
                                                     |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
                                                     |  rest-order-limit = $orderLimit
                                                     |}""".stripMargin)
 
-  val Configs: Seq[Config] = _Configs.map(updatedMatcherConfig.withFallback(_))
+  val Configs: Seq[Config] = Seq.empty // _Configs.map(updatedMatcherConfig.withFallback(_))
 
   def createAssetPair(asset1: String, asset2: String): AssetPair = {
     val (a1, a2) = (AssetPair.extractAssetId(asset1).get, AssetPair.extractAssetId(asset2).get)

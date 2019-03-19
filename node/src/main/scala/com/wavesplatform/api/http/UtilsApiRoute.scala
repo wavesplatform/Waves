@@ -15,7 +15,7 @@ import play.api.libs.json._
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute {
+case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends ApiRoute with WithSettings {
 
   import UtilsApiRoute._
 

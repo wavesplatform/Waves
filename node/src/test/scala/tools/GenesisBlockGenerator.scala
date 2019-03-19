@@ -23,14 +23,16 @@ object GenesisBlockGenerator extends App {
   private type SeedText = String
   private type Share    = Long
 
+  case class DistributionItem(seedText: String, nonce: Int, amount: Share)
+
   case class Settings(networkType: String,
-                      initialBalance: Long,
+                      initialBalance: Share,
                       baseTarget: Long,
                       averageBlockDelay: FiniteDuration,
                       timestamp: Option[Long],
-                      distributions: Map[SeedText, Share]) {
+                      distributions: Seq[DistributionItem]) {
 
-    private[this] val distributionsSum = distributions.values.sum
+    private[this] val distributionsSum = distributions.map(_.amount).sum
     require(
       distributionsSum == initialBalance,
       s"The sum of all balances should be == $initialBalance, but it is $distributionsSum"
@@ -46,12 +48,12 @@ object GenesisBlockGenerator extends App {
                              accountPublicKey: ByteStr,
                              accountAddress: Address)
 
-  private def toFullAddressInfo(seedText: SeedText): FullAddressInfo = {
-    val seedHash = seedText.getBytes
-    val acc      = Wallet.generateNewAccount(seedHash, 0)
+  private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
+    val seedHash = item.seedText.getBytes
+    val acc      = Wallet.generateNewAccount(seedHash, item.nonce)
 
     FullAddressInfo(
-      seedText = seedText,
+      seedText = item.seedText,
       seed = ByteStr(seedHash),
       accountSeed = ByteStr(acc.seed),
       accountPrivateKey = ByteStr(acc.privateKey),
@@ -75,9 +77,9 @@ object GenesisBlockGenerator extends App {
     override val chainId: Byte = settings.chainId
   }
 
-  val shares: Map[FullAddressInfo, Share] = {
-    settings.distributions.map { case (seedText, part) => toFullAddressInfo(seedText) -> part }
-  }
+  val shares: Map[FullAddressInfo, Share] = settings.distributions.map { x =>
+    toFullAddressInfo(x) -> x.amount
+  }.toMap
 
   val timestamp = settings.timestamp.getOrElse(System.currentTimeMillis())
 
@@ -108,8 +110,8 @@ object GenesisBlockGenerator extends App {
   report(
     addrInfos = shares.keysIterator,
     settings = GenesisSettings(
-      timestamp,
       genesisBlock.timestamp,
+      timestamp,
       settings.initialBalance,
       Some(signature),
       genesisTxs.map { tx =>

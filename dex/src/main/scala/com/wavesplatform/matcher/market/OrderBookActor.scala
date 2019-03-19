@@ -11,6 +11,7 @@ import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator.CreateTransaction
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging, Time}

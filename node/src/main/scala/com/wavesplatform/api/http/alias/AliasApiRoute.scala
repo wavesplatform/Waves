@@ -19,7 +19,8 @@ import play.api.libs.json.{Format, Json}
 @Api(value = "/alias")
 case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time, blockchain: Blockchain)
     extends ApiRoute
-    with BroadcastRoute {
+    with BroadcastRoute
+    with WithSettings {
 
   override val route = pathPrefix("alias") {
     alias ~ addressOfAlias ~ aliasOfAddress

@@ -1,17 +1,17 @@
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.Compat._
+import com.typesafe.sbt.packager.archetypes.JavaAppPackaging.autoImport.scriptClasspath
 import com.typesafe.sbt.packager.archetypes.JavaServerAppPackaging
 import com.typesafe.sbt.packager.universal.UniversalDeployPlugin
 import sbt.Keys._
 import sbt._
-import sbtdocker.DockerPlugin
 
 object ExtensionPackaging extends AutoPlugin {
 
   object autoImport extends ExtensionKeys
   import autoImport._
 
-  override def requires: Plugins = UniversalDeployPlugin && JavaServerAppPackaging // && DockerPlugin
+  override def requires: Plugins = UniversalDeployPlugin && JavaServerAppPackaging
 
   override def projectSettings: Seq[Def.Setting[_]] = Defaults.itSettings ++ Seq(
     publishArtifact in packageDoc := false,
@@ -32,6 +32,7 @@ object ExtensionPackaging extends AutoPlugin {
     classpathOrdering ++= excludeProvidedArtifacts((dependencyClasspath in Runtime).value, findProvidedArtifacts.value),
     mappings in Universal ++= classpathOrdering.value,
     classpath := makeRelativeClasspathNames(classpathOrdering.value),
+    scriptClasspath += "*"
   )
 
   private def makeRelativeClasspathNames(mappings: Seq[(File, String)]): Seq[String] =

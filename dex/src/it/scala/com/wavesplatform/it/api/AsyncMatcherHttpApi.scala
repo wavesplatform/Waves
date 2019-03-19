@@ -3,7 +3,7 @@ package com.wavesplatform.it.api
 import java.net.URL
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -45,6 +45,8 @@ object AsyncMatcherHttpApi extends Assertions {
   }
 
   implicit class MatcherAsyncHttpApi(matcherNode: Node) extends NodeAsyncHttpApi(matcherNode) {
+
+    def matcherPublicKey: PublicKeyAccount = PublicKeyAccount(Base58.decode(matcherNode.config.getString("matcher-public-key")).get)
 
     def matcherApiEndpoint: URL = new URL(s"http://localhost:${matcherNode.nodeExternalPort(matcherNode.config.getInt("waves.matcher.port"))}")
 
@@ -221,7 +223,6 @@ object AsyncMatcherHttpApi extends Assertions {
                      timestamp: Long = System.currentTimeMillis(),
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val timeToLiveTimestamp = timestamp + timeToLive.toMillis
-      val matcherPublicKey    = matcherNode.publicKey
       val unsigned =
         Order(sender, matcherPublicKey, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
       Order.sign(unsigned, sender)

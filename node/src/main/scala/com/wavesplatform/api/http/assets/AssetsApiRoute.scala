@@ -41,7 +41,8 @@ import scala.util.Success
 @Api(value = "assets")
 case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, blockchain: Blockchain, time: Time)
     extends ApiRoute
-    with BroadcastRoute {
+    with BroadcastRoute
+    with WithSettings {
 
   private val distributionTaskScheduler = {
     val executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS))

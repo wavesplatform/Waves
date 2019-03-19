@@ -21,7 +21,8 @@ import play.api.libs.json.JsNumber
 @Api(value = "/leasing")
 case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utx: UtxPool, allChannels: ChannelGroup, time: Time)
     extends ApiRoute
-    with BroadcastRoute {
+    with BroadcastRoute
+    with WithSettings {
 
   override val route = pathPrefix("leasing") {
     lease ~ cancel ~ active

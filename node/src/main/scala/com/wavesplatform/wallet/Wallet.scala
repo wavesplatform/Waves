@@ -28,6 +28,8 @@ trait Wallet {
 
   def generateNewAccount(): Option[PrivateKeyAccount]
 
+  def generateNewAccount(nonce: Int): Option[PrivateKeyAccount]
+
   def deleteAccount(account: PrivateKeyAccount): Boolean
 
   def privateKeyAccount(account: Address): Either[ValidationError, PrivateKeyAccount]
@@ -109,7 +111,10 @@ object Wallet extends ScorexLogging {
     private def save(): Unit = maybeFile.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Some(key)))
 
     private def generateNewAccountWithoutSave(): Option[PrivateKeyAccount] = lock {
-      val nonce   = getAndIncrementNonce()
+      generateNewAccountWithoutSave(getAndIncrementNonce())
+    }
+
+    private def generateNewAccountWithoutSave(nonce: Int): Option[PrivateKeyAccount] = lock {
       val account = Wallet.generateNewAccount(seed, nonce)
 
       val address = account.address
@@ -133,6 +138,13 @@ object Wallet extends ScorexLogging {
         save()
         acc
       })
+    }
+
+    override def generateNewAccount(nonce: Int): Option[PrivateKeyAccount] = lock {
+      generateNewAccountWithoutSave(nonce).map { acc =>
+        save()
+        acc
+      }
     }
 
     override def deleteAccount(account: PrivateKeyAccount): Boolean = lock {

@@ -95,13 +95,13 @@ object Dependencies {
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4")
     ))
 
-  lazy val itKit = Seq(
-    ScalaTest,
+  lazy val itTest = ScalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     ("com.spotify" % "docker-client" % "8.11.3").classifier("shaded"),
     jacksonModule("dataformat", "dataformat-properties"),
-    "org.asynchttpclient" % "async-http-client" % "2.7.0"
-  )
+    "org.asynchttpclient" % "async-http-client" % "2.7.0",
+    "org.scalacheck" %% "scalacheck" % "1.14.0"
+  ).map(_ % Test)
 
   lazy val test = Seq(
     ScalaTest,
@@ -110,10 +110,6 @@ object Dependencies {
     "io.github.amrhassan" %% "scalacheck-cats"             % "0.4.0",
     "org.mockito"         % "mockito-all"                  % "1.10.19",
     "org.scalamock"       %% "scalamock-scalatest-support" % "3.6.0"
-  ).map(_ % Test)
-
-  lazy val itTest = Seq(
-    "org.scalacheck" %% "scalacheck" % "1.14.0"
   ).map(_ % Test)
 
   lazy val Node = Def.setting(
