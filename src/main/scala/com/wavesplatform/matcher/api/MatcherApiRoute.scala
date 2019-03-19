@@ -197,7 +197,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     (pathEndOrSingleSlash & post & jsonEntity[Order]) { order =>
       unavailableOrderBookBarrier(order.assetPair) {
         complete(placeTimer.measureFuture(orderValidator(order) match {
-          case Right(_) => placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
+          case Right(_)    => placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
           case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
         }))
       }

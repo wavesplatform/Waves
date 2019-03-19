@@ -34,7 +34,6 @@ import javax.ws.rs.Path
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
 import play.api.libs.json._
-import com.wavesplatform.utils.byteStrWrites
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -63,6 +62,7 @@ case class DebugApiRoute(ws: WavesSettings,
     with ScorexLogging {
 
   import DebugApiRoute._
+  private[this] implicit val byteStrWrites = com.wavesplatform.utils.byteStrWrites
 
   private[this] val rollbackScheduler = Scheduler.singleThread("debug-rollback")
 
@@ -169,16 +169,18 @@ case class DebugApiRoute(ws: WavesSettings,
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = {
-    rollbackTask(blockId).asyncBoundary.map {
-      case Right(blocks) =>
-        allChannels.broadcast(LocalScoreChanged(ng.score))
-        if (returnTransactionsToUtx) {
-          blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
-        }
-        miner.scheduleMining()
-        Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
-      case Left(error) => ApiError.fromValidationError(error): ToResponseMarshallable
-    }.runAsyncLogErr(rollbackScheduler)
+    rollbackTask(blockId).asyncBoundary
+      .map {
+        case Right(blocks) =>
+          allChannels.broadcast(LocalScoreChanged(ng.score))
+          if (returnTransactionsToUtx) {
+            blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
+          }
+          miner.scheduleMining()
+          Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
+        case Left(error) => ApiError.fromValidationError(error): ToResponseMarshallable
+      }
+      .runAsyncLogErr(rollbackScheduler)
   }
 
   @Path("/rollback")

@@ -257,10 +257,13 @@ case class TransactionsApiRoute(settings: RestAPISettings,
         value = "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs"
       )
     ))
-  def broadcast: Route = (pathPrefix("broadcast") & post & withExecutionContext(BroadcastRoute.executionContext) & handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { jsv =>
-    val futureResult: Future[Either[ApiError, Transaction]] = this.doBroadcast(TransactionFactory.fromSignedRequest(jsv))
-    complete(futureResult)
-  }
+  def broadcast: Route =
+    (pathPrefix("broadcast") & post & withExecutionContext(BroadcastRoute.executionContext)) {
+      (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { jsv =>
+        val futureResult: Future[Either[ApiError, Transaction]] = this.doBroadcast(TransactionFactory.fromSignedRequest(jsv))
+        complete(futureResult)
+      }
+    }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
     import com.wavesplatform.transaction.lease.LeaseTransaction
