@@ -32,8 +32,8 @@ import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.eval.{Coeval, Task}
+import monix.execution.Scheduler
 import play.api.libs.json._
-import com.wavesplatform.utils.byteStrWrites
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -62,6 +62,8 @@ case class DebugApiRoute(ws: WavesSettings,
     with ScorexLogging {
 
   import DebugApiRoute._
+
+  private[this] val rollbackScheduler = Scheduler.singleThread("debug-rollback")
 
   private lazy val configStr             = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
   private lazy val fullConfig: JsValue   = Json.parse(configStr)
@@ -166,8 +168,6 @@ case class DebugApiRoute(ws: WavesSettings,
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = {
-    import monix.execution.Scheduler.Implicits.global
-
     rollbackTask(blockId).asyncBoundary.map {
       case Right(blocks) =>
         allChannels.broadcast(LocalScoreChanged(ng.score))
@@ -177,7 +177,7 @@ case class DebugApiRoute(ws: WavesSettings,
         miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
       case Left(error) => ApiError.fromValidationError(error): ToResponseMarshallable
-    }.runAsyncLogErr
+    }.runAsyncLogErr(rollbackScheduler)
   }
 
   @Path("/rollback")

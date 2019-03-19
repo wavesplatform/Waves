@@ -9,10 +9,7 @@ import com.wavesplatform.transaction._
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import monix.execution.Scheduler.Implicits.global
 import play.api.libs.json._
-
-import scala.concurrent._
 
 @Path("/blocks")
 @Api(value = "/blocks")
@@ -20,7 +17,6 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
 
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
-  val rollbackExecutor    = monix.execution.Scheduler.singleThread(name = "debug-rollback")
 
   override lazy val route =
     pathPrefix("blocks") {
@@ -192,7 +188,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
   def lastHeaderOnly: Route = (path("headers" / "last") & get)(last(includeTransactions = false))
 
   def last(includeTransactions: Boolean): StandardRoute = {
-    complete(Future {
+    complete {
       {
         val height = blockchain.height
 
@@ -203,7 +199,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
            BlockHeader.json(bhs._1, bhs._2)
          }) + ("height" -> Json.toJson(height))
       }
-    })
+    }
   }
 
   @Path("/first")
