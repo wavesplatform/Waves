@@ -26,7 +26,7 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     }
     .result()
 
-  def jsonEntity[A: Reads]: Directive1[A] = handleRejections(jsonRejectionHandler) & entity(as[A])
+  def jsonEntity[A: Reads]: Directive1[A]                   = handleRejections(jsonRejectionHandler) & entity(as[A])
   def json[A: Reads](f: A => ToResponseMarshallable): Route = jsonEntity.apply(a => complete(f(a)))
 
   val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {

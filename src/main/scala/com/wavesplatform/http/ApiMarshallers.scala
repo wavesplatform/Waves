@@ -27,9 +27,9 @@ trait ApiMarshallers {
   implicit lazy val ValidationErrorMarshaller: ToResponseMarshaller[ValidationError] =
     ApiErrorMarshaller.compose(ve => ApiError.fromValidationError(ve))
 
-  implicit val TransactionJsonWrites: Writes[Transaction] = Writes(_.json())
+  implicit lazy val TransactionJsonWrites: Writes[Transaction] = Writes(_.json())
 
-  private[this] val jsonStringUnmarshaller =
+  private[this] lazy val jsonStringUnmarshaller =
     Unmarshaller.byteStringUnmarshaller
       .forContentTypes(`application/json`)
       .mapWithCharset {
@@ -37,18 +37,20 @@ trait ApiMarshallers {
         case (data, charset)       => data.decodeString(charset.nioCharset.name)
       }
 
-  private[this] val jsonStringMarshaller =
+  private[this] lazy val jsonStringMarshaller =
     Marshaller.stringMarshaller(`application/json`)
 
   implicit def playJsonUnmarshaller[A](implicit reads: Reads[A]): FromEntityUnmarshaller[A] = {
-    jsonStringUnmarshaller.andThen(Unmarshaller(_ => data => Future {
-      val json = nonFatalCatch.withApply(t => throw PlayJsonException(cause = Some(t)))(Json.parse(data))
+    jsonStringUnmarshaller.andThen(Unmarshaller(_ =>
+      data =>
+        Future {
+          val json = nonFatalCatch.withApply(t => throw PlayJsonException(cause = Some(t)))(Json.parse(data))
 
-      json.validate[A] match {
-        case JsSuccess(value, _) => value
-        case JsError(errors)     => throw PlayJsonException(errors = errors)
-      }
-    } (ApiMarshallers.executionContext)))
+          json.validate[A] match {
+            case JsSuccess(value, _) => value
+            case JsError(errors)     => throw PlayJsonException(errors = errors)
+          }
+        }(ApiMarshallers.executionContext)))
   }
 
   // preserve support for extracting plain strings from requests
@@ -56,7 +58,8 @@ trait ApiMarshallers {
   implicit val intUnmarshaller: FromEntityUnmarshaller[Int]       = stringUnmarshaller.map(_.toInt)
 
   implicit def playJsonMarshaller[A](implicit writes: Writes[A], jsValueToString: JsValue => String = Json.stringify): ToEntityMarshaller[A] = {
-    Marshaller.futureMarshaller[String, MessageEntity](jsonStringMarshaller)
+    Marshaller
+      .futureMarshaller[String, MessageEntity](jsonStringMarshaller)
       .compose((value: A) => Future(jsValueToString(Json.toJson(value)))(ApiMarshallers.executionContext))
   }
 
