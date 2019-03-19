@@ -13,12 +13,15 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.execution.{Ack, Scheduler}
-import monix.execution.Ack.Continue
+import monix.execution.Ack.{Continue, Stop}
 import monix.reactive.{Observable, Observer}
 import com.wavesplatform.protobuf.events.{PBBlockchainUpdated, PBEvents}
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
 import io.netty.handler.codec.{MessageToByteEncoder, MessageToMessageEncoder}
 import io.netty.handler.codec.protobuf.ProtobufEncoder
+
+import scala.concurrent.Future
 
 private object PBInt32LengthPrepender extends MessageToByteEncoder[ByteBuf] {
   @throws[Exception]
@@ -36,23 +39,35 @@ private object PBScalaToJava extends MessageToMessageEncoder[PBBlockchainUpdated
   }
 }
 
-private class BlockchainUpdateHandler(blockchainUpdated: Observable[BlockchainUpdated], scheduler: Scheduler) extends ChannelInboundHandlerAdapter {
+private class BlockchainUpdateHandler(blockchainUpdated: Observable[BlockchainUpdated], scheduler: Scheduler)
+    extends ChannelInboundHandlerAdapter
+    with ScorexLogging {
   implicit def toByteString(bs: ByteStr): ByteString =
     ByteString.copyFrom(bs.arr)
 
   override def channelActive(ctx: ChannelHandlerContext): Unit = {
-    val obs = new Observer.Sync[BlockchainUpdated] {
-      override def onNext(evt: BlockchainUpdated): Ack = {
-        ctx.writeAndFlush(PBEvents.protobuf(evt)).await().sync()
-        Continue
-      }
+    val obs: Observer[BlockchainUpdated] = new Observer[BlockchainUpdated] {
+      override def onNext(evt: BlockchainUpdated): Future[Ack] =
+        Future {
+          try {
+            ctx.writeAndFlush(PBEvents.protobuf(evt)).get
+            Continue
+          } catch {
+            case e: Throwable =>
+              log.error("Error sending blockchain updates", e)
+              Stop
+          }
+        }(scheduler)
 
       override def onError(ex: Throwable): Unit = {
-        ex.printStackTrace()
+        log.error("Error sending blockchain updates", ex)
         ctx.close
       }
 
-      override def onComplete(): Unit = ctx.close
+      override def onComplete(): Unit = {
+        log.info("Blockchain updates channel closed")
+        ctx.close
+      }
     }
 
     blockchainUpdated.subscribe(obs)(scheduler)
@@ -65,8 +80,7 @@ private class BlockchainUpdateHandler(blockchainUpdated: Observable[BlockchainUp
 }
 
 class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observable[BlockchainUpdated], scheduler: Scheduler) {
-  private val group = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-updates-group", true))
-//  private val workerGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-updates-worker-group", true))
+  private val group = new NioEventLoopGroup(1, new DefaultThreadFactory("nio-updates-group", true))
 
   private val channel = new Bootstrap()
     .group(group)
@@ -89,6 +103,5 @@ class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observa
       channel.close().await()
     } finally {
       group.shutdownGracefully().await()
-//      bossGroup.shutdownGracefully().await()
     }
 }
