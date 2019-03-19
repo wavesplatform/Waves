@@ -255,6 +255,10 @@ class UtxPoolImpl(time: Time,
         case _                                                                    => false
       })
     }
+
+    def clearCaches(): Unit = {
+      scriptedCache.clear()
+    }
   }
 
   //noinspection ScalaStyle
@@ -290,6 +294,8 @@ class UtxPoolImpl(time: Time,
         if (remove) UtxPoolImpl.this.afterRemove(tx)
         remove
       }
+
+      TxCheck.clearCaches()
     }
   }
 
