@@ -49,14 +49,17 @@ object InvokeScriptTransactionDiff {
       val invocation = ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes)
       for {
         directives <- DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract)
-        ctx        <- Monoid.combineAll(
-                        Seq(
-                          PureContext.build(StdLibVersion.V3),
-                          CryptoContext.build(Global),
-                          WavesContext.build(directives, environment)
-                        )
-                      ).evaluationContext
-        evaluator <- ContractEvaluator(ctx, contract, invocation)
+        evaluator  <- ContractEvaluator(
+          Monoid.combineAll(
+            Seq(
+              PureContext.build(StdLibVersion.V3),
+              CryptoContext.build(Global),
+              WavesContext.build(directives, environment)
+            )
+          ).evaluationContext,
+          contract,
+          invocation
+        )
       } yield evaluator
     }
 

@@ -142,18 +142,16 @@ package object utils extends ScorexLogging {
     costs.toMap
   }
 
-  def compilerContext(version: StdLibVersion, cType: ContentType, isAssetScript: Boolean): Either[ExecutionError, CompilerContext] = {
-    val ds = DirectiveSet(version, ScriptType.isAssetScript(isAssetScript), cType)
-    ds.map(lazyContexts(_)().compilerContext)
+  def compilerContext(version: StdLibVersion, cType: ContentType, isAssetScript: Boolean): CompilerContext = {
+    val ds = DirectiveSet(version, ScriptType.isAssetScript(isAssetScript), cType).explicitGet()
+    lazyContexts(ds)().compilerContext
   }
 
   val defaultDecompilerContext: DecompilerContext =
     lazyContexts(DirectiveSet(V3, ScriptType.Account, ContentType.Contract).explicitGet())().decompilerContext
 
-  def varNames(version: StdLibVersion, cType: ContentType): Either[ExecutionError, Set[String]] =
-    compilerContext(version, cType, isAssetScript = false)
-      .map(_.varDefs)
-      .map(_.keySet)
+  def varNames(version: StdLibVersion, cType: ContentType): Set[String] =
+    compilerContext(version, cType, isAssetScript = false).varDefs.keySet
 
   @tailrec
   final def untilTimeout[T](timeout: FiniteDuration, delay: FiniteDuration = 100.milliseconds, onFailure: => Unit = {})(fn: => T): T = {
