@@ -62,10 +62,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
-  private val blockchainUpdatedScheduler = singleThread("blockchain-updated", reporter = log.error("Error in sending blockchain updates", _))
-  private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](blockchainUpdatedScheduler)
-  private val blockchainUpdater          = StorageFactory(settings, db, time, spendableBalanceChanged, Some(blockchainUpdated))
-
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
   private val wallet: Wallet = try {
@@ -83,6 +79,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val appenderScheduler               = singleThread("appender", reporter = log.error("Error in Appender", _))
   private val historyRepliesScheduler         = fixedPool("history-replier", poolSize = 2, reporter = log.error("Error in History Replier", _))
   private val minerScheduler                  = fixedPool("miner-pool", poolSize = 2, reporter = log.error("Error in Miner", _))
+  private val blockchainUpdatedScheduler      = singleThread("blockchain-updated", reporter = log.error("Error in sending blockchain updates", _))
+
+  private val blockchainUpdated = ConcurrentSubject.publish[BlockchainUpdated](blockchainUpdatedScheduler)
+
+  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, Some(blockchainUpdated))
 
   private var matcher: Option[Matcher]                                         = None
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
