@@ -28,6 +28,7 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
 
+import scala.concurrent.Future
 import scala.util.Success
 
 @Path("/transactions")
@@ -256,8 +257,9 @@ case class TransactionsApiRoute(settings: RestAPISettings,
         value = "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs"
       )
     ))
-  def broadcast: Route = (pathPrefix("broadcast") & post & withExecutionContext(BroadcastRoute.executionContext) & handleExceptions(jsonExceptionHandler) & json[JsObject]) { jsv =>
-    doBroadcast(TransactionFactory.fromSignedRequest(jsv))
+  def broadcast: Route = (pathPrefix("broadcast") & post & withExecutionContext(BroadcastRoute.executionContext) & handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { jsv =>
+    val futureResult: Future[Either[ApiError, Transaction]] = this.doBroadcast(TransactionFactory.fromSignedRequest(jsv))
+    complete(futureResult)
   }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
