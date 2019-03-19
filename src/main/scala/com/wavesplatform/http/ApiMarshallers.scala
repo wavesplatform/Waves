@@ -21,10 +21,10 @@ case class PlayJsonException(cause: Option[Throwable] = None, errors: Seq[(JsPat
 trait ApiMarshallers {
   import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
 
-  implicit val ApiErrorMarshaller: ToResponseMarshaller[ApiError] =
+  implicit lazy val ApiErrorMarshaller: ToResponseMarshaller[ApiError] =
     fromStatusCodeAndValue[StatusCode, JsValue].compose(ae => (ae.code, ae.json))
 
-  implicit val ValidationErrorMarshaller: ToResponseMarshaller[ValidationError] =
+  implicit lazy val ValidationErrorMarshaller: ToResponseMarshaller[ValidationError] =
     ApiErrorMarshaller.compose(ve => ApiError.fromValidationError(ve))
 
   implicit val TransactionJsonWrites: Writes[Transaction] = Writes(_.json())
@@ -41,7 +41,7 @@ trait ApiMarshallers {
     Marshaller.stringMarshaller(`application/json`)
 
   implicit def playJsonUnmarshaller[A](implicit reads: Reads[A]): FromEntityUnmarshaller[A] = {
-    jsonStringUnmarshaller.andThen(Unmarshaller( _ => data => Future {
+    jsonStringUnmarshaller.andThen(Unmarshaller(_ => data => Future {
       val json = nonFatalCatch.withApply(t => throw PlayJsonException(cause = Some(t)))(Json.parse(data))
 
       json.validate[A] match {
