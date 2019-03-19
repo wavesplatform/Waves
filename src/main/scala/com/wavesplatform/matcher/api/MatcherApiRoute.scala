@@ -53,7 +53,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            db: DB,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
-                           minMatcherFee: Long)
+                           matcherAccountFee: Long)
     extends ApiRoute
     with ScorexLogging {
 
@@ -137,7 +137,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
         "priceAssets" -> matcherSettings.priceAssets,
         "orderFee" -> Json.obj(
           "waves" -> Json.obj(
-            "baseFee" -> (matcherSettings.minOrderFee + minMatcherFee)
+            "baseFee" -> (matcherSettings.minOrderFee + matcherAccountFee)
           )
         ),
       )

@@ -105,7 +105,7 @@ class Matcher(actorSystem: ActorSystem,
       _ <- OrderValidator.blockchainAware(
         blockchain,
         transactionCreator.createTransaction,
-        settings.matcherSettings.orderMatchTxFee,
+        settings.matcherSettings.minOrderFee,
         matcherPublicKey.toAddress,
         time,
         matcherSettings.disableExtraFeeForScript

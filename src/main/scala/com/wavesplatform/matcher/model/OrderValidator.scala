@@ -82,7 +82,7 @@ object OrderValidator {
 
   def blockchainAware(blockchain: Blockchain,
                       transactionCreator: (LimitOrder, LimitOrder, Long) => Either[ValidationError, ExchangeTransaction],
-                      orderMatchTxFee: Long,
+                      minOrderFee: Long,
                       matcherAddress: Address,
                       time: Time,
                       disableExtraFeeForScript: Boolean)(order: Order): ValidationResult = timer.measure {
@@ -104,7 +104,7 @@ object OrderValidator {
         .ensure("Orders of version 1 are only accepted, because SmartAccountTrading has not been activated yet")(
           _.version == 1 || blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
         .ensure("Order expiration should be > 1 min")(_.expiration > time.correctedTime() + MinExpiration)
-      mof = ExchangeTransactionCreator.minFee(blockchain, orderMatchTxFee, matcherAddress, order.assetPair, disableExtraFeeForScript)
+      mof = ExchangeTransactionCreator.minFee(blockchain, minOrderFee, matcherAddress, order.assetPair, disableExtraFeeForScript)
       _ <- (Right(order): ValidationResult).ensure(s"Order matcherFee should be >= $mof")(_.matcherFee >= mof)
       _ <- validateDecimals(blockchain, order)
       _ <- verifyOrderByAccountScript(blockchain, order.sender, order)

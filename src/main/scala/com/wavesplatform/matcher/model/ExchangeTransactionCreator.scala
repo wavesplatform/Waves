@@ -50,16 +50,13 @@ object ExchangeTransactionCreator {
   /**
     * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
-  def minFee(blockchain: Blockchain,
-             orderMatchTxFee: Long,
-             matcherAddress: Address,
-             assetPair: AssetPair,
-             disableExtraFeeForScript: Boolean): Long = {
+  def minFee(blockchain: Blockchain, baseFee: Long, matcherAddress: Address, assetPair: AssetPair, disableExtraFeeForScript: Boolean): Long = {
+
     def assetFee(assetId: AssetId): Long = if (blockchain.hasAssetScript(assetId)) CommonValidation.ScriptExtraFee else 0L
 
-    if (disableExtraFeeForScript) orderMatchTxFee
+    if (disableExtraFeeForScript) baseFee
     else {
-      orderMatchTxFee +
+      baseFee +
         minAccountFee(blockchain, matcherAddress) +
         assetPair.amountAsset.fold(0L)(assetFee) +
         assetPair.priceAsset.fold(0L)(assetFee)
