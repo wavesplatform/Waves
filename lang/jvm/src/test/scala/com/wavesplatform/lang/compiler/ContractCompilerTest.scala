@@ -433,4 +433,67 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr) shouldBe 'right
   }
 
+  property("matching case with non-existing type should produce error message with suitable types") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          |
+          |  @Verifier(tx)
+          |  func test() =
+          |    match tx {
+          |      case _: UndefinedType => true
+          |      case _                => false
+          |    }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
+  }
+
+  property("expression matching case with non-existing type should produce error message with suitable types") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+
+    val expr = {
+      val script =
+        s"""
+          |
+          |  func local(tx: ${verifierTypes.mkString("|")}) = tx
+          |
+          |  @Verifier(tx)
+          |  func test() =
+          |    match local(tx) {
+          |      case _: UndefinedType => true
+          |      case _                => false
+          |  }
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
+  }
+
+  ignore("matching case with union type containing non-existing type should produce error message with suitable types") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val verifierTypes = WavesContext.verifierInput.types.map(_.name)
+
+    val expr = {
+      val script =
+        s"""
+           |
+           |  @Verifier(tx)
+           |  func test() =
+           |    match tx {
+           |      case _: ${verifierTypes.head} | UndefinedType => true
+           |      case _                                        => false
+           |    }
+           |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr) should produce(verifierTypes.toString)
+  }
 }
