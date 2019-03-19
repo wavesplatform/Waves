@@ -7,7 +7,7 @@ object TransactionsOrdering {
   trait WavesOrdering extends Ordering[Transaction] {
     def txTimestampOrder(ts: Long): Long
     private def orderBy(t: Transaction): (Double, Long, Long) = {
-      val size        = t.bytes().size
+      val size        = t.bytes().length
       val byFee       = if (t.assetFee._1 != Waves) 0 else -t.assetFee._2
       val byTimestamp = txTimestampOrder(t.timestamp)
 
