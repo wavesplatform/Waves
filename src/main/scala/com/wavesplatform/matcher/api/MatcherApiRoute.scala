@@ -196,19 +196,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       )
     ))
   def place: Route = path("orderbook") {
-    (pathEndOrSingleSlash & post) {
-      _json[Order] { order =>
-        unavailableOrderBookBarrier(order.assetPair) {
-          complete {
-            placeTimer.measureFuture {
-              orderValidator(order) match {
-                case Right(_) =>
-                  placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
-                case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
-              }
-            }
-          }
-        }
+    (pathEndOrSingleSlash & post & jsonEntity[Order]) { order =>
+      unavailableOrderBookBarrier(order.assetPair) {
+        complete(placeTimer.measureFuture(orderValidator(order) match {
+          case Right(_) => placeTimer.measureFuture(askAddressActor[MatcherResponse](order.sender, AddressActor.PlaceOrder(order)))
+          case Left(error) => Future.successful[MatcherResponse](OrderRejected(error))
+        }))
       }
     }
   }
