@@ -10,8 +10,8 @@ import com.wavesplatform.common.state.ByteStr._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{Storage, VersionedStorage}
 import com.wavesplatform.lang.ContentType._
-import com.wavesplatform.lang.{ContentType, ScriptType, StdLibVersion, ContentType => _, ScriptType => _, StdLibVersion => _, _}
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, V3}
+import com.wavesplatform.lang._
 import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
