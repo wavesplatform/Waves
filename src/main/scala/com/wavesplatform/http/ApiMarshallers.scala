@@ -19,13 +19,13 @@ case class PlayJsonException(cause: Option[Throwable] = None, errors: Seq[(JsPat
     with NoStackTrace
 
 trait ApiMarshallers {
-  private[this] type TRM[A] = ToResponseMarshaller[A]
-
   import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
-  implicit val ApiErrorMarshaller: TRM[ApiError] = fromStatusCodeAndValue[StatusCode, JsValue].compose { ae =>
-    ae.code -> ae.json
-  }
-  implicit val ValidationErrorMarshaller: TRM[ValidationError] = ApiErrorMarshaller.compose(ve => ApiError.fromValidationError(ve))
+
+  implicit val ApiErrorMarshaller: ToResponseMarshaller[ApiError] =
+    fromStatusCodeAndValue[StatusCode, JsValue].compose(ae => (ae.code, ae.json))
+
+  implicit val ValidationErrorMarshaller: ToResponseMarshaller[ValidationError] =
+    ApiErrorMarshaller.compose(ve => ApiError.fromValidationError(ve))
 
   implicit val TransactionJsonWrites: Writes[Transaction] = Writes(_.json())
 
