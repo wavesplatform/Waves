@@ -183,4 +183,12 @@ package object state {
 
   object TransactionId extends TaggedType[ByteStr]
   type TransactionId = TransactionId.Type
+
+  object MinerBalanceInfo extends TaggedType[(Long, Long)]
+  type MinerBalanceInfo = MinerBalanceInfo.Type
+
+  implicit class MinerBalanceInfoOps(b: MinerBalanceInfo) {
+    def currentBalance: Long = b._1
+    def miningBalance: Long  = b._2
+  }
 }

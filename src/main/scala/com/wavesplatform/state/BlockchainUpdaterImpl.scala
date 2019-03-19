@@ -612,6 +612,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
     }
   }
 
+  override def minerBalancesAtHeight(height: Height): Map[Address, MinerBalanceInfo] = {
+    blockchain.minerBalancesAtHeight(height)
+  }
+
   override def allActiveLeases: Set[LeaseTransaction] = readLock {
     ngState.fold(blockchain.allActiveLeases) { ng =>
       val (active, canceled) = ng.bestLiquidDiff.leaseState.partition(_._2)

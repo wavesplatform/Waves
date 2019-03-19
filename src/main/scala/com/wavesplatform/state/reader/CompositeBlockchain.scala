@@ -191,6 +191,8 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
     }
   }
 
+  override def minerBalancesAtHeight(height: Height): Map[Address, MinerBalanceInfo] = inner.minerBalancesAtHeight(height)
+
   override def score: BigInt = inner.score
 
   override def scoreOf(blockId: ByteStr): Option[BigInt] = inner.scoreOf(blockId)

@@ -154,4 +154,12 @@ object Keys {
       writeTransactionHN
     )
 
+  val MinerBalancesInfoAtHeightPrefix: Short = 54
+  def minerBalancesInfoAtHeight(height: Height): Key[Map[AddressId, MinerBalanceInfo]] =
+    Key(
+      "miner-balances-info-at-height",
+      h(MinerBalancesInfoAtHeightPrefix, height),
+      readMinersBalanceInfo,
+      writeMinersBalanceInfo
+    )
 }

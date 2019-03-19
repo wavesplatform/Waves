@@ -30,7 +30,7 @@ class BlockHeader(val timestamp: Long,
                   val consensusData: NxtLikeConsensusBlockData,
                   val transactionCount: Int,
                   val transactionTreeHash: Digest32,
-                  val minerBalancesTreeHash: Digest32,
+                  val minerWavesBalancesTreeHash: Digest32,
                   val featureVotes: Set[Short]) {
   protected val versionField: ByteBlockField             = ByteBlockField("version", version)
   protected val timestampField: LongBlockField           = LongBlockField("timestamp", timestamp)
@@ -135,7 +135,7 @@ case class Block private[block] (override val timestamp: Long,
                                  override val signerData: SignerData,
                                  override val consensusData: NxtLikeConsensusBlockData,
                                  override val transactionTreeHash: Digest32,
-                                 override val minerBalancesTreeHash: Digest32,
+                                 override val minerWavesBalancesTreeHash: Digest32,
                                  transactionData: Seq[Transaction],
                                  override val featureVotes: Set[Short])
     extends BlockHeader(timestamp,
@@ -145,7 +145,7 @@ case class Block private[block] (override val timestamp: Long,
                         consensusData,
                         transactionData.length,
                         transactionTreeHash,
-                        minerBalancesTreeHash,
+                        minerWavesBalancesTreeHash,
                         featureVotes)
     with Signed {
 
@@ -384,7 +384,7 @@ object Block extends ScorexLogging {
         signerData = SignerData(genesisSigner, ByteStr(signature)),
         consensusData = consensusGenesisData,
         transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
-        minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerWavesBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         transactionData = transactionGenesisData,
         featureVotes = Set.empty
       )

@@ -64,7 +64,7 @@ object TestBlock {
         consensusData = NxtLikeConsensusBlockData(2L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
         transactionData = txs,
         transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
-        minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerWavesBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         featureVotes = features
       )
     )

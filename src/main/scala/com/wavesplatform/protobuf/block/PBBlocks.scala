@@ -77,7 +77,7 @@ object PBBlocks {
             version,
             ByteString.copyFrom(generator.publicKey),
             ByteString.copyFrom(transactionTreeHash),
-            ByteString.copyFrom(minerBalancesTreeHash)
+            ByteString.copyFrom(minerWavesBalancesTreeHash)
           )),
           ByteString.copyFrom(signature)
         )),

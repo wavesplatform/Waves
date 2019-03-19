@@ -141,6 +141,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] = observedCache(maxCacheSize * 16, spendableBalanceChanged, loadBalance)
   protected def discardBalance(key: (Address, Asset)): Unit                 = balancesCache.invalidate(key)
   override def balance(address: Address, mayBeAssetId: Asset): Long         = balancesCache.get(address -> mayBeAssetId)
+
   protected def loadBalance(req: (Address, Asset)): Long
 
   private val assetDescriptionCache: LoadingCache[IssuedAsset, Option[AssetDescription]] = cache(maxCacheSize, loadAssetDescription)

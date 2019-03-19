@@ -81,6 +81,7 @@ trait Blockchain {
                                 fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage]
   def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]]
 
+  def minerBalancesAtHeight(height: Height): Map[Address, MinerBalanceInfo]
   // the following methods are used exclusively by patches
   def allActiveLeases: Set[LeaseTransaction]
 

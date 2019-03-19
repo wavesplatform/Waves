@@ -10,6 +10,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.FunctionalitySettings
@@ -258,17 +259,59 @@ class LevelDBWriter(writableDB: DB,
     val threshold        = height - maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
+    val miners: mutable.HashMap[AddressId, MinerBalanceInfo] =
+      mutable.HashMap.empty[AddressId, MinerBalanceInfo]
+
+    if (height > 1) {
+      rw.get(Keys.minerBalancesInfoAtHeight(Height @@ (height - 1)))
+        .foreach {
+          case (addrId, balance) =>
+            miners.put(addrId, balance)
+        }
+    }
+
+    val requiredBalance = GeneratingBalanceProvider.minimalEffectiveBalance(height, activatedFeatures)
+    val requiredBlocks  = GeneratingBalanceProvider.minimalBlockInterval(height, activatedFeatures)
+
     val newAddressesForWaves = ArrayBuffer.empty[BigInt]
+
     val updatedBalanceAddresses = for ((addressId, balance) <- wavesBalances) yield {
       val kwbh = Keys.wavesBalanceHistory(addressId)
       val wbh  = rw.get(kwbh)
       if (wbh.isEmpty) {
         newAddressesForWaves += addressId
       }
+
+      val knownMiner: Boolean      = miners.contains(AddressId @@ addressId)
+      val haveEnoughWaves: Boolean = balance >= requiredBalance
+
+      lazy val miningBalance = {
+        val snapshots = balanceSnapshots(rw, AddressId @@ addressId, (height - requiredBlocks + 1).max(1), this.lastBlockId.get)
+          .map(_.effectiveBalance)
+
+        (balance +: snapshots).min
+      }
+
+      val shouldBeAdded   = haveEnoughWaves
+      val shouldBeUpdated = knownMiner && haveEnoughWaves
+      val shouldBeRemoved = knownMiner && !haveEnoughWaves
+
+      if (shouldBeAdded || shouldBeUpdated) {
+        miners.update(AddressId @@ addressId, MinerBalanceInfo((balance, miningBalance)))
+      } else if (shouldBeRemoved) {
+        miners.remove(AddressId @@ addressId)
+      }
+
       rw.put(Keys.wavesBalance(addressId)(height), balance)
       expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshold, Keys.wavesBalance(addressId))
       addressId
     }
+
+    rw.put(Keys.minerBalancesInfoAtHeight(Height @@ height), miners.toMap)
+
+    val expiredMiners = Keys.minerBalancesInfoAtHeight(Height @@ (height - threshold))
+
+    expiredKeys.append(expiredMiners.keyBytes)
 
     val changedAddresses = addressTransactions.keys ++ updatedBalanceAddresses
 
@@ -529,6 +572,7 @@ class LevelDBWriter(writableDB: DB,
           rw.delete(Keys.blockHeaderAndSizeAt(h))
           rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
+          rw.delete(Keys.minerBalancesInfoAtHeight(Height @@ height))
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
             DisableHijackedAliases.revert(rw)
@@ -672,16 +716,20 @@ class LevelDBWriter(writableDB: DB,
     .recordStats()
     .build[(Int, BigInt), LeaseBalance]()
 
+  protected def balanceSnapshots(db: ReadOnlyDB, addressId: AddressId, from: Int, to: BlockId): Seq[BalanceSnapshot] = {
+    val toHeigth = this.heightOf(to).getOrElse(this.height)
+    val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
+    val lbh      = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
+    for {
+      (wh, lh) <- merge(wbh, lbh)
+      wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))
+      lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
+    } yield BalanceSnapshot(wh.max(lh), wb, lb.in, lb.out)
+  }
+
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
-      val toHeigth = this.heightOf(to).getOrElse(this.height)
-      val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
-      val lbh      = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
-      for {
-        (wh, lh) <- merge(wbh, lbh)
-        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))
-        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
-      } yield BalanceSnapshot(wh.max(lh), wb, lb.in, lb.out)
+      balanceSnapshots(db, AddressId @@ addressId, from, to)
     }
   }
 
@@ -973,6 +1021,15 @@ class LevelDBWriter(writableDB: DB,
       GenericError(s"Cannot get waves distribution at height less than ${canGetAfterHeight + 1}")
     )
   }
+
+  override def minerBalancesAtHeight(height: Height): Map[Address, MinerBalanceInfo] =
+    readOnly { db =>
+      db.get(Keys.minerBalancesInfoAtHeight(height))
+        .map {
+          case (addressId, balanceInfo) =>
+            db.get(Keys.idToAddress(addressId)) -> balanceInfo
+        }
+    }
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
     loadBlock(height, db)

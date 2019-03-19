@@ -79,7 +79,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         ),
         transactionData = txs,
         transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
-        minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerWavesBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         signerData = SignerData(
           generator = signer,
           signature = ByteStr.empty

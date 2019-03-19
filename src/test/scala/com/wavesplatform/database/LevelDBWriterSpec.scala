@@ -332,6 +332,22 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     }
   }
 
+  "miners balances" - {
+    "correctly written" in {
+      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
+        val minerBalances = writer.minerBalancesAtHeight(Height @@ writer.height)
+
+        minerBalances.foreach {
+          case (addr, balanceInfo) =>
+            val wavesBalance         = balanceInfo.currentBalance
+            val expectedWavesBalance = writer.balance(addr, Waves)
+
+            wavesBalance shouldEqual expectedWavesBalance
+        }
+      }
+    }
+  }
+
   "addressTransactions" - {
 
     "return txs in correct ordering without fromId" in {

@@ -91,6 +91,8 @@ object EmptyBlockchain extends Blockchain {
 
   override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
 
+  override def minerBalancesAtHeight(height: Height): Map[Address, MinerBalanceInfo] = Map.empty
+
   override def allActiveLeases: Set[LeaseTransaction] = Set.empty
 
   override def assetDistributionAtHeight(assetId: IssuedAsset,

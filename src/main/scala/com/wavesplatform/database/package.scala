@@ -356,6 +356,33 @@ package object database {
     ndo.toByteArray
   }
 
+  def readMinersBalanceInfo(bs: Array[Byte]): Map[AddressId, MinerBalanceInfo] = {
+    val ndi        = newDataInput(bs)
+    val entryCount = ndi.readInt()
+
+    (0 until entryCount).map { _ =>
+      val addrId        = AddressId @@ ndi.readBigInt()
+      val currBalance   = ndi.readLong()
+      val miningBalance = ndi.readLong()
+
+      addrId -> MinerBalanceInfo((currBalance, miningBalance))
+    }.toMap
+  }
+
+  def writeMinersBalanceInfo(v: Map[AddressId, MinerBalanceInfo]): Array[Byte] = {
+    val ndo = newDataOutput()
+
+    ndo.writeInt(v.size)
+    v.foreach {
+      case (addr, balance) =>
+        ndo.writeBigInt(addr)
+        ndo.writeLong(balance.currentBalance)
+        ndo.writeLong(balance.miningBalance)
+    }
+
+    ndo.toByteArray
+  }
+
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestSize
     def extractId(offset: Int = 2, length: Int = DigestSize): ByteStr = {
