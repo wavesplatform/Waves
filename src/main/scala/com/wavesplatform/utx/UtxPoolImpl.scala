@@ -121,8 +121,11 @@ class UtxPoolImpl(time: Time,
       }
     }
 
-    def checkIsMostProfitable(newTx: Transaction): Boolean =
-      !transactions.values().asScala.exists(poolTx => TransactionsOrdering.InUTXPool.compare(newTx, poolTx) >= 0)
+    def checkIsMostProfitable(newTx: Transaction): Boolean = {
+      transactions.values()
+        .asScala
+        .forall(poolTx => TransactionsOrdering.InUTXPool.compare(newTx, poolTx) < 0)
+    }
 
     PoolMetrics.putRequestStats.increment()
     val result = measureSuccessful(
