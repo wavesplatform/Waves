@@ -83,10 +83,12 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   private val cmpCtx: CompilerContext =
-    WavesContext.build(
-      DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract).explicitGet(),
-      Common.emptyBlockchainEnvironment()
-    ).compilerContext
+    WavesContext
+      .build(
+        DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract).explicitGet(),
+        Common.emptyBlockchainEnvironment()
+      )
+      .compilerContext
 
   property("contract compiles callable functions independently") {
     val ctx = Monoid.combine(compilerContext, cmpCtx)

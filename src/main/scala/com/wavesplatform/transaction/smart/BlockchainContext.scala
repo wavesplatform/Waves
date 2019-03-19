@@ -28,6 +28,6 @@ object BlockchainContext {
       ContentType.isContract(isContract)
     ).map(WavesContext.build(_, new WavesEnvironment(nByte, in, h, blockchain, tthis)))
       .map(Seq(PureContext.build(version), CryptoContext.build(Global), _))
-      .map(Monoid.combineAll)
+      .map(Monoid.combineAll(_))
       .map(_.evaluationContext)
 }

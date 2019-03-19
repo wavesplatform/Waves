@@ -569,8 +569,9 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(DirectiveSet(StdLibVersion.V2, ScriptType.Account, ContentType.Expression).explicitGet(),
-                 new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null))
+          .build(
+            DirectiveSet(StdLibVersion.V2, ScriptType.Account, ContentType.Expression).explicitGet(),
+            new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null))
           )
 
     for {
