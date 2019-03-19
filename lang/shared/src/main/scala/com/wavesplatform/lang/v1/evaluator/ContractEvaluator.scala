@@ -21,8 +21,8 @@ object ContractEvaluator {
         val otherFuncs = c.dec.filter(_.isInstanceOf[FUNC]).map(_.asInstanceOf[FUNC].name)
         val message =
           if (otherFuncs contains functionName)
-            s"function '$functionName exists in the contract but is not marked as @Callable, therefore cannot not be invoked"
-          else s"@Callable function '$functionName doesn't exist in the contract"
+            s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
+          else s"@Callable function '$functionName doesn't exist in the script"
         raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](message)
       case Some(f) =>
         val zeroExpr = Right(

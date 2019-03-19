@@ -6,8 +6,10 @@ import java.nio.charset.StandardCharsets
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.block.Block
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
@@ -25,7 +27,12 @@ object Exporter extends ScorexLogging {
     val configFilename       = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
     val outputFilenamePrefix = Try(args(1)).toOption.getOrElse("blockchain")
     val exportHeight         = Try(args(2)).toOption.flatMap(s => Try(s.toInt).toOption)
-    val format               = Try(args(3)).toOption.filter(s => s.toUpperCase == "JSON").getOrElse("BINARY").toUpperCase
+
+    val format = Try(args(3)).toOption
+      .map(_.toUpperCase)
+      .collect { case custom @ ("JSON" | "BINARY_OLD") => custom }
+      .getOrElse("BINARY")
+      .intern()
 
     val settings = WavesSettings.fromConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
     AddressScheme.current = new AddressScheme {
@@ -48,7 +55,8 @@ object Exporter extends ScorexLogging {
         val start         = System.currentTimeMillis()
         exportedBytes += writeHeader(bos, format)
         (2 to height).foreach { h =>
-          exportedBytes += (if (format == "JSON") exportBlockToJson(bos, blockchain, h) else exportBlockToBinary(bos, blockchain, h))
+          exportedBytes += (if (format == "JSON") exportBlockToJson(bos, blockchain, h)
+                            else exportBlockToBinary(bos, blockchain, h, format == "BINARY_OLD"))
           if (h % (height / 10) == 0)
             log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
         }
@@ -68,14 +76,17 @@ object Exporter extends ScorexLogging {
       new FileOutputStream(filename)
     }
 
-  private def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int): Int = {
+  private def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int, legacy: Boolean): Int = {
     val maybeBlockBytes = blockchain.blockBytes(height)
     maybeBlockBytes
-      .map { bytes =>
-        val len = bytes.length
-        stream.write(Ints.toByteArray(len))
+      .map { oldBytes =>
+        val bytes       = if (legacy) oldBytes else PBBlocks.clearChainId(PBBlocks.protobuf(Block.parseBytes(oldBytes).get)).toByteArray
+        val bytesLength = bytes.length
+
+        stream.write(Ints.toByteArray(bytesLength))
         stream.write(bytes)
-        len + Ints.BYTES
+
+        Ints.BYTES + bytesLength
       }
       .getOrElse(0)
   }

@@ -10,7 +10,7 @@ import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import org.scalatest._
@@ -21,7 +21,7 @@ class MatcherTickerTestSuite
     extends FreeSpec
     with Matchers
     with BeforeAndAfterAll
-    with CancelAfterFailure
+//    with CancelAfterFailure
     with NodesFromDocker
     with ReportingTestName {
 
@@ -55,8 +55,8 @@ class MatcherTickerTestSuite
 
     "try to work with incorrect pair" in {
       val usdWavesPair = AssetPair(
-        amountAsset = Some(UsdId),
-        priceAsset = None
+        amountAsset = UsdId,
+        priceAsset = Waves
       )
 
       assert(
@@ -171,7 +171,6 @@ object MatcherTickerTestSuite {
                                              |  enable = yes
                                              |  account = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
                                              |  bind-address = "0.0.0.0"
-                                             |  order-match-tx-fee = 300000
                                              |  blacklisted-assets = ["$ForbiddenAssetId"]
                                              |  balance-watching.enable = yes
                                              |}""".stripMargin)
@@ -215,27 +214,27 @@ object MatcherTickerTestSuite {
     .right
     .get
 
-  val UsdId: AssetId    = IssueUsdTx.id()
-  val EightDigitAssetId = IssueEightDigitAssetTx.id()
+  val UsdId: IssuedAsset             = IssuedAsset(IssueUsdTx.id())
+  val EightDigitAssetId: IssuedAsset = IssuedAsset(IssueEightDigitAssetTx.id())
 
   val edUsdPair = AssetPair(
-    amountAsset = Some(EightDigitAssetId),
-    priceAsset = Some(UsdId)
+    amountAsset = EightDigitAssetId,
+    priceAsset = UsdId
   )
 
   val wctWavesPair = AssetPair(
-    amountAsset = Some(EightDigitAssetId),
-    priceAsset = None
+    amountAsset = EightDigitAssetId,
+    priceAsset = Waves
   )
 
   val wavesUsdPair = AssetPair(
-    amountAsset = None,
-    priceAsset = Some(UsdId)
+    amountAsset = Waves,
+    priceAsset = UsdId
   )
 
   private val updatedMatcherConfig = parseString(s"""
                                                     |waves.matcher {
-                                                    |  price-assets = [ "$UsdId", "WAVES"]
+                                                    |  price-assets = [ "${UsdId.id.base58}", "WAVES"]
                                                     |}
      """.stripMargin)
 

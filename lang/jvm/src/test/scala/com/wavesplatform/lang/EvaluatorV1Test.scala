@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -23,8 +24,8 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
@@ -42,7 +43,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     Seq(
       defaultCryptoContext,
       pureContext,
-      WavesContext.build(V1, environment, isTokenContext = false)
+      WavesContext.build(DirectiveSet(V1, ScriptType.Account, ContentType.Expression), environment)
     )
   )
 
@@ -208,9 +209,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(blockBuilder) { block =>
       var functionEvaluated = 0
 
-      val f = NativeFunction("F", 1: Long, 258: Short, LONG: TYPE, "test function", Seq(("_", LONG, "")): _*) { _ =>
-        functionEvaluated = functionEvaluated + 1
-        evaluated(1L)
+      val f = NativeFunction("F", 1: Long, 258: Short, LONG: TYPE, "test function", Seq(("_", LONG, "")): _*) {
+        case _ =>
+          functionEvaluated = functionEvaluated + 1
+          evaluated(1L)
       }
 
       val context = Monoid.combine(pureEvalContext,
@@ -247,8 +249,9 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on function call getter evaluation") {
     val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType.typeRef, "test function", List.empty: _*) { _ =>
-      evaluated(CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L)))
+    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType.typeRef, "test function", List.empty: _*) {
+      case _ =>
+        evaluated(CaseObj(fooType.typeRef, Map("bar" -> "bAr", "buz" -> 1L)))
     }
 
     val context = EvaluationContext(
@@ -264,15 +267,16 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on block getter evaluation") {
     val fooType = CaseType("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType.typeRef, "test function", List.empty: _*) { _ =>
-      evaluated(
-        CaseObj(
-          fooType.typeRef,
-          Map(
-            "bar" -> "bAr",
-            "buz" -> 1L
-          )
-        ))
+    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType.typeRef, "test function", List.empty: _*) {
+      case _ =>
+        evaluated(
+          CaseObj(
+            fooType.typeRef,
+            Map(
+              "bar" -> "bAr",
+              "buz" -> 1L
+            )
+          ))
     }
     val fooTransform =
       NativeFunction("transformFoo", 1: Long, 260: Short, fooType.typeRef, "test function", ("foo", fooType.typeRef, "foo")) {
@@ -815,9 +819,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("each argument is evaluated maximum once for user function") {
     var functionEvaluated = 0
 
-    val f = NativeFunction("F", 1, 258: Short, LONG, "", ("_", LONG, "")) { _ =>
-      functionEvaluated = functionEvaluated + 1
-      evaluated(1L)
+    val f = NativeFunction("F", 1, 258: Short, LONG, "", ("_", LONG, "")) {
+      case _ =>
+        functionEvaluated = functionEvaluated + 1
+        evaluated(1L)
     }
 
     val doubleFst = UserFunction("ID", 0, LONG, "", ("x", LONG, "")) {

@@ -11,48 +11,48 @@ import scala.util.Random
 class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
   test("Able to send money to an alias") {
     val alias            = randomAlias()
-    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
+    val (balance1, eff1) = miner.accountBalances(firstAddress)
 
     val aliasFee = calcAliasFee(firstAddress, alias)
-    notMiner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
+    miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
 
     val aliasFull = fullAliasByAddress(firstAddress, alias)
 
     val transferId = sender.transfer(firstAddress, aliasFull, transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(transferId)
-    notMiner.assertBalances(firstAddress, balance1 - minFee - aliasFee, eff1 - minFee - aliasFee)
+    miner.assertBalances(firstAddress, balance1 - minFee - aliasFee, eff1 - minFee - aliasFee)
   }
 
   test("Not able to create same aliases to same address") {
     val alias            = randomAlias()
-    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
+    val (balance1, eff1) = miner.accountBalances(firstAddress)
     val aliasFee         = calcAliasFee(firstAddress, alias)
-    notMiner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
+    miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
 
     assertBadRequest(sender.createAlias(firstAddress, alias, minFee))
-    notMiner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
+    miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
   }
 
   test("Not able to create aliases to other addresses") {
     val alias = randomAlias()
 
-    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
+    val (balance1, eff1) = miner.accountBalances(firstAddress)
     val aliasFee         = calcAliasFee(firstAddress, alias)
     assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, minFee), "Alias already claimed")
-    notMiner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
+    miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
   }
 
   test("Able to create several different aliases to same addresses") {
     val firstAlias  = randomAlias()
     val secondAlias = randomAlias()
 
-    val (balance1, eff1) = notMiner.accountBalances(secondAddress)
+    val (balance1, eff1) = miner.accountBalances(secondAddress)
 
     val aliasFeeFirstAlias = calcAliasFee(secondAddress, firstAlias)
-    notMiner.assertBalances(secondAddress, balance1 - aliasFeeFirstAlias, eff1 - aliasFeeFirstAlias)
+    miner.assertBalances(secondAddress, balance1 - aliasFeeFirstAlias, eff1 - aliasFeeFirstAlias)
 
     val aliasFeeSecondAlias = calcAliasFee(secondAddress, secondAlias)
-    notMiner.assertBalances(secondAddress, balance1 - aliasFeeFirstAlias - aliasFeeSecondAlias, eff1 - aliasFeeFirstAlias - aliasFeeSecondAlias)
+    miner.assertBalances(secondAddress, balance1 - aliasFeeFirstAlias - aliasFeeSecondAlias, eff1 - aliasFeeFirstAlias - aliasFeeSecondAlias)
 
     val aliasesList = sender.aliasByAddress(secondAddress)
     aliasesList should contain allElementsOf Seq(fullAliasByAddress(secondAddress, firstAlias), fullAliasByAddress(secondAddress, secondAlias))
@@ -64,9 +64,9 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
   aliases_names.foreach { alias =>
     test(s"create alias named $alias") {
-      val (balance1, eff1) = notMiner.accountBalances(secondAddress)
+      val (balance1, eff1) = miner.accountBalances(secondAddress)
       val aliasFee         = calcAliasFee(secondAddress, alias)
-      notMiner.assertBalances(secondAddress, balance1 - aliasFee, eff1 - aliasFee)
+      miner.assertBalances(secondAddress, balance1 - aliasFee, eff1 - aliasFee)
     }
   }
 
@@ -91,8 +91,8 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   test("Able to lease by alias") {
     val thirdAddressAlias = randomAlias()
 
-    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-    val (balance3, eff3) = notMiner.accountBalances(thirdAddress)
+    val (balance1, eff1) = miner.accountBalances(firstAddress)
+    val (balance3, eff3) = miner.accountBalances(thirdAddress)
 
     val aliasFee  = calcAliasFee(thirdAddress, thirdAddressAlias)
     val aliasFull = fullAliasByAddress(thirdAddress, thirdAddressAlias)
@@ -102,14 +102,14 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val leasingTx = sender.lease(firstAddress, aliasFull, leasingAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(leasingTx)
 
-    notMiner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
-    notMiner.assertBalances(thirdAddress, balance3 - aliasFee, eff3 - aliasFee + leasingAmount)
+    miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
+    miner.assertBalances(thirdAddress, balance3 - aliasFee, eff3 - aliasFee + leasingAmount)
 
   }
 
   //previous test should not be commented to run this one
   test("Not able to create alias when insufficient funds") {
-    val balance = notMiner.accountBalances(firstAddress)._1
+    val balance = miner.accountBalances(firstAddress)._1
     val alias   = randomAlias()
     assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, balance + minFee), "State check failed. Reason: negative waves balance")
   }

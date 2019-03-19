@@ -1,8 +1,9 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
-import com.wavesplatform.state._
 import com.wavesplatform.account.Address
+import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.{GenericError, Validation}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -14,10 +15,10 @@ object MassTransferTransactionDiff {
     def parseTransfer(xfer: ParsedTransfer): Validation[(Map[Address, Portfolio], Long)] = {
       for {
         recipientAddr <- blockchain.resolveAlias(xfer.address)
-        portfolio = tx.assetId match {
-          case None      => Map(recipientAddr -> Portfolio(xfer.amount, LeaseBalance.empty, Map.empty))
-          case Some(aid) => Map(recipientAddr -> Portfolio(0, LeaseBalance.empty, Map(aid -> xfer.amount)))
-        }
+        portfolio = tx.assetId
+          .fold(Map(recipientAddr -> Portfolio(xfer.amount, LeaseBalance.empty, Map.empty))) { asset =>
+            Map(recipientAddr -> Portfolio(0, LeaseBalance.empty, Map(asset -> xfer.amount)))
+          }
       } yield (portfolio, xfer.amount)
     }
     val portfoliosEi = tx.transfers.traverse(parseTransfer)
@@ -28,12 +29,19 @@ object MassTransferTransactionDiff {
       val (recipientPortfolios, totalAmount) = list.fold(foldInit) { (u, v) =>
         (u._1 combine v._1, u._2 + v._2)
       }
-      val completePortfolio = recipientPortfolios.combine(tx.assetId match {
-        case None      => Map(sender -> Portfolio(-totalAmount, LeaseBalance.empty, Map.empty))
-        case Some(aid) => Map(sender -> Portfolio(0, LeaseBalance.empty, Map(aid -> -totalAmount)))
-      })
+      val completePortfolio =
+        recipientPortfolios
+          .combine(
+            tx.assetId
+              .fold(Map(sender -> Portfolio(-totalAmount, LeaseBalance.empty, Map.empty))) { asset =>
+                Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -totalAmount)))
+              }
+          )
 
-      val assetIssued = tx.assetId.forall(blockchain.assetDescription(_).isDefined)
+      val assetIssued = tx.assetId match {
+        case Waves                  => true
+        case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).isDefined
+      }
 
       Either.cond(assetIssued, Diff(height, tx, completePortfolio), GenericError(s"Attempt to transfer a nonexistent asset"))
     }

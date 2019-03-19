@@ -19,9 +19,9 @@ message Block {
          bytes generator = 7;
      }
 
-     bytes chainId = 1;
-     SignedHeader header = 2;
-     repeated SignedTransaction transactions = 3;
+    int32 chainId = 1;
+    SignedHeader header = 2;
+    repeated SignedTransaction transactions = 3;
 }
 
 message MicroBlock {

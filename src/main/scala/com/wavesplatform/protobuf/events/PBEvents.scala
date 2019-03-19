@@ -10,7 +10,7 @@ object PBEvents {
 
   // @todo deserialization to vanilla
 
-  private def protobufStateUpdated(reason: (Short, Option[ByteStr]), su: VanillaStateUpdated): PBStateUpdated = {
+  private def protobufStateUpdated(reason: (Short, ByteStr), su: VanillaStateUpdated): PBStateUpdated = {
     val reasonType = reason._1 match {
       case 0 => PBStateUpdated.ReasonType.BLOCK
       case 1 => PBStateUpdated.ReasonType.TRANSACTION
@@ -36,9 +36,9 @@ object PBEvents {
         val txsUpdates = block.transactionData
           .map(_.id())
           .zip(transactionsStateUpdates)
-          .map { case (id, su) => protobufStateUpdated((1, Some(id)), su) }
+          .map { case (id, su) => protobufStateUpdated((1, id), su) }
 
-        val blockUpdate = protobufStateUpdated((0, Some(block.uniqueId)), blockStateUpdate)
+        val blockUpdate = protobufStateUpdated((0, block.uniqueId), blockStateUpdate)
 
         PBBlockchainUpdated(
           id = block.uniqueId,
@@ -50,9 +50,9 @@ object PBEvents {
         val txsUpdates = microBlock.transactionData
           .map(_.id())
           .zip(transactionsStateUpdates)
-          .map { case (id, su) => protobufStateUpdated((1, Some(id)), su) }
+          .map { case (id, su) => protobufStateUpdated((1, id), su) }
 
-        val mbUpdate = protobufStateUpdated((2, Some(microBlock.totalResBlockSig)), microBlockStateUpdate)
+        val mbUpdate = protobufStateUpdated((2, microBlock.totalResBlockSig), microBlockStateUpdate)
 
         PBBlockchainUpdated(
           id = microBlock.totalResBlockSig,

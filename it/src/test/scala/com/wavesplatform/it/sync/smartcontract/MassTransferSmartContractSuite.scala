@@ -6,6 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -23,7 +24,7 @@ every month a foundation makes payments from two MassTransactions(type == 11):
  */
 
 class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val fourthAddress: String = sender.createAddress()
+  private val fourthAddress: String = notMiner.createAddress()
 
   test("airdrop emulation via MassTransfer") {
     val scriptText = s"""
@@ -34,7 +35,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
             let totalAmountToGov = commonAmount == 2000000000
             let massTxSize = size(ttx.transfers) == 2
 
-            let accountPK = base58'${ByteStr(sender.publicKey.publicKey)}'
+            let accountPK = base58'${ByteStr(notMiner.publicKey.publicKey)}'
             let accSig = sigVerify(ttx.bodyBytes,ttx.proofs[0],accountPK)
 
             let txToUsers = (massTxSize && totalAmountToUsers)
@@ -59,16 +60,16 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     // set script
     val script = ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(sender.privateKey, Some(script), setScriptFee, System.currentTimeMillis())
+      .selfSigned(notMiner.privateKey, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
-    val setScriptId = sender
+    val setScriptId = notMiner
       .signedBroadcast(setScriptTransaction.json())
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-    sender.addressScriptInfo(sender.address).scriptText.isEmpty shouldBe false
+    notMiner.addressScriptInfo(notMiner.address).scriptText.isEmpty shouldBe false
 
     //save time
     val currTime = System.currentTimeMillis()
@@ -82,40 +83,40 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val unsigned =
       MassTransferTransaction
-        .create(None, sender.publicKey, transfers, currTime, calcMassTransferFee(2) + smartFee, Array.emptyByteArray, Proofs.empty)
+        .create(Waves, notMiner.publicKey, transfers, currTime, calcMassTransferFee(2) + smartFee, Array.emptyByteArray, Proofs.empty)
         .explicitGet()
 
-    val accountSig = ByteStr(crypto.sign(sender.privateKey, unsigned.bodyBytes()))
+    val accountSig = ByteStr(crypto.sign(notMiner.privateKey, unsigned.bodyBytes()))
     val signed     = unsigned.copy(proofs = Proofs(Seq(accountSig)))
-    val toUsersID  = sender.signedBroadcast(signed.json()).id
+    val toUsersID  = notMiner.signedBroadcast(signed.json()).id
 
     nodes.waitForHeightAriseAndTxPresent(toUsersID)
 
     //make transfer with incorrect time
-    val heightBefore = sender.height
+    val heightBefore = notMiner.height
 
     val transfersToGov =
       MassTransferTransaction.parseTransfersList(List(Transfer(firstAddress, transferAmount), Transfer(fourthAddress, transferAmount))).explicitGet()
 
     val unsignedToGov =
       MassTransferTransaction
-        .create(None, sender.publicKey, transfersToGov, currTime, calcMassTransferFee(2) + smartFee, Array.emptyByteArray, Proofs.empty)
+        .create(Waves, notMiner.publicKey, transfersToGov, currTime, calcMassTransferFee(2) + smartFee, Array.emptyByteArray, Proofs.empty)
         .explicitGet()
-    val accountSigToGovFail = ByteStr(crypto.sign(sender.privateKey, unsignedToGov.bodyBytes()))
+    val accountSigToGovFail = ByteStr(crypto.sign(notMiner.privateKey, unsignedToGov.bodyBytes()))
     val signedToGovFail     = unsignedToGov.copy(proofs = Proofs(Seq(accountSigToGovFail)))
 
     assertBadRequestAndResponse(
-      sender.signedBroadcast(signedToGovFail.json()),
+      notMiner.signedBroadcast(signedToGovFail.json()),
       "Transaction is not allowed by account-script"
     )
 
     //make correct transfer to government after some time
-    sender.waitForHeight(heightBefore + 10, 5.minutes)
+    notMiner.waitForHeight(heightBefore + 10, 5.minutes)
 
     val unsignedToGovSecond =
       MassTransferTransaction
-        .create(None,
-                sender.publicKey,
+        .create(Waves,
+                notMiner.publicKey,
                 transfersToGov,
                 System.currentTimeMillis(),
                 calcMassTransferFee(2) + smartFee,
@@ -123,9 +124,9 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
                 Proofs.empty)
         .explicitGet()
 
-    val accountSigToGov = ByteStr(crypto.sign(sender.privateKey, unsignedToGovSecond.bodyBytes()))
+    val accountSigToGov = ByteStr(crypto.sign(notMiner.privateKey, unsignedToGovSecond.bodyBytes()))
     val signedToGovGood = unsignedToGovSecond.copy(proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.decode(toUsersID).get))))
-    val massTransferID  = sender.signedBroadcast(signedToGovGood.json()).id
+    val massTransferID  = notMiner.signedBroadcast(signedToGovGood.json()).id
 
     nodes.waitForHeightAriseAndTxPresent(massTransferID)
   }

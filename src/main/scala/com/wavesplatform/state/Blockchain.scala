@@ -5,9 +5,10 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.Script
-import com.wavesplatform.transaction.{AssetId, Transaction, ValidationError}
+import com.wavesplatform.transaction.{Asset, Transaction, ValidationError}
 
 trait Blockchain {
   def height: Int
@@ -49,7 +50,7 @@ trait Blockchain {
 
   def containsTransaction(tx: Transaction): Boolean
 
-  def assetDescription(id: ByteStr): Option[AssetDescription]
+  def assetDescription(id: IssuedAsset): Option[AssetDescription]
 
   def resolveAlias(a: Alias): Either[ValidationError, Address]
 
@@ -63,18 +64,18 @@ trait Blockchain {
   def accountScript(address: Address): Option[Script]
   def hasScript(address: Address): Boolean
 
-  def assetScript(id: ByteStr): Option[Script]
-  def hasAssetScript(id: ByteStr): Boolean
+  def assetScript(id: IssuedAsset): Option[Script]
+  def hasAssetScript(id: IssuedAsset): Boolean
 
   def accountData(acc: Address): AccountDataInfo
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
 
   def leaseBalance(address: Address): LeaseBalance
 
-  def balance(address: Address, mayBeAssetId: Option[AssetId] = None): Long
+  def balance(address: Address, mayBeAssetId: Asset = Waves): Long
 
-  def assetDistribution(assetId: ByteStr): AssetDistribution
-  def assetDistributionAtHeight(assetId: AssetId,
+  def assetDistribution(asset: IssuedAsset): AssetDistribution
+  def assetDistributionAtHeight(asset: IssuedAsset,
                                 height: Int,
                                 count: Int,
                                 fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage]
@@ -84,6 +85,7 @@ trait Blockchain {
   def allActiveLeases: Set[LeaseTransaction]
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
+    *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 

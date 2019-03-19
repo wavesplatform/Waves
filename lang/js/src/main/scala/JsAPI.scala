@@ -2,7 +2,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, _}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.directives.DirectiveParser
-import com.wavesplatform.lang.utils.{extractContentType, extractScriptType, extractStdLibVersion}
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
@@ -49,20 +49,21 @@ object JsAPI {
     toJs(TRUE) // later
   }
 
-  private def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean = false) = WavesContext.build(
-    v,
-    new Environment {
-      override def height: Long                                                                                    = 0
-      override def chainId: Byte                                                                                   = 1: Byte
-      override def inputEntity: Environment.InputEntity                                                            = null
-      override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-      override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
-      override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
-      override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-      override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    },
-    isTokenContext
-  )
+  private def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
+    WavesContext.build(
+      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) ContentType.Contract else ContentType.Expression),
+      new Environment {
+        override def height: Long                                                                                    = 0
+        override def chainId: Byte                                                                                   = 1: Byte
+        override def inputEntity: Environment.InputEntity                                                            = null
+        override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+        override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
+        override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
+        override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+        override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+        override def tthis: Recipient.Address                                                                        = ???
+      }
+    )
 
   private val cryptoContext    = CryptoContext.build(Global)
   private val letBLockVersions = Set(StdLibVersion.V1, StdLibVersion.V2)
@@ -78,29 +79,29 @@ object JsAPI {
   private val fullContractContext: CTX =
     buildContractContext(V3)
 
-  private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean): CTX = {
-    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext, wavesContext(v, isTokenContext)))
+  private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX = {
+    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext, wavesContext(v, isTokenContext, isContract)))
   }
 
   private def buildContractContext(v: StdLibVersion): CTX = {
-    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext, wavesContext(V3)))
+    Monoid.combineAll(Seq(PureContext.build(v), cryptoContext, wavesContext(V3, false, true)))
   }
 
   @JSExportTopLevel("getTypes")
-  def getTypes(ver: Int = 2, isTokenContext: Boolean = false): js.Array[js.Object with js.Dynamic] =
-    buildScriptContext(StdLibVersion.parseVersion(ver), isTokenContext).types
+  def getTypes(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
+    buildScriptContext(StdLibVersion.parseVersion(ver), isTokenContext, isContract).types
       .map(v => js.Dynamic.literal("name" -> v.name, "type" -> typeRepr(v.typeRef)))
       .toJSArray
 
   @JSExportTopLevel("getVarsDoc")
-  def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false): js.Array[js.Object with js.Dynamic] =
-    buildScriptContext(StdLibVersion.parseVersion(ver), isTokenContext).vars
+  def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
+    buildScriptContext(StdLibVersion.parseVersion(ver), isTokenContext, isContract).vars
       .map(v => js.Dynamic.literal("name" -> v._1, "type" -> typeRepr(v._2._1._1), "doc" -> v._2._1._2))
       .toJSArray
 
   @JSExportTopLevel("getFunctionsDoc")
-  def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false): js.Array[js.Object with js.Dynamic] =
-    buildScriptContext(StdLibVersion.parseVersion(ver), isTokenContext).functions
+  def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
+    buildScriptContext(StdLibVersion.parseVersion(ver), isTokenContext, isContract).functions
       .map(f =>
         js.Dynamic.literal(
           "name"       -> f.name,
@@ -118,8 +119,8 @@ object JsAPI {
     "MaxExprSizeInBytes"               -> ContractLimits.MaxExprSizeInBytes,
     "MaxContractComplexity"            -> ContractLimits.MaxContractComplexity,
     "MaxContractSizeInBytes"           -> ContractLimits.MaxContractSizeInBytes,
-    "MaxContractInvocationArgs"        -> ContractLimits.MaxContractInvocationArgs,
-    "MaxContractInvocationSizeInBytes" -> ContractLimits.MaxContractInvocationSizeInBytes,
+    "MaxContractInvocationArgs"        -> ContractLimits.MaxInvokeScriptArgs,
+    "MaxContractInvocationSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
     "MaxWriteSetSizeInBytes"           -> ContractLimits.MaxWriteSetSizeInBytes,
     "MaxPaymentAmount"                 -> ContractLimits.MaxPaymentAmount
   )
@@ -127,12 +128,10 @@ object JsAPI {
   @JSExportTopLevel("scriptInfo")
   def scriptInfo(input: String): js.Dynamic = {
     val directives = DirectiveParser(input)
-    val info = for {
-      ver         <- extractStdLibVersion(directives)
-      contentType <- extractContentType(directives)
-      scriptType  <- extractScriptType(directives)
-    } yield js.Dynamic.literal("stdLibVersion" -> ver, "contentType" -> contentType, "scriptType" -> scriptType)
-
+    val info = extractDirectives(directives) map {
+      case DirectiveSet(ver, scriptType, contentType) =>
+        js.Dynamic.literal("stdLibVersion" -> ver, "contentType" -> contentType, "scriptType" -> scriptType)
+    }
     info.fold(
       err => js.Dynamic.literal("error" -> err),
       identity
@@ -142,37 +141,34 @@ object JsAPI {
   @JSExportTopLevel("compile")
   def compile(input: String): js.Dynamic = {
     val directives = DirectiveParser(input)
-    val compiled = for {
-      ver         <- extractStdLibVersion(directives)
-      contentType <- extractContentType(directives)
-      scriptType  <- extractScriptType(directives)
-    } yield {
-      contentType match {
-        case ContentType.Expression =>
-          val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset)
-          Global
-            .compileExpression(input, ctx.compilerContext, letBLockVersions contains ver)
-            .fold(
-              err => {
-                js.Dynamic.literal("error" -> err)
-              }, {
-                case (bytes, ast) =>
-                  js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
-              }
-            )
-        case ContentType.Contract =>
-          // Just ignore stdlib version here
-          Global
-            .compileContract(input, fullContractContext.compilerContext)
-            .fold(
-              err => {
-                js.Dynamic.literal("error" -> err)
-              }, {
-                case (bytes, ast) =>
-                  js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
-              }
-            )
-      }
+    val compiled = extractDirectives(directives) map {
+      case DirectiveSet(ver, scriptType, contentType) =>
+        contentType match {
+          case ContentType.Expression =>
+            val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset, contentType == ContentType.Contract)
+            Global
+              .compileExpression(input, ctx.compilerContext, letBLockVersions contains ver, ver)
+              .fold(
+                err => {
+                  js.Dynamic.literal("error" -> err)
+                }, {
+                  case (bytes, ast) =>
+                    js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
+                }
+              )
+          case ContentType.Contract =>
+            // Just ignore stdlib version here
+            Global
+              .compileContract(input, fullContractContext.compilerContext, ver)
+              .fold(
+                err => {
+                  js.Dynamic.literal("error" -> err)
+                }, {
+                  case (bytes, ast) =>
+                    js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
+                }
+              )
+        }
     }
 
     compiled.fold(

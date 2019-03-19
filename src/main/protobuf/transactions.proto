@@ -1,8 +1,8 @@
 // Transactions
 syntax = "proto3";
 option java_package = "com.wavesplatform.protobuf.transaction";
-import "scripts.proto";
-import "address.proto";
+import "script.proto";
+import "recipient.proto";
 
 message AssetAmount {
     bytes assetId = 1;
@@ -22,7 +22,7 @@ message SignedTransaction {
 }
 
 message Transaction {
-    bytes chainId = 1;
+    int32 chainId = 1;
     bytes senderPublicKey = 2;
     Amount fee = 3;
     int64 timestamp = 4;
@@ -103,7 +103,7 @@ message LeaseCancelTransactionData {
 };
 
 message BurnTransactionData {
-    AssetAmount assetAmount = 1;;
+    AssetAmount assetAmount = 1;
 };
 
 message IssueTransactionData {
@@ -152,17 +152,18 @@ message ExchangeTransactionData {
             bytes priceAssetId = 2;
         };
 
-        bytes senderPublicKey = 1;
-        bytes matcherPublicKey = 2;
-        AssetPair assetPair = 3;
-        Side orderSide = 4;
-        int64 amount = 5;
-        int64 price = 6;
-        int64 timestamp = 7;
-        int64 expiration = 8;
-        Amount matcherFee = 9;
-        int32 version = 10;
-        repeated bytes proofs = 11;
+        int32 chainId = 1;
+        bytes senderPublicKey = 2;
+        bytes matcherPublicKey = 3;
+        AssetPair assetPair = 4;
+        Side orderSide = 5;
+        int64 amount = 6;
+        int64 price = 7;
+        int64 timestamp = 8;
+        int64 expiration = 9;
+        Amount matcherFee = 10;
+        int32 version = 11;
+        repeated bytes proofs = 12;
     };
 
     oneof orders {

@@ -12,6 +12,7 @@ import com.wavesplatform.matcher.AddressActor.{BalanceUpdated, PlaceOrder}
 import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, OrderV1}
 import com.wavesplatform.wallet.Wallet
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
@@ -33,7 +34,7 @@ class AddressActorSpecification
   private val sellTokenOrder1 = OrderV1(
     sender = privateKey("test"),
     matcher = PublicKeyAccount("matcher".getBytes()),
-    pair = AssetPair(None, Some(assetId)),
+    pair = AssetPair(Waves, IssuedAsset(assetId)),
     orderType = OrderType.BUY,
     price = 100000000L,
     amount = 100L,
@@ -47,7 +48,7 @@ class AddressActorSpecification
   private val sellTokenOrder2 = OrderV1(
     sender = privateKey("test"),
     matcher = PublicKeyAccount("matcher".getBytes()),
-    pair = AssetPair(None, Some(assetId)),
+    pair = AssetPair(Waves, IssuedAsset(assetId)),
     orderType = OrderType.BUY,
     price = 100000000L,
     amount = 100L,
@@ -61,7 +62,7 @@ class AddressActorSpecification
   private val sellWavesOrder = OrderV1(
     sender = privateKey("test"),
     matcher = PublicKeyAccount("matcher".getBytes()),
-    pair = AssetPair(None, Some(assetId)),
+    pair = AssetPair(Waves, IssuedAsset(assetId)),
     orderType = OrderType.SELL,
     price = 100000000L,
     amount = 100L,
@@ -207,7 +208,7 @@ class AddressActorSpecification
 
   private def requiredPortfolio(order: Order): Portfolio = {
     val b = LimitOrder(order).requiredBalance
-    Portfolio(b.getOrElse(None, 0L), LeaseBalance.empty, b.collect { case (Some(id), v) => id -> v })
+    Portfolio(b.getOrElse(Waves, 0L), LeaseBalance.empty, b.collect { case (id @ IssuedAsset(_), v) => id -> v })
   }
 
   private def addr(seed: String): Address                 = privateKey(seed).toAddress

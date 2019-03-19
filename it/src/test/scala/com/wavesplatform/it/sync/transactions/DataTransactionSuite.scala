@@ -18,22 +18,22 @@ import scala.util.{Failure, Random, Try}
 class DataTransactionSuite extends BaseTransactionSuite {
 
   test("sender's waves balance is decreased by fee.") {
-    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
+    val (balance1, eff1) = miner.accountBalances(firstAddress)
     val entry            = IntegerDataEntry("int", 0xcafebabe)
     val data             = List(entry)
     val transferFee      = calcDataFee(data)
     val txId             = sender.putData(firstAddress, data, transferFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
-    notMiner.assertBalances(firstAddress, balance1 - transferFee, eff1 - transferFee)
+    miner.assertBalances(firstAddress, balance1 - transferFee, eff1 - transferFee)
   }
 
   test("cannot transact without having enough waves") {
-    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
+    val (balance1, eff1) = miner.accountBalances(firstAddress)
 
     val data = List(BooleanDataEntry("bool", false))
     assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 + 1), "negative waves balance")
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance1, eff1)
+    miner.assertBalances(firstAddress, balance1, eff1)
 
     val leaseAmount = 1.waves
     val leaseId     = sender.lease(firstAddress, secondAddress, leaseAmount, minFee).id
@@ -41,7 +41,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
     assertBadRequestAndResponse(sender.putData(firstAddress, data, balance1 - leaseAmount), "negative effective balance")
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance1 - minFee, eff1 - leaseAmount - minFee)
+    miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leaseAmount - minFee)
   }
 
   test("invalid transaction should not be in UTX or blockchain") {
@@ -51,7 +51,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
              version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
       DataTransaction.selfSigned(sender.privateKey, entries, fee, timestamp).explicitGet()
 
-    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
+    val (balance1, eff1) = miner.accountBalances(firstAddress)
     val invalidTxs = Seq(
       (data(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
       (data(fee = 99999), "Fee .* does not exceed minimal value")
@@ -63,7 +63,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     }
 
     nodes.waitForHeightArise()
-    notMiner.assertBalances(firstAddress, balance1, eff1)
+    miner.assertBalances(firstAddress, balance1, eff1)
   }
 
   test("max transaction size") {
@@ -112,7 +112,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getData(secondAddress) shouldBe boolList ++ reIntList ++ stringList
 
     // define tx with all types
-    val (balance2, eff2) = notMiner.accountBalances(secondAddress)
+    val (balance2, eff2) = miner.accountBalances(secondAddress)
     val intEntry2        = IntegerDataEntry("int", -127)
     val boolEntry2       = BooleanDataEntry("bool", false)
     val blobEntry2       = BinaryDataEntry("blob", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
@@ -128,7 +128,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getData(secondAddress, "str") shouldBe stringEntry2
     sender.getData(secondAddress) shouldBe dataAllTypes.sortBy(_.key)
 
-    notMiner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
+    miner.assertBalances(secondAddress, balance2 - fee, eff2 - fee)
 
     val json = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody)
     ((json \ "data")(2) \ "value").as[String].startsWith("base64:") shouldBe true

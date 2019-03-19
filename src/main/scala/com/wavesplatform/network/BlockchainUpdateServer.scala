@@ -14,7 +14,6 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.execution.{Ack, Scheduler}
 import monix.execution.Ack.Continue
-import monix.execution.Scheduler.singleThread
 import monix.reactive.{Observable, Observer}
 import com.wavesplatform.protobuf.events.{PBBlockchainUpdated, PBEvents}
 import io.netty.buffer.ByteBuf
@@ -65,11 +64,9 @@ private class BlockchainUpdateHandler(blockchainUpdated: Observable[BlockchainUp
   }
 }
 
-class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observable[BlockchainUpdated]) {
+class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observable[BlockchainUpdated], scheduler: Scheduler) {
   private val group = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-updates-group", true))
 //  private val workerGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-updates-worker-group", true))
-
-  private val blockchainUpdatedScheduler = singleThread("blockchain-updated")
 
   private val channel = new Bootstrap()
     .group(group)
@@ -80,7 +77,7 @@ class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observa
           PBInt32LengthPrepender,
           new ProtobufEncoder,
           PBScalaToJava,
-          new BlockchainUpdateHandler(blockchainUpdates, blockchainUpdatedScheduler)
+          new BlockchainUpdateHandler(blockchainUpdates, scheduler)
         )
       )
     )
@@ -91,8 +88,6 @@ class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observa
     try {
       channel.close().await()
     } finally {
-      // @todo proper shutdown
-      blockchainUpdatedScheduler.shutdown()
       group.shutdownGracefully().await()
 //      bossGroup.shutdownGracefully().await()
     }

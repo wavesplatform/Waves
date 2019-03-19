@@ -1,76 +1,106 @@
 package com.wavesplatform.settings
 
-import com.typesafe.config.ConfigFactory
+import cats.implicits._
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.settings.fee.AssetType
+import com.wavesplatform.settings.fee.OrderFeeSettings._
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
+import scala.util.Try
 
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
+
+  def configStrWithOrderFeeSettings(orderFeeSettings: String): Config = {
+    val configStr =
+      s"""waves {
+      |  directory = /waves
+      |  matcher {
+      |    enable = yes
+      |    account = 3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX
+      |    bind-address = 127.0.0.1
+      |    port = 6886
+      |    actor-response-timeout = 11s
+      |    snapshots-interval = 999
+      |    make-snapshots-at-start = yes
+      |    snapshots-loading-timeout = 423s
+      |    start-events-processing-timeout = 543s
+      |    rest-order-limit = 100
+      |    price-assets = [
+      |      WAVES
+      |      8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS
+      |      DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J
+      |    ]
+      |    blacklisted-assets = ["a"]
+      |    blacklisted-names = ["b"]
+      |    blacklisted-addresses = [
+      |      3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD
+      |    ]
+      |    order-book-snapshot-http-cache {
+      |      cache-timeout = 11m
+      |      depth-ranges = [1, 5, 333]
+      |    }
+      |    balance-watching-buffer-interval = 33s
+      |    events-queue {
+      |      type = "kafka"
+      |
+      |      local {
+      |        polling-interval = 1d
+      |        max-elements-per-poll = 99
+      |        clean-before-consume = no
+      |      }
+      |
+      |      kafka {
+      |        topic = "some-events"
+      |
+      |        consumer {
+      |          buffer-size = 100
+      |          min-backoff = 11s
+      |          max-backoff = 2d
+      |        }
+      |
+      |        producer.buffer-size = 200
+      |      }
+      |    }
+      |    $orderFeeSettings
+      |  }
+      |}""".stripMargin
+
+    loadConfig(ConfigFactory.parseString(configStr))
+  }
+
   "MatcherSettings" should "read values" in {
-    val config = loadConfig(ConfigFactory.parseString("""waves {
-        |  directory = /waves
-        |  matcher {
-        |    enable = yes
-        |    account = 3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX
-        |    bind-address = 127.0.0.1
-        |    port = 6886
-        |    min-order-fee = 100000
-        |    order-match-tx-fee = 100000
-        |    snapshots-interval = 999
-        |    make-snapshots-at-start = yes
-        |    snapshots-loading-timeout = 423s
-        |    start-events-processing-timeout = 543s
-        |    rest-order-limit = 100
-        |    price-assets = [
-        |      WAVES
-        |      8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS
-        |      DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J
-        |    ]
-        |    blacklisted-assets = ["a"]
-        |    blacklisted-names = ["b"]
-        |    blacklisted-addresses = [
-        |      3N5CBq8NYBMBU3UVS3rfMgaQEpjZrkWcBAD
-        |    ]
-        |    order-book-snapshot-http-cache {
-        |      cache-timeout = 11m
-        |      depth-ranges = [1, 5, 333]
-        |    }
-        |    balance-watching-buffer-interval = 33s
-        |    events-queue {
-        |      type = "kafka"
-        |
-        |      local {
-        |        polling-interval = 1d
-        |        max-elements-per-poll = 99
-        |        clean-before-consume = no
-        |      }
-        |
-        |      kafka {
-        |        topic = "some-events"
-        |
-        |        consumer {
-        |          buffer-size = 100
-        |          min-backoff = 11s
-        |          max-backoff = 2d
-        |        }
-        |
-        |        producer.buffer-size = 200
-        |      }
-        |    }
-        |  }
-        |}""".stripMargin))
+
+    val correctOrderFeeSettings =
+      s"""
+         |order-fee {
+         |  mode = percent
+         |  fixed-waves {
+         |    base-fee = 300000
+         |  }
+         |  fixed {
+         |    asset-id = WAVES
+         |    min-fee = 300000
+         |  }
+         |  percent {
+         |    asset-type = amount
+         |    min-fee = 0.1
+         |  }
+         |}
+       """.stripMargin
+
+    val config = configStrWithOrderFeeSettings(correctOrderFeeSettings)
 
     val settings = MatcherSettings.fromConfig(config)
     settings.enable should be(true)
     settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
     settings.bindAddress should be("127.0.0.1")
     settings.port should be(6886)
-    settings.minOrderFee should be(100000)
-    settings.orderMatchTxFee should be(100000)
+    settings.actorResponseTimeout should be(11.seconds)
     settings.journalDataDir should be("/waves/matcher/journal")
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(999)
@@ -96,5 +126,134 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         KafkaMatcherQueue.ProducerSettings(200)
       )
     )
+
+    settings.orderFee match {
+      case FixedWavesSettings(baseFee) =>
+        baseFee shouldBe 300000
+      case FixedSettings(defaultAssetId, minFee) =>
+        defaultAssetId shouldBe None
+        minFee shouldBe 300000
+      case PercentSettings(assetType, minFee) =>
+        assetType shouldBe AssetType.AMOUNT
+        minFee shouldBe 0.1
+    }
+  }
+
+  "MatcherSettings" should "produce errors" in {
+
+    def getSettingByConfig(conf: Config): Either[String, MatcherSettings] = Try(MatcherSettings.fromConfig(conf)).toEither.leftMap(_.getMessage)
+
+    val invalidMode =
+      s"""
+         |order-fee {
+         |  mode = invalid
+         |  fixed-waves {
+         |    base-fee = 300000
+         |  }
+         |  fixed {
+         |    asset-id = WAVES
+         |    min-fee = 300000
+         |  }
+         |  percent {
+         |    asset-type = amount
+         |    min-fee = 0.1
+         |  }
+         |}
+       """.stripMargin
+
+    val invalidAssetTypeAndPercent =
+      s"""
+         |order-fee {
+         |  mode = percent
+         |  fixed-waves {
+         |    base-fee = 300000
+         |  }
+         |  fixed {
+         |    asset-id = WAVES
+         |    min-fee = 300000
+         |  }
+         |  percent {
+         |    asset-type = test
+         |    min-fee = 121
+         |  }
+         |}
+       """.stripMargin
+
+    val invalidAssetAndFee =
+      s"""
+         |order-fee {
+         |  mode = fixed
+         |  fixed-waves {
+         |    base-fee = 300000
+         |  }
+         |  fixed {
+         |    asset-id = ;;;;
+         |    min-fee = -300000
+         |  }
+         |  percent {
+         |    asset-type = test
+         |    min-fee = 121
+         |  }
+         |}
+       """.stripMargin
+
+    val invalidWavesAsset =
+      s"""
+         |order-fee {
+         |  mode = fixed
+         |  fixed-waves {
+         |    base-fee = 300000
+         |  }
+         |  fixed {
+         |    asset-id = WAVES
+         |    min-fee = 300000
+         |  }
+         |  percent {
+         |    asset-type = test
+         |    min-fee = 121
+         |  }
+         |}
+       """.stripMargin
+
+    val invalidFeeInWaves =
+      s"""
+         |order-fee {
+         |  mode = fixed-waves
+         |  fixed-waves {
+         |    base-fee = -350000
+         |  }
+         |  fixed {
+         |    asset-id = ;;;;
+         |    min-fee = -300000
+         |  }
+         |  percent {
+         |    asset-type = test
+         |    min-fee = 121
+         |  }
+         |}
+       """.stripMargin
+
+    val settingsInvalidMode           = getSettingByConfig(configStrWithOrderFeeSettings(invalidMode))
+    val settingsInvalidTypeAndPercent = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetTypeAndPercent))
+    val settingsInvalidAssetAndFee    = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetAndFee))
+    val settingsInvalidWavseAsset     = getSettingByConfig(configStrWithOrderFeeSettings(invalidWavesAsset))
+    val settingsInvalidFeeInWaves     = getSettingByConfig(configStrWithOrderFeeSettings(invalidFeeInWaves))
+
+    settingsInvalidMode shouldBe Left("Invalid setting waves.matcher.order-fee.mode value: invalid")
+
+    settingsInvalidTypeAndPercent shouldBe
+      Left(
+        "Invalid setting waves.matcher.order-fee.percent.asset-type value: test\n" +
+          "Invalid setting waves.matcher.order-fee.percent.min-fee value: 121.0, required 0 < p <= 100")
+
+    settingsInvalidAssetAndFee shouldBe
+      Left(
+        "Invalid setting waves.matcher.order-fee.fixed.asset-id value: ;;;;\n" +
+          "Invalid setting waves.matcher.order-fee.fixed.min-fee value: -300000, must be > 0")
+
+    settingsInvalidWavseAsset shouldBe
+      Left("Invalid setting waves.matcher.order-fee.fixed.asset-id value: WAVES, asset must not be Waves")
+
+    settingsInvalidFeeInWaves shouldBe Left("Invalid setting waves.matcher.order-fee.fixed-waves.base-fee value: -350000, must be > 0")
   }
 }

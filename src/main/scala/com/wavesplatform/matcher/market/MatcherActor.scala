@@ -5,14 +5,15 @@ import java.util.concurrent.atomic.AtomicReference
 import akka.actor.{ActorRef, Props, SupervisorStrategy, Terminated}
 import akka.persistence._
 import com.google.common.base.Charsets
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{DuringShutdown, OrderBookUnavailable}
+import com.wavesplatform.matcher.error.MatcherError
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.queue.QueueEventWithMeta.{Offset => EventOffset}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
 import com.wavesplatform.state.AssetDescription
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json._
@@ -22,7 +23,7 @@ class MatcherActor(settings: MatcherSettings,
                    recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
                    orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
                    orderBookActorProps: (AssetPair, ActorRef) => Props,
-                   assetDescription: ByteStr => Option[AssetDescription])
+                   assetDescription: IssuedAsset => Option[AssetDescription])
     extends PersistentActor
     with ScorexLogging {
 
@@ -46,17 +47,23 @@ class MatcherActor(settings: MatcherSettings,
 
   private def orderBook(pair: AssetPair) = Option(orderBooks.get()).flatMap(_.get(pair))
 
-  private def getAssetName(asset: Option[AssetId], desc: Option[AssetDescription]): String =
-    asset.fold(AssetPair.WavesName) { _ =>
-      desc.fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
+  private def getAssetName(asset: Asset, desc: Option[AssetDescription]): String =
+    asset match {
+      case Waves => AssetPair.WavesName
+      case _     => desc.fold("Unknown")(d => new String(d.name, Charsets.UTF_8))
     }
 
-  private def getAssetInfo(asset: Option[AssetId], desc: Option[AssetDescription]): Option[AssetInfo] =
+  private def getAssetInfo(asset: Asset, desc: Option[AssetDescription]): Option[AssetInfo] =
     asset.fold(Option(8))(_ => desc.map(_.decimals)).map(AssetInfo)
 
+  private def getAssetDescriptionByAssetId(assetId: Asset): Option[AssetDescription] = assetId match {
+    case Waves                  => None
+    case asset @ IssuedAsset(_) => assetDescription(asset)
+  }
+
   private def createMarketData(pair: AssetPair): MarketData = {
-    val amountDesc = pair.amountAsset.flatMap(assetDescription)
-    val priceDesc  = pair.priceAsset.flatMap(assetDescription)
+    val amountDesc = getAssetDescriptionByAssetId(pair.amountAsset)
+    val priceDesc  = getAssetDescriptionByAssetId(pair.priceAsset)
 
     MarketData(
       pair,
@@ -97,7 +104,7 @@ class MatcherActor(settings: MatcherSettings,
               orderBooks.get.get(assetPair).flatMap(_.toOption).foreach(_ ! SaveSnapshot(offset))
               snapshotsState = updatedSnapshotState
           }
-        case Some(Left(_)) => s ! OrderBookUnavailable
+        case Some(Left(_)) => s ! OrderBookUnavailable(MatcherError.OrderBookUnavailable(assetPair))
         case None =>
           val ob = createOrderBook(assetPair)
           persistAsync(OrderBookCreated(assetPair))(_ => ())
@@ -282,7 +289,7 @@ object MatcherActor {
             recoveryCompletedWithEventNr: Either[String, (ActorRef, Long)] => Unit,
             orderBooks: AtomicReference[Map[AssetPair, Either[Unit, ActorRef]]],
             orderBookProps: (AssetPair, ActorRef) => Props,
-            assetDescription: ByteStr => Option[AssetDescription]): Props =
+            assetDescription: IssuedAsset => Option[AssetDescription]): Props =
     Props(
       new MatcherActor(
         matcherSettings,

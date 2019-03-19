@@ -22,7 +22,8 @@ import com.wavesplatform.matcher.queue._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{Blockchain, VolumeAndFee}
-import com.wavesplatform.transaction.AssetId
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, Time, forceStopApplication}
 import com.wavesplatform.utx.UtxPool
@@ -40,7 +41,7 @@ class Matcher(actorSystem: ActorSystem,
               utx: UtxPool,
               allChannels: ChannelGroup,
               blockchain: Blockchain,
-              spendableBalanceChanged: Observable[(Address, Option[AssetId])],
+              spendableBalanceChanged: Observable[(Address, Asset)],
               settings: WavesSettings,
               matcherPrivateKey: PrivateKeyAccount)
     extends ScorexLogging {
@@ -54,9 +55,21 @@ class Matcher(actorSystem: ActorSystem,
   private val status: AtomicReference[Status] = new AtomicReference(Status.Starting)
   private var currentOffset                   = -1L // Used only for REST API
 
+  private val blacklistedAssets: Set[IssuedAsset] = matcherSettings.blacklistedAssets
+    .map { assetName =>
+      val asset = AssetPair
+        .extractAssetId(assetName)
+        .get
+
+      asset match {
+        case Waves              => throw new IllegalArgumentException("Can't blacklist the main coin")
+        case a @ IssuedAsset(_) => a
+      }
+    }
+
   private val pairBuilder        = new AssetPairBuilder(settings.matcherSettings, blockchain)
   private val orderBookCache     = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot](1000, 0.9f, 10)
-  private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings)
+  private val transactionCreator = new ExchangeTransactionCreator(blockchain, matcherPrivateKey, matcherSettings.orderFee)
 
   private val orderBooks = new AtomicReference(Map.empty[AssetPair, Either[Unit, ActorRef]])
   private val orderBooksSnapshotCache = new OrderBookSnapshotHttpCache(
@@ -96,19 +109,19 @@ class Matcher(actorSystem: ActorSystem,
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
 
-  private def validateOrder(o: Order) =
+  private def validateOrder(o: Order) = {
+    import com.wavesplatform.matcher.error._
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey,
-                                               blacklistedAddresses,
-                                               matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get))(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, matcherSettings.orderFee)(o)
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.blockchainAware(blockchain,
                                           transactionCreator.createTransaction,
-                                          settings.matcherSettings.orderMatchTxFee,
                                           matcherPublicKey.toAddress,
-                                          time)(o)
-      _ <- pairBuilder.validateAssetPair(o.assetPair)
+                                          time,
+                                          matcherSettings.orderFee)(o)
+      _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(x))
     } yield o
+  }
 
   lazy val matcherApiRoutes: Seq[MatcherApiRoute] = Seq(
     MatcherApiRoute(
@@ -125,7 +138,8 @@ class Matcher(actorSystem: ActorSystem,
       () => status.get(),
       db,
       time,
-      () => currentOffset
+      () => currentOffset,
+      ExchangeTransactionCreator.minAccountFee(blockchain, matcherPublicKey.toAddress)
     )
   )
 
@@ -294,7 +308,7 @@ object Matcher extends ScorexLogging {
             utx: UtxPool,
             allChannels: ChannelGroup,
             blockchain: Blockchain,
-            spendableBalanceChanged: Observable[(Address, Option[AssetId])],
+            spendableBalanceChanged: Observable[(Address, Asset)],
             settings: WavesSettings): Option[Matcher] =
     try {
       val privateKey = (for {

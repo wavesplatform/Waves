@@ -30,8 +30,8 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state.BlockchainUpdated
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.transaction.AssetId
-import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter, forceStopApplication}
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.utils.{NTP, ScorexLogging, SystemInformationReporter}
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -60,7 +60,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val LocalScoreBroadcastDebounce = 1.second
 
-  private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Option[AssetId])]
+  private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
   private val blockchainUpdated = ConcurrentSubject.publish[BlockchainUpdated]
   private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, Some(blockchainUpdated))
@@ -82,6 +82,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val appenderScheduler               = singleThread("appender", reporter = log.error("Error in Appender", _))
   private val historyRepliesScheduler         = fixedPool("history-replier", poolSize = 2, reporter = log.error("Error in History Replier", _))
   private val minerScheduler                  = fixedPool("miner-pool", poolSize = 2, reporter = log.error("Error in Miner", _))
+  private val blockchainUpdatedScheduler      = singleThread("blockchain-updated", reporter = log.error("Error in sending blockchain updates", _))
 
   private var matcher: Option[Matcher]                                         = None
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
@@ -149,7 +150,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = network.messages
 
-    val blockchainUpdateServer = new BlockchainUpdateServer(settings, blockchainUpdated)
+    val blockchainUpdateServer = new BlockchainUpdateServer(settings, blockchainUpdated, blockchainUpdatedScheduler)
     maybeBlockchainUpdateServer = Some(blockchainUpdateServer)
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
@@ -325,6 +326,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
       shutdownAndWait(scoreObserverScheduler, "ScoreObserver")
       shutdownAndWait(extensionLoaderScheduler, "ExtensionLoader")
+      shutdownAndWait(blockchainUpdatedScheduler, "BlockchainUpdated")
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes)
 
       log.info("Closing storage")
@@ -354,26 +356,9 @@ object Application extends ScorexLogging {
       maybeFilename <- userConfigPath
       file = new File(maybeFilename)
       if file.exists
-    } yield file
+    } yield ConfigFactory.parseFile(file)
 
-    val config = maybeConfigFile match {
-      // if no user config is supplied, the library will handle overrides/application/reference automatically
-      case None =>
-        log.warn("NO CONFIGURATION FILE WAS PROVIDED. STARTING WITH DEFAULT SETTINGS FOR TESTNET!")
-        ConfigFactory.load()
-      // application config needs to be resolved wrt both system properties *and* user-supplied config.
-      case Some(file) =>
-        val cfg = ConfigFactory.parseFile(file)
-        if (!cfg.hasPath("waves")) {
-          log.error("Malformed configuration file was provided! Aborting!")
-          log.error("Please, read following article about configuration file format:")
-          log.error("https://github.com/wavesplatform/Waves/wiki/Waves-Node-configuration-file")
-          forceStopApplication()
-        }
-        loadConfig(cfg)
-    }
-
-    config
+    loadConfig(maybeConfigFile)
   }
 
   def main(args: Array[String]): Unit = {

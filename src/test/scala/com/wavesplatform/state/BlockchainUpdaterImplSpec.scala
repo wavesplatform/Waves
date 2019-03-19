@@ -11,6 +11,7 @@ import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
@@ -65,7 +66,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
   def createTransfer(master: PrivateKeyAccount, recipient: Address, ts: Long): TransferTransaction = {
     TransferTransactionV1
-      .selfSigned(None, master, recipient, ENOUGH_AMT / 5, ts, None, FEE_AMT, Array.emptyByteArray)
+      .selfSigned(Waves, master, recipient, ENOUGH_AMT / 5, ts, Waves, 1000000, Array.emptyByteArray)
       .explicitGet()
   }
 

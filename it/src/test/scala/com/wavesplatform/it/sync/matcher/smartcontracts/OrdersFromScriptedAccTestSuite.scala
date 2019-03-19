@@ -9,6 +9,7 @@ import com.wavesplatform.it.matcher.MatcherSuiteBase
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
@@ -29,7 +30,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     val aliceAsset =
       aliceNode.issue(aliceAcc.address, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, smartIssueFee, 2).id
     matcherNode.waitForTransaction(aliceAsset)
-    val aliceWavesPair = AssetPair(ByteStr.decodeBase58(aliceAsset).toOption, None)
+    val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
 
     "setScript at account" in {
       // check assets's balances
@@ -46,14 +47,14 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     "trading is deprecated" in {
       assertBadRequestAndResponse(
         matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1, 10.minutes),
-        "Trading on scripted account isn't allowed yet"
+        "The trading on scripted account isn't yet supported"
       )
     }
 
     "can't place an OrderV2 before the activation" in {
       assertBadRequestAndResponse(
         matcherNode.placeOrder(bobAcc, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes),
-        "Orders of version 1 are only accepted, because SmartAccountTrading has not been activated yet"
+        "The order of version .* isn't yet supported"
       )
     }
 

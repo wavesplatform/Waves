@@ -14,6 +14,7 @@ import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.EmptyBlockchain
@@ -24,7 +25,7 @@ import scala.util.Random
 
 class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTPTime with ImplicitSender with MatcherTestData with PathMockFactory {
 
-  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings).createTransaction _
+  private val txFactory = new ExchangeTransactionCreator(EmptyBlockchain, MatcherAccount, matcherSettings.orderFee).createTransaction _
   private val obc       = new ConcurrentHashMap[AssetPair, OrderBook.AggregatedSnapshot]
   private val md        = new ConcurrentHashMap[AssetPair, MarketStatus]
 
@@ -37,7 +38,7 @@ class OrderBookActorSpecification extends MatcherSpec("OrderBookActor") with NTP
     Random.nextBytes(b.arr)
 
     val tp   = TestProbe()
-    val pair = AssetPair(Some(b), None)
+    val pair = AssetPair(IssuedAsset(b), Waves)
     val actor = system.actorOf(
       Props(
         new OrderBookActor(

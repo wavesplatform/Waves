@@ -18,12 +18,11 @@ package object compiler {
   val listOfLongs = LIST
   val idT = NativeFunction("idT", 1, 10000: Short, TYPEPARAM('T'), "test id", ("p1", TYPEPARAM('T'), "p1")) {
     case a :: Nil => Right(a)
-    case _        => ???
   }
   val returnsListLong =
-    NativeFunction("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE, "test undefinedOptionLong")(_ => ???)
+    NativeFunction("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE, "test undefinedOptionLong") { case _ => ??? }
   val idOptionLong =
-    NativeFunction("idOptionLong", 1, 1003: Short, UNIT, "test Some", ("opt", UNION(LONG, UNIT), "opt"))(_ => Right(unit))
+    NativeFunction("idOptionLong", 1, 1003: Short, UNIT, "test Some", ("opt", UNION(LONG, UNIT), "opt")) { case _ => Right(unit) }
   val functionWithTwoPrarmsOfTheSameType =
     NativeFunction("functionWithTwoPrarmsOfTheSameType",
                    1,
@@ -31,7 +30,7 @@ package object compiler {
                    TYPEPARAM('T'),
                    "test same type params",
                    ("p1", TYPEPARAM('T'), "p1"),
-                   ("p2", TYPEPARAM('T'), "p2"))(l => Right(l.head))
+                   ("p2", TYPEPARAM('T'), "p2")) { case l => Right(l.head) }
 
   private val arr = ARR(IndexedSeq[EVALUATED](null, null))
   val compilerContext: CompilerContext = Monoid

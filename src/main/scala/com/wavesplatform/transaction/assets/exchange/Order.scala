@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -45,7 +46,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 
   def signature: Array[Byte] = proofs.proofs(0).arr
 
-  def matcherFeeAssetId: Option[AssetId] = None
+  def matcherFeeAssetId: Asset = Waves
 
   import Order._
 
@@ -84,13 +85,13 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   val bytes: Coeval[Array[Byte]]
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAssetId: Option[AssetId] = orderType match {
+  def getReceiveAssetId: Asset = orderType match {
     case OrderType.BUY  => assetPair.amountAsset
     case OrderType.SELL => assetPair.priceAsset
   }
 
   @ApiModelProperty(hidden = true)
-  def getSpendAssetId: Option[AssetId] = orderType match {
+  def getSpendAssetId: Asset = orderType match {
     case OrderType.BUY  => assetPair.priceAsset
     case OrderType.SELL => assetPair.amountAsset
   }
@@ -102,7 +103,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
       if (orderType == OrderType.SELL) matchAmount
       else {
         val spend = BigInt(matchAmount) * matchPrice / PriceConstant
-        if (getSpendAssetId.isEmpty && !(spend + matcherFee).isValidLong) {
+        if (getSpendAssetId == Waves && !(spend + matcherFee).isValidLong) {
           throw new ArithmeticException("BigInteger out of long range")
         } else spend.bigInteger.longValueExact()
       }
@@ -201,7 +202,7 @@ object Order {
             matcherFee: Long,
             proofs: Proofs,
             version: Byte,
-            matcherFeeAssetId: Option[AssetId]): Order = version match {
+            matcherFeeAssetId: Asset): Order = version match {
     case 3 =>
       OrderV3(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, proofs)
   }
@@ -222,7 +223,7 @@ object Order {
           expiration: Long,
           matcherFee: Long,
           version: Byte = 1,
-          matcherFeeAssetId: Option[AssetId] = None): Order = {
+          matcherFeeAssetId: Asset = Waves): Order = {
     val unsigned = version match {
       case 3 =>
         Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
@@ -240,7 +241,7 @@ object Order {
            expiration: Long,
            matcherFee: Long,
            version: Byte = 1,
-           matcherFeeAssetId: Option[AssetId] = None): Order = {
+           matcherFeeAssetId: Asset = Waves): Order = {
     val unsigned = version match {
       case 3 =>
         Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
@@ -273,7 +274,7 @@ object Order {
             expiration: Long,
             matcherFee: Long,
             version: Byte,
-            matcherFeeAssetId: Option[AssetId]): Order = {
+            matcherFeeAssetId: Asset): Order = {
     val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
     sign(unsigned, sender)
   }
@@ -290,13 +291,14 @@ object Order {
     else (o2, o1)
   }
 
-  def assetIdBytes(assetId: Option[AssetId]): Array[Byte] = {
-    assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+  def assetIdBytes(assetId: Asset): Array[Byte] = {
+    assetId.byteRepr
   }
 
   def fromBytes(version: Byte, xs: Array[Byte]): Order = version match {
     case 1     => OrderV1.parseBytes(xs).get
     case 2     => OrderV2.parseBytes(xs).get
+    case 3     => OrderV3.parseBytes(xs).get
     case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
   }
 
