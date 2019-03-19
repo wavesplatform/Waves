@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ContentType
+import com.wavesplatform.lang.ContentType._
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
@@ -45,6 +46,9 @@ package object predef {
 
   def runScript[T <: EVALUATED](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] =
     runScript[T](script, V1, Coproduct(tx), blockchain, chainId)
+
+  def runScriptWithCustomContext[T <: EVALUATED](script: String, t: In, chainId: Byte, ctxV: StdLibVersion = V1): Either[String, T] =
+    runScript[T](script, ctxV, t, EmptyBlockchain, chainId)
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 

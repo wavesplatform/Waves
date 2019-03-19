@@ -63,7 +63,7 @@ object Bindings {
         paymentType.typeRef,
         Map(
           "amount" -> CONST_LONG(pmt.amount),
-          "asset" -> (pmt.asset match {
+          "assetId" -> (pmt.asset match {
             case None                 => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
             case Some(asset: ByteStr) => CONST_BYTESTR(asset)
           })
@@ -175,12 +175,13 @@ object Bindings {
                   ),
                   provenTxPart(p, proofsEnabled))
         )
-      case CI(p, address, maybePayment) =>
+      case CI(p, address, maybePayment, feeAssetId) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled).typeRef,
           combine(Map(
                     "contractAddress" -> mapRecipient(address)._2,
-                    "paymentInfo"     -> buildPayment(maybePayment)
+                    "payment"     -> buildPayment(maybePayment),
+                    "feeAssetId"     -> feeAssetId
                   ),
                   provenTxPart(p, proofsEnabled))
         )

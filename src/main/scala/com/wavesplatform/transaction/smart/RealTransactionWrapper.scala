@@ -101,7 +101,7 @@ object RealTransactionWrapper {
           }.toIndexedSeq
         )
       case ci: InvokeScriptTransaction =>
-        Tx.CI(proven(ci), ci.contractAddress, ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)))
+        Tx.CI(proven(ci), ci.contractAddress, ci.payment.headOption.map(p => Tx.Pmt(p.assetId.compatId, p.amount)), ci.feeAssetId.compatId)
     }
   }
 }

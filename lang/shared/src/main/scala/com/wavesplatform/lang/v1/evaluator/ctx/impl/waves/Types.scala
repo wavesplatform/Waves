@@ -15,7 +15,7 @@ object Types {
 
   val optionAddress        = UNION(addressType.typeRef, UNIT)
   val listTransfers        = LIST(transfer.typeRef)
-  val paymentType          = CaseType("AttachedPayment", List("asset" -> optionByteVector, "amount" -> LONG))
+  val paymentType          = CaseType("AttachedPayment", List("assetId" -> optionByteVector, "amount" -> LONG))
 
   val optionPayment = UNION(paymentType.typeRef, UNIT)
 
