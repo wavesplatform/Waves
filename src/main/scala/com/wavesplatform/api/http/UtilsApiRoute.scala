@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
+import java.util.concurrent.Executors
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.common.utils._
@@ -12,6 +13,8 @@ import com.wavesplatform.utils.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
+
+import scala.concurrent.ExecutionContext
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
