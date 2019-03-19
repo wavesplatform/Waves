@@ -1,12 +1,11 @@
 package com.wavesplatform.lang.utils
 import com.wavesplatform.lang.ContentType.ContentType
-import com.wavesplatform.lang.ContentType.Expression
+import com.wavesplatform.lang.ContentType.{Contract, Expression}
 import com.wavesplatform.lang.ScriptType.ScriptType
 import com.wavesplatform.lang.ScriptType.Account
 import com.wavesplatform.lang.{ContentType, ExecutionError, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.StdLibVersion.V3
 import com.wavesplatform.lang.StdLibVersion.StdLibVersion
-import com.wavesplatform.lang.contract.Contract
 
 case class DirectiveSet private (
   stdLibVersion: StdLibVersion,
