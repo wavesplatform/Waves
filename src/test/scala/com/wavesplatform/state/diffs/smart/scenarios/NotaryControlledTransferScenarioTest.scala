@@ -66,8 +66,12 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
       untypedScript = Parser.parseExpr(assetScript).get.value
 
-      typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedScript).explicitGet()._1)
-        .explicitGet()
+      typedScript = ExprScript(
+        ExpressionCompiler(
+          compilerContext(V1, ContentType.Expression, isAssetScript = false).explicitGet(),
+          untypedScript
+        ).explicitGet()._1
+      ).explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -115,11 +119,14 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
        transferFromAToB)
 
   def dummyEvalContext(version: StdLibVersion): EvaluationContext =
-    lazyContexts(DirectiveSet(V1, ScriptType.Asset, ContentType.Expression))().evaluationContext
+    lazyContexts(DirectiveSet(V1, ScriptType.Asset, ContentType.Expression).explicitGet())().evaluationContext
 
   private def eval(code: String) = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed   = ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untyped).map(_._1)
+    val typed   = ExpressionCompiler(
+      compilerContext(V1, ContentType.Expression, isAssetScript = false).explicitGet(),
+      untyped
+    ).map(_._1)
     typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(V1), _))
   }
 

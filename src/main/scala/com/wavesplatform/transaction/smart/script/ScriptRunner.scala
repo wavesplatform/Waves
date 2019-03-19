@@ -23,31 +23,36 @@ object ScriptRunner {
             contractAddress: Address): (Log, Either[ExecutionError, EVALUATED]) = {
     script match {
       case s: ExprScript =>
-        val ctx = BlockchainContext.build(
-          script.stdLibVersion,
-          AddressScheme.current.chainId,
-          Coeval.evalOnce(in),
-          Coeval.evalOnce(height),
-          blockchain,
-          isTokenScript,
-          false,
-          Coeval(contractAddress)
-        )
-        EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
+        for {
+          ctx <- BlockchainContext.build(
+                   script.stdLibVersion,
+                   AddressScheme.current.chainId,
+                   Coeval.evalOnce(in),
+                   Coeval.evalOnce(height),
+                   blockchain,
+                   isTokenScript,
+                   false,
+                   Coeval(contractAddress)
+                 )
+          result <- EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
+        } yield result
+
       case ContractScript.ContractScriptImpl(_, Contract(_, _, Some(vf)), _) =>
-        val ctx = BlockchainContext.build(
-          script.stdLibVersion,
-          AddressScheme.current.chainId,
-          Coeval.evalOnce(in),
-          Coeval.evalOnce(height),
-          blockchain,
-          isTokenScript,
-          true,
-          Coeval(contractAddress)
-        )
-        val evalContract = in.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.apply(t)),
-                                        _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), _ => ???))
-        EvaluatorV1.evalWithLogging(ctx, evalContract)
+        for {
+          ctx <- BlockchainContext.build(
+                    script.stdLibVersion,
+                    AddressScheme.current.chainId,
+                    Coeval.evalOnce(in),
+                    Coeval.evalOnce(height),
+                    blockchain,
+                    isTokenScript,
+                    true,
+                    Coeval(contractAddress)
+                 )
+          evalContract = in.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.apply(t)),
+                      _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), _ => ???))
+          result <- EvaluatorV1.evalWithLogging(ctx, evalContract)
+        } yield result
 
       case ContractScript.ContractScriptImpl(_, Contract(_, _, None), _) =>
         val t: Proven with Authorized =

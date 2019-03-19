@@ -1,4 +1,5 @@
 import cats.kernel.Monoid
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, _}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.directives.DirectiveParser
@@ -51,7 +52,8 @@ object JsAPI {
 
   private def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
     WavesContext.build(
-      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) ContentType.Contract else ContentType.Expression),
+      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) ContentType.Contract else ContentType.Expression)
+        .explicitGet(),
       new Environment {
         override def height: Long                                                                                    = 0
         override def chainId: Byte                                                                                   = 1: Byte

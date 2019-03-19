@@ -23,7 +23,10 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
   val ctx: CTX =
     PureContext.build(StdLibVersion.V3) |+|
       CTX(sampleTypes, Map.empty, Array.empty) |+|
-      WavesContext.build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
+      WavesContext.build(
+        DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract).explicitGet(),
+        Common.emptyBlockchainEnvironment()
+      )
 
   property("Simple call") {
     parseCompileAndEvaluate(

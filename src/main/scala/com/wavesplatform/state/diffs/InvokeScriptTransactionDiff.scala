@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.traits.domain.Tx.ContractTransfer
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
+import com.wavesplatform.lang._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -36,22 +36,28 @@ object InvokeScriptTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): Either[ValidationError, Diff] = {
     val sc = blockchain.accountScript(tx.contractAddress)
 
-    def evalContract(contract: Contract) = {
-      val ctx = Monoid
-        .combineAll(
-          Seq(
-            PureContext.build(StdLibVersion.V3),
-            CryptoContext.build(Global),
-            WavesContext.build(
-              DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract),
-              new WavesEnvironment(AddressScheme.current.chainId, Coeval(tx.asInstanceOf[In]), Coeval(height), blockchain, Coeval(tx.contractAddress))
-            )
-          ))
-        .evaluationContext
-
+    def evalContract(contract: Contract): Either[ExecutionError, ContractResult] = {
+      val environment = new WavesEnvironment(
+        AddressScheme.current.chainId,
+        Coeval(tx.asInstanceOf[In]),
+        Coeval(height),
+        blockchain,
+        Coeval(tx.contractAddress)
+      )
       val invoker                                       = tx.sender.toAddress.bytes
       val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
-      ContractEvaluator.apply(ctx, contract, ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes))
+      val invocation = ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes)
+      for {
+        directives <- DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract)
+        ctx        <- Monoid.combineAll(
+                        Seq(
+                          PureContext.build(StdLibVersion.V3),
+                          CryptoContext.build(Global),
+                          WavesContext.build(directives, environment)
+                        )
+                      ).evaluationContext
+        evaluator <- ContractEvaluator(ctx, contract, invocation)
+      } yield evaluator
     }
 
     sc match {
@@ -71,7 +77,7 @@ object InvokeScriptTransactionDiff {
                       Map(Address.fromBytes(addrBytes.arr).explicitGet() -> Map(maybeAsset -> amt))
                   }
                   for {
-                    feeInfo <- (tx.assetFee._1 match {
+                    feeInfo <- tx.assetFee._1 match {
                       case Waves => Right((tx.fee, Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))))
                       case asset @ IssuedAsset(_) =>
                         for {
@@ -90,7 +96,7 @@ object InvokeScriptTransactionDiff {
                              assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))
                            ))
                         }
-                    })
+                    }
                     wavesFee = feeInfo._1
                     dataAndPaymentDiff <- payableAndDataPart(height, tx, ds, feeInfo._2)
                     _                  <- Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, ""))

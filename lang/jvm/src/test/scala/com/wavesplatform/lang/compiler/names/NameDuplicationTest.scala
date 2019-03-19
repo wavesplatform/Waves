@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.compiler.names
 import cats.kernel.Monoid
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.compiler.compilerContext
 import com.wavesplatform.lang.contract.Contract
@@ -19,7 +20,10 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
     Monoid.combine(
       compilerContext,
       WavesContext
-        .build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
+        .build(
+          DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract).explicitGet(),
+          Common.emptyBlockchainEnvironment()
+        )
         .compilerContext
     )
 

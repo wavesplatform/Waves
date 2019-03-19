@@ -23,18 +23,18 @@ package object predef {
   def runScript[T <: EVALUATED](script: String, version: StdLibVersion, t: In, blockchain: Blockchain, chainId: Byte): Either[String, T] = {
     val Success(expr, _) = Parser.parseExpr(script)
     for {
-      compileResult <- ExpressionCompiler(compilerContext(version, ContentType.Expression, isAssetScript = false), expr)
-      (typedExpr, _) = compileResult
-      evalContext = BlockchainContext.build(version,
-                                            chainId,
-                                            Coeval.evalOnce(t),
-                                            Coeval.evalOnce(blockchain.height),
-                                            blockchain,
-                                            isTokenContext = false,
-                                            isContract = false,
-                                            Coeval(???))
-      r <- EvaluatorV1[T](evalContext, typedExpr)
-    } yield r
+      compilerCtx    <- compilerContext(version, ContentType.Expression, isAssetScript = false)
+      (typedExpr, _) <- ExpressionCompiler(compilerCtx, expr)
+      evalContext    <- BlockchainContext.build(version,
+                                                chainId,
+                                                Coeval.evalOnce(t),
+                                                Coeval.evalOnce(blockchain.height),
+                                                blockchain,
+                                                isTokenContext = false,
+                                                isContract = false,
+                                                Coeval(???))
+      result         <- EvaluatorV1[T](evalContext, typedExpr)
+    } yield result
   }
 
   def runScript[T <: EVALUATED](script: String, t: In = null, ctxV: StdLibVersion = V1): Either[String, T] =
