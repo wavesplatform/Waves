@@ -87,7 +87,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
   private var maybeNetwork: Option[NS]                                         = None
-  private var maybeBlockchainUpdateServer: Option[BlockchainUpdateServer]                = None
+  private var maybeBlockchainUpdateServer: Option[BlockchainUpdateServer]      = None
 
   def apiShutdown(): Unit = {
     for {

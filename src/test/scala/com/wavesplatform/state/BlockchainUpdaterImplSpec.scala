@@ -181,6 +181,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               block.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
+            case _ => fail()
           }
 
           // transfers block
@@ -195,6 +196,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               // first Tx updated balances
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT / 5
               transactionsStateUpdates.head.balances.last._3 shouldBe (ENOUGH_AMT - ENOUGH_AMT / 5 - FEE_AMT)
+            case _ => fail()
           }
         }
       }

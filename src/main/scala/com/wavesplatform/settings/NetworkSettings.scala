@@ -51,11 +51,11 @@ object NetworkSettings {
   }
 
   private def fromConfig(config: Config): NetworkSettings = {
-    val file                = config.getAs[File]("file")
-    val bindAddress         = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
+    val file                     = config.getAs[File]("file")
+    val bindAddress              = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
     val blockchainUpdatesAddress = new InetSocketAddress(config.as[String]("blockchain-updates-address"), config.as[Int]("blockchain-updates-port"))
-    val nonce               = config.getOrElse("nonce", randomNonce)
-    val nodeName            = config.getOrElse("node-name", s"Node-$nonce")
+    val nonce                    = config.getOrElse("nonce", randomNonce)
+    val nodeName                 = config.getOrElse("node-name", s"Node-$nonce")
     require(nodeName.getBytes(Charsets.UTF_8).length <= MaxNodeNameBytesLength,
             s"Node name should have length less than $MaxNodeNameBytesLength bytes")
     val declaredAddress = config.getAs[String]("declared-address").map { address =>
