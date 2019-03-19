@@ -9,7 +9,7 @@ import monix.execution.Scheduler
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-object BroadcastRoute {
+private[api] object BroadcastRoute {
   val executionContext = new ExecutionContextExecutor {
     //noinspection ScalaStyle
     private[this] val scheduler = Scheduler.computation(4, "rest-api-broadcast")
