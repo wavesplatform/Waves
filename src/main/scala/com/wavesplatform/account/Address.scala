@@ -28,9 +28,9 @@ object Address extends ScorexLogging {
 
   private def scheme = AddressScheme.current
 
-  private class AddressImpl(val bytes: ByteStr) extends Address
+  private[this] final case class AddressImpl(bytes: ByteStr) extends Address
 
-  private[wavesplatform] def createUnsafe(address: ByteStr): Address = new AddressImpl(address)
+  private[wavesplatform] def createUnsafe(address: ByteStr): Address = AddressImpl(address)
 
   def fromPublicKey(publicKey: Array[Byte], chainId: Byte = scheme.chainId): Address = {
     val publicKeyHash   = crypto.secureHash(publicKey)
