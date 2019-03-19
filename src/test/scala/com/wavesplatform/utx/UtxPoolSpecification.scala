@@ -2,16 +2,18 @@ package com.wavesplatform.utx
 
 import java.nio.file.Files
 
+import cats.data.NonEmptyList
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform
 import com.wavesplatform._
 import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
-import com.wavesplatform.db.openDB
+import com.wavesplatform.db.{WithDomain, openDB}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.history.{StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
@@ -26,7 +28,7 @@ import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.utils.Implicits.SubjectOps
 import com.wavesplatform.utils.Time
 import monix.reactive.subjects.Subject
@@ -53,7 +55,7 @@ private object UtxPoolSpecification {
   }
 }
 
-class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink {
+class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink with BlocksTransactionsHelpers with WithDomain {
   val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import CommonValidation.{ScriptExtraFee => extraFee}
@@ -348,6 +350,43 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
         packed.size shouldBe 2
         utx.all.size shouldBe 2
     }
+
+    "correctly process constrainst in packUnconfirmed" in {
+      withDomain(wavesplatform.history.TransfersV2ActivatedAt0WavesSettings) { d =>
+        val generateBlock: Gen[(PrivateKeyAccount, Block, Seq[Transaction], Seq[Transaction])] =
+          for {
+            richAccount   <- accountGen
+            randomAccount <- accountGen
+          } yield {
+            val genesisBlock = UnsafeBlocks.unsafeBlock(
+              reference = randomSig,
+              txs = Seq(
+                GenesisTransaction.create(richAccount, ENOUGH_AMT, ntpNow).explicitGet(),
+                GenesisTransaction.create(randomAccount, ENOUGH_AMT, ntpNow).explicitGet(),
+                SetScriptTransaction.signed(richAccount, Some(Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()), QuickTX.FeeAmount * 4, ntpNow, richAccount).explicitGet()
+              ),
+              signer = TestBlock.defaultSigner,
+              version = 3,
+              timestamp = ntpNow
+            )
+            val scripted = (1 to 100).flatMap(_ => QuickTX.transferV2(richAccount, randomAccount.toAddress, timestamp = ntpTimestampGen).sample)
+            val unscripted = (1 to 100).flatMap(_ => QuickTX.transfer(randomAccount, timestamp = ntpTimestampGen).sample)
+            (richAccount, genesisBlock, scripted, unscripted)
+          }
+
+        val Some((account, block, scripted, unscripted)) = generateBlock.sample
+        d.blockchainUpdater.processBlock(block) shouldBe 'right
+
+        val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, UtxSettings(9999999, PoolDefaultMaxBytes, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true))
+        all((scripted ++ unscripted).map(utx.putIfNew)) shouldBe 'right
+
+        val constraint = MultiDimensionalMiningConstraint(NonEmptyList.of(OneDimensionalMiningConstraint(1, TxEstimators.scriptRunNumber), OneDimensionalMiningConstraint(Block.MaxTransactionsPerBlockVer3, TxEstimators.one)))
+        val (packed, _) = utx.packUnconfirmed(constraint)
+        packed.size shouldBe (unscripted.size + 1)
+        packed.count(scripted.contains) shouldBe 1
+      }
+    }
+
 
     "pessimisticPortfolio" - {
       "is not empty if there are transactions" in forAll(withValidPayments) {
