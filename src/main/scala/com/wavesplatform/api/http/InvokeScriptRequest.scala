@@ -45,7 +45,7 @@ object InvokeScriptRequest {
     }
   }
 
-  implicit val functionCallReads                      = Json.reads[FunctionCallPart]
+  implicit val functionCallReads                = Json.reads[FunctionCallPart]
   implicit val unsignedInvokeScriptRequestReads = Json.reads[InvokeScriptRequest]
   implicit val signedInvokeScriptRequestReads   = Json.reads[SignedInvokeScriptRequest]
 

@@ -176,7 +176,7 @@ object InvokeScriptTransactionDiff {
   }
 
   private def foldContractTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction)(ps: List[(Recipient.Address, Long, Option[ByteStr])],
-                                                                                               dataDiff: Diff): Either[ValidationError, Diff] = {
+                                                                                         dataDiff: Diff): Either[ValidationError, Diff] = {
     if (ps.length <= ContractLimits.MaxPaymentAmount)
       ps.foldLeft(Either.right[ValidationError, Diff](dataDiff)) { (diffEi, payment) =>
         val (addressRepr, amount, asset) = payment
