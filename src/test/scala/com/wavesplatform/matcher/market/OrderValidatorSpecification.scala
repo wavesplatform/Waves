@@ -301,7 +301,12 @@ class OrderValidatorSpecification
   }
 
   private def mkOrderValidator(bc: Blockchain, tc: ExchangeTransactionCreator) =
-    OrderValidator.blockchainAware(bc, tc.createTransaction, (0.003 * Constants.UnitsInWave).toLong, MatcherAccount, ntpTime)(_)
+    OrderValidator.blockchainAware(bc,
+                                   tc.createTransaction,
+                                   (0.003 * Constants.UnitsInWave).toLong,
+                                   MatcherAccount,
+                                   ntpTime,
+                                   matcherSettings.disableExtraFeeForScript)(_)
 
   private def tradableBalance(p: Portfolio)(assetId: Option[AssetId]): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
