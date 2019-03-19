@@ -299,22 +299,21 @@ class UtxPoolSpecification extends FreeSpec with Matchers with MockFactory with 
     }
 
     "adds new transactions when skip checks is allowed" in {
-      forAll(stateGen) {
-        case (sender, senderBalance, bcu) =>
-          val time = new TestTime()
+      forAll(stateGen) { case (sender, senderBalance, bcu) =>
+        val time = new TestTime()
 
-          val gen = for {
-            headTransaction <- transfer(sender, senderBalance / 2, time)
-            vipTransaction <- transfer(sender, senderBalance / 2, time).suchThat(TransactionsOrdering.InUTXPool.compare(_, headTransaction) < 0)
-          } yield (headTransaction, vipTransaction)
+        val gen = for {
+          headTransaction <- transfer(sender, senderBalance / 2, time)
+          vipTransaction <- transfer(sender, senderBalance / 2, time).suchThat(TransactionsOrdering.InUTXPool.compare(_, headTransaction) < 0)
+        } yield (headTransaction, vipTransaction)
 
-          forAll(gen, Gen.choose(0, 1).label("allowSkipChecks")) { case ((headTransaction, vipTransaction), allowSkipChecks) =>
-            val utxSettings = UtxSettings(1, 152, 1, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = allowSkipChecks == 1)
-            val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, utxSettings)
+        forAll(gen, Gen.choose(0, 1).label("allowSkipChecks")) { case ((headTransaction, vipTransaction), allowSkipChecks) =>
+          val utxSettings = UtxSettings(1, 152, 1, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = allowSkipChecks == 1)
+          val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, FunctionalitySettings.TESTNET, utxSettings)
 
-            utx.putIfNew(headTransaction) shouldBe 'right
-            utx.putIfNew(vipTransaction) shouldBe (if (allowSkipChecks == 1) 'right else 'left)
-          }
+          utx.putIfNew(headTransaction) shouldBe 'right
+          utx.putIfNew(vipTransaction) shouldBe (if (allowSkipChecks == 1) 'right else 'left)
+        }
       }
     }
 
