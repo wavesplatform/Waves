@@ -62,7 +62,6 @@ case class DebugApiRoute(ws: WavesSettings,
     with ScorexLogging {
 
   import DebugApiRoute._
-  private[this] implicit val byteStrWrites = com.wavesplatform.utils.byteStrWrites
 
   private[this] val rollbackScheduler = Scheduler.singleThread("debug-rollback")
 
