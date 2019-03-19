@@ -11,17 +11,21 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
         |  utx {
         |    max-size = 100
         |    max-bytes-size = 100
+        |    max-scripted-size = 100
         |    blacklist-sender-addresses = ["a"]
         |    allow-blacklisted-transfer-to = ["b"]
         |    allow-transactions-from-smart-accounts = false
+        |    allow-skip-checks = false
         |  }
         |}""".stripMargin).resolve()
 
     val settings = config.as[UtxSettings]("waves.utx")
     settings.maxSize shouldBe 100
     settings.maxBytesSize shouldBe 100L
+    settings.maxScriptedSize shouldBe 100
     settings.blacklistSenderAddresses shouldBe Set("a")
     settings.allowBlacklistedTransferTo shouldBe Set("b")
     settings.allowTransactionsFromSmartAccounts shouldBe false
+    settings.allowSkipChecks shouldBe false
   }
 }

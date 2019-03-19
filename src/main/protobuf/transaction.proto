@@ -54,7 +54,7 @@ message GenesisTransactionData {
 };
 
 message PaymentTransactionData {
-    bytes address = 1;
+    bytes recipient_address = 1;
     int64 amount = 2;
 };
 
@@ -103,7 +103,7 @@ message LeaseCancelTransactionData {
 };
 
 message BurnTransactionData {
-    AssetAmount asset_amount = 1;;
+    AssetAmount asset_amount = 1;
 };
 
 message IssueTransactionData {
