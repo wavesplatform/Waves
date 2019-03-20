@@ -20,7 +20,7 @@ object Types {
   val optionPayment = UNION(paymentType.typeRef, UNIT)
 
   val invocationType =
-    CaseType("Invocation", List("caller" -> addressType.typeRef, "contractAddress" -> addressType.typeRef, "payment" -> optionPayment))
+    CaseType("Invocation", List("caller" -> addressType.typeRef, "payment" -> optionPayment))
 
   private val header = List(
     "id"        -> BYTESTR,
@@ -77,12 +77,13 @@ object Types {
     )
   )
 
-  def buildContractInvokationTransactionType(proofsEnabled: Boolean) = CaseType(
-    "ContractInvocationTransaction",
+  def buildInvokeScriptTransactionType(proofsEnabled: Boolean) = CaseType(
+    "InvokeScriptTransaction",
     addProofsIfNeeded(
       List(
         "contractAddress" -> addressType.typeRef,
-        "paymentInfo"     -> optionPayment
+        "payment"     -> optionPayment,
+        "feeAssetId" -> optionByteVector
       ) ++ header ++ proven,
       proofsEnabled
     )
@@ -263,7 +264,7 @@ object Types {
     buildExchangeTransactionType(proofsEnabled),
     buildTransferTransactionType(proofsEnabled),
     buildSetAssetScriptTransactionType(proofsEnabled)
-  ) ++ (if (v == StdLibVersion.V3) List(buildContractInvokationTransactionType(proofsEnabled)) else List.empty)
+  ) ++ (if (v == StdLibVersion.V3) List(buildInvokeScriptTransactionType(proofsEnabled)) else List.empty)
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CaseType] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++

@@ -1,8 +1,8 @@
 package com.wavesplatform.account
 
 import com.wavesplatform.common.utils.EitherExt2
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class AccountOrAliasTests extends PropSpec with PropertyChecks with Matchers {
 

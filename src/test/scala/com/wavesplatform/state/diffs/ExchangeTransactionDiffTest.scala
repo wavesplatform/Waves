@@ -1,15 +1,17 @@
 package com.wavesplatform.state.diffs
 
-import cats.{Order ⇒ _, _}
+import cats.{Order => _, _}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.matcher.model.OrderValidator
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.AccountBalanceError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -21,8 +23,8 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.util.Random
 
@@ -41,7 +43,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
   val fsWithOrderV3Feature: FunctionalitySettings = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.OrderV3.id -> 0))
 
-  val fsOV3MT =
+  val functionalitySettingsOrderV3MassTransfer =
     fsWithOrderV3Feature.copy(preActivatedFeatures = fsWithOrderV3Feature.preActivatedFeatures + (BlockchainFeatures.MassTransfer.id -> 0))
 
   property("Validation fails when OrderV3 feature is not activation yet") {
@@ -62,8 +64,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       exchange <- exchangeV2GeneratorP(
         buyer = buyer,
         seller = seller,
-        amountAssetId = maybeAsset2,
-        priceAssetId = maybeAsset1,
+        amountAssetId = Asset.fromCompatId(maybeAsset2),
+        priceAssetId = Asset.fromCompatId(maybeAsset1),
         orderVersions = Set(3)
       )
     } yield (gen1, gen2, gen3, issue1, issue2, exchange)
@@ -71,7 +73,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     forAll(preconditionsAndExchange) {
       case (gen1, gen2, gen3, issue1, issue2, exchange) =>
         assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange)), fs) { blockDiffEi =>
-          blockDiffEi should produce("Order Version 3 has not been activated yet")
+          blockDiffEi should produce("Order Version 3 feature has not been activated yet")
         }
     }
   }
@@ -86,8 +88,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
       issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id())
-      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
+      maybeAsset1              <- Gen.option(issue1.id()) map Asset.fromCompatId
+      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId) map Asset.fromCompatId
       exchange                 <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, issue1, issue2, exchange)
 
@@ -118,8 +120,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       gen3: GenesisTransaction = GenesisTransaction.create(matcher, ENOUGH_AMT, ts).explicitGet()
       issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id())
-      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
+      maybeAsset1              <- Gen.option(issue1.id()).map(Asset.fromCompatId)
+      maybeAsset2              <- (Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId)).map(Asset.fromCompatId)
       buyMatcherFeeAssetId     <- Gen.oneOf(maybeAsset1, maybeAsset2)
       sellMatcherFeeAssetId    <- Gen.oneOf(maybeAsset1, maybeAsset2)
       exchange <- exchangeV2GeneratorP(
@@ -170,8 +172,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       gen3: GenesisTransaction = GenesisTransaction.create(matcher, ENOUGH_AMT, ts).explicitGet()
       issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      buyerIssuedAsset  = Some(issue1.id())
-      sellerIssuedAsset = Some(issue2.id())
+      buyerIssuedAsset  = IssuedAsset(issue1.id())
+      sellerIssuedAsset = IssuedAsset(issue2.id())
       exchange <- exchangeV2GeneratorP(
         buyer = buyer,
         seller = seller,
@@ -214,10 +216,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
       issue3: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
       issue4: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id())
-      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
-      buyMatcherFeeAssetId  = Some(issue3.id())
-      sellMatcherFeeAssetId = Some(issue4.id())
+      maybeAsset1              <- (Gen.option(issue1.id())).map(Asset.fromCompatId)
+      maybeAsset2              <- (Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId)).map(Asset.fromCompatId)
+      buyMatcherFeeAssetId  = IssuedAsset(issue3.id())
+      sellMatcherFeeAssetId = IssuedAsset(issue4.id())
       exchange <- exchangeV2GeneratorP(
         buyer = buyer,
         seller = seller,
@@ -270,9 +272,9 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       gen3: GenesisTransaction = GenesisTransaction.create(matcher, ENOUGH_AMT, ts).explicitGet()
       issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- Gen.option(issue1.id())
-      maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
-      matcherFeeAssetId        <- assetIdGen retryUntil (_.nonEmpty)
+      maybeAsset1              <- Gen.option(issue1.id()).map(Asset.fromCompatId)
+      maybeAsset2              <- (Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId)).map(Asset.fromCompatId)
+      matcherFeeAssetId        <- assetIdGen retryUntil (_.nonEmpty) map (s => IssuedAsset(s.get))
       exchange <- exchangeV2GeneratorP(
         buyer = buyer,
         seller = seller,
@@ -315,10 +317,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
       issue3: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT / 1000000, buyer).map(_._1).retryUntil(_.script.isEmpty)
       issue4: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT / 1000000, seller).map(_._1).retryUntil(_.script.isEmpty)
-      buyerIssuedAsset      = Some(issue1.id())
-      sellerIssuedAsset     = Some(issue2.id())
-      buyMatcherFeeAssetId  = Some(issue3.id())
-      sellMatcherFeeAssetId = Some(issue4.id())
+      buyerIssuedAsset      = IssuedAsset(issue1.id())
+      sellerIssuedAsset     = IssuedAsset(issue2.id())
+      buyMatcherFeeAssetId  = IssuedAsset(issue3.id())
+      sellMatcherFeeAssetId = IssuedAsset(issue4.id())
       exchange <- exchangeV2GeneratorP(
         buyer = buyer,
         seller = seller,
@@ -352,9 +354,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditions) {
       case (genesises, issueTx1, issueTx2, massTransfer, exchanges, bigBuyOrder) =>
-        assertDiffAndState(Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
-                           TestBlock.create(exchanges),
-                           fsOV3MT) {
+        assertDiffAndState(
+          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
+          TestBlock.create(exchanges),
+          functionalitySettingsOrderV3MassTransfer
+        ) {
           case (blockDiff, _) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
 
@@ -362,12 +366,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
             totalPortfolioDiff.effectiveBalance shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
+            val combinedPortfolio = Monoid
+              .combineAll(
+                exchanges.map(ex => getOrderFeePortfolio(bigBuyOrder, ex.buyMatcherFee))
+              )
+
             val feeSumPaidByBuyer =
-              Monoid
-                .combineAll(
-                  exchanges.map(ex => getOrderFeePortfolio(bigBuyOrder, ex.buyMatcherFee))
-                )
-                .assets(bigBuyOrder.matcherFeeAssetId.get)
+              bigBuyOrder.matcherFeeAssetId
+                .fold(combinedPortfolio.balance)(combinedPortfolio.assets)
 
             (feeSumPaidByBuyer <= exchanges.head.buyOrder.matcherFee) shouldBe true
         }
@@ -384,9 +390,12 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditions) {
       case (genesises, issueTx1, issueTx2, massTransfer, exchanges, _) =>
-        assertDiffEi(Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))), TestBlock.create(exchanges), fsOV3MT) {
-          blockDiffEi =>
-            blockDiffEi should produce("Insufficient buy fee")
+        assertDiffEi(
+          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
+          TestBlock.create(exchanges),
+          functionalitySettingsOrderV3MassTransfer
+        ) { blockDiffEi =>
+          blockDiffEi should produce("Insufficient buy fee")
         }
     }
   }
@@ -401,9 +410,12 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditions) {
       case (genesises, issueTx1, issueTx2, massTransfer, exchanges, _) =>
-        assertDiffEi(Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))), TestBlock.create(exchanges), fsOV3MT) {
-          blockDiffEi =>
-            blockDiffEi should produce("Too much buy")
+        assertDiffEi(
+          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
+          TestBlock.create(exchanges),
+          functionalitySettingsOrderV3MassTransfer
+        ) { blockDiffEi =>
+          blockDiffEi should produce("Too much buy")
         }
     }
   }
@@ -417,8 +429,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
       issue1: IssueTransactionV1 <- issueGen(buyer)
       exchange <- Gen.oneOf(
-        exchangeV1GeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000)),
-        exchangeV2GeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000))
+        exchangeV1GeneratorP(buyer, seller, Waves, IssuedAsset(issue1.id()), fixedMatcherFee = Some(300000)),
+        exchangeV2GeneratorP(buyer, seller, Waves, IssuedAsset(issue1.id()), fixedMatcherFee = Some(300000))
       )
     } yield {
       (gen1, gen2, issue1, exchange)
@@ -473,7 +485,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditions, priceGen) {
       case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
-        val assetPair = AssetPair(Some(issue1.id()), None)
+        val assetPair = AssetPair(IssuedAsset(issue1.id()), Waves)
         val buy       = Order.buy(buyer, matcher, assetPair, 1000000L, price, Ts, Ts + 1, MatcherFee)
         val sell      = Order.sell(seller, matcher, assetPair, 1L, price, Ts, Ts + 1, MatcherFee)
         val tx        = createExTx(buy, sell, price, matcher, Ts).explicitGet()
@@ -502,7 +514,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditions, priceGen) {
       case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
-        val assetPair = AssetPair(Some(issue1.id()), None)
+        val assetPair = AssetPair(IssuedAsset(issue1.id()), Waves)
         val buy       = Order.buy(buyer, matcher, assetPair, issue1.quantity + 1, price, Ts, Ts + 1, MatcherFee)
         val sell      = Order.sell(seller, matcher, assetPair, issue1.quantity + 1, price, Ts, Ts + 1, MatcherFee)
         val tx        = createExTx(buy, sell, price, matcher, Ts).explicitGet()
@@ -533,7 +545,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       } yield (buyer, seller, matcher, gen1, gen2, gen3, issue1)
 
     val (buyer, seller, matcher, gen1, gen2, gen3, issue1) = preconditions.sample.get
-    val assetPair                                          = AssetPair(None, Some(issue1.id()))
+    val assetPair                                          = AssetPair(Waves, IssuedAsset(issue1.id()))
 
     val buy  = Order.buy(buyer, matcher, assetPair, 3100000000L, 238, Ts, Ts + 1, MatcherFee, version = 1: Byte).asInstanceOf[OrderV1]
     val sell = Order.sell(seller, matcher, assetPair, 425532L, 235, Ts, Ts + 1, MatcherFee, version = 1: Byte).asInstanceOf[OrderV1]
@@ -586,7 +598,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(allValidP) {
       case (genesis, transfers, issueAndScripts, etx) =>
-        val enoughFee = CommonValidation.ScriptExtraFee + CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
+        val enoughFee = CommonValidation.ScriptExtraFee + OrderValidator.exchangeTransactionCreationFee
         val smallFee  = enoughFee - 1
         val exchangeWithSmallFee = ExchangeTransactionV2
           .create(MATCHER, etx.buyOrder, etx.sellOrder, 1000000, 1000000, 0, 0, smallFee, etx.timestamp)
@@ -763,7 +775,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       setBuyerScript = SetScriptTransaction
         .selfSigned(buyer, buyerScript, enoughFee, ts + 7)
         .explicitGet()
-      assetPair = AssetPair(Some(asset1.id()), Some(asset2.id()))
+      assetPair = AssetPair(IssuedAsset(asset1.id()), IssuedAsset(asset2.id()))
       o1 <- Gen.oneOf(
         OrderV1.buy(seller, MATCHER, assetPair, 1000000, 1000000, ts + 8, ts + 10000, enoughFee),
         OrderV2.buy(seller, MATCHER, assetPair, 1000000, 1000000, ts + 8, ts + 10000, enoughFee)
@@ -876,7 +888,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       setBuyerScript = SetScriptTransaction
         .selfSigned(buyer, buyerScript, enoughFee, ts + 7)
         .explicitGet()
-      assetPair = AssetPair(Some(asset1.id()), Some(asset2.id()))
+      assetPair = AssetPair(IssuedAsset(asset1.id()), IssuedAsset(asset2.id()))
       o1        = OrderV2.buy(seller, MATCHER, assetPair, 1000000, 1000000, ts + 8, ts + 10000, enoughFee)
       o2        = OrderV2.sell(buyer, MATCHER, assetPair, 1000000, 1000000, ts + 9, ts + 10000, enoughFee)
       exchangeTx = {
@@ -895,8 +907,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
     issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
     issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
-    maybeAsset1              <- Gen.option(issue1.id())
-    maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
+    maybeAsset1              <- Gen.option(issue1.id()) map Asset.fromCompatId
+    maybeAsset2              <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId) map Asset.fromCompatId
     exchange                 <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
   } yield (gen1, gen2, issue1, issue2, exchange)
 
@@ -941,7 +953,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
                                         sellers: Seq[PrivateKeyAccount],
                                         assetPair: AssetPair,
                                         price: Long,
-                                        matcherFeeAssetId: Option[AssetId],
+                                        matcherFeeAssetId: Asset,
                                         totalAmount: Long,
                                         totalMatcherFee: Long): Gen[Seq[Order]] = {
 
@@ -995,7 +1007,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       issueTx1: IssueTransaction                                                                                     <- issueReissueBurnGeneratorP(Long.MaxValue - 1000L, buyer).map(_._1).retryUntil(_.script.isEmpty)
       issueTx2: IssueTransaction                                                                                     <- issueReissueBurnGeneratorP(Long.MaxValue - 1000L, buyer).map(_._1).retryUntil(_.script.isEmpty)
 
-      pair                                           = AssetPair(Some(issueTx2.id()), Some(issueTx1.id()))
+      pair                                           = AssetPair(IssuedAsset(issueTx2.id()), IssuedAsset(issueTx1.id()))
       (minTotalBuyMatcherFee, maxTotalBuyMatcherFee) = totalBuyMatcherFeeBoundaries(bigBuyOrderMatcherFee)
 
       totalBuyMatcherFeeForExchangeTransactions <- Gen.choose(minTotalBuyMatcherFee, maxTotalBuyMatcherFee)
@@ -1011,14 +1023,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         expiration = bigBuyOrderExpiration,
         matcherFee = bigBuyOrderMatcherFee,
         version = 3: Byte,
-        matcherFeeAssetId = Some(issueTx1.id())
+        matcherFeeAssetId = IssuedAsset(issueTx1.id())
       )
 
       sellOrders <- sellOrdersForBigBuyOrderGenerator(
         matcher = matcher,
         assetPair = pair,
         price = price,
-        matcherFeeAssetId = Some(issueTx2.id()),
+        matcherFeeAssetId = IssuedAsset(issueTx2.id()),
         sellers = sellers,
         totalAmount = sellersTotalAmount(bigBuyOrderAmount),
         totalMatcherFee = bigBuyOrderMatcherFee
@@ -1032,7 +1044,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       val massTransfer =
         MassTransferTransaction
           .selfSigned(
-            assetId = Some(issueTx2.id()),
+            assetId = IssuedAsset(issueTx2.id()),
             sender = buyer,
             transfers = sellers.map(seller => ParsedTransfer(seller, issueTx2.quantity / sellOrdersCount)),
             genesisTimestamp + 1000L,

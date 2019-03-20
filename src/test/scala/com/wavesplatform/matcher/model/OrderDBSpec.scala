@@ -1,12 +1,12 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.{NoShrink, WithDB}
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.matcher.{MatcherTestData, OrderDB}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.{NoShrink, WithDB}
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class OrderDBSpec extends FreeSpec with Matchers with WithDB with MatcherTestData with PropertyChecks with NoShrink {
   import OrderDBSpec._

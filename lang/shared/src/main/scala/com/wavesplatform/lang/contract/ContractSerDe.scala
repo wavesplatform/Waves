@@ -6,6 +6,7 @@ import java.nio.ByteBuffer
 import cats.implicits._
 import com.wavesplatform.lang.contract.Contract._
 import com.wavesplatform.lang.utils.Serialize._
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.Serde.desAux
 import com.wavesplatform.lang.v1.compiler.Terms.{DECLARATION, FUNC}
@@ -73,6 +74,7 @@ object ContractSerDe {
     for {
       ca <- deserializeCallableAnnotation(bb)
       cf <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
+      _  <- Either.cond(cf.name.getBytes().size <= ContractLimits.MaxCallableFunctionNameInBytes, (), s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxCallableFunctionNameInBytes}")
     } yield CallableFunction(ca, cf)
   }
 

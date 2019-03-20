@@ -6,6 +6,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.IntegerDataEntry
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
@@ -40,8 +41,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     sender.transfer(firstAddress, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
-    notMiner.assertAssetBalance(firstAddress, asset, firstAssetBalance - 100)
-    notMiner.assertAssetBalance(secondAddress, asset, secondAssetBalance + 100)
+    miner.assertAssetBalance(firstAddress, asset, firstAssetBalance - 100)
+    miner.assertAssetBalance(secondAddress, asset, secondAssetBalance + 100)
 
     sender.transfer(secondAddress, thirdAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
@@ -64,8 +65,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     sender.transfer(thirdAddress, secondAddress, 99, smartMinFee, Some(asset), waitForTx = true)
 
-    notMiner.assertAssetBalance(secondAddress, asset, secondAssetBalance + 99)
-    notMiner.assertAssetBalance(thirdAddress, asset, thirdAssetBalance + 1)
+    miner.assertAssetBalance(secondAddress, asset, secondAssetBalance + 99)
+    miner.assertAssetBalance(thirdAddress, asset, thirdAssetBalance + 1)
   }
 
   test("transfer goes only to addresses from list (white or black)") {
@@ -170,12 +171,12 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val blackTx = TransferTransactionV2
       .selfSigned(
-        Some(ByteStr.decodeBase58(blackAsset).get),
+        IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
         pkByAddress(secondAddress),
         pkByAddress(thirdAddress),
         1,
         System.currentTimeMillis + 1.minutes.toMillis,
-        None,
+        Waves,
         smartMinFee,
         Array.emptyByteArray
       )
@@ -184,12 +185,12 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val incorrectTx = TransferTransactionV2
       .selfSigned(
-        Some(ByteStr.decodeBase58(blackAsset).get),
+        IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
         pkByAddress(secondAddress),
         pkByAddress(thirdAddress),
         1,
         System.currentTimeMillis + 10.minutes.toMillis,
-        None,
+        Waves,
         smartMinFee,
         Array.emptyByteArray
       )

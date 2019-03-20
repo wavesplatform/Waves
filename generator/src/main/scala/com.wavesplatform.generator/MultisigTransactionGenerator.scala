@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
@@ -35,7 +36,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
 
     val res = Range(0, settings.transactions).map { i =>
       val tx = TransferTransactionV2
-        .create(None, bank, owners(1), totalAmountOnNewAccount - 2 * enoughFee - i, now + i, None, enoughFee, Array.emptyByteArray, Proofs.empty)
+        .create(Waves, bank, owners(1), totalAmountOnNewAccount - 2 * enoughFee - i, now + i, Waves, enoughFee, Array.emptyByteArray, Proofs.empty)
         .explicitGet()
       val signatures = owners.map(crypto.sign(_, tx.bodyBytes())).map(ByteStr(_))
       tx.copy(proofs = Proofs(signatures))
