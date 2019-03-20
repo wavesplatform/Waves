@@ -8,7 +8,9 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.{ContentType, Global, ScriptType}
+import com.wavesplatform.lang.ScriptType._
+import com.wavesplatform.lang.ContentType._
+import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
@@ -90,45 +92,30 @@ package object utils extends ScorexLogging {
     }
   }
 
-  private val lazyAssetContexts: Map[StdLibVersion, Coeval[CTX]] =
-    Seq
-      .tabulate(2) { v =>
-        val version = com.wavesplatform.lang.StdLibVersion.parseVersion(v + 1)
-        version -> Coeval.evalOnce(
+  val lazyContexts: Map[DirectiveSet, Coeval[CTX]] = {
+    for {
+      version    <- StdLibVersion.SupportedVersions
+      cType      <- ContentType.SupportedTypes
+      scriptType <- ScriptType.SupportedTypes
+    } yield {
+      val ds = DirectiveSet(version, scriptType, cType)
+      ds -> Coeval
+        .evalOnce(
           Monoid
             .combineAll(Seq(
               PureContext.build(version),
               CryptoContext.build(Global),
               WavesContext
                 .build(
-                  DirectiveSet(version, ScriptType.Asset, ContentType.Expression),
+                  ds,
                   new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
                 )
             )))
-      }
-      .toMap
-
-  private val lazyContexts: Map[StdLibVersion, Coeval[CTX]] =
-    Seq
-      .tabulate(3) { v =>
-        val version: StdLibVersion = com.wavesplatform.lang.StdLibVersion(v + 1)
-        version -> Coeval.evalOnce(
-          Monoid
-            .combineAll(Seq(
-              PureContext.build(version),
-              CryptoContext.build(Global),
-              WavesContext.build(
-                DirectiveSet(version, ScriptType.Account, ContentType.Contract), // TODO: why contract? should be DirectiveSet->Coeval[CTX]
-                new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
-              )
-            )))
-      }
-      .toMap
-
-  def dummyEvalContext(version: StdLibVersion): EvaluationContext = lazyContexts(version)().evaluationContext
+    }
+  }.toMap
 
   private val lazyFunctionCosts: Map[StdLibVersion, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
-    lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1, ctx.evaluationContext))))
+    lazyContexts.map(el => (el._1.stdLibVersion, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext))))
 
   def functionCosts(version: StdLibVersion): Map[FunctionHeader, Coeval[Long]] = lazyFunctionCosts(version)()
 
@@ -145,13 +132,14 @@ package object utils extends ScorexLogging {
     costs.toMap
   }
 
-  def compilerContext(version: StdLibVersion, isAssetScript: Boolean): CompilerContext =
-    if (isAssetScript) lazyAssetContexts(version)().compilerContext
-    else lazyContexts(version)().compilerContext
+  def compilerContext(version: StdLibVersion, cType: ContentType, isAssetScript: Boolean): CompilerContext = {
+    val ds = DirectiveSet(version, ScriptType.isAssetScript(isAssetScript), cType)
+    lazyContexts(ds)().compilerContext
+  }
 
-  val defaultDecompilerContext: DecompilerContext = lazyContexts(V3)().decompilerContext
+  val defaultDecompilerContext: DecompilerContext = lazyContexts(DirectiveSet(V3, ScriptType.Account, ContentType.Contract))().decompilerContext
 
-  def varNames(version: StdLibVersion): Set[String] = compilerContext(version, isAssetScript = false).varDefs.keySet
+  def varNames(version: StdLibVersion, cType: ContentType): Set[String] = compilerContext(version, cType, isAssetScript = false).varDefs.keySet
 
   @tailrec
   final def untilTimeout[T](timeout: FiniteDuration, delay: FiniteDuration = 100.milliseconds, onFailure: => Unit = {})(fn: => T): T = {

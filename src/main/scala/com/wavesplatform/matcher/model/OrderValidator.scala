@@ -212,15 +212,15 @@ object OrderValidator {
 
   def validatePriceDeviation(order: Order, deviationSettings: DeviationsSettings, marketStatus: Option[MarketStatus]): Result[Order] = {
 
-    def multiplyLongByDoubleRoundDown(l: Long, d: Double): Long = (BigDecimal(l) * d).setScale(0, RoundingMode.HALF_DOWN).toLong
+    def multiplyLongByDoubleRoundFloor(l: Long, d: Double): Long = (BigDecimal(l) * d).setScale(0, RoundingMode.FLOOR).toLong
 
     def isPriceInDeviationBounds(subtractedPercent: Double, addedPercent: Double): Boolean = marketStatus forall { ms =>
       lazy val isPriceHigherThanMinDeviation = ms.bestBid forall { bestBid =>
-        multiplyLongByDoubleRoundDown(bestBid.price, 1 - (subtractedPercent / 100)) <= order.price
+        order.price >= multiplyLongByDoubleRoundFloor(bestBid.price, 1 - (subtractedPercent / 100))
       }
 
       lazy val isPriceLessThanMaxDeviation = ms.bestAsk forall { bestAsk =>
-        order.price <= multiplyLongByDoubleRoundDown(bestAsk.price, 1 + (addedPercent / 100))
+        order.price <= multiplyLongByDoubleRoundFloor(bestAsk.price, 1 + (addedPercent / 100))
       }
 
       isPriceHigherThanMinDeviation && isPriceLessThanMaxDeviation

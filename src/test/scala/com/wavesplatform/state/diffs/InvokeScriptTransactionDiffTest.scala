@@ -1,19 +1,23 @@
 package com.wavesplatform.state.diffs
 
+import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -21,10 +25,12 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ContractScript
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-import com.wavesplatform.transaction.{Asset, Transaction, GenesisTransaction}
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
+import com.wavesplatform.utils.EmptyBlockchain
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB, utils}
+import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -126,6 +132,73 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         )),
       None
     )
+  }
+
+  def simpleContract(funcName: String): Either[String, Contract] = {
+    val expr = {
+      val script =
+        s"""
+          |
+          |{-# STDLIB_VERSION 3 #-}
+          |{-# CONTENT_TYPE CONTRACT #-}
+          |
+          |@Callable(xx)
+          |func $funcName(amount: Int) = {
+          |    if (amount + 1 != 0) then throw() else throw()
+          |}
+          |
+          |@Verifier(txx)
+          |func verify() = {
+          |    false
+          |}
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val ctx = {
+      utils.functionCosts(StdLibVersion.V3)
+      Monoid
+        .combineAll(
+          Seq(
+            PureContext.build(StdLibVersion.V3),
+            CryptoContext.build(Global),
+            WavesContext.build(
+              DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression),
+              new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+            )
+          ))
+    }
+
+    compiler.ContractCompiler(ctx.compilerContext, expr)
+  }
+
+  def simplePreconditionsAndSetContract(invokerGen: Gen[PrivateKeyAccount] = accountGen,
+                                        masterGen: Gen[PrivateKeyAccount] = accountGen,
+                                        payment: Option[Payment] = None,
+                                        feeGen: Gen[Long] = ciFee(0),
+                                        sponsored: Boolean = false)
+    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] = {
+    for {
+      master  <- masterGen
+      invoker <- invokerGen
+      ts      <- timestampGen
+      genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      fee         <- feeGen
+      arg         <- genBoundedString(1, 32)
+      funcBinding <- Gen.const("funcForTesting")
+      contract    = simpleContract(funcBinding).explicitGet()
+      script      = ContractScript(StdLibVersion.V3, contract)
+      setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
+      (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
+      fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_STRING("Not-a-Number")))
+      ci = InvokeScriptTransaction
+        .selfSigned(invoker, master, fc, payment.toSeq, if (sponsored) { sponsorTx.minSponsoredAssetFee.get * 5 } else { fee }, if (sponsored) {
+          IssuedAsset(issueTx.id())
+        } else { Waves }, ts)
+        .explicitGet()
+    } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
   }
 
   def dataContractGen(func: String, bigData: Boolean) =
@@ -454,4 +527,14 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
   }
 
+  property("argument passed to callable function has wrong type") {
+    forAll(for {
+      r <- simplePreconditionsAndSetContract()
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ should produce("Passed argument with wrong type")
+        }
+    }
+  }
 }

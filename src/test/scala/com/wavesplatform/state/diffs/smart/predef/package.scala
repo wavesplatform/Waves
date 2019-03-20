@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ContentType
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
@@ -22,7 +23,7 @@ package object predef {
   def runScript[T <: EVALUATED](script: String, version: StdLibVersion, t: In, blockchain: Blockchain, chainId: Byte): Either[String, T] = {
     val Success(expr, _) = Parser.parseExpr(script)
     for {
-      compileResult <- ExpressionCompiler(compilerContext(version, isAssetScript = false), expr)
+      compileResult <- ExpressionCompiler(compilerContext(version, ContentType.Expression, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
       evalContext = BlockchainContext.build(version,
                                             chainId,
@@ -36,8 +37,8 @@ package object predef {
     } yield r
   }
 
-  def runScript[T <: EVALUATED](script: String, t: In = null): Either[String, T] =
-    runScript[T](script, V1, t, EmptyBlockchain, chainId)
+  def runScript[T <: EVALUATED](script: String, t: In = null, ctxV: StdLibVersion = V1): Either[String, T] =
+    runScript[T](script, ctxV, t, EmptyBlockchain, chainId)
 
   def runScript[T <: EVALUATED](script: String, t: In, chainId: Byte): Either[String, T] =
     runScript[T](script, V1, t, EmptyBlockchain, chainId)
