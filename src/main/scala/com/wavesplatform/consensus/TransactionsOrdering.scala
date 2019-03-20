@@ -1,13 +1,14 @@
 package com.wavesplatform.consensus
 
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 
 object TransactionsOrdering {
   trait WavesOrdering extends Ordering[Transaction] {
     def txTimestampOrder(ts: Long): Long
     private def orderBy(t: Transaction): (Double, Long, Long) = {
-      val size        = t.bytes().size
-      val byFee       = if (t.assetFee._1.nonEmpty) 0 else -t.assetFee._2
+      val size        = t.bytes().length
+      val byFee       = if (t.assetFee._1 != Waves) 0 else -t.assetFee._2
       val byTimestamp = txTimestampOrder(t.timestamp)
 
       (byFee.toDouble / size.toDouble, byFee, byTimestamp)

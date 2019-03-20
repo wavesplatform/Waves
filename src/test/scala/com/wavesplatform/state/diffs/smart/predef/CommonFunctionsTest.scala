@@ -7,11 +7,12 @@ import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertions, Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import shapeless.Coproduct
 
 class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -29,8 +30,8 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
           Coproduct(transfer)
         )
         transfer.assetId match {
-          case Some(v) => result.explicitGet().asInstanceOf[CONST_BYTESTR].bs.arr sameElements v.arr
-          case None    => result should produce("extract() called on unit")
+          case IssuedAsset(v) => result.explicitGet().asInstanceOf[CONST_BYTESTR].bs.arr sameElements v.arr
+          case Waves          => result should produce("extract() called on unit")
         }
     }
   }
@@ -47,7 +48,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                                           |""".stripMargin,
           Coproduct(transfer)
         )
-        result shouldEqual evaluated(transfer.assetId.isDefined)
+        result shouldEqual evaluated(transfer.assetId != Waves)
     }
   }
 

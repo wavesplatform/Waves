@@ -6,8 +6,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.{TransactionGen, WithDB}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
 class IssueTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithDB with HistoryTest {
@@ -36,6 +36,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
                        "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                        "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                        "fee": 100000000,
+                       "feeAssetId": null,
                        "timestamp": 1526287561757,
                        "proofs": [
                        "43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g"

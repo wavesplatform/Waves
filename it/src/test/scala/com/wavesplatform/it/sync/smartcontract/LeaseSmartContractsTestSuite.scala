@@ -20,13 +20,13 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
   private val acc2 = pkByAddress(thirdAddress)
 
   test("set contract, make leasing and cancel leasing") {
-    val (balance1, eff1) = notMiner.accountBalances(acc0.address)
-    val (balance2, eff2) = notMiner.accountBalances(thirdAddress)
+    val (balance1, eff1) = miner.accountBalances(acc0.address)
+    val (balance2, eff2) = miner.accountBalances(thirdAddress)
 
     val txId = sender.transfer(sender.address, acc0.address, 10 * transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
-    notMiner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
+    miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
 
     val scriptText = s"""
         let pkA = base58'${ByteStr(acc0.publicKey)}'
@@ -74,10 +74,10 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
 
     nodes.waitForHeightAriseAndTxPresent(leasingId)
 
-    notMiner.assertBalances(firstAddress,
-                            balance1 + 10 * transferAmount - (minFee + setScriptFee + 0.2.waves),
-                            eff1 + 9 * transferAmount - (minFee + setScriptFee + 0.2.waves))
-    notMiner.assertBalances(thirdAddress, balance2, eff2 + transferAmount)
+    miner.assertBalances(firstAddress,
+                         balance1 + 10 * transferAmount - (minFee + setScriptFee + 0.2.waves),
+                         eff1 + 9 * transferAmount - (minFee + setScriptFee + 0.2.waves))
+    miner.assertBalances(thirdAddress, balance2, eff2 + transferAmount)
 
     val unsignedCancelLeasing =
       LeaseCancelTransactionV2
@@ -102,10 +102,10 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
 
     nodes.waitForHeightAriseAndTxPresent(leasingCancelId)
 
-    notMiner.assertBalances(firstAddress,
-                            balance1 + 10 * transferAmount - (2 * minFee + setScriptFee + 2 * 0.2.waves),
-                            eff1 + 10 * transferAmount - (2 * minFee + setScriptFee + 2 * 0.2.waves))
-    notMiner.assertBalances(thirdAddress, balance2, eff2)
+    miner.assertBalances(firstAddress,
+                         balance1 + 10 * transferAmount - (2 * minFee + setScriptFee + 2 * 0.2.waves),
+                         eff1 + 10 * transferAmount - (2 * minFee + setScriptFee + 2 * 0.2.waves))
+    miner.assertBalances(thirdAddress, balance2, eff2)
 
   }
 }

@@ -11,10 +11,11 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.Validation
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 
@@ -65,10 +66,7 @@ sealed trait ByteEntity[T] { self =>
 
   /** Generates documentation ready for pasting into .md files */
   def getStringDocForMD: String = {
-
-    val docs = generateDoc
-
-    docs
+    generateDoc
       .map {
         case ByteEntityDescription(idx, name, tpe, length, subIndex, additionalInfo) =>
           s"| $idx${Option(subIndex).filter(_ != 0).fold("")(si => s".$si")} | $name | $tpe | $length $additionalInfo\n"
@@ -83,11 +81,11 @@ sealed trait ByteEntity[T] { self =>
 
 object ByteEntity {
 
-  implicit def byteEntityFunctor: Functor[ByteEntity] = new Functor[ByteEntity] {
+  implicit val byteEntityFunctor: Functor[ByteEntity] = new Functor[ByteEntity] {
     def map[A, B](fa: ByteEntity[A])(f: A => B): ByteEntity[B] = fa map f
   }
 
-  implicit def byteEntitySemigroupal: Semigroupal[ByteEntity] = new Semigroupal[ByteEntity] {
+  implicit val byteEntitySemigroupal: Semigroupal[ByteEntity] = new Semigroupal[ByteEntity] {
     def product[A, B](fa: ByteEntity[A], fb: ByteEntity[B]): ByteEntity[(A, B)] = Composition(fa, fb)
   }
 }
@@ -384,14 +382,19 @@ case class FunctionCallBytes(index: Int, name: String) extends ByteEntity[Terms.
   }
 }
 
-case class AssetIdBytes(index: Int, name: String) extends ByteEntity[AssetId] {
+case class AssetIdBytes(index: Int, name: String) extends ByteEntity[IssuedAsset] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
     Seq(ByteEntityDescription(index, name, "AssetId (ByteStr = Array[Byte])", AssetIdLength.toString))
   }
 
-  def deserialize(buf: Array[Byte], offset: Int): Try[(AssetId, Int)] = {
-    Try { ByteStr(buf.slice(offset, offset + AssetIdLength)) -> (offset + AssetIdLength) }
+  def deserialize(buf: Array[Byte], offset: Int): Try[(IssuedAsset, Int)] = {
+    Try {
+      val bytes = ByteStr(buf.slice(offset, offset + AssetIdLength))
+      val off   = offset + AssetIdLength
+
+      IssuedAsset(bytes) -> off
+    }
   }
 }
 
@@ -424,12 +427,13 @@ case class PaymentBytes(index: Int, name: String) extends ByteEntity[Payment] {
   def deserialize(buf: Array[Byte], offset: Int): Try[(Payment, Int)] = {
     Try {
 
-      val paymentLength                    = Shorts.fromByteArray(buf.slice(offset, offset + 2))
-      val arr                              = buf.slice(offset + 2, offset + 2 + paymentLength)
-      val amt: Long                        = Longs.fromByteArray(arr.take(8))
-      val (maybeAsset: Option[AssetId], _) = Deser.parseOption(arr, 8)(ByteStr.apply)
+      val paymentLength     = Shorts.fromByteArray(buf.slice(offset, offset + 2))
+      val arr               = buf.slice(offset + 2, offset + 2 + paymentLength)
+      val amt: Long         = Longs.fromByteArray(arr.take(8))
+      val (maybeAssetId, _) = Deser.parseOption(arr, 8)(ByteStr.apply)
+      val asset             = maybeAssetId.fold[Asset](Waves)(IssuedAsset)
 
-      Payment(amt, maybeAsset) -> (offset + 2 + paymentLength)
+      Payment(amt, asset) -> (offset + 2 + paymentLength)
     }
   }
 }
@@ -467,6 +471,37 @@ object OptionBytes {
     new OptionBytes(index, name, nestedByteEntity, firstByteInterpretation)
 }
 
+class SeqBytes[U](val index: Int, name: String, nestedByteEntity: ByteEntity[U]) extends ByteEntity[Seq[U]] {
+
+  def generateDoc: Seq[ByteEntityDescription] = {
+    ByteEntityDescription(index, s"$name", UnimportantType, "1", subIndex = 1) +:
+      nestedByteEntity.generateDoc.map { desc =>
+      desc.copy(
+        length = desc.length + s"/0 (depends on short in $index.1)",
+        subIndex = if (desc.subIndex != 0) desc.subIndex + 1 else desc.subIndex + 2
+      )
+    }
+  }
+
+  def deserialize(buf: Array[Byte], offset: Int): Try[(Seq[U], Int)] = {
+    Try {
+      val entryCount = Shorts.fromByteArray(buf.slice(offset, offset + 2))
+
+      if (entryCount > 0) {
+        val parsed = List.iterate(nestedByteEntity.deserialize(buf, offset + 2).get, entryCount) {
+          case (_, p) => nestedByteEntity.deserialize(buf, p).get
+        }
+        parsed.map(_._1) -> parsed.last._2
+      } else
+        List.empty -> (offset + 2)
+    }
+  }
+}
+
+object SeqBytes {
+  def apply[U](index: Int, name: String, nestedByteEntity: ByteEntity[U]): ByteEntity[Seq[U]] =
+    new SeqBytes[U](index, name, nestedByteEntity)
+}
 case class Composition[T1, T2](e1: ByteEntity[T1], e2: ByteEntity[T2]) extends ByteEntity[(T1, T2)] {
 
   val index: Int = e2.index // use last index in composition

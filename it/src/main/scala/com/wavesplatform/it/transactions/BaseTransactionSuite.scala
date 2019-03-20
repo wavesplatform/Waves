@@ -26,7 +26,7 @@ abstract class BaseTransactionSuite
       .withSpecial(_.nonMiner)
       .buildNonConflicting()
 
-  override def notMiner: Node = nodes.last
+  override def miner: Node = nodes.head
 
   // protected because https://github.com/sbt/zinc/issues/292
   protected val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {

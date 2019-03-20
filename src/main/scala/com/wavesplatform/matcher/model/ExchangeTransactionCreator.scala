@@ -9,8 +9,9 @@ import com.wavesplatform.settings.fee.AssetType.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.{AssetId, ValidationError}
+import com.wavesplatform.transaction.{Asset, ValidationError}
 import com.wavesplatform.common.utils.EitherExt2
 
 class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: PrivateKeyAccount, matcherOrderFeeSettings: OrderFeeSettings) {
@@ -22,25 +23,25 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
       p.toLong
     }
 
-    def getNomDenomByAssetType(assetType: AssetType, buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) = {
-      val (buyND, sellND) = assetType match {
+    def getBuySellAmountTxOrTotal(assetType: AssetType, buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) = {
+      val (buyAmt, sellAmt) = assetType match {
         case AssetType.AMOUNT    => buy.getReceiveAmount(buyAmount, buyPrice) -> sell.getSpendAmount(sellAmount, sellPrice)
         case AssetType.PRICE     => buy.getSpendAmount(buyAmount, buyPrice)   -> sell.getReceiveAmount(sellAmount, sellPrice)
         case AssetType.RECEIVING => buy.getReceiveAmount(buyAmount, buyPrice) -> sell.getReceiveAmount(sellAmount, sellPrice)
         case AssetType.SPENDING  => buy.getSpendAmount(buyAmount, buyPrice)   -> sell.getSpendAmount(sellAmount, sellPrice)
       }
 
-      buyND.explicitGet() -> sellND.explicitGet()
+      buyAmt.explicitGet() -> sellAmt.explicitGet()
     }
 
     matcherOrderFeeSettings match {
       case PercentSettings(assetType, _) =>
-        val (buyFeeNominator, sellFeeNominator)     = getNomDenomByAssetType(assetType, executedAmount, executedPrice, executedAmount, executedPrice)
-        val (buyFeeDenominator, sellFeeDenominator) = getNomDenomByAssetType(assetType, buy.amount, buy.price, sell.amount, sell.price)
+        val (buyAmountFromTx, sellAmountFromTx) = getBuySellAmountTxOrTotal(assetType, executedAmount, executedPrice, executedAmount, executedPrice)
+        val (buyAmountTotal, sellAmountTotal)   = getBuySellAmountTxOrTotal(assetType, buy.amount, buy.price, sell.amount, sell.price)
 
         (
-          Math.min(buy.matcherFee, calcFee(buy, buyFeeNominator, buyFeeDenominator)),
-          Math.min(sell.matcherFee, calcFee(sell, sellFeeNominator, sellFeeDenominator))
+          Math.min(buy.matcherFee, calcFee(buy, buyAmountFromTx, buyAmountTotal)),
+          Math.min(sell.matcherFee, calcFee(sell, sellAmountFromTx, sellAmountTotal))
         )
 
       case _ => calcFee(buy, executedAmount, buy.amount) -> calcFee(sell, executedAmount, sell.amount)
@@ -53,7 +54,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) = calculateMatcherFee(buy, sell, executedAmount, price)
 
-    val txFee = minFee(blockchain, matcherPrivateKey, counter.order.assetPair)
+    val txFee = minFee(blockchain, matcherPrivateKey, counter.order.assetPair, OrderValidator.exchangeTransactionCreationFee)
     if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
       ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
     else
@@ -66,7 +67,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
 
   private def toV1(order: Order): Either[ValidationError, OrderV1] = order match {
     case x: OrderV1 => Right(x)
-    case _          => Left(ValidationError.ActivationError("SmartAccountTrading has not been activated yet"))
+    case _          => Left(ValidationError.ActivationError("Smart Account Trading feature has not been activated yet"))
   }
 }
 
@@ -77,13 +78,22 @@ object ExchangeTransactionCreator {
   /**
     * @see [[com.wavesplatform.transaction.smart.Verifier#verifyExchange verifyExchange]]
     */
-  def minFee(blockchain: Blockchain, matcherAddress: Address, assetPair: AssetPair): Long = {
-    def assetFee(assetId: AssetId): Long   = if (blockchain.hasAssetScript(assetId)) CommonValidation.ScriptExtraFee else 0L
-    def accountFee(address: Address): Long = if (blockchain.hasScript(address)) CommonValidation.ScriptExtraFee else 0L
+  def minFee(blockchain: Blockchain, matcherAddress: Address, assetPair: AssetPair, baseFee: Long): Long = {
 
-    CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit +
-      accountFee(matcherAddress) +
+    def assetFee(assetId: Asset): Long = assetId match {
+      case Waves => 0L
+      case asset: IssuedAsset =>
+        if (blockchain.hasAssetScript(asset)) CommonValidation.ScriptExtraFee
+        else 0L
+    }
+
+    baseFee +
+      minAccountFee(blockchain, matcherAddress) +
       assetPair.amountAsset.fold(0L)(assetFee) +
       assetPair.priceAsset.fold(0L)(assetFee)
+  }
+
+  def minAccountFee(blockchain: Blockchain, address: Address): Long = {
+    if (blockchain hasScript address) CommonValidation.ScriptExtraFee else 0L
   }
 }

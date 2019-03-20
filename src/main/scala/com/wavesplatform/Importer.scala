@@ -11,10 +11,11 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.transaction.{AssetId, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPool
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
@@ -42,6 +43,12 @@ object Importer extends ScorexLogging {
     val blockchainFilename = Try(argi.next)
     val importHeight       = Try(argi.next).map(_.toInt).getOrElse(Int.MaxValue)
 
+    val format = Try(argi.next)
+      .map(_.toUpperCase)
+      .collect { case custom @ "BINARY_OLD" => custom }
+      .getOrElse("BINARY")
+      .intern()
+
     val config   = loadConfig(ConfigFactory.parseFile(new File(configFilename)))
     val settings = WavesSettings.fromConfig(config)
     AddressScheme.current = new AddressScheme {
@@ -50,15 +57,15 @@ object Importer extends ScorexLogging {
 
     implicit val scheduler: Scheduler = Scheduler.singleThread("appender")
     val utxPoolStub = new UtxPool {
-      override def putIfNew(tx: Transaction)                                       = ???
-      override def removeAll(txs: Traversable[Transaction]): Unit                  = {}
-      override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long = ???
-      override def pessimisticPortfolio(addr: Address): Portfolio                  = ???
-      override def all                                                             = ???
-      override def size                                                            = ???
-      override def transactionById(transactionId: ByteStr)                         = ???
-      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint)         = ???
-      override def close(): Unit                                                   = {}
+      override def putIfNew(tx: Transaction)                               = ???
+      override def removeAll(txs: Traversable[Transaction]): Unit          = {}
+      override def spendableBalance(addr: Address, assetId: Asset): Long   = ???
+      override def pessimisticPortfolio(addr: Address): Portfolio          = ???
+      override def all                                                     = ???
+      override def size                                                    = ???
+      override def transactionById(transactionId: ByteStr)                 = ???
+      override def packUnconfirmed(rest: MultiDimensionalMiningConstraint) = ???
+      override def close(): Unit                                           = {}
     }
 
     val time = new NTP(settings.ntpServer)
@@ -93,7 +100,10 @@ object Importer extends ScorexLogging {
                   if (blocksToSkip > 0) {
                     blocksToSkip -= 1
                   } else {
-                    val block = Block.parseBytes(buffer).get
+                    val Right(block) =
+                      if (format == "BINARY_OLD") Block.parseBytes(buffer).toEither
+                      else PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(buffer), unsafe = true)
+
                     if (blockchainUpdater.lastBlockId.contains(block.reference)) {
                       Await.result(extAppender.apply(block).runAsync, Duration.Inf) match {
                         case Left(ve) =>
@@ -125,9 +135,5 @@ object Importer extends ScorexLogging {
     time.close()
   }
 
-  def createInputStream(filename: String): Try[FileInputStream] =
-    Try {
-      new FileInputStream(filename)
-    }
-
+  private[this] def createInputStream(filename: String) = Try(new FileInputStream(filename))
 }
