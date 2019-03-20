@@ -11,6 +11,8 @@ object FastBase58 {
     38, 39, 40, 41, 42, 43, -1, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57)
 
   def encode(bin: Array[Byte]): String = {
+    if (bin.isEmpty) return ""
+
     val zeroCount = bin
       .takeWhile(_ == 0)
       .length
