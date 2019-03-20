@@ -1,5 +1,7 @@
 package com.wavesplatform.matcher.model
 
+import java.util.concurrent.ConcurrentHashMap
+
 import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.common.state.ByteStr
@@ -8,8 +10,10 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.settings.Constants
+import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus
+import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedWavesSettings, OrderFeeSettings, PercentSettings}
+import com.wavesplatform.settings.{Constants, DeviationsSettings}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -204,8 +208,8 @@ class OrderValidatorSpecification
 
         def updateOrder(order: Order, percentSettings: PercentSettings, offset: Long): Order = {
           order
-            .updateFee(OrderValidator.getMinValidFee(order, percentSettings) + offset) // incorrect fee (less than minimal admissible by offset)
-            .updateMatcherFeeAssetId(OrderValidator.getValidFeeAsset(order, percentSettings.assetType)) // but correct asset
+            .updateFee(OrderValidator.getMinValidFeeForSettings(order, percentSettings, order.price) + offset) // incorrect fee (less than minimal admissible by offset)
+            .updateMatcherFeeAssetId(OrderValidator.getValidFeeAssetForSettings(order, percentSettings)) // but correct asset
         }
 
         val preconditions =
@@ -327,6 +331,115 @@ class OrderValidatorSpecification
                 setScriptAndValidateWithSettings(None, None, None)(order) shouldBe 'right
             }
         }
+      }
+
+      "buy order's price is too high" in {
+
+        val preconditions =
+          for {
+            bestAmount <- maxWavesAmountGen
+            bestPrice  <- Gen.choose(1, (Long.MaxValue / bestAmount) - 100)
+
+            bestAsk                = LevelAgg(bestAmount, bestPrice)
+            deviationSettings      = DeviationsSettings(true, 50, 70, 50)
+            tooHighPriceInBuyOrder = (bestAsk.price * (1 + (deviationSettings.maxPriceLoss / 100))).toLong + 50L
+
+            (order, orderFeeSettings) <- orderWithMatcherSettingsGenerator(OrderType.BUY, tooHighPriceInBuyOrder)
+          } yield {
+            val assetPair2MarketStatus = new ConcurrentHashMap[AssetPair, MarketStatus]
+            assetPair2MarketStatus.put(order.assetPair, MarketStatus(None, None, Some(bestAsk)))
+            (order, orderFeeSettings, deviationSettings, Option(assetPair2MarketStatus.get(order.assetPair)))
+          }
+
+        forAll(preconditions) {
+          case (order, orderFeeSettings, deviationSettings, nonEmptyMarketStatus) =>
+            OrderValidator.marketAware(orderFeeSettings, deviationSettings, nonEmptyMarketStatus)(order) should produce("DeviantOrderPrice")
+        }
+      }
+
+      "sell order's price is out of deviation bounds" in {
+        val fixedWavesFeeSettings = FixedWavesSettings(300000L)
+
+        // seller cannot sell with price which:
+        //   1. less than 50% of best bid (sell order price must be >= 2000)
+        //   2. higher than 170% of best ask (sell order price must be <= 8500)
+
+        val deviationSettings = DeviationsSettings(true, maxPriceProfit = 70, maxPriceLoss = 50, 50)
+        val bestBid           = LevelAgg(1000L, 4000L)
+        val bestAsk           = LevelAgg(1000L, 5000L)
+
+        val tooLowPrice      = 1999L // = 50% of best bid (4000) - 1, hence invalid
+        val lowButValidPrice = 2000L // = 50% of best bid (4000)
+
+        val tooHighPrice      = 8501L // = 170% of best ask (5000) + 1, hence invalid
+        val highButValidPrice = 8500L // = 170% of best ask (5000)
+
+        val assetPair2MarketStatus = new ConcurrentHashMap[AssetPair, MarketStatus]
+        assetPair2MarketStatus.put(pairWavesBtc, MarketStatus(None, Some(bestBid), Some(bestAsk)))
+        val nonEmptyMarketStatus = assetPair2MarketStatus.get(pairWavesBtc)
+
+        val tooLowPriceOrder =
+          Order(
+            sender = PrivateKeyAccount("seed".getBytes),
+            matcher = MatcherAccount,
+            pair = pairWavesBtc,
+            orderType = OrderType.SELL,
+            amount = 1000,
+            price = tooLowPrice,
+            timestamp = System.currentTimeMillis() - 10000L,
+            expiration = System.currentTimeMillis() + 10000L,
+            matcherFee = 1000L,
+            version = 3: Byte,
+            matcherFeeAssetId = Waves
+          )
+
+        val lowButValidPriceOrder  = tooLowPriceOrder.updatePrice(lowButValidPrice)
+        val tooHighPriceOrder      = tooLowPriceOrder.updatePrice(tooHighPrice)
+        val highButValidPriceOrder = tooLowPriceOrder.updatePrice(highButValidPrice)
+
+        val orderValidator = OrderValidator.marketAware(fixedWavesFeeSettings, deviationSettings, Option(nonEmptyMarketStatus)) _
+
+        orderValidator(tooLowPriceOrder) should produce("DeviantOrderPrice")
+        orderValidator(lowButValidPriceOrder) shouldBe 'right
+
+        orderValidator(tooHighPriceOrder) should produce("DeviantOrderPrice")
+        orderValidator(highButValidPriceOrder) shouldBe 'right
+      }
+
+      "order's fee is out of deviation bounds" in {
+
+        val percentSettings   = PercentSettings(AssetType.PRICE, 10)
+        val deviationSettings = DeviationsSettings(true, 100, 100, maxPriceFee = 10)
+
+        val bestAsk = LevelAgg(1000L, 4000L)
+
+        val assetPair2MarketStatus = new ConcurrentHashMap[AssetPair, MarketStatus]
+        assetPair2MarketStatus.put(pairWavesBtc, MarketStatus(None, None, Some(bestAsk)))
+        val nonEmptyMarketStatus = assetPair2MarketStatus.get(pairWavesBtc)
+
+        val order =
+          Order(
+            sender = PrivateKeyAccount("seed".getBytes),
+            matcher = MatcherAccount,
+            pair = pairWavesBtc,
+            orderType = OrderType.BUY,
+            amount = 1000,
+            price = 1000,
+            timestamp = System.currentTimeMillis() - 10000L,
+            expiration = System.currentTimeMillis() + 10000L,
+            matcherFee = 1000L,
+            version = 3: Byte,
+            matcherFeeAssetId = wbtc
+          )
+
+        val validFee     = OrderValidator.getMinValidFeeForSettings(order, percentSettings, bestAsk.price, 1 - (deviationSettings.maxPriceFee / 100))
+        val validOrder   = order.updateFee(validFee)
+        val invalidOrder = order.updateFee(validFee - 1L)
+
+        val orderValidator = OrderValidator.marketAware(percentSettings, deviationSettings, Option(nonEmptyMarketStatus)) _
+
+        orderValidator(invalidOrder) should produce("DeviantOrderMatcherFee")
+        orderValidator(validOrder) shouldBe 'right
       }
     }
 
@@ -520,7 +633,7 @@ class OrderValidatorSpecification
   private def setScriptsAndValidate(orderFeeSettings: OrderFeeSettings)(
       scriptForAmountAsset: Option[Script],
       scriptForPriceAsset: Option[Script],
-      scriptForAccount: Option[Script])(order: Order): OrderValidator.Result[Order] = {
+      scriptForMatcherAccount: Option[Script])(order: Order): OrderValidator.Result[Order] = {
     val blockchain = stub[Blockchain]
 
     activate(blockchain, BlockchainFeatures.SmartAccountTrading -> 0, BlockchainFeatures.OrderV3 -> 0, BlockchainFeatures.SmartAssets -> 0)
@@ -542,8 +655,8 @@ class OrderValidatorSpecification
                   order.assetPair.priceAsset  -> scriptForPriceAsset,
                   order.matcherFeeAssetId     -> None)
 
-    (blockchain.accountScript _).when(MatcherAccount.toAddress).returns(scriptForAccount)
-    (blockchain.hasScript _).when(MatcherAccount.toAddress).returns(scriptForAccount.isDefined)
+    (blockchain.accountScript _).when(MatcherAccount.toAddress).returns(scriptForMatcherAccount)
+    (blockchain.hasScript _).when(MatcherAccount.toAddress).returns(scriptForMatcherAccount.isDefined)
 
     (blockchain.accountScript _).when(order.sender.toAddress).returns(None)
     (blockchain.hasScript _).when(order.sender.toAddress).returns(false)
