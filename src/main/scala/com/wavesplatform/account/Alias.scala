@@ -26,7 +26,7 @@ object Alias {
   }
 
   def fromString(str: String): Either[ValidationError, Alias] = {
-    val aliasPatternInfo     = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
+    val aliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
 
     if (!str.startsWith(Prefix)) {
       Left(GenericError(aliasPatternInfo))
@@ -53,7 +53,8 @@ object Alias {
   }
 
   @inline private[this] def currentChainId: Byte = AddressScheme.current.chainId
-  private[this] def isValidAliasChar(c: Char): Boolean = ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
+  private[this] def isValidAliasChar(c: Char): Boolean =
+    ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
   private[wavesplatform] def createWithChainId(name: String, chainId: Byte = currentChainId): Either[ValidationError, Alias] = {
     final case class AliasImpl(chainId: Byte, name: String) extends Alias
