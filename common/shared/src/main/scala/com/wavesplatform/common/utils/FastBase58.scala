@@ -11,10 +11,9 @@ object FastBase58 {
     38, 39, 40, 41, 42, 43, -1, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57)
 
   def encode(bin: Array[Byte]): String = {
-    val zeroCount = bin.indices
-      .dropWhile(i => bin(i) == 0)
-      .headOption
-      .getOrElse(bin.length)
+    val zeroCount = bin
+      .takeWhile(_ == 0)
+      .length
 
     val bufferSize = (bin.length - zeroCount) * 138 / 100 + 1
     val buffer = new Array[Byte](bufferSize)
@@ -41,16 +40,16 @@ object FastBase58 {
     val base58Output = new Array[Byte](bufferSize - startIndex + zeroCount)
 
     if (zeroCount != 0) for (i <- 0 until zeroCount) base58Output(i) = '1'.toByte
+    val bufferZeroCount = buffer.takeWhile(_ == 0).length
 
-    for (j <- zeroCount until bufferSize) {
-      base58Output(startIndex - zeroCount) = Alphabet(java.lang.Byte.toUnsignedInt(buffer(j)))
-    }
+    for (j <- bufferZeroCount until bufferSize)
+      base58Output(j - bufferZeroCount) = Alphabet(java.lang.Byte.toUnsignedInt(buffer(j)))
 
     new String(base58Output, US_ASCII)
   }
 
   def decode(str: String): Array[Byte] = {
-    if (str.isEmpty) throw new IllegalArgumentException("Zero length string")
+    if (str.isEmpty) return Array.emptyByteArray
 
     val b58Chars = str.toCharArray
     val outArrayLength = (b58Chars.length + 3) / 4
@@ -62,13 +61,12 @@ object FastBase58 {
 
     val outLongs = new Array[Long](outArrayLength)
     for (r <- b58Chars) {
-      if (r > 127) throw new IllegalArgumentException("High-bit set on invalid digit")
-      if (DecodeTable(r) == -1)  throw new IllegalArgumentException("Invalid base58 digit (%q)")
+      if (r >= DecodeTable.length || DecodeTable(r) == -1)  throw new IllegalArgumentException(s"Invalid base58 digit $r")
       var c = java.lang.Byte.toUnsignedLong(DecodeTable(r))
       for (j <- (outArrayLength - 1) until 0 by -1) {
         val t = outLongs(j)*58 + c
-        c = (t >>> 32) & 0x3f
-        outLongs(j) = t & 0xffffffff
+        c = (t >>> 32) & 0x3fL
+        outLongs(j) = t & 0xffffffffL
       }
 
       if (c > 0) throw new IllegalArgumentException("Output number too big (carry to the next int32)")
@@ -87,15 +85,13 @@ object FastBase58 {
       if (j == 0) bytesLeft = 4
     }
 
-    val zeroCount = b58Chars.indices
-      .dropWhile(i => b58Chars(i) == '1')
-      .headOption
-      .getOrElse(b58Chars.length - 1)
+    val zeroCount = b58Chars
+      .takeWhile(_ == '1')
+      .length
 
     for ((v, n) <- outBytes.zipWithIndex) {
       if (v != 0) {
-        var start = n - zeroCount.toInt
-        if (start < 0) start = 0
+        val start = (n - zeroCount) max 0
         return outBytes.slice(start, outBytesCount)
       }
     }
