@@ -32,10 +32,9 @@ object FastBase58 {
       high = endIndex
     }
 
-    val startIndex = (0 until bufferSize)
-      .dropWhile(j => buffer(j) == 0)
-      .headOption
-      .getOrElse(bufferSize - 1)
+    val startIndex = buffer
+      .takeWhile(_ == 0)
+      .length
 
     val base58Output = new Array[Byte](bufferSize - startIndex + zeroCount)
 
