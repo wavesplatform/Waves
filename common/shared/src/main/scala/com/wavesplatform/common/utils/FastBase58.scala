@@ -1,6 +1,7 @@
 package com.wavesplatform.common.utils
 import java.nio.charset.StandardCharsets.US_ASCII
 
+//noinspection ScalaStyle
 object FastBase58 {
   private[this] val Alphabet: Array[Byte] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".getBytes(US_ASCII)
 
@@ -10,114 +11,95 @@ object FastBase58 {
     38, 39, 40, 41, 42, 43, -1, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57)
 
   def encode(bin: Array[Byte]): String = {
-    val binsz = bin.length
-    var i, j, high, zcount, carry = 0
+    val zeroCount = bin.indices
+      .dropWhile(i => bin(i) == 0)
+      .headOption
+      .getOrElse(bin.length)
 
-    while (zcount < binsz && bin(zcount) == 0) zcount += 1
+    val bufferSize = (bin.length - zeroCount) * 138 / 100 + 1
+    val buffer = new Array[Byte](bufferSize)
 
-    val size = (binsz-zcount)*138/100 + 1
-    val buf = new Array[Byte](size)
+    var high = bufferSize - 1
+    for (index <- zeroCount until bin.length) {
+      var endIndex = bufferSize - 1
+      var carry = java.lang.Byte.toUnsignedInt(bin(index))
 
-    high = size - 1
-    i = zcount
-    while (i < binsz) {
-      j = size - 1
-      carry = java.lang.Byte.toUnsignedInt(bin(i))
-
-      while (j > high || carry != 0) {
-        carry = carry + (256 * java.lang.Byte.toUnsignedInt(buf(j)))
-        buf(j) = (carry % 58).toByte
+      while (endIndex > high || carry != 0) {
+        carry = carry + (256 * java.lang.Byte.toUnsignedInt(buffer(endIndex)))
+        buffer(endIndex) = (carry % 58).toByte
         carry /= 58
-        j -= 1
+        endIndex -= 1
       }
-      high = j
-      i += 1
+      high = endIndex
     }
 
-    j = 0
-    while (j < size && buf(j) == 0) j += 1
+    val startIndex = (0 until bufferSize)
+      .dropWhile(j => buffer(j) == 0)
+      .headOption
+      .getOrElse(bufferSize - 1)
 
-    val b58 = new Array[Byte](size - j + zcount)
+    val base58Output = new Array[Byte](bufferSize - startIndex + zeroCount)
 
-    if (zcount != 0) {
-      i = 0
-      while (i < zcount) {
-        b58(i) = '1'.toByte
-        i += 1
-      }
+    if (zeroCount != 0) for (i <- 0 until zeroCount) base58Output(i) = '1'.toByte
+
+    for (j <- zeroCount until bufferSize) {
+      base58Output(startIndex - zeroCount) = Alphabet(java.lang.Byte.toUnsignedInt(buffer(j)))
     }
 
-    i = zcount
-    while (j < size) {
-      b58(i) = Alphabet(java.lang.Byte.toUnsignedInt(buf(j)))
-      j += 1
-      i += 1
-    }
-
-    new String(b58, US_ASCII)
+    new String(base58Output, US_ASCII)
   }
 
   def decode(str: String): Array[Byte] = {
-    if (str.isEmpty) throw new IllegalArgumentException("zero length string")
+    if (str.isEmpty) throw new IllegalArgumentException("Zero length string")
 
-    var t, zcount = 0L
-    var zmask = 0
-    val b58u = str.toCharArray
-    val b58sz = b58u.length
-    val outisz = (b58sz + 3) / 4
-    val binu = new Array[Byte]((b58sz+3)*3)
-    var bytesleft = b58sz % 4
+    val b58Chars = str.toCharArray
+    val outArrayLength = (b58Chars.length + 3) / 4
 
-    if (bytesleft > 0) {
-      zmask = 0xffffffff << (bytesleft*8)
-    } else {
-      bytesleft = 4
-    }
+    var bytesLeft = b58Chars.length % 4
+    var zeroMask = 0
+    if (bytesLeft > 0) zeroMask = 0xffffffff << (bytesLeft*8)
+    else bytesLeft = 4
 
-    val outi = new Array[Long](outisz)
-
-    var i = 0
-    while (i < b58sz && b58u(i) == '1') {
-      zcount += 1
-      i += 1
-    }
-
-    for (r <- b58u) {
+    val outLongs = new Array[Long](outArrayLength)
+    for (r <- b58Chars) {
       if (r > 127) throw new IllegalArgumentException("High-bit set on invalid digit")
       if (DecodeTable(r) == -1)  throw new IllegalArgumentException("Invalid base58 digit (%q)")
       var c = java.lang.Byte.toUnsignedLong(DecodeTable(r))
-      var j = (outisz - 1)
-      while (j >= 0) {
-        t = outi(j)*58 + c
+      for (j <- (outArrayLength - 1) until 0 by -1) {
+        val t = outLongs(j)*58 + c
         c = (t >>> 32) & 0x3f
-        outi(j) = t & 0xffffffff
-        j -= 1
+        outLongs(j) = t & 0xffffffff
       }
 
       if (c > 0) throw new IllegalArgumentException("Output number too big (carry to the next int32)")
-      if ((outi(0) & zmask) != 0) throw new IllegalArgumentException("Output number too big (last int32 filled too far)")
+      if ((outLongs(0) & zeroMask) != 0) throw new IllegalArgumentException("Output number too big (last int32 filled too far)")
     }
 
-    var j, cnt = 0
-    while (j < outisz) {
-      var mask = (((bytesleft-1) & 0xff) * 8).toByte
+    val outBytes = new Array[Byte]((b58Chars.length + 3) * 3)
+    var outBytesCount = 0
+    for (j <- 0 until outArrayLength) {
+      var mask = (((bytesLeft-1) & 0xff) * 8).toByte
       while (java.lang.Byte.toUnsignedInt(mask) <= 0x18) {
-        binu(cnt) = (outi(j) >> mask).toByte
+        outBytes(outBytesCount) = (outLongs(j) >> mask).toByte
         mask = (mask - 8).toByte
-        cnt += 1
+        outBytesCount += 1
       }
-      if (j == 0) bytesleft = 4
-      j += 1
+      if (j == 0) bytesLeft = 4
     }
 
-    for ((v, n) <- binu.zipWithIndex) {
+    val zeroCount = b58Chars.indices
+      .dropWhile(i => b58Chars(i) == '1')
+      .headOption
+      .getOrElse(b58Chars.length - 1)
+
+    for ((v, n) <- outBytes.zipWithIndex) {
       if (v != 0) {
-        var start = n - zcount.toInt
+        var start = n - zeroCount.toInt
         if (start < 0) start = 0
-        return binu.slice(start, cnt)
+        return outBytes.slice(start, outBytesCount)
       }
     }
 
-    binu.take(cnt)
+    outBytes.take(outBytesCount)
   }
 }
