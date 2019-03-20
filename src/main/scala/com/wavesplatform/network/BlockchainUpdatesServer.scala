@@ -39,7 +39,7 @@ private object PBScalaToJava extends MessageToMessageEncoder[PBBlockchainUpdated
   }
 }
 
-private class BlockchainUpdateHandler(blockchainUpdated: Observable[BlockchainUpdated], scheduler: Scheduler)
+private class BlockchainUpdatesHandler(blockchainUpdated: Observable[BlockchainUpdated], scheduler: Scheduler)
     extends ChannelInboundHandlerAdapter
     with ScorexLogging {
   implicit def toByteString(bs: ByteStr): ByteString =
@@ -79,7 +79,7 @@ private class BlockchainUpdateHandler(blockchainUpdated: Observable[BlockchainUp
   }
 }
 
-class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observable[BlockchainUpdated], scheduler: Scheduler) {
+class BlockchainUpdatesServer(settings: WavesSettings, blockchainUpdated: Observable[BlockchainUpdated], scheduler: Scheduler) {
   private val group = new NioEventLoopGroup(1, new DefaultThreadFactory("nio-updates-group", true))
 
   private val channel = new Bootstrap()
@@ -91,11 +91,11 @@ class BlockchainUpdateServer(settings: WavesSettings, blockchainUpdates: Observa
           PBInt32LengthPrepender,
           new ProtobufEncoder,
           PBScalaToJava,
-          new BlockchainUpdateHandler(blockchainUpdates, scheduler)
+          new BlockchainUpdatesHandler(blockchainUpdated, scheduler)
         )
       )
     )
-    .connect(settings.networkSettings.blockchainUpdatesAddress)
+    .connect(settings.blockchainUpdatesSettings.address)
     .channel()
 
   def shutdown(): Unit =

@@ -23,7 +23,8 @@ case class WavesSettings(directory: String,
                          synchronizationSettings: SynchronizationSettings,
                          utxSettings: UtxSettings,
                          featuresSettings: FeaturesSettings,
-                         metrics: Metrics.Settings)
+                         metrics: Metrics.Settings,
+                         blockchainUpdatesSettings: BlockchainUpdatesSettings)
 
 object WavesSettings {
 
@@ -32,22 +33,23 @@ object WavesSettings {
   val configPath: String = "waves"
 
   def fromConfig(config: Config): WavesSettings = {
-    val directory               = config.as[String](s"$configPath.directory")
-    val dataDirectory           = config.as[String](s"$configPath.data-directory")
-    val maxCacheSize            = config.as[Int](s"$configPath.max-cache-size")
-    val maxRollbackDepth        = config.as[Int](s"$configPath.max-rollback-depth")
-    val rememberBlocks          = config.as[FiniteDuration](s"$configPath.remember-blocks-interval-in-cache")
-    val ntpServer               = config.as[String](s"$configPath.ntp-server")
-    val networkSettings         = config.as[NetworkSettings]("waves.network")
-    val walletSettings          = config.as[WalletSettings]("waves.wallet")
-    val blockchainSettings      = BlockchainSettings.fromConfig(config)
-    val matcherSettings         = MatcherSettings.fromConfig(config)
-    val minerSettings           = MinerSettings.fromConfig(config)
-    val restAPISettings         = RestAPISettings.fromConfig(config)
-    val synchronizationSettings = SynchronizationSettings.fromConfig(config)
-    val utxSettings             = config.as[UtxSettings]("waves.utx")
-    val featuresSettings        = config.as[FeaturesSettings]("waves.features")
-    val metrics                 = config.as[Metrics.Settings]("metrics")
+    val directory                 = config.as[String](s"$configPath.directory")
+    val dataDirectory             = config.as[String](s"$configPath.data-directory")
+    val maxCacheSize              = config.as[Int](s"$configPath.max-cache-size")
+    val maxRollbackDepth          = config.as[Int](s"$configPath.max-rollback-depth")
+    val rememberBlocks            = config.as[FiniteDuration](s"$configPath.remember-blocks-interval-in-cache")
+    val ntpServer                 = config.as[String](s"$configPath.ntp-server")
+    val networkSettings           = config.as[NetworkSettings]("waves.network")
+    val walletSettings            = config.as[WalletSettings]("waves.wallet")
+    val blockchainSettings        = BlockchainSettings.fromConfig(config)
+    val matcherSettings           = MatcherSettings.fromConfig(config)
+    val minerSettings             = MinerSettings.fromConfig(config)
+    val restAPISettings           = RestAPISettings.fromConfig(config)
+    val synchronizationSettings   = SynchronizationSettings.fromConfig(config)
+    val utxSettings               = config.as[UtxSettings]("waves.utx")
+    val featuresSettings          = config.as[FeaturesSettings]("waves.features")
+    val metrics                   = config.as[Metrics.Settings]("metrics")
+    val blockchainUpdatesSettings = BlockchainUpdatesSettings.fromConfig(config)
 
     WavesSettings(
       directory,
@@ -65,7 +67,8 @@ object WavesSettings {
       synchronizationSettings,
       utxSettings,
       featuresSettings,
-      metrics
+      metrics,
+      blockchainUpdatesSettings
     )
   }
 }

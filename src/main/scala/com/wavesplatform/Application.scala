@@ -79,24 +79,26 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val appenderScheduler               = singleThread("appender", reporter = log.error("Error in Appender", _))
   private val historyRepliesScheduler         = fixedPool("history-replier", poolSize = 2, reporter = log.error("Error in History Replier", _))
   private val minerScheduler                  = fixedPool("miner-pool", poolSize = 2, reporter = log.error("Error in Miner", _))
-  private val blockchainUpdatedScheduler      = singleThread("blockchain-updated", reporter = log.error("Error in sending blockchain updates", _))
 
-  private val blockchainUpdated = ConcurrentSubject.publish[BlockchainUpdated](blockchainUpdatedScheduler)
+  private val maybeBlockchainUpdatesScheduler =
+    if (settings.blockchainUpdatesSettings.enable)
+      Some(singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _)))
+    else None
+  private val blockchainUpdated = maybeBlockchainUpdatesScheduler map (ConcurrentSubject.publish[BlockchainUpdated](_))
 
-  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, Some(blockchainUpdated))
+  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdated)
 
   private var matcher: Option[Matcher]                                         = None
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
   private var maybeNetwork: Option[NS]                                         = None
-  private var maybeBlockchainUpdateServer: Option[BlockchainUpdateServer]      = None
+  private var maybeBlockchainUpdatesServer: Option[BlockchainUpdatesServer]    = None
 
   def apiShutdown(): Unit = {
     for {
       u <- maybeUtx
       n <- maybeNetwork
-      s <- maybeBlockchainUpdateServer
-    } yield shutdown(u, n, s)
+    } yield shutdown(u, n)
   }
 
   def run(): Unit = {
@@ -151,8 +153,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = network.messages
 
-    val blockchainUpdateServer = new BlockchainUpdateServer(settings, blockchainUpdated, blockchainUpdatedScheduler)
-    maybeBlockchainUpdateServer = Some(blockchainUpdateServer)
+    maybeBlockchainUpdatesServer = for {
+      s  <- maybeBlockchainUpdatesScheduler
+      bu <- blockchainUpdated
+    } yield new BlockchainUpdatesServer(settings, bu, s)
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
@@ -283,19 +287,19 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     sys.addShutdownHook {
       Await.ready(Kamon.stopAllReporters(), 20.seconds)
       Metrics.shutdown()
-      shutdown(utxStorage, network, blockchainUpdateServer)
+      shutdown(utxStorage, network)
     }
   }
 
   @volatile var shutdownInProgress           = false
   @volatile var serverBinding: ServerBinding = _
 
-  def shutdown(utx: UtxPool, network: NS, blockchainUpdateServer: BlockchainUpdateServer): Unit = {
+  def shutdown(utx: UtxPool, network: NS): Unit = {
     if (!shutdownInProgress) {
       shutdownInProgress = true
 
       spendableBalanceChanged.onComplete()
-      blockchainUpdated.onComplete()
+      blockchainUpdated foreach (_.onComplete)
       utx.close()
 
       shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)
@@ -321,13 +325,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       log.info("Stopping network services")
       network.shutdown()
-      blockchainUpdateServer.shutdown()
+
+      maybeBlockchainUpdatesServer foreach (_.shutdown())
+      maybeBlockchainUpdatesScheduler foreach (shutdownAndWait(_, "BlockchainUpdated"))
 
       shutdownAndWait(minerScheduler, "Miner")
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
       shutdownAndWait(scoreObserverScheduler, "ScoreObserver")
       shutdownAndWait(extensionLoaderScheduler, "ExtensionLoader")
-      shutdownAndWait(blockchainUpdatedScheduler, "BlockchainUpdated")
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes)
 
       log.info("Closing storage")
