@@ -1,13 +1,15 @@
 package com.wavesplatform.settings.fee
 
-import cats.data.Validated
+import cats.data.Validated.Valid
 import cats.implicits._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.settings.fee.AssetType.AssetType
 import com.wavesplatform.settings.fee.Mode.Mode
 import com.wavesplatform.settings.utils.ConfigSettingsValidator
+import com.wavesplatform.settings.utils.ConfigSettingsValidator.ErrorsListOr
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
@@ -16,21 +18,21 @@ import play.api.libs.json.{JsObject, Json}
 
 object OrderFeeSettings {
 
-  type ErrorsListOr[A] = Validated[List[String], A]
+  val totalWavesAmount: Long = Constants.UnitsInWave * Constants.TotalWaves
 
   sealed trait OrderFeeSettings {
 
     /** Returns json for order fee settings taking into account fee that should be paid for matcher's account script invocation */
-    def getJson(minMarcherFee: Long): Coeval[JsObject] = Coeval.evalOnce {
+    def getJson(matcherAccountFee: Long): Coeval[JsObject] = Coeval.evalOnce {
       Json.obj(
         this match {
           case FixedWavesSettings(baseFee) =>
-            "fixedWaves" -> Json.obj(
-              "baseFee" -> (baseFee + minMarcherFee)
+            "waves" -> Json.obj(
+              "baseFee" -> (baseFee + matcherAccountFee)
             )
           case FixedSettings(defaultAssetId, minFee) =>
             "fixed" -> Json.obj(
-              "assetId" -> defaultAssetId.maybeBase58Repr,
+              "assetId" -> AssetPair.assetIdStr(defaultAssetId),
               "minFee"  -> minFee
             )
           case PercentSettings(assetType, minFee) =>
@@ -52,52 +54,43 @@ object OrderFeeSettings {
 
     def getPrefixByMode(mode: Mode): String = s"$path.$mode"
 
-    def validateNonWavesAsset(settingName: String)(assetIdStr: String): ErrorsListOr[Asset] = {
-      cfgValidator
-        .validateAsset(settingName)(assetIdStr)
-        .ensure(List(s"Invalid setting $settingName value: $assetIdStr, asset must not be Waves"))(_ != Waves)
-    }
-
-    def validateFixedWavesSettings: ErrorsListOr[FixedWavesSettings] = {
-      cfgValidator.validateByPredicate[Long](s"${getPrefixByMode(Mode.FIXED_WAVES)}.base-fee")(
-        predicate = fee => 0 < fee && fee <= (Constants.UnitsInWave * Constants.TotalWaves),
-        errorMsg = s"required 0 < base fee <= ${Constants.UnitsInWave * Constants.TotalWaves}"
+    def validateWavesSettings: ErrorsListOr[FixedWavesSettings] = {
+      cfgValidator.validateByPredicate[Long](s"${getPrefixByMode(Mode.WAVES)}.base-fee")(
+        predicate = fee => 0 < fee && fee <= totalWavesAmount,
+        errorMsg = s"required 0 < base fee <= $totalWavesAmount"
       ) map FixedWavesSettings
     }
 
     def validateFixedSettings: ErrorsListOr[FixedSettings] = {
 
-      val prefix                 = getPrefixByMode(Mode.FIXED)
-      val assetSettingName       = s"$prefix.asset-id"
-      val fixedMinFeeSettingName = s"$prefix.min-fee"
+      val prefix         = getPrefixByMode(Mode.FIXED)
+      val feeValidator   = cfgValidator.validateByPredicate[Long](s"$prefix.min-fee") _
+      val assetValidated = cfgValidator.validateAsset(s"$prefix.asset")
 
-      val assetStr = cfg.getString(assetSettingName)
+      val feeValidated = assetValidated match {
+        case Valid(Waves) => feeValidator(fee => 0 < fee && fee <= totalWavesAmount, s"required 0 < fee <= $totalWavesAmount")
+        case _            => feeValidator(_ > 0, "required 0 < fee")
+      }
 
-      (
-        validateNonWavesAsset(assetSettingName)(assetStr),
-        cfgValidator.validateByPredicate[Long](fixedMinFeeSettingName)(_ > 0, "must be > 0")
-      ) mapN FixedSettings
+      (assetValidated, feeValidated) mapN FixedSettings
     }
 
     def validatePercentSettings: ErrorsListOr[PercentSettings] = {
-
-      val prefix             = getPrefixByMode(Mode.PERCENT)
-      val percentSettingName = s"$prefix.min-fee"
-
+      val prefix = getPrefixByMode(Mode.PERCENT)
       (
         cfgValidator.validateSafe[AssetType](s"$prefix.asset-type"),
-        cfgValidator.validatePercent(percentSettingName)
+        cfgValidator.validatePercent(s"$prefix.min-fee")
       ) mapN PercentSettings
     }
 
     def getSettingsByMode(mode: Mode): ErrorsListOr[OrderFeeSettings] = mode match {
-      case Mode.FIXED_WAVES => validateFixedWavesSettings
-      case Mode.FIXED       => validateFixedSettings
-      case Mode.PERCENT     => validatePercentSettings
+      case Mode.WAVES   => validateWavesSettings
+      case Mode.FIXED   => validateFixedSettings
+      case Mode.PERCENT => validatePercentSettings
     }
 
     cfgValidator.validateSafe[Mode](s"$path.mode").toEither flatMap (mode => getSettingsByMode(mode).toEither) match {
-      case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString("\n"))
+      case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString(", "))
       case Right(orderFeeSettings) => orderFeeSettings
     }
   }
@@ -115,7 +108,7 @@ object AssetType extends Enumeration {
 object Mode extends Enumeration {
   type Mode = Value
 
-  val FIXED_WAVES = Value("fixed-waves")
-  val FIXED       = Value("fixed")
-  val PERCENT     = Value("percent")
+  val WAVES   = Value("waves")
+  val FIXED   = Value("fixed")
+  val PERCENT = Value("percent")
 }
