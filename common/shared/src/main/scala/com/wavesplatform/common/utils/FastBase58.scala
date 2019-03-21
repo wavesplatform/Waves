@@ -2,6 +2,7 @@ package com.wavesplatform.common.utils
 import java.nio.charset.StandardCharsets.US_ASCII
 
 import scala.annotation.tailrec
+import scala.util.Try
 
 //noinspection ScalaStyle
 object FastBase58 {
@@ -45,8 +46,8 @@ object FastBase58 {
     if (zeroCount != 0) for (i <- 0 until zeroCount) base58Output(i) = '1'.toByte
     val bufferZeroCount = buffer.takeWhile(_ == 0).length
 
-    for (j <- bufferZeroCount until bufferSize)
-      base58Output(j - bufferZeroCount) = Alphabet(java.lang.Byte.toUnsignedInt(buffer(j)))
+    for (bufferIndex <- bufferZeroCount until bufferSize)
+      base58Output(bufferIndex - bufferZeroCount) = Alphabet(java.lang.Byte.toUnsignedInt(buffer(bufferIndex)))
 
     new String(base58Output, US_ASCII)
   }
@@ -65,14 +66,14 @@ object FastBase58 {
     val outLongs = new Array[Long](outArrayLength)
     for (r <- b58Chars) {
       if (r >= DecodeTable.length || DecodeTable(r) == -1)  throw new IllegalArgumentException(s"Invalid base58 digit $r")
-      var c = java.lang.Byte.toUnsignedLong(DecodeTable(r))
-      for (j <- (outArrayLength - 1) until 0 by -1) {
-        val t = outLongs(j)*58 + c
-        c = (t >>> 32) & 0x3fL
-        outLongs(j) = t & 0xffffffffL
+      var base58EncMask = java.lang.Byte.toUnsignedLong(DecodeTable(r))
+      for (outIndex <- (outArrayLength - 1) until 0 by -1) {
+        val longValue = outLongs(outIndex)*58 + base58EncMask
+        base58EncMask = (longValue >>> 32) & 0x3fL
+        outLongs(outIndex) = longValue & 0xffffffffL
       }
 
-      if (c > 0) throw new IllegalArgumentException("Output number too big (carry to the next int32)")
+      if (base58EncMask > 0) throw new IllegalArgumentException("Output number too big (carry to the next int32)")
       if ((outLongs(0) & zeroMask) != 0) throw new IllegalArgumentException("Output number too big (last int32 filled too far)")
     }
 
@@ -81,18 +82,18 @@ object FastBase58 {
     for (j <- 0 until outArrayLength) {
       var mask = (((bytesLeft-1) & 0xff) * 8).toByte
       while (java.lang.Byte.toUnsignedInt(mask) <= 0x18) {
-        outBytes(outBytesCount) = (outLongs(j) >> mask).toByte
+        outBytes(outBytesCount) = (outLongs(j) >>> mask).toByte
         mask = (mask - 8).toByte
         outBytesCount += 1
       }
       if (j == 0) bytesLeft = 4
     }
 
-    val zeroCount = b58Chars
-      .takeWhile(_ == '1')
-      .length
-
     val outBytesStart: Int = {
+      val zeroCount = b58Chars
+        .takeWhile(_ == '1')
+        .length
+
       @tailrec
       def findStart(start: Int = 0): Int = {
         if (start >= outBytes.length) return 0
@@ -105,5 +106,10 @@ object FastBase58 {
     }
 
     java.util.Arrays.copyOfRange(outBytes, outBytesStart, outBytesCount)
+  }
+
+  def tryDecode(str: String, limit: Int = 192): Try[Array[Byte]] = Try {
+    require(str.length <= limit, s"base58Decode input exceeds $limit")
+    decode(str)
   }
 }
