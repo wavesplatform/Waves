@@ -68,5 +68,12 @@ trait ApiMarshallers {
 }
 
 object ApiMarshallers extends ApiMarshallers {
-  val executionContext = Scheduler.computation(name = "api-marshalling")
+  lazy val executionContext = {
+    val parallelism = sys.props
+      .get("waves.rest-api.marshalling-parallelism")
+      .map(_.toInt)
+      .getOrElse((Runtime.getRuntime.availableProcessors() / 2) max 1)
+
+    Scheduler.computation(parallelism, "rest-api-marshalling")
+  }
 }

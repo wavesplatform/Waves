@@ -10,9 +10,13 @@ import monix.execution.Scheduler
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 private[wavesplatform] object BroadcastRoute {
-  val executionContext = new ExecutionContextExecutor {
-    //noinspection ScalaStyle
-    private[this] val scheduler = Scheduler.computation(4, "rest-api-broadcast")
+  lazy val executionContext = new ExecutionContextExecutor {
+    private[this] val parallelism = sys.props
+      .get("waves.rest-api.broadcast-parallelism")
+      .map(_.toInt)
+      .getOrElse((Runtime.getRuntime.availableProcessors() / 2) max 1)
+
+    private[this] val scheduler = Scheduler.computation(parallelism, "rest-api-broadcast")
 
     override def reportFailure(cause: Throwable): Unit = scheduler.reportFailure(cause)
     override def execute(command: Runnable): Unit      = scheduler.execute(command)
