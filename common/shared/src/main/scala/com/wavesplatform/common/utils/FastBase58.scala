@@ -56,37 +56,37 @@ object FastBase58 extends BaseXXEncDec {
     if (str.isEmpty) return Array.emptyByteArray
 
     val b58Chars = str.toCharArray
-    val outArrayLength = (b58Chars.length + 3) / 4
 
     var bytesLeft = b58Chars.length % 4
     var zeroMask = 0
     if (bytesLeft > 0) zeroMask = 0xffffffff << (bytesLeft*8)
     else bytesLeft = 4
 
-    val outLongs = new Array[Long](outArrayLength)
-    for (r <- b58Chars) {
-      if (r >= DecodeTable.length || DecodeTable(r) == -1)  throw new IllegalArgumentException(s"Invalid base58 digit $r")
-      var base58EncMask = ByteOps.toUnsignedLong(DecodeTable(r))
+    val outArrayLength = (b58Chars.length + 3) / 4
+    val outArray = new Array[Long](outArrayLength)
+    for (b58Char <- b58Chars) {
+      if (b58Char >= DecodeTable.length || DecodeTable(b58Char) == -1)  throw new IllegalArgumentException(s"Invalid base58 digit $b58Char")
+      var base58EncMask = ByteOps.toUnsignedLong(DecodeTable(b58Char))
       for (outIndex <- (outArrayLength - 1) until 0 by -1) {
-        val longValue = outLongs(outIndex)*58 + base58EncMask
+        val longValue = outArray(outIndex)*58 + base58EncMask
         base58EncMask = (longValue >>> 32) & 0x3fL
-        outLongs(outIndex) = longValue & 0xffffffffL
+        outArray(outIndex) = longValue & 0xffffffffL
       }
 
       if (base58EncMask > 0) throw new IllegalArgumentException("Output number too big (carry to the next int32)")
-      if ((outLongs(0) & zeroMask) != 0) throw new IllegalArgumentException("Output number too big (last int32 filled too far)")
+      if ((outArray(0) & zeroMask) != 0) throw new IllegalArgumentException("Output number too big (last int32 filled too far)")
     }
 
     val outBytes = new Array[Byte]((b58Chars.length + 3) * 3)
     var outBytesCount = 0
-    for (j <- 0 until outArrayLength) {
+    for (outArrayIndex <- 0 until outArrayLength) {
       var mask = (((bytesLeft-1) & 0xff) * 8).toByte
       while (ByteOps.toUnsignedInt(mask) <= 0x18) {
-        outBytes(outBytesCount) = (outLongs(j) >>> mask).toByte
+        outBytes(outBytesCount) = (outArray(outArrayIndex) >>> mask).toByte
         mask = (mask - 8).toByte
         outBytesCount += 1
       }
-      if (j == 0) bytesLeft = 4
+      if (outArrayIndex == 0) bytesLeft = 4
     }
 
     val outBytesStart: Int = {
