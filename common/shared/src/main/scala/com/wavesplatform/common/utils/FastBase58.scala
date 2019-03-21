@@ -27,10 +27,10 @@ object FastBase58 extends BaseXXEncDec {
     var high = bufferSize - 1
     for (index <- zeroCount until bin.length) {
       var endIndex = bufferSize - 1
-      var carry = java.lang.Byte.toUnsignedInt(bin(index))
+      var carry = ByteOps.toUnsignedInt(bin(index))
 
       while (endIndex > high || carry != 0) {
-        carry = carry + (256 * java.lang.Byte.toUnsignedInt(buffer(endIndex)))
+        carry = carry + (256 * ByteOps.toUnsignedInt(buffer(endIndex)))
         buffer(endIndex) = (carry % 58).toByte
         carry /= 58
         endIndex -= 1
@@ -47,7 +47,7 @@ object FastBase58 extends BaseXXEncDec {
 
     val bufferZeroCount = buffer.takeWhile(_ == 0).length
     for (bufferIndex <- bufferZeroCount until bufferSize)
-      base58Output(zeroCount + bufferIndex - bufferZeroCount) = Alphabet(java.lang.Byte.toUnsignedInt(buffer(bufferIndex)))
+      base58Output(zeroCount + bufferIndex - bufferZeroCount) = Alphabet(ByteOps.toUnsignedInt(buffer(bufferIndex)))
 
     new String(base58Output, US_ASCII)
   }
@@ -66,7 +66,7 @@ object FastBase58 extends BaseXXEncDec {
     val outLongs = new Array[Long](outArrayLength)
     for (r <- b58Chars) {
       if (r >= DecodeTable.length || DecodeTable(r) == -1)  throw new IllegalArgumentException(s"Invalid base58 digit $r")
-      var base58EncMask = java.lang.Byte.toUnsignedLong(DecodeTable(r))
+      var base58EncMask = ByteOps.toUnsignedLong(DecodeTable(r))
       for (outIndex <- (outArrayLength - 1) until 0 by -1) {
         val longValue = outLongs(outIndex)*58 + base58EncMask
         base58EncMask = (longValue >>> 32) & 0x3fL
@@ -81,7 +81,7 @@ object FastBase58 extends BaseXXEncDec {
     var outBytesCount = 0
     for (j <- 0 until outArrayLength) {
       var mask = (((bytesLeft-1) & 0xff) * 8).toByte
-      while (java.lang.Byte.toUnsignedInt(mask) <= 0x18) {
+      while (ByteOps.toUnsignedInt(mask) <= 0x18) {
         outBytes(outBytesCount) = (outLongs(j) >>> mask).toByte
         mask = (mask - 8).toByte
         outBytesCount += 1
@@ -106,5 +106,14 @@ object FastBase58 extends BaseXXEncDec {
     }
 
     java.util.Arrays.copyOfRange(outBytes, outBytesStart, outBytesCount)
+  }
+
+  // Scala.js linking errors fix (from java.lang.Byte)
+  private[this] object ByteOps {
+    @inline
+    def toUnsignedInt(x: Byte): Int = x.toInt & 0xff
+
+    @inline
+    def toUnsignedLong(x: Byte): Long = x.toLong & 0xffL
   }
 }
