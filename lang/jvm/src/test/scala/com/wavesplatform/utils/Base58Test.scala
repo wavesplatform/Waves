@@ -7,6 +7,8 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.encode.{Base58 => scorexBase58}
 
 class Base58Test extends PropSpec with PropertyChecks with Matchers {
+  import org.scalacheck.Shrink
+  implicit val noShrink: Shrink[String] = Shrink.shrinkAny
 
   private val Base58Chars  = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
   private val IllegalChars = "+/=-_0lIO"
