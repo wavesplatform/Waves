@@ -43,7 +43,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
   val fsWithOrderV3Feature: FunctionalitySettings = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.OrderV3.id -> 0))
 
-  val fsOV3MT =
+  val functionalitySettingsOrderV3MassTransfer =
     fsWithOrderV3Feature.copy(preActivatedFeatures = fsWithOrderV3Feature.preActivatedFeatures + (BlockchainFeatures.MassTransfer.id -> 0))
 
   property("Validation fails when OrderV3 feature is not activation yet") {
@@ -354,9 +354,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditions) {
       case (genesises, issueTx1, issueTx2, massTransfer, exchanges, bigBuyOrder) =>
-        assertDiffAndState(Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
-                           TestBlock.create(exchanges),
-                           fsOV3MT) {
+        assertDiffAndState(
+          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
+          TestBlock.create(exchanges),
+          functionalitySettingsOrderV3MassTransfer
+        ) {
           case (blockDiff, _) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
 
@@ -388,9 +390,12 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditions) {
       case (genesises, issueTx1, issueTx2, massTransfer, exchanges, _) =>
-        assertDiffEi(Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))), TestBlock.create(exchanges), fsOV3MT) {
-          blockDiffEi =>
-            blockDiffEi should produce("Insufficient buy fee")
+        assertDiffEi(
+          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
+          TestBlock.create(exchanges),
+          functionalitySettingsOrderV3MassTransfer
+        ) { blockDiffEi =>
+          blockDiffEi should produce("Insufficient buy fee")
         }
     }
   }
@@ -405,9 +410,12 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditions) {
       case (genesises, issueTx1, issueTx2, massTransfer, exchanges, _) =>
-        assertDiffEi(Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))), TestBlock.create(exchanges), fsOV3MT) {
-          blockDiffEi =>
-            blockDiffEi should produce("Too much buy")
+        assertDiffEi(
+          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
+          TestBlock.create(exchanges),
+          functionalitySettingsOrderV3MassTransfer
+        ) { blockDiffEi =>
+          blockDiffEi should produce("Too much buy")
         }
     }
   }
