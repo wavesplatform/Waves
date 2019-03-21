@@ -26,13 +26,15 @@ object Address extends ScorexLogging {
   val AddressStringLength  = base58Length(AddressLength)
 
   def fromPublicKey(publicKey: Array[Byte], chainId: Byte = scheme.chainId): Address = {
-    val withoutChecksum = ByteBuffer.allocate(1 + 1 + HashLength)
+    val withoutChecksum = ByteBuffer
+      .allocate(1 + 1 + HashLength)
       .put(AddressVersion)
       .put(chainId)
       .put(crypto.secureHash(publicKey), 0, HashLength)
       .array()
 
-    val bytes           = ByteBuffer.allocate(AddressLength)
+    val bytes = ByteBuffer
+      .allocate(AddressLength)
       .put(withoutChecksum)
       .put(calcCheckSum(withoutChecksum), 0, ChecksumLength)
       .array()
@@ -61,7 +63,7 @@ object Address extends ScorexLogging {
       _ <- Either.cond(base58String.length <= AddressStringLength,
                        (),
                        InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}"))
-      byteArray <- Base58.decode(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
+      byteArray <- Base58.tryDecodeWithLimit(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
       address   <- fromBytes(byteArray)
     } yield address
   }

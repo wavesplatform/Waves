@@ -39,7 +39,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
         o.senderPublicKey shouldBe PublicKeyAccount(pk.publicKey)
-        o.matcherPublicKey shouldBe PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
+        o.matcherPublicKey shouldBe PublicKeyAccount(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset.compatId.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
         o.assetPair.priceAsset.compatId.get shouldBe ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
         o.price shouldBe 0
@@ -47,7 +47,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         o.matcherFee shouldBe 0
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
-        o.signature shouldBe Base58.decode("signature").get
+        o.signature shouldBe Base58.tryDecodeWithLimit("signature").get
     }
 
     val jsonOV3 = Json.parse(s"""
@@ -74,7 +74,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
         o.senderPublicKey shouldBe PublicKeyAccount(pk.publicKey)
-        o.matcherPublicKey shouldBe PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
+        o.matcherPublicKey shouldBe PublicKeyAccount(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
         o.assetPair.priceAsset shouldBe IssuedAsset(ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get)
         o.price shouldBe 0
@@ -82,7 +82,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         o.matcherFee shouldBe 0
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
-        o.signature shouldBe Base58.decode("signature").get
+        o.signature shouldBe Base58.tryDecodeWithLimit("signature").get
         o.matcherFeeAssetId shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
     }
   }
@@ -123,14 +123,14 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
 
   property("Json Reads Base58") {
     val sender = (json \ "sender").as[Option[Array[Byte]]]
-    sender.get shouldBe Base58.decode(base58Str).get
+    sender.get shouldBe Base58.tryDecodeWithLimit(base58Str).get
 
     (json \ "wrong_sender").validate[Array[Byte]] shouldBe a[JsError]
   }
 
   property("Json Reads PublicKeyAccount") {
     val publicKey = (json \ "publicKey").as[PublicKeyAccount]
-    publicKey.bytes shouldBe PublicKeyAccount(Base58.decode(base58Str).get).bytes
+    publicKey.bytes shouldBe PublicKeyAccount(Base58.tryDecodeWithLimit(base58Str).get).bytes
 
     (json \ "wrong_publicKey").validate[PublicKeyAccount] match {
       case e: JsError =>
