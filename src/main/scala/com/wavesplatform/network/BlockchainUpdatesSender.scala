@@ -19,23 +19,22 @@ import com.wavesplatform.protobuf.events.{PBBlockchainUpdated, PBEvents}
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
 import io.netty.handler.codec.{MessageToByteEncoder, MessageToMessageEncoder}
-import io.netty.handler.codec.protobuf.ProtobufEncoder
 
 import scala.concurrent.Future
 
-private object PBInt32LengthPrepender extends MessageToByteEncoder[ByteBuf] {
-  @throws[Exception]
-  override protected def encode(ctx: ChannelHandlerContext, msg: ByteBuf, out: ByteBuf): Unit = {
-    val bodyLen: Int = msg.readableBytes
+private object PBInt32LengthPrepender extends MessageToByteEncoder[Array[Byte]] {
+  @throws[IndexOutOfBoundsException]
+  override protected def encode(ctx: ChannelHandlerContext, msg: Array[Byte], out: ByteBuf): Unit = {
+    val bodyLen: Int = msg.length
     out.ensureWritable(4 + bodyLen)
     out.writeInt(bodyLen)
     out.writeBytes(msg)
   }
 }
 
-private object PBScalaToJava extends MessageToMessageEncoder[PBBlockchainUpdated] {
+private object PBEncoder extends MessageToMessageEncoder[PBBlockchainUpdated] {
   override def encode(ctx: ChannelHandlerContext, msg: PBBlockchainUpdated, out: util.List[AnyRef]): Unit = {
-    out.add(PBBlockchainUpdated.toJavaProto(msg))
+    out.add(PBBlockchainUpdated.toByteArray(msg))
   }
 }
 
@@ -79,7 +78,7 @@ private class BlockchainUpdatesHandler(blockchainUpdated: Observable[BlockchainU
   }
 }
 
-class BlockchainUpdatesServer(settings: WavesSettings, blockchainUpdated: Observable[BlockchainUpdated], scheduler: Scheduler) {
+class BlockchainUpdatesSender(settings: WavesSettings, blockchainUpdated: Observable[BlockchainUpdated], scheduler: Scheduler) {
   private val group = new NioEventLoopGroup(1, new DefaultThreadFactory("nio-updates-group", true))
 
   private val channel = new Bootstrap()
@@ -89,8 +88,7 @@ class BlockchainUpdatesServer(settings: WavesSettings, blockchainUpdated: Observ
       new PipelineInitializer[SocketChannel](
         Seq(
           PBInt32LengthPrepender,
-          new ProtobufEncoder,
-          PBScalaToJava,
+          PBEncoder,
           new BlockchainUpdatesHandler(blockchainUpdated, scheduler)
         )
       )

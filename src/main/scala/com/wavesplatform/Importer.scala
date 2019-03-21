@@ -11,7 +11,7 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.openDB
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
-import com.wavesplatform.network.BlockchainUpdatesServer
+import com.wavesplatform.network.BlockchainUpdatesSender
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{BlockchainUpdated, Portfolio}
@@ -83,10 +83,10 @@ object Importer extends ScorexLogging {
             val blockchainUpdatesScheduler: Option[Scheduler] =
               if (settings.blockchainUpdatesSettings.enable) Some(Scheduler.singleThread("blockchain-updates")) else None
             val blockchainUpdated = blockchainUpdatesScheduler map (ConcurrentSubject.publish[BlockchainUpdated](_))
-            val blockchainUpdatesServer = for {
+            val blockchainUpdatesSender = for {
               s  <- blockchainUpdatesScheduler
               bu <- blockchainUpdated
-            } yield new BlockchainUpdatesServer(settings, bu, s)
+            } yield new BlockchainUpdatesSender(settings, bu, s)
 
             val blockchainUpdater =
               StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), blockchainUpdated)
@@ -139,7 +139,7 @@ object Importer extends ScorexLogging {
             bis.close()
             inputStream.close()
             blockchainUpdated foreach (_.onComplete())
-            blockchainUpdatesServer foreach (_.shutdown())
+            blockchainUpdatesSender foreach (_.shutdown())
             val duration = System.currentTimeMillis() - start
             log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
           case Failure(_) => log.error(s"Failed to open file '$filename")

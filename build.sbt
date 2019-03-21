@@ -120,10 +120,8 @@ inConfig(Compile)(
     publishArtifact in packageDoc := false,
     publishArtifact in packageSrc := false,
     sourceGenerators += versionSource,
-    PB.targets += PB.gens.java -> (sourceManaged in Compile).value,
     PB.targets += scalapb.gen(
-      flatPackage = true,
-      javaConversions = true
+      flatPackage = true
     ) -> (sourceManaged in Compile).value,
     PB.deleteTargetDirectory := false
   ))

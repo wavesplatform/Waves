@@ -92,7 +92,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
   private var maybeNetwork: Option[NS]                                         = None
-  private var maybeBlockchainUpdatesServer: Option[BlockchainUpdatesServer]    = None
+  private var maybeBlockchainUpdatesSender: Option[BlockchainUpdatesSender]    = None
 
   def apiShutdown(): Unit = {
     for {
@@ -153,10 +153,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = network.messages
 
-    maybeBlockchainUpdatesServer = for {
+    maybeBlockchainUpdatesSender = for {
       s  <- maybeBlockchainUpdatesScheduler
       bu <- blockchainUpdated
-    } yield new BlockchainUpdatesServer(settings, bu, s)
+    } yield new BlockchainUpdatesSender(settings, bu, s)
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
@@ -326,7 +326,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Stopping network services")
       network.shutdown()
 
-      maybeBlockchainUpdatesServer foreach (_.shutdown())
+      maybeBlockchainUpdatesSender foreach (_.shutdown())
       maybeBlockchainUpdatesScheduler foreach (shutdownAndWait(_, "BlockchainUpdated"))
 
       shutdownAndWait(minerScheduler, "Miner")
