@@ -7,14 +7,16 @@ object StdBase58 extends BaseXXEncDec {
 
   private val Alphabet: Array[Byte] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".getBytes(US_ASCII)
 
-  private val DecodeTable: Array[Byte] = Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -1, -1, -1, -1, -1, -1,
-    9, 10, 11, 12, 13, 14, 15, 16, -1, 17, 18, 19, 20, 21, -1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, -1, -1, -1, -1, -1, -1, 33, 34, 35, 36, 37,
-    38, 39, 40, 41, 42, 43, -1, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57)
+  private val DecodeTable: Array[Byte] = Array(
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -1, -1, -1, -1, -1, -1, 9, 10, 11, 12, 13, 14, 15, 16, -1, 17,
+    18, 19, 20, 21, -1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, -1, -1, -1, -1, -1, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, -1, 44, 45,
+    46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57
+  )
 
   private def toBase58(c: Char): Byte = if (c < DecodeTable.length) DecodeTable(c) else -1
 
-  override def defaultDecodeLimit: Int                                           = 192 /* 140*log(256)/log(58) */
+  override def defaultDecodeLimit: Int = 192 /* 140*log(256)/log(58) */
 
   def encode(bytes: Array[Byte]): String = {
     val input     = Arrays.copyOf(bytes, bytes.length)
@@ -42,8 +44,10 @@ object StdBase58 extends BaseXXEncDec {
   def decode(string: String): Array[Byte] = {
     val input: Array[Byte] = new Array[Byte](string.length)
 
-    for (i <- 0 until string.length)
-      input(i) = toBase58(string(i)).ensuring(_ != -1, s"Wrong char '${string(i)}' in Base58 string '$string'")
+    for (i <- 0 until string.length) {
+      input(i) = toBase58(string(i))
+      require(input(i) != -1, s"Wrong char '${string(i)}' in Base58 string '$string'")
+    }
 
     val zeroCount = input.takeWhile(_ == 0).length
 

@@ -12,8 +12,9 @@ trait BaseXXEncDec {
     this.decode(str)
   }
 
-  def tryDecodeWithLimit(str: String, limit: Int = defaultDecodeLimit): Try[Array[Byte]] = Try {
-    require(str.length <= limit, s"base58Decode input exceeds $limit")
-    this.tryDecode(str)
-  }.flatten
+  def tryDecodeWithLimit(str: String, limit: Int = defaultDecodeLimit): Try[Array[Byte]] =
+    Try {
+      require(str.length <= limit, s"base58Decode input exceeds $limit")
+      this.tryDecode(str)
+    }.flatten
 }

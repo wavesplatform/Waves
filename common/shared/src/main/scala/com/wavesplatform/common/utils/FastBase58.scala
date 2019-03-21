@@ -3,14 +3,14 @@ import java.nio.charset.StandardCharsets.US_ASCII
 
 import scala.annotation.tailrec
 
-//noinspection ScalaStyle
 object FastBase58 extends BaseXXEncDec {
   private[this] val Alphabet: Array[Byte] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".getBytes(US_ASCII)
-
-  private[this] val DecodeTable: Array[Byte] = Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -1, -1, -1, -1, -1, -1,
-    9, 10, 11, 12, 13, 14, 15, 16, -1, 17, 18, 19, 20, 21, -1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, -1, -1, -1, -1, -1, -1, 33, 34, 35, 36, 37,
-    38, 39, 40, 41, 42, 43, -1, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57)
+  private[this] val DecodeTable: Array[Byte] = Array(
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -1, -1, -1, -1, -1, -1, 9, 10, 11, 12, 13, 14, 15, 16, -1, 17,
+    18, 19, 20, 21, -1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, -1, -1, -1, -1, -1, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, -1, 44, 45,
+    46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57
+  )
 
   override def defaultDecodeLimit: Int = 192
 
@@ -22,12 +22,12 @@ object FastBase58 extends BaseXXEncDec {
       .length
 
     val bufferSize = (bin.length - zeroCount) * 138 / 100 + 1
-    val buffer = new Array[Byte](bufferSize)
+    val buffer     = new Array[Byte](bufferSize)
 
     var high = bufferSize - 1
     for (index <- zeroCount until bin.length) {
       var endIndex = bufferSize - 1
-      var carry = ByteOps.toUnsignedInt(bin(index))
+      var carry    = ByteOps.toUnsignedInt(bin(index))
 
       while (endIndex > high || carry != 0) {
         carry = carry + (256 * ByteOps.toUnsignedInt(buffer(endIndex)))
@@ -58,17 +58,17 @@ object FastBase58 extends BaseXXEncDec {
     val b58Chars = str.toCharArray
 
     var bytesLeft = b58Chars.length % 4
-    var zeroMask = 0
-    if (bytesLeft > 0) zeroMask = 0xffffffff << (bytesLeft*8)
+    var zeroMask  = 0
+    if (bytesLeft > 0) zeroMask = 0xffffffff << (bytesLeft * 8)
     else bytesLeft = 4
 
     val outArrayLength = (b58Chars.length + 3) / 4
-    val outArray = new Array[Long](outArrayLength)
+    val outArray       = new Array[Long](outArrayLength)
     for (b58Char <- b58Chars) {
-      if (b58Char >= DecodeTable.length || DecodeTable(b58Char) == -1)  throw new IllegalArgumentException(s"Invalid base58 digit $b58Char")
+      if (b58Char >= DecodeTable.length || DecodeTable(b58Char) == -1) throw new IllegalArgumentException(s"Invalid base58 digit $b58Char")
       var base58EncMask = ByteOps.toUnsignedLong(DecodeTable(b58Char))
       for (outIndex <- (outArrayLength - 1) until 0 by -1) {
-        val longValue = outArray(outIndex)*58 + base58EncMask
+        val longValue = outArray(outIndex) * 58 + base58EncMask
         base58EncMask = (longValue >>> 32) & 0x3fL
         outArray(outIndex) = longValue & 0xffffffffL
       }
@@ -77,10 +77,10 @@ object FastBase58 extends BaseXXEncDec {
       if ((outArray(0) & zeroMask) != 0) throw new IllegalArgumentException("Output number too big (last int32 filled too far)")
     }
 
-    val outBytes = new Array[Byte]((b58Chars.length + 3) * 3)
+    val outBytes      = new Array[Byte]((b58Chars.length + 3) * 3)
     var outBytesCount = 0
     for (outArrayIndex <- 0 until outArrayLength) {
-      var mask = (((bytesLeft-1) & 0xff) * 8).toByte
+      var mask = (((bytesLeft - 1) & 0xff) * 8).toByte
       while (ByteOps.toUnsignedInt(mask) <= 0x18) {
         outBytes(outBytesCount) = (outArray(outArrayIndex) >>> mask).toByte
         mask = (mask - 8).toByte
@@ -108,7 +108,9 @@ object FastBase58 extends BaseXXEncDec {
     java.util.Arrays.copyOfRange(outBytes, outBytesStart, outBytesCount)
   }
 
-  // Scala.js linking errors fix (from java.lang.Byte)
+  /**
+    * Scala.js linking errors fix (from java.lang.Byte)
+    */
   private[this] object ByteOps {
     @inline
     def toUnsignedInt(x: Byte): Int = x.toInt & 0xff

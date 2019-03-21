@@ -1,10 +1,12 @@
 package com.wavesplatform.utils
 
-import com.wavesplatform.common.utils.{FastBase58, StdBase58}
+import com.wavesplatform.common.utils.{Base58, FastBase58, StdBase58}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.encode.{Base58 => ScorexBase58}
+
+import scala.util.Success
 
 class Base58Test extends PropSpec with PropertyChecks with Matchers {
   import org.scalacheck.Shrink
@@ -60,24 +62,29 @@ class Base58Test extends PropSpec with PropertyChecks with Matchers {
     }
   }
 
-  property("handles zeroes in start") {
-    val s       = "11WH5tQgZH6Djm7RS2guC"
-    val bytes   = StdBase58.decode(s)
-    val str     = StdBase58.encode(bytes)
+  property("handles zeroes at start") {
+    val encodedString  = "11WH5tQgZH6Djm7RS2guC"
+    val Success(bytes) = ScorexBase58.decode(encodedString)
+
+    val stdStr  = StdBase58.encode(bytes)
     val fastStr = FastBase58.encode(bytes)
-    str shouldBe fastStr
+
+    stdStr shouldBe fastStr
   }
 
   property("handles empty sequences") {
     StdBase58.encode(Array.emptyByteArray) shouldBe ""
-    val d = StdBase58.tryDecodeWithLimit("")
-    d.isSuccess shouldBe true
-    d.get.length shouldBe 0
+    FastBase58.encode(Array.emptyByteArray) shouldBe ""
+
+    StdBase58.decode("").toSeq shouldBe Nil
+    FastBase58.decode("").toSeq shouldBe Nil
   }
 
   property("decoding fails on illegal characters") {
-    forAll(nonBase58Gen) { s =>
-      StdBase58.tryDecodeWithLimit(s).isSuccess shouldBe false
+    forAll(nonBase58Gen) { invalidStr =>
+      intercept[IllegalArgumentException](StdBase58.decode(invalidStr))
+      intercept[IllegalArgumentException](FastBase58.decode(invalidStr))
+      intercept[IllegalArgumentException](Base58.decode(invalidStr))
     }
   }
 }
