@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.common.utils._
+import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
@@ -24,6 +25,21 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
     forAll(contractGen) { sc =>
       val allBytes = ContractScript.apply(V3, sc).explicitGet().bytes().arr
       ScriptReader.fromBytes(allBytes).explicitGet().expr shouldBe sc
+    }
+  }
+
+  property("should parse expression with all supported std lib version") {
+    val scriptEthList =
+      StdLibVersion.SupportedVersions.map { version =>
+        ScriptCompiler.compile(s"""
+                                    |{-# STDLIB_VERSION ${version} #-}
+                                    |  true
+                                  """.stripMargin)
+      }
+    scriptEthList.foreach(_ shouldBe 'right)
+
+    scriptEthList.foreach { scriptEth =>
+      ScriptReader.fromBytes(scriptEth.explicitGet()._1.bytes()) shouldBe 'right
     }
   }
 }
