@@ -1,6 +1,8 @@
 package com.wavesplatform.common.utils
 import java.nio.charset.StandardCharsets.US_ASCII
 
+import scala.annotation.tailrec
+
 //noinspection ScalaStyle
 object FastBase58 {
   private[this] val Alphabet: Array[Byte] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".getBytes(US_ASCII)
@@ -90,13 +92,18 @@ object FastBase58 {
       .takeWhile(_ == '1')
       .length
 
-    for ((v, n) <- outBytes.zipWithIndex) {
-      if (v != 0) {
-        val start = (n - zeroCount) max 0
-        return outBytes.slice(start, outBytesCount)
+    val outBytesStart: Int = {
+      @tailrec
+      def findStart(start: Int = 0): Int = {
+        if (start >= outBytes.length) return 0
+        val element = outBytes(start)
+        if (element != 0) (start - zeroCount) max 0
+        else findStart(start + 1)
       }
+
+      findStart()
     }
 
-    outBytes.take(outBytesCount)
+    java.util.Arrays.copyOfRange(outBytes, outBytesStart, outBytesCount)
   }
 }
