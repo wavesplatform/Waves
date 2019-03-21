@@ -80,7 +80,7 @@ class MatcherActor(settings: MatcherSettings,
   /**
     * @param f (sender, orderBook)
     */
-  private def runFor(eventWithMeta: QueueEventWithMeta)(f: (ActorRef, ActorRef) => Unit): Unit = {
+  private def runFor(eventWithMeta: QueueEventWithMeta, autoCreate: Boolean = true)(f: (ActorRef, ActorRef) => Unit): Unit = {
     import eventWithMeta.event.assetPair
     import eventWithMeta.offset
 
@@ -99,9 +99,14 @@ class MatcherActor(settings: MatcherSettings,
           }
         case Some(Left(_)) => s ! OrderBookUnavailable
         case None =>
-          val ob = createOrderBook(assetPair)
-          persistAsync(OrderBookCreated(assetPair))(_ => ())
-          f(s, ob)
+          if (autoCreate) {
+            val ob = createOrderBook(assetPair)
+            persistAsync(OrderBookCreated(assetPair))(_ => ())
+            f(s, ob)
+          } else {
+            log.warn(s"OrderBook fro $assetPair is stopped and autoCreate is $autoCreate, respond to client with OrderBookUnavailable")
+            s ! OrderBookUnavailable
+          }
       }
   }
 
@@ -113,7 +118,8 @@ class MatcherActor(settings: MatcherSettings,
     case request: QueueEventWithMeta =>
       request.event match {
         case QueueEvent.OrderBookDeleted(assetPair) =>
-          runFor(request) { (sender, ref) =>
+          // autoCreate = false for case, when multiple OrderBookDeleted(A1-A2) events happen one after another
+          runFor(request, autoCreate = false) { (sender, ref) =>
             ref.tell(request, sender)
             orderBooks.getAndUpdate(_.filterNot { x =>
               x._2.right.exists(_ == ref)
