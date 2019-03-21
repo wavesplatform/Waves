@@ -263,6 +263,34 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
+  property("InvokeScriptTransaction binding") {
+    forAll(invokeScriptGen) { t =>
+      val script =
+        s"""
+            |match tx {
+            | case t : InvokeScriptTransaction  =>
+            |   ${provenPart(t)}
+            |   let contractAddress = t.contractAddress.bytes == base58'${t.contractAddress.bytes.base58}'
+            |   let paymentAmount = if(${t.payment.nonEmpty})
+            |     then extract(t.payment).amount == ${t.payment.headOption.map(_.amount).getOrElse(-1)}
+            |     else isDefined(t.payment) == false
+            |   let paymentAssetId = if(${t.payment.nonEmpty})
+            |     then if (${t.payment.headOption.map(_.assetId != Waves).getOrElse(false)})
+            |             then extract(t.payment).assetId == base58'${t.payment.headOption.flatMap(_.assetId.maybeBase58Repr).getOrElse("")}'
+            |             else isDefined(extract(t.payment).assetId) == false
+            |     else isDefined(t.payment) == false
+            |   let feeAssetId = if (${t.feeAssetId != Waves})
+            |      then extract(t.feeAssetId) == base58'${t.feeAssetId.maybeBase58Repr.getOrElse("")}'
+            |      else isDefined(t.feeAssetId) == false
+            |   ${assertProvenPart("t")} && contractAddress && paymentAmount && paymentAssetId && feeAssetId
+            | case other => throw()
+            | }
+            |""".stripMargin
+      val result = runScriptWithCustomContext(script, Coproduct(t), T, StdLibVersion.V3)
+      result shouldBe evaluated(true)
+    }
+  }
+
   property("SetAssetScriptTransaction binding") {
     forAll(setAssetScriptTransactionGen.map(_._2)) { t =>
       val result = runScript(
