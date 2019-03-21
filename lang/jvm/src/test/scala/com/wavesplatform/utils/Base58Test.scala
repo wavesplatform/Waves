@@ -53,7 +53,7 @@ class Base58Test extends PropSpec with PropertyChecks with Matchers {
 
   property("encodes the same as fast implementation") {
     forAll(base58Gen) { s =>
-      val bytes     = StdBase58.decode(s)
+      val bytes   = StdBase58.decode(s)
       val str     = StdBase58.encode(bytes)
       val fastStr = FastBase58.encode(bytes)
       str shouldBe fastStr
@@ -61,8 +61,8 @@ class Base58Test extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("handles zeroes in start") {
-    val s = "11WH5tQgZH6Djm7RS2guC"
-    val bytes     = StdBase58.decode(s)
+    val s       = "11WH5tQgZH6Djm7RS2guC"
+    val bytes   = StdBase58.decode(s)
     val str     = StdBase58.encode(bytes)
     val fastStr = FastBase58.encode(bytes)
     str shouldBe fastStr
