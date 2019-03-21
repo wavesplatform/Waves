@@ -120,9 +120,7 @@ inConfig(Compile)(
     publishArtifact in packageDoc := false,
     publishArtifact in packageSrc := false,
     sourceGenerators += versionSource,
-    PB.targets += scalapb.gen(
-      flatPackage = true
-    ) -> (sourceManaged in Compile).value,
+    PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged in Compile).value,
     PB.deleteTargetDirectory := false
   ))
 
