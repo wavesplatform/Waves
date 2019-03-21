@@ -42,12 +42,11 @@ object FastBase58 {
       .length
 
     val base58Output = new Array[Byte](bufferSize - startIndex + zeroCount)
+    for (i <- 0 until zeroCount) base58Output(i) = Alphabet(0)
 
-    if (zeroCount != 0) for (i <- 0 until zeroCount) base58Output(i) = '1'.toByte
     val bufferZeroCount = buffer.takeWhile(_ == 0).length
-
     for (bufferIndex <- bufferZeroCount until bufferSize)
-      base58Output(bufferIndex - bufferZeroCount) = Alphabet(java.lang.Byte.toUnsignedInt(buffer(bufferIndex)))
+      base58Output(zeroCount + bufferIndex - bufferZeroCount) = Alphabet(java.lang.Byte.toUnsignedInt(buffer(bufferIndex)))
 
     new String(base58Output, US_ASCII)
   }

@@ -60,6 +60,14 @@ class Base58Test extends PropSpec with PropertyChecks with Matchers {
     }
   }
 
+  property("handles zeroes in start") {
+    val s = "11WH5tQgZH6Djm7RS2guC"
+    val bytes     = Base58.decode(s).get
+    val str     = Base58.encode(bytes)
+    val fastStr = FastBase58.encode(bytes)
+    str shouldBe fastStr
+  }
+
   property("handles empty sequences") {
     Base58.encode(Array.emptyByteArray) shouldBe ""
     val d = Base58.decode("")
