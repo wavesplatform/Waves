@@ -5,11 +5,9 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.common.utils.Base58
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json._
-import com.wavesplatform.utils.byteStrWrites
 
 case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") sender: PublicKeyAccount,
                               @ApiModelProperty(dataType = "java.lang.String") orderId: Option[ByteStr],
@@ -29,7 +27,7 @@ case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") s
 object CancelOrderRequest {
   implicit val byteArrayFormat: Format[Array[Byte]] = Format(
     {
-      case JsString(base58String) => Base58.decode(base58String).fold(_ => JsError("Invalid signature"), b => JsSuccess(b))
+      case JsString(base58String) => Base58.tryDecodeWithLimit(base58String).fold(_ => JsError("Invalid signature"), b => JsSuccess(b))
       case other                  => JsError(s"Expecting string but got $other")
     },
     b => JsString(Base58.encode(b))

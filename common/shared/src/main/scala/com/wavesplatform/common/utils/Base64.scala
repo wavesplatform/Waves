@@ -1,12 +1,13 @@
 package com.wavesplatform.common.utils
 
-import scala.util.Try
+object Base64 extends BaseXXEncDec {
+  val Prefix = "base64:"
+  override val defaultDecodeLimit: Int = 1024 * 1024 * 1024 // 1 MB
 
-object Base64 {
-  def encode(input: Array[Byte]): String = new String(java.util.Base64.getEncoder.encode(input))
+  override def encode(input: Array[Byte]): String = new String(java.util.Base64.getEncoder.encode(input))
 
-  def decode(input: String): Try[Array[Byte]] = Try {
-    val str = if (input.startsWith("base64:")) input.substring(7) else input
+  override def decode(input: String): Array[Byte] = {
+    val str = if (input.startsWith(Prefix)) input.substring(Prefix.length) else input
     java.util.Base64.getDecoder.decode(str)
   }
 }

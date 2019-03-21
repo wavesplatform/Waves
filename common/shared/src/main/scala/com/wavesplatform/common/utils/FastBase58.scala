@@ -2,10 +2,9 @@ package com.wavesplatform.common.utils
 import java.nio.charset.StandardCharsets.US_ASCII
 
 import scala.annotation.tailrec
-import scala.util.Try
 
 //noinspection ScalaStyle
-object FastBase58 {
+object FastBase58 extends BaseXXEncDec {
   private[this] val Alphabet: Array[Byte] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".getBytes(US_ASCII)
 
   private[this] val DecodeTable: Array[Byte] = Array(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -13,7 +12,9 @@ object FastBase58 {
     9, 10, 11, 12, 13, 14, 15, 16, -1, 17, 18, 19, 20, 21, -1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, -1, -1, -1, -1, -1, -1, 33, 34, 35, 36, 37,
     38, 39, 40, 41, 42, 43, -1, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57)
 
-  def encode(bin: Array[Byte]): String = {
+  override def defaultDecodeLimit: Int = 192
+
+  override def encode(bin: Array[Byte]): String = {
     if (bin.isEmpty) return ""
 
     val zeroCount = bin
@@ -51,7 +52,7 @@ object FastBase58 {
     new String(base58Output, US_ASCII)
   }
 
-  def decode(str: String): Array[Byte] = {
+  override def decode(str: String): Array[Byte] = {
     if (str.isEmpty) return Array.emptyByteArray
 
     val b58Chars = str.toCharArray
@@ -105,10 +106,5 @@ object FastBase58 {
     }
 
     java.util.Arrays.copyOfRange(outBytes, outBytesStart, outBytesCount)
-  }
-
-  def tryDecode(str: String, limit: Int = 192): Try[Array[Byte]] = Try {
-    require(str.length <= limit, s"base58Decode input exceeds $limit")
-    decode(str)
   }
 }

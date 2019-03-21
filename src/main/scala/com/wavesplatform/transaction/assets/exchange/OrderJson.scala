@@ -17,7 +17,7 @@ object OrderJson {
 
   implicit val byteArrayReads: Reads[Array[Byte]] = {
     case JsString(s) =>
-      Base58.decode(s) match {
+      Base58.tryDecodeWithLimit(s) match {
         case Success(bytes) => JsSuccess(bytes)
         case Failure(_)     => JsError(JsPath, JsonValidationError("error.incorrect.base58"))
       }
@@ -27,7 +27,7 @@ object OrderJson {
   implicit val optionByteArrayReads: Reads[Option[Array[Byte]]] = {
     case JsString(s) if s.isEmpty => JsSuccess(Option.empty[Array[Byte]])
     case JsString(s) if s.nonEmpty =>
-      Base58.decode(s) match {
+      Base58.tryDecodeWithLimit(s) match {
         case Success(bytes) => JsSuccess(Some(bytes))
         case Failure(_)     => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
       }
@@ -36,7 +36,7 @@ object OrderJson {
 
   implicit val publicKeyAccountReads: Reads[PublicKeyAccount] = {
     case JsString(s) =>
-      Base58.decode(s) match {
+      Base58.tryDecodeWithLimit(s) match {
         case Success(bytes) if bytes.length == 32 => JsSuccess(PublicKeyAccount(bytes))
         case _                                    => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.publicKeyAccount"))))
       }

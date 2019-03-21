@@ -61,7 +61,7 @@ object LevelDBWriterBenchmark {
 
   @State(Scope.Benchmark)
   class TransactionByIdSt extends BaseSt {
-    val allTxs: Vector[ByteStr] = load("transactionById", benchSettings.restTxsFile)(x => ByteStr(Base58.decode(x).get))
+    val allTxs: Vector[ByteStr] = load("transactionById", benchSettings.restTxsFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }
 
   @State(Scope.Benchmark)
@@ -71,7 +71,7 @@ object LevelDBWriterBenchmark {
 
   @State(Scope.Benchmark)
   class BlocksByIdSt extends BaseSt {
-    val allBlocks: Vector[ByteStr] = load("blocksById", benchSettings.blocksFile)(x => ByteStr(Base58.decode(x).get))
+    val allBlocks: Vector[ByteStr] = load("blocksById", benchSettings.blocksFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }
 
   @State(Scope.Benchmark)

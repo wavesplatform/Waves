@@ -2,7 +2,6 @@ package com.wavesplatform.common
 import scala.util.{Failure, Success, Try}
 
 package object utils {
-
   implicit class EitherExt2[A, B](ei: Either[A, B]) {
 
     def explicitGet(): B = ei match {

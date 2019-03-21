@@ -3,7 +3,7 @@ package com.wavesplatform.common
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import com.wavesplatform.common.Base58Benchmark.{Base58St, BytesSt}
-import com.wavesplatform.common.utils.{Base58, FastBase58}
+import com.wavesplatform.common.utils.{Base58, FastBase58, StdBase58}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
@@ -18,10 +18,10 @@ class Base58Benchmark {
   def base58_fastEncode_test(st: BytesSt, bh: Blackhole): Unit = bh.consume(FastBase58.encode(st.bytes))
 
   @Benchmark
-  def base58_encode_test(st: BytesSt, bh: Blackhole): Unit = bh.consume(Base58.encode(st.bytes))
+  def base58_encode_test(st: BytesSt, bh: Blackhole): Unit = bh.consume(StdBase58.encode(st.bytes))
 
   @Benchmark
-  def base58_decode_test(st: Base58St, bh: Blackhole): Unit = bh.consume(Base58.decode(st.base58, Int.MaxValue).get)
+  def base58_decode_test(st: Base58St, bh: Blackhole): Unit = bh.consume(StdBase58.decode(st.base58))
 
   @Benchmark
   def base58_fastDecode_test(st: Base58St, bh: Blackhole): Unit = bh.consume(FastBase58.decode(st.base58))
