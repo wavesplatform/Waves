@@ -3,7 +3,7 @@ syntax = "proto3";
 option java_package = "com.wavesplatform.protobuf.events";
 
 import "block.proto";
-import "transactions.proto";
+import "transaction.proto";
 
 message BlockchainUpdated {
     bytes id = 1;
