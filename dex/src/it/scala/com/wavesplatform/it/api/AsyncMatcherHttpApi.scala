@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.http.api_key
 import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.util.{GlobalTimer, TimerExt}
 import com.wavesplatform.it.{Node, api}
 import com.wavesplatform.matcher.api.CancelOrderRequest
@@ -45,8 +46,6 @@ object AsyncMatcherHttpApi extends Assertions {
   }
 
   implicit class MatcherAsyncHttpApi(matcherNode: Node) extends NodeAsyncHttpApi(matcherNode) {
-
-    def matcherPublicKey: PublicKeyAccount = PublicKeyAccount(Base58.decode(matcherNode.config.getString("matcher-public-key")).get)
 
     def matcherApiEndpoint: URL = new URL(s"http://localhost:${matcherNode.nodeExternalPort(matcherNode.config.getInt("waves.matcher.port"))}")
 
@@ -224,7 +223,7 @@ object AsyncMatcherHttpApi extends Assertions {
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val timeToLiveTimestamp = timestamp + timeToLive.toMillis
       val unsigned =
-        Order(sender, matcherPublicKey, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
+        Order(sender, MatcherPriceAssetConfig.matcher, pair, orderType, amount, price, timestamp, timeToLiveTimestamp, fee, Proofs.empty, version)
       Order.sign(unsigned, sender)
     }
 

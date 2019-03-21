@@ -29,6 +29,9 @@ abstract class MatcherSuiteBase
   val smartTradeFee    = tradeFee + smartFee
   val twoSmartTradeFee = tradeFee + 2 * smartFee
 
+  protected override def createDocker: Docker = new Docker(tag = getClass.getSimpleName, imageName = "com.wavesplatform/dex-it:latest")
+  protected def node                          = dockerNodes().head
+
   protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .withDefault(4)

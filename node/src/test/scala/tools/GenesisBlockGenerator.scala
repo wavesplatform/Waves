@@ -20,8 +20,9 @@ import scala.concurrent.duration._
 
 object GenesisBlockGenerator extends App {
 
-  private type SeedText = String
-  private type Share    = Long
+  private type AccountName = String
+  private type SeedText    = String
+  private type Share       = Long
 
   case class DistributionItem(seedText: String, nonce: Int, amount: Share)
 
@@ -30,9 +31,9 @@ object GenesisBlockGenerator extends App {
                       baseTarget: Long,
                       averageBlockDelay: FiniteDuration,
                       timestamp: Option[Long],
-                      distributions: Seq[DistributionItem]) {
+                      distributions: Map[AccountName, DistributionItem]) {
 
-    private[this] val distributionsSum = distributions.map(_.amount).sum
+    private[this] val distributionsSum = distributions.values.map(_.amount).sum
     require(
       distributionsSum == initialBalance,
       s"The sum of all balances should be == $initialBalance, but it is $distributionsSum"
@@ -77,16 +78,16 @@ object GenesisBlockGenerator extends App {
     override val chainId: Byte = settings.chainId
   }
 
-  val shares: Map[FullAddressInfo, Share] = settings.distributions.map { x =>
-    toFullAddressInfo(x) -> x.amount
-  }.toMap
+  val shares: Seq[(AccountName, FullAddressInfo, Share)] = settings.distributions.map {
+    case (accountName, x) => (accountName, toFullAddressInfo(x), x.amount)
+  }.toSeq
 
   val timestamp = settings.timestamp.getOrElse(System.currentTimeMillis())
 
   val genesisTxs: Seq[GenesisTransaction] = shares.map {
-    case (addrInfo, part) =>
+    case (_, addrInfo, part) =>
       GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty)
-  }.toSeq
+  }
 
   val genesisBlock: Block = {
     val reference     = ByteStr(Array.fill(SignatureLength)(-1: Byte))
@@ -108,7 +109,7 @@ object GenesisBlockGenerator extends App {
   val signature = genesisBlock.signerData.signature
 
   report(
-    addrInfos = shares.keysIterator,
+    addrInfos = shares.map(x => (x._1, x._2)),
     settings = GenesisSettings(
       genesisBlock.timestamp,
       timestamp,
@@ -122,13 +123,12 @@ object GenesisBlockGenerator extends App {
     )
   )
 
-  private def report(addrInfos: Iterator[FullAddressInfo], settings: GenesisSettings): Unit = {
-
+  private def report(addrInfos: Iterable[(AccountName, FullAddressInfo)], settings: GenesisSettings): Unit = {
     val output = new StringBuilder
     output.append("Addresses:\n")
     addrInfos.zipWithIndex.foreach {
-      case (acc, n) =>
-        output.append(s"""($n):
+      case ((accountName, acc), n) =>
+        output.append(s"""$accountName:
            | Seed text:           ${acc.seedText}
            | Seed:                ${acc.seed}
            | Account seed:        ${acc.accountSeed}

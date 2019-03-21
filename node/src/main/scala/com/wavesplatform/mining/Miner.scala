@@ -290,7 +290,7 @@ class MinerImpl(allChannels: ChannelGroup,
     val height    = blockchainUpdater.height
     val lastBlock = blockchainUpdater.lastBlock.get
     for {
-      _  <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get)
+      _  <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get) // lastBlock ?
       _  <- checkScript(account)
       ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
       calculatedOffset = ts - timeService.correctedTime()

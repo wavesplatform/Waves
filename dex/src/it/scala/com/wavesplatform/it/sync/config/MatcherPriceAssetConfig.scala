@@ -1,5 +1,7 @@
 package com.wavesplatform.it.sync.config
 
+import java.nio.charset.StandardCharsets
+
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.config.ConfigFactory.{empty, parseString}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
@@ -14,18 +16,36 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.wallet.Wallet
 
 import scala.util.Random
+import scala.collection.JavaConverters._
 
 // TODO: Make it trait
 object MatcherPriceAssetConfig {
 
   private val Default: Config = ConfigFactory.parseResources("nodes.conf")
 
+  val accounts: Map[String, PrivateKeyAccount] = {
+    val config           = ConfigFactory.parseResources("genesis.conf")
+    val distributionsKey = "genesis-generator.distributions"
+    val distributions    = config.getObject(distributionsKey)
+    distributions
+      .keySet()
+      .asScala
+      .map { accountName =>
+        val prefix   = s"$distributionsKey.$accountName"
+        val seedText = config.getString(s"$prefix.seed-text")
+        val nonce    = config.getInt(s"$prefix.nonce")
+        accountName -> Wallet.generateNewAccount(seedText.getBytes(StandardCharsets.UTF_8), nonce)
+      }
+      .toMap
+  }
+
 //  private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(2))
 //    .zip(Seq(matcherConfig.withFallback(minerDisabled), minerDisabled, empty()))
 //    .map { case (n, o) => o.withFallback(n) }
 
-  val alicePk = Wallet.generateNewAccount("seed".getBytes(), 808464434)
-  val bobPk   = Wallet.generateNewAccount("seed".getBytes(), 808464435)
+  val matcher: PrivateKeyAccount = accounts("matcher")
+  val alice: PrivateKeyAccount   = accounts("alice")
+  val bob: PrivateKeyAccount     = accounts("bob")
 
   val Decimals: Byte = 2
 
@@ -37,7 +57,7 @@ object MatcherPriceAssetConfig {
   val IssueUsdTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
       AddressScheme.current.chainId,
-      sender = alicePk,
+      sender = alice,
       name = usdAssetName.getBytes(),
       description = "asset description".getBytes(),
       quantity = defaultAssetQuantity,
@@ -53,7 +73,7 @@ object MatcherPriceAssetConfig {
   val IssueWctTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
       AddressScheme.current.chainId,
-      sender = bobPk,
+      sender = bob,
       name = wctAssetName.getBytes(),
       description = "asset description".getBytes(),
       quantity = defaultAssetQuantity,
@@ -69,7 +89,7 @@ object MatcherPriceAssetConfig {
   val IssueEthTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
       AddressScheme.current.chainId,
-      sender = alicePk,
+      sender = alice,
       name = ethAssetName.getBytes(),
       description = "asset description".getBytes(),
       quantity = defaultAssetQuantity,
@@ -85,7 +105,7 @@ object MatcherPriceAssetConfig {
   val IssueBtcTx: IssueTransactionV2 = IssueTransactionV2
     .selfSigned(
       AddressScheme.current.chainId,
-      sender = bobPk,
+      sender = bob,
       name = btcAssetName.getBytes(),
       description = "asset description".getBytes(),
       quantity = defaultAssetQuantity,
