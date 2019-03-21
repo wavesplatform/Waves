@@ -34,7 +34,14 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     assetWOScript = sender
-      .issue(firstAddress, "AssetWOScript", "Test coin for SetAssetScript tests w/o script", someAssetAmount, 0, reissuable = false, issueFee, 2)
+      .issue(firstAddress,
+             "AssetWOScript",
+             "Test coin for SetAssetScript tests w/o script",
+             someAssetAmount,
+             0,
+             reissuable = false,
+             issueFee,
+             version = 2)
       .id
 
     assetWScript = sender

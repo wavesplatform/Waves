@@ -1,16 +1,23 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
+import com.wavesplatform.common.utils.EitherExt2
 import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, Matchers}
@@ -144,6 +151,32 @@ object SyncHttpApi extends Assertions {
 
     def debugPortfoliosFor(address: String, considerUnspent: Boolean): Portfolio = sync(async(n).debugPortfoliosFor(address, considerUnspent))
 
+    def broadcastIssue(source: PrivateKeyAccount,
+                       name: String,
+                       description: String,
+                       quantity: Long,
+                       decimals: Byte,
+                       reissuable: Boolean,
+                       fee: Long,
+                       script: Option[String]): Transaction = {
+      val tx = IssueTransactionV2
+        .selfSigned(
+          chainId = AddressScheme.current.chainId,
+          sender = source,
+          name = name.getBytes(StandardCharsets.UTF_8),
+          description = description.getBytes(StandardCharsets.UTF_8),
+          quantity = quantity,
+          decimals = decimals,
+          reissuable = reissuable,
+          script = script.map(x => Script.fromBase64String(x).explicitGet()),
+          fee = fee,
+          timestamp = System.currentTimeMillis()
+        )
+        .explicitGet()
+
+      maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = false)
+    }
+
     def issue(sourceAddress: String,
               name: String,
               description: String,
@@ -195,6 +228,28 @@ object SyncHttpApi extends Assertions {
 
     def aliasByAddress(targetAddress: String): Seq[String] =
       sync(async(n).aliasByAddress(targetAddress))
+
+    def broadcastTransfer(source: PrivateKeyAccount,
+                          recipient: String,
+                          amount: Long,
+                          fee: Long,
+                          assetId: Option[String],
+                          feeAssetId: Option[String]): Transaction = {
+      val tx = TransferTransactionV2
+        .selfSigned(
+          assetId = Asset.fromString(assetId),
+          sender = source,
+          recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+          amount = amount,
+          timestamp = System.currentTimeMillis(),
+          feeAssetId = Asset.fromString(feeAssetId),
+          feeAmount = fee,
+          attachment = Array.emptyByteArray
+        )
+        .explicitGet()
+
+      maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = false)
+    }
 
     def transfer(sourceAddress: String,
                  recipient: String,

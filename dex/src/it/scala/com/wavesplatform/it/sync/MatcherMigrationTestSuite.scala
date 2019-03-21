@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherDefaultConfig._
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 
@@ -17,39 +17,32 @@ class MatcherMigrationTestSuite extends MatcherSuiteBase {
   "issue asset and run migration tool inside container" - {
     // Alice issues new asset
     val aliceAsset =
-      aliceNode
-        .issue(aliceAcc.address,
-               "DisconnectCoin",
-               "Alice's coin for disconnect tests",
-               1000 * someAssetAmount,
-               8,
-               reissuable = false,
-               smartIssueFee,
-               2)
+      node
+        .broadcastIssue(alice, "DisconnectCoin", "Alice's coin for disconnect tests", 1000 * someAssetAmount, 8, reissuable = false, issueFee, None)
         .id
     nodes.waitForHeightAriseAndTxPresent(aliceAsset)
 
-    val aliceBalance = aliceNode.accountBalances(aliceAcc.address)._2
-    val t1           = aliceNode.transfer(aliceAcc.address, matcherAcc.address, aliceBalance - minFee - 250000, minFee, None, None, 2).id
+    val aliceBalance = node.accountBalances(alice.address)._2
+    val t1           = node.broadcastTransfer(alice, matcher.address, aliceBalance - minFee - 250000, minFee, None, None).id
     nodes.waitForHeightAriseAndTxPresent(t1)
 
     val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
 
     "place order and run migration tool" in {
       // Alice places sell order
-      val aliceOrder = matcherNode
-        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 3000000, 3000000, matcherFee)
+      val aliceOrder = node
+        .placeOrder(alice, aliceWavesPair, OrderType.SELL, 3000000, 3000000, matcherFee)
       aliceOrder.status shouldBe "OrderAccepted"
       val firstOrder = aliceOrder.message.id
 
       // check order status
-      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
+      node.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
 
-      // sell order should be in the aliceNode orderbook
-      matcherNode.fullOrderHistory(aliceAcc).head.status shouldBe "Accepted"
+      // sell order should be in the node orderbook
+      node.fullOrderHistory(alice).head.status shouldBe "Accepted"
 
-      val tbBefore = matcherNode.tradableBalance(aliceAcc, aliceWavesPair)
-      val rbBefore = matcherNode.reservedBalance(aliceAcc)
+      val tbBefore = node.tradableBalance(alice, aliceWavesPair)
+      val rbBefore = node.reservedBalance(alice)
 
       // stop node, run migration tool and start node again
       docker.runMigrationToolInsideContainer(dockerNodes().head)
@@ -57,12 +50,12 @@ class MatcherMigrationTestSuite extends MatcherSuiteBase {
 
       val height = nodes.map(_.height).max
 
-      matcherNode.waitForHeight(height + 1, 40.seconds)
-      matcherNode.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
-      matcherNode.fullOrderHistory(aliceAcc).head.status shouldBe "Accepted"
+      node.waitForHeight(height + 1, 40.seconds)
+      node.orderStatus(firstOrder, aliceWavesPair).status shouldBe "Accepted"
+      node.fullOrderHistory(alice).head.status shouldBe "Accepted"
 
-      val tbAfter = matcherNode.tradableBalance(aliceAcc, aliceWavesPair)
-      val rbAfter = matcherNode.reservedBalance(aliceAcc)
+      val tbAfter = node.tradableBalance(alice, aliceWavesPair)
+      val rbAfter = node.reservedBalance(alice)
 
       assert(tbBefore == tbAfter)
       assert(rbBefore == rbAfter)

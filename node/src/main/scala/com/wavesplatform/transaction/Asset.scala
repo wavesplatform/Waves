@@ -38,6 +38,10 @@ object Asset {
   implicit val assetJsonFormat: Format[IssuedAsset] = Format(assetReads, assetWrites)
   implicit val assetIdJsonFormat: Format[Asset]     = Format(assetIdReads, assetIdWrites)
 
+  def fromString(maybeStr: Option[String]): Asset = {
+    maybeStr.map(x => IssuedAsset(ByteStr.decodeBase58(x).get)).getOrElse(Waves)
+  }
+
   def fromCompatId(maybeBStr: Option[ByteStr]): Asset = {
     maybeBStr.map(IssuedAsset).getOrElse(Waves)
   }

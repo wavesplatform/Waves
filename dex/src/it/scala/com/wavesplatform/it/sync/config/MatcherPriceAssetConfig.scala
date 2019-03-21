@@ -21,7 +21,10 @@ import scala.collection.JavaConverters._
 // TODO: Make it trait
 object MatcherPriceAssetConfig {
 
-  private val Default: Config = ConfigFactory.parseResources("nodes.conf")
+  private val genesisConfig = ConfigFactory.parseResources("genesis.conf")
+  AddressScheme.current = new AddressScheme {
+    override val chainId: Byte = genesisConfig.getString("genesis-generator.network-type").head.toByte
+  }
 
   val accounts: Map[String, PrivateKeyAccount] = {
     val config           = ConfigFactory.parseResources("genesis.conf")
@@ -165,7 +168,9 @@ object MatcherPriceAssetConfig {
                                                     |  rest-order-limit = $orderLimit
                                                     |}""".stripMargin)
 
-  val Configs: Seq[Config] = Seq.empty // _Configs.map(updatedMatcherConfig.withFallback(_))
+  val Configs: Seq[Config] = Seq(
+    updatedMatcherConfig.withFallback(ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala.head)
+  )
 
   def createAssetPair(asset1: String, asset2: String): AssetPair = {
     val (a1, a2) = (AssetPair.extractAssetId(asset1).get, AssetPair.extractAssetId(asset2).get)

@@ -1,33 +1,29 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
-import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.assets.exchange.OrderType._
 import org.scalatest._
-
-import scala.collection.JavaConverters._
 
 class BlacklistedTradingTestSuite extends MatcherSuiteBase with GivenWhenThen {
 
   import BlacklistedTradingTestSuite._
 
-  private def Default: Seq[Config] = ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala
+  override protected def nodeConfigs: Seq[Config] = Seq(configWithBlacklisted().withFallback(Configs.head))
 
-  override protected def nodeConfigs: Seq[Config] =
-    Seq(configWithBlacklisted().withFallback(MatcherPriceAssetConfig.updatedMatcherConfig).withFallback(Default.head))
-
-  val (dec2, dec8) = (1000L, 1000000000L)
-  "issue assets" in {
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
     val xs = Seq(IssueUsdTx, IssueWctTx, IssueEthTx, IssueBtcTx).map(createSignedIssueRequest).map(node.signedIssue)
     xs.foreach(tx => node.waitForTransaction(tx.id))
   }
 
   "When blacklists are empty" in {
+    val (dec2, dec8) = (1000L, 1000000000L)
+
     Then("Place some orders")
     val usdOrder = node.placeOrder(alice, wavesUsdPair, BUY, dec8, dec2, matcherFee).message.id
     val wctOrder = node.placeOrder(alice, wctWavesPair, BUY, dec2, dec8, matcherFee).message.id

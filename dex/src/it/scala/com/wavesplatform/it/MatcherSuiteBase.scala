@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.Config
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest._
@@ -15,6 +16,8 @@ abstract class MatcherSuiteBase
     with NodesFromDocker
     with BeforeAndAfterAll
     with MatcherNode {
+
+  private val iWantToInitializeThisDumbAddressScheme = MatcherPriceAssetConfig.Configs
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
