@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
 
 import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
@@ -11,11 +10,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
-import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
+import scala.collection.mutable.{ArrayBuffer => MList, Map => MMap}
 
 /* This is not thread safe, used only from BlockchainUpdaterImpl */
 class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val approvedFeatures: Set[Short]) extends ScorexLogging {
-  private[this] val MaxTotalDiffs = 3
+  private[this] val MaxTotalDiffs = 100
 
   private[this] val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
   private[this] val micros: MList[MicroBlock]                     = MList.empty // fresh head
@@ -26,8 +25,11 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     .expireAfterWrite(10, TimeUnit.MINUTES)
     .build[BlockId, (Diff, Long)]()
 
-  private[this] val bestLiquidBlockDiffCache =
-    new AtomicReference[Diff]()
+  private[this] val forgedBlockCache = CacheBuilder
+    .newBuilder()
+    .maximumSize(MaxTotalDiffs)
+    .expireAfterWrite(10, TimeUnit.MINUTES)
+    .build[BlockId, Option[(Block, DiscardedMicroBlocks)]]()
 
   def microBlockIds: Seq[BlockId] =
     micros.map(_.totalResBlockSig)
@@ -36,10 +38,8 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     if (totalResBlockSig == base.uniqueId)
       (baseBlockDiff, baseBlockCarry)
     else
-      Option(totalBlockDiffCache.getIfPresent(totalResBlockSig)) match {
-        case Some(cachedDiffAndCarry) => cachedDiffAndCarry
-
-        case None =>
+      totalBlockDiffCache.get(
+        totalResBlockSig, { () =>
           micros.find(_.totalResBlockSig == totalResBlockSig) match {
             case Some(current) =>
               val prevResBlockSig          = current.prevResBlockSig
@@ -52,7 +52,8 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
             case None =>
               (Diff.empty, 0L)
           }
-      }
+        }
+      )
 
   def bestLiquidBlockId: BlockId =
     micros.headOption.map(_.totalResBlockSig).getOrElse(base.uniqueId)
@@ -74,46 +75,12 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
         (block, diff, carry, discarded)
     }
 
-  def bestLiquidDiff: Diff = {
-    Option(bestLiquidBlockDiffCache.get()) match {
-      case Some(value) =>
-        value
-
-      case None =>
-        val newValue = micros.headOption.fold(baseBlockDiff)(m => diffFor(m.totalResBlockSig)._1)
-        bestLiquidBlockDiffCache.set(newValue)
-        newValue
-    }
-  }
+  def bestLiquidDiff: Diff =
+    micros.headOption.fold(baseBlockDiff)(m => diffFor(m.totalResBlockSig)._1)
 
   def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
 
   def microBlock(id: BlockId): Option[MicroBlock] = micros.find(_.totalResBlockSig == id)
-
-  private def forgeBlock(id: BlockId): Option[(Block, DiscardedMicroBlocks)] = {
-    val ms = micros.reverse
-    if (base.uniqueId == id) {
-      Some((base, ms))
-    } else if (!ms.exists(_.totalResBlockSig == id)) None
-    else {
-      val (accumulatedTxs, maybeFound) = ms.foldLeft((List.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
-        case ((accumulated, maybeDiscarded), micro) =>
-          maybeDiscarded match {
-            case Some((sig, discarded)) => (accumulated, Some((sig, micro +: discarded)))
-            case None =>
-              if (micro.totalResBlockSig == id)
-                (accumulated ++ micro.transactionData, Some((micro.totalResBlockSig, Seq.empty[MicroBlock])))
-              else
-                (accumulated ++ micro.transactionData, None)
-          }
-      }
-      maybeFound.map {
-        case (sig, discardedMicroblocks) =>
-          (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs),
-           discardedMicroblocks)
-      }
-    }
-  }
 
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
     val blockId = micros
@@ -126,8 +93,35 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
     microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
     micros.prepend(m)
-    bestLiquidBlockDiffCache.set(null)
   }
 
   def carryFee: Long = baseBlockCarry + microDiffs.values.map(_._2).sum
+
+  private[this] def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
+    forgedBlockCache.get(
+      blockId, { () =>
+        val microsFromEnd = micros.view.reverse
+
+        if (base.uniqueId == blockId) {
+          Some((base, microsFromEnd))
+        } else if (!microsFromEnd.exists(_.totalResBlockSig == blockId)) None
+        else {
+          val (accumulatedTxs, maybeFound) = microsFromEnd.foldLeft((MList.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
+            case ((accumulated, maybeDiscarded), micro) =>
+              maybeDiscarded match {
+                case Some((sig, discarded)) => (accumulated, Some((sig, micro +: discarded)))
+                case None =>
+                  if (micro.totalResBlockSig == blockId)
+                    (accumulated ++= micro.transactionData, Some((micro.totalResBlockSig, Seq.empty[MicroBlock])))
+                  else
+                    (accumulated ++= micro.transactionData, None)
+              }
+          }
+          maybeFound.map {
+            case (sig, discarded) =>
+              (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs), discarded)
+          }
+        }
+      }
+    )
 }
