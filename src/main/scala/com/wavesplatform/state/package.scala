@@ -83,8 +83,8 @@ package object state {
     def blockById(blockId: ByteStr): Option[Block] = blockchain.blockBytes(blockId).flatMap(bb => Block.parseBytes(bb).toOption)
     def blockAt(height: Int): Option[Block]        = blockchain.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
 
-    def lastBlockId: Option[ByteStr]                 = blockchain.lastBlock.map(_.uniqueId)
-    def lastBlockTimestamp: Option[Long]             = blockchain.lastBlock.map(_.timestamp)
+    def lastBlockId: Option[ByteStr]     = blockchain.lastBlock.map(_.uniqueId)
+    def lastBlockTimestamp: Option[Long] = blockchain.lastBlock.map(_.timestamp)
 
     def lastBlocks(howMany: Int): Seq[Block] = {
       (Math.max(1, blockchain.height - howMany + 1) to blockchain.height).flatMap(blockchain.blockAt).reverse
