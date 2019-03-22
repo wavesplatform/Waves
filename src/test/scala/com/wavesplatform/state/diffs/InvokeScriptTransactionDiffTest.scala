@@ -59,7 +59,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     .compile(
       s"""
          |match tx {
-         |  case tx:TransferTransaction => tx.amount > 10
+         |  case tx:TransferTransaction => false
          |  case _ => false
          |}""".stripMargin,
     )
