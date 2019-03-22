@@ -197,10 +197,6 @@ object OrderValidator {
     }
   }
 
-  def validateOrderAssetPairByWhitelist(order: Order, allowedAssetPairs: Set[AssetPair]): Result[Order] = {
-    lift(order).ensure(MatcherError.AssetPairIsNotAllowed(order.assetPair))(ord => allowedAssetPairs.isEmpty || allowedAssetPairs(ord.assetPair))
-  }
-
   def matcherSettingsAware(matcherPublicKey: PublicKeyAccount,
                            blacklistedAddresses: Set[Address],
                            blacklistedAssets: Set[IssuedAsset],
@@ -213,10 +209,12 @@ object OrderValidator {
       _ <- lift(order)
         .ensure(MatcherError.UnexpectedMatcherPublicKey(matcherPublicKey, order.matcherPublicKey))(_.matcherPublicKey == matcherPublicKey)
         .ensure(MatcherError.AddressIsBlacklisted(order.sender))(o => !blacklistedAddresses.contains(o.sender.toAddress))
+        .ensure(MatcherError.AssetPairIsNotAllowed(order.assetPair)) { o =>
+          matcherSettings.allowedAssetPairs.isEmpty || matcherSettings.allowedAssetPairs(o.assetPair)
+        }
       _ <- validateBlacklistedAsset(order.assetPair.amountAsset, MatcherError.AmountAssetBlacklisted)
       _ <- validateBlacklistedAsset(order.assetPair.priceAsset, MatcherError.PriceAssetBlacklisted)
       _ <- validateBlacklistedAsset(order.matcherFeeAssetId, MatcherError.FeeAssetBlacklisted)
-      _ <- validateOrderAssetPairByWhitelist(order, matcherSettings.allowedAssetPairs)
       _ <- validateOrderFee(order, matcherSettings.orderFee)
     } yield order
   }
