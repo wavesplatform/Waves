@@ -7,8 +7,8 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.StdLibVersion
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
 // [WAIT] import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 // [WAIT] import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -176,7 +176,7 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe 0
     }
 
-    val testContract = Contract(List(), List(), Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
+    val testContract = DApp(List(), List(), Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE))))
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
       .onCall((_: Address) => Some(ContractScript(StdLibVersion.V3, testContract).explicitGet()))

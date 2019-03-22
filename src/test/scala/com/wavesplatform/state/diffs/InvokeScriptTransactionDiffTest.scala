@@ -7,8 +7,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
@@ -68,7 +68,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), GETTER(GETTER(REF(senderBinding), "caller"), "bytes"))), REF("nil")))
         )
 
-    Contract(
+    DApp(
       List.empty,
       List(
         CallableFunction(
@@ -116,7 +116,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       else
         List(FUNCTION_CALL(Native(1100), List(oneTransfer, REF("nil"))))
 
-    Contract(
+    DApp(
       List.empty,
       List(
         CallableFunction(
@@ -134,7 +134,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     )
   }
 
-  def simpleContract(funcName: String): Either[String, Contract] = {
+  def simpleContract(funcName: String): Either[String, DApp] = {
     val expr = {
       val script =
         s"""
@@ -213,7 +213,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       argBinding    <- validAliasStringGen
     } yield paymentContract(senderBinging, argBinding, func, address, amount, masspayment, paymentCount, assetId)
 
-  def preconditionsAndSetContract(senderBindingToContract: String => Gen[Contract],
+  def preconditionsAndSetContract(senderBindingToContract: String => Gen[DApp],
                                   invokerGen: Gen[PrivateKeyAccount] = accountGen,
                                   masterGen: Gen[PrivateKeyAccount] = accountGen,
                                   payment: Option[Payment] = None,

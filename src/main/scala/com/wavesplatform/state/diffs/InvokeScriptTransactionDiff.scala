@@ -6,7 +6,7 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -36,7 +36,7 @@ object InvokeScriptTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: InvokeScriptTransaction): Either[ValidationError, Diff] = {
     val sc = blockchain.accountScript(tx.dappAddress)
 
-    def evalContract(contract: Contract): Either[ExecutionError, ScriptResult] = {
+    def evalContract(contract: DApp): Either[ExecutionError, ScriptResult] = {
       val environment = new WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval(tx.asInstanceOf[In]),

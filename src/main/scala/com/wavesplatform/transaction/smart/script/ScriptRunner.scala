@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.smart.script
 import cats.implicits._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.lang._
-import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
 import com.wavesplatform.state._
@@ -34,7 +34,7 @@ object ScriptRunner {
           Coeval(dappAddress)
         )
         EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
-      case ContractScript.ContractScriptImpl(_, Contract(_, _, Some(vf)), _) =>
+      case ContractScript.ContractScriptImpl(_, DApp(_, _, Some(vf)), _) =>
         val ctx = BlockchainContext.build(
           script.stdLibVersion,
           AddressScheme.current.chainId,
@@ -49,7 +49,7 @@ object ScriptRunner {
                                         _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), _ => ???))
         EvaluatorV1.evalWithLogging(ctx, evalContract)
 
-      case ContractScript.ContractScriptImpl(_, Contract(_, _, None), _) =>
+      case ContractScript.ContractScriptImpl(_, DApp(_, _, None), _) =>
         val t: Proven with Authorized =
           in.eliminate(_.asInstanceOf[Proven with Authorized], _.eliminate(_.asInstanceOf[Proven with Authorized], _ => ???))
         (List.empty, Verifier.verifyAsEllipticCurveSignature[Proven with Authorized](t) match {

@@ -1,7 +1,7 @@
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, _}
-import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveParser
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.CTX
@@ -46,7 +46,7 @@ object JsAPI {
     r(ast)
   }
 
-  private def toJs(c: Contract): js.Object = {
+  private def toJs(c: DApp): js.Object = {
     toJs(TRUE) // later
   }
 

@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.VerifierFunction
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 object ContractEvaluator {
   case class Invocation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], dappAddress: ByteStr)
 
-  def eval(c: Contract, i: Invocation): EvalM[EVALUATED] = {
+  def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
     val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name
     c.cfs.find(_.u.name == functionName) match {
       case None =>
@@ -64,6 +64,6 @@ object ContractEvaluator {
     EvaluatorV1.evalExpr(expr)
   }
 
-  def apply(ctx: EvaluationContext, c: Contract, i: Invocation): Either[ExecutionError, ScriptResult] =
+  def apply(ctx: EvaluationContext, c: DApp, i: Invocation): Either[ExecutionError, ScriptResult] =
     EvaluatorV1.evalWithLogging(ctx, eval(c, i))._2.flatMap(ScriptResult.fromObj)
 }
