@@ -100,7 +100,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   private[this] def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
     forgedBlockCache.get(
       blockId, { () =>
-        val microsFromEnd = micros.view.reverse
+        val microsFromEnd = micros.reverse
 
         if (base.uniqueId == blockId) {
           Some((base, microsFromEnd))
