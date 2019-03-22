@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.StdLibVersion.V2
@@ -574,8 +575,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(DirectiveSet(V2, ScriptType.Asset, ContentType.Expression),
-                 new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain, Coeval(null)))
+          .build(
+            DirectiveSet(V2, ScriptType.Asset, ContentType.Expression).explicitGet(),
+            new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain, Coeval(null))
+          )
 
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
@@ -594,8 +597,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(DirectiveSet(StdLibVersion.V2, ScriptType.Account, ContentType.Expression),
-                 new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null)))
+          .build(
+            DirectiveSet(StdLibVersion.V2, ScriptType.Account, ContentType.Expression).explicitGet(),
+            new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null))
+          )
 
     for {
       compileResult <- ExpressionCompiler(ctx.compilerContext, expr)

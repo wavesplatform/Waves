@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
+import com.wavesplatform.common.utils.EitherExt2
 
 import scala.collection.JavaConverters._
 
@@ -19,7 +20,7 @@ object DocExport {
     } else {
       val version = StdLibVersion(args(1).toInt)
       val wavesContext = WavesContext.build(
-        DirectiveSet(version, ScriptType.Account, ContentType.Contract),
+        DirectiveSet(version, ScriptType.Account, ContentType.Contract).explicitGet(),
         new Environment {
           override def height: Long                                                                                    = ???
           override def chainId: Byte                                                                                   = 66

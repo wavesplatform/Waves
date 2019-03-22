@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
@@ -24,7 +25,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid.combine(
       compilerContext,
       WavesContext
-        .build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
+        .build(
+          DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract).explicitGet(),
+          Common.emptyBlockchainEnvironment()
+        )
         .compilerContext
     )
     val expr = {
@@ -79,7 +83,13 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   private val cmpCtx: CompilerContext =
-    WavesContext.build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment()).compilerContext
+    WavesContext
+      .build(
+        DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract).explicitGet(),
+        Common.emptyBlockchainEnvironment()
+      )
+      .compilerContext
+
   property("contract compiles callable functions independently") {
     val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
@@ -224,7 +234,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         Seq(
           PureContext.build(StdLibVersion.V3),
           CryptoContext.build(com.wavesplatform.lang.Global),
-          WavesContext.build(DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract), Common.emptyBlockchainEnvironment())
+          WavesContext.build(
+            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract).explicitGet(),
+            Common.emptyBlockchainEnvironment()
+          )
         ))
       .compilerContext
     val expr = {
