@@ -18,9 +18,9 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{Time, byteStrWrites}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
@@ -233,8 +233,8 @@ case class TransactionsApiRoute(settings: RestAPISettings,
               case CreateAliasTransactionV1 => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], wallet, signerAddress, time)
               case CreateAliasTransactionV2 => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], wallet, signerAddress, time)
               case DataTransaction          => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
-              case ContractInvocationTransaction =>
-                TransactionFactory.contractInvocation(txJson.as[ContractInvocationRequest], wallet, signerAddress, time)
+              case InvokeScriptTransaction =>
+                TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
               case SetScriptTransaction      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
               case SetAssetScriptTransaction => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
               case SponsorFeeTransaction     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)

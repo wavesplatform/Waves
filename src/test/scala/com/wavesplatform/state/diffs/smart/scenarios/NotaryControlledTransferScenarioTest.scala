@@ -5,15 +5,18 @@ import java.nio.charset.StandardCharsets
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, V1}
+import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.{Global, Testing}
+import com.wavesplatform.lang.{ContentType, Global, ScriptType, Testing}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
@@ -21,8 +24,8 @@ import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
@@ -63,7 +66,8 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
       untypedScript = Parser.parseExpr(assetScript).get.value
 
-      typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1).explicitGet()
+      typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedScript).explicitGet()._1)
+        .explicitGet()
 
       issueTransaction = IssueTransactionV2
         .selfSigned(
@@ -80,18 +84,18 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
         )
         .explicitGet()
 
-      assetId = issueTransaction.id()
+      assetId = IssuedAsset(issueTransaction.id())
 
       kingDataTransaction = DataTransaction
         .selfSigned(king, List(BinaryDataEntry("notary1PK", ByteStr(notary.publicKey))), 1000, ts + 1)
         .explicitGet()
 
       transferFromCompanyToA = TransferTransactionV1
-        .selfSigned(Some(assetId), company, accountA, 1, ts + 20, None, 1000, Array.empty)
+        .selfSigned(assetId, company, accountA, 1, ts + 20, Waves, 1000, Array.empty)
         .explicitGet()
 
       transferFromAToB = TransferTransactionV1
-        .selfSigned(Some(assetId), accountA, accountB, 1, ts + 30, None, 1000, Array.empty)
+        .selfSigned(assetId, accountA, accountB, 1, ts + 30, Waves, 1000, Array.empty)
         .explicitGet()
 
       notaryDataTransaction = DataTransaction
@@ -110,9 +114,12 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
        accountBDataTransaction,
        transferFromAToB)
 
+  def dummyEvalContext(version: StdLibVersion): EvaluationContext =
+    lazyContexts(DirectiveSet(V1, ScriptType.Asset, ContentType.Expression))().evaluationContext
+
   private def eval(code: String) = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed   = ExpressionCompiler(compilerContext(V1, isAssetScript = false), untyped).map(_._1)
+    val typed   = ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untyped).map(_._1)
     typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(V1), _))
   }
 

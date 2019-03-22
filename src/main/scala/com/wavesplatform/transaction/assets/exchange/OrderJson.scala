@@ -4,7 +4,8 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.transaction.{AssetId, Proofs}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, Proofs}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -16,7 +17,7 @@ object OrderJson {
 
   implicit val byteArrayReads: Reads[Array[Byte]] = {
     case JsString(s) =>
-      Base58.decode(s) match {
+      Base58.tryDecodeWithLimit(s) match {
         case Success(bytes) => JsSuccess(bytes)
         case Failure(_)     => JsError(JsPath, JsonValidationError("error.incorrect.base58"))
       }
@@ -26,7 +27,7 @@ object OrderJson {
   implicit val optionByteArrayReads: Reads[Option[Array[Byte]]] = {
     case JsString(s) if s.isEmpty => JsSuccess(Option.empty[Array[Byte]])
     case JsString(s) if s.nonEmpty =>
-      Base58.decode(s) match {
+      Base58.tryDecodeWithLimit(s) match {
         case Success(bytes) => JsSuccess(Some(bytes))
         case Failure(_)     => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
       }
@@ -35,18 +36,9 @@ object OrderJson {
 
   implicit val publicKeyAccountReads: Reads[PublicKeyAccount] = {
     case JsString(s) =>
-      Base58.decode(s) match {
+      Base58.tryDecodeWithLimit(s) match {
         case Success(bytes) if bytes.length == 32 => JsSuccess(PublicKeyAccount(bytes))
         case _                                    => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.publicKeyAccount"))))
-      }
-    case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
-  }
-
-  implicit val assetIdReads: Reads[AssetId] = {
-    case JsString(s) =>
-      Base58.decode(s) match {
-        case Success(bytes) => JsSuccess(ByteStr(bytes))
-        case _              => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.assetId"))))
       }
     case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }
@@ -66,12 +58,11 @@ object OrderJson {
 
     val eproofs =
       proofs
-        .map(p => Proofs(p.map(ByteStr.apply)))
-        .orElse(signature.map(s => Proofs(Seq(ByteStr(s)))))
+        .map(p => Proofs(p.map(ByteStr.apply).toList))
+        .orElse(signature.map(s => Proofs(List(ByteStr(s)))))
         .getOrElse(Proofs.empty)
 
     val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
-
     Order(
       sender,
       matcher,
@@ -99,7 +90,7 @@ object OrderJson {
                   signature: Option[Array[Byte]],
                   proofs: Option[Array[Array[Byte]]],
                   version: Byte,
-                  matcherFeeAssetId: Option[AssetId]): Order = {
+                  matcherFeeAssetId: Asset): Order = {
 
     val eproofs =
       proofs
@@ -124,7 +115,10 @@ object OrderJson {
   }
 
   def readAssetPair(amountAsset: Option[Option[Array[Byte]]], priceAsset: Option[Option[Array[Byte]]]): AssetPair = {
-    AssetPair(amountAsset.flatten.map(ByteStr(_)), priceAsset.flatten.map(ByteStr(_)))
+    AssetPair(
+      amountAsset.flatten.map(arr => IssuedAsset(ByteStr(arr))).getOrElse(Waves),
+      priceAsset.flatten.map(arr => IssuedAsset(ByteStr(arr))).getOrElse(Waves)
+    )
   }
 
   implicit val assetPairReads: Reads[AssetPair] = {
@@ -165,7 +159,9 @@ object OrderJson {
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").read[Byte] and
-      (JsPath \ "matcherFeeAssetId").readNullable[AssetId]
+      (JsPath \ "matcherFeeAssetId")
+        .readNullable[Array[Byte]]
+        .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
     r(readOrderV3 _)
   }
 

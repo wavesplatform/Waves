@@ -3,7 +3,7 @@ package com.wavesplatform.utils
 import com.wavesplatform.common.utils.Base64
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class Base64Test extends PropSpec with PropertyChecks with Matchers {
 
@@ -20,17 +20,17 @@ class Base64Test extends PropSpec with PropertyChecks with Matchers {
 
   property("handles empty sequences") {
     Base64.encode(Array.emptyByteArray) shouldBe ""
-    Base64.decode("").get.length shouldBe 0
-    Base64.decode("base64:").get.length shouldBe 0
+    Base64.tryDecode("").get.length shouldBe 0
+    Base64.tryDecode("base64:").get.length shouldBe 0
   }
 
   property("decoding fails on illegal characters") {
     forAll(illegalGen) { s =>
-      Base64.decode(s).isSuccess shouldBe false
+      Base64.tryDecode(s).isSuccess shouldBe false
     }
   }
 
   property("decoding fails on null") {
-    Base64.decode(null).isSuccess shouldBe false
+    Base64.tryDecode(null).isSuccess shouldBe false
   }
 }

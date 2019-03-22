@@ -6,18 +6,19 @@ import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 
 import scala.util.Try
 
-case class TransferTransactionV1 private (assetId: Option[AssetId],
+case class TransferTransactionV1 private (assetId: Asset,
                                           sender: PublicKeyAccount,
                                           recipient: AddressOrAlias,
                                           amount: Long,
                                           timestamp: Long,
-                                          feeAssetId: Option[AssetId],
+                                          feeAssetId: Asset,
                                           fee: Long,
                                           attachment: Array[Byte],
                                           signature: ByteStr)
@@ -44,12 +45,12 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
     }
   }
 
-  def create(assetId: Option[AssetId],
+  def create(assetId: Asset,
              sender: PublicKeyAccount,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
-             feeAssetId: Option[AssetId],
+             feeAssetId: Asset,
              feeAmount: Long,
              attachment: Array[Byte],
              signature: ByteStr): Either[ValidationError, TransactionT] = {
@@ -58,12 +59,12 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
       .map(_ => TransferTransactionV1(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature))
   }
 
-  def signed(assetId: Option[AssetId],
+  def signed(assetId: Asset,
              sender: PublicKeyAccount,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
-             feeAssetId: Option[AssetId],
+             feeAssetId: Asset,
              feeAmount: Long,
              attachment: Array[Byte],
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
@@ -72,12 +73,12 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
     }
   }
 
-  def selfSigned(assetId: Option[AssetId],
+  def selfSigned(assetId: Asset,
                  sender: PrivateKeyAccount,
                  recipient: AddressOrAlias,
                  amount: Long,
                  timestamp: Long,
-                 feeAssetId: Option[AssetId],
+                 feeAssetId: Asset,
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
     signed(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, sender)
@@ -88,8 +89,8 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
       SignatureBytes(tailIndex(1), "Signature"),
       ConstantByte(tailIndex(2), value = typeId, name = "Transaction type"),
       PublicKeyAccountBytes(tailIndex(3), "Sender's public key"),
-      OptionBytes[AssetId](tailIndex(4), "Asset ID", AssetIdBytes(tailIndex(4), "Asset ID"), "flag (1 - asset, 0 - Waves)"),
-      OptionBytes[AssetId](tailIndex(5), "Fee's asset ID", AssetIdBytes(tailIndex(5), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
+      OptionBytes[IssuedAsset](tailIndex(4), "Asset ID", AssetIdBytes(tailIndex(4), "Asset ID"), "flag (1 - asset, 0 - Waves)"),
+      OptionBytes[IssuedAsset](tailIndex(5), "Fee's asset ID", AssetIdBytes(tailIndex(5), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
       LongBytes(tailIndex(6), "Timestamp"),
       LongBytes(tailIndex(7), "Amount"),
       LongBytes(tailIndex(8), "Fee"),
@@ -99,12 +100,12 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
       case (signature, txId, senderPublicKey, assetId, feeAssetId, timestamp, amount, fee, recipient, attachments) =>
         require(txId == typeId, s"Signed tx id is not match")
         TransferTransactionV1(
-          assetId = assetId,
+          assetId = assetId.getOrElse(Waves),
           sender = senderPublicKey,
           recipient = recipient,
           amount = amount,
           timestamp = timestamp,
-          feeAssetId = feeAssetId,
+          feeAssetId = feeAssetId.getOrElse(Waves),
           fee = fee,
           attachment = attachments,
           signature = signature

@@ -4,12 +4,14 @@ import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ContentType
 import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -17,8 +19,8 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
@@ -39,7 +41,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
          |
       """.stripMargin
     val untyped = Parser.parseExpr(script).get.value
-    ExpressionCompiler(compilerContext(V1, isAssetScript = false), untyped).explicitGet()._1
+    ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untyped).explicitGet()._1
   }
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, TransferTransactionV2, Seq[ByteStr])] = for {
@@ -57,7 +59,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
   } yield {
     val unsigned =
       TransferTransactionV2
-        .create(None, master, recepient, amount, timestamp, None, fee, Array.emptyByteArray, proofs = Proofs.empty)
+        .create(Waves, master, recepient, amount, timestamp, Waves, fee, Array.emptyByteArray, proofs = Proofs.empty)
         .explicitGet()
     val sig0 = ByteStr(crypto.sign(s0, unsigned.bodyBytes()))
     val sig1 = ByteStr(crypto.sign(s1, unsigned.bodyBytes()))

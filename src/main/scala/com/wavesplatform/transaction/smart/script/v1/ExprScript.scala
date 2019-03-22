@@ -1,11 +1,11 @@
 package com.wavesplatform.transaction.smart.script.v1
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto
+import com.wavesplatform.lang.{ContentType, Global}
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.ContractLimits._
+import com.wavesplatform.lang.v1.ScriptEstimator
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.{ScriptEstimator, Serde}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.{functionCosts, varNames}
 import monix.eval.Coeval
@@ -20,7 +20,7 @@ object ExprScript {
 
   def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true): Either[String, Script] =
     for {
-      scriptComplexity <- ScriptEstimator(varNames(version), functionCosts(version), x)
+      scriptComplexity <- ScriptEstimator(varNames(version, ContentType.Expression), functionCosts(version), x)
       _                <- Either.cond(scriptComplexity <= MaxExprComplexity, (), s"Script is too complex: $scriptComplexity > $MaxExprComplexity")
       s = new ExprScriptImpl(version, x, scriptComplexity)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
@@ -28,12 +28,7 @@ object ExprScript {
 
   private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR, complexity: Long) extends ExprScript {
     override type Expr = EXPR
-
-    override val bytes: Coeval[ByteStr] =
-      Coeval.evalOnce {
-        val s = Array(stdLibVersion.toByte) ++ Serde.serialize(expr)
-        ByteStr(s ++ crypto.secureHash(s).take(checksumLength))
-      }
+    override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion)))
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.сontainsBlockV2(expr))
   }
 

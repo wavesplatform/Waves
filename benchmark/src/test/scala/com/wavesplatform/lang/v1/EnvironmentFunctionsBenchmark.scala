@@ -83,6 +83,7 @@ object EnvironmentFunctionsBenchmark {
     override def resolveAlias(alias: String): Either[String, Recipient.Address]                                  = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def tthis: Recipient.Address                                                                        = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)

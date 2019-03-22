@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script}
 import org.scalacheck.Gen
@@ -22,7 +23,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
     first.timestamp shouldEqual second.timestamp
     first.fee shouldEqual second.fee
     first.version shouldEqual second.version
-    first.assetId shouldEqual second.assetId
+    first.asset shouldEqual second.asset
     first.proofs shouldEqual second.proofs
     first.bytes() shouldEqual second.bytes()
     first.script shouldEqual second.script
@@ -30,12 +31,12 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
   def jsonRepr: Seq[(JsValue, SetAssetScriptTransaction)] =
     Seq(
       (Json.parse(
-         s"""{"type":15,"id":"3GdaFxG3JDdUnGDoFNs2MoGwZYivYkkAHFcZe3T2yu72","sender":"3NBKqNonmitNjGJNS3HRKxAhJVRKiFw4PLu","senderPublicKey":"5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr","fee":78311891,"timestamp":1868142423132802425,"proofs":["5sRtXKcdDa","9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn","","3C","24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",""],"version":1,"chainId":${AddressScheme.current.chainId},"assetId":"DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n","script":"base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg=="}"""),
+         s"""{"type":15,"id":"3GdaFxG3JDdUnGDoFNs2MoGwZYivYkkAHFcZe3T2yu72","sender":"3NBKqNonmitNjGJNS3HRKxAhJVRKiFw4PLu","senderPublicKey":"5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr","fee":78311891,"feeAssetId":null,"timestamp":1868142423132802425,"proofs":["5sRtXKcdDa","9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn","","3C","24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",""],"version":1,"chainId":${AddressScheme.current.chainId},"assetId":"DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n","script":"base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg=="}"""),
        SetAssetScriptTransaction
          .create(
            AddressScheme.current.chainId,
            PublicKeyAccount.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet(),
-           ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get,
+           IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
            Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()),
            78311891L,
            1868142423132802425L,
@@ -57,7 +58,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
       .create(
         AddressScheme.current.chainId,
         accountA,
-        ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get,
+        IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
         Some(ContractScript(StdLibVersion.V3, Contract(List.empty, List.empty, None)).explicitGet()),
         1222,
         System.currentTimeMillis(),

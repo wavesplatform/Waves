@@ -13,6 +13,7 @@ import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.openDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.{Height, TxNum}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.UncaughtExceptionReporter
@@ -116,7 +117,7 @@ object Explorer extends ScorexLogging {
 
       flag match {
         case "B" =>
-          val maybeBlockId = Base58.decode(args(2)).toOption.map(ByteStr.apply)
+          val maybeBlockId = Base58.tryDecodeWithLimit(args(2)).toOption.map(ByteStr.apply)
           if (maybeBlockId.isDefined) {
             val kBlockHeight     = Keys.heightOf(maybeBlockId.get)
             val blockHeightBytes = db.get(kBlockHeight.keyBytes)
@@ -129,7 +130,7 @@ object Explorer extends ScorexLogging {
           } else log.error("No block ID was provided")
 
         case "O" =>
-          val orderId = Base58.decode(args(2)).toOption.map(ByteStr.apply)
+          val orderId = Base58.tryDecodeWithLimit(args(2)).toOption.map(ByteStr.apply)
           if (orderId.isDefined) {
             val kVolumeAndFee = Keys.filledVolumeAndFee(orderId.get)(blockchainHeight)
             val bytes1        = db.get(kVolumeAndFee.keyBytes)
@@ -189,7 +190,7 @@ object Explorer extends ScorexLogging {
           val secondaryId = args(3)
 
           val address   = Address.fromString(args(2)).explicitGet()
-          val asset     = ByteStr.decodeBase58(secondaryId).get
+          val asset     = IssuedAsset(ByteStr.decodeBase58(secondaryId).get)
           val ai        = Keys.addressId(address)
           val addressId = ai.parse(db.get(ai.keyBytes)).get
           log.info(s"Address ID = $addressId")

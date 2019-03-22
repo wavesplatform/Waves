@@ -58,7 +58,7 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
                                                  price,
                                                  invalidFee,
                                                  2,
-                                                 expectedMessage = Some("Order matcherFee should be >= 700000"))
+                                                 expectedMessage = Some("Required 700000 WAVES as fee for this order, but given 699999 WAVES"))
 
         val counter = matcherNode.placeOrder(aliceAcc, oneSmartPair, SELL, amount, price, expectedFee, 2).message.id
         matcherNode.waitOrderStatus(oneSmartPair, counter, "Accepted")
@@ -89,14 +89,16 @@ class ExtraFeeTestSuite extends MatcherSuiteBase {
           val expectedFee = tradeFee + 2 * smartFee + smartFee // 2 x "smart asset" and 1 x "matcher script"
           val invalidFee  = expectedFee - 1
 
-          matcherNode.expectRejectedOrderPlacement(aliceAcc,
-                                                   bothSmartPair,
-                                                   SELL,
-                                                   amount,
-                                                   price,
-                                                   invalidFee,
-                                                   2,
-                                                   expectedMessage = Some("Order matcherFee should be >= 1500000"))
+          matcherNode.expectRejectedOrderPlacement(
+            aliceAcc,
+            bothSmartPair,
+            SELL,
+            amount,
+            price,
+            invalidFee,
+            2,
+            expectedMessage = Some("Required 1500000 WAVES as fee for this order, but given 1499999 WAVES")
+          )
 
           val counter = matcherNode.placeOrder(aliceAcc, bothSmartPair, SELL, amount, price, expectedFee, 2).message.id
           matcherNode.waitOrderStatus(bothSmartPair, counter, "Accepted")

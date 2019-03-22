@@ -10,8 +10,8 @@ import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalacheck.Gen
 import org.scalatest.exceptions.TestFailedException
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.encode.{Base58 => ScorexBase58}
 
 class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
@@ -1227,6 +1227,23 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
       PART.VALID(AnyPos, "getElement"),
       List(REF(AnyPos, PART.VALID(AnyPos, "xs")), CONST_LONG(AnyPos, 1))
     )
+  }
+
+  property("comments - in func and around") {
+    val code =
+      """
+        |
+        | # comment 1
+        | func foo() = # comment 2
+        | { # more comments
+        |   throw()
+        | } # comment 3
+        |
+        | foo()
+        |
+        """.stripMargin
+
+    parse(code)
   }
 
   property("operations priority") {

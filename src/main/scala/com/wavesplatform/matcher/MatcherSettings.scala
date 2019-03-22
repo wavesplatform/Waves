@@ -8,6 +8,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.settings.DeviationsSettings
+import com.wavesplatform.settings.DeviationsSettings.deviationsSettingsReader
 import com.wavesplatform.settings.fee.OrderFeeSettings._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
@@ -20,6 +22,7 @@ case class MatcherSettings(enable: Boolean,
                            account: String,
                            bindAddress: String,
                            port: Int,
+                           actorResponseTimeout: FiniteDuration,
                            dataDir: String,
                            recoverOrderHistory: Boolean,
                            journalDataDir: String,
@@ -37,7 +40,8 @@ case class MatcherSettings(enable: Boolean,
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
                            balanceWatchingBufferInterval: FiniteDuration,
                            eventsQueue: EventsQueueSettings,
-                           orderFee: OrderFeeSettings)
+                           orderFee: OrderFeeSettings,
+                           deviation: DeviationsSettings)
 
 object MatcherSettings {
 
@@ -61,6 +65,7 @@ object MatcherSettings {
     val account                      = config.as[String](s"$configPath.account")
     val bindAddress                  = config.as[String](s"$configPath.bind-address")
     val port                         = config.as[Int](s"$configPath.port")
+    val actorResponseTimeout         = config.as[FiniteDuration](s"$configPath.actor-response-timeout")
     val dataDirectory                = config.as[String](s"$configPath.data-directory")
     val journalDirectory             = config.as[String](s"$configPath.journal-directory")
     val snapshotsDirectory           = config.as[String](s"$configPath.snapshots-directory")
@@ -82,13 +87,15 @@ object MatcherSettings {
     val eventsQueue         = config.as[EventsQueueSettings](s"$configPath.events-queue")
     val recoverOrderHistory = !new File(dataDirectory).exists()
 
-    val orderFee = config.as[OrderFeeSettings](s"$configPath.order-fee")
+    val orderFee  = config.as[OrderFeeSettings](s"$configPath.order-fee")
+    val deviation = config.as[DeviationsSettings](s"$configPath.max-price-deviations")
 
     MatcherSettings(
       enabled,
       account,
       bindAddress,
       port,
+      actorResponseTimeout,
       dataDirectory,
       recoverOrderHistory,
       journalDirectory,
@@ -105,7 +112,8 @@ object MatcherSettings {
       orderBookSnapshotHttpCache,
       balanceWatchingBufferInterval,
       eventsQueue,
-      orderFee
+      orderFee,
+      deviation
     )
   }
 }

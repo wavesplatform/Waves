@@ -6,6 +6,7 @@ import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAcc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
@@ -15,7 +16,7 @@ import scala.util._
 
 case class ReissueTransactionV2 private (chainId: Byte,
                                          sender: PublicKeyAccount,
-                                         assetId: ByteStr,
+                                         asset: IssuedAsset,
                                          quantity: Long,
                                          reissuable: Boolean,
                                          fee: Long,
@@ -59,7 +60,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
 
   def create(chainId: Byte,
              sender: PublicKeyAccount,
-             assetId: ByteStr,
+             asset: IssuedAsset,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
@@ -68,38 +69,38 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
     for {
       _ <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
       _ <- ReissueTransaction.validateReissueParams(quantity, fee)
-    } yield ReissueTransactionV2(chainId, sender, assetId, quantity, reissuable, fee, timestamp, proofs)
+    } yield ReissueTransactionV2(chainId, sender, asset, quantity, reissuable, fee, timestamp, proofs)
   }
 
   def signed(chainId: Byte,
              sender: PublicKeyAccount,
-             assetId: ByteStr,
+             asset: IssuedAsset,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
     for {
-      unverified <- create(chainId, sender, assetId, quantity, reissuable, fee, timestamp, Proofs.empty)
+      unverified <- create(chainId, sender, asset, quantity, reissuable, fee, timestamp, Proofs.empty)
       proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unverified.bodyBytes()))))
     } yield unverified.copy(proofs = proofs)
   }
 
   def selfSigned(chainId: Byte,
                  sender: PrivateKeyAccount,
-                 assetId: ByteStr,
+                 asset: IssuedAsset,
                  quantity: Long,
                  reissuable: Boolean,
                  fee: Long,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
-    signed(chainId, sender, assetId, quantity, reissuable, fee, timestamp, sender)
+    signed(chainId, sender, asset, quantity, reissuable, fee, timestamp, sender)
   }
 
   val byteTailDescription: ByteEntity[ReissueTransactionV2] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
       PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
-      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength),
+      ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength).map(IssuedAsset),
       LongBytes(tailIndex(4), "Quantity"),
       BooleanByte(tailIndex(5), "Reissuable flag (1 - True, 0 - False)"),
       LongBytes(tailIndex(6), "Fee"),

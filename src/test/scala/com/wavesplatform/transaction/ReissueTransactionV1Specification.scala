@@ -4,9 +4,10 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{ReissueTransaction, ReissueTransactionV1}
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
 class ReissueTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -32,6 +33,7 @@ class ReissueTransactionV1Specification extends PropSpec with PropertyChecks wit
                     "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                     "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                     "fee": 100000000,
+                    "feeAssetId": null,
                     "timestamp": 1526287561757,
                     "signature": "3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA",
                     "proofs": ["3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA"],
@@ -46,7 +48,7 @@ class ReissueTransactionV1Specification extends PropSpec with PropertyChecks wit
     val tx = ReissueTransactionV1
       .create(
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get,
+        IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
         100000000L,
         true,
         100000000L,

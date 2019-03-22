@@ -4,11 +4,12 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
 class MassTransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -19,7 +20,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       val recovered = MassTransferTransaction.parseBytes(tx.bytes()).get
 
       recovered.sender.address shouldEqual tx.sender.address
-      recovered.assetId.map(_ == tx.assetId.get).getOrElse(tx.assetId.isEmpty) shouldBe true
+      recovered.assetId shouldBe tx.assetId
       recovered.timestamp shouldEqual tx.timestamp
       recovered.fee shouldEqual tx.fee
 
@@ -81,6 +82,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
                        "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
                        "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
                        "fee": 200000,
+                       "feeAssetId": null,
                        "timestamp": 1518091313964,
                        "proofs": [
                        "FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ"],
@@ -110,12 +112,12 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
 
     val tx = MassTransferTransaction
       .create(
-        None,
+        Waves,
         PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         transfers,
         1518091313964L,
         200000,
-        Base58.decode("59QuUcqP6p").get,
+        Base58.tryDecodeWithLimit("59QuUcqP6p").get,
         Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
       )
       .right

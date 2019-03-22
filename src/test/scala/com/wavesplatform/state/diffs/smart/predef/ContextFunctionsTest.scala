@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.{Global, StdLibVersion,ContentType}
 import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -16,8 +16,8 @@ import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.utils.compilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import shapeless.Coproduct
 
 class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -50,7 +50,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
       .map(x => Parser.parseExpr(x).get.value)
 
     typedScript = {
-      val compilerScript = ExpressionCompiler(compilerContext(V1, isAssetScript = false), untypedScript).explicitGet()._1
+      val compilerScript = ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedScript).explicitGet()._1
       ExprScript(compilerScript).explicitGet()
     }
     setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(recipient, Some(typedScript), 100000000L, ts).explicitGet()
@@ -115,7 +115,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                | case _ => throw()
                |}
                |""".stripMargin,
-          Coproduct(tx)
+          Coproduct(tx), StdLibVersion.V3
         )
         result shouldBe evaluated(true)
     }

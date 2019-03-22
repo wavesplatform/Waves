@@ -22,7 +22,7 @@ import com.wavesplatform.{NoShrink, TestTime, TestWallet, crypto}
 import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 class AddressRouteSpec
@@ -101,7 +101,7 @@ class AddressRouteSpec
         Post(uri, message) ~> route should produce(ApiKeyNotValid)
         Post(uri, message) ~> api_key(apiKey) ~> route ~> check {
           val resp      = responseAs[JsObject]
-          val signature = Base58.decode((resp \ "signature").as[String]).get
+          val signature = Base58.tryDecodeWithLimit((resp \ "signature").as[String]).get
 
           (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes) else message)
           (resp \ "publicKey").as[String] shouldEqual Base58.encode(account.publicKey)

@@ -17,12 +17,13 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{AssetId, AssetIdStringLength, TransactionFactory, ValidationError}
+import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory, ValidationError}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -65,11 +66,11 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     }
 
   def assetDistributionTask(params: DistributionParams): Task[ToResponseMarshallable] = {
-    val (assetId, height, limit, maybeAfter) = params
+    val (asset, height, limit, maybeAfter) = params
 
     val distributionTask = Task.eval(
       blockchain
-        .assetDistributionAtHeight(assetId, height, limit, maybeAfter)
+        .assetDistributionAtHeight(asset, height, limit, maybeAfter)
     )
 
     distributionTask.map {
@@ -87,14 +88,14 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     ))
   def balanceDistribution: Route =
     (get & path(Segment / "distribution")) { (assetParam) =>
-      val assetIdEi = AssetsApiRoute
+      val assetEi = AssetsApiRoute
         .validateAssetId(assetParam)
 
-      val distributionTask = assetIdEi match {
+      val distributionTask = assetEi match {
         case Left(err) => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
-        case Right(assetId) =>
+        case Right(asset) =>
           Task
-            .eval(blockchain.assetDistribution(assetId))
+            .eval(blockchain.assetDistribution(asset))
             .map(dst => Json.toJson(dst): ToResponseMarshallable)
       }
 
@@ -206,7 +207,9 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         (for {
           acc <- Address.fromString(address)
         } yield
-          Json.obj("address" -> acc.address, "assetId" -> assetIdStr, "balance" -> JsNumber(BigDecimal(blockchain.balance(acc, Some(assetId)))))).left
+          Json.obj("address" -> acc.address,
+                   "assetId" -> assetIdStr,
+                   "balance" -> JsNumber(BigDecimal(blockchain.balance(acc, IssuedAsset(assetId)))))).left
           .map(ApiError.fromValidationError)
       case _ => Left(InvalidAddress)
     }
@@ -220,10 +223,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         "address" -> acc.address,
         "balances" -> JsArray(
           (for {
-            (assetId, balance) <- blockchain.portfolio(acc).assets
+            (asset @ IssuedAsset(assetId), balance) <- blockchain.portfolio(acc).assets
             if balance > 0
-            assetInfo                                 <- blockchain.assetDescription(assetId)
-            (_, (issueTransaction: IssueTransaction)) <- blockchain.transactionInfo(assetId)
+            assetInfo                               <- blockchain.assetDescription(asset)
+            (_, issueTransaction: IssueTransaction) <- blockchain.transactionInfo(assetId)
             sponsorBalance = if (assetInfo.sponsorship != 0) {
               Some(blockchain.wavesPortfolio(issueTransaction.sender).spendableBalance)
             } else {
@@ -231,7 +234,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
             }
           } yield
             Json.obj(
-              "assetId"    -> assetId.base58,
+              "assetId"    -> assetId,
               "balance"    -> balance,
               "reissuable" -> assetInfo.reissuable,
               "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
@@ -254,7 +257,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         case t: IssueTransaction => Some(t)
         case _                   => None
       }).toRight("No issue transaction found with given asset ID")
-      description <- blockchain.assetDescription(id).toRight("Failed to get description of the asset")
+      description <- blockchain.assetDescription(IssuedAsset(id)).toRight("Failed to get description of the asset")
       script = description.script.filter(_ => full)
       complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.stdLibVersion))
     } yield {
@@ -291,7 +294,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 object AssetsApiRoute {
   val MAX_DISTRIBUTION_TASKS = 5
 
-  type DistributionParams = (AssetId, Int, Int, Option[Address])
+  type DistributionParams = (IssuedAsset, Int, Int, Option[Address])
 
   def validateDistributionParams(blockchain: Blockchain,
                                  assetParam: String,
@@ -307,14 +310,14 @@ object AssetsApiRoute {
     } yield (assetId, height, limit, after)
   }
 
-  def validateAssetId(assetParam: String): Either[ValidationError, AssetId] = {
+  def validateAssetId(assetParam: String): Either[ValidationError, IssuedAsset] = {
     for {
       _ <- Either.cond(assetParam.length <= AssetIdStringLength, (), GenericError("Unexpected assetId length"))
       assetId <- Base58
-        .decode(assetParam)
+        .tryDecodeWithLimit(assetParam)
         .fold(
-          _ => GenericError("Must be base58-encoded assetId").asLeft[AssetId],
-          arr => ByteStr(arr).asRight[ValidationError]
+          _ => GenericError("Must be base58-encoded assetId").asLeft[IssuedAsset],
+          arr => IssuedAsset(ByteStr(arr)).asRight[ValidationError]
         )
     } yield assetId
   }

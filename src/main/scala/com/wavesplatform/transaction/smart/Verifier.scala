@@ -7,6 +7,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError.{GenericError, HasScriptType, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -46,7 +47,10 @@ object Verifier extends Instrumented with ScorexLogging {
     }).flatMap(
       tx =>
         tx.checkedAssets()
-          .flatMap(assetId => blockchain.assetDescription(assetId).flatMap(_.script))
+          .flatMap {
+            case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script)
+            case _                  => None
+          }
           .foldRight(Either.right[ValidationError, Transaction](tx)) { (script, txr) =>
             txr.right.flatMap(tx =>
               stats.assetScriptExecution
@@ -57,7 +61,12 @@ object Verifier extends Instrumented with ScorexLogging {
     Try {
       logged(
         s"transaction ${transaction.id()}",
-        ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](transaction), blockchain, script, isTokenScript)
+        ScriptRunner(height,
+                     Coproduct[ScriptRunner.TxOrd](transaction),
+                     blockchain,
+                     script,
+                     isTokenScript,
+                     transaction.asInstanceOf[Authorized].sender.toAddress)
       ) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isTokenScript))
         case (log, Right(FALSE)) =>
@@ -73,7 +82,10 @@ object Verifier extends Instrumented with ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, height: Int, order: Order): ValidationResult[Order] =
     Try {
-      logged(s"order ${order.idStr()}", ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isTokenScript = false)) match {
+      logged(
+        s"order ${order.idStr()}",
+        ScriptRunner(height, Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isTokenScript = false, order.sender.toAddress)
+      ) match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isTokenScript = false))
         case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isTokenScript = false))
         case (_, Right(TRUE))       => Right(order)
@@ -88,6 +100,7 @@ object Verifier extends Instrumented with ScorexLogging {
                      blockchain: Blockchain,
                      matcherScriptOpt: Option[Script],
                      height: Int): ValidationResult[Transaction] = {
+
     val typeId    = et.builder.typeId
     val sellOrder = et.sellOrder
     val buyOrder  = et.buyOrder
@@ -104,45 +117,44 @@ object Verifier extends Instrumented with ScorexLogging {
         }
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et)))
 
-    def sellerOrderVerification =
+    def buyerOrSellerOrderVerification(order: Order) = {
       blockchain
-        .accountScript(sellOrder.sender.toAddress)
-        .map(script =>
-          if (sellOrder.version != 1) {
-            stats.orderValidation.measure(verifyOrder(blockchain, script, height, sellOrder))
+        .accountScript(order.sender.toAddress)
+        .map { script =>
+          if (order.version != 1) {
+            stats.orderValidation.measure(verifyOrder(blockchain, script, height, order))
           } else {
             Left(GenericError("Can't process order with signature from scripted account"))
-        })
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(sellOrder)))
+          }
+        }
+        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(order)))
+    }
 
-    def buyerOrderVerification =
-      blockchain
-        .accountScript(buyOrder.sender.toAddress)
-        .map(script =>
-          if (buyOrder.version != 1) {
-            stats.orderValidation.measure(verifyOrder(blockchain, script, height, buyOrder))
-          } else {
-            Left(GenericError("Can't process order with signature from scripted account"))
-        })
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(buyOrder)))
-
-    def assetVerification(assetId: Option[AssetId], tx: ExchangeTransaction) =
-      assetId.fold[ValidationResult[Transaction]](Right(tx)) { assetId =>
-        blockchain.assetScript(assetId).fold[ValidationResult[Transaction]](Right(tx)) { script =>
-          verifyTx(blockchain, script, height, tx, isTokenScript = true).left.map {
+    def assetVerification(assetId: Asset) = assetId match {
+      case Waves => Right(et)
+      case asset: IssuedAsset =>
+        blockchain.assetScript(asset).fold[ValidationResult[Transaction]](Right(et)) { script =>
+          verifyTx(blockchain, script, height, et, isTokenScript = true) leftMap {
             case x: HasScriptType => x
             case GenericError(x)  => ScriptExecutionError(x, List.empty, isTokenScript = true)
             case x                => ScriptExecutionError(x.toString, List.empty, isTokenScript = true)
           }
         }
-      }
+    }
+
+    def matcherFeeAssetVerification(order: Order) = {
+      if (order.matcherFeeAssetId == order.assetPair.amountAsset || order.matcherFeeAssetId == order.assetPair.priceAsset) Right(et)
+      else assetVerification(order.matcherFeeAssetId)
+    }
 
     for {
       _ <- matcherTxVerification
-      _ <- sellerOrderVerification
-      _ <- buyerOrderVerification
-      _ <- assetVerification(et.buyOrder.assetPair.amountAsset, et)
-      _ <- assetVerification(et.buyOrder.assetPair.priceAsset, et)
+      _ <- buyerOrSellerOrderVerification(sellOrder)
+      _ <- buyerOrSellerOrderVerification(buyOrder)
+      _ <- assetVerification(buyOrder.assetPair.amountAsset)
+      _ <- assetVerification(buyOrder.assetPair.priceAsset)
+      _ <- matcherFeeAssetVerification(buyOrder)
+      _ <- matcherFeeAssetVerification(sellOrder)
     } yield et
   }
 

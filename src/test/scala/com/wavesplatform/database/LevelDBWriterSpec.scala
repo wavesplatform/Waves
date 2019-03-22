@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
@@ -151,7 +152,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
 
   def createTransfer(master: PrivateKeyAccount, recipient: Address, ts: Long): TransferTransaction = {
     TransferTransactionV1
-      .selfSigned(None, master, recipient, ENOUGH_AMT / 5, ts, None, 1000000, Array.emptyByteArray)
+      .selfSigned(Waves, master, recipient, ENOUGH_AMT / 5, ts, Waves, 1000000, Array.emptyByteArray)
       .explicitGet()
   }
 

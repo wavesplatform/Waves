@@ -2,23 +2,24 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{AddressScheme, DefaultAddressScheme, PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.api.http.{ContractInvocationRequest, SignedContractInvocationRequest}
+import com.wavesplatform.api.http.{InvokeScriptRequest, SignedInvokeScriptRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.transaction.smart.ContractInvocationTransaction.Payment
-import com.wavesplatform.transaction.smart.{ContractInvocationTransaction, Verifier}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
 import org.scalatest._
-import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, Json}
 
-class ContractInvocationTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("ContractInvocationTransaction serialization roundtrip") {
-    forAll(contractInvocationGen) { transaction: ContractInvocationTransaction =>
+    forAll(invokeScriptGen) { transaction: InvokeScriptTransaction =>
       val bytes = transaction.bytes()
-      val deser = ContractInvocationTransaction.parseBytes(bytes).get
+      val deser = InvokeScriptTransaction.parseBytes(bytes).get
       deser.sender shouldEqual transaction.sender
       deser.contractAddress shouldEqual transaction.contractAddress
       deser.fc shouldEqual transaction.fc
@@ -36,10 +37,11 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val js = Json.parse("""{
                          "type": 16,
-                         "id": "3RRmhhMxbD9SUGUEokaBFmdWqT42vKRiM94tqxuXHE9q",
+                         "id": "AkoaZ4TvxxDcdDXKKfYetpZEaiAVdvdoRmDQYojiARzq",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
                          "senderPublicKey": "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
                          "fee": 100000,
+                         "feeAssetId": null,
                          "timestamp": 1526910778245,
                          "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
                          "version": 1,
@@ -52,20 +54,21 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
                              }
                             ]
                           },
-                         "payment" : {
+                         "payment" : [{
                             "amount" : 7,
                             "assetId" : "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK"
-                            }
+                            }]
                         }
     """)
 
-    val tx = ContractInvocationTransaction
+    val tx = InvokeScriptTransaction
       .selfSigned(
         PrivateKeyAccount("test3".getBytes()),
         PrivateKeyAccount("test4".getBytes()),
-        Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr(Base64.decode("YWxpY2U=").get)))),
-        Some(ContractInvocationTransaction.Payment(7, Some(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
+        Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)))),
+        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
         100000,
+        Waves,
         1526910778245L,
       )
       .right
@@ -79,11 +82,12 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
 
   property("Signed ContractInvocationTransactionRequest parser") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
-    val req = SignedContractInvocationRequest(
+    val req = SignedInvokeScriptRequest(
       senderPublicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK",
       fee = 1,
-      call = ContractInvocationRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
-      payment = Some(Payment(1, None)),
+      feeAssetId = None,
+      call = InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
+      payment = Some(Seq(Payment(1, Waves))),
       contractAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
@@ -92,15 +96,16 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
     AddressScheme.current = DefaultAddressScheme
   }
 
-  property(s"can't have more than ${ContractLimits.MaxContractInvocationArgs} args") {
+  property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKeyAccount.fromBase58String("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").explicitGet()
-    ContractInvocationTransaction.create(
+    InvokeScriptTransaction.create(
       pk,
       pk.toAddress,
       Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList),
-      None,
+      Seq(),
       1,
+      Waves,
       1,
       Proofs.empty
     ) should produce("more than 22 arguments")
@@ -110,12 +115,13 @@ class ContractInvocationTransactionSpecification extends PropSpec with PropertyC
     val largeString = "abcde" * 1024
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKeyAccount.fromBase58String("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").explicitGet()
-    ContractInvocationTransaction.create(
+    InvokeScriptTransaction.create(
       pk,
       pk.toAddress,
       Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString))),
-      None,
+      Seq(),
       1,
+      Waves,
       1,
       Proofs.empty
     ) should produce("TooBigArray")

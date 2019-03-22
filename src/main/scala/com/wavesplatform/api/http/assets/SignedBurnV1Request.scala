@@ -1,13 +1,13 @@
 package com.wavesplatform.api.http.assets
 
-import io.swagger.annotations.ApiModelProperty
-import play.api.libs.functional.syntax._
-import play.api.libs.json._
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
+import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.assets.BurnTransactionV1
-import com.wavesplatform.transaction.{AssetIdStringLength, ValidationError}
+import io.swagger.annotations.ApiModelProperty
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
 object SignedBurnV1Request {
   implicit val reads: Reads[SignedBurnV1Request] = (
@@ -39,7 +39,7 @@ case class SignedBurnV1Request(@ApiModelProperty(value = "Base58 encoded Issuer 
   def toTx: Either[ValidationError, BurnTransactionV1] =
     for {
       _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _assetId   <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
+      _assetId   <- parseBase58ToAsset(assetId)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _t         <- BurnTransactionV1.create(_sender, _assetId, quantity, fee, timestamp, _signature)
     } yield _t

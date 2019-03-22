@@ -4,6 +4,7 @@ import com.wavesplatform.api.http.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ContentType
 import com.wavesplatform.lang.Global.MaxBase58Bytes
 import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -17,8 +18,8 @@ import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, G
 import com.wavesplatform.utils.compilerContext
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class OracleDataTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions
@@ -58,7 +59,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
       setScript <- {
         val untypedAllFieldsRequiredScript = Parser.parseExpr(allFieldsRequiredScript).get.value
         val typedAllFieldsRequiredScript =
-          ExpressionCompiler(compilerContext(V1, isAssetScript = false), untypedAllFieldsRequiredScript).explicitGet()._1
+          ExpressionCompiler(compilerContext(V1, ContentType.Expression, isAssetScript = false), untypedAllFieldsRequiredScript).explicitGet()._1
         selfSignedSetScriptTransactionGenP(master, ExprScript(typedAllFieldsRequiredScript).explicitGet())
       }
       transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
