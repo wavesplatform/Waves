@@ -25,7 +25,7 @@ object BlockchainContext {
     DirectiveSet(
       version,
       ScriptType.isAssetScript(isTokenContext),
-      ContentType.isContract(isContract)
+      ContentType.isDApp(isContract)
     ).map(WavesContext.build(_, new WavesEnvironment(nByte, in, h, blockchain, tthis)))
       .map(Seq(PureContext.build(version), CryptoContext.build(Global), _))
       .map(Monoid.combineAll(_))

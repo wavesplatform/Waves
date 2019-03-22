@@ -271,7 +271,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
             |match tx {
             | case t : InvokeScriptTransaction  =>
             |   ${provenPart(t)}
-            |   let contractAddress = t.contractAddress.bytes == base58'${t.contractAddress.bytes.base58}'
+            |   let dappAddress = t.dappAddress.bytes == base58'${t.dappAddress.bytes.base58}'
             |   let paymentAmount = if(${t.payment.nonEmpty})
             |     then extract(t.payment).amount == ${t.payment.headOption.map(_.amount).getOrElse(-1)}
             |     else isDefined(t.payment) == false
@@ -283,7 +283,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
             |   let feeAssetId = if (${t.feeAssetId != Waves})
             |      then extract(t.feeAssetId) == base58'${t.feeAssetId.maybeBase58Repr.getOrElse("")}'
             |      else isDefined(t.feeAssetId) == false
-            |   ${assertProvenPart("t")} && contractAddress && paymentAmount && paymentAssetId && feeAssetId
+            |   ${assertProvenPart("t")} && dappAddress && paymentAmount && paymentAssetId && feeAssetId
             | case other => throw()
             | }
             |""".stripMargin
