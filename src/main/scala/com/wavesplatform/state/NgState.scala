@@ -43,11 +43,9 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
           micros.find(_.totalResBlockSig == totalResBlockSig) match {
             case Some(current) =>
               val prevResBlockSig          = current.prevResBlockSig
-              val (prevDiff, prevCarry)    = Option(blockDiffCache.getIfPresent(prevResBlockSig)).getOrElse(diffFor(prevResBlockSig))
+              val (prevDiff, prevCarry)    = diffFor(prevResBlockSig)
               val (currDiff, currCarry, _) = microDiffs(totalResBlockSig)
-              val result                   = (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry)
-              blockDiffCache.put(totalResBlockSig, result)
-              result
+              (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry)
 
             case None =>
               (Diff.empty, 0L)
@@ -94,7 +92,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
     micros.prepend(m)
     forgedBlockCache.invalidateAll()
-    blockDiffCache.invalidateAll()
+    blockDiffCache.invalidate(m.totalResBlockSig)
   }
 
   def carryFee: Long = baseBlockCarry + microDiffs.values.map(_._2).sum
@@ -109,16 +107,14 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
         } else if (!microsFromEnd.exists(_.totalResBlockSig == blockId)) None
         else {
           val (accumulatedTxs, maybeFound) = microsFromEnd.foldLeft((MList.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
-            case ((accumulated, maybeDiscarded), micro) =>
-              maybeDiscarded match {
-                case Some((sig, discarded)) => (accumulated, Some((sig, micro +: discarded)))
-                case None =>
-                  if (micro.totalResBlockSig == blockId)
-                    (accumulated ++= micro.transactionData, Some((micro.totalResBlockSig, Seq.empty[MicroBlock])))
-                  else
-                    (accumulated ++= micro.transactionData, None)
-              }
+            case ((accumulated, Some((sig, discarded))), micro) =>
+              (accumulated, Some((sig, micro +: discarded)))
+
+            case ((accumulated, None), micro) =>
+              val found = Some((micro.totalResBlockSig, Seq.empty[MicroBlock])).filter(_._1 == blockId)
+              (accumulated ++= micro.transactionData, found)
           }
+
           maybeFound.map {
             case (sig, discarded) =>
               (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs), discarded)
