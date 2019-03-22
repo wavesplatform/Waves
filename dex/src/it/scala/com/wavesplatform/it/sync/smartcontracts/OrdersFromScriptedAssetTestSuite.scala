@@ -1,14 +1,14 @@
 package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi.NodeExtSync
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherDefaultConfig
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.sync.createSignedIssueRequest
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -31,36 +31,36 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
   import OrdersFromScriptedAssetTestSuite._
 
-  override protected def nodeConfigs: Seq[Config] = Configs
+  override protected def nodeConfigs: Seq[Config] = Configs.map(commonConfig.withFallback)
 
   "can match orders when SmartAccTrading is still not activated" in {
     val pair = AssetPair(Waves, IssuedAsset(AllowAsset.id()))
 
     val counter =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 1, fee = smartTradeFee)
-    matcherNode.waitOrderStatus(pair, counter.message.id, "Accepted")
+      node.placeOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 1, fee = smartTradeFee)
+    node.waitOrderStatus(pair, counter.message.id, "Accepted")
 
     val submitted =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 1, fee = smartTradeFee)
-    matcherNode.waitOrderStatus(pair, submitted.message.id, "Filled")
+      node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 1, fee = smartTradeFee)
+    node.waitOrderStatus(pair, submitted.message.id, "Filled")
 
-    matcherNode.waitOrderInBlockchain(submitted.message.id)
-    matcherNode.waitForHeight(activationHeight + 1, 2.minutes)
+    node.waitOrderInBlockchain(submitted.message.id)
+    node.waitForHeight(activationHeight + 1, 2.minutes)
   }
 
   "can place if the script returns TRUE" in {
     val pair = AssetPair.createAssetPair(UnscriptedAssetId, AllowAssetId).get
     val counterId =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
-    matcherNode.waitOrderStatus(pair, counterId, "Accepted")
-    matcherNode.cancelOrder(matcherPk, pair, counterId)
+      node.placeOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
+    node.waitOrderStatus(pair, counterId, "Accepted")
+    node.cancelOrder(matcher, pair, counterId)
   }
 
   "can't place if the script returns FALSE" in {
     val pair = AssetPair.createAssetPair(UnscriptedAssetId, DenyAssetId).get
     val order = Order.buy(
-      matcherPk,
-      matcherPk,
+      matcher,
+      matcher,
       pair,
       100000,
       2 * Order.PriceConstant,
@@ -69,20 +69,20 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
       matcherFee = smartTradeFee,
       version = 2
     )
-    matcherNode.expectIncorrectOrderPlacement(order, 400, "OrderRejected")
+    node.expectIncorrectOrderPlacement(order, 400, "OrderRejected")
   }
 
   "can execute against unscripted, if the script returns TRUE" in {
     info("place counter")
     val pair = AssetPair.createAssetPair(UnscriptedAssetId, AllowAssetId).get
     val counterId =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
-    matcherNode.waitOrderStatus(pair, counterId, "Accepted")
+      node.placeOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
+    node.waitOrderStatus(pair, counterId, "Accepted")
 
     info("place a submitted order")
     val submittedId =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
-    matcherNode.waitOrderStatus(pair, submittedId, "Filled")
+      node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
+    node.waitOrderStatus(pair, submittedId, "Filled")
   }
 
   "can execute against scripted, if both scripts returns TRUE" in {
@@ -91,99 +91,97 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
     info("place a counter order")
     val pair = AssetPair.createAssetPair(allowAsset2Id, AllowAssetId).get
     val counterId =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
-    matcherNode.waitOrderStatus(pair, counterId, "Accepted")
+      node.placeOrder(matcher, pair, OrderType.SELL, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
+    node.waitOrderStatus(pair, counterId, "Accepted")
 
     info("place a submitted order")
     val submittedId =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
+      node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
 
     info("both orders are cancelled")
-    matcherNode.waitOrderStatus(pair, submittedId, "Filled")
-    matcherNode.waitOrderStatus(pair, counterId, "Filled")
+    node.waitOrderStatus(pair, submittedId, "Filled")
+    node.waitOrderStatus(pair, counterId, "Filled")
   }
 
   "can't execute against unscripted, if the script returns FALSE" in {
     info("place a counter order")
     val pair = AssetPair.createAssetPair(AllowAsset2Id, UnscriptedAssetId).get
     val counterId =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
-    matcherNode.waitOrderStatus(pair, counterId, "Accepted")
+      node.placeOrder(matcher, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
+    node.waitOrderStatus(pair, counterId, "Accepted")
 
     info("update a script")
-    val setAssetScriptId = matcherNode.setAssetScript(AllowAsset2Id, matcherPk.address, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
-    matcherNode.waitForTransaction(setAssetScriptId)
+    val setAssetScriptId = node.setAssetScript(AllowAsset2Id, matcher.address, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
+    node.waitForTransaction(setAssetScriptId)
 
     info("a counter order wasn't rejected")
-    matcherNode.orderStatus(counterId, pair).status shouldBe "Accepted"
+    node.orderStatus(counterId, pair).status shouldBe "Accepted"
 
     info("place a submitted order")
     val submittedId =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
+      node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = smartTradeFee).message.id
 
     info("two orders form an invalid transaction")
-    matcherNode.waitOrderStatus(pair, submittedId, "Filled")
-    matcherNode.waitOrderStatus(pair, counterId, "PartiallyFilled")
+    node.waitOrderStatus(pair, submittedId, "Filled")
+    node.waitOrderStatus(pair, counterId, "PartiallyFilled")
 
-    val txs = matcherNode.transactionsByOrder(submittedId)
+    val txs = node.transactionsByOrder(submittedId)
     txs.size shouldBe 1
-    matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.ErrorCode
+    node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.ErrorCode
   }
 
   "can't execute against scripted, if one script returns FALSE" in {
     info("place a counter order")
     val pair = AssetPair.createAssetPair(AllowAsset3Id, AllowAssetId).get
     val counterId =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
-    matcherNode.waitOrderStatus(pair, counterId, "Accepted")
+      node.placeOrder(matcher, pair, OrderType.SELL, 100001, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
+    node.waitOrderStatus(pair, counterId, "Accepted")
 
     info("update a script")
-    val setAssetScriptId = matcherNode.setAssetScript(AllowAsset3Id, matcherPk.address, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
-    matcherNode.waitForTransaction(setAssetScriptId)
+    val setAssetScriptId = node.setAssetScript(AllowAsset3Id, matcher.address, 1.waves, Some(DenyBigAmountScript.bytes().base64)).id
+    node.waitForTransaction(setAssetScriptId)
 
     info("a counter order wasn't rejected")
-    matcherNode.orderStatus(counterId, pair).status shouldBe "Accepted"
+    node.orderStatus(counterId, pair).status shouldBe "Accepted"
 
     info("place a submitted order")
     val submittedId =
-      matcherNode.placeOrder(matcherPk, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
+      node.placeOrder(matcher, pair, OrderType.BUY, 100000, 2 * Order.PriceConstant, version = 2, fee = twoSmartTradeFee).message.id
 
     info("two orders form an invalid transaction")
-    matcherNode.waitOrderStatus(pair, submittedId, "Filled")
-    matcherNode.waitOrderStatus(pair, counterId, "PartiallyFilled")
+    node.waitOrderStatus(pair, submittedId, "Filled")
+    node.waitOrderStatus(pair, counterId, "PartiallyFilled")
 
-    val txs = matcherNode.transactionsByOrder(submittedId)
+    val txs = node.transactionsByOrder(submittedId)
     txs.size shouldBe 1
-    matcherNode.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.ErrorCode
+    node.expectSignedBroadcastRejected(Json.toJson(txs.head)) shouldBe TransactionNotAllowedByAssetScript.ErrorCode
   }
 
   private def issueAsset(): String = {
     info("issue an asset")
     val allowAsset2   = mkAllowAsset()
     val allowAsset2Id = allowAsset2.id().base58
-    matcherNode.signedIssue(createSignedIssueRequest(allowAsset2))
-    matcherNode.waitForTransaction(allowAsset2Id)
+    node.signedIssue(createSignedIssueRequest(allowAsset2))
+    node.waitForTransaction(allowAsset2Id)
     allowAsset2Id
   }
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Seq(UnscriptedAsset).map(createSignedIssueRequest).map(matcherNode.signedIssue).foreach { tx =>
-      matcherNode.waitForTransaction(tx.id)
+    Seq(UnscriptedAsset).map(createSignedIssueRequest).map(node.signedIssue).foreach { tx =>
+      node.waitForTransaction(tx.id)
     }
-    Seq(AllowAsset, AllowAsset2, AllowAsset3, DenyAsset).map(createSignedIssueRequest).map(matcherNode.signedIssue).foreach { tx =>
-      matcherNode.waitForTransaction(tx.id)
+    Seq(AllowAsset, AllowAsset2, AllowAsset3, DenyAsset).map(createSignedIssueRequest).map(node.signedIssue).foreach { tx =>
+      node.waitForTransaction(tx.id)
     }
   }
 }
 
 object OrdersFromScriptedAssetTestSuite {
 
-  private val matcherPk = PrivateKeyAccount.fromSeed(MatcherDefaultConfig.Configs.head.getString("account-seed")).right.get
-
   private val UnscriptedAsset = IssueTransactionV1
     .selfSigned(
-      sender = matcherPk,
+      sender = matcher,
       name = "UnscriptedAsset".getBytes(),
       description = "unscripted".getBytes(),
       quantity = Int.MaxValue / 3,
@@ -200,7 +198,7 @@ object OrdersFromScriptedAssetTestSuite {
     IssueTransactionV2
       .selfSigned(
         AddressScheme.current.chainId,
-        sender = matcherPk,
+        sender = matcher,
         name = s"AllowAsset-$id".getBytes(),
         description = s"AllowAsset-$id".getBytes(),
         quantity = Int.MaxValue / 3,
@@ -223,7 +221,7 @@ object OrdersFromScriptedAssetTestSuite {
   private val DenyAsset = IssueTransactionV2
     .selfSigned(
       AddressScheme.current.chainId,
-      sender = matcherPk,
+      sender = matcher,
       name = "DenyAsset".getBytes(),
       description = "DenyAsset".getBytes(),
       quantity = Int.MaxValue / 3,
@@ -252,12 +250,9 @@ object OrdersFromScriptedAssetTestSuite {
 
   private val commonConfig = ConfigFactory.parseString(s"""waves {
                                                           |  blockchain.custom.functionality.pre-activated-features = {
-                                                           |    ${BlockchainFeatures.SmartAssets.id} = 0,
-                                                           |    ${BlockchainFeatures.SmartAccountTrading.id} = $activationHeight
-                                                           |  }
+                                                          |    ${BlockchainFeatures.SmartAssets.id} = 0,
+                                                          |    ${BlockchainFeatures.SmartAccountTrading.id} = $activationHeight
+                                                          |  }
                                                           |  matcher.price-assets = ["$AllowAssetId", "$DenyAssetId", "$UnscriptedAssetId"]
                                                           |}""".stripMargin)
-
-  private val Configs = MatcherDefaultConfig.Configs.map(commonConfig.withFallback(_))
-
 }

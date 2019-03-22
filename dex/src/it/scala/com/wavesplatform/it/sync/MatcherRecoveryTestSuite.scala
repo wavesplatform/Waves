@@ -30,7 +30,10 @@ class MatcherRecoveryTestSuite extends MatcherSuiteBase {
   private val assetPair3                   = AssetPair(assetPair1.priceAsset, Waves)
   private val assetPairs                   = Seq(assetPair1, assetPair2, assetPair3)
 
-  Seq(issue1, issue2).map(node.signedIssue).map(x => node.waitForTransaction(x.id))
+  {
+    val xs = Seq(issue1, issue2).map(_.json()).map(node.broadcastRequest(_))
+    xs.foreach(x => node.waitForTransaction(x.id))
+  }
 
   private val orders    = Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcher, alice, assetPairs)).sample.get
   private val lastOrder = orderGen(matcher, alice, assetPairs).sample.get

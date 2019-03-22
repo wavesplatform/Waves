@@ -2,8 +2,9 @@ package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
 import com.wavesplatform.it.Node
+import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -209,10 +210,9 @@ object SyncMatcherHttpApi extends Assertions {
                      timeToLive: Duration = 30.days - 1.seconds): Order = {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
-      val matcherPublicKey    = m.publicKey
       val unsigned =
         Order(PublicKeyAccount(sender.publicKey),
-              matcherPublicKey,
+              matcher,
               pair,
               orderType,
               amount,

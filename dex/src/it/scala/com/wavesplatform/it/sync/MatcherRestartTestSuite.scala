@@ -53,7 +53,7 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
       orders.asks.head.amount shouldBe 500
       orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
-      // sell order should be in the aliceNode orderbook
+      // sell order should be in the node orderbook
       node.fullOrderHistory(alice).head.status shouldBe "Accepted"
 
       // reboot matcher's node

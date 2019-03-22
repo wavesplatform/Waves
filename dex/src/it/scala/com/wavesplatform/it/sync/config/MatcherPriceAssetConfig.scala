@@ -2,27 +2,24 @@ package com.wavesplatform.it.sync.config
 
 import java.nio.charset.StandardCharsets
 
+import com.typesafe.config.ConfigFactory.parseString
 import com.typesafe.config.{Config, ConfigFactory}
-import com.typesafe.config.ConfigFactory.{empty, parseString}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
-import com.wavesplatform.api.http.assets.SignedIssueV1Request
-import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
-import com.wavesplatform.it.sync.config.MatcherDefaultConfig._
-import com.wavesplatform.it.sync.{createSignedIssueRequest, issueFee, someAssetAmount}
+import com.wavesplatform.it.sync.{issueFee, someAssetAmount}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.AssetPairBuilder
 import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.wallet.Wallet
 
-import scala.util.Random
 import scala.collection.JavaConverters._
+import scala.util.Random
 
-// TODO: Make it trait
 object MatcherPriceAssetConfig {
 
   private val genesisConfig = ConfigFactory.parseResources("genesis.conf")
@@ -45,10 +42,6 @@ object MatcherPriceAssetConfig {
       }
       .toMap
   }
-
-//  private val _Configs: Seq[Config] = (Default.last +: Random.shuffle(Default.init).take(2))
-//    .zip(Seq(matcherConfig.withFallback(minerDisabled), minerDisabled, empty()))
-//    .map { case (n, o) => o.withFallback(n) }
 
   val matcher: PrivateKeyAccount = accounts("matcher")
   val alice: PrivateKeyAccount   = accounts("alice")
@@ -167,10 +160,12 @@ object MatcherPriceAssetConfig {
 
   val orderLimit = 10
 
+  val ForbiddenAssetId     = "FdbnAsset"
   val updatedMatcherConfig = parseString(s"""waves.matcher {
-                                                    |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
-                                                    |  rest-order-limit = $orderLimit
-                                                    |}""".stripMargin)
+                                            |  blacklisted-assets = ["$ForbiddenAssetId"]
+                                            |  price-assets = [ "$UsdId", "$BtcId", "WAVES" ]
+                                            |  rest-order-limit = $orderLimit
+                                            |}""".stripMargin)
 
   val Configs: Seq[Config] = Seq(
     updatedMatcherConfig.withFallback(ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala.head)
@@ -186,14 +181,14 @@ object MatcherPriceAssetConfig {
 
   def issueAssetPair(issuer: PrivateKeyAccount,
                      amountAssetDecimals: Byte,
-                     priceAssetDecimals: Byte): (SignedIssueV1Request, SignedIssueV1Request, AssetPair) = {
+                     priceAssetDecimals: Byte): (IssueTransaction, IssueTransaction, AssetPair) = {
     issueAssetPair(issuer, issuer, amountAssetDecimals, priceAssetDecimals)
   }
 
   def issueAssetPair(amountAssetIssuer: PrivateKeyAccount,
                      priceAssetIssuer: PrivateKeyAccount,
                      amountAssetDecimals: Byte,
-                     priceAssetDecimals: Byte): (SignedIssueV1Request, SignedIssueV1Request, AssetPair) = {
+                     priceAssetDecimals: Byte): (IssueTransaction, IssueTransaction, AssetPair) = {
 
     val issueAmountAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
@@ -206,8 +201,7 @@ object MatcherPriceAssetConfig {
         fee = issueFee,
         timestamp = System.currentTimeMillis()
       )
-      .right
-      .get
+      .explicitGet()
 
     val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
@@ -220,12 +214,11 @@ object MatcherPriceAssetConfig {
         fee = issueFee,
         timestamp = System.currentTimeMillis()
       )
-      .right
-      .get
+      .explicitGet()
 
     if (MatcherActor.compare(Some(issuePriceAssetTx.id().arr), Some(issueAmountAssetTx.id().arr)) < 0) {
-      (createSignedIssueRequest(issueAmountAssetTx),
-       createSignedIssueRequest(issuePriceAssetTx),
+      (issueAmountAssetTx,
+       issuePriceAssetTx,
        AssetPair(
          amountAsset = IssuedAsset(issueAmountAssetTx.id()),
          priceAsset = IssuedAsset(issuePriceAssetTx.id())
@@ -234,7 +227,7 @@ object MatcherPriceAssetConfig {
       issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
   }
 
-  def assetPairIssuePriceAsset(issuer: PrivateKeyAccount, amountAssetId: Asset, priceAssetDecimals: Byte): (SignedIssueV1Request, AssetPair) = {
+  def assetPairIssuePriceAsset(issuer: PrivateKeyAccount, amountAssetId: Asset, priceAssetDecimals: Byte): (IssueTransaction, AssetPair) = {
 
     val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(
@@ -251,7 +244,7 @@ object MatcherPriceAssetConfig {
       .get
 
     if (MatcherActor.compare(Some(issuePriceAssetTx.id().arr), amountAssetId.compatId.map(_.arr)) < 0) {
-      (createSignedIssueRequest(issuePriceAssetTx),
+      (issuePriceAssetTx,
        AssetPair(
          amountAsset = amountAssetId,
          priceAsset = IssuedAsset(issuePriceAssetTx.id())

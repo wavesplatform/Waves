@@ -9,12 +9,14 @@ import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
@@ -272,6 +274,24 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).massTransfer(sourceAddress, transfers, fee, assetId)), waitForTx)
     }
 
+    def broadcastLease(source: PrivateKeyAccount,
+                       recipient: String,
+                       leasingAmount: Long,
+                       leasingFee: Long,
+                       waitForTx: Boolean = false): Transaction = {
+      val tx = LeaseTransactionV2
+        .selfSigned(
+          sender = source,
+          amount = leasingAmount,
+          fee = leasingFee,
+          timestamp = System.currentTimeMillis(),
+          recipient = AddressOrAlias.fromString(recipient).explicitGet()
+        )
+        .explicitGet()
+
+      maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
+    }
+
     def lease(sourceAddress: String,
               recipient: String,
               leasingAmount: Long,
@@ -294,6 +314,20 @@ object SyncHttpApi extends Assertions {
 
     def activeLeases(sourceAddress: String): Seq[Transaction] =
       sync(async(n).activeLeases(sourceAddress))
+
+    def broadcastCancelLease(source: PrivateKeyAccount, leaseId: String, fee: Long, waitForTx: Boolean = false): Transaction = {
+      val tx = LeaseCancelTransactionV2
+        .selfSigned(
+          chainId = AddressScheme.current.chainId,
+          sender = source,
+          leaseId = ByteStr.decodeBase58(leaseId).get,
+          fee = fee,
+          timestamp = System.currentTimeMillis()
+        )
+        .explicitGet()
+
+      maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
+    }
 
     def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: Byte = 1): Transaction =
       sync(async(n).cancelLease(sourceAddress, leaseId, fee))
