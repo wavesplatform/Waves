@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontracts
 
-import com.typesafe.config.Config
 import com.wavesplatform.api.http.TransactionNotAllowedByAccountScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
@@ -16,17 +15,12 @@ import play.api.libs.json.Json
 import scala.concurrent.duration._
 
 class OrderTypeTestSuite extends MatcherSuiteBase {
-  override protected def nodeConfigs: Seq[Config] = Configs
-
   private val aliceAsset =
     node
-      .issue(alice.address, "AliceCoinOrders", "AliceCoin for tests with order types", someAssetAmount, 0, reissuable = false, smartIssueFee, 2)
+      .broadcastIssue(alice, "AliceCoinOrders", "AliceCoin for tests with order types", someAssetAmount, 0, reissuable = false, smartIssueFee, None)
       .id
 
-  {
-    val issueTx = node.signedIssue(createSignedIssueRequest(IssueUsdTx))
-    node.waitForTransaction(issueTx.id)
-  }
+  Seq(aliceAsset, node.broadcastRequest(IssueUsdTx.json()).id).map(node.waitForTransaction(_))
 
   private val predefAssetPair = wavesUsdPair
   private val aliceWavesPair  = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
@@ -154,7 +148,7 @@ class OrderTypeTestSuite extends MatcherSuiteBase {
         node.waitOrderStatus(aliceWavesPair, bobOrd2, "Filled", 1.minute)
 
         val exchangeTx1 = node.transactionsByOrder(bobOrd1).headOption.getOrElse(fail("Expected an exchange transaction"))
-        nodes.waitForTransaction(exchangeTx1.id)
+        node.waitForTransaction(exchangeTx1.id)
 
         val txs = node.transactionsByOrder(bobOrd2)
         txs.size shouldBe 1

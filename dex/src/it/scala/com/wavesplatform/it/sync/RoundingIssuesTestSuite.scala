@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.Config
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -11,9 +10,6 @@ import com.wavesplatform.transaction.assets.exchange.OrderType
 import scala.concurrent.duration._
 
 class RoundingIssuesTestSuite extends MatcherSuiteBase {
-
-  override protected def nodeConfigs: Seq[Config] = Configs
-
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     val xs = Seq(IssueUsdTx, IssueEthTx, IssueBtcTx).map(_.json()).map(node.broadcastRequest(_))

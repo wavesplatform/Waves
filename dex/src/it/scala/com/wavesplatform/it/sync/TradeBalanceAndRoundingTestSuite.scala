@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.Config
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.AssetDecimalsInfo
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -15,9 +14,6 @@ import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
 
 class TradeBalanceAndRoundingTestSuite extends MatcherSuiteBase {
-
-  override protected def nodeConfigs: Seq[Config] = Configs
-
   {
     val xs = Seq(IssueUsdTx, IssueEthTx, IssueWctTx).map(_.json()).map(node.broadcastRequest(_))
     xs.foreach(x => node.waitForTransaction(x.id))

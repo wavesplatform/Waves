@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.Config
 import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
@@ -14,8 +13,6 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
-  override protected def nodeConfigs: Seq[Config] = Configs
-
   private def orderVersion = (Random.nextInt(2) + 1).toByte
 
   "Create orders with statuses FILL, PARTIAL, CANCELLED, ACTIVE" - {

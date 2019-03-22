@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.Config
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -12,14 +11,11 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, OrderType}
 import scala.concurrent.duration._
 
 class CancelOrderTestSuite extends MatcherSuiteBase {
-
-  override protected def nodeConfigs: Seq[Config] = Configs
-
   private val wavesBtcPair = AssetPair(Waves, IssuedAsset(BtcId))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    val xs = Seq(IssueUsdTx, IssueBtcTx).map(createSignedIssueRequest).map(node.signedIssue)
+    val xs = Seq(IssueUsdTx, IssueBtcTx).map(_.json()).map(node.signedBroadcast(_))
     xs.foreach(tx => node.waitForTransaction(tx.id))
   }
 
@@ -56,7 +52,7 @@ class CancelOrderTestSuite extends MatcherSuiteBase {
       val orderId = node.placeOrder(bob, wavesUsdPair, OrderType.SELL, 100.waves, 800, matcherFee).message.id
       node.waitOrderStatus(wavesUsdPair, orderId, "Accepted", 1.minute)
 
-      node.expectCancelRejected(node.privateKey, wavesUsdPair, orderId)
+      node.expectCancelRejected(matcher, wavesUsdPair, orderId)
 
       // Cleanup
       node.cancelOrder(bob, wavesUsdPair, orderId)

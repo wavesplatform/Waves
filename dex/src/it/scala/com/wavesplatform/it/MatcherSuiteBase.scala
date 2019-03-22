@@ -17,8 +17,6 @@ abstract class MatcherSuiteBase
     with BeforeAndAfterAll
     with MatcherNode {
 
-  private val iWantToInitializeThisDumbAddressScheme = MatcherPriceAssetConfig.Configs
-
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
   val defaultAssetQuantity = 999999999999L
@@ -35,9 +33,6 @@ abstract class MatcherSuiteBase
   protected override def createDocker: Docker = new Docker(tag = getClass.getSimpleName, imageName = "com.wavesplatform/dex-it:latest")
   protected def node                          = dockerNodes().head
 
-  protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .withDefault(4)
-      .buildNonConflicting()
+  protected def nodeConfigs: Seq[Config] = MatcherPriceAssetConfig.Configs
 
 }

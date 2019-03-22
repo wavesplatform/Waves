@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.MatcherSuiteBase
@@ -18,12 +17,11 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class MatcherTestSuite extends MatcherSuiteBase with TableDrivenPropertyChecks {
-  private val aliceSellAmount                     = 500
-  private val exTxFee                             = 300000
-  private val amountAssetName                     = "AliceCoin"
-  private val AssetQuantity                       = 1000
-  private val aliceCoinDecimals: Byte             = 0
-  override protected def nodeConfigs: Seq[Config] = Configs
+  private val aliceSellAmount         = 500
+  private val exTxFee                 = 300000
+  private val amountAssetName         = "AliceCoin"
+  private val AssetQuantity           = 1000
+  private val aliceCoinDecimals: Byte = 0
 
   private def orderVersion = (Random.nextInt(2) + 1).toByte
 

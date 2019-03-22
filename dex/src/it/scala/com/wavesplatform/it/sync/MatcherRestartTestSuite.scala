@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.OrderBookResponse
@@ -15,8 +14,7 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class MatcherRestartTestSuite extends MatcherSuiteBase {
-  override protected def nodeConfigs: Seq[Config] = Configs
-  private def orderVersion                        = (Random.nextInt(2) + 1).toByte
+  private def orderVersion = (Random.nextInt(2) + 1).toByte
 
   "check order execution" - {
     "make order and after matcher's restart try to cancel it" in {

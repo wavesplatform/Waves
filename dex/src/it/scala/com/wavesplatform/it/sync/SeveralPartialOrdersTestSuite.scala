@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync
 
-import com.typesafe.config.Config
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.LevelResponse
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -13,9 +12,6 @@ import scala.concurrent.duration._
 import scala.math.BigDecimal.RoundingMode
 
 class SeveralPartialOrdersTestSuite extends MatcherSuiteBase {
-
-  override protected def nodeConfigs: Seq[Config] = Configs
-
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     node.waitForTransaction(node.broadcastRequest(IssueUsdTx.json()).id)

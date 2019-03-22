@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontracts
 
-import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.it.MatcherSuiteBase
@@ -17,14 +16,12 @@ import play.api.libs.json.Json
 import scala.concurrent.duration._
 
 class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
-  override protected def nodeConfigs: Seq[Config] = Configs
-
   private val aliceAsset =
     node.broadcastIssue(alice, "AliceCoin", "AliceCoin for matcher's tests", someAssetAmount, 0, reissuable = false, smartIssueFee, None).id
 
   {
     val issueTx = node.signedIssue(createSignedIssueRequest(IssueUsdTx))
-    nodes.waitForTransaction(issueTx.id)
+    node.waitForTransaction(issueTx.id)
   }
 
   private val predefAssetPair = wavesUsdPair
@@ -156,7 +153,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
           val unsigned =
             OrderV2(
               alice,
-              node.publicKey,
+              matcher,
               predefAssetPair,
               OrderType.BUY,
               500,
@@ -232,7 +229,7 @@ class ProofAndAssetPairTestSuite extends MatcherSuiteBase {
         setContract(Some("true"), alice)
 
         val transferTx = node.broadcastTransfer(alice, bob.address, 1000, 0.005.waves, Some(aliceAsset), None)
-        nodes.waitForHeightAriseAndTxPresent(transferTx.id)
+        node.waitForTransaction(transferTx.id)
 
         for ((sc, i) <- Seq(sc5, sc6).zip(Seq(5, 6))) {
           markup(s"$i")
