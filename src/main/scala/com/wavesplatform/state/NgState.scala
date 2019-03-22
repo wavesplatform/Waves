@@ -19,18 +19,6 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   private[this] val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
   private[this] val micros: MList[MicroBlock]                     = MList.empty // fresh head
 
-  private[this] val blockDiffCache = CacheBuilder
-    .newBuilder()
-    .maximumSize(MaxTotalDiffs)
-    .expireAfterWrite(10, TimeUnit.MINUTES)
-    .build[BlockId, (Diff, Long)]()
-
-  private[this] val forgedBlockCache = CacheBuilder
-    .newBuilder()
-    .maximumSize(MaxTotalDiffs)
-    .expireAfterWrite(10, TimeUnit.MINUTES)
-    .build[BlockId, Option[(Block, DiscardedMicroBlocks)]]()
-
   def microBlockIds: Seq[BlockId] =
     micros.map(_.totalResBlockSig)
 
@@ -38,7 +26,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     if (totalResBlockSig == base.uniqueId)
       (baseBlockDiff, baseBlockCarry)
     else
-      blockDiffCache.get(
+      internalCaches.blockDiffCache.get(
         totalResBlockSig, { () =>
           micros.find(_.totalResBlockSig == totalResBlockSig) match {
             case Some(current) =>
@@ -60,11 +48,21 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     micros.headOption
 
   def transactions: Seq[Transaction] =
-    base.transactionData ++ micros.map(_.transactionData).reverse.flatten
+    base.transactionData ++ micros.view.map(_.transactionData).reverse.flatten.toList
 
   def bestLiquidBlock: Block =
-    if (micros.isEmpty) base
-    else base.copy(signerData = base.signerData.copy(signature = micros.head.totalResBlockSig), transactionData = transactions)
+    if (micros.isEmpty)
+      base
+    else
+      internalCaches.bestBlockCache match {
+        case Some(cachedBlock) =>
+          cachedBlock
+
+        case None =>
+          val block = base.copy(signerData = base.signerData.copy(signature = micros.head.totalResBlockSig), transactionData = transactions)
+          internalCaches.bestBlockCache = Some(block)
+          block
+      }
 
   def totalDiffOf(id: BlockId): Option[(Block, Diff, Long, DiscardedMicroBlocks)] =
     forgeBlock(id).map {
@@ -91,14 +89,13 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
     microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
     micros.prepend(m)
-    forgedBlockCache.invalidateAll()
-    blockDiffCache.invalidate(m.totalResBlockSig)
+    internalCaches.invalidate(m.totalResBlockSig)
   }
 
   def carryFee: Long = baseBlockCarry + microDiffs.values.map(_._2).sum
 
   private[this] def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
-    forgedBlockCache.get(
+    internalCaches.forgedBlockCache.get(
       blockId, { () =>
         val microsFromEnd = micros.reverse
 
@@ -122,4 +119,27 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
         }
       }
     )
+
+  private[this] object internalCaches {
+    val blockDiffCache = CacheBuilder
+      .newBuilder()
+      .maximumSize(MaxTotalDiffs)
+      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .build[BlockId, (Diff, Long)]()
+
+    val forgedBlockCache = CacheBuilder
+      .newBuilder()
+      .maximumSize(MaxTotalDiffs)
+      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .build[BlockId, Option[(Block, DiscardedMicroBlocks)]]()
+
+    @volatile
+    var bestBlockCache = Option.empty[Block]
+
+    def invalidate(newBlockId: BlockId): Unit = {
+      forgedBlockCache.invalidateAll()
+      blockDiffCache.invalidate(newBlockId)
+      bestBlockCache = None
+    }
+  }
 }
