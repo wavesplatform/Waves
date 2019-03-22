@@ -26,25 +26,28 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     .expireAfterWrite(10, TimeUnit.MINUTES)
     .build[BlockId, (Diff, Long)]()
 
-  private[this] val bestLiquidBlockDiffCache = new AtomicReference[Option[Diff]](None)
+  private[this] val bestLiquidBlockDiffCache =
+    new AtomicReference[Diff]()
 
-  def microBlockIds: Seq[BlockId] = micros.map(_.totalResBlockSig).toList
+  def microBlockIds: Seq[BlockId] =
+    micros.map(_.totalResBlockSig)
 
   def diffFor(totalResBlockSig: BlockId): (Diff, Long) =
     if (totalResBlockSig == base.uniqueId)
       (baseBlockDiff, baseBlockCarry)
     else
       Option(totalBlockDiffCache.getIfPresent(totalResBlockSig)) match {
-        case Some(d) => d
+        case Some(cachedDiffAndCarry) => cachedDiffAndCarry
+
         case None =>
           micros.find(_.totalResBlockSig == totalResBlockSig) match {
             case Some(current) =>
               val prevResBlockSig          = current.prevResBlockSig
               val (prevDiff, prevCarry)    = Option(totalBlockDiffCache.getIfPresent(prevResBlockSig)).getOrElse(diffFor(prevResBlockSig))
               val (currDiff, currCarry, _) = microDiffs(totalResBlockSig)
-              val r                        = (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry)
-              totalBlockDiffCache.put(totalResBlockSig, r)
-              r
+              val result                   = (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry)
+              totalBlockDiffCache.put(totalResBlockSig, result)
+              result
 
             case None =>
               (Diff.empty, 0L)
@@ -54,32 +57,31 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   def bestLiquidBlockId: BlockId =
     micros.headOption.map(_.totalResBlockSig).getOrElse(base.uniqueId)
 
-  def lastMicroBlock: Option[MicroBlock] = micros.headOption
+  def lastMicroBlock: Option[MicroBlock] =
+    micros.headOption
 
-  def transactions: Seq[Transaction] = base.transactionData ++ micros.map(_.transactionData).reverse.flatten
+  def transactions: Seq[Transaction] =
+    base.transactionData ++ micros.map(_.transactionData).reverse.flatten
 
   def bestLiquidBlock: Block =
-    if (micros.isEmpty) {
-      base
-    } else {
-      base.copy(signerData = base.signerData.copy(signature = micros.head.totalResBlockSig), transactionData = transactions)
-    }
+    if (micros.isEmpty) base
+    else base.copy(signerData = base.signerData.copy(signature = micros.head.totalResBlockSig), transactionData = transactions)
 
   def totalDiffOf(id: BlockId): Option[(Block, Diff, Long, DiscardedMicroBlocks)] =
     forgeBlock(id).map {
-      case (b, txs) =>
-        val (d, c) = diffFor(id)
-        (b, d, c, txs)
+      case (block, discarded) =>
+        val (diff, carry) = this.diffFor(id)
+        (block, diff, carry, discarded)
     }
 
   def bestLiquidDiff: Diff = {
-    bestLiquidBlockDiffCache.get() match {
+    Option(bestLiquidBlockDiffCache.get()) match {
       case Some(value) =>
         value
 
       case None =>
         val newValue = micros.headOption.fold(baseBlockDiff)(m => diffFor(m.totalResBlockSig)._1)
-        bestLiquidBlockDiffCache.set(Some(newValue))
+        bestLiquidBlockDiffCache.set(newValue)
         newValue
     }
   }
@@ -124,7 +126,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
     microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
     micros.prepend(m)
-    bestLiquidBlockDiffCache.set(None)
+    bestLiquidBlockDiffCache.set(null)
   }
 
   def carryFee: Long = baseBlockCarry + microDiffs.values.map(_._2).sum
