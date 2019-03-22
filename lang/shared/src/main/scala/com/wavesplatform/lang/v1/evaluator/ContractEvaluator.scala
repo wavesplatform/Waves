@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.traits.domain.Tx.{ContractTransfer, Pmt}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 
 object ContractEvaluator {
-  case class Invocation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
+  case class Invocation(fc: FUNCTION_CALL, caller: Recipient.Address, callerPk: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
 
   def eval(c: Contract, i: Invocation): EvalM[EVALUATED] = {
     val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name
@@ -30,7 +30,7 @@ object ContractEvaluator {
             LET(
               f.annotation.invocationArgName,
               Bindings
-                .buildInvocation(Recipient.Address(i.invoker), i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.contractAddress))
+                .buildInvocation(i.caller, i.callerPk, i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.contractAddress))
             ),
             BLOCK(f.u, i.fc)
           ))

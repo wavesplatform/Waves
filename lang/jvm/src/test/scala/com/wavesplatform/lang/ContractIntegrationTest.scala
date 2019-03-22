@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.traits.domain.DataItem
+import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -28,6 +28,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         Common.emptyBlockchainEnvironment()
       )
 
+  private val callerAddress: ByteStr   = ByteStr.fromLong(1)
+  private val callerPublicKey: ByteStr = ByteStr.fromLong(2)
   property("Simple call") {
     parseCompileAndEvaluate(
       """
@@ -43,9 +45,10 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |@Callable(invocation)
         |func foo(a:ByteVector) = {
         |  let x = invocation.caller.bytes
+        |  let y = invocation.callerPublicKey
         |  if (fooHelper())
         |    then WriteSet([DataEntry("b", 1), DataEntry("sender", x)])
-        |    else WriteSet([DataEntry("a", a), DataEntry("sender", x)])
+        |    else WriteSet([DataEntry("caller", x), DataEntry("callerPk", y)])
         |}
         |
         |@Verifier(t)
@@ -57,8 +60,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       "foo"
     ).explicitGet() shouldBe ContractResult(
       List(
-        DataItem.Bin("a", ByteStr.empty),
-        DataItem.Bin("sender", ByteStr.empty)
+        DataItem.Bin("caller", callerAddress),
+        DataItem.Bin("callerPk", callerPublicKey)
       ),
       List()
     )
@@ -100,7 +103,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     ContractEvaluator(
       ctx.evaluationContext,
       compiled,
-      Invocation(Terms.FUNCTION_CALL(FunctionHeader.User(func), args), ByteStr.empty, None, ByteStr.empty)
+      Invocation(Terms.FUNCTION_CALL(FunctionHeader.User(func), args), Recipient.Address(callerAddress), callerPublicKey, None, ByteStr.empty)
     )
   }
 
