@@ -11,6 +11,7 @@ import com.google.common.primitives.Shorts
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.database._
 import com.wavesplatform.db.openDB
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
@@ -78,14 +79,13 @@ object MatcherTool extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     log.info(s"OK, engine start")
 
-    val userConfig                   = args.headOption.fold(ConfigFactory.empty())(f => ConfigFactory.parseFile(new File(f)))
-    val actualConfig                 = loadConfig(userConfig)
-    val wavesSettings: WavesSettings = ???
-    val settings: MatcherSettings    = ???
-    val db                           = openDB(settings.dataDir)
+    val userConfig                = args.headOption.fold(ConfigFactory.empty())(f => ConfigFactory.parseFile(new File(f)))
+    val actualConfig              = loadConfig(userConfig)
+    val settings: MatcherSettings = MatcherSettings.fromConfig(actualConfig)
+    val db                        = openDB(settings.dataDir)
 
     AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
+      override val chainId: Byte = Base58.decode(settings.account).get(1)
     }
 
     val start = System.currentTimeMillis()

@@ -1,13 +1,11 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.transaction.assets.IssueTransactionV2
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -22,55 +20,49 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
 
   "Create orders with statuses FILL, PARTIAL, CANCELLED, ACTIVE" - {
     // Alice issues new assets
-    val aliceAssetTransaction = IssueTransactionV2
-      .selfSigned(
-        AddressScheme.current.chainId,
-        sender = alice,
-        name = "AliceCoin".getBytes(),
-        description = "AliceCoin for matcher's tests".getBytes(),
+    val aliceAsset = node
+      .broadcastIssue(
+        source = alice,
+        name = "AliceCoin",
+        description = "AliceCoin for matcher's tests",
         quantity = someAssetAmount,
         decimals = 0,
         reissuable = false,
         script = None,
-        fee = issueFee,
-        timestamp = System.currentTimeMillis()
+        fee = issueFee
       )
-      .explicitGet()
+      .id
 
-    val aliceSecondAssetTransaction = IssueTransactionV2
-      .selfSigned(
-        AddressScheme.current.chainId,
-        sender = alice,
-        name = "AliceSecondCoin".getBytes(),
-        description = "AliceSecondCoin for matcher's tests".getBytes(),
+    val aliceSecondAsset = node
+      .broadcastIssue(
+        source = alice,
+        name = "AliceSecondCoin",
+        description = "AliceSecondCoin for matcher's tests",
         quantity = someAssetAmount,
         decimals = 0,
         reissuable = false,
         script = None,
-        fee = issueFee,
-        timestamp = System.currentTimeMillis()
+        fee = issueFee
       )
-      .explicitGet()
+      .id
 
-    val aliceAsset       = aliceAssetTransaction.id().base58
-    val aliceSecondAsset = aliceSecondAssetTransaction.id().base58
-
-    val xs = Seq(aliceAssetTransaction, aliceSecondAssetTransaction).map(createSignedIssueRequest).map(node.signedIssue)
-    xs.foreach(tx => node.waitForTransaction(tx.id))
-
+    Seq(aliceAsset, aliceSecondAsset).foreach(node.waitForTransaction(_))
     val aliceWavesPair       = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
     val aliceSecondWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceSecondAsset).get), Waves)
 
-    // Check balances on Alice's account
-    node.assertAssetBalance(alice.address, aliceAsset, someAssetAmount)
-    node.assertAssetBalance(alice.address, aliceSecondAsset, someAssetAmount)
-    node.assertAssetBalance(matcher.address, aliceAsset, 0)
+    withClue("Check balances on Alice's account") {
+      node.assertAssetBalance(alice.address, aliceAsset, someAssetAmount)
+      node.assertAssetBalance(alice.address, aliceSecondAsset, someAssetAmount)
+      node.assertAssetBalance(matcher.address, aliceAsset, 0)
+    }
 
-    val transfer1ToBobId = node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(aliceAsset), None).id
-    node.waitForTransaction(transfer1ToBobId)
-
-    val transfer2ToBobId = node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(aliceSecondAsset), None).id
-    node.waitForTransaction(transfer2ToBobId)
+    withClue("Distribute assets") {
+      val xs = Seq(
+        node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(aliceAsset), None),
+        node.broadcastTransfer(alice, bob.address, someAssetAmount / 2, minFee, Some(aliceSecondAsset), None),
+      )
+      xs.foreach(tx => node.waitForTransaction(tx.id))
+    }
 
     node.assertAssetBalance(bob.address, aliceAsset, someAssetAmount / 2)
     node.assertAssetBalance(bob.address, aliceSecondAsset, someAssetAmount / 2)

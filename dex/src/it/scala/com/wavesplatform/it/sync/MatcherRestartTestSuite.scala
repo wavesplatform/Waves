@@ -6,7 +6,7 @@ import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.OrderBookResponse
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
-import com.wavesplatform.it.sync.config.MatcherDefaultConfig._
+import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -19,65 +19,69 @@ class MatcherRestartTestSuite extends MatcherSuiteBase {
   private def orderVersion                        = (Random.nextInt(2) + 1).toByte
 
   "check order execution" - {
-    // Alice issues new asset
-    val aliceAsset =
-      aliceNode
-        .issue(aliceAcc.address, "DisconnectCoin", "Alice's coin for disconnect tests", someAssetAmount, 0, reissuable = false, smartIssueFee, 2)
-        .id
-    matcherNode.waitForTransaction(aliceAsset)
-
-    val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
-    // check assets's balances
-    matcherNode.assertAssetBalance(aliceAcc.address, aliceAsset, someAssetAmount)
-    matcherNode.assertAssetBalance(matcherAcc.address, aliceAsset, 0)
-
     "make order and after matcher's restart try to cancel it" in {
+      // Alice issues new asset
+      val aliceAsset =
+        node
+          .broadcastIssue(alice,
+                          "DisconnectCoin",
+                          "Alice's coin for disconnect tests",
+                          someAssetAmount,
+                          0,
+                          reissuable = false,
+                          smartIssueFee,
+                          None,
+                          waitForTx = true)
+          .id
+      node.waitForHeight(node.height + 1)
+
+      val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
+      // check assets's balances
+      node.assertAssetBalance(alice.address, aliceAsset, someAssetAmount)
+      node.assertAssetBalance(matcher.address, aliceAsset, 0)
+
       // Alice places sell order
-      val aliceOrder = matcherNode
-        .placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee, orderVersion)
+      val aliceOrder = node
+        .placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee, orderVersion)
       aliceOrder.status shouldBe "OrderAccepted"
       val firstOrder = aliceOrder.message.id
 
-      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
+      node.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
 
       // check that order is correct
-      val orders = matcherNode.orderBook(aliceWavesPair)
+      val orders = node.orderBook(aliceWavesPair)
       orders.asks.head.amount shouldBe 500
       orders.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
       // sell order should be in the aliceNode orderbook
-      matcherNode.fullOrderHistory(aliceAcc).head.status shouldBe "Accepted"
+      node.fullOrderHistory(alice).head.status shouldBe "Accepted"
 
       // reboot matcher's node
-      docker.killAndStartContainer(dockerNodes().head)
-      Thread.sleep(60.seconds.toMillis)
+      docker.killAndStartContainer(node)
 
-      val height = nodes.map(_.height).max
+      node.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
+      node.fullOrderHistory(alice).head.status shouldBe "Accepted"
 
-      matcherNode.waitForHeight(height + 1, 40.seconds)
-      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Accepted")
-      matcherNode.fullOrderHistory(aliceAcc).head.status shouldBe "Accepted"
-
-      val orders1 = matcherNode.orderBook(aliceWavesPair)
+      val orders1 = node.orderBook(aliceWavesPair)
       orders1.asks.head.amount shouldBe 500
       orders1.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
       val aliceSecondOrder =
-        matcherNode.placeOrder(aliceAcc, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee, orderVersion, 5.minutes)
+        node.placeOrder(alice, aliceWavesPair, OrderType.SELL, 500, 2.waves * Order.PriceConstant, matcherFee, orderVersion, 5.minutes)
       aliceSecondOrder.status shouldBe "OrderAccepted"
 
       val orders2 =
-        matcherNode.waitFor[OrderBookResponse]("Top ask has 1000 amount")(_.orderBook(aliceWavesPair), _.asks.head.amount == 1000, 1.second)
+        node.waitFor[OrderBookResponse]("Top ask has 1000 amount")(_.orderBook(aliceWavesPair), _.asks.head.amount == 1000, 1.second)
       orders2.asks.head.price shouldBe 2.waves * Order.PriceConstant
 
-      val cancel = matcherNode.cancelOrder(aliceAcc, aliceWavesPair, firstOrder)
+      val cancel = node.cancelOrder(alice, aliceWavesPair, firstOrder)
       cancel.status should be("OrderCanceled")
 
-      val orders3 = matcherNode.orderBook(aliceWavesPair)
+      val orders3 = node.orderBook(aliceWavesPair)
       orders3.asks.head.amount shouldBe 500
 
-      matcherNode.waitOrderStatus(aliceWavesPair, firstOrder, "Cancelled")
-      matcherNode.fullOrderHistory(aliceAcc).head.status shouldBe "Accepted"
+      node.waitOrderStatus(aliceWavesPair, firstOrder, "Cancelled")
+      node.fullOrderHistory(alice).head.status shouldBe "Accepted"
     }
   }
 }

@@ -158,7 +158,8 @@ object SyncHttpApi extends Assertions {
                        decimals: Byte,
                        reissuable: Boolean,
                        fee: Long,
-                       script: Option[String]): Transaction = {
+                       script: Option[String],
+                       waitForTx: Boolean = false): Transaction = {
       val tx = IssueTransactionV2
         .selfSigned(
           chainId = AddressScheme.current.chainId,
@@ -174,7 +175,7 @@ object SyncHttpApi extends Assertions {
         )
         .explicitGet()
 
-      maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = false)
+      maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
 
     def issue(sourceAddress: String,
@@ -234,7 +235,8 @@ object SyncHttpApi extends Assertions {
                           amount: Long,
                           fee: Long,
                           assetId: Option[String],
-                          feeAssetId: Option[String]): Transaction = {
+                          feeAssetId: Option[String],
+                          waitForTx: Boolean = false): Transaction = {
       val tx = TransferTransactionV2
         .selfSigned(
           assetId = Asset.fromString(assetId),
@@ -248,7 +250,7 @@ object SyncHttpApi extends Assertions {
         )
         .explicitGet()
 
-      maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = false)
+      maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
 
     def transfer(sourceAddress: String,

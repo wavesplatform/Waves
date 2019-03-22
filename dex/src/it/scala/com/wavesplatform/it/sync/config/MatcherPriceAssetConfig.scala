@@ -5,13 +5,17 @@ import java.nio.charset.StandardCharsets
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.config.ConfigFactory.{empty, parseString}
 import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.config.MatcherDefaultConfig._
+import com.wavesplatform.it.sync.{createSignedIssueRequest, issueFee, someAssetAmount}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.AssetPairBuilder
+import com.wavesplatform.matcher.market.MatcherActor
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.wallet.Wallet
 
@@ -178,6 +182,82 @@ object MatcherPriceAssetConfig {
       AssetPair(a1, a2)
     else
       AssetPair(a2, a1)
+  }
+
+  def issueAssetPair(issuer: PrivateKeyAccount,
+                     amountAssetDecimals: Byte,
+                     priceAssetDecimals: Byte): (SignedIssueV1Request, SignedIssueV1Request, AssetPair) = {
+    issueAssetPair(issuer, issuer, amountAssetDecimals, priceAssetDecimals)
+  }
+
+  def issueAssetPair(amountAssetIssuer: PrivateKeyAccount,
+                     priceAssetIssuer: PrivateKeyAccount,
+                     amountAssetDecimals: Byte,
+                     priceAssetDecimals: Byte): (SignedIssueV1Request, SignedIssueV1Request, AssetPair) = {
+
+    val issueAmountAssetTx: IssueTransactionV1 = IssueTransactionV1
+      .selfSigned(
+        sender = amountAssetIssuer,
+        name = Random.nextString(4).getBytes(),
+        description = Random.nextString(10).getBytes(),
+        quantity = someAssetAmount,
+        decimals = amountAssetDecimals,
+        reissuable = false,
+        fee = issueFee,
+        timestamp = System.currentTimeMillis()
+      )
+      .right
+      .get
+
+    val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
+      .selfSigned(
+        sender = priceAssetIssuer,
+        name = Random.nextString(4).getBytes(),
+        description = Random.nextString(10).getBytes(),
+        quantity = someAssetAmount,
+        decimals = priceAssetDecimals,
+        reissuable = false,
+        fee = issueFee,
+        timestamp = System.currentTimeMillis()
+      )
+      .right
+      .get
+
+    if (MatcherActor.compare(Some(issuePriceAssetTx.id().arr), Some(issueAmountAssetTx.id().arr)) < 0) {
+      (createSignedIssueRequest(issueAmountAssetTx),
+       createSignedIssueRequest(issuePriceAssetTx),
+       AssetPair(
+         amountAsset = IssuedAsset(issueAmountAssetTx.id()),
+         priceAsset = IssuedAsset(issuePriceAssetTx.id())
+       ))
+    } else
+      issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
+  }
+
+  def assetPairIssuePriceAsset(issuer: PrivateKeyAccount, amountAssetId: Asset, priceAssetDecimals: Byte): (SignedIssueV1Request, AssetPair) = {
+
+    val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
+      .selfSigned(
+        sender = issuer,
+        name = Random.nextString(4).getBytes(),
+        description = Random.nextString(10).getBytes(),
+        quantity = someAssetAmount,
+        decimals = priceAssetDecimals,
+        reissuable = false,
+        fee = issueFee,
+        timestamp = System.currentTimeMillis()
+      )
+      .right
+      .get
+
+    if (MatcherActor.compare(Some(issuePriceAssetTx.id().arr), amountAssetId.compatId.map(_.arr)) < 0) {
+      (createSignedIssueRequest(issuePriceAssetTx),
+       AssetPair(
+         amountAsset = amountAssetId,
+         priceAsset = IssuedAsset(issuePriceAssetTx.id())
+       ))
+    } else
+      assetPairIssuePriceAsset(issuer, amountAssetId, priceAssetDecimals)
   }
 
 }

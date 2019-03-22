@@ -549,7 +549,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         "sh",
         "-c",
         s"""rm /opt/waves/start-waves.sh && echo '#!/bin/bash' >> /opt/waves/start-waves.sh &&
-             |echo 'java ${renderProperties(asProperties(genesisOverride))} -cp /opt/waves/waves.jar com.wavesplatform.matcher.MatcherTool /opt/waves/template.conf cb > /opt/waves/migration-tool.log' >> /opt/waves/start-waves.sh &&
+             |echo 'java ${renderProperties(asProperties(genesisOverride))} -cp "/opt/waves/lib/*" com.wavesplatform.matcher.MatcherTool /opt/waves/template.conf cb > /opt/waves/migration-tool.log' >> /opt/waves/start-waves.sh &&
              |echo 'less /opt/waves/migration-tool.log | grep -ir completed && cp /opt/waves/start-waves.sh.bk /opt/waves/start-waves.sh && chmod +x /opt/waves/start-waves.sh' >> /opt/waves/start-waves.sh &&
              |chmod +x /opt/waves/start-waves.sh
            """.stripMargin
