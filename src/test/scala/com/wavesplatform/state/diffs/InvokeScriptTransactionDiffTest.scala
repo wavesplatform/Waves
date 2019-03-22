@@ -23,7 +23,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.script.ContractScript
+import com.wavesplatform.transaction.smart.script.{ContractScript, ScriptCompiler}
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
@@ -55,7 +55,16 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     FUNCTION_CALL(FunctionHeader.Native(FunctionIds.GT_LONG), List(GETTER(REF("tx"), "fee"), CONST_LONG(-1)))
   ).explicitGet()
 
-  val assetBanned = ExprScript(FALSE).explicitGet()
+  val assetBanned = ScriptCompiler
+    .compile(
+      s"""
+         |match tx {
+         |  case tx:TransferTransaction => tx.amount > 10
+         |  case _ => false
+         |}""".stripMargin,
+    )
+    .explicitGet()
+    ._1
 
   def dataContract(senderBinding: String, argName: String, funcName: String, bigData: Boolean) = {
     val datas =
