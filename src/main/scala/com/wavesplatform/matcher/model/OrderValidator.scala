@@ -209,6 +209,7 @@ object OrderValidator {
       _ <- lift(order)
         .ensure(MatcherError.UnexpectedMatcherPublicKey(matcherPublicKey, order.matcherPublicKey))(_.matcherPublicKey == matcherPublicKey)
         .ensure(MatcherError.AddressIsBlacklisted(order.sender))(o => !blacklistedAddresses.contains(o.sender.toAddress))
+        .ensure(MatcherError.OrderV3IsNotAllowed)(_.version != 3 || matcherSettings.allowOrderV3)
         .ensure(MatcherError.AssetPairIsNotAllowed(order.assetPair)) { o =>
           matcherSettings.allowedAssetPairs.isEmpty || matcherSettings.allowedAssetPairs(o.assetPair)
         }
