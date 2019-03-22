@@ -22,7 +22,7 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
   }
 
   property("GenesisTransaction parse from Bytes should work fine") {
-    val bytes = Base58.decode("5GoidXWjBfzuS9tZm4Fp6GAXUYFunVMsoWAew3eBnDbmaDi7WiP9yVpBD2").get
+    val bytes = Base58.tryDecodeWithLimit("5GoidXWjBfzuS9tZm4Fp6GAXUYFunVMsoWAew3eBnDbmaDi7WiP9yVpBD2").get
 
     val actualTransaction = GenesisTransaction.parseBytes(bytes).get
 

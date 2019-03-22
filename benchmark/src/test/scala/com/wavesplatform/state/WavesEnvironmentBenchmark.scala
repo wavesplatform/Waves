@@ -83,7 +83,7 @@ object WavesEnvironmentBenchmark {
 
   @State(Scope.Benchmark)
   class TransactionByIdSt extends BaseSt {
-    val allTxs: Vector[Array[Byte]] = load("transactionById", benchSettings.restTxsFile)(x => Base58.decode(x).get)
+    val allTxs: Vector[Array[Byte]] = load("transactionById", benchSettings.restTxsFile)(x => Base58.tryDecodeWithLimit(x).get)
   }
 
   @State(Scope.Benchmark)
@@ -96,7 +96,7 @@ object WavesEnvironmentBenchmark {
 
   @State(Scope.Benchmark)
   class AccountBalanceOfAssetSt extends AccountBalanceOfWavesSt {
-    val assets: Vector[Array[Byte]] = load("assets", benchSettings.assetsFile)(x => Base58.decode(x).get)
+    val assets: Vector[Array[Byte]] = load("assets", benchSettings.assetsFile)(x => Base58.tryDecodeWithLimit(x).get)
   }
 
   @State(Scope.Benchmark)

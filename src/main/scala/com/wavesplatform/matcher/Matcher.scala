@@ -109,11 +109,14 @@ class Matcher(actorSystem: ActorSystem,
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
 
+  private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
+
   private def validateOrder(o: Order) = {
     import com.wavesplatform.matcher.error._
     for {
       _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, matcherSettings.orderFee)(o)
       _ <- OrderValidator.timeAware(time)(o)
+      _ <- OrderValidator.marketAware(matcherSettings.orderFee, matcherSettings.deviation, getMarketStatus(o.assetPair))(o)
       _ <- OrderValidator.blockchainAware(blockchain,
                                           transactionCreator.createTransaction,
                                           matcherPublicKey.toAddress,
@@ -131,7 +134,7 @@ class Matcher(actorSystem: ActorSystem,
       addressActors,
       matcherQueue.storeEvent,
       p => Option(orderBooks.get()).flatMap(_.get(p)),
-      p => Option(marketStatuses.get(p)),
+      getMarketStatus,
       validateOrder,
       orderBooksSnapshotCache,
       settings,
