@@ -38,7 +38,7 @@ object ScriptReader {
             bytes <- Serde.deserialize(scriptBytes).map(_._1)
             s     <- ExprScript(stdLibVersion, bytes, checkSize = false, checkComplexity = checkComplexity)
           } yield s
-        case ContentType.Contract =>
+        case ContentType.DApp =>
           for {
             bytes <- ContractSerDe.deserialize(scriptBytes)
             s     <- ContractScript(stdLibVersion, bytes)

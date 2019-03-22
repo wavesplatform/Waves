@@ -36,7 +36,7 @@ object ScriptCompiler extends ScorexLogging {
     try {
       cType match {
         case ContentType.Expression => ExpressionCompiler.compile(src, ctx).flatMap(expr => ExprScript.apply(version, expr))
-        case ContentType.Contract   => ContractCompiler.compile(src, ctx).flatMap(expr => ContractScript.apply(version, expr))
+        case ContentType.DApp       => ContractCompiler.compile(src, ctx).flatMap(expr => ContractScript.apply(version, expr))
       }
     } catch {
       case ex: Throwable =>

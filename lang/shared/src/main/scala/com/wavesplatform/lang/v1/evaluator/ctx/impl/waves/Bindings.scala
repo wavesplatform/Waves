@@ -93,7 +93,7 @@ object Bindings {
       )
     )
 
-  def buildInvocation(caller: Recipient.Address, payment: Option[Pmt], contractAddress: Recipient.Address) =
+  def buildInvocation(caller: Recipient.Address, payment: Option[Pmt], dappAddress: Recipient.Address) =
     CaseObj(
       invocationType.typeRef,
       Map(
@@ -104,7 +104,7 @@ object Bindings {
 
   def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType.typeRef, Map("bytes" -> sender.bytes))
 
-  def contractTransfer(ct: ContractTransfer): CaseObj =
+  def scriptTransfer(ct: ScriptTransfer): CaseObj =
     transactionObject(
       Transfer(
         Proven(h = Header(id = ct.id, fee = 0, timestamp = ct.timestamp, version = 0),
@@ -179,7 +179,7 @@ object Bindings {
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled).typeRef,
           combine(Map(
-                    "contractAddress" -> mapRecipient(address)._2,
+                    "dappAddress" -> mapRecipient(address)._2,
                     "payment"     -> buildPayment(maybePayment),
                     "feeAssetId"     -> feeAssetId
                   ),

@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ContractResult}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ScriptResult}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.domain.DataItem
@@ -24,7 +24,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     PureContext.build(StdLibVersion.V3) |+|
       CTX(sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
-        DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract).explicitGet(),
+        DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
         Common.emptyBlockchainEnvironment()
       )
 
@@ -55,7 +55,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |
       """.stripMargin,
       "foo"
-    ).explicitGet() shouldBe ContractResult(
+    ).explicitGet() shouldBe ScriptResult(
       List(
         DataItem.Bin("a", ByteStr.empty),
         DataItem.Bin("sender", ByteStr.empty)
@@ -74,7 +74,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       """.stripMargin,
       "foo",
       Range(1, 23).map(i => Terms.CONST_LONG(i)).toList
-    ).explicitGet() shouldBe ContractResult(List(DataItem.Lng("1", 22)), List())
+    ).explicitGet() shouldBe ScriptResult(List(DataItem.Lng("1", 22)), List())
   }
 
   property("Callable can't have more than 22 args") {
@@ -93,7 +93,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
 
   def parseCompileAndEvaluate(script: String,
                               func: String,
-                              args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty))): Either[ExecutionError, ContractResult] = {
+                              args: List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty))): Either[ExecutionError, ScriptResult] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
 

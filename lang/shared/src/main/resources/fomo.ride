@@ -1,5 +1,5 @@
 {-# STDLIB_VERSION 3 #-}
-{-# CONTENT_TYPE CONTRACT -#}
+{-# CONTENT_TYPE DAPP -#}
 
 let lpKey = "lastPayment"
 let liKey = "bestFomoer"
@@ -39,6 +39,6 @@ func withdraw() = {
 	let canWithdraw = heightCorrect && callerCorrect
 
 	if (canWithdraw)
-		then TransferSet([ContractTransfer(i.caller, wavesBalance(this), unit)])
+		then TransferSet([ScriptTransfer(i.caller, wavesBalance(this), unit)])
 		else throw("behold")
 }

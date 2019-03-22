@@ -7,7 +7,7 @@ case class TransferItem(recipient: Recipient, amount: Long)
 trait Tx
 
 object Tx {
-  case class ContractTransfer(assetId: Option[ByteStr],
+  case class ScriptTransfer(assetId: Option[ByteStr],
                               sender: Recipient.Address,
                               recipient: Recipient.Address,
                               amount: Long,
@@ -27,7 +27,7 @@ object Tx {
       extends Tx
   case class ReIssue(p: Proven, quantity: Long, assetId: ByteStr, reissuable: Boolean)                         extends Tx
   case class Burn(p: Proven, quantity: Long, assetId: ByteStr)                                                 extends Tx
-  case class CI(p: Proven, contractAddress: Recipient, maybePayment: Option[Pmt], feeAssetId: Option[ByteStr]) extends Tx
+  case class CI(p: Proven, dappAddress: Recipient, maybePayment: Option[Pmt], feeAssetId: Option[ByteStr]) extends Tx
   case class Lease(p: Proven, amount: Long, recipient: Recipient)                                              extends Tx
   case class LeaseCancel(p: Proven, leaseId: ByteStr)                                                          extends Tx
   case class CreateAlias(p: Proven, alias: String)                                                             extends Tx

@@ -49,7 +49,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
     val script =
       """
         | {-# STDLIB_VERSION 3 #-}
-        | {-# CONTENT_TYPE CONTRACT #-}
+        | {-# CONTENT_TYPE DAPP #-}
         | {-# SCRIPT_TYPE ASSET #-}
       """.stripMargin
     ScriptCompiler.compile(script) should produce("Inconsistent set of directives")
@@ -59,7 +59,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
     val script =
       """
         | {-# STDLIB_VERSION 2 #-}
-        | {-# CONTENT_TYPE CONTRACT #-}
+        | {-# CONTENT_TYPE DAPP #-}
         | {-# SCRIPT_TYPE ACCOUNT #-}
       """.stripMargin
     ScriptCompiler.compile(script) should produce("Inconsistent set of directives")

@@ -53,20 +53,19 @@ object InvokeScriptRequest {
     FUNCTION_CALL(FunctionHeader.User(fc.function), fc.args)
 }
 
-case class InvokeScriptRequest(
-    sender: String,
-    @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
-    @(ApiModelProperty @field)(
-      dataType = "string",
-      example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
-      required = false
-    ) feeAssetId: Option[String],
-    @(ApiModelProperty @field)(required = true) call: InvokeScriptRequest.FunctionCallPart,
-    @(ApiModelProperty @field)(required = true) payment: Seq[InvokeScriptTransaction.Payment],
-    @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") contractAddress: String,
-    timestamp: Option[Long] = None)
+case class InvokeScriptRequest(sender: String,
+                               @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
+                               @(ApiModelProperty @field)(
+                                 dataType = "string",
+                                 example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
+                                 required = false
+                               ) feeAssetId: Option[String],
+                               @(ApiModelProperty @field)(required = true) call: InvokeScriptRequest.FunctionCallPart,
+                               @(ApiModelProperty @field)(required = true) payment: Seq[InvokeScriptTransaction.Payment],
+                               @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") dappAddress: String,
+                               timestamp: Option[Long] = None)
 
-@ApiModel(value = "Signed Data transaction")
+@ApiModel(value = "Signed Invoke script transaction")
 case class SignedInvokeScriptRequest(
     @(ApiModelProperty @field)(value = "Base58 encoded sender public key", required = true) senderPublicKey: String,
     @(ApiModelProperty @field)(required = true) fee: Long,
@@ -75,7 +74,7 @@ case class SignedInvokeScriptRequest(
       example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
       required = false
     ) feeAssetId: Option[String],
-    @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") contractAddress: String,
+    @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") dappAddress: String,
     @(ApiModelProperty @field)(required = true) call: InvokeScriptRequest.FunctionCallPart,
     @(ApiModelProperty @field)(required = true) payment: Option[Seq[InvokeScriptTransaction.Payment]],
     @(ApiModelProperty @field)(required = true, value = "1000") timestamp: Long,
@@ -83,14 +82,14 @@ case class SignedInvokeScriptRequest(
     extends BroadcastRequest {
   def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
-      _sender          <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _contractAddress <- Address.fromString(contractAddress)
-      _feeAssetId      <- parseBase58ToAssetId(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
-      _proofBytes      <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
-      _proofs          <- Proofs.create(_proofBytes)
+      _sender      <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _dappAddress <- Address.fromString(dappAddress)
+      _feeAssetId  <- parseBase58ToAssetId(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
+      _proofBytes  <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
+      _proofs      <- Proofs.create(_proofBytes)
       t <- InvokeScriptTransaction.create(
         _sender,
-        _contractAddress,
+        _dappAddress,
         InvokeScriptRequest.buildFunctionCall(call),
         payment.getOrElse(Seq()),
         fee,

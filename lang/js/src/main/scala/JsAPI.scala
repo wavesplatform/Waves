@@ -52,7 +52,7 @@ object JsAPI {
 
   private def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
     WavesContext.build(
-      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) ContentType.Contract else ContentType.Expression)
+      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) ContentType.DApp else ContentType.Expression)
         .explicitGet(),
       new Environment {
         override def height: Long                                                                                    = 0
@@ -147,7 +147,7 @@ object JsAPI {
       case DirectiveSet(ver, scriptType, contentType) =>
         contentType match {
           case ContentType.Expression =>
-            val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset, contentType == ContentType.Contract)
+            val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset, contentType == ContentType.DApp)
             Global
               .compileExpression(input, ctx.compilerContext, letBLockVersions contains ver, ver)
               .fold(
@@ -158,7 +158,7 @@ object JsAPI {
                     js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
                 }
               )
-          case ContentType.Contract =>
+          case ContentType.DApp =>
             // Just ignore stdlib version here
             Global
               .compileContract(input, fullContractContext.compilerContext, ver)

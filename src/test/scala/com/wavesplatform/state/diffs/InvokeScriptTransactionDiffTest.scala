@@ -99,7 +99,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                       paymentCount: Int = 11,
                       assetId: Asset = Waves) = {
     val oneTransfer = FUNCTION_CALL(
-      User(FieldNames.ContractTransfer),
+      User(FieldNames.ScriptTransfer),
       List(
         FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes))),
         CONST_LONG(recipientAmount),
@@ -140,7 +140,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         s"""
           |
           |{-# STDLIB_VERSION 3 #-}
-          |{-# CONTENT_TYPE CONTRACT #-}
+          |{-# CONTENT_TYPE DAPP #-}
           |
           |@Callable(xx)
           |func $funcName(amount: Int) = {
@@ -292,7 +292,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("many ContractTransfers")
+          _ should produce("many ScriptTransfers")
         }
     }
   }
@@ -320,7 +320,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           case (blockDiff, newState) =>
             newState.balance(acc, Waves) shouldBe amount
             newState.balance(invoker, IssuedAsset(asset.id())) shouldBe (asset.quantity - 1)
-            newState.balance(ci.contractAddress, IssuedAsset(asset.id())) shouldBe 1
+            newState.balance(ci.dappAddress, IssuedAsset(asset.id())) shouldBe 1
         }
     }
   }

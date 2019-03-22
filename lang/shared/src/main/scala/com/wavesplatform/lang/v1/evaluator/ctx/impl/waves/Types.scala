@@ -81,7 +81,7 @@ object Types {
     "InvokeScriptTransaction",
     addProofsIfNeeded(
       List(
-        "contractAddress" -> addressType.typeRef,
+        "dappAddress" -> addressType.typeRef,
         "payment"     -> optionPayment,
         "feeAssetId" -> optionByteVector
       ) ++ header ++ proven,

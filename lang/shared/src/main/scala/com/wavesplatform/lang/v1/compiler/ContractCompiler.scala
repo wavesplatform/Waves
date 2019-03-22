@@ -43,8 +43,8 @@ object ContractCompiler {
               tpe match {
                 case _
                     if tpe <= UNION(WavesContext.writeSetType.typeRef,
-                                    WavesContext.contractTransferSetType.typeRef,
-                                    WavesContext.contractResultType.typeRef) =>
+                                    WavesContext.scriptTransferSetType.typeRef,
+                                    WavesContext.scriptResultType.typeRef) =>
                   true
                 case _ => false
               },
@@ -88,7 +88,7 @@ object ContractCompiler {
     }
   }
 
-  private def compileContract(contract: Expressions.CONTRACT): CompileM[Contract] = {
+  private def compileContract(contract: Expressions.DAPP): CompileM[Contract] = {
     for {
       ds <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
       _  <- validateDuplicateVarsInContract(contract)
@@ -128,7 +128,7 @@ object ContractCompiler {
     } yield Contract(ds, fs, v)
   }
 
-  private def validateDuplicateVarsInContract(contract: Expressions.CONTRACT): CompileM[Any] = {
+  private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] = {
     for {
       ctx <- get[CompilerContext, CompilationError]
       annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, String](handlePart)
@@ -151,7 +151,7 @@ object ContractCompiler {
     } yield ()
   }
 
-  def apply(c: CompilerContext, contract: Expressions.CONTRACT): Either[String, Contract] =
+  def apply(c: CompilerContext, contract: Expressions.DAPP): Either[String, Contract] =
     compileContract(contract)
       .run(c)
       .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))

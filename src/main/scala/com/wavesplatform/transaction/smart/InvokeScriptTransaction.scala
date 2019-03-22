@@ -23,7 +23,7 @@ import scala.util.Try
 
 case class InvokeScriptTransaction private (chainId: Byte,
                                             sender: PublicKeyAccount,
-                                            contractAddress: Address,
+                                            dappAddress: Address,
                                             fc: Terms.FUNCTION_CALL,
                                             payment: Seq[Payment],
                                             fee: Long,
@@ -44,7 +44,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
       Bytes.concat(
         Array(builder.typeId, version, chainId),
         sender.publicKey,
-        contractAddress.bytes.arr,
+        dappAddress.bytes.arr,
         Serde.serialize(fc),
         Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId.compatId)(_.arr))),
         Longs.toByteArray(fee),
@@ -58,10 +58,10 @@ case class InvokeScriptTransaction private (chainId: Byte,
     Coeval.evalOnce(
       jsonBase()
         ++ Json.obj(
-          "version"         -> version,
-          "contractAddress" -> contractAddress.bytes,
-          "call"            -> InvokeScriptTransaction.functionCallToJson(fc),
-          "payment"         -> payment
+          "version"     -> version,
+          "dappAddress" -> dappAddress.bytes,
+          "call"        -> InvokeScriptTransaction.functionCallToJson(fc),
+          "payment"     -> payment
         )
     )
 
@@ -119,7 +119,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
   }
 
   def create(sender: PublicKeyAccount,
-             contractAddress: Address,
+             dappAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
              fee: Long,
@@ -148,33 +148,33 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
       _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                        (),
                        GenericError("all arguments of invokeScript must be EVALUATED"))
-      tx   = new InvokeScriptTransaction(currentChainId, sender, contractAddress, fc, p, fee, feeAssetId, timestamp, proofs)
+      tx   = new InvokeScriptTransaction(currentChainId, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs)
       size = tx.bytes().length
       _ <- Either.cond(size <= ContractLimits.MaxInvokeScriptSizeInBytes, (), ValidationError.TooBigArray)
     } yield tx
   }
 
   def signed(sender: PublicKeyAccount,
-             contractAddress: Address,
+             dappAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
              fee: Long,
              feeAssetId: Asset,
              timestamp: Long,
              signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).right.map { unsigned =>
+    create(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
   def selfSigned(sender: PrivateKeyAccount,
-                 contractAddress: Address,
+                 dappAddress: Address,
                  fc: Terms.FUNCTION_CALL,
                  p: Seq[Payment],
                  fee: Long,
                  feeAssetId: Asset,
                  timestamp: Long): Either[ValidationError, TransactionT] = {
-    signed(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, sender)
+    signed(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, sender)
   }
 
   val byteTailDescription: ByteEntity[InvokeScriptTransaction] = {

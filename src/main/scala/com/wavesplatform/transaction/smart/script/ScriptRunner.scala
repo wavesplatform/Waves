@@ -20,7 +20,7 @@ object ScriptRunner {
             blockchain: Blockchain,
             script: Script,
             isTokenScript: Boolean,
-            contractAddress: Address): (Log, Either[ExecutionError, EVALUATED]) = {
+            dappAddress: Address): (Log, Either[ExecutionError, EVALUATED]) = {
     script match {
       case s: ExprScript =>
         val ctx = BlockchainContext.build(
@@ -31,7 +31,7 @@ object ScriptRunner {
           blockchain,
           isTokenScript,
           false,
-          Coeval(contractAddress)
+          Coeval(dappAddress)
         )
         EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
       case ContractScript.ContractScriptImpl(_, Contract(_, _, Some(vf)), _) =>
@@ -43,7 +43,7 @@ object ScriptRunner {
           blockchain,
           isTokenScript,
           true,
-          Coeval(contractAddress)
+          Coeval(dappAddress)
         )
         val evalContract = in.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.apply(t)),
                                         _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), _ => ???))

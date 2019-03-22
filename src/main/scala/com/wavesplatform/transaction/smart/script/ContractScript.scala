@@ -42,7 +42,7 @@ object ContractScript {
       (contract.cfs.map(func => (func.annotation.invocationArgName, func.u)) ++ contract.vf.map(func => (func.annotation.invocationArgName, func.u)))
         .map {
           case (annotationArgName, funcExpr) =>
-            ScriptEstimator(varNames(version, ContentType.Contract),
+            ScriptEstimator(varNames(version, ContentType.DApp),
                             functionCosts(version),
                             constructExprFromFuncAndContext(contract.dec, annotationArgName, funcExpr))
               .map(complexity => (funcExpr.name, complexity))

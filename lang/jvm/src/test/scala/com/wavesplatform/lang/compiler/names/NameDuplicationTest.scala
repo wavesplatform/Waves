@@ -21,7 +21,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
       compilerContext,
       WavesContext
         .build(
-          DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract).explicitGet(),
+          DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
           Common.emptyBlockchainEnvironment()
         )
         .compilerContext

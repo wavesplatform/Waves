@@ -40,7 +40,7 @@ trait BaseGlobal {
   }
 
   def serializeContract(c: Contract, stdLibVersion: StdLibVersion): Array[Byte] = {
-    val s = Array(0: Byte, ContentType.Contract.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(c)
+    val s = Array(0: Byte, ContentType.DApp.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(c)
     s ++ checksum(s)
   }
 
