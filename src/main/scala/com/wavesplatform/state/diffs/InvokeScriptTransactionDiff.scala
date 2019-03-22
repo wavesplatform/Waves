@@ -46,7 +46,7 @@ object InvokeScriptTransactionDiff {
       )
       val invoker                                       = tx.sender.toAddress.bytes
       val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))
-      val invocation                                    = ContractEvaluator.Invocation(tx.fc, invoker, maybePayment, tx.contractAddress.bytes)
+      val invocation                                    = ContractEvaluator.Invocation(tx.fc, Recipient.Address(invoker), tx.sender.publicKey, maybePayment, tx.contractAddress.bytes)
       for {
         directives <- DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract)
         evaluator <- ContractEvaluator(
