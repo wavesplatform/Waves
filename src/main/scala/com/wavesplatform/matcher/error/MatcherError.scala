@@ -203,6 +203,14 @@ object MatcherError {
         e"The order's matcher fee ${'matcherFee -> ord.matcherFee} is out of deviation bounds (max-price-deviation-fee: ${'maxPriceDeviationFee -> deviationSettings.maxPriceFee}%, in relation to the best-bid/ask)"
       )
 
+  case class AssetPairIsNotAllowed(orderAssetPair: AssetPair)
+      extends MatcherError(
+        order,
+        assetPair,
+        denied,
+        e"Trading is not allowed for the pair: ${'amountAssetId -> orderAssetPair.amountAsset} - ${'priceAssetId -> orderAssetPair.priceAsset}"
+      )
+
   sealed abstract class Entity(val code: Int)
   object Entity {
     object common  extends Entity(0)

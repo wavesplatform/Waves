@@ -264,7 +264,6 @@ class UtxPoolImpl(time: Time,
       }
     }
 
-
     def isExpired(transaction: Transaction, currentTime: Long = time.correctedTime()): Boolean = {
       (currentTime - transaction.timestamp) > ExpirationTime
     }

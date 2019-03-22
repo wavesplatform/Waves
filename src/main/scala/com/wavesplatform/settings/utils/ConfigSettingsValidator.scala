@@ -1,6 +1,7 @@
 package com.wavesplatform.settings.utils
 
 import cats.data.Validated
+import cats.implicits._
 import com.typesafe.config.Config
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -30,7 +31,7 @@ class ConfigSettingsValidator(config: Config) {
     Validated cond (predicate(settingValue), settingValue, createInvalidSettingValueError(settingName, settingValue, errorMsg))
   }
 
-  def validateSafe[T: ValueReader](settingName: String): ErrorsListOr[T] = {
+  def validateSafeFromString[T: ValueReader](settingName: String): ErrorsListOr[T] = {
     Validated fromTry Try(config.as[T](settingName)) leftMap (_ => createInvalidSettingValueError(settingName, config getString settingName))
   }
 
@@ -41,5 +42,35 @@ class ConfigSettingsValidator(config: Config) {
 
   def validatePercent(settingName: String): ErrorsListOr[Double] = {
     validateByPredicate[Double](settingName)(p => 0 < p && p <= 100, "required 0 < percent <= 100")
+  }
+
+  def validateAssetPairSet(settingName: String): ErrorsListOr[Set[AssetPair]] = {
+
+    def validateAssetStrList(list: List[(String, String)]): Either[List[String], Set[AssetPair]] = {
+      list
+        .traverse {
+          case (amountAssetStr, priceAssetStr) =>
+            Validated fromTry (AssetPair createAssetPair (amountAssetStr, priceAssetStr)) leftMap (_ => List(s"[$amountAssetStr, $priceAssetStr]"))
+        }
+        .map(_.toSet)
+        .leftMap(invalidPairs => createInvalidSettingValueError(settingName, invalidPairs.mkString(", ")))
+        .toEither
+    }
+
+    def toTupleList(list: List[List[String]]): List[(String, String)] = list map {
+      case amountAsset :: priceAsset :: Nil => amountAsset -> priceAsset
+    }
+
+    lazy val rawPairsList = config.as[List[List[String]]](settingName)
+
+    Either
+      .fromTry(Try(rawPairsList))
+      .leftMap(ex => List(s"Invalid setting $settingName value (${ex.getMessage})"))
+      .ensure(
+        List(s"Assets count in the pair != 2: ${rawPairsList.withFilter(_.size != 2).map(_.mkString("[", ", ", "]")).mkString(", ")}")
+      )(_ forall (_.size == 2))
+      .map(toTupleList)
+      .flatMap(validateAssetStrList)
+      .toValidated
   }
 }

@@ -18,7 +18,7 @@ object DeviationsSettings {
     }
 
     (
-      cfgValidator.validateSafe[Boolean](s"$path.enable"),
+      cfgValidator.validateSafeFromString[Boolean](s"$path.enable"),
       validateDeviationPercent(s"$path.profit"),
       validateDeviationPercent(s"$path.loss"),
       validateDeviationPercent(s"$path.fee")

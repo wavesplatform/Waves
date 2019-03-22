@@ -8,9 +8,11 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.settings.DeviationsSettings
-import com.wavesplatform.settings.DeviationsSettings.deviationsSettingsReader
-import com.wavesplatform.settings.fee.OrderFeeSettings._
+import com.wavesplatform.settings.AllowedAssetPairsSettings._
+import com.wavesplatform.settings.DeviationsSettings._
+import com.wavesplatform.settings.OrderFeeSettings._
+import com.wavesplatform.settings.{AllowedAssetPairsSettings, DeviationsSettings}
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
@@ -41,7 +43,8 @@ case class MatcherSettings(enable: Boolean,
                            balanceWatchingBufferInterval: FiniteDuration,
                            eventsQueue: EventsQueueSettings,
                            orderFee: OrderFeeSettings,
-                           deviation: DeviationsSettings)
+                           deviation: DeviationsSettings,
+                           allowedAssetPairs: Set[AssetPair])
 
 object MatcherSettings {
 
@@ -87,8 +90,9 @@ object MatcherSettings {
     val eventsQueue         = config.as[EventsQueueSettings](s"$configPath.events-queue")
     val recoverOrderHistory = !new File(dataDirectory).exists()
 
-    val orderFee  = config.as[OrderFeeSettings](s"$configPath.order-fee")
-    val deviation = config.as[DeviationsSettings](s"$configPath.max-price-deviations")
+    val orderFee          = config.as[OrderFeeSettings](s"$configPath.order-fee")
+    val deviation         = config.as[DeviationsSettings](s"$configPath.max-price-deviations")
+    val allowedAssetPairs = config.as[AllowedAssetPairsSettings](s"$configPath.allowed-asset-pairs").value
 
     MatcherSettings(
       enabled,
@@ -113,7 +117,8 @@ object MatcherSettings {
       balanceWatchingBufferInterval,
       eventsQueue,
       orderFee,
-      deviation
+      deviation,
+      allowedAssetPairs
     )
   }
 }

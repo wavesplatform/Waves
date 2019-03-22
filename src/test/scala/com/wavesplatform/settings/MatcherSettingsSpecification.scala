@@ -1,21 +1,57 @@
 package com.wavesplatform.settings
 
+import com.wavesplatform.state.diffs.produce
 import cats.implicits._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.settings.fee.{AssetType, OrderFeeSettings}
-import com.wavesplatform.settings.fee.OrderFeeSettings._
+import com.wavesplatform.settings.OrderFeeSettings._
 import org.scalatest.{FlatSpec, Matchers}
+import com.wavesplatform.common.utils.EitherExt2
 
 import scala.concurrent.duration._
 import scala.util.Try
 
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
-  def configStrWithOrderFeeSettings(orderFeeSettings: String): Config = {
+  def getSettingByConfig(conf: Config): Either[String, MatcherSettings] = Try(MatcherSettings.fromConfig(conf)).toEither.leftMap(_.getMessage)
+
+  val correctOrderFeeSettingsStr: String =
+    s"""
+       |order-fee {
+       |  mode = percent
+       |  waves {
+       |    base-fee = 300000
+       |  }
+       |  fixed {
+       |    asset = WAVES
+       |    min-fee = 300000
+       |  }
+       |  percent {
+       |    asset-type = amount
+       |    min-fee = 0.1
+       |  }
+       |}
+       """.stripMargin
+
+  val correctDeviationSettingsStr: String =
+    s"""
+       |max-price-deviations {
+       |  enable = yes
+       |  profit = 1000000
+       |  loss = 1000000
+       |  fee = 1000000
+       |}
+     """.stripMargin
+
+  val correctAllowedAssetPairsSettings: String =
+    s"""
+       |allowed-asset-pairs = []
+     """.stripMargin
+
+  def configStrWithSettings(orderFeeSettingsStr: String)(deviationsSettingsStr: String)(allowedAssetPairsSettingsStr: String): Config = {
     val configStr =
       s"""waves {
       |  directory = /waves
@@ -66,13 +102,9 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |        producer.buffer-size = 200
       |      }
       |    }
-      |    $orderFeeSettings
-      |    max-price-deviations {
-      |      enable = yes
-      |      profit = 1000000
-      |      loss = 1000000
-      |      fee = 1000000
-      |    }
+      |    $orderFeeSettingsStr
+      |    $deviationsSettingsStr
+      |    $allowedAssetPairsSettingsStr
       |  }
       |}""".stripMargin
 
@@ -81,25 +113,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
 
   "MatcherSettings" should "read values" in {
 
-    val correctOrderFeeSettings =
-      s"""
-         |order-fee {
-         |  mode = percent
-         |  waves {
-         |    base-fee = 300000
-         |  }
-         |  fixed {
-         |    asset = WAVES
-         |    min-fee = 300000
-         |  }
-         |  percent {
-         |    asset-type = amount
-         |    min-fee = 0.1
-         |  }
-         |}
-       """.stripMargin
-
-    val config = configStrWithOrderFeeSettings(correctOrderFeeSettings)
+    val config = configStrWithSettings(correctOrderFeeSettingsStr)(correctDeviationSettingsStr)(correctAllowedAssetPairsSettings)
 
     val settings = MatcherSettings.fromConfig(config)
     settings.enable should be(true)
@@ -145,9 +159,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     }
   }
 
-  "MatcherSettings" should "produce errors" in {
-
-    def getSettingByConfig(conf: Config): Either[String, MatcherSettings] = Try(MatcherSettings.fromConfig(conf)).toEither.leftMap(_.getMessage)
+  "OrderFeeSettings in MatcherSettings" should "be validated" in {
 
     val invalidMode =
       s"""
@@ -221,10 +233,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
          |}
        """.stripMargin
 
-    val settingsInvalidMode           = getSettingByConfig(configStrWithOrderFeeSettings(invalidMode))
-    val settingsInvalidTypeAndPercent = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetTypeAndPercent))
-    val settingsInvalidAssetAndFee    = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetAndFee))
-    val settingsInvalidFeeInWaves     = getSettingByConfig(configStrWithOrderFeeSettings(invalidFeeInWaves))
+    val configStr: String => Config   = configStrWithSettings(_)(correctDeviationSettingsStr)(correctAllowedAssetPairsSettings)
+    val settingsInvalidMode           = getSettingByConfig(configStr(invalidMode))
+    val settingsInvalidTypeAndPercent = getSettingByConfig(configStr(invalidAssetTypeAndPercent))
+    val settingsInvalidAssetAndFee    = getSettingByConfig(configStr(invalidAssetAndFee))
+    val settingsInvalidFeeInWaves     = getSettingByConfig(configStr(invalidFeeInWaves))
 
     settingsInvalidMode shouldBe Left("Invalid setting waves.matcher.order-fee.mode value: invalid")
 
@@ -241,5 +254,39 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settingsInvalidFeeInWaves shouldBe Left(
       s"Invalid setting waves.matcher.order-fee.waves.base-fee value: -350000, required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount}"
     )
+  }
+
+  "AllowedAssetPairsSettings" should "be validated" in {
+
+    val configStr: String => Config = configStrWithSettings(correctOrderFeeSettingsStr)(correctDeviationSettingsStr)
+
+    val nonList = """allowed-asset-pairs = ["WAVES"]"""
+
+    val incorrectAssetsCount =
+      """allowed-asset-pairs = [
+        | ["WAVES", "BTC"],
+        | ["WAVES", "BTC", "ETH"],
+        | ["ETH"]
+        |]
+        """.stripMargin
+
+    val incorrectAssets =
+      """allowed-asset-pairs = [
+        | ["WAVES", ";;;"],
+        | ["WAVES", "BTC"]
+        |]
+      """.stripMargin
+
+    val duplicates =
+      """allowed-asset-pairs = [
+        | ["WAVES", "BTC"],
+        | ["WAVES", "BTC"]
+        |]
+      """.stripMargin
+
+    getSettingByConfig(configStr(nonList)) should produce("Invalid setting waves.matcher.allowed-asset-pairs value")
+    getSettingByConfig(configStr(incorrectAssetsCount)) should produce("Assets count in the pair != 2: [WAVES, BTC, ETH], [ETH]")
+    getSettingByConfig(configStr(incorrectAssets)) should produce("Invalid setting waves.matcher.allowed-asset-pairs value: [WAVES, ;;;]")
+    getSettingByConfig(configStr(duplicates)).explicitGet().allowedAssetPairs.size shouldBe 1
   }
 }

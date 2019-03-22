@@ -26,13 +26,15 @@ object Address extends ScorexLogging {
   val AddressStringLength  = base58Length(AddressLength)
 
   def fromPublicKey(publicKey: Array[Byte], chainId: Byte = scheme.chainId): Address = {
-    val withoutChecksum = ByteBuffer.allocate(1 + 1 + HashLength)
+    val withoutChecksum = ByteBuffer
+      .allocate(1 + 1 + HashLength)
       .put(AddressVersion)
       .put(chainId)
       .put(crypto.secureHash(publicKey), 0, HashLength)
       .array()
 
-    val bytes           = ByteBuffer.allocate(AddressLength)
+    val bytes = ByteBuffer
+      .allocate(AddressLength)
       .put(withoutChecksum)
       .put(calcCheckSum(withoutChecksum), 0, ChecksumLength)
       .array()
