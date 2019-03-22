@@ -93,7 +93,7 @@ object InvokeScriptTransactionDiff {
                     })
                     wavesFee = feeInfo._1
                     dataAndPaymentDiff <- payableAndDataPart(height, tx, ds, feeInfo._2)
-                    _                  <- Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), ValidationError.NegativeAmount(-42, ""))
+                    _                  <- Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ > 0), (), ValidationError.NonPositiveAmount(-42, ""))
                     _                  <- validateOverflow(pmts.flatMap(_.values).flatMap(_.values), "Attempt to transfer unavailable funds in contract payment")
                     _ <- Either.cond(
                       pmts

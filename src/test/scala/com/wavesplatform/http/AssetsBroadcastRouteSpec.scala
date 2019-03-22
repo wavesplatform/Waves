@@ -68,7 +68,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
           posting(ir.copy(fee = q)) should produce(InsufficientFee())
         }
         forAll(nonPositiveLong) { q =>
-          posting(ir.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
+          posting(ir.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
         }
         forAll(invalidDecimals) { d =>
           posting(ir.copy(decimals = d)) should produce(TooBigArrayAllocation)
@@ -95,7 +95,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
         // todo: invalid sender
         forAll(nonPositiveLong) { q =>
-          posting(rr.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
+          posting(rr.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
         }
         forAll(nonPositiveLong) { fee =>
           posting(rr.copy(fee = fee)) should produce(InsufficientFee())
@@ -112,7 +112,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
           posting(br.copy(senderPublicKey = pk)) should produce(InvalidAddress)
         }
         forAll(nonPositiveLong) { q =>
-          posting(br.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
+          posting(br.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
         }
         forAll(nonPositiveLong) { fee =>
           posting(br.copy(fee = fee)) should produce(InsufficientFee())
@@ -126,7 +126,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
         forAll(nonPositiveLong) { q =>
-          posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of ${tr.assetId.getOrElse("waves")}"))
+          posting(tr.copy(amount = q)) should produce(NonPositiveAmount(s"$q of ${tr.assetId.getOrElse("waves")}"))
         }
         forAll(invalidBase58) { pk =>
           posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress)

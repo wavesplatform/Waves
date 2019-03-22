@@ -408,7 +408,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             .selfSigned(IssuedAsset(asset.id()), master, acc, asset.quantity / 10, ts, Waves, enoughFee, Array[Byte]())
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi should produce("NegativeAmount")
+          blockDiffEi should produce("NonPositiveAmount")
         }
     }
   }
@@ -423,7 +423,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
       ci = InvokeScriptTransaction.selfSigned(invoker, master, fc, Seq(Payment(-1, Waves)), fee, Waves, ts)
-    } yield (ci)) { _ should produce("NegativeAmount") }
+    } yield ci) { _ should produce("NonPositiveAmount") }
   }
 
   property("smart asset payment require extra fee") {
