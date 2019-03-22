@@ -45,6 +45,7 @@ object Wallet extends ScorexLogging {
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
     crypto.secureHash(Bytes.concat(Ints.toByteArray(nonce), seed))
 
+  @throws[IllegalArgumentException]("if invalid wallet configuration provided")
   def apply(settings: WalletSettings): Wallet =
     new WalletImpl(settings.file, settings.password, settings.seed)
 
