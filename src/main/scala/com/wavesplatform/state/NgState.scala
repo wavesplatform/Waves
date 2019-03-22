@@ -1,30 +1,32 @@
 package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
-import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
+import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
 /* This is not thread safe, used only from BlockchainUpdaterImpl */
 class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val approvedFeatures: Set[Short]) extends ScorexLogging {
+  private[this] val MaxTotalDiffs = 3
 
-  private val MaxTotalDiffs = 3
+  private[this] val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
+  private[this] val micros: MList[MicroBlock]                     = MList.empty // fresh head
 
-  private val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
-  private val micros: MList[MicroBlock]                     = MList.empty // fresh head
-
-  private val totalBlockDiffCache = CacheBuilder
+  private[this] val totalBlockDiffCache = CacheBuilder
     .newBuilder()
     .maximumSize(MaxTotalDiffs)
     .expireAfterWrite(10, TimeUnit.MINUTES)
     .build[BlockId, (Diff, Long)]()
+
+  private[this] val bestLiquidBlockDiffCache = new AtomicReference[Option[Diff]](None)
 
   def microBlockIds: Seq[BlockId] = micros.map(_.totalResBlockSig).toList
 
@@ -70,7 +72,17 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
         (b, d, c, txs)
     }
 
-  def bestLiquidDiff: Diff = micros.headOption.fold(baseBlockDiff)(m => diffFor(m.totalResBlockSig)._1)
+  def bestLiquidDiff: Diff = {
+    bestLiquidBlockDiffCache.get() match {
+      case Some(value) =>
+        value
+
+      case None =>
+        val newValue = micros.headOption.fold(baseBlockDiff)(m => diffFor(m.totalResBlockSig)._1)
+        bestLiquidBlockDiffCache.set(Some(newValue))
+        newValue
+    }
+  }
 
   def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
 
@@ -112,6 +124,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
     microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
     micros.prepend(m)
+    bestLiquidBlockDiffCache.set(None)
   }
 
   def carryFee: Long = baseBlockCarry + microDiffs.values.map(_._2).sum
