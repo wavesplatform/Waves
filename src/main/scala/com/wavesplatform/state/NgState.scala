@@ -19,7 +19,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   private[this] val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
   private[this] val micros: MList[MicroBlock]                     = MList.empty // fresh head
 
-  private[this] val totalBlockDiffCache = CacheBuilder
+  private[this] val blockDiffCache = CacheBuilder
     .newBuilder()
     .maximumSize(MaxTotalDiffs)
     .expireAfterWrite(10, TimeUnit.MINUTES)
@@ -38,15 +38,15 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     if (totalResBlockSig == base.uniqueId)
       (baseBlockDiff, baseBlockCarry)
     else
-      totalBlockDiffCache.get(
+      blockDiffCache.get(
         totalResBlockSig, { () =>
           micros.find(_.totalResBlockSig == totalResBlockSig) match {
             case Some(current) =>
               val prevResBlockSig          = current.prevResBlockSig
-              val (prevDiff, prevCarry)    = Option(totalBlockDiffCache.getIfPresent(prevResBlockSig)).getOrElse(diffFor(prevResBlockSig))
+              val (prevDiff, prevCarry)    = Option(blockDiffCache.getIfPresent(prevResBlockSig)).getOrElse(diffFor(prevResBlockSig))
               val (currDiff, currCarry, _) = microDiffs(totalResBlockSig)
               val result                   = (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry)
-              totalBlockDiffCache.put(totalResBlockSig, result)
+              blockDiffCache.put(totalResBlockSig, result)
               result
 
             case None =>
@@ -93,6 +93,8 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
   def append(m: MicroBlock, diff: Diff, microblockCarry: Long, timestamp: Long): Unit = {
     microDiffs.put(m.totalResBlockSig, (diff, microblockCarry, timestamp))
     micros.prepend(m)
+    forgedBlockCache.invalidateAll()
+    blockDiffCache.invalidateAll()
   }
 
   def carryFee: Long = baseBlockCarry + microDiffs.values.map(_._2).sum
