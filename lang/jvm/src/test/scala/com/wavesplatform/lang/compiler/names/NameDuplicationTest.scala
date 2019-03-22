@@ -3,7 +3,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.compiler.compilerContext
-import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.CompilerContext
@@ -21,7 +21,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
       compilerContext,
       WavesContext
         .build(
-          DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract).explicitGet(),
+          DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.DApp).explicitGet(),
           Common.emptyBlockchainEnvironment()
         )
         .compilerContext
@@ -206,7 +206,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
 
   }
 
-  def compileOf(script: String): Either[String, Contract] = {
+  def compileOf(script: String): Either[String, DApp] = {
     val expr = Parser.parseContract(script.stripMargin).get.value
     compiler.ContractCompiler(ctx, expr)
   }

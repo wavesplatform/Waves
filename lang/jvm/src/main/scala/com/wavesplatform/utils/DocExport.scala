@@ -20,7 +20,7 @@ object DocExport {
     } else {
       val version = StdLibVersion(args(1).toInt)
       val wavesContext = WavesContext.build(
-        DirectiveSet(version, ScriptType.Account, ContentType.Contract).explicitGet(),
+        DirectiveSet(version, ScriptType.Account, ContentType.DApp).explicitGet(),
         new Environment {
           override def height: Long                                                                                    = ???
           override def chainId: Byte                                                                                   = 66

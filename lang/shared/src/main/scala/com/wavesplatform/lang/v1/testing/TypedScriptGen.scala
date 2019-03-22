@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.testing
 
-import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
+import com.wavesplatform.lang.contract.{DApp, ContractSerDe}
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -50,7 +50,7 @@ trait TypedScriptGen {
       funcs      <- Gen.listOfN(nFuncs, funcGen)
       callables  <- Gen.listOfN(nCallables, callableGen)
       verifier   <- Gen.option(verifierGen)
-      c = Contract(lets ++ funcs, callables, verifier)
+      c = DApp(lets ++ funcs, callables, verifier)
       if ContractSerDe.serialize(c).size < Short.MaxValue - 3 - 4
     } yield c
 

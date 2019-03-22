@@ -68,7 +68,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     val scriptText =
       """
         |{-# STDLIB_VERSION 3 #-}
-        |{-# CONTENT_TYPE CONTRACT #-}
+        |{-# CONTENT_TYPE DAPP #-}
         |
         | @Callable(inv)
         | func foo(a:ByteVector) = {
@@ -112,7 +112,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       InvokeScriptTransaction
         .selfSigned(
           sender = caller,
-          contractAddress = contract,
+          dappAddress = contract,
           fc = fc,
           p = Seq(),
           timestamp = System.currentTimeMillis(),

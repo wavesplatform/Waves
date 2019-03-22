@@ -148,7 +148,7 @@ package object utils extends ScorexLogging {
   }
 
   val defaultDecompilerContext: DecompilerContext =
-    lazyContexts(DirectiveSet(V3, ScriptType.Account, ContentType.Contract).explicitGet())().decompilerContext
+    lazyContexts(DirectiveSet(V3, ScriptType.Account, ContentType.DApp).explicitGet())().decompilerContext
 
   def varNames(version: StdLibVersion, cType: ContentType): Set[String] =
     compilerContext(version, cType, isAssetScript = false).varDefs.keySet

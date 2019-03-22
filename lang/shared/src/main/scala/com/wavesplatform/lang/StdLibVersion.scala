@@ -22,20 +22,20 @@ object ContentType extends TaggedType[Int] {
   type ContentType = ContentType.Type
 
   val Expression: ContentType = 1 @@ ContentType
-  val Contract: ContentType   = 2 @@ ContentType
+  val DApp: ContentType   = 2 @@ ContentType
 
-  val SupportedTypes: Set[ContentType] = Set(Expression, Contract)
+  val SupportedTypes: Set[ContentType] = Set(Expression, DApp)
 
   def parseId(i: Int) = i match {
     case 1 => Expression
-    case 2 => Contract
+    case 2 => DApp
   }
 
-  def isContract(isContract: Boolean) = if (isContract) Contract else Expression
+  def isDApp(isDApp: Boolean) = if (isDApp) DApp else Expression
 
   def parseString(s: String) = s match {
     case "EXPRESSION" => Expression
-    case "CONTRACT"   => Contract
+    case "DAPP"   => DApp
   }
 }
 

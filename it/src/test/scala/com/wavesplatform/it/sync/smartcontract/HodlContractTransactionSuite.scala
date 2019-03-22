@@ -66,7 +66,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val scriptText =
       """
         |{-# STDLIB_VERSION 3 #-}
-        |{-# CONTENT_TYPE CONTRACT #-}
+        |{-# CONTENT_TYPE DAPP #-}
         |
         |	@Callable(i)
         |	func deposit() = {
@@ -96,9 +96,9 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |			then throw("Can't withdraw negative amount")
         |  else if (newAmount < 0)
         |			then throw("Not enough balance")
-        |			else ContractResult(
+        |			else ScriptResult(
         |					WriteSet([DataEntry(currentKey, newAmount)]),
-        |					TransferSet([ContractTransfer(i.caller, amount, unit)])
+        |					TransferSet([ScriptTransfer(i.caller, amount, unit)])
         |				)
         |	}
         |
@@ -133,7 +133,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       InvokeScriptTransaction
         .selfSigned(
           sender = caller,
-          contractAddress = contract,
+          dappAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty),
           p = Seq(InvokeScriptTransaction.Payment(1.5.waves, Waves)),
           timestamp = System.currentTimeMillis(),
@@ -159,7 +159,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       InvokeScriptTransaction
         .selfSigned(
           sender = caller,
-          contractAddress = contract,
+          dappAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.51.waves))),
           p = Seq(),
           timestamp = System.currentTimeMillis(),
@@ -179,7 +179,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       InvokeScriptTransaction
         .selfSigned(
           sender = caller,
-          contractAddress = contract,
+          dappAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.49.waves))),
           p = Seq(),
           timestamp = System.currentTimeMillis(),

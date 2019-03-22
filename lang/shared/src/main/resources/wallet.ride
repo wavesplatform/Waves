@@ -25,8 +25,8 @@ func withdraw(amount: Int) = {
 			then throw("Can't withdraw negative amount")
     else if (newAmount < 0)
 			then throw("Not enough balance")
-			else ContractResult(
+			else ScriptResult(
 					WriteSet(List(DataEntry(currentKey, newAmount))),
-					TransferSet(List(ContractTransfer(i.caller, amount, unit)))
+					TransferSet(List(ScriptTransfer(i.caller, amount, unit)))
 				)
 	}
