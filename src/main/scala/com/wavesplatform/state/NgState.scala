@@ -48,7 +48,7 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
     micros.headOption
 
   def transactions: Seq[Transaction] =
-    base.transactionData ++ micros.view.map(_.transactionData).reverse.flatten.toList
+    base.transactionData ++ micros.view.map(_.transactionData).reverse.flatten
 
   def bestLiquidBlock: Block =
     if (micros.isEmpty)
