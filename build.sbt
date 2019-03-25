@@ -6,7 +6,7 @@ import sbtassembly.MergeStrategy
 import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
-scalafmtOnCompile in ThisBuild := true
+scalafmtOnCompile in ThisBuild := false
 Global / cancelable := true
 Global / coverageExcludedPackages := ".*"
 
