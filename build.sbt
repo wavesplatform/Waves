@@ -233,7 +233,7 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .disablePlugins(ProtocPlugin)
   .settings(
-    libraryDependencies += Dependencies.ScalaTest % "test"
+    libraryDependencies += Dependencies.ScalaTest
   )
 
 lazy val commonJS  = common.js
@@ -285,16 +285,18 @@ lazy val langJS  = lang.js
 lazy val langJVM = lang.jvm
 
 lazy val node = project
-  .enablePlugins(ExtensionPackaging)
+  .enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin)
   .settings(
     Compile / mainClass := Some("com.wavesplatform.Application"),
     libraryDependencies ++= Dependencies.Node.value, /*++ Dependencies.itKit.map(_ % IntegrationTest*/
+    dependencyOverrides ++= Dependencies.EnforcedVersions.value,
     Compile / sourceGenerators += versionSource,
     Compile / PB.targets += scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value,
     Compile / PB.deleteTargetDirectory := false,
     Compile / publishArtifact in packageDoc := false,
     Compile / publishArtifact in packageSrc := false,
-    coverageExcludedPackages := ""
+    coverageExcludedPackages := "",
+    // scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
   )
   .dependsOn(langJVM % "compile;test->test", commonJVM % "compile;test->test")
 
@@ -321,6 +323,7 @@ lazy val `node-it` = project
   .dependsOn(node)
 
 lazy val dex = project
+  .enablePlugins(ExtensionPackaging)
   .settings(
     libraryDependencies ++= Dependencies.test
   )
@@ -331,17 +334,17 @@ lazy val dex = project
 lazy val `dex-it` = project
   .in(file(".") / "dex" / "src" / "it")
   .enablePlugins(sbtdocker.DockerPlugin)
-  .settings(ItSettings.settings ++ DockerSettings.settings)
+  .settings(ItSettings.settings ++ DockerSettings.dexSettings)
   .settings(
     description := "DEX integration tests",
     target := (dex / Compile / target).value / "it", // see ItSettings
     libraryDependencies ++= Dependencies.itTest,
-    dependencyOverrides ++= Dependencies.EnforcedVersions.value,
+    //dependencyOverrides ++= Dependencies.EnforcedVersions.value,
     inTask(docker)(
       Seq(
         imageNames := Seq(ImageName("com.wavesplatform/dex-it")),
-        DockerSettings.exposedPorts := (`node-it` / docker / DockerSettings.exposedPorts).value + 6886,
-        DockerSettings.additionalFiles ++= (`node-it` / docker / DockerSettings.additionalFiles).value ++ Seq(
+        DockerSettings.exposedPorts := Set(6886),
+        DockerSettings.additionalFiles ++= Seq(
           (dex / Universal / stage).value,
           (Test / resourceDirectory).value / "template.conf",
           sourceDirectory.value / "container" / "wallet.dat"

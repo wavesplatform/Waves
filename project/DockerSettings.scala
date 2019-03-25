@@ -32,4 +32,18 @@ object DockerSettings {
         },
         buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
       ))
+
+  def dexSettings: Seq[Def.Setting[_]] =
+    inTask(docker)(
+      Seq(
+        additionalFiles := Seq.empty,
+        dockerfile := {
+          new Dockerfile {
+            from("com.wavesplatform/node-it:latest")
+            add(additionalFiles.value, "/opt/waves/")
+            expose(exposedPorts.value.toSeq: _*)
+          }
+        },
+        buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
+      ))
 }

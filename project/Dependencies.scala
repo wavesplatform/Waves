@@ -25,7 +25,7 @@ object Dependencies {
 
   private val KindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
 
-  val ScalaTest                  = "org.scalatest" %% "scalatest" % "3.0.6"
+  val ScalaTest                  = "org.scalatest" %% "scalatest" % "3.0.6" % Test
   private val AkkaHttp           = akkaHttpModule("akka-http")
   private val JacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
   private val GoogleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
@@ -103,8 +103,7 @@ object Dependencies {
     "org.scalacheck" %% "scalacheck" % "1.14.0"
   ).map(_ % Test)
 
-  lazy val test = Seq(
-    ScalaTest,
+  lazy val test = ScalaTest +: Seq(
     Logback,
     "org.scalacheck"      %% "scalacheck"                  % "1.14.0",
     "io.github.amrhassan" %% "scalacheck-cats"             % "0.4.0",

@@ -10,6 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, OrderValidator, SellLimitOrder}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
+import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.settings.fee.AssetType
 import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, FixedWavesSettings, OrderFeeSettings, PercentSettings}
 import com.wavesplatform.settings.loadConfig

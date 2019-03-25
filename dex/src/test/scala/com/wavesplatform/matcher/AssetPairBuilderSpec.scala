@@ -4,6 +4,7 @@ import com.google.common.base.Charsets
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain}
