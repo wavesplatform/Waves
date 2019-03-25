@@ -64,7 +64,7 @@ object OrderFeeSettings {
 
       val prefix         = getPrefixByMode(FeeMode.FIXED)
       val feeValidator   = cfgValidator.validateByPredicate[Long](s"$prefix.min-fee") _
-      val assetValidated = cfgValidator.validateAsset(s"$prefix.asset")
+      val assetValidated = cfgValidator.validate[Asset](s"$prefix.asset")
 
       val feeValidated = assetValidated match {
         case Valid(Waves) => feeValidator(fee => 0 < fee && fee <= totalWavesAmount, s"required 0 < fee <= $totalWavesAmount")
@@ -77,7 +77,7 @@ object OrderFeeSettings {
     def validatePercentSettings: ErrorsListOr[PercentSettings] = {
       val prefix = getPrefixByMode(FeeMode.PERCENT)
       (
-        cfgValidator.validateSafeFromString[AssetType](s"$prefix.asset-type"),
+        cfgValidator.validate[AssetType](s"$prefix.asset-type"),
         cfgValidator.validatePercent(s"$prefix.min-fee")
       ) mapN PercentSettings
     }
@@ -88,7 +88,7 @@ object OrderFeeSettings {
       case FeeMode.PERCENT => validatePercentSettings
     }
 
-    cfgValidator.validateSafeFromString[FeeMode](s"$path.mode").toEither flatMap (mode => getSettingsByMode(mode).toEither) match {
+    cfgValidator.validate[FeeMode](s"$path.mode").toEither flatMap (mode => getSettingsByMode(mode).toEither) match {
       case Left(errorsAcc)         => throw new Exception(errorsAcc.mkString(", "))
       case Right(orderFeeSettings) => orderFeeSettings
     }
