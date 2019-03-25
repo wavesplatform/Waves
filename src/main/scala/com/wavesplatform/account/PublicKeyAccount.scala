@@ -30,6 +30,9 @@ object PublicKeyAccount {
     new PublicKeyAccountImpl(publicKey)
   }
 
+  def unapply(arg: PublicKeyAccount): Option[Array[Byte]] =
+    Some(arg.publicKey)
+
   implicit def toAddress(publicKeyAccount: PublicKeyAccount): Address =
     publicKeyAccount.toAddress
 
