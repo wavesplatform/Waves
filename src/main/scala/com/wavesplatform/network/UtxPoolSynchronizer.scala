@@ -1,7 +1,5 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.TimeUnit
-
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -29,7 +27,6 @@ object UtxPoolSynchronizer extends ScorexLogging {
     val knownTransactions = CacheBuilder
       .newBuilder()
       .maximumSize(settings.networkTxCacheSize)
-      .expireAfterWrite(settings.networkTxCacheTime.toMillis, TimeUnit.MILLISECONDS)
       .build[ByteStr, Object]
 
     val blockCacheCleaning = blockSource
