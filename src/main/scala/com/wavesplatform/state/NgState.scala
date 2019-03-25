@@ -10,7 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
-import scala.collection.mutable.{ArrayBuffer => MList, Map => MMap}
+import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
 /* This is not thread safe, used only from BlockchainUpdaterImpl */
 class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val approvedFeatures: Set[Short]) extends ScorexLogging {
