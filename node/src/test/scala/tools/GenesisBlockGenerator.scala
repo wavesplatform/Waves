@@ -78,9 +78,12 @@ object GenesisBlockGenerator extends App {
     override val chainId: Byte = settings.chainId
   }
 
-  val shares: Seq[(AccountName, FullAddressInfo, Share)] = settings.distributions.map {
-    case (accountName, x) => (accountName, toFullAddressInfo(x), x.amount)
-  }.toSeq
+  val shares: Seq[(AccountName, FullAddressInfo, Share)] = settings.distributions
+    .map {
+      case (accountName, x) => (accountName, toFullAddressInfo(x), x.amount)
+    }
+    .toSeq
+    .sortBy(_._1)
 
   val timestamp = settings.timestamp.getOrElse(System.currentTimeMillis())
 
@@ -126,8 +129,8 @@ object GenesisBlockGenerator extends App {
   private def report(addrInfos: Iterable[(AccountName, FullAddressInfo)], settings: GenesisSettings): Unit = {
     val output = new StringBuilder
     output.append("Addresses:\n")
-    addrInfos.zipWithIndex.foreach {
-      case ((accountName, acc), n) =>
+    addrInfos.foreach {
+      case (accountName, acc) =>
         output.append(s"""$accountName:
            | Seed text:           ${acc.seedText}
            | Seed:                ${acc.seed}
@@ -149,11 +152,7 @@ object GenesisBlockGenerator extends App {
          |  signature: "${settings.signature.get}"
          |  initial-balance: ${settings.initialBalance}
          |  transactions = [
-         |    ${settings.transactions
-           .map { x =>
-             s"""{recipient: "${x.recipient}", amount: ${x.amount}}"""
-           }
-           .mkString(",\n    ")}
+         |    ${settings.transactions.map(x => s"""{recipient: "${x.recipient}", amount: ${x.amount}}""").mkString(",\n    ")}
          |  ]
          |}
          |""".stripMargin
@@ -161,6 +160,5 @@ object GenesisBlockGenerator extends App {
 
     output.append("\nDon't forget to delete the data!")
     System.out.print(output)
-
   }
 }

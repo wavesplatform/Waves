@@ -32,6 +32,7 @@ object WalletGeneratorApp extends App {
   val walletFile     = new File(args(1))
   val nonceList      = args(2).split(',').map(_.toInt)
 
+  walletFile.delete()
   println(s"""Wallet file:  ${walletFile.getAbsolutePath}
        |Network byte: '${networkByte.toChar}'
        |Nonce list:   ${nonceList.mkString(", ")}""".stripMargin)

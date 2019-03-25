@@ -1,3 +1,8 @@
+// IDEA notes
+// * Do not name the root directory with the existed project name (node, dex, ...)
+// * To run integration tests from IDEA, enable the "sbt" checkbox
+// * May require to run from SBT: node / Compile / managedSources 
+
 import com.typesafe.sbt.SbtNativePackager.Universal
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
@@ -17,7 +22,7 @@ inScope(Global)(
     concurrentRestrictions := {
       val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
       Seq(
-        Tags.limit(Tags.ForkedTestGroup, threadNumber),
+        Tags.limit(Tags.ForkedTestGroup, threadNumber)
       )
     }
   ))
@@ -298,20 +303,22 @@ lazy val langJVM = lang.jvm
 lazy val node = project
   .enablePlugins(JavaServerAppPackaging, UniversalDeployPlugin)
   .settings(
-    Compile / mainClass := Some("com.wavesplatform.Application"),
+    inConfig(Compile)(
+      Seq(
+        mainClass := Some("com.wavesplatform.Application"),
+        sourceGenerators += versionSource,
+        PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
+        PB.deleteTargetDirectory := false,
+        packageDoc / publishArtifact := false,
+        packageSrc / publishArtifact := false
+      )),
     libraryDependencies ++= Dependencies.Node.value, /*++ Dependencies.itKit.map(_ % IntegrationTest*/
     dependencyOverrides ++= Dependencies.EnforcedVersions.value,
-    Compile / sourceGenerators += versionSource,
-    Compile / PB.targets += scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value,
-    Compile / PB.deleteTargetDirectory := false,
-    Compile / publishArtifact in packageDoc := false,
-    Compile / publishArtifact in packageSrc := false,
-    coverageExcludedPackages := "",
+    coverageExcludedPackages := ""
     // scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
   )
   .dependsOn(langJVM % "compile;test->test", commonJVM % "compile;test->test")
 
-// To run integration tests from IDEA, enable the "sbt" checkbox
 lazy val `node-it` = project
   .in(file(".") / "node" / "src" / "it")
   .enablePlugins(sbtdocker.DockerPlugin)
@@ -358,7 +365,7 @@ lazy val `dex-it` = project
         DockerSettings.additionalFiles ++= Seq(
           (dex / Universal / stage).value,
           (Test / resourceDirectory).value / "template.conf",
-          sourceDirectory.value / "container" / "wallet.dat"
+          sourceDirectory.value / "container" / "wallet"
         )
       ))
   )

@@ -36,8 +36,8 @@ object OrderValidator {
 
   private val timer = Kamon.timer("matcher.validation").refine("type" -> "blockchain")
 
-  val MinExpiration: Long   = 60 * 1000L
-  val MaxActiveOrders: Long = 200
+  val MinExpiration: Long  = 60 * 1000L
+  val MaxActiveOrders: Int = 200
 
   val exchangeTransactionCreationFee: Long = CommonValidation.FeeConstants(ExchangeTransaction.typeId) * CommonValidation.FeeUnit
 
