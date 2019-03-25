@@ -30,9 +30,8 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
         totalResBlockSig, { () =>
           micros.find(_.totalResBlockSig == totalResBlockSig) match {
             case Some(current) =>
-              val prevResBlockSig          = current.prevResBlockSig
-              val (prevDiff, prevCarry)    = diffFor(prevResBlockSig)
-              val (currDiff, currCarry, _) = microDiffs(totalResBlockSig)
+              val (prevDiff, prevCarry)    = this.diffFor(current.prevResBlockSig)
+              val (currDiff, currCarry, _) = this.microDiffs(totalResBlockSig)
               (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry)
 
             case None =>
