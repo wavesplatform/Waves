@@ -12,13 +12,12 @@ import java.util.{Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
-import com.google.common.collect.ImmutableMap
 import com.google.common.primitives.Ints._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -87,7 +86,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
   private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
 
   private lazy val wavesNetwork: Network = {
-    val networkName = s"waves-${hashCode().toLong.toHexString}"
+    val id          = Random.nextInt(Int.MaxValue)
+    val networkName = s"waves-$id"
 
     def network: Option[Network] =
       try {
@@ -101,15 +101,13 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       try {
         network match {
           case Some(n) =>
-            val ipam = s"ipam: ${n
+            val ipam = n
               .ipam()
               .config()
               .asScala
-              .map { n =>
-                s"subnet=${n.subnet()}, ip range=${n.ipRange()}"
-              }
-              .mkString(", ")}"
-            log.info(s"Network ${n.name()} (id: ${n.id()}) is created for $tag, $ipam")
+              .map(n => s"subnet=${n.subnet()}, ip range=${n.ipRange()}")
+              .mkString(", ")
+            log.info(s"Network ${n.name()} (id: ${n.id()}) is created for $tag, ipam: $ipam")
             n
           case None =>
             log.debug(s"Creating network $networkName for $tag")
@@ -206,20 +204,10 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         .withFallback(defaultReference())
         .resolve()
 
-      val restApiPort    = actualConfig.getString("waves.rest-api.port")
-      val networkPort    = actualConfig.getString("waves.network.port")
-      val matcherApiPort = actualConfig.getString("waves.matcher.port") // <-------- TODO!!!!1
-
-      val portBindings = new ImmutableMap.Builder[String, java.util.List[PortBinding]]()
-        .put(s"$ProfilerPort", singletonList(PortBinding.randomPort("0.0.0.0")))
-        .put(restApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
-        .put(networkPort, singletonList(PortBinding.randomPort("0.0.0.0")))
-        .put(matcherApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
-        .build()
-
+      val networkPort = actualConfig.getString("waves.network.port")
       val hostConfig = HostConfig
         .builder()
-        .portBindings(portBindings)
+        .publishAllPorts(true)
         .build()
 
       val nodeName   = actualConfig.getString("waves.network.node-name")
@@ -253,10 +241,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
-        .exposedPorts(s"$ProfilerPort", restApiPort, networkPort, matcherApiPort) // <---
-        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
-          wavesNetwork.name() -> endpointConfigFor(nodeName)
-        ).asJava))
+        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(wavesNetwork.name() -> endpointConfigFor(nodeName)).asJava))
         .hostConfig(hostConfig)
         .env(s"WAVES_OPTS=$configOverrides")
         .build()
@@ -450,7 +435,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
   def disconnectFromNetwork(node: DockerNode): Unit = disconnectFromNetwork(node.containerId)
 
   private def disconnectFromNetwork(containerId: String): Unit = {
-    log.info(s"Trying to disconnect container ${containerId} from network ...")
+    log.info(s"Trying to disconnect container $containerId from network ...")
     client.disconnectFromNetwork(containerId, wavesNetwork.id())
   }
 
@@ -475,7 +460,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
   }
 
   private def connectToNetwork(node: DockerNode): Unit = {
-    log.info(s"Trying to connect node ${node} to network ...")
+    log.info(s"Trying to connect node $node to network ...")
     client.connectToNetwork(
       wavesNetwork.id(),
       NetworkConnection
@@ -571,26 +556,25 @@ object Docker {
   private val jsonMapper  = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
 
-  val configTemplate = parseResources("template.conf")
-  def genesisOverride = {
+  val configTemplate: Config = parseResources("template.conf")
+  def genesisOverride: Config = {
     val genesisTs = System.currentTimeMillis()
 
-    // TODO
-//    val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
-//                                            |  timestamp = $genesisTs
-//                                            |  block-timestamp = $genesisTs
-//                                            |}""".stripMargin)
-    val timestampOverrides = ConfigFactory.empty()
+    val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
+                                            |  timestamp = $genesisTs
+                                            |  block-timestamp = $genesisTs
+                                            |  signature = null # To calculate it in Block.genesis
+                                            |}""".stripMargin)
 
-    val genesisConfig    = configTemplate.withFallback(timestampOverrides)
+    val genesisConfig    = timestampOverrides.withFallback(configTemplate)
     val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
     val genesisSignature = Block.genesis(gs).explicitGet().uniqueId
 
-    timestampOverrides.withFallback(parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature"))
+    parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
   }
 
   AddressScheme.current = new AddressScheme {
-    override val chainId = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
+    override val chainId: Byte = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
   }
 
   def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)

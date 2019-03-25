@@ -16,8 +16,7 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.matching.Regex
 
-case class MatcherSettings(enable: Boolean,
-                           account: String,
+case class MatcherSettings(account: String,
                            bindAddress: String,
                            port: Int,
                            actorResponseTimeout: FiniteDuration,
@@ -58,7 +57,6 @@ object MatcherSettings {
   }
 
   def fromConfig(config: Config): MatcherSettings = {
-    val enabled                      = config.as[Boolean](s"$configPath.enable")
     val account                      = config.as[String](s"$configPath.account")
     val bindAddress                  = config.as[String](s"$configPath.bind-address")
     val port                         = config.as[Int](s"$configPath.port")
@@ -87,7 +85,6 @@ object MatcherSettings {
     val orderFee = config.as[OrderFeeSettings](s"$configPath.order-fee")
 
     MatcherSettings(
-      enabled,
       account,
       bindAddress,
       port,

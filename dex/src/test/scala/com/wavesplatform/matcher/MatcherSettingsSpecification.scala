@@ -20,7 +20,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""waves {
       |  directory = /waves
       |  matcher {
-      |    enable = yes
       |    account = 3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX
       |    bind-address = 127.0.0.1
       |    port = 6886
@@ -96,7 +95,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val config = configStrWithOrderFeeSettings(correctOrderFeeSettings)
 
     val settings = MatcherSettings.fromConfig(config)
-    settings.enable should be(true)
     settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
     settings.bindAddress should be("127.0.0.1")
     settings.port should be(6886)

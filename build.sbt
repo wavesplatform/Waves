@@ -285,7 +285,7 @@ lazy val langJS  = lang.js
 lazy val langJVM = lang.jvm
 
 lazy val node = project
-  .enablePlugins(ExtensionPackaging) //.configs(IntegrationTest)
+  .enablePlugins(ExtensionPackaging)
   .settings(
     Compile / mainClass := Some("com.wavesplatform.Application"),
     libraryDependencies ++= Dependencies.Node.value, /*++ Dependencies.itKit.map(_ % IntegrationTest*/
@@ -311,6 +311,7 @@ lazy val `node-it` = project
     inTask(docker)(
       Seq(
         imageNames := Seq(ImageName("com.wavesplatform/node-it")),
+        DockerSettings.exposedPorts := Set(6863, 6869), // NetworkApi, RestApi
         DockerSettings.additionalFiles ++= (node / Universal / stage).value +: Seq(
           (Test / resourceDirectory).value / "template.conf",
           sourceDirectory.value / "container" / "start-waves.sh"
@@ -339,6 +340,7 @@ lazy val `dex-it` = project
     inTask(docker)(
       Seq(
         imageNames := Seq(ImageName("com.wavesplatform/dex-it")),
+        DockerSettings.exposedPorts := (`node-it` / docker / DockerSettings.exposedPorts).value + 6886,
         DockerSettings.additionalFiles ++= (`node-it` / docker / DockerSettings.additionalFiles).value ++ Seq(
           (dex / Universal / stage).value,
           (Test / resourceDirectory).value / "template.conf",

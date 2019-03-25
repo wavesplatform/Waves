@@ -3,6 +3,7 @@ import sbtdocker.DockerPlugin.autoImport._
 
 object DockerSettings {
   val additionalFiles = taskKey[Seq[File]]("Additional files to copy to /opt/waves")
+  val exposedPorts = taskKey[Set[Int]]("Exposed ports")
 
   def settings: Seq[Def.Setting[_]] =
     inTask(docker)(
@@ -26,7 +27,7 @@ object DockerSettings {
             add(additionalFiles.value, "/opt/waves/")
             runShell("chmod", "+x", bin)
             entryPoint(bin)
-            expose(10001)
+            expose(exposedPorts.value.toSeq: _*)
           }
         },
         buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
