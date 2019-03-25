@@ -5,18 +5,9 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.ValidationError.InvalidAddress
 import com.wavesplatform.utils.base58Length
 
-trait PublicKeyAccount {
+sealed trait PublicKeyAccount {
   def publicKey: Array[Byte]
-
-  lazy val toAddress: Address = Address.fromPublicKey(publicKey)
-
-  override def equals(obj: Any): Boolean = obj match {
-    case a: PublicKeyAccount => java.util.Arrays.equals(this.publicKey, a.publicKey)
-    case _                   => false
-  }
-
-  override def hashCode(): Int       = java.util.Arrays.hashCode(publicKey)
-  override lazy val toString: String = this.toAddress.address
+  def toAddress: Address
 }
 
 object PublicKeyAccount {
@@ -25,8 +16,18 @@ object PublicKeyAccount {
   val empty = apply(Array.emptyByteArray)
 
   def apply(publicKey: Array[Byte]): PublicKeyAccount = {
-    final case class PublicKeyAccountImpl(publicKey: Array[Byte]) extends PublicKeyAccount
-    PublicKeyAccountImpl(publicKey)
+    final class PublicKeyAccountImpl(val publicKey: Array[Byte]) extends PublicKeyAccount {
+      override lazy val toAddress: Address = Address.fromPublicKey(publicKey)
+      override lazy val toString: String = this.toAddress.address
+
+      override def equals(obj: Any): Boolean = obj match {
+        case a: PublicKeyAccount => java.util.Arrays.equals(this.publicKey, a.publicKey)
+        case _                   => false
+      }
+      override def hashCode(): Int       = java.util.Arrays.hashCode(publicKey)
+    }
+
+    new PublicKeyAccountImpl(publicKey)
   }
 
   implicit def toAddress(publicKeyAccount: PublicKeyAccount): Address =
