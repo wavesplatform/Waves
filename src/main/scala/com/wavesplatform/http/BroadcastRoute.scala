@@ -14,7 +14,7 @@ private[wavesplatform] object BroadcastRoute {
     private[this] val parallelism = sys.props
       .get("waves.rest-api.broadcast-parallelism")
       .map(_.toInt)
-      .getOrElse((Runtime.getRuntime.availableProcessors() / 2) max 1)
+      .getOrElse((Runtime.getRuntime.availableProcessors() / 4) max 1)
 
     private[this] val scheduler = Scheduler.computation(parallelism, "rest-api-broadcast")
 
