@@ -5,7 +5,6 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
-import com.google.common.collect.MapMaker
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
@@ -207,7 +206,8 @@ class UtxPoolImpl(time: Time,
           val updatedBlockchain = composite(blockchain, diff)
           val updatedRest       = currRest.put(updatedBlockchain, tx)
           if (updatedRest.isOverfilled) {
-            log.trace(s"Mining constraints overfilled: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
+            log.trace(
+              s"Mining constraints overfilled: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
             (invalid, valid, diff, currRest, isEmpty)
           } else {
             differ(updatedBlockchain, tx) match {
@@ -230,38 +230,6 @@ class UtxPoolImpl(time: Time,
   private[this] object TxCheck {
     private[this] val ExpirationTime = fs.maxTransactionTimeBackOffset.toMillis
 
-    private[this] object Caches {
-      val scriptedCache = {
-        new MapMaker()
-          .concurrencyLevel(Runtime.getRuntime.availableProcessors())
-          .weakKeys()
-          .makeMap[Address, Boolean]()
-          .asScala
-      }
-
-      val createAliasCache = {
-        new MapMaker()
-          .concurrencyLevel(Runtime.getRuntime.availableProcessors())
-          .weakKeys()
-          .makeMap[String, Boolean]()
-          .asScala
-      }
-
-      val reissueCache = {
-        new MapMaker()
-          .concurrencyLevel(Runtime.getRuntime.availableProcessors())
-          .weakKeys()
-          .makeMap[ByteStr, Boolean]()
-          .asScala
-      }
-
-      def clear(): Unit = {
-        scriptedCache.clear()
-        createAliasCache.clear()
-        reissueCache.clear()
-      }
-    }
-
     def isExpired(transaction: Transaction, currentTime: Long = time.correctedTime()): Boolean = {
       (currentTime - transaction.timestamp) > ExpirationTime
     }
@@ -275,22 +243,16 @@ class UtxPoolImpl(time: Time,
 
     def isScripted(transaction: Transaction): Boolean = {
       transaction match {
-        case a: AuthorizedTransaction => Caches.scriptedCache.getOrElseUpdate(a.sender.toAddress, blockchain.hasScript(a.sender.toAddress))
+        case a: AuthorizedTransaction => blockchain.hasScript(a.sender.toAddress)
         case _                        => false
       }
     }
 
-    def canCreateAlias(alias: Alias): Boolean = {
-      Caches.createAliasCache.getOrElseUpdate(alias.name, blockchain.canCreateAlias(alias))
-    }
+    def canCreateAlias(alias: Alias): Boolean =
+      blockchain.canCreateAlias(alias)
 
-    def canReissue(asset: IssuedAsset): Boolean = {
-      Caches.reissueCache.getOrElseUpdate(asset.id, blockchain.assetDescription(asset).forall(_.reissuable))
-    }
-
-    def clearCaches(): Unit = {
-      Caches.clear()
-    }
+    def canReissue(asset: IssuedAsset): Boolean =
+      blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
   //noinspection ScalaStyle
@@ -326,8 +288,6 @@ class UtxPoolImpl(time: Time,
         if (remove) UtxPoolImpl.this.afterRemove(tx)
         remove
       }
-
-      TxCheck.clearCaches()
     }
   }
 
