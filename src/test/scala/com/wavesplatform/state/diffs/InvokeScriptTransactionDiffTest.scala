@@ -408,7 +408,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             .selfSigned(IssuedAsset(asset.id()), master, acc, asset.quantity / 10, ts, Waves, enoughFee, Array[Byte]())
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi should produce("NonPositiveAmount")
+          blockDiffEi should produce("NegativeAmount")
         }
     }
   }
