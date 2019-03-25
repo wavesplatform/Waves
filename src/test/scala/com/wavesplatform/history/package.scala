@@ -29,8 +29,10 @@ package object history {
   val MicroblocksActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0)))
 
-  val TransfersV2ActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
-    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0)))
+  val TransfersV2ActivatedAt0BlockchainSettings: BlockchainSettings =
+    DefaultBlockchainSettings.copy(
+      functionalitySettings =
+        DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0)))
 
   val MicroblocksActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = MicroblocksActivatedAt0BlockchainSettings)
 
@@ -59,6 +61,7 @@ package object history {
         transactionData = txs,
         transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
         minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerEffectiveBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         signer = signer,
         Set.empty
       )

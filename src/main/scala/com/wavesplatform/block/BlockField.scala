@@ -1,14 +1,13 @@
 package com.wavesplatform.block
 
 import com.google.common.primitives.{Bytes, Longs}
-import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
 import com.wavesplatform.transaction.Transaction
+import monix.eval.Coeval
+import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.hash.Digest32
 
 abstract class BlockField[T] extends BytesSerializable with JsonSerializable {

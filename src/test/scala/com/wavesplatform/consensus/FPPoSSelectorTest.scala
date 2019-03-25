@@ -276,6 +276,7 @@ object FPPoSSelectorTest {
           Seq.empty,
           Merkle.EMPTY_ROOT_HASH,
           Merkle.EMPTY_ROOT_HASH,
+          Merkle.EMPTY_ROOT_HASH,
           miner,
           Set.empty
         )
@@ -318,15 +319,18 @@ object FPPoSSelectorTest {
     val updatedCData = cData.copy(updateBT(cData.baseTarget), updateGS(cData.generationSignature))
 
     Block
-      .buildAndSign(3: Byte,
-                    lastBlock.timestamp + delay,
-                    lastBlock.uniqueId,
-                    updatedCData,
-                    Seq.empty,
-                    Merkle.EMPTY_ROOT_HASH,
-                    Merkle.EMPTY_ROOT_HASH,
-                    miner,
-                    Set.empty)
+      .buildAndSign(
+        3: Byte,
+        lastBlock.timestamp + delay,
+        lastBlock.uniqueId,
+        updatedCData,
+        Seq.empty,
+        Merkle.EMPTY_ROOT_HASH,
+        Merkle.EMPTY_ROOT_HASH,
+        Merkle.EMPTY_ROOT_HASH,
+        miner,
+        Set.empty
+      )
       .explicitGet()
   }
 

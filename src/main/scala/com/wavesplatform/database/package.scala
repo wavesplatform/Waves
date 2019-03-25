@@ -301,6 +301,7 @@ package object database {
       transactionCount,
       Merkle.EMPTY_ROOT_HASH,
       Merkle.EMPTY_ROOT_HASH,
+      Merkle.EMPTY_ROOT_HASH,
       featureVotes
     )
 

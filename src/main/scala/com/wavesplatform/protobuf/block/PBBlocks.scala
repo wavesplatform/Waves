@@ -18,6 +18,7 @@ object PBBlocks {
                transactionData: Seq[VanillaTransaction],
                transactionTreeHash: Digest32,
                minerBalancesTreeHash: Digest32,
+               minerEffectiveBalancesTreeHash: Digest32,
                featureVotes: Set[Short],
                generator: PublicKeyAccount,
                signature: ByteStr): VanillaBlock = {
@@ -29,6 +30,7 @@ object PBBlocks {
         consensusData,
         transactionTreeHash,
         minerBalancesTreeHash,
+        minerEffectiveBalancesTreeHash,
         transactionData,
         featureVotes
       )
@@ -52,6 +54,7 @@ object PBBlocks {
         transactions,
         Digest32 @@ header.transactionTreeHash.toByteArray,
         Digest32 @@ header.minerBalancesTreeHash.toByteArray,
+        Digest32 @@ header.minerEffectiveBalancesTreeHash.toByteArray,
         header.featureVotes.map(intToShort).toSet,
         PublicKeyAccount(header.generator.toByteArray),
         ByteStr(signedHeader.signature.toByteArray)
@@ -77,7 +80,8 @@ object PBBlocks {
             version,
             ByteString.copyFrom(generator.publicKey),
             ByteString.copyFrom(transactionTreeHash),
-            ByteString.copyFrom(minerWavesBalancesTreeHash)
+            ByteString.copyFrom(minerWavesBalancesTreeHash),
+            ByteString.copyFrom(minerEffectiveBalancesTreeHash)
           )),
           ByteString.copyFrom(signature)
         )),

@@ -55,6 +55,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           Seq.fill(amt)(paymentTransaction),
           transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
           minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
+          minerEffectiveBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
           recipient,
           Set.empty
         )
@@ -71,6 +72,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
               reference,
               NxtLikeConsensusBlockData(baseTarget, generationSignature),
               transactionData,
+              Merkle.EMPTY_ROOT_HASH,
               Merkle.EMPTY_ROOT_HASH,
               Merkle.EMPTY_ROOT_HASH,
               recipient,
@@ -99,6 +101,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             transactionData,
             Merkle.EMPTY_ROOT_HASH,
             Merkle.EMPTY_ROOT_HASH,
+            Merkle.EMPTY_ROOT_HASH,
             recipient,
             Set(1)
           ) should produce("could not contain feature votes")
@@ -120,6 +123,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           transactionData,
           Merkle.EMPTY_ROOT_HASH,
           Merkle.EMPTY_ROOT_HASH,
+          Merkle.EMPTY_ROOT_HASH,
           recipient,
           supportedFeatures
         ) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature votes")
@@ -139,6 +143,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             reference,
             NxtLikeConsensusBlockData(baseTarget, generationSignature),
             transactionData,
+            Merkle.EMPTY_ROOT_HASH,
             Merkle.EMPTY_ROOT_HASH,
             Merkle.EMPTY_ROOT_HASH,
             recipient,
@@ -168,6 +173,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             transactionData,
             Merkle.EMPTY_ROOT_HASH,
             Merkle.EMPTY_ROOT_HASH,
+            Merkle.EMPTY_ROOT_HASH,
             SignerData(weakAccount, ByteStr(Array.fill(64)(0: Byte))),
             Set.empty
           )
@@ -187,6 +193,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
                             ByteStr(ref),
                             NxtLikeConsensusBlockData(1, ByteStr(gs)),
                             txs,
+                            Merkle.EMPTY_ROOT_HASH,
                             Merkle.EMPTY_ROOT_HASH,
                             Merkle.EMPTY_ROOT_HASH,
                             acc,

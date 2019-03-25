@@ -30,6 +30,7 @@ object TestBlock {
         transactionData = b.transactionData,
         transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
         minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerEffectiveBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         signer = signer,
         featureVotes = b.featureVotes
       )
@@ -65,6 +66,7 @@ object TestBlock {
         transactionData = txs,
         transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
         minerWavesBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerEffectiveBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         featureVotes = features
       )
     )
@@ -78,6 +80,7 @@ object TestBlock {
         ref,
         SignerData(defaultSigner, ByteStr.empty),
         NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
+        Merkle.EMPTY_ROOT_HASH,
         Merkle.EMPTY_ROOT_HASH,
         Merkle.EMPTY_ROOT_HASH,
         Seq.empty,
@@ -94,6 +97,7 @@ object TestBlock {
         ref,
         SignerData(defaultSigner, ByteStr.empty),
         NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
+        Merkle.EMPTY_ROOT_HASH,
         Merkle.EMPTY_ROOT_HASH,
         Merkle.EMPTY_ROOT_HASH,
         Seq.empty,

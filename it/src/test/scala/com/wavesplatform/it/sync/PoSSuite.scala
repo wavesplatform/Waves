@@ -257,6 +257,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         transactionData = Nil,
         transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
         minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerEffectiveBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         signer = signerPK,
         featureVotes = Set.empty
       )

@@ -38,6 +38,7 @@ trait BlockGen extends TransactionGen { _: Suite =>
           txs,
           Merkle.EMPTY_ROOT_HASH,
           Merkle.EMPTY_ROOT_HASH,
+          Merkle.EMPTY_ROOT_HASH,
           signer,
           Set.empty
         )

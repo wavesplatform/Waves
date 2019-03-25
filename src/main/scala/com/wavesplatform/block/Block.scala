@@ -31,14 +31,18 @@ class BlockHeader(val timestamp: Long,
                   val transactionCount: Int,
                   val transactionTreeHash: Digest32,
                   val minerWavesBalancesTreeHash: Digest32,
+                  val minerEffectiveBalancesTreeHash: Digest32,
                   val featureVotes: Set[Short]) {
   protected val versionField: ByteBlockField             = ByteBlockField("version", version)
   protected val timestampField: LongBlockField           = LongBlockField("timestamp", timestamp)
   protected val referenceField: BlockIdField             = BlockIdField("reference", reference.arr)
   protected val signerField: SignerDataBlockField        = SignerDataBlockField("signature", signerData)
   protected val consensusField                           = NxtConsensusBlockField(consensusData)
-  protected val transactionTreeHashField: HashBlockField = HashBlockField("transactionTreeHash", transactionTreeHash)
-  protected val supportedFeaturesField                   = FeaturesBlockField(version, featureVotes)
+  protected val transactionTreeHashField: HashBlockField = HashBlockField("transactionsHash", transactionTreeHash)
+  protected val balancesTreeHashField: HashBlockField    = HashBlockField("balancesHash", minerWavesBalancesTreeHash)
+  protected val effectiveBalancesTreeHashField: HashBlockField =
+    HashBlockField("effectiveBalancesHash", minerEffectiveBalancesTreeHash)
+  protected val supportedFeaturesField = FeaturesBlockField(version, featureVotes)
 
   val headerJson: Coeval[JsObject] = Coeval.evalOnce(
     versionField.json() ++
@@ -111,6 +115,7 @@ object BlockHeader extends ScorexLogging {
           txCount,
           Merkle.EMPTY_ROOT_HASH,
           Merkle.EMPTY_ROOT_HASH,
+          Merkle.EMPTY_ROOT_HASH,
           supportedFeaturesIds
         )
       (blockHeader, tBytes)
@@ -136,17 +141,21 @@ case class Block private[block] (override val timestamp: Long,
                                  override val consensusData: NxtLikeConsensusBlockData,
                                  override val transactionTreeHash: Digest32,
                                  override val minerWavesBalancesTreeHash: Digest32,
+                                 override val minerEffectiveBalancesTreeHash: Digest32,
                                  transactionData: Seq[Transaction],
                                  override val featureVotes: Set[Short])
-    extends BlockHeader(timestamp,
-                        version,
-                        reference,
-                        signerData,
-                        consensusData,
-                        transactionData.length,
-                        transactionTreeHash,
-                        minerWavesBalancesTreeHash,
-                        featureVotes)
+    extends BlockHeader(
+      timestamp,
+      version,
+      reference,
+      signerData,
+      consensusData,
+      transactionData.length,
+      transactionTreeHash,
+      minerWavesBalancesTreeHash,
+      minerEffectiveBalancesTreeHash,
+      featureVotes
+    )
     with Signed {
 
   import Block._
@@ -270,6 +279,7 @@ object Block extends ScorexLogging {
         transactionsData,
         Merkle.EMPTY_ROOT_HASH,
         Merkle.EMPTY_ROOT_HASH,
+        Merkle.EMPTY_ROOT_HASH,
         blockHeader.signerData,
         blockHeader.featureVotes
       ).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
@@ -288,6 +298,7 @@ object Block extends ScorexLogging {
       txs,
       Merkle.EMPTY_ROOT_HASH,
       Merkle.EMPTY_ROOT_HASH,
+      Merkle.EMPTY_ROOT_HASH,
       h.signerData,
       h.featureVotes
     )
@@ -300,6 +311,7 @@ object Block extends ScorexLogging {
             transactionData: Seq[Transaction],
             transactionTreeHash: Digest32,
             minerBalancesTreeHash: Digest32,
+            minerEffectiveBalancesTreeHash: Digest32,
             signerData: SignerData,
             featureVotes: Set[Short]): Either[GenericError, Block] = {
     (for {
@@ -309,7 +321,18 @@ object Block extends ScorexLogging {
       _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
       _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
     } yield
-      Block(timestamp, version, reference, signerData, consensusData, transactionTreeHash, minerBalancesTreeHash, transactionData, featureVotes)).left
+      Block(
+        timestamp,
+        version,
+        reference,
+        signerData,
+        consensusData,
+        transactionTreeHash,
+        minerBalancesTreeHash,
+        minerEffectiveBalancesTreeHash,
+        transactionData,
+        featureVotes
+      )).left
       .map(GenericError(_))
   }
 
@@ -320,17 +343,21 @@ object Block extends ScorexLogging {
                    transactionData: Seq[Transaction],
                    transactionTreeHash: Digest32,
                    minerBalancesTreeHash: Digest32,
+                   minerEffectiveBalancesTreeHash: Digest32,
                    signer: PrivateKeyAccount,
                    featureVotes: Set[Short]): Either[GenericError, Block] =
-    build(version,
-          timestamp,
-          reference,
-          consensusData,
-          transactionData,
-          transactionTreeHash,
-          minerBalancesTreeHash,
-          SignerData(signer, ByteStr.empty),
-          featureVotes).right
+    build(
+      version,
+      timestamp,
+      reference,
+      consensusData,
+      transactionData,
+      transactionTreeHash,
+      minerBalancesTreeHash,
+      minerEffectiveBalancesTreeHash,
+      SignerData(signer, ByteStr.empty),
+      featureVotes
+    ).right
       .map(unsigned => unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
@@ -385,6 +412,7 @@ object Block extends ScorexLogging {
         consensusData = consensusGenesisData,
         transactionTreeHash = Merkle.EMPTY_ROOT_HASH,
         minerWavesBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
+        minerEffectiveBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
         transactionData = transactionGenesisData,
         featureVotes = Set.empty
       )

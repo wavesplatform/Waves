@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import cats.data.EitherT
 import cats.implicits._
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.block.Block._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -24,6 +24,7 @@ import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
+import scorex.crypto.hash.Digest32
 
 import scala.concurrent.duration._
 
@@ -157,20 +158,51 @@ class MinerImpl(allChannels: ChannelGroup,
         mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
         (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint)
         _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-        transactionHash                    = Merkle.mkTxTree(unconfirmed).rootHash
+        (txHash, bsHash, effBsHash)        = calculateHashesIfNeeded(blockchainUpdater, unconfirmed)
         block <- Block
-          .buildAndSign(version.toByte,
-                        currentTime,
-                        refBlockID,
-                        consensusData,
-                        unconfirmed,
-                        transactionHash,
-                        Merkle.EMPTY_ROOT_HASH,
-                        account,
-                        blockFeatures(version))
+          .buildAndSign(
+            version.toByte,
+            currentTime,
+            refBlockID,
+            consensusData,
+            unconfirmed,
+            txHash,
+            bsHash,
+            effBsHash,
+            account,
+            blockFeatures(version)
+          )
           .leftMap(_.err)
       } yield (estimators, block, updatedMdConstraint.constraints.head)
     )
+  }
+
+  private def calculateHashesIfNeeded(blockchain: Blockchain, transactions: Seq[Transaction]): (Digest32, Digest32, Digest32) = {
+    if (blockchain.isFeatureActivated(BlockchainFeatures.DummyFeature, blockchain.height)) {
+      val minerBalanceInfo = blockchain.minerBalancesAtHeight(Height @@ blockchain.height)
+
+      val (balances, effectiveBalances) = minerBalanceInfo.foldLeft((List.empty[(Address, Long)], List.empty[(Address, Long)])) {
+        case ((_balances, _effectiveBalances), (address, balanceInfo)) =>
+          val nextBalances = (address, balanceInfo.currentBalance) :: _balances
+          val nextEffectiveBalances =
+            if (balanceInfo.miningBalance > 1000) (address, balanceInfo.miningBalance) :: _effectiveBalances else _effectiveBalances
+
+          (nextBalances, nextEffectiveBalances)
+      }
+
+      (
+        Merkle.mkTxTree(transactions).rootHash,
+        Merkle.mkMinerBalanceTree(balances.sortBy(_._2)).rootHash,
+        Merkle.mkMinerBalanceTree(effectiveBalances.sortBy(_._2)).rootHash
+      )
+
+    } else {
+      (
+        Merkle.EMPTY_ROOT_HASH,
+        Merkle.EMPTY_ROOT_HASH,
+        Merkle.EMPTY_ROOT_HASH
+      )
+    }
   }
 
   private def checkQuorumAvailable(): Either[String, Unit] = {
@@ -214,8 +246,9 @@ class MinerImpl(allChannels: ChannelGroup,
         Task.now(Stop)
       } else {
         log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
-        val start        = System.currentTimeMillis()
-        val transactions = accumulatedBlock.transactionData ++ unconfirmed
+        val start                       = System.currentTimeMillis()
+        val transactions                = accumulatedBlock.transactionData ++ unconfirmed
+        val (txHash, bsHash, effBsHash) = calculateHashesIfNeeded(blockchainUpdater, unconfirmed)
         (for {
           signedBlock <- EitherT.fromEither[Task](
             Block.buildAndSign(
@@ -224,8 +257,9 @@ class MinerImpl(allChannels: ChannelGroup,
               reference = accumulatedBlock.reference,
               consensusData = accumulatedBlock.consensusData,
               transactionData = transactions,
-              transactionTreeHash = Merkle.mkTxTree(transactions).rootHash,
-              minerBalancesTreeHash = Merkle.EMPTY_ROOT_HASH,
+              transactionTreeHash = txHash,
+              minerBalancesTreeHash = bsHash,
+              minerEffectiveBalancesTreeHash = effBsHash,
               signer = account,
               featureVotes = accumulatedBlock.featureVotes
             ))
