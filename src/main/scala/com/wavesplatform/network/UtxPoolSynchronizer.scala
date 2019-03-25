@@ -3,6 +3,7 @@ package com.wavesplatform.network
 import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.CacheBuilder
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSettings
 import com.wavesplatform.transaction.Transaction
@@ -20,7 +21,8 @@ object UtxPoolSynchronizer extends ScorexLogging {
   def start(utx: UtxPool,
             settings: UtxSynchronizerSettings,
             allChannels: ChannelGroup,
-            txSource: ChannelObservable[Transaction]): CancelableFuture[Unit] = {
+            txSource: ChannelObservable[Transaction],
+            blockSource: ChannelObservable[Block]): CancelableFuture[Unit] = {
     implicit val scheduler: Scheduler = Scheduler.singleThread("utx-pool-sync")
 
     val dummy = new Object()
@@ -29,6 +31,11 @@ object UtxPoolSynchronizer extends ScorexLogging {
       .maximumSize(settings.networkTxCacheSize)
       .expireAfterWrite(settings.networkTxCacheTime.toMillis, TimeUnit.MILLISECONDS)
       .build[ByteStr, Object]
+
+    val blockCacheCleaning = blockSource
+      .observeOn(scheduler)
+      .foreachL(_ => knownTransactions.invalidateAll())
+      .runAsyncLogErr
 
     val synchronizerFuture = txSource
       .observeOn(scheduler)
@@ -63,6 +70,8 @@ object UtxPoolSynchronizer extends ScorexLogging {
       case Success(_)            => log.error("UtxPoolSynschronizer stops")
       case Failure(NonFatal(th)) => log.error("Error in utx pool synchronizer", th)
     }
+
+    synchronizerFuture.onComplete(_ => blockCacheCleaning.cancel())
     synchronizerFuture
   }
 }
