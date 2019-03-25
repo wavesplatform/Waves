@@ -117,7 +117,7 @@ object Explorer extends ScorexLogging {
 
       flag match {
         case "B" =>
-          val maybeBlockId = Base58.decode(args(2)).toOption.map(ByteStr.apply)
+          val maybeBlockId = Base58.tryDecodeWithLimit(args(2)).toOption.map(ByteStr.apply)
           if (maybeBlockId.isDefined) {
             val kBlockHeight     = Keys.heightOf(maybeBlockId.get)
             val blockHeightBytes = db.get(kBlockHeight.keyBytes)
@@ -130,7 +130,7 @@ object Explorer extends ScorexLogging {
           } else log.error("No block ID was provided")
 
         case "O" =>
-          val orderId = Base58.decode(args(2)).toOption.map(ByteStr.apply)
+          val orderId = Base58.tryDecodeWithLimit(args(2)).toOption.map(ByteStr.apply)
           if (orderId.isDefined) {
             val kVolumeAndFee = Keys.filledVolumeAndFee(orderId.get)(blockchainHeight)
             val bytes1        = db.get(kVolumeAndFee.keyBytes)

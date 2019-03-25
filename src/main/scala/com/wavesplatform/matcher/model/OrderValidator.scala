@@ -111,6 +111,11 @@ object OrderValidator {
       exchangeTx.flatMap(verifySmartToken(blockchain, assetId, _))
     }
 
+    def verifyMatcherFeeAssetScript(matcherFeeAsset: Asset): Result[Unit] = {
+      if (matcherFeeAsset == order.assetPair.amountAsset || matcherFeeAsset == order.assetPair.priceAsset) success
+      else verifyAssetScript(matcherFeeAsset)
+    }
+
     for {
       _ <- lift(order)
         .ensure(MatcherError.OrderVersionUnsupported(order.version, BlockchainFeatures.SmartAccountTrading)) {
@@ -129,6 +134,7 @@ object OrderValidator {
       _ <- verifyOrderByAccountScript(blockchain, order.sender, order)
       _ <- verifyAssetScript(order.assetPair.amountAsset)
       _ <- verifyAssetScript(order.assetPair.priceAsset)
+      _ <- verifyMatcherFeeAssetScript(order.matcherFeeAssetId)
     } yield order
   }
 

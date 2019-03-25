@@ -21,7 +21,7 @@ object PrivateKeyAccount {
     PrivateKeyAccountImpl(seed, pair._1, pair._2)
   }
 
-  def fromSeed(s: String): Either[GenericError, PrivateKeyAccount] = Base58.decode(s) match {
+  def fromSeed(s: String): Either[GenericError, PrivateKeyAccount] = Base58.tryDecodeWithLimit(s) match {
     case Success(x) => Right(PrivateKeyAccount(x))
     case Failure(e) => Left(GenericError(s"Unable to get a private key from the seed '$s': ${e.getMessage}"))
   }

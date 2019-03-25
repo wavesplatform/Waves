@@ -458,7 +458,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs)))
       val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
-      actual shouldBe evaluated(ByteStr(Base58.decode(xs).get))
+      actual shouldBe evaluated(ByteStr(Base58.tryDecodeWithLimit(xs).get))
     }
   }
 
@@ -485,7 +485,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs)))
       val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
-      actual shouldBe evaluated(ByteStr(Base64.decode(xs).get))
+      actual shouldBe evaluated(ByteStr(Base64.tryDecode(xs).get))
     }
   }
 
@@ -498,7 +498,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs)))
       val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
-      actual shouldBe evaluated(ByteStr(Base64.decode(xs).get))
+      actual shouldBe evaluated(ByteStr(Base64.tryDecode(xs).get))
     }
   }
 

@@ -17,13 +17,11 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
   val settings: RestAPISettings
   val route: Route
 
-  private lazy val apiKeyHash = Base58.decode(settings.apiKeyHash).toOption
+  private lazy val apiKeyHash = Base58.tryDecodeWithLimit(settings.apiKeyHash).toOption
 
   private val jsonRejectionHandler = RejectionHandler
     .newBuilder()
-    .handle {
-      case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors))
-    }
+    .handle { case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors)) }
     .result()
 
   def _json[A: Reads](f: A => Route): Route                 = (handleRejections(jsonRejectionHandler) & entity(as[A])).apply(f)
