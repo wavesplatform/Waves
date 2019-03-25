@@ -221,7 +221,7 @@ class MatcherActor(settings: MatcherSettings,
     )
 
     log.info(s"All snapshots are loaded, oldestEventNr: $oldestEventNr, newestEventNr: $newestEventNr")
-    log.trace(s"Expecting snapshots at: ${snapshotsState.nearestSnapshotOffsets}")
+    log.trace(s"Expecting next snapshots at: ${snapshotsState.nearestSnapshotOffsets}")
 
     unstashAll()
     recoveryCompletedWithEventNr(Right((self, oldestEventNr)))

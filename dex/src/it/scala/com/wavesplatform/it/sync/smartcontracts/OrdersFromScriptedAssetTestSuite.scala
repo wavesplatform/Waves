@@ -168,12 +168,8 @@ class OrdersFromScriptedAssetTestSuite extends MatcherSuiteBase {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Seq(UnscriptedAsset).map(createSignedIssueRequest).map(node.signedIssue).foreach { tx =>
-      node.waitForTransaction(tx.id)
-    }
-    Seq(AllowAsset, AllowAsset2, AllowAsset3, DenyAsset).map(createSignedIssueRequest).map(node.signedIssue).foreach { tx =>
-      node.waitForTransaction(tx.id)
-    }
+    val xs = Seq(UnscriptedAsset, AllowAsset, AllowAsset2, AllowAsset3, DenyAsset).map(_.json()).map(node.broadcastRequest)
+    xs.foreach(tx => node.waitForTransaction(tx.id))
   }
 }
 

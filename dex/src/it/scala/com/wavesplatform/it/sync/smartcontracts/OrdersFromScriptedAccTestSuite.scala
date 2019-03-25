@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.smartcontracts
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.MatcherSuiteBase
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -10,6 +11,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.duration._
@@ -25,34 +27,32 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
       |3)
       |x == 3""".stripMargin
 
+  private val aliceAssetTx = IssueTransactionV1
+    .selfSigned(
+      sender = alice,
+      name = "AliceCoin".getBytes(),
+      description = "AliceCoin for matcher's tests".getBytes(),
+      quantity = someAssetAmount,
+      decimals = 0,
+      reissuable = false,
+      fee = issueFee,
+      timestamp = System.currentTimeMillis()
+    )
+    .explicitGet()
+
+  private val aliceAsset     = aliceAssetTx.id().base58
+  private val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+
+    setContract(Some("true"), bob)
+    node.waitForTransaction(node.broadcastRequest(aliceAssetTx.json()).id)
+    node.assertAssetBalance(alice.address, aliceAsset, someAssetAmount)
+    node.assertAssetBalance(matcher.address, aliceAsset, 0)
+  }
+
   "issue asset and run test" - {
-    // Alice issues new asset
-    val aliceAsset =
-      node
-        .broadcastIssue(alice,
-                        "AliceCoin",
-                        "AliceCoin for matcher's tests",
-                        someAssetAmount,
-                        0,
-                        reissuable = false,
-                        smartIssueFee,
-                        None,
-                        waitForTx = true)
-        .id
-    val aliceWavesPair = AssetPair(IssuedAsset(ByteStr.decodeBase58(aliceAsset).get), Waves)
-
-    "setScript at account" in {
-      // check assets's balances
-      node.assertAssetBalance(alice.address, aliceAsset, someAssetAmount)
-      node.assertAssetBalance(matcher.address, aliceAsset, 0)
-
-      withClue("mining was too fast, can't continue") {
-        node.height shouldBe <(activationHeight)
-      }
-
-      setContract(Some("true"), bob)
-    }
-
     "trading is deprecated" in {
       assertBadRequestAndResponse(
         node.placeOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 1, 10.minutes),
@@ -68,7 +68,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
     }
 
     "invalid setScript at account" in {
-      node.waitForHeight(activationHeight, 6.minutes)
+      node.waitForHeight(activationHeight, 5.minutes)
       setContract(Some("true && (height > 0)"), bob)
       assertBadRequestAndResponse(
         node.placeOrder(bob, aliceWavesPair, OrderType.BUY, 500, 2.waves * Order.PriceConstant, smartTradeFee, version = 2, 10.minutes),
@@ -99,7 +99,7 @@ class OrdersFromScriptedAccTestSuite extends MatcherSuiteBase {
 }
 
 object OrdersFromScriptedAccTestSuite {
-  val activationHeight = 25
+  val activationHeight = 10
 
   private val matcherConfig = ConfigFactory.parseString(s"""
                                                            |waves {
