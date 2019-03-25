@@ -15,7 +15,7 @@ object Asset {
   implicit val assetReads: Reads[IssuedAsset] = Reads {
     case JsString(str) if str.length > AssetIdStringLength => JsError("invalid.feeAssetId")
     case JsString(str) =>
-      Base58.decode(str) match {
+      Base58.tryDecodeWithLimit(str) match {
         case Success(arr) => JsSuccess(IssuedAsset(ByteStr(arr)))
         case _            => JsError("Expected base58-encoded assetId")
       }

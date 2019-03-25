@@ -82,9 +82,9 @@ object ByteStr {
 
   def fill(size: Int)(b: Int): ByteStr = ByteStr(Array.fill(size)(b.toByte))
 
-  def decodeBase58(s: String): Try[ByteStr] = Base58.decode(s).map(ByteStr(_))
+  def decodeBase58(s: String): Try[ByteStr] = Base58.tryDecodeWithLimit(s).map(ByteStr(_))
 
-  def decodeBase64(s: String): Try[ByteStr] = Base64.decode(s).map(ByteStr(_))
+  def decodeBase64(s: String): Try[ByteStr] = Base64.tryDecode(s).map(ByteStr(_))
 
   implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => compare(x.arr, y.arr)
 

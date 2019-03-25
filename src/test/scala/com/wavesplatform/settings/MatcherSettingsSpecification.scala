@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.settings.fee.AssetType
+import com.wavesplatform.settings.fee.{AssetType, OrderFeeSettings}
 import com.wavesplatform.settings.fee.OrderFeeSettings._
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -67,6 +67,12 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       |      }
       |    }
       |    $orderFeeSettings
+      |    max-price-deviations {
+      |      enable = yes
+      |      profit = 1000000
+      |      loss = 1000000
+      |      fee = 1000000
+      |    }
       |  }
       |}""".stripMargin
 
@@ -79,11 +85,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = percent
-         |  fixed-waves {
+         |  waves {
          |    base-fee = 300000
          |  }
          |  fixed {
-         |    asset-id = WAVES
+         |    asset = WAVES
          |    min-fee = 300000
          |  }
          |  percent {
@@ -147,11 +153,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = invalid
-         |  fixed-waves {
+         |  waves {
          |    base-fee = 300000
          |  }
          |  fixed {
-         |    asset-id = WAVES
+         |    asset = WAVES
          |    min-fee = 300000
          |  }
          |  percent {
@@ -165,11 +171,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = percent
-         |  fixed-waves {
+         |  waves {
          |    base-fee = 300000
          |  }
          |  fixed {
-         |    asset-id = WAVES
+         |    asset = WAVES
          |    min-fee = 300000
          |  }
          |  percent {
@@ -183,30 +189,12 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       s"""
          |order-fee {
          |  mode = fixed
-         |  fixed-waves {
+         |  waves {
          |    base-fee = 300000
          |  }
          |  fixed {
-         |    asset-id = ;;;;
+         |    asset = ;;;;
          |    min-fee = -300000
-         |  }
-         |  percent {
-         |    asset-type = test
-         |    min-fee = 121
-         |  }
-         |}
-       """.stripMargin
-
-    val invalidWavesAsset =
-      s"""
-         |order-fee {
-         |  mode = fixed
-         |  fixed-waves {
-         |    base-fee = 300000
-         |  }
-         |  fixed {
-         |    asset-id = WAVES
-         |    min-fee = 300000
          |  }
          |  percent {
          |    asset-type = test
@@ -218,12 +206,12 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val invalidFeeInWaves =
       s"""
          |order-fee {
-         |  mode = fixed-waves
-         |  fixed-waves {
+         |  mode = waves
+         |  waves {
          |    base-fee = -350000
          |  }
          |  fixed {
-         |    asset-id = ;;;;
+         |    asset = ;;;;
          |    min-fee = -300000
          |  }
          |  percent {
@@ -236,24 +224,22 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     val settingsInvalidMode           = getSettingByConfig(configStrWithOrderFeeSettings(invalidMode))
     val settingsInvalidTypeAndPercent = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetTypeAndPercent))
     val settingsInvalidAssetAndFee    = getSettingByConfig(configStrWithOrderFeeSettings(invalidAssetAndFee))
-    val settingsInvalidWavseAsset     = getSettingByConfig(configStrWithOrderFeeSettings(invalidWavesAsset))
     val settingsInvalidFeeInWaves     = getSettingByConfig(configStrWithOrderFeeSettings(invalidFeeInWaves))
 
     settingsInvalidMode shouldBe Left("Invalid setting waves.matcher.order-fee.mode value: invalid")
 
     settingsInvalidTypeAndPercent shouldBe
       Left(
-        "Invalid setting waves.matcher.order-fee.percent.asset-type value: test\n" +
-          "Invalid setting waves.matcher.order-fee.percent.min-fee value: 121.0, required 0 < p <= 100")
+        "Invalid setting waves.matcher.order-fee.percent.asset-type value: test, " +
+          "Invalid setting waves.matcher.order-fee.percent.min-fee value: 121.0, required 0 < percent <= 100")
 
     settingsInvalidAssetAndFee shouldBe
       Left(
-        "Invalid setting waves.matcher.order-fee.fixed.asset-id value: ;;;;\n" +
-          "Invalid setting waves.matcher.order-fee.fixed.min-fee value: -300000, must be > 0")
+        "Invalid setting waves.matcher.order-fee.fixed.asset value: ;;;;, " +
+          "Invalid setting waves.matcher.order-fee.fixed.min-fee value: -300000, required 0 < fee")
 
-    settingsInvalidWavseAsset shouldBe
-      Left("Invalid setting waves.matcher.order-fee.fixed.asset-id value: WAVES, asset must not be Waves")
-
-    settingsInvalidFeeInWaves shouldBe Left("Invalid setting waves.matcher.order-fee.fixed-waves.base-fee value: -350000, must be > 0")
+    settingsInvalidFeeInWaves shouldBe Left(
+      s"Invalid setting waves.matcher.order-fee.waves.base-fee value: -350000, required 0 < base fee <= ${OrderFeeSettings.totalWavesAmount}"
+    )
   }
 }

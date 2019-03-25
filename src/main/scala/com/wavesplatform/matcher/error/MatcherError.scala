@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.matcher.error.MatcherError._
+import com.wavesplatform.settings.DeviationsSettings
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
@@ -186,6 +187,22 @@ object MatcherError {
         e"The asset's script of ${'assetId -> assetId} is broken, please contact with the owner. The returned error is ${'errorName -> errorName}, the text is: ${'errorText -> errorText}"
       )
 
+  case class DeviantOrderPrice(ord: Order, deviationSettings: DeviationsSettings)
+      extends MatcherError(
+        order,
+        price,
+        outOfBound,
+        e"The order's price ${'price -> ord.price} is out of deviation bounds (max-price-deviation-profit: ${'maxPriceDeviationProfit -> deviationSettings.maxPriceProfit}%, max-price-deviation-loss: ${'maxPriceDeviationLoss -> deviationSettings.maxPriceLoss}%, in relation to the best-bid/ask)"
+      )
+
+  case class DeviantOrderMatcherFee(ord: Order, deviationSettings: DeviationsSettings)
+      extends MatcherError(
+        order,
+        fee,
+        outOfBound,
+        e"The order's matcher fee ${'matcherFee -> ord.matcherFee} is out of deviation bounds (max-price-deviation-fee: ${'maxPriceDeviationFee -> deviationSettings.maxPriceFee}%, in relation to the best-bid/ask)"
+      )
+
   sealed abstract class Entity(val code: Int)
   object Entity {
     object common  extends Entity(0)
@@ -230,6 +247,7 @@ object MatcherError {
     object timedOut     extends Class(12)
     object starting     extends Class(13)
     object stopping     extends Class(14)
+    object outOfBound   extends Class(15)
   }
 
   private def formatBalance(b: Map[Asset, Long]): String =

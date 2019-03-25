@@ -314,7 +314,7 @@ object AssetsApiRoute {
     for {
       _ <- Either.cond(assetParam.length <= AssetIdStringLength, (), GenericError("Unexpected assetId length"))
       assetId <- Base58
-        .decode(assetParam)
+        .tryDecodeWithLimit(assetParam)
         .fold(
           _ => GenericError("Must be base58-encoded assetId").asLeft[IssuedAsset],
           arr => IssuedAsset(ByteStr(arr)).asRight[ValidationError]
