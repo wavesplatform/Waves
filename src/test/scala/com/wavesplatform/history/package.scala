@@ -28,8 +28,10 @@ package object history {
   val MicroblocksActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0)))
 
-  val TransfersV2ActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
-    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0)))
+  val TransfersV2ActivatedAt0BlockchainSettings: BlockchainSettings =
+    DefaultBlockchainSettings.copy(
+      functionalitySettings =
+        DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0)))
 
   val MicroblocksActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = MicroblocksActivatedAt0BlockchainSettings)
 

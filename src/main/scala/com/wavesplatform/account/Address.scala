@@ -53,7 +53,7 @@ object Address extends ScorexLogging {
                        s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
       checkSum          = addressBytes.takeRight(ChecksumLength)
       checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
-      _ <- Either.cond(checkSum.sameElements(checkSumGenerated), (), s"Bad address checksum")
+      _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
     } yield createUnsafe(addressBytes)).left.map(InvalidAddress)
   }
 

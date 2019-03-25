@@ -37,7 +37,7 @@ final case class ByteStr(arr: Array[Byte]) {
   def dropRight(n: Long): ByteStr = take(arr.length.toLong - n.max(0))
 
   override def equals(a: Any): Boolean = a match {
-    case other: ByteStr => arr.sameElements(other.arr)
+    case other: ByteStr => java.util.Arrays.equals(arr, other.arr)
     case _              => false
   }
 

@@ -61,8 +61,8 @@ case class AssetDescription(issuer: PublicKeyAccount,
   override def equals(obj: scala.Any) = obj match {
     case o: AssetDescription =>
       o.issuer == this.issuer &&
-        o.name.sameElements(name) &&
-        o.description.sameElements(description) &&
+        java.util.Arrays.equals(o.name, name) &&
+        java.util.Arrays.equals(o.description, description) &&
         o.decimals == decimals &&
         o.reissuable == reissuable &&
         o.totalVolume == totalVolume &&
