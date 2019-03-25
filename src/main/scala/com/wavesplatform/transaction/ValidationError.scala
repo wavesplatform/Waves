@@ -14,7 +14,7 @@ object ValidationError {
   type Validation[T] = Either[ValidationError, T]
 
   case class InvalidAddress(reason: String)                    extends ValidationError
-  case class NegativeAmount(amount: Long, of: String)          extends ValidationError //currently unused
+  case class NegativeAmount(amount: Long, of: String)          extends ValidationError
   case class NonPositiveAmount(amount: Long, of: String)       extends ValidationError
   case class NegativeMinFee(minFee: Long, of: String)          extends ValidationError
   case class InsufficientFee(msg: String = "insufficient fee") extends ValidationError

@@ -53,8 +53,8 @@ object BurnTransaction {
   }
 
   def validateBurnParams(amount: Long, fee: Long): Either[ValidationError, Unit] =
-    if (amount <= 0) {
-      Left(ValidationError.NonPositiveAmount(amount, "assets"))
+    if (amount < 0) {
+      Left(ValidationError.NegativeAmount(amount, "assets"))
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee())
     } else Right(())

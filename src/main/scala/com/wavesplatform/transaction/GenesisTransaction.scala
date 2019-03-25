@@ -74,15 +74,15 @@ object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with 
 
       byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
         Either
-          .cond(tx.amount > 0, tx, ValidationError.NonPositiveAmount(tx.amount, "waves"))
+          .cond(tx.amount >= 0, tx, ValidationError.NegativeAmount(tx.amount, "waves"))
           .foldToTry
       }
     }.flatten
   }
 
   def create(recipient: Address, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
-    if (amount <= 0) {
-      Left(ValidationError.NonPositiveAmount(amount, "waves"))
+    if (amount < 0) {
+      Left(ValidationError.NegativeAmount(amount, "waves"))
     } else {
       val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
       Right(GenesisTransaction(recipient, amount, timestamp, signature))

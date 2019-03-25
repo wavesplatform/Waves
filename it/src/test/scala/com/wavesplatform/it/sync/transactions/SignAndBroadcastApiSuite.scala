@@ -154,6 +154,10 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
         version = v
       )
 
+      signBroadcastAndCalcFee(Json.obj("type" -> BurnTransaction.typeId, "quantity" -> 0, "assetId" -> issueId, "sender" -> firstAddress),
+                              usesProofs = isProof,
+                              version = v)
+
       signBroadcastAndCalcFee(Json.obj("type" -> BurnTransaction.typeId, "quantity" -> 100.waves, "assetId" -> issueId, "sender" -> firstAddress),
                               usesProofs = isProof,
                               version = v)
