@@ -8,8 +8,19 @@ import sbtdocker.DockerPlugin
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 scalafmtOnCompile in ThisBuild := true
-Global / cancelable := true
-Global / coverageExcludedPackages := ".*"
+
+inScope(Global)(
+  Seq(
+    cancelable := true,
+    coverageExcludedPackages := ".*",
+    // Can be changed only in Global
+    concurrentRestrictions := {
+      val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
+      Seq(
+        Tags.limit(Tags.ForkedTestGroup, threadNumber),
+      )
+    }
+  ))
 
 val versionSource = Def.task {
   // WARNING!!!
@@ -243,7 +254,7 @@ lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
     .disablePlugins(ProtocPlugin)
-    .dependsOn(common % "compile->compile;test->test")
+    .dependsOn(common % "compile;test->test")
     .settings(
       version := "1.0.0",
       coverageExcludedPackages := ".*",

@@ -5,6 +5,7 @@ import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncMatcherHttpApi._
+import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.async.CorrectStatusAfterPlaceTestSuite._
 import com.wavesplatform.it.sync.config.MatcherPriceAssetConfig._
 import com.wavesplatform.it.util._
@@ -118,7 +119,9 @@ class CorrectStatusAfterPlaceTestSuite extends MatcherSuiteBase {
 
   private def request(order: Order): Future[(String, String)] =
     for {
-      _      <- node.placeOrder(order)
+      _ <- node.placeOrder(order).recover {
+        case e: UnexpectedStatusCodeException if e.statusCode == 503 => // Acceptable
+      }
       status <- node.orderStatus(order.idStr(), order.assetPair, waitForStatus = false)
     } yield (order.idStr(), status.status)
 
