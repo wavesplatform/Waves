@@ -286,9 +286,16 @@ class LevelDBWriter(writableDB: DB,
       val haveEnoughWaves: Boolean = balance >= requiredBalance
 
       lazy val miningBalance = {
-        val snapshots = balanceSnapshots(rw, AddressId @@ addressId, (height - requiredBlocks + 1).max(1), this.lastBlockId.get)
-          .map(_.effectiveBalance)
-
+        val snapshots = {
+          Try {
+            rw.get(Keys.idToAddress(addressId))
+          }.toOption
+            .map { addr =>
+              balanceSnapshots(addr, (height - requiredBlocks + 1).max(1), this.lastBlockId.get)
+            }
+            .getOrElse(Seq(BalanceSnapshot(1, 0, 0, 0)))
+            .map(_.effectiveBalance)
+        }
         (balance +: snapshots).min
       }
 
@@ -716,20 +723,16 @@ class LevelDBWriter(writableDB: DB,
     .recordStats()
     .build[(Int, BigInt), LeaseBalance]()
 
-  protected def balanceSnapshots(db: ReadOnlyDB, addressId: AddressId, from: Int, to: BlockId): Seq[BalanceSnapshot] = {
-    val toHeigth = this.heightOf(to).getOrElse(this.height)
-    val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
-    val lbh      = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
-    for {
-      (wh, lh) <- merge(wbh, lbh)
-      wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))
-      lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
-    } yield BalanceSnapshot(wh.max(lh), wb, lb.in, lb.out)
-  }
-
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
-      balanceSnapshots(db, AddressId @@ addressId, from, to)
+      val toHeigth = this.heightOf(to).getOrElse(this.height)
+      val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
+      val lbh      = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
+      for {
+        (wh, lh) <- merge(wbh, lbh)
+        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))
+        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
+      } yield BalanceSnapshot(wh.max(lh), wb, lb.in, lb.out)
     }
   }
 
