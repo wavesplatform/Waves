@@ -264,7 +264,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       1526992336241L,
       1529584336241L,
       1,
-      Base58.decode("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get
+      Base58.tryDecodeWithLimit("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get
     )
 
     val sell = OrderV1(
@@ -277,7 +277,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       1526992336241L,
       1529584336241L,
       2,
-      Base58.decode("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
+      Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
     )
 
     val tx = ExchangeTransactionV1
@@ -370,7 +370,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       1526992336241L,
       1529584336241L,
       2,
-      Base58.decode("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
+      Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
     )
 
     val tx = ExchangeTransactionV2
@@ -465,7 +465,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       1526992336241L,
       1529584336241L,
       2,
-      Base58.decode("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
+      Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
     )
 
     val tx = ExchangeTransactionV2

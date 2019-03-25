@@ -12,10 +12,10 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, _}
+import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -324,7 +324,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     assert(signedRequest.recipient == secondAddress)
     assert(signedRequest.fee == minFee)
     assert(signedRequest.amount == transferAmount)
-    val signature  = Base58.decode((signedRequestJson \ "signature").as[String]).get
+    val signature  = Base58.tryDecodeWithLimit((signedRequestJson \ "signature").as[String]).get
     val tx         = signedRequest.toTx.explicitGet()
     val privateKey = pkByAddress(thirdAddress)
     assert(crypto.verify(signature, tx.bodyBytes(), privateKey.publicKey))
