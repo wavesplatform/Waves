@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
@@ -8,7 +8,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class GenesisTransactionSpecification extends PropSpec with PropertyChecks with Matchers {
 
-  private val defaultRecipient = PublicKeyAccount(Array.fill(32)(0: Byte))
+  private val defaultRecipient = AccountPublicKey(Array.fill(32)(0: Byte))
 
   property("GenesisTransaction Signature should be the same") {
     val balance   = 457L
@@ -36,7 +36,7 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
   property("GenesisTransaction serialize/deserialize roundtrip") {
     forAll(Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray), Gen.posNum[Long], Gen.posNum[Long]) {
       (recipientSeed: Array[Byte], time: Long, amount: Long) =>
-        val recipient = PrivateKeyAccount(recipientSeed)
+        val recipient = AccountKeyPair(recipientSeed)
         val source    = GenesisTransaction.create(recipient, amount, time).explicitGet()
         val bytes     = source.bytes()
         val dest      = GenesisTransaction.parseBytes(bytes).get

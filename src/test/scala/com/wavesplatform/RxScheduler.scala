@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.block.{Block, MicroBlock, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -33,7 +33,7 @@ trait RxScheduler extends BeforeAndAfterAll { _: Suite =>
 
   def byteStr(id: Int): ByteStr = ByteStr(Array.concat(Array.fill(SignatureLength - 1)(0), Array(id.toByte)))
 
-  val signer: PrivateKeyAccount = TestBlock.defaultSigner
+  val signer: AccountKeyPair = TestBlock.defaultSigner
 
   def block(id: Int): Block = TestBlock.create(Seq.empty).copy(signerData = SignerData(signer, byteStr(id)))
 

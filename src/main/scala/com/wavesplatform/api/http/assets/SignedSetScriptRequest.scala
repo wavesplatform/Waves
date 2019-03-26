@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.AccountPublicKey
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.Script
@@ -37,7 +37,7 @@ case class SignedSetScriptRequest(@ApiModelProperty(value = "Base58 encoded send
     extends BroadcastRequest {
   def toTx: Either[ValidationError, SetScriptTransaction] =
     for {
-      _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _sender <- AccountPublicKey.fromBase58String(senderPublicKey)
       _script <- script match {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))

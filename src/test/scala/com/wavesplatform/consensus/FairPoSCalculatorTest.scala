@@ -2,8 +2,8 @@ package com.wavesplatform.consensus
 
 import cats.data.NonEmptyList
 import cats.implicits._
+import com.wavesplatform.account.AccountKeyPair
 import org.scalatest.{Matchers, PropSpec}
-import com.wavesplatform.account.PrivateKeyAccount
 
 import scala.util.Random
 
@@ -13,7 +13,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
 
   val pos: PoSCalculator = FairPoSCalculator
 
-  case class Block(height: Int, baseTarget: Long, miner: PrivateKeyAccount, timestamp: Long, delay: Long)
+  case class Block(height: Int, baseTarget: Long, miner: AccountKeyPair, timestamp: Long, delay: Long)
 
   def generationSignature: Array[Byte] = {
     val arr = new Array[Byte](32)
@@ -28,7 +28,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
   property("Correct consensus parameters distribution of blocks generated with FairPoS") {
 
     val miners = mkMiners
-    val first  = Block(0, defaultBaseTarget, PrivateKeyAccount(generationSignature), System.currentTimeMillis(), 0)
+    val first  = Block(0, defaultBaseTarget, AccountKeyPair(generationSignature), System.currentTimeMillis(), 0)
 
     val chain = (1 to 100000 foldLeft NonEmptyList.of(first))((acc, _) => {
       val gg     = acc.tail.lift(1)
@@ -49,9 +49,9 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
     assert(avgBT < 200 && avgBT > 20)
   }
 
-  def mineBlock(prev: Block, grand: Option[Block], minerWithBalance: (PrivateKeyAccount, Long)): Block = {
+  def mineBlock(prev: Block, grand: Option[Block], minerWithBalance: (AccountKeyPair, Long)): Block = {
     val (miner, balance) = minerWithBalance
-    val gs               = generatorSignature(generationSignature, miner.publicKey)
+    val gs               = generatorSignature(generationSignature, miner)
     val h                = hit(gs)
     val delay            = pos.calculateDelay(h, prev.baseTarget, balance)
     val bt = pos.calculateBaseTarget(
@@ -72,7 +72,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
     )
   }
 
-  def calcPerfomance(chain: List[Block], miners: Map[PrivateKeyAccount, Long]): Map[Long, Double] = {
+  def calcPerfomance(chain: List[Block], miners: Map[AccountKeyPair, Long]): Map[Long, Double] = {
     val balanceSum  = miners.values.sum
     val blocksCount = chain.length
 
@@ -89,13 +89,13 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
       })
   }
 
-  def mkMiners: Map[PrivateKeyAccount, Long] =
+  def mkMiners: Map[AccountKeyPair, Long] =
     List(
-      PrivateKeyAccount(generationSignature) -> 200000000000000L,
-      PrivateKeyAccount(generationSignature) -> 500000000000000L,
-      PrivateKeyAccount(generationSignature) -> 1000000000000000L,
-      PrivateKeyAccount(generationSignature) -> 1500000000000000L,
-      PrivateKeyAccount(generationSignature) -> 2000000000000000L,
-      PrivateKeyAccount(generationSignature) -> 2500000000000000L
+      AccountKeyPair(generationSignature) -> 200000000000000L,
+      AccountKeyPair(generationSignature) -> 500000000000000L,
+      AccountKeyPair(generationSignature) -> 1000000000000000L,
+      AccountKeyPair(generationSignature) -> 1500000000000000L,
+      AccountKeyPair(generationSignature) -> 2000000000000000L,
+      AccountKeyPair(generationSignature) -> 2500000000000000L
     ).toMap
 }

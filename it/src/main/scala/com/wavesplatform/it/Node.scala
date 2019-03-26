@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import java.net.{InetSocketAddress, URL}
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
@@ -25,8 +25,8 @@ abstract class Node(config: Config) extends AutoCloseable {
       .setKeepAlive(false)
       .setNettyTimer(GlobalTimer.instance))
 
-  val privateKey: PrivateKeyAccount = PrivateKeyAccount.fromSeed(config.getString("account-seed")).explicitGet()
-  val publicKey: PublicKeyAccount   = PublicKeyAccount.fromBase58String(config.getString("public-key")).explicitGet()
+  val privateKey: AccountKeyPair = AccountKeyPair.fromSeed(config.getString("account-seed")).explicitGet()
+  val publicKey: PublicKeyAccount   = AccountPublicKey.fromBase58String(config.getString("public-key")).explicitGet()
   val address: String               = config.getString("address")
 
   def nodeApiEndpoint: URL
@@ -42,11 +42,8 @@ abstract class Node(config: Config) extends AutoCloseable {
 object Node {
   implicit class NodeExt(val n: Node) extends AnyVal {
     def name: String = n.settings.networkSettings.nodeName
-
-    def publicKeyStr = Base58.encode(n.publicKey.publicKey)
-
+    def publicKeyStr: String = Base58.encode(n.publicKey)
     def fee(txTypeId: Byte): Long = CommonValidation.FeeConstants(txTypeId) * CommonValidation.FeeUnit
-
     def blockDelay: FiniteDuration = n.settings.blockchainSettings.genesisSettings.averageBlockDelay
   }
 }

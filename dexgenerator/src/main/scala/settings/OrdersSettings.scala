@@ -1,7 +1,6 @@
 package settings
 
 import cats.Show
-import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.dexgen.utils.GenOrderType
 import settings.OrdersSettings.Settings
 

@@ -4,7 +4,6 @@ import java.io.IOException
 import java.util.concurrent.TimeoutException
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.PrivateKeyAccount
 import com.wavesplatform.api.http.assets.{SignedIssueV2Request, SignedMassTransferRequest, SignedTransferV1Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -68,7 +67,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
   def createSignedIssueRequest(tx: IssueTransactionV2): SignedIssueV2Request = {
     import tx._
     SignedIssueV2Request(
-      Base58.encode(tx.sender.publicKey),
+      Base58.encode(tx.sender),
       new String(name),
       new String(description),
       quantity,
@@ -83,7 +82,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
 
   def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
     SignedMassTransferRequest(
-      Base58.encode(tx.sender.publicKey),
+      Base58.encode(tx.sender),
       tx.assetId.compatId.map(_.base58),
       tx.transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },
       tx.fee,
@@ -96,7 +95,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
   def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
 
     SignedTransferV1Request(
-      Base58.encode(tx.sender.publicKey),
+      Base58.encode(tx.sender),
       tx.assetId.compatId.map(_.base58),
       tx.recipient.stringRepr,
       tx.amount,
@@ -181,8 +180,8 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
 
     def orderHistory(pk: PrivateKeyAccount)(implicit tag: String): Future[Seq[OrderbookHistory]] = {
       val ts        = System.currentTimeMillis()
-      val signature = ByteStr(crypto.sign(pk, pk.publicKey ++ Longs.toByteArray(ts)))
-      orderbookByPublicKey(Base58.encode(pk.publicKey), ts, signature)
+      val signature = ByteStr(crypto.sign(pk, pk ++ Longs.toByteArray(ts)))
+      orderbookByPublicKey(Base58.encode(pk), ts, signature)
     }
 
     def utx(implicit tag: String): Future[Seq[Transaction]] = get(s"/transactions/unconfirmed").as[Seq[Transaction]]

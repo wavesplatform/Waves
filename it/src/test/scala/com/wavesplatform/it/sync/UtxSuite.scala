@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -29,7 +29,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
 
     Random.nextBytes(seed)
 
-    val account = PrivateKeyAccount(seed)
+    val account = AccountKeyPair(seed)
 
     val transferToAccount = TransferTransactionV1
       .selfSigned(Waves, miner.privateKey, account, AMOUNT, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)

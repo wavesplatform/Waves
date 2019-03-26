@@ -1,7 +1,7 @@
 package com.wavesplatform.it.async.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi.NodesAsyncHttpApi
@@ -124,7 +124,7 @@ class CorrectStatusAfterPlaceTestSuite extends FreeSpec with Matchers with Nodes
 }
 
 object CorrectStatusAfterPlaceTestSuite {
-  private val AllPrivateKeys = NodeConfigs.Default.map(c => PrivateKeyAccount.fromSeed(c.getString("account-seed")).right.get)
+  private val AllPrivateKeys = NodeConfigs.Default.map(c => AccountKeyPair.fromSeed(c.getString("account-seed")).right.get)
   private val Issuer         = AllPrivateKeys.head
 
   private val Asset1 = IssueTransactionV1

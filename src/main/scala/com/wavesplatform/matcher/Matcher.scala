@@ -9,7 +9,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{AskTimeoutException, gracefulStop}
 import akka.stream.ActorMaterializer
-import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, Address}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db._
@@ -43,7 +43,7 @@ class Matcher(actorSystem: ActorSystem,
               blockchain: Blockchain,
               spendableBalanceChanged: Observable[(Address, Asset)],
               settings: WavesSettings,
-              matcherPrivateKey: PrivateKeyAccount)
+              matcherPrivateKey: AccountKeyPair)
     extends ScorexLogging {
 
   import settings._
@@ -205,7 +205,7 @@ class Matcher(actorSystem: ActorSystem,
     )
 
   private lazy val blacklistedAddresses = settings.matcherSettings.blacklistedAddresses.map(Address.fromString(_).explicitGet())
-  private lazy val matcherPublicKey     = PublicKeyAccount(matcherPrivateKey.publicKey)
+  private lazy val matcherPublicKey     = matcherPrivateKey
 
   private lazy val db = openDB(matcherSettings.dataDir)
 

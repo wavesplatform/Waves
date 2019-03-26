@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -28,9 +27,9 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
     val script =
       s"""
          |
-         |let A = base58'${ByteStr(pk0.publicKey)}'
-         |let B = base58'${ByteStr(pk1.publicKey)}'
-         |let C = base58'${ByteStr(pk2.publicKey)}'
+         |let A = base58'${ByteStr(pk0)}'
+         |let B = base58'${ByteStr(pk1)}'
+         |let C = base58'${ByteStr(pk2)}'
          |
          |let proofs = tx.proofs
          |let AC = if(sigVerify(tx.bodyBytes,proofs[0],A)) then 1 else 0

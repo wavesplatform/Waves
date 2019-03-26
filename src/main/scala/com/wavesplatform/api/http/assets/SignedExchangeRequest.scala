@@ -1,13 +1,13 @@
 package com.wavesplatform.api.http.assets
 
-import io.swagger.annotations.ApiModelProperty
-import play.api.libs.json.{Format, Json}
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.AccountPublicKey
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange._
+import io.swagger.annotations.ApiModelProperty
+import play.api.libs.json.{Format, Json}
 
 object SignedExchangeRequest {
   implicit val orderFormat: Format[Order]                                 = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
@@ -37,7 +37,7 @@ case class SignedExchangeRequest(@ApiModelProperty(value = "Base58 encoded sende
     extends BroadcastRequest {
   def toTx: Either[ValidationError, ExchangeTransaction] =
     for {
-      _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _sender    <- AccountPublicKey.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       o1         <- castOrder(order1)
       o2         <- castOrder(order2)

@@ -18,7 +18,7 @@ class AccountSpecification extends PropSpec with PropertyChecks with Matchers {
 
   property("PublicKeyAccount should return Address as it's string representation") {
     forAll { bytes: Array[Byte] =>
-      val a = PublicKeyAccount.apply(bytes)
+      val a = AccountPublicKey.apply(bytes)
       a.toString shouldBe a.toAddress.address
     }
   }

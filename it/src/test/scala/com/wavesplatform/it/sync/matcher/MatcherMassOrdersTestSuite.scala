@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi._
@@ -139,7 +139,7 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
 
   }
 
-  private def ordersRequestsGen(n: Int, sender: PrivateKeyAccount, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[String] = {
+  private def ordersRequestsGen(n: Int, sender: AccountKeyPair, assetPair: AssetPair, orderType: OrderType, amount: Long): Seq[String] = {
     val orderIds = 1 to n map (_ => {
       matcherNode
         .placeOrder(sender, assetPair, orderType, amount, Order.PriceConstant, matcherFee, orderVersion, (120 + Random.nextInt(70)).seconds)
@@ -149,6 +149,6 @@ class MatcherMassOrdersTestSuite extends MatcherSuiteBase {
     orderIds
   }
 
-  private def orderStatus(sender: PrivateKeyAccount, assetPair: AssetPair, orderId: String, expectedStatus: String) =
+  private def orderStatus(sender: AccountKeyPair, assetPair: AssetPair, orderId: String, expectedStatus: String) =
     matcherNode.waitOrderStatus(assetPair, orderId, expectedStatus)
 }

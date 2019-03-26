@@ -3,7 +3,7 @@ package com.wavesplatform.generator
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
-import com.wavesplatform.account.{Alias, PrivateKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.duration._
 import scala.util.Random
 
-class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
+class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[AccountKeyPair]) extends TransactionGenerator {
 
   private def r = ThreadLocalRandom.current
 

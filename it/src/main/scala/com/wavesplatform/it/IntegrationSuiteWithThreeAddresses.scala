@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.account.PrivateKeyAccount
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -31,7 +31,8 @@ trait IntegrationSuiteWithThreeAddresses
   protected lazy val secondAddress: String = sender.createAddress()
   protected lazy val thirdAddress: String  = sender.createAddress()
 
-  def pkByAddress(address: String): PrivateKeyAccount = PrivateKeyAccount.fromSeed(sender.seed(address)).right.get
+  def pkByAddress(address: String): AccountKeyPair =
+    AccountKeyPair(Base58.decode(sender.seed(address)))
 
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -87,7 +88,7 @@ trait IntegrationSuiteWithThreeAddresses
     }
   }
 
-  def setContract(contractText: Option[String], acc: PrivateKeyAccount): String = {
+  def setContract(contractText: Option[String], acc: AccountKeyPair): String = {
     val script = contractText.map { x =>
       val scriptText = x.stripMargin
       ScriptCompiler(scriptText, isAssetScript = false).explicitGet()._1
@@ -101,7 +102,7 @@ trait IntegrationSuiteWithThreeAddresses
       .id
   }
 
-  def setContracts(contracts: (Option[String], PrivateKeyAccount)*): Unit = {
+  def setContracts(contracts: (Option[String], AccountKeyPair)*): Unit = {
     contracts
       .map {
         case (src, acc) => setContract(src, acc)

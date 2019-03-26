@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -52,7 +51,7 @@ class TransactionsRouteSpec
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
-          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
@@ -78,7 +77,7 @@ class TransactionsRouteSpec
         val transferTx = Json.obj(
           "type"            -> 11,
           "version"         -> 1,
-          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "senderPublicKey" -> Base58.encode(sender),
           "transfers" -> Json.arr(
             Json.obj(
               "recipient" -> accountGen.sample.get.toAddress,
@@ -118,7 +117,7 @@ class TransactionsRouteSpec
           "version"         -> 2,
           "amount"          -> 1000000,
           "feeAssetId"      -> assetId.base58,
-          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
@@ -147,7 +146,7 @@ class TransactionsRouteSpec
           "version"         -> 2,
           "amount"          -> 1000000,
           "feeAssetId"      -> assetId.id.base58,
-          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
@@ -189,7 +188,7 @@ class TransactionsRouteSpec
           "version"         -> 2,
           "amount"          -> 1000000,
           "feeAssetId"      -> assetId.id.base58,
-          "senderPublicKey" -> Base58.encode(sender.publicKey),
+          "senderPublicKey" -> Base58.encode(sender),
           "recipient"       -> accountGen.sample.get.toAddress
         )
 

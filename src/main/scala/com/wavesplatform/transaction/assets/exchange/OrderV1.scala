@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets.exchange
 
 import cats.data.State
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
@@ -68,7 +68,7 @@ case class OrderV1(@ApiModelProperty(
 
   @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    senderPublicKey.publicKey ++ matcherPublicKey.publicKey ++
+    senderPublicKey ++ matcherPublicKey ++
       assetPair.bytes ++ orderType.bytes ++
       Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
       Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
@@ -76,7 +76,7 @@ case class OrderV1(@ApiModelProperty(
   )
 
   @ApiModelProperty(hidden = true)
-  val signatureValid = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), senderPublicKey.publicKey))
+  val signatureValid = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), senderPublicKey))
 
   @ApiModelProperty(hidden = true)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(bodyBytes() ++ signature)
@@ -107,7 +107,7 @@ object OrderV1 {
             Proofs(List(ByteStr(signature))))
   }
 
-  def buy(sender: PrivateKeyAccount,
+  def buy(sender: AccountKeyPair,
           matcher: PublicKeyAccount,
           pair: AssetPair,
           amount: Long,
@@ -120,7 +120,7 @@ object OrderV1 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def sell(sender: PrivateKeyAccount,
+  def sell(sender: AccountKeyPair,
            matcher: PublicKeyAccount,
            pair: AssetPair,
            amount: Long,
@@ -133,7 +133,7 @@ object OrderV1 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def apply(sender: PrivateKeyAccount,
+  def apply(sender: AccountKeyPair,
             matcher: PublicKeyAccount,
             pair: AssetPair,
             orderType: OrderType,
@@ -160,8 +160,8 @@ object OrderV1 {
       (off, res)
     }
     val makeOrder = for {
-      sender  <- read(PublicKeyAccount.apply, KeyLength)
-      matcher <- read(PublicKeyAccount.apply, KeyLength)
+      sender  <- read(AccountPublicKey.apply, KeyLength)
+      matcher <- read(AccountPublicKey.apply, KeyLength)
       amountAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
         .map {
           case Some(arr) => IssuedAsset(ByteStr(arr))

@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{Alias, PublicKeyAccount}
+import com.wavesplatform.account.{AccountPublicKey, Alias}
 import com.wavesplatform.crypto._
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
@@ -27,7 +27,7 @@ trait CreateAliasTransaction extends ProvenTransaction with VersionedTransaction
 
   val baseBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
-      sender.publicKey,
+      sender,
       Deser.serializeArray(alias.bytes.arr),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
@@ -40,7 +40,7 @@ object CreateAliasTransaction {
 
   def parseBase(start: Int, bytes: Array[Byte]): Try[(PublicKeyAccount, Alias, Long, Long, Int)] = {
     for {
-      sender <- Try(PublicKeyAccount(bytes.slice(start, start + KeyLength)))
+      sender <- Try(AccountPublicKey(bytes.slice(start, start + KeyLength)))
       (aliasBytes, aliasEnd) = Deser.parseArraySize(bytes, start + KeyLength)
       alias     <- Alias.fromBytes(aliasBytes).fold(err => Failure(new Exception(err.toString)), Success.apply)
       fee       <- Try(Longs.fromByteArray(bytes.slice(aliasEnd, aliasEnd + 8)))

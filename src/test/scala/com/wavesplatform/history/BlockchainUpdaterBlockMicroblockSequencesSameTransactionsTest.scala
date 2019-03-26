@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -45,7 +45,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
   }
 
   property("Miner fee from microblock [Genesis] <- [Empty] <~ (Micro with tx) <- [Empty]") {
-    val preconditionsAndPayments: Gen[(PrivateKeyAccount, GenesisTransaction, TransferTransactionV1, Int)] = for {
+    val preconditionsAndPayments: Gen[(AccountKeyPair, GenesisTransaction, TransferTransactionV1, Int)] = for {
       master <- accountGen
       miner  <- accountGen
       ts     <- positiveIntGen
@@ -69,7 +69,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
     }
   }
 
-  def randomPayment(accs: Seq[PrivateKeyAccount], ts: Long): Gen[TransferTransactionV1] =
+  def randomPayment(accs: Seq[AccountKeyPair], ts: Long): Gen[TransferTransactionV1] =
     for {
       from <- Gen.oneOf(accs)
       to   <- Gen.oneOf(accs)
@@ -77,7 +77,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
       amt  <- smallFeeGen
     } yield createWavesTransfer(from, to, amt, fee, ts).explicitGet()
 
-  def randomPayments(accs: Seq[PrivateKeyAccount], ts: Long, amt: Int): Gen[Seq[TransferTransactionV1]] =
+  def randomPayments(accs: Seq[AccountKeyPair], ts: Long, amt: Int): Gen[Seq[TransferTransactionV1]] =
     if (amt == 0)
       Gen.const(Seq.empty)
     else
@@ -88,7 +88,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
 
   val TOTAL_WAVES = ENOUGH_AMT
 
-  def accsAndGenesis(): Gen[(Seq[PrivateKeyAccount], PrivateKeyAccount, Block, Int)] =
+  def accsAndGenesis(): Gen[(Seq[AccountKeyPair], AccountKeyPair, Block, Int)] =
     for {
       alice   <- accountGen
       bob     <- accountGen
@@ -165,7 +165,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
   def stepR(txs: Seq[Transaction],
             sizes: BlockAndMicroblockSize,
             prev: ByteStr,
-            signer: PrivateKeyAccount,
+            signer: AccountKeyPair,
             version: Byte,
             timestamp: Long): (BlockAndMicroblocks, Seq[Transaction]) = {
     val ((blockTxs, microblockTxs), rest) = take(txs, sizes)
@@ -180,7 +180,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
   def r(txs: Seq[Transaction],
         sizes: BlockAndMicroblockSizes,
         initial: ByteStr,
-        signer: PrivateKeyAccount,
+        signer: AccountKeyPair,
         version: Byte,
         timestamp: Long): BlockAndMicroblockSequence = {
     sizes

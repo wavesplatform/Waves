@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
@@ -41,7 +41,7 @@ case class MassTransferTransaction private (assetId: Asset,
 
     Bytes.concat(
       Array(builder.typeId, version),
-      sender.publicKey,
+      sender,
       assetIdBytes,
       Shorts.toByteArray(transfers.size.toShort),
       transferBytes,
@@ -152,7 +152,7 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   }
 
   def selfSigned(assetId: Asset,
-                 sender: PrivateKeyAccount,
+                 sender: AccountKeyPair,
                  transfers: List[ParsedTransfer],
                  timestamp: Long,
                  feeAmount: Long,

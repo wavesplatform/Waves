@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -31,7 +31,7 @@ case class SponsorFeeTransaction private (sender: PublicKeyAccount,
       Bytes.concat(
         Array(builder.typeId),
         Array(version),
-        sender.publicKey,
+        sender,
         asset.id.arr,
         Longs.toByteArray(minSponsoredAssetFee.getOrElse(0)),
         Longs.toByteArray(fee),
@@ -101,7 +101,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount,
+  def selfSigned(sender: AccountKeyPair,
                  asset: IssuedAsset,
                  minSponsoredAssetFee: Option[Long],
                  fee: Long,

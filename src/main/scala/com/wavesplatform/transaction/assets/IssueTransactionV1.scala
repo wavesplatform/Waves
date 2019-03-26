@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -76,7 +76,7 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount,
+  def selfSigned(sender: AccountKeyPair,
                  name: Array[Byte],
                  description: Array[Byte],
                  quantity: Long,

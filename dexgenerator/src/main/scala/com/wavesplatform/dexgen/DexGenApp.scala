@@ -4,7 +4,7 @@ import java.util.concurrent.Executors
 
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AddressOrAlias, AddressScheme}
 import com.wavesplatform.api.http.assets.{SignedIssueV2Request, SignedMassTransferRequest}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.dexgen.cli.ScoptImplicits
@@ -90,7 +90,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
           reissuable = false,
           fee = 100000000,
           timestamp = now + i,
-          sender = PrivateKeyAccount.fromSeed(richAddressSeed).explicitGet(),
+          sender = AccountKeyPair.fromSeed(richAddressSeed).explicitGet(),
           script = None
         )
         .explicitGet()
@@ -111,7 +111,7 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
     tradingAssets
   }
 
-  def parsedTransfersList(endpoint: String, assetId: Asset, transferAmount: Long, pk: PrivateKeyAccount, accounts: Seq[PrivateKeyAccount])(
+  def parsedTransfersList(endpoint: String, assetId: Asset, transferAmount: Long, pk: AccountKeyPair, accounts: Seq[AccountKeyPair])(
       implicit tag: String): List[ParsedTransfer] = {
     val assetsTransfers = accounts.map { accountPk =>
       ParsedTransfer(AddressOrAlias.fromString(accountPk.address).right.get, transferAmount)
@@ -119,10 +119,10 @@ object DexGenApp extends App with ScoptImplicits with FicusImplicits with Enumer
     assetsTransfers.toList
   }
 
-  def massTransfer(endpoint: String, richAccountSeed: String, accounts: Seq[PrivateKeyAccount], tradingAssets: Seq[Asset])(
+  def massTransfer(endpoint: String, richAccountSeed: String, accounts: Seq[AccountKeyPair], tradingAssets: Seq[Asset])(
       implicit tag: String): Future[Seq[Transaction]] = {
     val node          = api.to(endpoint)
-    val richAccountPk = PrivateKeyAccount.fromSeed(richAccountSeed).right.get
+    val richAccountPk = AccountKeyPair.fromSeed(richAccountSeed).right.get
 
     val massTransferTxSeq: Seq[Future[Transaction]] = tradingAssets.map { assetId =>
       node

@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.AccountPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
@@ -11,7 +11,6 @@ import play.api.libs.json._
 import scala.util.{Failure, Success}
 
 object OrderJson {
-
   import play.api.libs.functional.syntax._
   import play.api.libs.json.Reads._
 
@@ -37,8 +36,8 @@ object OrderJson {
   implicit val publicKeyAccountReads: Reads[PublicKeyAccount] = {
     case JsString(s) =>
       Base58.tryDecodeWithLimit(s) match {
-        case Success(bytes) if bytes.length == 32 => JsSuccess(PublicKeyAccount(bytes))
-        case _                                    => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.publicKeyAccount"))))
+        case Success(bytes) if bytes.length == 32 => JsSuccess(AccountPublicKey(bytes))
+        case _                                    => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrectAccount"))))
       }
     case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }

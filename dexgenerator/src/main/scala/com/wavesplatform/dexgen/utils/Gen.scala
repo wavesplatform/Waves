@@ -2,7 +2,7 @@ package com.wavesplatform.dexgen.utils
 
 import java.util.concurrent.ThreadLocalRandom
 
-import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, Address}
 import com.wavesplatform.dexgen.utils.Implicits._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
@@ -13,7 +13,7 @@ import scorex.crypto.signatures.Curve25519.KeyLength
 object Gen {
   private def random = ThreadLocalRandom.current
 
-  def txs(minFee: Long, maxFee: Long, senderAccounts: Seq[PrivateKeyAccount], recipientGen: Iterator[Address]): Iterator[Transaction] = {
+  def txs(minFee: Long, maxFee: Long, senderAccounts: Seq[AccountKeyPair], recipientGen: Iterator[Address]): Iterator[Transaction] = {
     val senderGen = Iterator.randomContinually(senderAccounts)
     val feeGen    = Iterator.continually(minFee + random.nextLong(maxFee - minFee))
     transfers(senderGen, recipientGen, feeGen)
@@ -21,7 +21,7 @@ object Gen {
       .flatMap { case (tt, mtt) => Iterator(mtt, tt) }
   }
 
-  def transfers(senderGen: Iterator[PrivateKeyAccount], recipientGen: Iterator[Address], feeGen: Iterator[Long]): Iterator[Transaction] = {
+  def transfers(senderGen: Iterator[AccountKeyPair], recipientGen: Iterator[Address], feeGen: Iterator[Long]): Iterator[Transaction] = {
     val now = System.currentTimeMillis()
     senderGen
       .zip(recipientGen)
@@ -34,7 +34,7 @@ object Gen {
       .collect { case Right(x) => x }
   }
 
-  def massTransfers(senderGen: Iterator[PrivateKeyAccount], recipientGen: Iterator[Address], amountGen: Iterator[Long]): Iterator[Transaction] = {
+  def massTransfers(senderGen: Iterator[AccountKeyPair], recipientGen: Iterator[Address], amountGen: Iterator[Long]): Iterator[Transaction] = {
     val transferCountGen = Iterator.continually(random.nextInt(MassTransferTransaction.MaxTransferCount + 1))
     senderGen
       .zip(transferCountGen)

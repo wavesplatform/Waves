@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -76,7 +76,7 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
   }
 
   def selfSigned(assetId: Asset,
-                 sender: PrivateKeyAccount,
+                 sender: AccountKeyPair,
                  recipient: AddressOrAlias,
                  amount: Long,
                  timestamp: Long,

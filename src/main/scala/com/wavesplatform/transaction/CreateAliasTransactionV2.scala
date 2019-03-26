@@ -2,15 +2,11 @@ package com.wavesplatform.transaction
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{Alias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction.description._
-import monix.eval.Coeval
-import com.wavesplatform.account.{Alias, PrivateKeyAccount, PublicKeyAccount}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -63,7 +59,7 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
     } yield unsigned.copy(proofs = proofs)
   }
 
-  def selfSigned(sender: PrivateKeyAccount, alias: Alias, fee: Long, timestamp: Long): Either[ValidationError, CreateAliasTransactionV2] = {
+  def selfSigned(sender: AccountKeyPair, alias: Alias, fee: Long, timestamp: Long): Either[ValidationError, CreateAliasTransactionV2] = {
     signed(sender, alias, fee, timestamp, sender)
   }
 

@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountPrivateKey, AccountPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -14,8 +14,8 @@ import play.api.libs.json._
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Read Order from json") {
-    val pk        = PrivateKeyAccount("123".getBytes)
-    val pubKeyStr = Base58.encode(pk.publicKey)
+    val pk        = AccountPrivateKey.fromSeed("123".getBytes)
+    val pubKeyStr = Base58.encode(pk)
 
     val json = Json.parse(s"""
         {
@@ -38,8 +38,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
       case JsError(e) =>
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
-        o.senderPublicKey shouldBe PublicKeyAccount(pk.publicKey)
-        o.matcherPublicKey shouldBe PublicKeyAccount(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
+        o.senderPublicKey shouldBe AccountPublicKey(pk)
+        o.matcherPublicKey shouldBe AccountPublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset.compatId.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
         o.assetPair.priceAsset.compatId.get shouldBe ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
         o.price shouldBe 0
@@ -73,8 +73,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
       case JsError(e) =>
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
-        o.senderPublicKey shouldBe PublicKeyAccount(pk.publicKey)
-        o.matcherPublicKey shouldBe PublicKeyAccount(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
+        o.senderPublicKey shouldBe AccountPublicKey(pk)
+        o.matcherPublicKey shouldBe AccountPublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
         o.assetPair.priceAsset shouldBe IssuedAsset(ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get)
         o.price shouldBe 0
@@ -130,11 +130,11 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
 
   property("Json Reads PublicKeyAccount") {
     val publicKey = (json \ "publicKey").as[PublicKeyAccount]
-    publicKey.bytes shouldBe PublicKeyAccount(Base58.tryDecodeWithLimit(base58Str).get).bytes
+    publicKey.bytes shouldBe AccountPublicKey(Base58.tryDecodeWithLimit(base58Str).get).bytes
 
     (json \ "wrong_publicKey").validate[PublicKeyAccount] match {
       case e: JsError =>
-        e.errors.head._2.head.message shouldBe "error.incorrect.publicKeyAccount"
+        e.errors.head._2.head.message shouldBe "error.incorrectAccount"
       case _ => fail("Should be JsError")
     }
   }
@@ -154,8 +154,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
   }
 
   property("Read Order with empty assetId") {
-    val pk        = PrivateKeyAccount("123".getBytes)
-    val pubKeyStr = Base58.encode(pk.publicKey)
+    val pk        = AccountPrivateKey.fromSeed("123".getBytes)
+    val pubKeyStr = Base58.encode(pk)
 
     val json = Json.parse(s"""
         {

@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.http._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -110,7 +110,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def signedGet(publicKey: PublicKeyAccount): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
       case (timestamp, sig) =>
-        require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey.publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey.publicKey),
+        require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey),
                 "Incorrect signature")
         pass
     }
@@ -127,7 +127,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @Path("/")
   @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET")
   def getMatcherPublicKey: Route = (pathEndOrSingleSlash & get) {
-    complete(JsString(Base58.encode(matcherPublicKey.publicKey)))
+    complete(JsString(Base58.encode(matcherPublicKey)))
   }
 
   @Path("/settings")
@@ -216,7 +216,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   def orderbooks: Route = (path("orderbook") & pathEndOrSingleSlash & get) {
     complete((matcher ? GetMarkets).mapTo[Seq[MarketData]].map { markets =>
       StatusCodes.OK -> Json.obj(
-        "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
+        "matcherPublicKey" -> Base58.encode(matcherPublicKey),
         "markets" -> JsArray(markets.map(m =>
           Json.obj(
             "amountAsset"     -> m.pair.amountAssetStr,

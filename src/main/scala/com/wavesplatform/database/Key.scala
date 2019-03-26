@@ -1,13 +1,9 @@
 package com.wavesplatform.database
-import java.util
 
 trait Key[V] {
   def name: String
-
   def keyBytes: Array[Byte]
-
   def parse(bytes: Array[Byte]): V
-
   def encode(v: V): Array[Byte]
 
   override lazy val toString: String = BigInt(keyBytes).toString(16)

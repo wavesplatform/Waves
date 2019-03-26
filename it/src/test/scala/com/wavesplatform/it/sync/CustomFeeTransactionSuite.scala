@@ -1,14 +1,14 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.Sponsorship
 import com.wavesplatform.transaction.assets.IssueTransactionV1
-import com.wavesplatform.common.utils.EitherExt2
 import org.scalatest.CancelAfterFailure
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -73,7 +73,7 @@ object CustomFeeTransactionSuite {
   val featureCheckBlocksPeriod = 13
 
   private val seed = Default(2).getString("account-seed")
-  private val pk   = PrivateKeyAccount.fromSeed(seed).explicitGet()
+  private val pk   = AccountKeyPair.fromSeed(seed).explicitGet()
   val assetTx = IssueTransactionV1
     .selfSigned(
       sender = pk,

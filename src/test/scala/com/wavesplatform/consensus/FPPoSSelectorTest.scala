@@ -1,7 +1,7 @@
 package com.wavesplatform.consensus
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError
@@ -45,7 +45,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                 .orElse(blockchain.blockAt(blockchain.height + fork1.length - 100))
                 .getOrElse(fork1.head)
 
-            calcDelay(blockForHit, fork1.head.consensusData.baseTarget, miner1.publicKey, miner1Balance)
+            calcDelay(blockForHit, fork1.head.consensusData.baseTarget, miner1, miner1Balance)
           }
 
           val fork2Delay = {
@@ -55,7 +55,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                 .orElse(blockchain.blockAt(blockchain.height + fork2.length - 100))
                 .getOrElse(fork2.head)
 
-            calcDelay(blockForHit, fork2.head.consensusData.baseTarget, miner1.publicKey, miner1Balance)
+            calcDelay(blockForHit, fork2.head.consensusData.baseTarget, miner1, miner1Balance)
           }
 
           fork1Delay shouldEqual fork2Delay
@@ -202,7 +202,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     }
   }
 
-  def withEnv(gen: Time => Gen[(Seq[PrivateKeyAccount], Seq[Block])])(f: Env => Unit): Unit = {
+  def withEnv(gen: Time => Gen[(Seq[AccountKeyPair], Seq[Block])])(f: Env => Unit): Unit = {
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
@@ -233,11 +233,11 @@ object FPPoSSelectorTest {
     }
   }
 
-  final case class Env(pos: PoSSelector, blockchain: BlockchainUpdater with NG, miners: Seq[PrivateKeyAccount])
+  final case class Env(pos: PoSSelector, blockchain: BlockchainUpdater with NG, miners: Seq[AccountKeyPair])
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  def mkFork(blockCount: Int, miner: PrivateKeyAccount, blockchain: Blockchain): List[Block] = {
+  def mkFork(blockCount: Int, miner: AccountKeyPair, blockchain: Blockchain): List[Block] = {
     val height = blockchain.height
 
     val lastBlock = blockchain.lastBlock.get
@@ -253,7 +253,7 @@ object FPPoSSelectorTest {
         PoSCalculator
           .generatorSignature(
             blockForHit.consensusData.generationSignature.arr,
-            miner.publicKey
+            miner
           )
 
       val delay: Long = 60000
@@ -283,7 +283,7 @@ object FPPoSSelectorTest {
     }
   }
 
-  def forgeBlock(miner: PrivateKeyAccount, blockchain: Blockchain with NG, pos: PoSSelector)(updateDelay: Long => Long = identity,
+  def forgeBlock(miner: AccountKeyPair, blockchain: Blockchain with NG, pos: PoSSelector)(updateDelay: Long => Long = identity,
                                                                                              updateBT: Long => Long = identity,
                                                                                              updateGS: ByteStr => ByteStr = identity): Block = {
     val height       = blockchain.height
@@ -294,7 +294,7 @@ object FPPoSSelectorTest {
       pos
         .getValidBlockDelay(
           height,
-          miner.publicKey,
+          miner,
           lastBlock.consensusData.baseTarget,
           minerBalance
         )
@@ -303,7 +303,7 @@ object FPPoSSelectorTest {
 
     val cData = pos
       .consensusData(
-        miner.publicKey,
+        miner,
         height,
         60.seconds,
         lastBlock.consensusData.baseTarget,
@@ -320,12 +320,12 @@ object FPPoSSelectorTest {
       .explicitGet()
   }
 
-  val accountGen: Gen[PrivateKeyAccount] =
+  val accountGen: Gen[AccountKeyPair] =
     Gen
       .containerOfN[Array, Byte](32, Arbitrary.arbitrary[Byte])
-      .map(PrivateKeyAccount.apply)
+      .map(seed => AccountKeyPair(seed: ByteStr))
 
-  def chainGen(balances: List[Long], blockCount: Int)(t: Time): Gen[(Seq[PrivateKeyAccount], Seq[Block])] = {
+  def chainGen(balances: List[Long], blockCount: Int)(t: Time): Gen[(Seq[AccountKeyPair], Seq[Block])] = {
     val ts = t.correctedTime()
 
     Gen
@@ -355,7 +355,7 @@ object FPPoSSelectorTest {
       }
   }
 
-  def calcDelay(blockForHit: Block, prevBT: Long, minerPK: Array[Byte], effBalance: Long): Long = {
+  def calcDelay(blockForHit: Block, prevBT: Long, minerPK: PublicKeyAccount, effBalance: Long): Long = {
 
     val gs =
       PoSCalculator

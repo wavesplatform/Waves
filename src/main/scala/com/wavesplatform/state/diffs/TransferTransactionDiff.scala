@@ -15,7 +15,7 @@ import scala.util.{Right, Try}
 object TransferTransactionDiff {
   def apply(blockchain: Blockchain, s: FunctionalitySettings, blockTime: Long, height: Int)(
       tx: TransferTransaction): Either[ValidationError, Diff] = {
-    val sender = Address.fromPublicKey(tx.sender.publicKey)
+    val sender = Address.fromPublicKey(tx.sender)
 
     def isSmartAsset = tx.feeAssetId match {
       case Waves => false

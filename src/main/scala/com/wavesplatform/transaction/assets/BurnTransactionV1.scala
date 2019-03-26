@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -61,7 +61,7 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount, asset: IssuedAsset, quantity: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def selfSigned(sender: AccountKeyPair, asset: IssuedAsset, quantity: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, asset, quantity, fee, timestamp, sender)
   }
 

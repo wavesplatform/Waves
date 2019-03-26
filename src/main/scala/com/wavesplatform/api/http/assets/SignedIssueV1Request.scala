@@ -1,13 +1,13 @@
 package com.wavesplatform.api.http.assets
 
 import com.google.common.base.Charsets
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import play.api.libs.json.{Format, Json}
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.AccountPublicKey
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.assets.IssueTransactionV1
+import io.swagger.annotations.{ApiModel, ApiModelProperty}
+import play.api.libs.json.{Format, Json}
 
 object SignedIssueV1Request {
   implicit val assetIssueRequestReads: Format[SignedIssueV1Request] = Json.format
@@ -35,7 +35,7 @@ case class SignedIssueV1Request(@ApiModelProperty(value = "Base58 encoded Issuer
     extends BroadcastRequest {
   def toTx: Either[ValidationError, IssueTransactionV1] =
     for {
-      _sender    <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _sender    <- AccountPublicKey.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid signature", SignatureStringLength)
       _t <- IssueTransactionV1.create(_sender,
                                       name.getBytes(Charsets.UTF_8),

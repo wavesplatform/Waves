@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.lease
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -64,7 +64,7 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount,
+  def selfSigned(sender: AccountKeyPair,
                  amount: Long,
                  fee: Long,
                  timestamp: Long,

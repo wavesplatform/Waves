@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{Alias, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import org.scalatest._
@@ -26,7 +26,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
 
   property("The same aliases from different senders have the same id") {
     forAll(accountGen, accountGen, aliasGen, timestampGen) {
-      case (a1: PrivateKeyAccount, a2: PrivateKeyAccount, a: Alias, t: Long) =>
+      case (a1: AccountKeyPair, a2: AccountKeyPair, a: Alias, t: Long) =>
         val tx1 = CreateAliasTransactionV1.selfSigned(a1, a, MinIssueFee, t).explicitGet()
         val tx2 = CreateAliasTransactionV1.selfSigned(a2, a, MinIssueFee, t).explicitGet()
         tx1.id() shouldBe tx2.id()
@@ -51,7 +51,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
 
     val tx = CreateAliasTransactionV1
       .create(
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        AccountPublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         Alias.create("myalias").explicitGet(),
         100000,
         1526910778245L,
@@ -82,7 +82,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
 
     val tx = CreateAliasTransactionV2
       .create(
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        AccountPublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         Alias.create("myalias").explicitGet(),
         100000,
         1526910778245L,

@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -125,8 +125,8 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
       "version"          -> version,
       "id"               -> idStr(),
       "sender"           -> senderPublicKey.address,
-      "senderPublicKey"  -> Base58.encode(senderPublicKey.publicKey),
-      "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
+      "senderPublicKey"  -> Base58.encode(senderPublicKey),
+      "matcherPublicKey" -> Base58.encode(matcherPublicKey),
       "assetPair"        -> assetPair.json,
       "orderType"        -> orderType.toString,
       "amount"           -> amount,
@@ -214,7 +214,7 @@ object Order {
 
   def correctAmount(o: Order): Long = correctAmount(o.amount, o.price)
 
-  def buy(sender: PrivateKeyAccount,
+  def buy(sender: AccountKeyPair,
           matcher: PublicKeyAccount,
           pair: AssetPair,
           amount: Long,
@@ -232,7 +232,7 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def sell(sender: PrivateKeyAccount,
+  def sell(sender: AccountKeyPair,
            matcher: PublicKeyAccount,
            pair: AssetPair,
            amount: Long,
@@ -250,7 +250,7 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def apply(sender: PrivateKeyAccount,
+  def apply(sender: AccountKeyPair,
             matcher: PublicKeyAccount,
             pair: AssetPair,
             orderType: OrderType,
@@ -264,7 +264,7 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def apply(sender: PrivateKeyAccount,
+  def apply(sender: AccountKeyPair,
             matcher: PublicKeyAccount,
             pair: AssetPair,
             orderType: OrderType,

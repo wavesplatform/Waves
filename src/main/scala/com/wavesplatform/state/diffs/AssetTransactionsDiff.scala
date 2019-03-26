@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings

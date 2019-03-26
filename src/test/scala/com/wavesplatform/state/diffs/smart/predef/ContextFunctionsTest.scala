@@ -1,12 +1,12 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.account.PrivateKeyAccount
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.{Global, StdLibVersion, ContentType}
 import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.{ContentType, Global, StdLibVersion}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
@@ -22,7 +22,7 @@ import shapeless.Coproduct
 
 class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  def compactDataTransactionGen(sender: PrivateKeyAccount) =
+  def compactDataTransactionGen(sender: AccountKeyPair) =
     for {
       long <- longEntryGen(dataAsciiKeyGen)
       bool <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)

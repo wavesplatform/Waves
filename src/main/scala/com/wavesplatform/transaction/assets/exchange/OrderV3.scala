@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets.exchange
 
 import cats.data.State
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -35,8 +35,8 @@ case class OrderV3(senderPublicKey: PublicKeyAccount,
   val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
       Array(version) ++
-        senderPublicKey.publicKey ++
-        matcherPublicKey.publicKey ++
+        senderPublicKey.arr ++
+        matcherPublicKey.arr ++
         assetPair.bytes ++
         orderType.bytes ++
         Longs.toByteArray(amount) ++
@@ -57,8 +57,8 @@ case class OrderV3(senderPublicKey: PublicKeyAccount,
           "version"           -> version,
           "id"                -> idStr(),
           "sender"            -> senderPublicKey.address,
-          "senderPublicKey"   -> Base58.encode(senderPublicKey.publicKey),
-          "matcherPublicKey"  -> Base58.encode(matcherPublicKey.publicKey),
+          "senderPublicKey"   -> Base58.encode(senderPublicKey),
+          "matcherPublicKey"  -> Base58.encode(matcherPublicKey),
           "assetPair"         -> assetPair.json,
           "orderType"         -> orderType.toString,
           "amount"            -> amount,
@@ -78,7 +78,7 @@ object OrderV3 {
 
   private val AssetIdLength = 32
 
-  def buy(sender: PrivateKeyAccount,
+  def buy(sender: AccountKeyPair,
           matcher: PublicKeyAccount,
           pair: AssetPair,
           amount: Long,
@@ -94,7 +94,7 @@ object OrderV3 {
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
-  def sell(sender: PrivateKeyAccount,
+  def sell(sender: AccountKeyPair,
            matcher: PublicKeyAccount,
            pair: AssetPair,
            amount: Long,
@@ -110,7 +110,7 @@ object OrderV3 {
     unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
   }
 
-  def apply(sender: PrivateKeyAccount,
+  def apply(sender: AccountKeyPair,
             matcher: PublicKeyAccount,
             pair: AssetPair,
             orderType: OrderType,
@@ -152,8 +152,8 @@ object OrderV3 {
     val makeOrder = for {
       version <- readByte
       _ = if (version != 3) { throw new Exception(s"Incorrect order version: expect 3 but found $version") }
-      sender            <- read(PublicKeyAccount.apply, KeyLength)
-      matcher           <- read(PublicKeyAccount.apply, KeyLength)
+      sender            <- read(AccountPublicKey.apply, KeyLength)
+      matcher           <- read(AccountPublicKey.apply, KeyLength)
       amountAssetId     <- parse(Deser.parseByteArrayOption, AssetIdLength).map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
       priceAssetId      <- parse(Deser.parseByteArrayOption, AssetIdLength).map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
       orderType         <- readByte

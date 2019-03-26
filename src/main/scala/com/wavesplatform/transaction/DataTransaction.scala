@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.AccountKeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -25,7 +25,7 @@ case class DataTransaction private (sender: PublicKeyAccount, data: List[DataEnt
     Coeval.evalOnce {
       Bytes.concat(
         Array(builder.typeId, version),
-        sender.publicKey,
+        sender,
         Shorts.toByteArray(data.size.toShort),
         data.flatMap(_.toBytes).toArray,
         Longs.toByteArray(timestamp),
@@ -97,7 +97,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount, data: List[DataEntry[_]], feeAmount: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def selfSigned(sender: AccountKeyPair, data: List[DataEntry[_]], feeAmount: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     signed(sender, data, feeAmount, timestamp, sender)
   }
 

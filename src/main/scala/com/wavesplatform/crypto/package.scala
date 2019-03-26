@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import com.wavesplatform.account.PrivateKeyAccount
 import scorex.crypto.hash.{Blake2b256, Keccak256}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey, Signature}
 
@@ -19,7 +18,7 @@ package object crypto {
   def secureHash(s: String): Array[Byte] = secureHash(s.getBytes())
 
   def sign(account: PrivateKeyAccount, message: Array[Byte]): Array[Byte] =
-    Curve25519.sign(PrivateKey(account.privateKey), message)
+    Curve25519.sign(PrivateKey(account.arr), message)
 
   def sign(privateKeyBytes: Array[Byte], message: Array[Byte]): Array[Byte] =
     Curve25519.sign(PrivateKey(privateKeyBytes), message)

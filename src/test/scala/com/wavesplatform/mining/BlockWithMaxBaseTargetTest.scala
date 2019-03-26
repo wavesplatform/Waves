@@ -4,7 +4,7 @@ import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, Address}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -148,7 +148,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       val (account, firstBlock, secondBlock) =
         Gen
           .containerOfN[Array, Byte](32, Arbitrary.arbitrary[Byte])
-          .map(PrivateKeyAccount.apply)
+          .map(bs => AccountKeyPair(bs))
           .map { account =>
             val tx           = GenesisTransaction.create(account, ENOUGH_AMT, ts + 1).explicitGet()
             val genesisBlock = TestBlock.create(ts + 2, List(tx))
@@ -182,6 +182,6 @@ object BlockWithMaxBaseTargetTest {
                        bcu: BlockchainUpdater with NG,
                        utxPool: UtxPool,
                        schedulerService: SchedulerService,
-                       miner: PrivateKeyAccount,
+                       miner: AccountKeyPair,
                        lastBlock: Block)
 }

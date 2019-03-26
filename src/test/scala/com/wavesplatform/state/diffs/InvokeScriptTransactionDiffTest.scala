@@ -1,23 +1,23 @@
 package com.wavesplatform.state.diffs
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, AddressScheme, PrivateKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.contract.Contract
 import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.utils.DirectiveSet
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
+import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -173,12 +173,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     compiler.ContractCompiler(ctx.compilerContext, expr)
   }
 
-  def simplePreconditionsAndSetContract(invokerGen: Gen[PrivateKeyAccount] = accountGen,
-                                        masterGen: Gen[PrivateKeyAccount] = accountGen,
+  def simplePreconditionsAndSetContract(invokerGen: Gen[AccountKeyPair] = accountGen,
+                                        masterGen: Gen[AccountKeyPair] = accountGen,
                                         payment: Option[Payment] = None,
                                         feeGen: Gen[Long] = ciFee(0),
                                         sponsored: Boolean = false)
-    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] = {
+    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, AccountKeyPair, IssueTransaction, SponsorFeeTransaction)] = {
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -214,12 +214,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield paymentContract(senderBinging, argBinding, func, address, amount, masspayment, paymentCount, assetId)
 
   def preconditionsAndSetContract(senderBindingToContract: String => Gen[Contract],
-                                  invokerGen: Gen[PrivateKeyAccount] = accountGen,
-                                  masterGen: Gen[PrivateKeyAccount] = accountGen,
+                                  invokerGen: Gen[AccountKeyPair] = accountGen,
+                                  masterGen: Gen[AccountKeyPair] = accountGen,
                                   payment: Option[Payment] = None,
                                   feeGen: Gen[Long] = ciFee(0),
                                   sponsored: Boolean = false)
-    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, PrivateKeyAccount, IssueTransaction, SponsorFeeTransaction)] =
+    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, AccountKeyPair, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
       invoker <- invokerGen

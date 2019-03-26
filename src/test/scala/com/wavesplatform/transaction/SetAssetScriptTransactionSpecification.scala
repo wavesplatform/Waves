@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
+import com.wavesplatform.account.{AccountPublicKey, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
@@ -35,7 +35,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
        SetAssetScriptTransaction
          .create(
            AddressScheme.current.chainId,
-           PublicKeyAccount.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet(),
+           AccountPublicKey.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet(),
            IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
            Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()),
            78311891L,
@@ -52,7 +52,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
   def transactionName: String = "SetAssetScriptTransaction"
 
   property("issuer can`t make SetAssetScript tx when Script is Contract") {
-    val accountA = PublicKeyAccount.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet()
+    val accountA = AccountPublicKey.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet()
 
     SetAssetScriptTransaction
       .create(

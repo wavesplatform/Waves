@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -87,7 +87,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
   }
 
   def selfSigned(chainId: Byte,
-                 sender: PrivateKeyAccount,
+                 sender: AccountKeyPair,
                  asset: IssuedAsset,
                  quantity: Long,
                  reissuable: Boolean,

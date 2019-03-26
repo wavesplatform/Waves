@@ -3,7 +3,6 @@ package com.wavesplatform.matcher.matching
 import akka.actor.Props
 import akka.pattern.ask
 import akka.util.Timeout
-import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.matcher.market.MatcherSpecLike
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderHistoryStub}

@@ -1,9 +1,9 @@
 package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
-import com.wavesplatform.account.{AddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.matcher.model.OrderValidator
@@ -30,7 +30,7 @@ import scala.util.Random
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
-  val MATCHER: PrivateKeyAccount = PrivateKeyAccount.fromSeed("matcher").explicitGet()
+  val MATCHER: AccountKeyPair = AccountKeyPair(Base58.decode("matcher"))
 
   val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -452,7 +452,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  def createExTx(buy: Order, sell: Order, price: Long, matcher: PrivateKeyAccount, ts: Long): Either[ValidationError, ExchangeTransaction] = {
+  def createExTx(buy: Order, sell: Order, price: Long, matcher: AccountKeyPair, ts: Long): Either[ValidationError, ExchangeTransaction] = {
     val mf     = buy.matcherFee
     val amount = math.min(buy.amount, sell.amount)
     ExchangeTransactionV1.create(
@@ -472,7 +472,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val MatcherFee = 300000L
     val Ts         = 1000L
 
-    val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+    val preconditions: Gen[(AccountKeyPair, AccountKeyPair, AccountKeyPair, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -501,7 +501,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val MatcherFee = 300000L
     val Ts         = 1000L
 
-    val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+    val preconditions: Gen[(AccountKeyPair, AccountKeyPair, AccountKeyPair, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -532,7 +532,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val Ts         = 1000L
 
     val preconditions: Gen[
-      (PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+      (AccountKeyPair, AccountKeyPair, AccountKeyPair, GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -693,10 +693,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (gen1, gen2, issue1, issue2, exchange) =>
         val exchangeWithResignedOrder = exchange match {
           case e1 @ ExchangeTransactionV1(bo, so, _, _, _, _, _, _, _) =>
-            val newSig = ByteStr(crypto.sign(so.senderPublicKey.publicKey, bo.bodyBytes()))
+            val newSig = ByteStr(crypto.sign(so.senderPublicKey, bo.bodyBytes()))
             e1.copy(buyOrder = bo.updateProofs(Proofs(Seq(newSig))).asInstanceOf[OrderV1])
           case e2 @ ExchangeTransactionV2(bo, so, _, _, _, _, _, _, _) =>
-            val newSig = ByteStr(crypto.sign(bo.senderPublicKey.publicKey, so.bodyBytes()))
+            val newSig = ByteStr(crypto.sign(bo.senderPublicKey, so.bodyBytes()))
             e2.copy(sellOrder = so.updateProofs(Proofs(Seq(newSig))))
         }
 
@@ -720,8 +720,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (gen1, gen2, issue1, issue2, exchange) =>
         val newProofs = Proofs(
           Seq(
-            ByteStr(crypto.sign(exchange.sender.publicKey, exchange.sellOrder.bodyBytes())),
-            ByteStr(crypto.sign(exchange.sellOrder.senderPublicKey.publicKey, exchange.sellOrder.bodyBytes()))
+            ByteStr(crypto.sign(exchange.sender, exchange.sellOrder.bodyBytes())),
+            ByteStr(crypto.sign(exchange.sellOrder.senderPublicKey, exchange.sellOrder.bodyBytes()))
           )
         )
 
@@ -950,7 +950,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
   /** Generates sequence of sell orders for one big buy order */
   def sellOrdersForBigBuyOrderGenerator(matcher: PublicKeyAccount,
-                                        sellers: Seq[PrivateKeyAccount],
+                                        sellers: Seq[AccountKeyPair],
                                         assetPair: AssetPair,
                                         price: Long,
                                         matcherFeeAssetId: Asset,

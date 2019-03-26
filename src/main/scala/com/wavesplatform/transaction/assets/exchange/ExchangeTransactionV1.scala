@@ -2,7 +2,6 @@ package com.wavesplatform.transaction.assets.exchange
 
 import cats.implicits._
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -62,7 +61,7 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
              fee: Long,
              timestamp: Long): Either[ValidationError, TransactionT] = {
     create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(crypto.sign(matcher.privateKey, unverified.bodyBytes())))
+      unverified.copy(signature = ByteStr(crypto.sign(matcher, unverified.bodyBytes())))
     }
   }
 

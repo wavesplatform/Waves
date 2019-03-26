@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets.exchange
 
 import cats.data.State
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -34,7 +34,7 @@ case class OrderV2(senderPublicKey: PublicKeyAccount,
   override def signature: Array[Byte] = proofs.proofs(0).arr
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    (version +: senderPublicKey.publicKey) ++ matcherPublicKey.publicKey ++
+    (version +: senderPublicKey.arr) ++ matcherPublicKey.arr ++
       assetPair.bytes ++ orderType.bytes ++
       Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
       Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
@@ -47,7 +47,7 @@ case class OrderV2(senderPublicKey: PublicKeyAccount,
 object OrderV2 {
   private val AssetIdLength = 32
 
-  def buy(sender: PrivateKeyAccount,
+  def buy(sender: AccountKeyPair,
           matcher: PublicKeyAccount,
           pair: AssetPair,
           amount: Long,
@@ -60,7 +60,7 @@ object OrderV2 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def sell(sender: PrivateKeyAccount,
+  def sell(sender: AccountKeyPair,
            matcher: PublicKeyAccount,
            pair: AssetPair,
            amount: Long,
@@ -73,7 +73,7 @@ object OrderV2 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def apply(sender: PrivateKeyAccount,
+  def apply(sender: AccountKeyPair,
             matcher: PublicKeyAccount,
             pair: AssetPair,
             orderType: OrderType,
@@ -105,8 +105,8 @@ object OrderV2 {
     val makeOrder = for {
       version <- readByte
       _ = if (version != 2) { throw new Exception(s"Incorrect order version: expect 2 but found $version") }
-      sender  <- read(PublicKeyAccount.apply, KeyLength)
-      matcher <- read(PublicKeyAccount.apply, KeyLength)
+      sender  <- read(AccountPublicKey.apply, KeyLength)
+      matcher <- read(AccountPublicKey.apply, KeyLength)
       amountAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
         .map {
           case Some(arr) => IssuedAsset(ByteStr(arr))

@@ -22,7 +22,7 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class InvokeScriptTransaction private (chainId: Byte,
-                                            sender: PublicKeyAccount,
+                                            sender: AccountPublicKey,
                                             contractAddress: Address,
                                             fc: Terms.FUNCTION_CALL,
                                             payment: Seq[Payment],
@@ -43,7 +43,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
     Coeval.evalOnce(
       Bytes.concat(
         Array(builder.typeId, version, chainId),
-        sender.publicKey,
+        sender,
         contractAddress.bytes.arr,
         Serde.serialize(fc),
         Deser.serializeArrays(payment.map(pmt => Longs.toByteArray(pmt.amount) ++ Deser.serializeOption(pmt.assetId.compatId)(_.arr))),
@@ -118,7 +118,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     }
   }
 
-  def create(sender: PublicKeyAccount,
+  def create(sender: AccountPublicKey,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
@@ -154,20 +154,20 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     } yield tx
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: AccountPublicKey,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
              fee: Long,
              feeAssetId: Asset,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
-  def selfSigned(sender: PrivateKeyAccount,
+  def selfSigned(sender: AccountKeyPair,
                  contractAddress: Address,
                  fc: Terms.FUNCTION_CALL,
                  p: Seq[Payment],

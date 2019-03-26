@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.ConfigFactory.{defaultApplication, defaultReference}
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.AccountPublicKey
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -34,12 +34,12 @@ object BaseTargetChecker {
     try {
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
         case cfg if cfg.as[Boolean]("waves.miner.enable") =>
-          val account   = PublicKeyAccount(cfg.as[ByteStr]("public-key").arr)
+          val account   = AccountPublicKey(cfg.as[ByteStr]("public-key").arr)
           val address   = account.toAddress
           val balance   = bu.balance(address, Waves)
           val consensus = genesisBlock.consensusData
           val timeDelay = pos
-            .getValidBlockDelay(bu.height, account.publicKey, consensus.baseTarget, balance)
+            .getValidBlockDelay(bu.height, account, consensus.baseTarget, balance)
             .explicitGet()
 
           f"$address: ${timeDelay * 1e-3}%10.3f s"

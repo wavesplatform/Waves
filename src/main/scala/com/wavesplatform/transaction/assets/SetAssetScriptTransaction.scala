@@ -18,7 +18,7 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.Try
 
 case class SetAssetScriptTransaction private (chainId: Byte,
-                                              sender: PublicKeyAccount,
+                                              sender: AccountPublicKey,
                                               asset: IssuedAsset,
                                               script: Option[Script],
                                               fee: Long,
@@ -45,7 +45,7 @@ case class SetAssetScriptTransaction private (chainId: Byte,
     Coeval.evalOnce(
       Bytes.concat(
         Array(builder.typeId, version, chainId),
-        sender.publicKey,
+        sender,
         asset.id.arr,
         Longs.toByteArray(fee),
         Longs.toByteArray(timestamp),
@@ -67,7 +67,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
   private def currentChainId: Byte = AddressScheme.current.chainId
 
   def create(chainId: Byte,
-             sender: PublicKeyAccount,
+             sender: AccountPublicKey,
              assetId: IssuedAsset,
              script: Option[Script],
              fee: Long,
@@ -86,12 +86,12 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
   }
 
   def signed(chainId: Byte,
-             sender: PublicKeyAccount,
+             sender: AccountPublicKey,
              asset: IssuedAsset,
              script: Option[Script],
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
     create(chainId, sender, asset, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(sign(signer, unsigned.bodyBytes())))).explicitGet())
     }

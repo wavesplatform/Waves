@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.assets
 
 import cats.implicits._
-import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
+import com.wavesplatform.account.{AccountPublicKey, AddressOrAlias}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Proofs, ValidationError}
@@ -49,7 +49,7 @@ case class SignedTransferV2Request(@ApiModelProperty(value = "Base58 encoded sen
     extends BroadcastRequest {
   def toTx: Either[ValidationError, TransferTransactionV2] =
     for {
-      _sender     <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _sender     <- AccountPublicKey.fromBase58String(senderPublicKey)
       _assetId    <- parseBase58ToAssetId(assetId.filter(_.length > 0), "invalid.assetId")
       _feeAssetId <- parseBase58ToAssetId(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))

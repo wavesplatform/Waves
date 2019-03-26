@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
@@ -34,10 +34,10 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
     Seq(GenesisTransaction.create(address, initialBalance, genesisTs).explicitGet())
   )
 
-  private def transfer(sender: PrivateKeyAccount, recipient: Address, amount: Long) =
+  private def transfer(sender: AccountKeyPair, recipient: Address, amount: Long) =
     TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, nextTs, Waves, 1, Array.empty[Byte]).explicitGet()
 
-  private def randomOp(sender: PrivateKeyAccount, recipient: Address, amount: Long, op: Int, nextTs: => Long = nextTs) = {
+  private def randomOp(sender: AccountKeyPair, recipient: Address, amount: Long, op: Int, nextTs: => Long = nextTs) = {
     import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
     op match {
       case 1 =>

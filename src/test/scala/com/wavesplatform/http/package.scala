@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
+import com.wavesplatform.account.{AccountPublicKey, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.transfer._
@@ -49,8 +49,8 @@ package object http {
   )
 
   implicit val publicKeyAccountFormat: Format[PublicKeyAccount] = byteStrFormat.inmap[PublicKeyAccount](
-    x => PublicKeyAccount(x.arr),
-    x => ByteStr(x.publicKey)
+    x => AccountPublicKey(x.arr),
+    x => ByteStr(x)
   )
 
   implicit val proofsFormat: Format[Proofs] = Format(

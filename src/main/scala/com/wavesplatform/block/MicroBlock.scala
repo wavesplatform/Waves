@@ -1,7 +1,7 @@
 package com.wavesplatform.block
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.block.Block.{BlockId, transParseBytes}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -43,7 +43,7 @@ case class MicroBlock(version: Byte,
 
   private val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
-  override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature.arr, bytesWithoutSignature(), sender.publicKey))
+  override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature.arr, bytesWithoutSignature(), sender))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
   override def toString: String = s"MicroBlock(${totalResBlockSig.trim} -> ${prevResBlockSig.trim}, txs=${transactionData.size})"
@@ -64,7 +64,7 @@ object MicroBlock extends ScorexLogging {
       Right(new MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, signature))
   }
 
-  def buildAndSign(generator: PrivateKeyAccount,
+  def buildAndSign(generator: AccountKeyPair,
                    transactionData: Seq[Transaction],
                    prevResBlockSig: BlockId,
                    totalResBlockSig: BlockId): Either[ValidationError, MicroBlock] =
@@ -105,7 +105,7 @@ object MicroBlock extends ScorexLogging {
 
       val signature = ByteStr(bytes.slice(position, position + SignatureLength))
 
-      create(version, PublicKeyAccount(genPK), txBlockField, prevResBlockSig, totalResBlockSig, signature).explicitGet()
+      create(version, AccountPublicKey(genPK), txBlockField, prevResBlockSig, totalResBlockSig, signature).explicitGet()
     }.recoverWith {
       case t: Throwable =>
         log.error("Error when parsing microblock", t)

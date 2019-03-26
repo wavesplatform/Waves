@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.AccountPublicKey
 import com.wavesplatform.api.http.SignedDataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -68,7 +68,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
       json.toString shouldEqual tx.toString
 
       val req = json.as[SignedDataRequest]
-      req.senderPublicKey shouldEqual Base58.encode(tx.sender.publicKey)
+      req.senderPublicKey shouldEqual Base58.encode(tx.sender)
       req.fee shouldEqual tx.fee
       req.timestamp shouldEqual tx.timestamp
 
@@ -178,7 +178,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
     val tx = DataTransaction
       .create(
-        PublicKeyAccount.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        AccountPublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         List(entry1, entry2, entry3),
         100000,
         1526911531530L,

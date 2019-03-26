@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.account.{AccountKeyPair, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -26,7 +26,7 @@ case class PaymentTransaction private (sender: PublicKeyAccount, recipient: Addr
   private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(Array(builder.typeId),
                  Longs.toByteArray(timestamp),
-                 sender.publicKey,
+                 sender,
                  recipient.bytes.arr,
                  Longs.toByteArray(amount),
                  Longs.toByteArray(fee)))
@@ -34,7 +34,7 @@ case class PaymentTransaction private (sender: PublicKeyAccount, recipient: Addr
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
     Bytes.concat(Ints.toByteArray(builder.typeId),
                  Longs.toByteArray(timestamp),
-                 sender.publicKey,
+                 sender,
                  recipient.bytes.arr,
                  Longs.toByteArray(amount),
                  Longs.toByteArray(fee)))
@@ -54,7 +54,7 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
   private val FeeLength    = 8
   private val BaseLength   = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
-  def create(sender: PrivateKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def create(sender: AccountKeyPair, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     })
