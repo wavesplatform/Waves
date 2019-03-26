@@ -316,7 +316,7 @@ class LevelDBWriter(writableDB: DB,
 
     rw.put(Keys.minerBalancesInfoAtHeight(Height @@ height), miners.toMap)
 
-    val expiredMiners = Keys.minerBalancesInfoAtHeight(Height @@ (height - threshold))
+    val expiredMiners = Keys.minerBalancesInfoAtHeight(Height @@ threshold)
 
     expiredKeys.append(expiredMiners.keyBytes)
 
