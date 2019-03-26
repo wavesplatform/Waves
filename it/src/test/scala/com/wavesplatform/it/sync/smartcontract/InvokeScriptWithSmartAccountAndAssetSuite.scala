@@ -204,7 +204,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
         fee = 0.05299999.waves
       ),
-      s"with 11 total scripts invoked does not exceed minimal value of 5300000"
+      s"with 12 total scripts invoked does not exceed minimal value of 5300000"
     )
 
     val invokeScriptTxId = sender

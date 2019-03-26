@@ -120,7 +120,8 @@ object InvokeScriptTransactionDiff {
                         tx.checkedAssets()
                           .collect { case asset @ IssuedAsset(_) => asset }
                           .count(blockchain.hasAssetScript) +
-                          ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id))))
+                          ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
+                          (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
                       val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
                       Either.cond(
                         minWaves <= wavesFee,
