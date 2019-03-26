@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import com.wavesplatform.api.http.{ApiError, ApiRoute}
 import com.wavesplatform.network._
-import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.{Transaction, ValidationError}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup

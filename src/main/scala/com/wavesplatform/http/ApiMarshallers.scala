@@ -61,14 +61,14 @@ trait ApiMarshallers { self: ApiRoute =>
   implicit def playJsonMarshaller[A](implicit writes: Writes[A], jsValueToString: JsValue => String = Json.stringify): ToEntityMarshaller[A] = {
     Marshaller
       .futureMarshaller[String, MessageEntity](jsonStringMarshaller)
-      .compose((value: A) => Future(jsValueToString(Json.toJson(value)))(ApiMarshallers.executionContext))
+      .compose((value: A) => Future(jsValueToString(Json.toJson(value)))(ApiMarshallers.executionContext(settings)))
   }
 
   // preserve support for using plain strings as request entities
   implicit val stringMarshaller = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
 }
 
-private object ApiMarshallers extends ApiMarshallers {
+private object ApiMarshallers {
   private[this] var executionContext = Option.empty[ExecutionContextExecutor]
 
   def executionContext(settings: RestAPISettings): ExecutionContextExecutor = {
