@@ -7,7 +7,7 @@ import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, BlockHeader, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -68,8 +68,8 @@ package object database {
       ByteStr(readBytes(len))
     }
 
-    def readSignature: ByteStr          = readByteStr(SignatureLength)
-    def readPublicKey: AccountPublicKey = AccountPublicKey(readBytes(KeyLength))
+    def readSignature: ByteStr   = readByteStr(SignatureLength)
+    def readPublicKey: PublicKey = PublicKey(readBytes(KeyLength))
   }
 
   def writeIntSeq(values: Seq[Int]): Array[Byte] = {

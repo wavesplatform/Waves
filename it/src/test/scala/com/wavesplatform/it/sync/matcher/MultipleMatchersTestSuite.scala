@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -92,7 +92,7 @@ class MultipleMatchersTestSuite extends MatcherSuiteBase {
     state1 shouldBe state2
   }
 
-  private def mkOrders(account: AccountKeyPair) =
+  private def mkOrders(account: KeyPair) =
     Gen.containerOfN[Vector, Order](placesNumber, orderGen(matcherPublicKey, account, assetPairs)).sample.get
 
   private def state(matcherNode: Node) = clean(matcherNode.matcherState(assetPairs, orders, Seq(aliceAcc, bobAcc)))

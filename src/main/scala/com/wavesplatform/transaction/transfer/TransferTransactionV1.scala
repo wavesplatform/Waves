@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey, AddressOrAlias}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -14,7 +14,7 @@ import monix.eval.Coeval
 import scala.util.Try
 
 case class TransferTransactionV1 private (assetId: Asset,
-                                          sender: AccountPublicKey,
+                                          sender: PublicKey,
                                           recipient: AddressOrAlias,
                                           amount: Long,
                                           timestamp: Long,
@@ -46,7 +46,7 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
   }
 
   def create(assetId: Asset,
-             sender: AccountPublicKey,
+             sender: PublicKey,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
@@ -60,21 +60,21 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
   }
 
   def signed(assetId: Asset,
-             sender: AccountPublicKey,
+             sender: PublicKey,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
              feeAssetId: Asset,
              feeAmount: Long,
              attachment: Array[Byte],
-             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
   }
 
   def selfSigned(assetId: Asset,
-                 sender: AccountKeyPair,
+                 sender: KeyPair,
                  recipient: AddressOrAlias,
                  amount: Long,
                  timestamp: Long,
@@ -88,7 +88,7 @@ object TransferTransactionV1 extends TransactionParserFor[TransferTransactionV1]
     (
       SignatureBytes(tailIndex(1), "Signature"),
       ConstantByte(tailIndex(2), value = typeId, name = "Transaction type"),
-      AccountPublicKeyBytes(tailIndex(3), "Sender's public key"),
+      PublicKeyBytes(tailIndex(3), "Sender's public key"),
       OptionBytes[IssuedAsset](tailIndex(4), "Asset ID", AssetIdBytes(tailIndex(4), "Asset ID"), "flag (1 - asset, 0 - Waves)"),
       OptionBytes[IssuedAsset](tailIndex(5), "Fee's asset ID", AssetIdBytes(tailIndex(5), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
       LongBytes(tailIndex(6), "Timestamp"),

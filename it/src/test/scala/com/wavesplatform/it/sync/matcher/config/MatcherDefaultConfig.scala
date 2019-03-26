@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.matcher.config
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.assets.SignedIssueV1Request
 import com.wavesplatform.it.sync._
 import com.wavesplatform.matcher.market.MatcherActor
@@ -40,14 +40,14 @@ object MatcherDefaultConfig {
     .zip(Seq(matcherConfig, minerDisabled, minerEnabled))
     .map { case (n, o) => o.withFallback(n) }
 
-  def issueAssetPair(issuer: AccountKeyPair,
+  def issueAssetPair(issuer: KeyPair,
                      amountAssetDecimals: Byte,
                      priceAssetDecimals: Byte): (SignedIssueV1Request, SignedIssueV1Request, AssetPair) = {
     issueAssetPair(issuer, issuer, amountAssetDecimals, priceAssetDecimals)
   }
 
-  def issueAssetPair(amountAssetIssuer: AccountKeyPair,
-                     priceAssetIssuer: AccountKeyPair,
+  def issueAssetPair(amountAssetIssuer: KeyPair,
+                     priceAssetIssuer: KeyPair,
                      amountAssetDecimals: Byte,
                      priceAssetDecimals: Byte): (SignedIssueV1Request, SignedIssueV1Request, AssetPair) = {
 
@@ -90,7 +90,7 @@ object MatcherDefaultConfig {
       issueAssetPair(amountAssetIssuer, priceAssetIssuer, amountAssetDecimals, priceAssetDecimals)
   }
 
-  def assetPairIssuePriceAsset(issuer: AccountKeyPair, amountAssetId: Asset, priceAssetDecimals: Byte): (SignedIssueV1Request, AssetPair) = {
+  def assetPairIssuePriceAsset(issuer: KeyPair, amountAssetId: Asset, priceAssetDecimals: Byte): (SignedIssueV1Request, AssetPair) = {
 
     val issuePriceAssetTx: IssueTransactionV1 = IssueTransactionV1
       .selfSigned(

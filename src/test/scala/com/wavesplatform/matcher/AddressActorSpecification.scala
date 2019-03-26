@@ -6,7 +6,7 @@ import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import cats.kernel.Monoid
 import com.wavesplatform.NTPTime
-import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey, Address}
+import com.wavesplatform.account.{KeyPair, PublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.AddressActor.{BalanceUpdated, PlaceOrder}
 import com.wavesplatform.matcher.model.LimitOrder
@@ -33,7 +33,7 @@ class AddressActorSpecification
 
   private val sellTokenOrder1 = OrderV1(
     sender = privateKey("test"),
-    matcher = AccountPublicKey("matcher".getBytes()),
+    matcher = PublicKey("matcher".getBytes()),
     pair = AssetPair(Waves, IssuedAsset(assetId)),
     orderType = OrderType.BUY,
     price = 100000000L,
@@ -47,7 +47,7 @@ class AddressActorSpecification
 
   private val sellTokenOrder2 = OrderV1(
     sender = privateKey("test"),
-    matcher = AccountPublicKey("matcher".getBytes()),
+    matcher = PublicKey("matcher".getBytes()),
     pair = AssetPair(Waves, IssuedAsset(assetId)),
     orderType = OrderType.BUY,
     price = 100000000L,
@@ -61,7 +61,7 @@ class AddressActorSpecification
 
   private val sellWavesOrder = OrderV1(
     sender = privateKey("test"),
-    matcher = AccountPublicKey("matcher".getBytes()),
+    matcher = PublicKey("matcher".getBytes()),
     pair = AssetPair(Waves, IssuedAsset(assetId)),
     orderType = OrderType.SELL,
     price = 100000000L,
@@ -212,7 +212,7 @@ class AddressActorSpecification
   }
 
   private def addr(seed: String): Address              = privateKey(seed).toAddress
-  private def privateKey(seed: String): AccountKeyPair = Wallet.generateNewAccount(seed.getBytes(), 0)
+  private def privateKey(seed: String): KeyPair = Wallet.generateNewAccount(seed.getBytes(), 0)
 
   override protected def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)

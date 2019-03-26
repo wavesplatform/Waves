@@ -3,7 +3,7 @@ package com.wavesplatform.generator
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Gen
@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 
 import scala.concurrent.duration._
 
-class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[AccountKeyPair]) extends TransactionGenerator {
+class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPair]) extends TransactionGenerator {
   private def r                                   = ThreadLocalRandom.current
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
 

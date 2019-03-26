@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -14,7 +14,7 @@ import monix.eval.Coeval
 import scala.util.Try
 
 final case class BurnTransactionV2 private (chainId: Byte,
-                                            sender: AccountPublicKey,
+                                            sender: PublicKey,
                                             asset: IssuedAsset,
                                             quantity: Long,
                                             fee: Long,
@@ -51,7 +51,7 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
   }
 
   def create(chainId: Byte,
-             sender: AccountPublicKey,
+             sender: PublicKey,
              asset: IssuedAsset,
              quantity: Long,
              fee: Long,
@@ -63,12 +63,12 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
   }
 
   def signed(chainId: Byte,
-             sender: AccountPublicKey,
+             sender: PublicKey,
              asset: IssuedAsset,
              quantity: Long,
              fee: Long,
              timestamp: Long,
-             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     for {
       unsigned <- create(chainId, sender, asset, quantity, fee, timestamp, Proofs.empty)
       proofs   <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes()))))
@@ -76,7 +76,7 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
   }
 
   def selfSigned(chainId: Byte,
-                 sender: AccountKeyPair,
+                 sender: KeyPair,
                  asset: IssuedAsset,
                  quantity: Long,
                  fee: Long,
@@ -87,7 +87,7 @@ object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with Tr
   val byteTailDescription: ByteEntity[BurnTransactionV2] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      AccountPublicKeyBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength).map(IssuedAsset),
       LongBytes(tailIndex(4), "Quantity"),
       LongBytes(tailIndex(5), "Fee"),

@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets.exchange
 
 import cats.data.State
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
@@ -24,14 +24,14 @@ case class OrderV1(@ApiModelProperty(
                      dataType = "string",
                      example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
                    )
-                   senderPublicKey: AccountPublicKey,
+                   senderPublicKey: PublicKey,
                    @ApiModelProperty(
                      value = "Base58 encoded Matcher public key",
                      required = true,
                      dataType = "string",
                      example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
                    )
-                   matcherPublicKey: AccountPublicKey,
+                   matcherPublicKey: PublicKey,
                    @ApiModelProperty(value = "Asset pair", required = true)
                    assetPair: AssetPair,
                    @ApiModelProperty(
@@ -85,8 +85,8 @@ case class OrderV1(@ApiModelProperty(
 object OrderV1 {
   private val AssetIdLength = 32
 
-  def apply(senderPublicKey: AccountPublicKey,
-            matcherPublicKey: AccountPublicKey,
+  def apply(senderPublicKey: PublicKey,
+            matcherPublicKey: PublicKey,
             assetPair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -107,8 +107,8 @@ object OrderV1 {
             Proofs(List(ByteStr(signature))))
   }
 
-  def buy(sender: AccountKeyPair,
-          matcher: AccountPublicKey,
+  def buy(sender: KeyPair,
+          matcher: PublicKey,
           pair: AssetPair,
           amount: Long,
           price: Long,
@@ -120,8 +120,8 @@ object OrderV1 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def sell(sender: AccountKeyPair,
-           matcher: AccountPublicKey,
+  def sell(sender: KeyPair,
+           matcher: PublicKey,
            pair: AssetPair,
            amount: Long,
            price: Long,
@@ -133,8 +133,8 @@ object OrderV1 {
     unsigned.copy(proofs = Proofs(List(ByteStr(sig))))
   }
 
-  def apply(sender: AccountKeyPair,
-            matcher: AccountPublicKey,
+  def apply(sender: KeyPair,
+            matcher: PublicKey,
             pair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -160,8 +160,8 @@ object OrderV1 {
       (off, res)
     }
     val makeOrder = for {
-      sender  <- read(AccountPublicKey.apply, KeyLength)
-      matcher <- read(AccountPublicKey.apply, KeyLength)
+      sender  <- read(PublicKey.apply, KeyLength)
+      matcher <- read(PublicKey.apply, KeyLength)
       amountAssetId <- parse(Deser.parseByteArrayOption, AssetIdLength)
         .map {
           case Some(arr) => IssuedAsset(ByteStr(arr))

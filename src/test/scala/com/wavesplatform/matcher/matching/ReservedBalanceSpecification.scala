@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.matching
 import akka.actor.Props
 import akka.pattern.ask
 import akka.util.Timeout
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.matcher.market.MatcherSpecLike
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderHistoryStub}
@@ -98,7 +98,7 @@ class ReservedBalanceSpecification
       )
     ))
 
-  private def openVolume(senderPublicKey: AccountPublicKey, assetId: Asset): Long =
+  private def openVolume(senderPublicKey: PublicKey, assetId: Asset): Long =
     Await
       .result(
         (addressDir ? AddressDirectory.Envelope(senderPublicKey, AddressActor.GetReservedBalance)).mapTo[Map[Asset, Long]],

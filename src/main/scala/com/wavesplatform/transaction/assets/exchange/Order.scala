@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -22,9 +22,9 @@ import scala.util.Try
   * Order to matcher service for asset exchange
   */
 trait Order extends BytesSerializable with JsonSerializable with Proven {
-  def senderPublicKey: AccountPublicKey
+  def senderPublicKey: PublicKey
 
-  def matcherPublicKey: AccountPublicKey
+  def matcherPublicKey: PublicKey
 
   def assetPair: AssetPair
 
@@ -176,8 +176,8 @@ object Order {
   val PriceConstant     = 100000000L
   val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
 
-  def apply(senderPublicKey: AccountPublicKey,
-            matcherPublicKey: AccountPublicKey,
+  def apply(senderPublicKey: PublicKey,
+            matcherPublicKey: PublicKey,
             assetPair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -191,8 +191,8 @@ object Order {
     case 2 => OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
   }
 
-  def apply(senderPublicKey: AccountPublicKey,
-            matcherPublicKey: AccountPublicKey,
+  def apply(senderPublicKey: PublicKey,
+            matcherPublicKey: PublicKey,
             assetPair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -214,8 +214,8 @@ object Order {
 
   def correctAmount(o: Order): Long = correctAmount(o.amount, o.price)
 
-  def buy(sender: AccountKeyPair,
-          matcher: AccountPublicKey,
+  def buy(sender: KeyPair,
+          matcher: PublicKey,
           pair: AssetPair,
           amount: Long,
           price: Long,
@@ -232,8 +232,8 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def sell(sender: AccountKeyPair,
-           matcher: AccountPublicKey,
+  def sell(sender: KeyPair,
+           matcher: PublicKey,
            pair: AssetPair,
            amount: Long,
            price: Long,
@@ -250,8 +250,8 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def apply(sender: AccountKeyPair,
-            matcher: AccountPublicKey,
+  def apply(sender: KeyPair,
+            matcher: PublicKey,
             pair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -264,8 +264,8 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def apply(sender: AccountKeyPair,
-            matcher: AccountPublicKey,
+  def apply(sender: KeyPair,
+            matcher: PublicKey,
             pair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -279,7 +279,7 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def sign(unsigned: Order, sender: AccountPrivateKey): Order = {
+  def sign(unsigned: Order, sender: PrivateKey): Order = {
     require(unsigned.senderPublicKey == sender)
     val sig = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))

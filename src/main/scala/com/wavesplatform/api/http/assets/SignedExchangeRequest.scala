@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http.assets
 
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.ValidationError
@@ -37,7 +37,7 @@ case class SignedExchangeRequest(@ApiModelProperty(value = "Base58 encoded sende
     extends BroadcastRequest {
   def toTx: Either[ValidationError, ExchangeTransaction] =
     for {
-      _sender    <- AccountPublicKey.fromBase58String(senderPublicKey)
+      _sender    <- PublicKey.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       o1         <- castOrder(order1)
       o2         <- castOrder(order2)

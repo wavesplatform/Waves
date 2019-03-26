@@ -1,6 +1,6 @@
 package com.wavesplatform.lagonaki.mocks
 
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.Transaction
 import scala.util.{Random, Try}
 
 object TestBlock {
-  val defaultSigner = AccountKeyPair(Array.fill(KeyLength)(0: Byte))
+  val defaultSigner = KeyPair(Array.fill(KeyLength)(0: Byte))
 
   val random: Random = new Random()
 
@@ -19,7 +19,7 @@ object TestBlock {
 
   def randomSignature(): ByteStr = randomOfLength(SignatureLength)
 
-  def sign(signer: AccountKeyPair, b: Block): Block = {
+  def sign(signer: KeyPair, b: Block): Block = {
     Block
       .buildAndSign(
         version = b.version,
@@ -35,20 +35,20 @@ object TestBlock {
 
   def create(txs: Seq[Transaction]): Block = create(defaultSigner, txs)
 
-  def create(signer: AccountKeyPair, txs: Seq[Transaction]): Block =
+  def create(signer: KeyPair, txs: Seq[Transaction]): Block =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs, signer = signer)
 
-  def create(signer: AccountKeyPair, txs: Seq[Transaction], features: Set[Short]): Block =
+  def create(signer: KeyPair, txs: Seq[Transaction], features: Set[Short]): Block =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), ref = randomSignature(), txs = txs, signer = signer, version = 3, features = features)
 
   def create(time: Long, txs: Seq[Transaction]): Block = create(time, randomSignature(), txs, defaultSigner)
 
-  def create(time: Long, txs: Seq[Transaction], signer: AccountKeyPair): Block = create(time, randomSignature(), txs, signer)
+  def create(time: Long, txs: Seq[Transaction], signer: KeyPair): Block = create(time, randomSignature(), txs, signer)
 
   def create(time: Long,
              ref: ByteStr,
              txs: Seq[Transaction],
-             signer: AccountKeyPair = defaultSigner,
+             signer: KeyPair = defaultSigner,
              version: Byte = 2,
              features: Set[Short] = Set.empty[Short]): Block =
     sign(

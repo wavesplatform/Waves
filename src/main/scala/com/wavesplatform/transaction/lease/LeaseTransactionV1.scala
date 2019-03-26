@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.lease
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey, AddressOrAlias}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -12,7 +12,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class LeaseTransactionV1 private (sender: AccountPublicKey,
+case class LeaseTransactionV1 private (sender: PublicKey,
                                        amount: Long,
                                        fee: Long,
                                        timestamp: Long,
@@ -42,7 +42,7 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
     }
   }
 
-  def create(sender: AccountPublicKey,
+  def create(sender: PublicKey,
              amount: Long,
              fee: Long,
              timestamp: Long,
@@ -53,18 +53,18 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
       .map(_ => LeaseTransactionV1(sender, amount, fee, timestamp, recipient, signature))
   }
 
-  def signed(sender: AccountPublicKey,
+  def signed(sender: PublicKey,
              amount: Long,
              fee: Long,
              timestamp: Long,
              recipient: AddressOrAlias,
-             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, amount, fee, timestamp, recipient, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
   }
 
-  def selfSigned(sender: AccountKeyPair,
+  def selfSigned(sender: KeyPair,
                  amount: Long,
                  fee: Long,
                  timestamp: Long,
@@ -74,7 +74,7 @@ object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with 
 
   val byteTailDescription: ByteEntity[LeaseTransactionV1] = {
     (
-      AccountPublicKeyBytes(tailIndex(1), "Sender's public key"),
+      PublicKeyBytes(tailIndex(1), "Sender's public key"),
       AddressOrAliasBytes(tailIndex(2), "Recipient"),
       LongBytes(tailIndex(3), "Amount"),
       LongBytes(tailIndex(4), "Fee"),

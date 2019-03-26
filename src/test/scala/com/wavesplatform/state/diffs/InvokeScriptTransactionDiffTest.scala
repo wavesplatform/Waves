@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{AccountKeyPair, Address, AddressScheme}
+import com.wavesplatform.account.{KeyPair, Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -173,12 +173,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     compiler.ContractCompiler(ctx.compilerContext, expr)
   }
 
-  def simplePreconditionsAndSetContract(invokerGen: Gen[AccountKeyPair] = accountGen,
-                                        masterGen: Gen[AccountKeyPair] = accountGen,
+  def simplePreconditionsAndSetContract(invokerGen: Gen[KeyPair] = accountGen,
+                                        masterGen: Gen[KeyPair] = accountGen,
                                         payment: Option[Payment] = None,
                                         feeGen: Gen[Long] = ciFee(0),
                                         sponsored: Boolean = false)
-    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, AccountKeyPair, IssueTransaction, SponsorFeeTransaction)] = {
+    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] = {
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -214,12 +214,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield paymentContract(senderBinging, argBinding, func, address, amount, masspayment, paymentCount, assetId)
 
   def preconditionsAndSetContract(senderBindingToContract: String => Gen[Contract],
-                                  invokerGen: Gen[AccountKeyPair] = accountGen,
-                                  masterGen: Gen[AccountKeyPair] = accountGen,
+                                  invokerGen: Gen[KeyPair] = accountGen,
+                                  masterGen: Gen[KeyPair] = accountGen,
                                   payment: Option[Payment] = None,
                                   feeGen: Gen[Long] = ciFee(0),
                                   sponsored: Boolean = false)
-    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, AccountKeyPair, IssueTransaction, SponsorFeeTransaction)] =
+    : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
       invoker <- invokerGen

@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -30,7 +30,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     alias                    <- aliasGen
     alias2                   <- aliasGen suchThat (_.name != alias.name)
     fee                      <- smallFeeGen
-    other: AccountKeyPair <- accountGen
+    other: KeyPair <- accountGen
     aliasTx                  <- createAliasGen(master, alias, fee, ts)
     sameAliasTx              <- createAliasGen(master, alias, fee + 1, ts)
     sameAliasOtherSenderTx   <- createAliasGen(other, alias, fee + 2, ts)

@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http.assets
 
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.ValidationError
@@ -29,7 +29,7 @@ case class SignedReissueV1Request(@ApiModelProperty(value = "Base58 encoded Issu
     extends BroadcastRequest {
   def toTx: Either[ValidationError, ReissueTransactionV1] =
     for {
-      _sender    <- AccountPublicKey.fromBase58String(senderPublicKey)
+      _sender    <- PublicKey.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _assetId   <- parseBase58ToAsset(assetId)
       _t         <- ReissueTransactionV1.create(_sender, _assetId, quantity, reissuable, fee, timestamp, _signature)

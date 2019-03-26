@@ -1,6 +1,6 @@
 package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.exchange.{OrderV1, OrderV2}
@@ -11,8 +11,8 @@ object PBOrders {
 
   def vanilla(order: PBOrder, version: Int = 0): VanillaOrder = {
     VanillaOrder(
-      AccountPublicKey(order.senderPublicKey.toByteArray),
-      AccountPublicKey(order.matcherPublicKey.toByteArray),
+      PublicKey(order.senderPublicKey.toByteArray),
+      PublicKey(order.matcherPublicKey.toByteArray),
       vt.assets.exchange.AssetPair(Asset.fromProtoId(order.getAssetPair.amountAssetId), Asset.fromProtoId(order.getAssetPair.priceAssetId)),
       order.orderSide match {
         case PBOrder.Side.BUY             => vt.assets.exchange.OrderType.BUY

@@ -3,7 +3,7 @@ package com.wavesplatform.wallet
 import java.io.File
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.account.{AccountKeyPair, Address}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.WalletSettings
@@ -18,32 +18,32 @@ import scala.util.control.NonFatal
 trait Wallet {
   def seed: Array[Byte]
   def nonce: Int
-  def AccountPrivateKeys: Seq[AccountKeyPair]
-  def generateNewAccounts(howMany: Int): Seq[AccountKeyPair]
-  def generateNewAccount(): Option[AccountKeyPair]
-  def deleteAccount(account: AccountKeyPair): Boolean
-  def AccountPrivateKey(account: Address): Either[ValidationError, AccountKeyPair]
+  def PrivateKeys: Seq[KeyPair]
+  def generateNewAccounts(howMany: Int): Seq[KeyPair]
+  def generateNewAccount(): Option[KeyPair]
+  def deleteAccount(account: KeyPair): Boolean
+  def PrivateKey(account: Address): Either[ValidationError, KeyPair]
 }
 
 object Wallet extends ScorexLogging {
 
   implicit class WalletExtension(w: Wallet) {
-    def findPrivateKey(addressString: String): Either[ValidationError, AccountKeyPair] =
+    def findPrivateKey(addressString: String): Either[ValidationError, KeyPair] =
       for {
         acc        <- Address.fromString(addressString)
-        privKeyAcc <- w.AccountPrivateKey(acc)
+        privKeyAcc <- w.PrivateKey(acc)
       } yield privKeyAcc
 
-    def exportAccountSeed(account: Address): Either[ValidationError, Array[Byte]] = w.AccountPrivateKey(account).map(_.seed)
+    def exportAccountSeed(account: Address): Either[ValidationError, Array[Byte]] = w.PrivateKey(account).map(_.seed)
   }
 
   private case class WalletData(seed: ByteStr, accountSeeds: Set[ByteStr], nonce: Int)
 
   private implicit val walletFormat: Format[WalletData] = Json.format
 
-  def generateNewAccount(seed: Array[Byte], nonce: Int): AccountKeyPair = {
+  def generateNewAccount(seed: Array[Byte], nonce: Int): KeyPair = {
     val accountSeed = generateAccountSeed(seed, nonce)
-    AccountKeyPair(accountSeed)
+    KeyPair(accountSeed)
   }
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
@@ -92,14 +92,14 @@ object Wallet extends ScorexLogging {
 
     private def lock[T](f: => T): T = l.synchronized(f)
 
-    private[this] val accountsCache: TrieMap[String, AccountKeyPair] = {
-      val accounts = walletData.accountSeeds.map(AccountKeyPair(_))
+    private[this] val accountsCache: TrieMap[String, KeyPair] = {
+      val accounts = walletData.accountSeeds.map(KeyPair(_))
       TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
     }
 
     private def save(): Unit = maybeFile.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Some(key)))
 
-    private def generateNewAccountWithoutSave(): Option[AccountKeyPair] = lock {
+    private def generateNewAccountWithoutSave(): Option[KeyPair] = lock {
       val nonce   = getAndIncrementNonce()
       val account = Wallet.generateNewAccount(seed, nonce)
 
@@ -107,27 +107,27 @@ object Wallet extends ScorexLogging {
       if (!accountsCache.contains(address)) {
         accountsCache += account.address -> account
         walletData = walletData.copy(accountSeeds = walletData.accountSeeds + ByteStr(account.seed))
-        log.info("Added account #" + this.AccountPrivateKeys.length)
+        log.info("Added account #" + this.PrivateKeys.length)
         Some(account)
       } else None
     }
 
     override def seed: Array[Byte] = walletData.seed.arr
 
-    override def AccountPrivateKeys: Seq[AccountKeyPair] =
+    override def PrivateKeys: Seq[KeyPair] =
       accountsCache.values.toVector
 
-    override def generateNewAccounts(howMany: Int): Seq[AccountKeyPair] =
+    override def generateNewAccounts(howMany: Int): Seq[KeyPair] =
       (1 to howMany).flatMap(_ => generateNewAccountWithoutSave()).tap(_ => save())
 
-    override def generateNewAccount(): Option[AccountKeyPair] = lock {
+    override def generateNewAccount(): Option[KeyPair] = lock {
       generateNewAccountWithoutSave().map(acc => {
         save()
         acc
       })
     }
 
-    override def deleteAccount(account: AccountKeyPair): Boolean = lock {
+    override def deleteAccount(account: KeyPair): Boolean = lock {
       val before = walletData.accountSeeds.size
       walletData = walletData.copy(accountSeeds = walletData.accountSeeds - ByteStr(account.seed))
       accountsCache -= account.address
@@ -135,7 +135,7 @@ object Wallet extends ScorexLogging {
       before > walletData.accountSeeds.size
     }
 
-    override def AccountPrivateKey(account: Address): Either[ValidationError, AccountKeyPair] =
+    override def PrivateKey(account: Address): Either[ValidationError, KeyPair] =
       accountsCache.get(account.address).toRight[ValidationError](MissingSenderPrivateKey)
     override def nonce: Int = walletData.nonce
 

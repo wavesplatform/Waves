@@ -1,7 +1,7 @@
 package com.wavesplatform.consensus
 
 import cats.implicits._
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -23,7 +23,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     if (fairPosActivated(height)) FairPoSCalculator
     else NxtPoSCalculator
 
-  def consensusData(accountPublicKey: AccountPublicKey,
+  def consensusData(accountPublicKey: PublicKey,
                     height: Int,
                     targetBlockDelay: FiniteDuration,
                     refBlockBT: Long,
@@ -40,7 +40,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
           .toRight(GenericError("No blocks in blockchain")))
   }
 
-  def getValidBlockDelay(height: Int, accountPublicKey: AccountPublicKey, refBlockBT: Long, balance: Long): Either[ValidationError, Long] = {
+  def getValidBlockDelay(height: Int, accountPublicKey: PublicKey, refBlockBT: Long, balance: Long): Either[ValidationError, Long] = {
     val pc = pos(height)
 
     getHit(height, accountPublicKey)
@@ -101,7 +101,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     )
   }
 
-  private def getHit(height: Int, accountPublicKey: AccountPublicKey): Option[BigInt] = {
+  private def getHit(height: Int, accountPublicKey: PublicKey): Option[BigInt] = {
     val blockForHit =
       if (fairPosActivated(height) && height > 100) blockchain.blockAt(height - 100)
       else blockchain.lastBlock

@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.account.{AccountKeyPair, Address}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.{Asset, ValidationError}
 
-class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: AccountKeyPair, matcherOrderFeeSettings: OrderFeeSettings) {
+class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: KeyPair, matcherOrderFeeSettings: OrderFeeSettings) {
   private def calculateMatcherFee(buy: Order, sell: Order, executedAmount: Long, executedPrice: Long): (Long, Long) = {
     def calcFee(o: Order, txAmount: Long, totalAmount: Long): Long = {
       val p = BigInt(txAmount) * o.matcherFee / totalAmount

@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.{Directive0, Directive1, Route}
 import akka.pattern.ask
 import akka.util.Timeout
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.{AccountPublicKey, Address}
+import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.api.http._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -40,7 +40,7 @@ import scala.util.Failure
 @Path("/matcher")
 @Api(value = "/matcher/")
 case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
-                           matcherPublicKey: AccountPublicKey,
+                           matcherPublicKey: PublicKey,
                            matcher: ActorRef,
                            addressActor: ActorRef,
                            storeEvent: StoreEvent,
@@ -107,7 +107,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       } ~ complete(StatusCodes.BadRequest)
     } ~ complete(StatusCodes.MethodNotAllowed)
 
-  private def signedGet(publicKey: AccountPublicKey): Directive0 =
+  private def signedGet(publicKey: PublicKey): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
       case (timestamp, sig) =>
         require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey),

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
@@ -171,7 +171,7 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
       case other => false
     }""".stripMargin
 
-    val pkSwapBC1 = AccountKeyPair.fromSeed(sender.seed(firstAddress)).right.get
+    val pkSwapBC1 = KeyPair.fromSeed(sender.seed(firstAddress)).right.get
     val script    = ScriptCompiler(scriptText, isAssetScript = false).right.get._1
     val sc1SetTx = SetScriptTransaction
       .selfSigned(sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())

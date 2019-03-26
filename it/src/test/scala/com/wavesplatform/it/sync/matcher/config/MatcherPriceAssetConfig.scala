@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.matcher.config
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.{empty, parseString}
-import com.wavesplatform.account.{AccountKeyPair, AddressScheme}
+import com.wavesplatform.account.{KeyPair, AddressScheme}
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.sync.CustomFeeTransactionSuite.defaultAssetQuantity
 import com.wavesplatform.it.sync.matcher.config.MatcherDefaultConfig._
@@ -23,8 +23,8 @@ object MatcherPriceAssetConfig {
 
   private val aliceSeed = _Configs(1).getString("account-seed")
   private val bobSeed   = _Configs(2).getString("account-seed")
-  private val alicePk   = AccountKeyPair.fromSeed(aliceSeed).right.get
-  private val bobPk     = AccountKeyPair.fromSeed(bobSeed).right.get
+  private val alicePk   = KeyPair.fromSeed(aliceSeed).right.get
+  private val bobPk     = KeyPair.fromSeed(bobSeed).right.get
 
   val Decimals: Byte = 2
 

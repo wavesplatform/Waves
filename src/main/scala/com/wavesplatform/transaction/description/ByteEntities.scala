@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.description
 
 import cats.{Functor, Semigroupal}
 import com.google.common.primitives.{Ints, Longs, Shorts}
-import com.wavesplatform.account.{AccountPublicKey, Address, AddressOrAlias, Alias}
+import com.wavesplatform.account.{PublicKey, Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
@@ -173,13 +173,13 @@ case class ByteStrDefinedLength(index: Int, name: String, length: Int) extends B
   }
 }
 
-case class AccountPublicKeyBytes(index: Int, name: String) extends ByteEntity[AccountPublicKey] {
+case class PublicKeyBytes(index: Int, name: String) extends ByteEntity[PublicKey] {
 
   def generateDoc: Seq[ByteEntityDescription] =
-    Seq(ByteEntityDescription(index, name, s"AccountPublicKey ($ByteArrayType)", KeyLength.toString))
+    Seq(ByteEntityDescription(index, name, s"PublicKey ($ByteArrayType)", KeyLength.toString))
 
-  def deserialize(buf: Array[Byte], offset: Int): Try[(AccountPublicKey, Int)] = {
-    Try { AccountPublicKey(buf.slice(offset, offset + KeyLength)) -> (offset + KeyLength) }
+  def deserialize(buf: Array[Byte], offset: Int): Try[(PublicKey, Int)] = {
+    Try { PublicKey(buf.slice(offset, offset + KeyLength)) -> (offset + KeyLength) }
   }
 }
 

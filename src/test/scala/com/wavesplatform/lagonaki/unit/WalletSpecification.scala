@@ -17,8 +17,8 @@ class WalletSpecification extends FunSuite with Matchers {
   test("wallet - acc creation") {
     w.generateNewAccounts(walletSize)
 
-    w.AccountPrivateKeys.size shouldBe walletSize
-    w.AccountPrivateKeys.map(_.address) shouldBe Seq(
+    w.PrivateKeys.size shouldBe walletSize
+    w.PrivateKeys.map(_.address) shouldBe Seq(
       "3MqMwwHW4v2nSEDHVWoh8RCQL8QrsWLkkeB",
       "3MuwVgJA8EXHukxo6rcakT5tD6FpvACtitG",
       "3MuAvUG4EAsG9RP9jaWjewCVmggaQD2t39B",
@@ -34,16 +34,16 @@ class WalletSpecification extends FunSuite with Matchers {
 
   test("wallet - acc deletion") {
 
-    val head = w.AccountPrivateKeys.head
+    val head = w.PrivateKeys.head
     w.deleteAccount(head)
-    assert(w.AccountPrivateKeys.lengthCompare(walletSize - 1) == 0)
+    assert(w.PrivateKeys.lengthCompare(walletSize - 1) == 0)
 
-    w.deleteAccount(w.AccountPrivateKeys.head)
-    assert(w.AccountPrivateKeys.lengthCompare(walletSize - 2) == 0)
+    w.deleteAccount(w.PrivateKeys.head)
+    assert(w.PrivateKeys.lengthCompare(walletSize - 2) == 0)
 
-    w.AccountPrivateKeys.foreach(w.deleteAccount)
+    w.PrivateKeys.foreach(w.deleteAccount)
 
-    assert(w.AccountPrivateKeys.isEmpty)
+    assert(w.PrivateKeys.isEmpty)
   }
 
   test("reopening") {
@@ -51,12 +51,12 @@ class WalletSpecification extends FunSuite with Matchers {
 
     val w1 = Wallet(WalletSettings(walletFile, "cookies".some, ByteStr.decodeBase58("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption))
     w1.generateNewAccounts(10)
-    val w1AccountPrivateKeys = w1.AccountPrivateKeys
+    val w1PrivateKeys = w1.PrivateKeys
     val w1nonce              = w1.nonce
 
     val w2 = Wallet(WalletSettings(walletFile, "cookies".some, None))
-    w2.AccountPrivateKeys.nonEmpty shouldBe true
-    w2.AccountPrivateKeys shouldEqual w1AccountPrivateKeys
+    w2.PrivateKeys.nonEmpty shouldBe true
+    w2.PrivateKeys shouldEqual w1PrivateKeys
     w2.nonce shouldBe w1nonce
   }
 

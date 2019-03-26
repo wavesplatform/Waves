@@ -3,7 +3,7 @@ package com.wavesplatform.state
 import java.io.File
 import java.nio.file.Files
 
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
@@ -33,21 +33,21 @@ trait BaseState {
   private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr)
   val state: LevelDBWriter     = new LevelDBWriter(db, portfolioChanges, fsSettings, 100000, 2000, 120 * 60 * 1000)
 
-  private var _richAccount: AccountKeyPair = _
-  def richAccount: AccountKeyPair          = _richAccount
+  private var _richAccount: KeyPair = _
+  def richAccount: KeyPair          = _richAccount
 
   private var _lastBlock: Block = _
   def lastBlock: Block          = _lastBlock
 
   protected def waves(n: Float): Long = (n * 100000000L).toLong
-  protected val accountGen: Gen[AccountKeyPair] =
-    Gen.containerOfN[Array, Byte](32, Arbitrary.arbitrary[Byte]).map(seed => AccountKeyPair(seed))
+  protected val accountGen: Gen[KeyPair] =
+    Gen.containerOfN[Array, Byte](32, Arbitrary.arbitrary[Byte]).map(seed => KeyPair(seed))
 
   protected def updateFunctionalitySettings(base: FunctionalitySettings): FunctionalitySettings = base
 
-  protected def txGenP(sender: AccountKeyPair, ts: Long): Gen[Transaction]
+  protected def txGenP(sender: KeyPair, ts: Long): Gen[Transaction]
 
-  private def genBlock(base: Block, sender: AccountKeyPair): Gen[Block] =
+  private def genBlock(base: Block, sender: KeyPair): Gen[Block] =
     for {
       transferTxs <- Gen.sequence[Vector[Transaction], Transaction]((1 to TxsInBlock).map { i =>
         txGenP(sender, base.timestamp + i)
@@ -59,7 +59,7 @@ trait BaseState {
         txs = transferTxs
       )
 
-  private val initGen: Gen[(AccountKeyPair, Block)] = for {
+  private val initGen: Gen[(KeyPair, Block)] = for {
     rich <- accountGen
   } yield {
     val genesisTx = GenesisTransaction.create(rich, waves(100000000L), System.currentTimeMillis() - 10000).explicitGet()

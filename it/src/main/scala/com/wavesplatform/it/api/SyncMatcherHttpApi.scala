@@ -1,7 +1,7 @@
 package com.wavesplatform.it.api
 
 import akka.http.scaladsl.model.StatusCodes
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
 import com.wavesplatform.it.matcher.MatcherState
@@ -65,19 +65,19 @@ object SyncMatcherHttpApi extends Assertions {
     def deleteOrderBook(assetPair: AssetPair): MessageMatcherResponse =
       sync(async(m).deleteOrderBook(assetPair), RequestAwaitTime)
 
-    def fullOrderHistory(sender: AccountKeyPair): Seq[OrderbookHistory] =
+    def fullOrderHistory(sender: KeyPair): Seq[OrderbookHistory] =
       sync(async(m).fullOrdersHistory(sender), RequestAwaitTime)
 
-    def orderHistoryByPair(sender: AccountKeyPair, assetPair: AssetPair, activeOnly: Boolean = false): Seq[OrderbookHistory] =
+    def orderHistoryByPair(sender: KeyPair, assetPair: AssetPair, activeOnly: Boolean = false): Seq[OrderbookHistory] =
       sync(async(m).orderHistoryByPair(sender, assetPair, activeOnly), RequestAwaitTime)
 
-    def activeOrderHistory(sender: AccountKeyPair): Seq[OrderbookHistory] =
+    def activeOrderHistory(sender: KeyPair): Seq[OrderbookHistory] =
       sync(async(m).fullOrdersHistory(sender, activeOnly = Some(true)))
 
     def placeOrder(order: Order): MatcherResponse =
       sync(async(m).placeOrder(order))
 
-    def placeOrder(sender: AccountKeyPair,
+    def placeOrder(sender: KeyPair,
                    pair: AssetPair,
                    orderType: OrderType,
                    amount: Long,
@@ -134,10 +134,10 @@ object SyncMatcherHttpApi extends Assertions {
                               waitTime: Duration = OrderRequestAwaitTime): Seq[TransactionInfo] =
       sync(async(m).waitOrderInBlockchain(orderId, retryInterval), waitTime)
 
-    def reservedBalance(sender: AccountKeyPair, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
+    def reservedBalance(sender: KeyPair, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       sync(async(m).reservedBalance(sender), waitTime)
 
-    def tradableBalance(sender: AccountKeyPair, assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
+    def tradableBalance(sender: KeyPair, assetPair: AssetPair, waitTime: Duration = OrderRequestAwaitTime): Map[String, Long] =
       sync(async(m).tradableBalance(sender, assetPair), waitTime)
 
     def tradingMarkets(waitTime: Duration = OrderRequestAwaitTime): MarketDataInfo =
@@ -150,7 +150,7 @@ object SyncMatcherHttpApi extends Assertions {
                                       waitTime: Duration = OrderRequestAwaitTime): Boolean =
       sync(async(m).expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus, expectedMessage), waitTime)
 
-    def expectRejectedOrderPlacement(sender: AccountKeyPair,
+    def expectRejectedOrderPlacement(sender: KeyPair,
                                      pair: AssetPair,
                                      orderType: OrderType,
                                      amount: Long,
@@ -164,22 +164,22 @@ object SyncMatcherHttpApi extends Assertions {
                                     "OrderRejected",
                                     expectedMessage)
 
-    def expectCancelRejected(sender: AccountKeyPair, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
+    def expectCancelRejected(sender: KeyPair, assetPair: AssetPair, orderId: String, waitTime: Duration = OrderRequestAwaitTime): Unit =
       sync(async(m).expectCancelRejected(sender, assetPair, orderId), waitTime)
 
-    def cancelOrder(sender: AccountKeyPair,
+    def cancelOrder(sender: KeyPair,
                     assetPair: AssetPair,
                     orderId: String,
                     waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       sync(async(m).cancelOrder(sender, assetPair, orderId), waitTime)
 
-    def cancelOrdersForPair(sender: AccountKeyPair,
+    def cancelOrdersForPair(sender: KeyPair,
                             assetPair: AssetPair,
                             timestamp: Long = System.currentTimeMillis(),
                             waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       sync(async(m).cancelOrdersForPair(sender, assetPair, timestamp), waitTime)
 
-    def cancelAllOrders(sender: AccountKeyPair,
+    def cancelAllOrders(sender: KeyPair,
                         timestamp: Long = System.currentTimeMillis(),
                         waitTime: Duration = OrderRequestAwaitTime): MatcherStatusResponse =
       sync(async(m).cancelAllOrders(sender, timestamp), waitTime)
@@ -200,7 +200,7 @@ object SyncMatcherHttpApi extends Assertions {
     def matcherPost[A: Writes](path: String, body: A, waitTime: Duration = RequestAwaitTime): Response =
       sync(async(m).matcherPost(path, body), waitTime)
 
-    def prepareOrder(sender: AccountKeyPair,
+    def prepareOrder(sender: KeyPair,
                      pair: AssetPair,
                      orderType: OrderType,
                      amount: Long,
@@ -215,7 +215,7 @@ object SyncMatcherHttpApi extends Assertions {
       Order.sign(unsigned, sender)
     }
 
-    def ordersByAddress(sender: AccountKeyPair, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderbookHistory] =
+    def ordersByAddress(sender: KeyPair, activeOnly: Boolean, waitTime: Duration = RequestAwaitTime): Seq[OrderbookHistory] =
       sync(async(m).ordersByAddress(sender, activeOnly), waitTime)
 
     def getCurrentOffset: QueueEventWithMeta.Offset                   = sync(async(m).getCurrentOffset)
@@ -230,7 +230,7 @@ object SyncMatcherHttpApi extends Assertions {
 
     def matcherState(assetPairs: Seq[AssetPair],
                      orders: IndexedSeq[Order],
-                     accounts: Seq[AccountKeyPair],
+                     accounts: Seq[KeyPair],
                      waitTime: Duration = RequestAwaitTime * 5): MatcherState =
       sync(async(m).matcherState(assetPairs, orders, accounts), waitTime)
   }

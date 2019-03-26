@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
@@ -26,7 +26,7 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
     val accounts = List(nodeA, nodeB).map(i => {
 
       val nodeAddress = i.createAddress()
-      val acc         = AccountKeyPair.fromSeed(i.seed(nodeAddress)).right.get
+      val acc         = KeyPair.fromSeed(i.seed(nodeAddress)).right.get
 
       val tx = i.transfer(i.address, nodeAddress, 10.waves, 0.005.waves).id
       nodes.waitForHeightAriseAndTxPresent(tx)

@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.leasing
 
 import cats.implicits._
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.lease.LeaseCancelTransactionV2
@@ -25,7 +25,7 @@ case class SignedLeaseCancelV2Request(@ApiModelProperty(required = true)
     extends BroadcastRequest {
   def toTx: Either[ValidationError, LeaseCancelTransactionV2] =
     for {
-      _sender     <- AccountPublicKey.fromBase58String(senderPublicKey)
+      _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _leaseTx    <- parseBase58(leaseId, "invalid.leaseTx", SignatureStringLength)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)

@@ -1,7 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{AccountKeyPair, Address, AddressOrAlias}
+import com.wavesplatform.account.{KeyPair, Address, AddressOrAlias}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
@@ -132,7 +132,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
       case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microBlocks1) = chainBaseAndMicro(block0.uniqueId, masterToAlice, Seq(Seq(aliceToBob)))
-        val otherSigner            = AccountKeyPair(Array.fill(KeyLength)(1: Byte))
+        val otherSigner            = KeyPair(Array.fill(KeyLength)(1: Byte))
         val block2                 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice, aliceToBob2), otherSigner, 1, 0L, DefaultBaseTarget / 2)
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()

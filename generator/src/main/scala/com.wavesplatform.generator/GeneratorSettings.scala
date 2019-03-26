@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import cats.Show
 import cats.implicits.showInterpolator
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 
 case class GeneratorSettings(chainId: String,
@@ -19,7 +19,7 @@ case class GeneratorSettings(chainId: String,
                              oracle: OracleTransactionGenerator.Settings,
                              swarm: SmartGenerator.Settings) {
   val addressScheme: Char                        = chainId.head
-  val AccountPrivateKeys: Seq[AccountKeyPair] = accounts.map(s => AccountKeyPair.fromSeed(s).explicitGet())
+  val PrivateKeys: Seq[KeyPair] = accounts.map(s => KeyPair.fromSeed(s).explicitGet())
 }
 
 object GeneratorSettings {

@@ -3,12 +3,12 @@ package com.wavesplatform.generator
 import java.util.concurrent.atomic.AtomicReference
 
 import cats.Show
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.generator.DynamicWideTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
 import com.wavesplatform.transaction.Transaction
 
-class DynamicWideTransactionGenerator(settings: Settings, accounts: Seq[AccountKeyPair]) extends TransactionGenerator {
+class DynamicWideTransactionGenerator(settings: Settings, accounts: Seq[KeyPair]) extends TransactionGenerator {
   require(accounts.nonEmpty)
 
   private val nextTxsNumber = new AtomicReference[Double](settings.start)

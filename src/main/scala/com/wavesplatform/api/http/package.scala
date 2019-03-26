@@ -1,7 +1,7 @@
 package com.wavesplatform.api
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.DataRequest._
 import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
@@ -43,7 +43,7 @@ package object http extends ApiMarshallers {
         val version = value.getOrElse(1: Byte)
         val txJson  = jsv ++ Json.obj("version" -> version)
 
-        AccountPublicKey
+        PublicKey
           .fromBase58String(senderPk)
           .flatMap { senderPk =>
             TransactionParsers.by(typeId, version) match {

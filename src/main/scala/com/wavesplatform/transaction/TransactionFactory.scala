@@ -48,7 +48,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def transferAssetV1(request: TransferV1Request, sender: AccountPublicKey): Either[ValidationError, TransferTransactionV1] =
+  def transferAssetV1(request: TransferV1Request, sender: PublicKey): Either[ValidationError, TransferTransactionV1] =
     for {
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- TransferTransactionV1.create(
@@ -85,7 +85,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def transferAssetV2(request: TransferV2Request, sender: AccountPublicKey): Either[ValidationError, TransferTransactionV2] =
+  def transferAssetV2(request: TransferV2Request, sender: PublicKey): Either[ValidationError, TransferTransactionV2] =
     for {
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- TransferTransactionV2.create(
@@ -123,7 +123,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def massTransferAsset(request: MassTransferRequest, sender: AccountPublicKey): Either[ValidationError, MassTransferTransaction] =
+  def massTransferAsset(request: MassTransferRequest, sender: PublicKey): Either[ValidationError, MassTransferTransaction] =
     for {
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.create(
@@ -157,7 +157,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def setScript(request: SetScriptRequest, sender: AccountPublicKey): Either[ValidationError, SetScriptTransaction] =
+  def setScript(request: SetScriptRequest, sender: PublicKey): Either[ValidationError, SetScriptTransaction] =
     for {
       script <- request.script match {
         case None | Some("") => Right(None)
@@ -194,7 +194,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def setAssetScript(request: SetAssetScriptRequest, sender: AccountPublicKey): Either[ValidationError, SetAssetScriptTransaction] =
+  def setAssetScript(request: SetAssetScriptRequest, sender: PublicKey): Either[ValidationError, SetAssetScriptTransaction] =
     for {
       script <- request.script match {
         case None | Some("") => Right(None)
@@ -237,7 +237,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def issueAssetV2(request: IssueV2Request, sender: AccountPublicKey): Either[ValidationError, IssueTransactionV2] =
+  def issueAssetV2(request: IssueV2Request, sender: PublicKey): Either[ValidationError, IssueTransactionV2] =
     for {
       s <- request.script match {
         case None    => Right(None)
@@ -278,7 +278,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def issueAssetV1(request: IssueV1Request, sender: AccountPublicKey): Either[ValidationError, IssueTransactionV1] = IssueTransactionV1.create(
+  def issueAssetV1(request: IssueV1Request, sender: PublicKey): Either[ValidationError, IssueTransactionV1] = IssueTransactionV1.create(
     sender,
     request.name.getBytes(Charsets.UTF_8),
     request.description.getBytes(Charsets.UTF_8),
@@ -308,7 +308,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def leaseV1(request: LeaseV1Request, sender: AccountPublicKey): Either[ValidationError, LeaseTransactionV1] =
+  def leaseV1(request: LeaseV1Request, sender: PublicKey): Either[ValidationError, LeaseTransactionV1] =
     for {
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- LeaseTransactionV1.create(
@@ -339,7 +339,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def leaseV2(request: LeaseV2Request, sender: AccountPublicKey): Either[ValidationError, LeaseTransactionV2] =
+  def leaseV2(request: LeaseV2Request, sender: PublicKey): Either[ValidationError, LeaseTransactionV2] =
     for {
       recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- LeaseTransactionV2.create(
@@ -371,7 +371,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def leaseCancelV1(request: LeaseCancelV1Request, sender: AccountPublicKey): Either[ValidationError, LeaseCancelTransactionV1] =
+  def leaseCancelV1(request: LeaseCancelV1Request, sender: PublicKey): Either[ValidationError, LeaseCancelTransactionV1] =
     LeaseCancelTransactionV1.create(
       sender,
       ByteStr.decodeBase58(request.txId).get,
@@ -400,7 +400,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def leaseCancelV2(request: LeaseCancelV2Request, sender: AccountPublicKey): Either[ValidationError, LeaseCancelTransactionV2] =
+  def leaseCancelV2(request: LeaseCancelV2Request, sender: PublicKey): Either[ValidationError, LeaseCancelTransactionV2] =
     LeaseCancelTransactionV2.create(
       AddressScheme.current.chainId,
       sender,
@@ -427,7 +427,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def aliasV1(request: CreateAliasV1Request, sender: AccountPublicKey): Either[ValidationError, CreateAliasTransactionV1] =
+  def aliasV1(request: CreateAliasV1Request, sender: PublicKey): Either[ValidationError, CreateAliasTransactionV1] =
     for {
       alias <- Alias.create(request.alias)
       tx <- CreateAliasTransactionV1.create(
@@ -456,7 +456,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def aliasV2(request: CreateAliasV2Request, sender: AccountPublicKey): Either[ValidationError, CreateAliasTransactionV2] =
+  def aliasV2(request: CreateAliasV2Request, sender: PublicKey): Either[ValidationError, CreateAliasTransactionV2] =
     for {
       alias <- Alias.create(request.alias)
       tx <- CreateAliasTransactionV2.create(
@@ -486,7 +486,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def reissueAssetV1(request: ReissueV1Request, sender: AccountPublicKey): Either[ValidationError, ReissueTransactionV1] =
+  def reissueAssetV1(request: ReissueV1Request, sender: PublicKey): Either[ValidationError, ReissueTransactionV1] =
     ReissueTransactionV1.create(
       sender,
       IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
@@ -516,7 +516,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def reissueAssetV2(request: ReissueV2Request, sender: AccountPublicKey): Either[ValidationError, ReissueTransactionV2] =
+  def reissueAssetV2(request: ReissueV2Request, sender: PublicKey): Either[ValidationError, ReissueTransactionV2] =
     ReissueTransactionV2.create(
       AddressScheme.current.chainId,
       sender,
@@ -545,7 +545,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def burnAssetV1(request: BurnV1Request, sender: AccountPublicKey): Either[ValidationError, BurnTransactionV1] = BurnTransactionV1.create(
+  def burnAssetV1(request: BurnV1Request, sender: PublicKey): Either[ValidationError, BurnTransactionV1] = BurnTransactionV1.create(
     sender,
     IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
     request.quantity,
@@ -572,7 +572,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def burnAssetV2(request: BurnV2Request, sender: AccountPublicKey): Either[ValidationError, BurnTransactionV2] = BurnTransactionV2.create(
+  def burnAssetV2(request: BurnV2Request, sender: PublicKey): Either[ValidationError, BurnTransactionV2] = BurnTransactionV2.create(
     AddressScheme.current.chainId,
     sender,
     IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
@@ -598,7 +598,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def data(request: DataRequest, sender: AccountPublicKey): Either[ValidationError, DataTransaction] =
+  def data(request: DataRequest, sender: PublicKey): Either[ValidationError, DataTransaction] =
     DataTransaction.create(
       sender,
       request.data,
@@ -631,7 +631,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def invokeScript(request: InvokeScriptRequest, sender: AccountPublicKey): Either[ValidationError, InvokeScriptTransaction] =
+  def invokeScript(request: InvokeScriptRequest, sender: PublicKey): Either[ValidationError, InvokeScriptTransaction] =
     for {
       contract <- Address.fromString(request.contractAddress)
       fc = InvokeScriptRequest.buildFunctionCall(request.call)
@@ -672,7 +672,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def sponsor(request: SponsorFeeRequest, sender: AccountPublicKey): Either[ValidationError, SponsorFeeTransaction] =
+  def sponsor(request: SponsorFeeRequest, sender: PublicKey): Either[ValidationError, SponsorFeeTransaction] =
     for {
       assetId <- ByteStr
         .decodeBase58(request.assetId)
@@ -691,7 +691,7 @@ object TransactionFactory {
       )
     } yield tx
 
-  def exchangeV1(request: SignedExchangeRequest, sender: AccountPublicKey): Either[ValidationError, ExchangeTransactionV1] = {
+  def exchangeV1(request: SignedExchangeRequest, sender: PublicKey): Either[ValidationError, ExchangeTransactionV1] = {
     def orderV1(ord: Order) = {
       import ord._
       OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
@@ -713,7 +713,7 @@ object TransactionFactory {
     } yield tx
   }
 
-  def exchangeV2(request: SignedExchangeRequestV2, sender: AccountPublicKey): Either[ValidationError, ExchangeTransactionV2] = {
+  def exchangeV2(request: SignedExchangeRequestV2, sender: PublicKey): Either[ValidationError, ExchangeTransactionV2] = {
     val decodedProofs = request.proofs.map(ByteStr.decodeBase58(_))
     for {
       proofs <- Either.cond(decodedProofs.forall(_.isSuccess),

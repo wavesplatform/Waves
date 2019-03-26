@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import java.net.{InetSocketAddress, URL}
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
@@ -25,8 +25,8 @@ abstract class Node(config: Config) extends AutoCloseable {
       .setKeepAlive(false)
       .setNettyTimer(GlobalTimer.instance))
 
-  val privateKey: AccountKeyPair = AccountKeyPair.fromSeed(config.getString("account-seed")).explicitGet()
-  val publicKey: AccountPublicKey   = AccountPublicKey.fromBase58String(config.getString("public-key")).explicitGet()
+  val privateKey: KeyPair = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
+  val publicKey: PublicKey   = PublicKey.fromBase58String(config.getString("public-key")).explicitGet()
   val address: String               = config.getString("address")
 
   def nodeApiEndpoint: URL

@@ -1,7 +1,7 @@
 package com.wavesplatform.matcher.api
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -9,7 +9,7 @@ import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json._
 
-case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") sender: AccountPublicKey,
+case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") sender: PublicKey,
                               @ApiModelProperty(dataType = "java.lang.String") orderId: Option[ByteStr],
                               @ApiModelProperty() timestamp: Option[Long],
                               @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]) {
@@ -33,9 +33,9 @@ object CancelOrderRequest {
     b => JsString(Base58.encode(b))
   )
 
-  implicit val pkFormat: Format[AccountPublicKey] = Format(
+  implicit val pkFormat: Format[PublicKey] = Format(
     {
-      case JsString(value) => AccountPublicKey.fromBase58String(value).fold(_ => JsError("Invalid public key"), pk => JsSuccess(pk))
+      case JsString(value) => PublicKey.fromBase58String(value).fold(_ => JsError("Invalid public key"), pk => JsSuccess(pk))
       case other           => JsError(s"Expecting string but got $other")
     },
     pk => JsString(Base58.encode(pk))

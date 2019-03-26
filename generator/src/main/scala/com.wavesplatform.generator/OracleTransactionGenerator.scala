@@ -1,7 +1,7 @@
 package com.wavesplatform.generator
 
 import cats.Show
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.OracleTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 
-class OracleTransactionGenerator(settings: Settings, val accounts: Seq[AccountKeyPair]) extends TransactionGenerator {
+class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair]) extends TransactionGenerator {
   override def next(): Iterator[Transaction] = generate(settings).toIterator
 
   def generate(settings: Settings): Seq[Transaction] = {

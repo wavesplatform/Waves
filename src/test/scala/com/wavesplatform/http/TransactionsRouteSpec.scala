@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -47,7 +47,7 @@ class TransactionsRouteSpec
   routePath("/calculateFee") - {
     "transfer with Waves fee" - {
       "TransferTransaction" in {
-        val sender: AccountPublicKey = accountGen.sample.get
+        val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
@@ -74,7 +74,7 @@ class TransactionsRouteSpec
       }
 
       "MassTransferTransaction" in {
-        val sender: AccountPublicKey = accountGen.sample.get
+        val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 11,
           "version"         -> 1,
@@ -112,7 +112,7 @@ class TransactionsRouteSpec
     "transfer with Asset fee" - {
       "without sponsorship" in {
         val assetId: ByteStr         = issueGen.sample.get.assetId()
-        val sender: AccountPublicKey = accountGen.sample.get
+        val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
@@ -141,7 +141,7 @@ class TransactionsRouteSpec
 
       "with sponsorship" in {
         val assetId: IssuedAsset     = IssuedAsset(issueGen.sample.get.assetId())
-        val sender: AccountPublicKey = accountGen.sample.get
+        val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
@@ -183,7 +183,7 @@ class TransactionsRouteSpec
 
       "with sponsorship, smart token and smart account" in {
         val assetId: IssuedAsset     = IssuedAsset(issueGen.sample.get.assetId())
-        val sender: AccountPublicKey = accountGen.sample.get
+        val sender: PublicKey = accountGen.sample.get
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,

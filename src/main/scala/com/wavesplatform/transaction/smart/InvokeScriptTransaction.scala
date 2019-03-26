@@ -22,7 +22,7 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class InvokeScriptTransaction private (chainId: Byte,
-                                            sender: AccountPublicKey,
+                                            sender: PublicKey,
                                             contractAddress: Address,
                                             fc: Terms.FUNCTION_CALL,
                                             payment: Seq[Payment],
@@ -118,7 +118,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     }
   }
 
-  def create(sender: AccountPublicKey,
+  def create(sender: PublicKey,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
@@ -154,20 +154,20 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     } yield tx
   }
 
-  def signed(sender: AccountPublicKey,
+  def signed(sender: PublicKey,
              contractAddress: Address,
              fc: Terms.FUNCTION_CALL,
              p: Seq[Payment],
              fee: Long,
              feeAssetId: Asset,
              timestamp: Long,
-             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, contractAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
-  def selfSigned(sender: AccountKeyPair,
+  def selfSigned(sender: KeyPair,
                  contractAddress: Address,
                  fc: Terms.FUNCTION_CALL,
                  p: Seq[Payment],
@@ -180,7 +180,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
   val byteTailDescription: ByteEntity[InvokeScriptTransaction] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      AccountPublicKeyBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       AddressBytes(tailIndex(3), "Contract address"),
       FunctionCallBytes(tailIndex(4), "Function call"),
       SeqBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")),

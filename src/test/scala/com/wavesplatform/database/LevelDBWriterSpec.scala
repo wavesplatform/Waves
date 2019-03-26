@@ -1,7 +1,7 @@
 package com.wavesplatform.database
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{AccountKeyPair, Address}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
@@ -77,13 +77,13 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
       }
     }
 
-    def gen(ts: Long): Gen[(AccountKeyPair, Seq[Block])] = baseGen(ts).map {
+    def gen(ts: Long): Gen[(KeyPair, Seq[Block])] = baseGen(ts).map {
       case (master, blocks) =>
         val nextBlock = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq())
         (master, blocks :+ nextBlock)
     }
 
-    def resetGen(ts: Long): Gen[(AccountKeyPair, Seq[Block])] = baseGen(ts).map {
+    def resetGen(ts: Long): Gen[(KeyPair, Seq[Block])] = baseGen(ts).map {
       case (master, blocks) =>
         val unsetScriptTx = SetScriptTransaction
           .selfSigned(master, None, 5000000, ts + 1)
@@ -94,7 +94,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
         (master, blocks ++ List(block1, block2))
     }
 
-    def baseGen(ts: Long): Gen[(AccountKeyPair, Seq[Block])] = accountGen.map { master =>
+    def baseGen(ts: Long): Gen[(KeyPair, Seq[Block])] = accountGen.map { master =>
       val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       val setScriptTx = SetScriptTransaction
         .selfSigned(master, Some(ExprScript(Terms.TRUE).explicitGet()), 5000000, ts)
@@ -104,13 +104,13 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
       (master, Seq(block))
     }
 
-    def test(f: (LevelDBWriter, AccountKeyPair) => Unit): Unit = baseTest(t => gen(t.correctedTime()))(f)
+    def test(f: (LevelDBWriter, KeyPair) => Unit): Unit = baseTest(t => gen(t.correctedTime()))(f)
 
-    def resetTest(f: (LevelDBWriter, AccountKeyPair) => Unit): Unit = baseTest(t => resetGen(t.correctedTime()))(f)
+    def resetTest(f: (LevelDBWriter, KeyPair) => Unit): Unit = baseTest(t => resetGen(t.correctedTime()))(f)
 
   }
 
-  def baseTest(gen: Time => Gen[(AccountKeyPair, Seq[Block])])(f: (LevelDBWriter, AccountKeyPair) => Unit): Unit = {
+  def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, KeyPair) => Unit): Unit = {
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
@@ -130,7 +130,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     }
   }
 
-  def testWithBlocks(gen: Time => Gen[(AccountKeyPair, Seq[Block])])(f: (LevelDBWriter, Seq[Block], AccountKeyPair) => Unit): Unit = {
+  def testWithBlocks(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, Seq[Block], KeyPair) => Unit): Unit = {
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, 100000, 2000, 120 * 60 * 1000)
     val settings0     = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
@@ -150,13 +150,13 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     }
   }
 
-  def createTransfer(master: AccountKeyPair, recipient: Address, ts: Long): TransferTransaction = {
+  def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
     TransferTransactionV1
       .selfSigned(Waves, master, recipient, ENOUGH_AMT / 5, ts, Waves, 1000000, Array.emptyByteArray)
       .explicitGet()
   }
 
-  def preconditions(ts: Long): Gen[(AccountKeyPair, List[Block])] = {
+  def preconditions(ts: Long): Gen[(KeyPair, List[Block])] = {
     for {
       master    <- accountGen
       recipient <- accountGen
@@ -181,8 +181,8 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu       = new BlockchainUpdaterImpl(rw, ignoreSpendableBalanceChanged, settings, ntpTime)
     try {
-      val master    = AccountKeyPair("master".getBytes())
-      val recipient = AccountKeyPair("recipient".getBytes())
+      val master    = KeyPair("master".getBytes())
+      val recipient = KeyPair("recipient".getBytes())
 
       val ts = System.currentTimeMillis()
 
@@ -235,7 +235,7 @@ class LevelDBWriterSpec extends FreeSpec with Matchers with TransactionGen with 
 
   "allActiveLeases" - {
     "should return correct set of leases" in {
-      def precs: Gen[(AccountKeyPair, Seq[LeaseTransaction], Seq[Block])] = {
+      def precs: Gen[(KeyPair, Seq[LeaseTransaction], Seq[Block])] = {
 
         val ts = ntpTime.correctedTime()
 

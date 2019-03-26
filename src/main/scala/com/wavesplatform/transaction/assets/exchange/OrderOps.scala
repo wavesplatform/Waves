@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.transaction.{Asset, Proofs}
 
 class OrderOps(val o: Order) extends AnyVal {
@@ -55,14 +55,14 @@ class OrderOps(val o: Order) extends AnyVal {
       _.copy(price = price)
     )
   }
-  @inline def updateMatcher(pk: AccountKeyPair): Order = {
+  @inline def updateMatcher(pk: KeyPair): Order = {
     copy(
       _.copy(matcherPublicKey = pk),
       _.copy(matcherPublicKey = pk),
       _.copy(matcherPublicKey = pk)
     )
   }
-  @inline def updateSender(pk: AccountKeyPair): Order = {
+  @inline def updateSender(pk: KeyPair): Order = {
     copy(
       _.copy(senderPublicKey = pk),
       _.copy(senderPublicKey = pk),

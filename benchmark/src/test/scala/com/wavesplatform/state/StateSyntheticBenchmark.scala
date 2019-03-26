@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ContentType
 import com.wavesplatform.lang.StdLibVersion.V1
@@ -39,7 +39,7 @@ object StateSyntheticBenchmark {
 
   @State(Scope.Benchmark)
   class St extends BaseState {
-    protected override def txGenP(sender: AccountKeyPair, ts: Long): Gen[Transaction] =
+    protected override def txGenP(sender: KeyPair, ts: Long): Gen[Transaction] =
       for {
         amount    <- Gen.choose(1, waves(1))
         recipient <- accountGen
@@ -53,9 +53,9 @@ object StateSyntheticBenchmark {
       base.copy(preActivatedFeatures = Map(4.toShort -> 0))
     }
 
-    protected override def txGenP(sender: AccountKeyPair, ts: Long): Gen[Transaction] =
+    protected override def txGenP(sender: KeyPair, ts: Long): Gen[Transaction] =
       for {
-        recipient: AccountKeyPair <- accountGen
+        recipient: KeyPair <- accountGen
         amount                    <- Gen.choose(1, waves(1))
       } yield
         TransferTransactionV2

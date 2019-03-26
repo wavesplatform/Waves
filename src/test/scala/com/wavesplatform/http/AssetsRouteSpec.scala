@@ -29,7 +29,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   private val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
   private val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
-  (wallet.AccountPrivateKey _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
+  (wallet.PrivateKey _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
   (utx.putIfNew _).when(*).onCall((_: Transaction) => Right((true, Diff.empty))).anyNumberOfTimes()
   (allChannels.writeAndFlush(_: Any, _: ChannelMatcher)).when(*, *).onCall((_: Any, _: ChannelMatcher) => stub[ChannelGroupFuture]).anyNumberOfTimes()
 

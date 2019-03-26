@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey, Address}
+import com.wavesplatform.account.{KeyPair, PublicKey, Address}
 import com.wavesplatform.block.fields.FeaturesBlockField
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -97,7 +97,7 @@ object BlockHeader extends ScorexLogging {
       position += SignatureLength
 
       val blockHeader =
-        new BlockHeader(timestamp, version, reference, SignerData(AccountPublicKey(genPK), signature), consData, txCount, supportedFeaturesIds)
+        new BlockHeader(timestamp, version, reference, SignerData(PublicKey(genPK), signature), consData, txCount, supportedFeaturesIds)
       (blockHeader, tBytes)
     }.recoverWith {
       case t: Throwable =>
@@ -285,7 +285,7 @@ object Block extends ScorexLogging {
                    reference: ByteStr,
                    consensusData: NxtLikeConsensusBlockData,
                    transactionData: Seq[Transaction],
-                   signer: AccountKeyPair,
+                   signer: KeyPair,
                    featureVotes: Set[Short]): Either[GenericError, Block] =
     build(version, timestamp, reference, consensusData, transactionData, SignerData(signer, ByteStr.empty), featureVotes).right.map(unsigned =>
       unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))))
@@ -298,7 +298,7 @@ object Block extends ScorexLogging {
   }
 
   def genesis(genesisSettings: GenesisSettings): Either[ValidationError, Block] = {
-    val genesisSigner = AccountKeyPair(ByteStr.empty)
+    val genesisSigner = KeyPair(ByteStr.empty)
 
     val transactionGenesisData      = genesisTransactions(genesisSettings)
     val transactionGenesisDataField = TransactionsBlockFieldVersion1or2(transactionGenesisData)

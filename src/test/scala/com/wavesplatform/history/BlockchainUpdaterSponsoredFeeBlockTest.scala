@@ -1,7 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
@@ -111,10 +111,10 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, feeAsset, sponsor).map(Seq(_)))
         val block1 = customBuildBlockOfTxs(microBlocks.last.totalResBlockSig,
                                            Seq.empty,
-                                           AccountKeyPair(Array.fill(KeyLength)(1: Byte)),
+                                           KeyPair(Array.fill(KeyLength)(1: Byte)),
                                            3: Byte,
                                            sponsor.timestamp + 1)
-        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq.empty, AccountKeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
+        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
         val block3 = buildBlockOfTxs(block2.uniqueId, Seq(aliceToBob, bobToMaster))
         val block4 = buildBlockOfTxs(block3.uniqueId, Seq(bobToMaster2))
 

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -73,7 +73,7 @@ object CustomFeeTransactionSuite {
   val featureCheckBlocksPeriod = 13
 
   private val seed = Default(2).getString("account-seed")
-  private val pk   = AccountKeyPair.fromSeed(seed).explicitGet()
+  private val pk   = KeyPair.fromSeed(seed).explicitGet()
   val assetTx = IssueTransactionV1
     .selfSigned(
       sender = pk,

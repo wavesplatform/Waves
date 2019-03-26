@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey, AddressOrAlias}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -13,7 +13,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class TransferTransactionV2 private (sender: AccountPublicKey,
+case class TransferTransactionV2 private (sender: PublicKey,
                                           recipient: AddressOrAlias,
                                           assetId: Asset,
                                           amount: Long,
@@ -48,7 +48,7 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
   }
 
   def create(assetId: Asset,
-             sender: AccountPublicKey,
+             sender: PublicKey,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
@@ -62,21 +62,21 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
   }
 
   def signed(assetId: Asset,
-             sender: AccountPublicKey,
+             sender: PublicKey,
              recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
              feeAssetId: Asset,
              feeAmount: Long,
              attachment: Array[Byte],
-             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
   def selfSigned(assetId: Asset,
-                 sender: AccountKeyPair,
+                 sender: KeyPair,
                  recipient: AddressOrAlias,
                  amount: Long,
                  timestamp: Long,
@@ -88,7 +88,7 @@ object TransferTransactionV2 extends TransactionParserFor[TransferTransactionV2]
 
   val byteTailDescription: ByteEntity[TransferTransactionV2] = {
     (
-      AccountPublicKeyBytes(tailIndex(1), "Sender's public key"),
+      PublicKeyBytes(tailIndex(1), "Sender's public key"),
       OptionBytes(tailIndex(2), "Asset ID", AssetIdBytes(tailIndex(2), "Asset ID"), "flag (1 - asset, 0 - Waves)"),
       OptionBytes(tailIndex(3), "Fee's asset ID", AssetIdBytes(tailIndex(3), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)"),
       LongBytes(tailIndex(4), "Timestamp"),

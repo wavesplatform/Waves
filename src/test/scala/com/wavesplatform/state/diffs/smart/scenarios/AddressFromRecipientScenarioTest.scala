@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.account.{AccountKeyPair, AddressOrAlias}
+import com.wavesplatform.account.{KeyPair, AddressOrAlias}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
@@ -19,7 +19,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
   val preconditionsAndAliasCreations: Gen[(Seq[GenesisTransaction], CreateAliasTransaction, TransferTransactionV1, TransferTransactionV1)] = for {
     master                   <- accountGen
     ts                       <- timestampGen
-    other: AccountKeyPair <- accountGen
+    other: KeyPair <- accountGen
     genesis1: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     genesis2: GenesisTransaction = GenesisTransaction.create(other, ENOUGH_AMT, ts).explicitGet()
     alias              <- aliasGen

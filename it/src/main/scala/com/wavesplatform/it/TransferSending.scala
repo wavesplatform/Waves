@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.{AccountKeyPair, Address, AddressOrAlias, AddressScheme}
+import com.wavesplatform.account.{KeyPair, Address, AddressOrAlias, AddressScheme}
 import com.wavesplatform.api.http.assets.SignedTransferV2Request
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
@@ -59,7 +59,7 @@ trait TransferSending extends ScorexLogging {
       .map {
         case (config, _) =>
           val accountSeed = config.getString("account-seed")
-          (config, AccountKeyPair(Base58.decode(accountSeed)))
+          (config, KeyPair(Base58.decode(accountSeed)))
       }
 
     val sourceAndDest = (1 to n).map { _ =>
@@ -114,7 +114,7 @@ trait TransferSending extends ScorexLogging {
             TransferTransactionV2
               .selfSigned(
                 assetId = Waves,
-                sender = AccountKeyPair(Base58.decode(x.senderSeed)),
+                sender = KeyPair(Base58.decode(x.senderSeed)),
                 recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
                 amount = x.amount,
                 timestamp = start + i,

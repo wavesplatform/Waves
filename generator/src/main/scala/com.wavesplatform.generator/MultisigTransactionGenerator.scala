@@ -1,6 +1,6 @@
 package com.wavesplatform.generator
 import cats.Show
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.{Proofs, Transaction}
 
 import scala.util.Random
 
-class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settings, val accounts: Seq[AccountKeyPair])
+class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settings, val accounts: Seq[KeyPair])
     extends TransactionGenerator {
 
   override def next(): Iterator[Transaction] = {
@@ -52,7 +52,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
   private def createAccount() = {
     val seedBytes = Array.fill(32)(0: Byte)
     Random.nextBytes(seedBytes)
-    AccountKeyPair(seedBytes)
+    KeyPair(seedBytes)
   }
 }
 

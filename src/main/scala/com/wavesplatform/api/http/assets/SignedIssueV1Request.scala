@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.assets
 
 import com.google.common.base.Charsets
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.ValidationError
@@ -35,7 +35,7 @@ case class SignedIssueV1Request(@ApiModelProperty(value = "Base58 encoded Issuer
     extends BroadcastRequest {
   def toTx: Either[ValidationError, IssueTransactionV1] =
     for {
-      _sender    <- AccountPublicKey.fromBase58String(senderPublicKey)
+      _sender    <- PublicKey.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid signature", SignatureStringLength)
       _t <- IssueTransactionV1.create(_sender,
                                       name.getBytes(Charsets.UTF_8),

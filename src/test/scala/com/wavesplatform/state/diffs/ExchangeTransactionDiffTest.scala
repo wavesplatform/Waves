@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
-import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey, AddressScheme}
+import com.wavesplatform.account.{KeyPair, PublicKey, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -30,7 +30,7 @@ import scala.util.Random
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
-  val MATCHER: AccountKeyPair = AccountKeyPair(Base58.decode("matcher"))
+  val MATCHER: KeyPair = KeyPair(Base58.decode("matcher"))
 
   val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -452,7 +452,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     }
   }
 
-  def createExTx(buy: Order, sell: Order, price: Long, matcher: AccountKeyPair, ts: Long): Either[ValidationError, ExchangeTransaction] = {
+  def createExTx(buy: Order, sell: Order, price: Long, matcher: KeyPair, ts: Long): Either[ValidationError, ExchangeTransaction] = {
     val mf     = buy.matcherFee
     val amount = math.min(buy.amount, sell.amount)
     ExchangeTransactionV1.create(
@@ -472,7 +472,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val MatcherFee = 300000L
     val Ts         = 1000L
 
-    val preconditions: Gen[(AccountKeyPair, AccountKeyPair, AccountKeyPair, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+    val preconditions: Gen[(KeyPair, KeyPair, KeyPair, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -501,7 +501,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val MatcherFee = 300000L
     val Ts         = 1000L
 
-    val preconditions: Gen[(AccountKeyPair, AccountKeyPair, AccountKeyPair, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+    val preconditions: Gen[(KeyPair, KeyPair, KeyPair, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -532,7 +532,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val Ts         = 1000L
 
     val preconditions: Gen[
-      (AccountKeyPair, AccountKeyPair, AccountKeyPair, GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+      (KeyPair, KeyPair, KeyPair, GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -949,8 +949,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   }
 
   /** Generates sequence of sell orders for one big buy order */
-  def sellOrdersForBigBuyOrderGenerator(matcher: AccountPublicKey,
-                                        sellers: Seq[AccountKeyPair],
+  def sellOrdersForBigBuyOrderGenerator(matcher: PublicKey,
+                                        sellers: Seq[KeyPair],
                                         assetPair: AssetPair,
                                         price: Long,
                                         matcherFeeAssetId: Asset,

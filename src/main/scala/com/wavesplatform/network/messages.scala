@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
-import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -40,7 +40,7 @@ case class MicroBlockRequest(totalBlockSig: ByteStr) extends Message
 
 case class MicroBlockResponse(microblock: MicroBlock) extends Message
 
-case class MicroBlockInv(sender: AccountPublicKey, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
+case class MicroBlockInv(sender: PublicKey, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
   override val signatureValid: Coeval[Boolean] =
     Coeval.evalOnce(crypto.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender))
 
@@ -49,7 +49,7 @@ case class MicroBlockInv(sender: AccountPublicKey, totalBlockSig: ByteStr, prevB
 
 object MicroBlockInv {
 
-  def apply(sender: AccountKeyPair, totalBlockSig: ByteStr, prevBlockSig: ByteStr): MicroBlockInv = {
+  def apply(sender: KeyPair, totalBlockSig: ByteStr, prevBlockSig: ByteStr): MicroBlockInv = {
     val signature = crypto.sign(sender, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr)
     new MicroBlockInv(sender, totalBlockSig, prevBlockSig, ByteStr(signature))
   }

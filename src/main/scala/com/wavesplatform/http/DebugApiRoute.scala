@@ -233,7 +233,7 @@ case class DebugApiRoute(ws: WavesSettings,
     ))
   def minerInfo: Route = (path("minerInfo") & get & withAuth) {
     complete(
-      wallet.AccountPrivateKeys
+      wallet.PrivateKeys
         .filterNot(account => ng.hasScript(account.toAddress))
         .map { account =>
           (account.toAddress, miner.getNextBlockGenerationOffset(account))

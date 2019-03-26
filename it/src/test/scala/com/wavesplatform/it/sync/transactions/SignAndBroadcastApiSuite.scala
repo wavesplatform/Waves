@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.assets.SignedTransferV1Request
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -320,7 +320,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     assert(signedRequestResponse.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val signedRequestJson = Json.parse(signedRequestResponse.getResponseBody)
     val signedRequest     = signedRequestJson.as[SignedTransferV1Request]
-    assert(AccountPublicKey.fromBase58String(signedRequest.senderPublicKey).explicitGet().address == firstAddress)
+    assert(PublicKey.fromBase58String(signedRequest.senderPublicKey).explicitGet().address == firstAddress)
     assert(signedRequest.recipient == secondAddress)
     assert(signedRequest.fee == minFee)
     assert(signedRequest.amount == transferAmount)

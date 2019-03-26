@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -14,7 +14,7 @@ import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
-case class SponsorFeeTransaction private (sender: AccountPublicKey,
+case class SponsorFeeTransaction private (sender: PublicKey,
                                           asset: IssuedAsset,
                                           minSponsoredAssetFee: Option[Long],
                                           fee: Long,
@@ -75,7 +75,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     }
   }
 
-  def create(sender: AccountPublicKey,
+  def create(sender: PublicKey,
              asset: IssuedAsset,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
@@ -90,18 +90,18 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     }
   }
 
-  def signed(sender: AccountPublicKey,
+  def signed(sender: PublicKey,
              asset: IssuedAsset,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
              timestamp: Long,
-             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, asset, minSponsoredAssetFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
-  def selfSigned(sender: AccountKeyPair,
+  def selfSigned(sender: KeyPair,
                  asset: IssuedAsset,
                  minSponsoredAssetFee: Option[Long],
                  fee: Long,
@@ -113,7 +113,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     (
       OneByte(tailIndex(1), "Transaction type"),
       OneByte(tailIndex(2), "Version"),
-      AccountPublicKeyBytes(tailIndex(3), "Sender's public key"),
+      PublicKeyBytes(tailIndex(3), "Sender's public key"),
       ByteStrDefinedLength(tailIndex(4), "Asset ID", AssetIdLength),
       SponsorFeeOptionLongBytes(tailIndex(5), "Minimal fee in assets*"),
       LongBytes(tailIndex(6), "Fee"),

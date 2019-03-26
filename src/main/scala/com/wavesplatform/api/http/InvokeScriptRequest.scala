@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http
 
 import cats.implicits._
-import com.wavesplatform.account.{AccountPublicKey, Address}
+import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -83,7 +83,7 @@ case class SignedInvokeScriptRequest(
     extends BroadcastRequest {
   def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
-      _sender          <- AccountPublicKey.fromBase58String(senderPublicKey)
+      _sender          <- PublicKey.fromBase58String(senderPublicKey)
       _contractAddress <- Address.fromString(contractAddress)
       _feeAssetId      <- parseBase58ToAssetId(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
       _proofBytes      <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))

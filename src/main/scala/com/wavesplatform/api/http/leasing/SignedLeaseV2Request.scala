@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.leasing
 
 import cats.implicits._
-import com.wavesplatform.account.{AccountPublicKey, AddressOrAlias}
+import com.wavesplatform.account.{PublicKey, AddressOrAlias}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.lease.LeaseTransactionV2
 import com.wavesplatform.transaction.{Proofs, ValidationError}
@@ -23,7 +23,7 @@ case class SignedLeaseV2Request(@ApiModelProperty(value = "Base58 encoded sender
     extends BroadcastRequest {
   def toTx: Either[ValidationError, LeaseTransactionV2] =
     for {
-      _sender     <- AccountPublicKey.fromBase58String(senderPublicKey)
+      _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _recipient  <- AddressOrAlias.fromString(recipient)

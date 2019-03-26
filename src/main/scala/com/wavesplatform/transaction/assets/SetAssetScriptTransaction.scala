@@ -18,7 +18,7 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.Try
 
 case class SetAssetScriptTransaction private (chainId: Byte,
-                                              sender: AccountPublicKey,
+                                              sender: PublicKey,
                                               asset: IssuedAsset,
                                               script: Option[Script],
                                               fee: Long,
@@ -67,7 +67,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
   private def currentChainId: Byte = AddressScheme.current.chainId
 
   def create(chainId: Byte,
-             sender: AccountPublicKey,
+             sender: PublicKey,
              assetId: IssuedAsset,
              script: Option[Script],
              fee: Long,
@@ -86,12 +86,12 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
   }
 
   def signed(chainId: Byte,
-             sender: AccountPublicKey,
+             sender: PublicKey,
              asset: IssuedAsset,
              script: Option[Script],
              fee: Long,
              timestamp: Long,
-             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(chainId, sender, asset, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
@@ -108,7 +108,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
   val byteTailDescription: ByteEntity[SetAssetScriptTransaction] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      AccountPublicKeyBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength),
       LongBytes(tailIndex(4), "Fee"),
       LongBytes(tailIndex(5), "Timestamp"),

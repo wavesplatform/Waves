@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.StdLibVersion.V1
 import com.wavesplatform.lang.Testing._
@@ -22,7 +22,7 @@ import shapeless.Coproduct
 
 class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  def compactDataTransactionGen(sender: AccountKeyPair) =
+  def compactDataTransactionGen(sender: KeyPair) =
     for {
       long <- longEntryGen(dataAsciiKeyGen)
       bool <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)

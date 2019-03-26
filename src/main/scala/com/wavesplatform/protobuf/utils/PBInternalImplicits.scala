@@ -1,6 +1,6 @@
 package com.wavesplatform.protobuf.utils
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -44,7 +44,7 @@ private[protobuf] object PBInternalImplicits {
 
   implicit class PBByteStringOps(bs: PBByteString) {
     def byteStr          = ByteStr(bs.toByteArray)
-    def publicKeyAccount = AccountPublicKey(bs.toByteArray)
+    def publicKeyAccount = PublicKey(bs.toByteArray)
   }
 
   implicit def byteStringToByte(bytes: ByteString): Byte =

@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.it.api.AsyncMatcherHttpApi._
 import com.wavesplatform.it.matcher.MatcherCommand
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -27,7 +27,7 @@ package object matcher {
       }
   }
 
-  def orderGen(matcher: AccountPublicKey, trader: AccountKeyPair, assetPairs: Seq[AssetPair]): Gen[Order] =
+  def orderGen(matcher: PublicKey, trader: KeyPair, assetPairs: Seq[AssetPair]): Gen[Order] =
     for {
       assetPair      <- Gen.oneOf(assetPairs)
       tpe            <- Gen.oneOf(OrderType.BUY, OrderType.SELL)

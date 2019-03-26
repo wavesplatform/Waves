@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{AccountPublicKey, Address}
+import com.wavesplatform.account.{PublicKey, Address}
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.crypto
@@ -290,7 +290,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   @Path("/")
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
   def root: Route = (path("addresses") & get) {
-    val accounts = wallet.AccountPrivateKeys
+    val accounts = wallet.PrivateKeys
     val json     = JsArray(accounts.map(a => JsString(a.address)))
     complete(json)
   }
@@ -307,7 +307,7 @@ case class AddressApiRoute(settings: RestAPISettings,
       case (start, end) =>
         if (start >= 0 && end >= 0 && start - end < MaxAddressesPerRequest) {
           val json = JsArray(
-            wallet.AccountPrivateKeys.map(a => JsString(a.address)).slice(start, end)
+            wallet.PrivateKeys.map(a => JsString(a.address)).slice(start, end)
           )
 
           complete(json)
@@ -434,7 +434,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: String) = {
     (msg, Base58.tryDecodeWithLimit(signature), Base58.tryDecodeWithLimit(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-        val account = AccountPublicKey(pubKeyBytes)
+        val account = PublicKey(pubKeyBytes)
         val isValid = account.address == address && crypto.verify(signatureBytes, msgBytes, pubKeyBytes)
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)

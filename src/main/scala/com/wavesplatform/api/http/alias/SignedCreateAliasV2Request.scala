@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.alias
 
 import cats.implicits._
-import com.wavesplatform.account.{AccountPublicKey, Alias}
+import com.wavesplatform.account.{PublicKey, Alias}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.transaction.{CreateAliasTransaction, CreateAliasTransactionV2, Proofs, ValidationError}
 import io.swagger.annotations.ApiModelProperty
@@ -20,7 +20,7 @@ case class SignedCreateAliasV2Request(@ApiModelProperty(value = "Base58 encoded 
     extends BroadcastRequest {
   def toTx: Either[ValidationError, CreateAliasTransaction] =
     for {
-      _sender     <- AccountPublicKey.fromBase58String(senderPublicKey)
+      _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _alias      <- Alias.create(alias)

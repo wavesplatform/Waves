@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.model
 import java.util.concurrent.ConcurrentHashMap
 
 import com.google.common.base.Charsets
-import com.wavesplatform.account.{AccountKeyPair, Address}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -57,7 +57,7 @@ class OrderValidatorSpecification
       }
 
       "sender's address is blacklisted" in {
-        val blacklistedAccount = AccountKeyPair("3irbW78fffj5XDzAMjaEeo3kn8V".getBytes(Charsets.UTF_8))
+        val blacklistedAccount = KeyPair("3irbW78fffj5XDzAMjaEeo3kn8V".getBytes(Charsets.UTF_8))
         val o                  = newBuyOrder(blacklistedAccount)
 
         val v = msa(Set(blacklistedAccount.toAddress), o)
@@ -103,7 +103,7 @@ class OrderValidatorSpecification
       }
 
       "amount is invalid" in {
-        val pk = AccountKeyPair(randomBytes())
+        val pk = KeyPair(randomBytes())
         val unsigned = newBuyOrder(pk) match {
           case x: OrderV1 => x.copy(amount = 0L)
           case x: OrderV2 => x.copy(amount = 0L)
@@ -113,7 +113,7 @@ class OrderValidatorSpecification
       }
 
       "order signature is invalid" in portfolioTest(defaultPortfolio) { (ov, bc) =>
-        val pk = AccountKeyPair(randomBytes())
+        val pk = KeyPair(randomBytes())
         (bc.accountScript _).when(pk.toAddress).returns(None)
         val order = newBuyOrder(pk) match {
           case x: OrderV1 => x.copy(proofs = Proofs(Seq(ByteStr(Array.emptyByteArray))))
@@ -123,7 +123,7 @@ class OrderValidatorSpecification
       }
 
       "order exists" in {
-        val pk = AccountKeyPair(randomBytes())
+        val pk = KeyPair(randomBytes())
         val ov = OrderValidator.accountStateAware(pk, defaultPortfolio.balanceOf, 1, _ => true)(_)
         ov(newBuyOrder(pk, 1000)) should produce("OrderDuplicate")
       }
@@ -312,7 +312,7 @@ class OrderValidatorSpecification
 
         val tooLowPriceOrder =
           Order(
-            sender = AccountKeyPair("seed".getBytes),
+            sender = KeyPair("seed".getBytes),
             matcher = MatcherAccount,
             pair = pairWavesBtc,
             orderType = OrderType.SELL,
@@ -350,7 +350,7 @@ class OrderValidatorSpecification
 
         val order =
           Order(
-            sender = AccountKeyPair("seed".getBytes),
+            sender = KeyPair("seed".getBytes),
             matcher = MatcherAccount,
             pair = pairWavesBtc,
             orderType = OrderType.BUY,
@@ -407,7 +407,7 @@ class OrderValidatorSpecification
     "meaningful error for undefined functions in matcher" in portfolioTest(defaultPortfolio) { (ov, bc) =>
       activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
 
-      val pk     = AccountKeyPair(randomBytes())
+      val pk     = KeyPair(randomBytes())
       val o      = newBuyOrder(pk, version = 2)
       val script = ScriptCompiler("true && (height > 0)", isAssetScript = false).explicitGet()._1
       (bc.accountScript _).when(pk.toAddress).returns(Some(script))
@@ -459,7 +459,7 @@ class OrderValidatorSpecification
           (bc.assetDescription _).when(asset1).returns(mkAssetDescription(8))
           (bc.assetDescription _).when(asset2).returns(mkAssetDescription(8))
 
-          val pk = AccountKeyPair(randomBytes())
+          val pk = KeyPair(randomBytes())
           val o = buy(
             pair = pair,
             amount = 100 * Constants.UnitsInWave,
@@ -518,7 +518,7 @@ class OrderValidatorSpecification
 
   private def validateOrderProofsTest(proofs: Seq[ByteStr]): Unit = {
     val bc = stub[Blockchain]
-    val pk = AccountKeyPair(randomBytes())
+    val pk = KeyPair(randomBytes())
 
     activate(bc, BlockchainFeatures.SmartAccountTrading -> 0)
     (bc.accountScript _).when(pk.toAddress).returns(Some(accountScript)).anyNumberOfTimes()
@@ -550,7 +550,7 @@ class OrderValidatorSpecification
   private def newBuyOrder: Order =
     buy(pair = pairWavesBtc, amount = 100 * Constants.UnitsInWave, price = 0.0022, matcherFee = Some((0.003 * Constants.UnitsInWave).toLong))
 
-  private def newBuyOrder(pk: AccountKeyPair, ts: Long = 0, version: Byte = 1) =
+  private def newBuyOrder(pk: KeyPair, ts: Long = 0, version: Byte = 1) =
     buy(
       pair = pairWavesBtc,
       amount = 100 * Constants.UnitsInWave,

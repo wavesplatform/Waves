@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http
 
 import cats.implicits._
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.{DataTransaction, Proofs, ValidationError}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
@@ -33,7 +33,7 @@ case class SignedDataRequest(@(ApiModelProperty @field)(value = "Base58 encoded 
     extends BroadcastRequest {
   def toTx: Either[ValidationError, DataTransaction] =
     for {
-      _sender     <- AccountPublicKey.fromBase58String(senderPublicKey)
+      _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       t           <- DataTransaction.create(_sender, data, fee, timestamp, _proofs)

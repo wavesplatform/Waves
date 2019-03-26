@@ -4,7 +4,7 @@ import java.io.IOException
 import java.util.concurrent.TimeoutException
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.AccountPrivateKey
+import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.api.http.assets.{SignedIssueV2Request, SignedMassTransferRequest, SignedTransferV1Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -179,7 +179,7 @@ class ApiRequests(client: AsyncHttpClient) extends ScorexLogging {
 
     def broadcastRequest[A: Writes](req: A)(implicit tag: String): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
-    def orderHistory(pk: AccountPrivateKey)(implicit tag: String): Future[Seq[OrderbookHistory]] = {
+    def orderHistory(pk: PrivateKey)(implicit tag: String): Future[Seq[OrderbookHistory]] = {
       val ts        = System.currentTimeMillis()
       val signature = ByteStr(crypto.sign(pk, pk ++ Longs.toByteArray(ts)))
       orderbookByPublicKey(Base58.encode(pk), ts, signature)

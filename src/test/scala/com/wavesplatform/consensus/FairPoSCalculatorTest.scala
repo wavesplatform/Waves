@@ -2,7 +2,7 @@ package com.wavesplatform.consensus
 
 import cats.data.NonEmptyList
 import cats.implicits._
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import org.scalatest.{Matchers, PropSpec}
 
 import scala.util.Random
@@ -13,7 +13,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
 
   val pos: PoSCalculator = FairPoSCalculator
 
-  case class Block(height: Int, baseTarget: Long, miner: AccountKeyPair, timestamp: Long, delay: Long)
+  case class Block(height: Int, baseTarget: Long, miner: KeyPair, timestamp: Long, delay: Long)
 
   def generationSignature: Array[Byte] = {
     val arr = new Array[Byte](32)
@@ -28,7 +28,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
   property("Correct consensus parameters distribution of blocks generated with FairPoS") {
 
     val miners = mkMiners
-    val first  = Block(0, defaultBaseTarget, AccountKeyPair(generationSignature), System.currentTimeMillis(), 0)
+    val first  = Block(0, defaultBaseTarget, KeyPair(generationSignature), System.currentTimeMillis(), 0)
 
     val chain = (1 to 100000 foldLeft NonEmptyList.of(first))((acc, _) => {
       val gg     = acc.tail.lift(1)
@@ -49,7 +49,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
     assert(avgBT < 200 && avgBT > 20)
   }
 
-  def mineBlock(prev: Block, grand: Option[Block], minerWithBalance: (AccountKeyPair, Long)): Block = {
+  def mineBlock(prev: Block, grand: Option[Block], minerWithBalance: (KeyPair, Long)): Block = {
     val (miner, balance) = minerWithBalance
     val gs               = generatorSignature(generationSignature, miner)
     val h                = hit(gs)
@@ -72,7 +72,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
     )
   }
 
-  def calcPerfomance(chain: List[Block], miners: Map[AccountKeyPair, Long]): Map[Long, Double] = {
+  def calcPerfomance(chain: List[Block], miners: Map[KeyPair, Long]): Map[Long, Double] = {
     val balanceSum  = miners.values.sum
     val blocksCount = chain.length
 
@@ -89,13 +89,13 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
       })
   }
 
-  def mkMiners: Map[AccountKeyPair, Long] =
+  def mkMiners: Map[KeyPair, Long] =
     List(
-      AccountKeyPair(generationSignature) -> 200000000000000L,
-      AccountKeyPair(generationSignature) -> 500000000000000L,
-      AccountKeyPair(generationSignature) -> 1000000000000000L,
-      AccountKeyPair(generationSignature) -> 1500000000000000L,
-      AccountKeyPair(generationSignature) -> 2000000000000000L,
-      AccountKeyPair(generationSignature) -> 2500000000000000L
+      KeyPair(generationSignature) -> 200000000000000L,
+      KeyPair(generationSignature) -> 500000000000000L,
+      KeyPair(generationSignature) -> 1000000000000000L,
+      KeyPair(generationSignature) -> 1500000000000000L,
+      KeyPair(generationSignature) -> 2000000000000000L,
+      KeyPair(generationSignature) -> 2500000000000000L
     ).toMap
 }

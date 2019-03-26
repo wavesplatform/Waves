@@ -1,7 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
@@ -59,7 +59,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment, payment2)) =>
-        val otherSigner = AccountKeyPair(TestBlock.randomOfLength(KeyLength).arr)
+        val otherSigner = KeyPair(TestBlock.randomOfLength(KeyLength).arr)
         val block0      = buildBlockOfTxs(randomSig, Seq(genesis))
         val block1      = buildBlockOfTxs(block0.uniqueId, Seq(payment))
         val badSigMicro = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2), otherSigner)._2

@@ -1,6 +1,6 @@
 package com.wavesplatform.consensus
 
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.crypto
 
 trait PoSCalculator {
@@ -18,7 +18,7 @@ object PoSCalculator {
   private[consensus] val HitSize: Int        = 8
   private[consensus] val MinBaseTarget: Long = 9
 
-  private[consensus] def generatorSignature(signature: Array[Byte], publicKey: AccountPublicKey): Array[Byte] = {
+  private[consensus] def generatorSignature(signature: Array[Byte], publicKey: PublicKey): Array[Byte] = {
     val s = new Array[Byte](crypto.DigestSize * 2)
     System.arraycopy(signature, 0, s, 0, crypto.DigestSize)
     System.arraycopy(publicKey, 0, s, crypto.DigestSize, crypto.DigestSize)

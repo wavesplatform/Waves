@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey, AddressScheme}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -15,7 +15,7 @@ import monix.eval.Coeval
 import scala.util._
 
 case class ReissueTransactionV2 private (chainId: Byte,
-                                         sender: AccountPublicKey,
+                                         sender: PublicKey,
                                          asset: IssuedAsset,
                                          quantity: Long,
                                          reissuable: Boolean,
@@ -59,7 +59,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
   }
 
   def create(chainId: Byte,
-             sender: AccountPublicKey,
+             sender: PublicKey,
              asset: IssuedAsset,
              quantity: Long,
              reissuable: Boolean,
@@ -73,13 +73,13 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
   }
 
   def signed(chainId: Byte,
-             sender: AccountPublicKey,
+             sender: PublicKey,
              asset: IssuedAsset,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
+             signer: PrivateKey): Either[ValidationError, TransactionT] = {
     for {
       unverified <- create(chainId, sender, asset, quantity, reissuable, fee, timestamp, Proofs.empty)
       proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unverified.bodyBytes()))))
@@ -87,7 +87,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
   }
 
   def selfSigned(chainId: Byte,
-                 sender: AccountKeyPair,
+                 sender: KeyPair,
                  asset: IssuedAsset,
                  quantity: Long,
                  reissuable: Boolean,
@@ -99,7 +99,7 @@ object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] w
   val byteTailDescription: ByteEntity[ReissueTransactionV2] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      AccountPublicKeyBytes(tailIndex(2), "Sender's public key"),
+      PublicKeyBytes(tailIndex(2), "Sender's public key"),
       ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength).map(IssuedAsset),
       LongBytes(tailIndex(4), "Quantity"),
       BooleanByte(tailIndex(5), "Reissuable flag (1 - True, 0 - False)"),

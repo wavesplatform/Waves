@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.BlockGen
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
@@ -20,16 +20,16 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
 
   private val TransactionFee = 10
 
-  def randomAccountKeyPair(): AccountKeyPair = {
+  def randomKeyPair(): KeyPair = {
     val seed = Array.ofDim[Byte](KeyLength)
     ThreadLocalRandom.current().nextBytes(seed)
-    AccountKeyPair(seed)
+    KeyPair(seed)
   }
 
-  private val signerA, signerB = randomAccountKeyPair()
+  private val signerA, signerB = randomKeyPair()
 
   private val testChain: Seq[Block] = {
-    val master, recipient = randomAccountKeyPair()
+    val master, recipient = randomKeyPair()
     getTwoMinersBlockChain(master, recipient, 9)
   }
 
@@ -133,7 +133,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }
 
-  private def getTwoMinersBlockChain(from: AccountKeyPair, to: AccountKeyPair, numPayments: Int): Seq[Block] = {
+  private def getTwoMinersBlockChain(from: KeyPair, to: KeyPair, numPayments: Int): Seq[Block] = {
     val ts                   = System.currentTimeMillis() - 100000
     val genesisTx            = GenesisTransaction.create(from, Long.MaxValue - 1, ts).explicitGet()
     val features: Set[Short] = Set[Short](2)

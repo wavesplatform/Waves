@@ -1,7 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform._
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -141,7 +141,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
       }
     }
 
-    def leaseAndLeaseCancel(): Gen[(Block, Block, Block, Seq[MicroBlock], Block, AccountKeyPair)] = {
+    def leaseAndLeaseCancel(): Gen[(Block, Block, Block, Seq[MicroBlock], Block, KeyPair)] = {
       for {
         richAccount   <- accountGen
         secondAccount <- accountGen

@@ -1,6 +1,6 @@
 package com.wavesplatform.protobuf.block
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.AccountPublicKey
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.SignerData
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -16,7 +16,7 @@ object PBBlocks {
                consensusData: NxtLikeConsensusBlockData,
                transactionData: Seq[VanillaTransaction],
                featureVotes: Set[Short],
-               generator: AccountPublicKey,
+               generator: PublicKey,
                signature: ByteStr): VanillaBlock = {
       VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes)
     }
@@ -38,7 +38,7 @@ object PBBlocks {
         NxtLikeConsensusBlockData(header.baseTarget, ByteStr(header.generationSignature.toByteArray)),
         transactions,
         header.featureVotes.map(intToShort).toSet,
-        AccountPublicKey(header.generator.toByteArray),
+        PublicKey(header.generator.toByteArray),
         ByteStr(signedHeader.signature.toByteArray)
       )
     } yield result

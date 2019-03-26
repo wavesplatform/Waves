@@ -1,6 +1,6 @@
 package com.wavesplatform.lagonaki.unit
 
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -20,8 +20,8 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
   val prevResBlockSig  = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
   val totalResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
   val reference        = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
-  val sender           = AccountKeyPair(reference.dropRight(2))
-  val gen              = AccountKeyPair(reference)
+  val sender           = KeyPair(reference.dropRight(2))
+  val gen              = KeyPair(reference)
 
   test("MicroBlock with txs bytes/parse roundtrip") {
 

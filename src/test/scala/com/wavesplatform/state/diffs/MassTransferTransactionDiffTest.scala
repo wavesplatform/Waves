@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.account.{AccountKeyPair, Address}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
@@ -19,7 +19,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
 
   val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0))
 
-  val baseSetup: Gen[(GenesisTransaction, AccountKeyPair)] = for {
+  val baseSetup: Gen[(GenesisTransaction, KeyPair)] = for {
     master <- accountGen
     ts     <- positiveLongGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()

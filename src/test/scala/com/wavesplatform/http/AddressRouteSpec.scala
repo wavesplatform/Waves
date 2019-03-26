@@ -33,7 +33,7 @@ class AddressRouteSpec
     with TestWallet
     with NoShrink {
 
-  private val allAccounts  = testWallet.AccountPrivateKeys
+  private val allAccounts  = testWallet.PrivateKeys
   private val allAddresses = allAccounts.map(_.address)
   private val blockchain   = stub[Blockchain]
 

@@ -158,12 +158,12 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       }
 
       val generator: TransactionGenerator = finalConfig.mode match {
-        case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.AccountPrivateKeys)
-        case Mode.WIDE     => new WideTransactionGenerator(finalConfig.wide, finalConfig.AccountPrivateKeys)
-        case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.AccountPrivateKeys)
-        case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.AccountPrivateKeys)
-        case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.AccountPrivateKeys)
-        case Mode.SWARM    => new SmartGenerator(finalConfig.swarm, finalConfig.AccountPrivateKeys)
+        case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.PrivateKeys)
+        case Mode.WIDE     => new WideTransactionGenerator(finalConfig.wide, finalConfig.PrivateKeys)
+        case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.PrivateKeys)
+        case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.PrivateKeys)
+        case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.PrivateKeys)
+        case Mode.SWARM    => new SmartGenerator(finalConfig.swarm, finalConfig.PrivateKeys)
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))

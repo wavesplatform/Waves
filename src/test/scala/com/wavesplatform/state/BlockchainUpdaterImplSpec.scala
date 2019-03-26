@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{AccountKeyPair, Address}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
@@ -19,7 +19,7 @@ import org.scalatest.{FreeSpec, Matchers}
 
 class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings {
 
-  def baseTest(gen: Time => Gen[(AccountKeyPair, Seq[Block])])(f: (BlockchainUpdaterImpl, AccountKeyPair) => Unit): Unit = {
+  def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
     val defaultWriter = new LevelDBWriter(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, maxCacheSize, 2000, 120 * 60 * 1000)
     val settings      = WavesSettings.fromConfig(loadConfig(ConfigFactory.load()))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
@@ -38,14 +38,14 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     }
   }
 
-  def createTransfer(master: AccountKeyPair, recipient: Address, ts: Long): TransferTransaction = {
+  def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
     TransferTransactionV1
       .selfSigned(Waves, master, recipient, ENOUGH_AMT / 5, ts, Waves, 1000000, Array.emptyByteArray)
       .explicitGet()
   }
 
   "addressTransactions" - {
-    def preconditions(ts: Long): Gen[(AccountKeyPair, List[Block])] = {
+    def preconditions(ts: Long): Gen[(KeyPair, List[Block])] = {
       for {
         master    <- accountGen
         recipient <- accountGen

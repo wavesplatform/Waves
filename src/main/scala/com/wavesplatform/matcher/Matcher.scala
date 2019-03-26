@@ -9,7 +9,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.pattern.{AskTimeoutException, gracefulStop}
 import akka.stream.ActorMaterializer
-import com.wavesplatform.account.{AccountKeyPair, Address}
+import com.wavesplatform.account.{KeyPair, Address}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db._
@@ -43,7 +43,7 @@ class Matcher(actorSystem: ActorSystem,
               blockchain: Blockchain,
               spendableBalanceChanged: Observable[(Address, Asset)],
               settings: WavesSettings,
-              matcherPrivateKey: AccountKeyPair)
+              matcherPrivateKey: KeyPair)
     extends ScorexLogging {
 
   import settings._
@@ -316,7 +316,7 @@ object Matcher extends ScorexLogging {
     try {
       val privateKey = (for {
         address <- Address.fromString(settings.matcherSettings.account)
-        pk      <- wallet.AccountPrivateKey(address)
+        pk      <- wallet.PrivateKey(address)
       } yield pk).explicitGet()
 
       val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, spendableBalanceChanged, settings, privateKey)

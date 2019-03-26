@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{AccountPublicKey, Address, Alias}
+import com.wavesplatform.account.{PublicKey, Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -50,7 +50,7 @@ object AssetInfo {
   }
 }
 
-case class AssetDescription(issuer: AccountPublicKey,
+case class AssetDescription(issuer: PublicKey,
                             name: Array[Byte],
                             description: Array[Byte],
                             decimals: Int,

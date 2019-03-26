@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.matcher
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.SyncMatcherHttpApi
@@ -181,8 +181,8 @@ object MatcherTickerTestSuite {
 
   private val aliceSeed = _Configs(1).getString("account-seed")
   private val bobSeed   = _Configs(2).getString("account-seed")
-  private val alicePk   = AccountKeyPair.fromSeed(aliceSeed).right.get
-  private val bobPk     = AccountKeyPair.fromSeed(bobSeed).right.get
+  private val alicePk   = KeyPair.fromSeed(aliceSeed).right.get
+  private val bobPk     = KeyPair.fromSeed(bobSeed).right.get
 
   val usdAssetName             = "USD-X"
   val eightDigitAssetAssetName = "Eight-X"
