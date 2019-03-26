@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.ContentType.ContentType
 import supertagged._
 
 object StdLibVersion extends TaggedType[Int] {
@@ -33,9 +34,10 @@ object ContentType extends TaggedType[Int] {
 
   def isDApp(isDApp: Boolean) = if (isDApp) DApp else Expression
 
-  def parseString(s: String) = s match {
-    case "EXPRESSION" => Expression
-    case "DAPP"   => DApp
+  def parseString(s: String): Either[String, ContentType] = s match {
+    case "EXPRESSION" => Right(Expression)
+    case "DAPP"   => Right(DApp)
+    case _ => Left("Wrong content type")
   }
 }
 
@@ -54,8 +56,9 @@ object ScriptType extends TaggedType[Int] {
 
   def isAssetScript(b: Boolean) = if (b) Asset else Account
 
-  def parseString(s: String) = s match {
-    case "ACCOUNT" => Account
-    case "ASSET"   => Asset
+  def parseString(s: String): Either[String, ScriptType] = s match {
+    case "ACCOUNT" => Right(Account)
+    case "ASSET"   => Right(Asset)
+    case _ => Left("Wrong script type")
   }
 }

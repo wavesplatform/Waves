@@ -34,6 +34,16 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
     ScriptCompiler(script, isAssetScript = false) shouldBe Left("Can't parse language version")
   }
 
+  property("fails on incorrect content type value") {
+    val script = scriptWithContentType("oOooOps".some)
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Wrong content type")
+  }
+
+  property("fails on incorrect script type value") {
+    val script = scriptWithScriptType("oOooOps".some)
+    ScriptCompiler.compile(script) shouldBe Left("Wrong script type")
+  }
+
   property("fails with right error position") {
     val script =
       """
@@ -99,11 +109,41 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
         .getOrElse("")
 
     s"""
-      | $directive
-      |
+       | $directive
+       |
       | let x = 10
-      | 20 == x + x
-      |
+       | 20 == x + x
+       |
+      """.stripMargin
+  }
+
+  private def scriptWithContentType(contentTypeStr: Option[String]): String = {
+    val directive =
+      contentTypeStr
+        .map(v => s"{-# CONTENT_TYPE $v #-}")
+        .getOrElse("")
+
+    s"""
+       | $directive
+       |
+      | let x = 10
+       | 20 == x + x
+       |
+      """.stripMargin
+  }
+
+  private def scriptWithScriptType(scriptTypeStr: Option[String]): String = {
+    val directive =
+      scriptTypeStr
+        .map(v => s"{-# SCRIPT_TYPE $v #-}")
+        .getOrElse("")
+
+    s"""
+       | $directive
+       |
+      | let x = 10
+       | 20 == x + x
+       |
       """.stripMargin
   }
 }
