@@ -77,7 +77,7 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
         1526641218066L,
         Waves,
         100000000,
-        Base58.decode("4t2Xazb2SX").get,
+        Base58.tryDecodeWithLimit("4t2Xazb2SX").get,
         Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
       )
       .right

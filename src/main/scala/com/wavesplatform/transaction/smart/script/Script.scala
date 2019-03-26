@@ -9,10 +9,10 @@ import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
 import com.wavesplatform.utils.defaultDecompilerContext
 import com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl
-import monix.eval.Coeval
-import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import DecompileInstances._
 import shapeless.HList
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import monix.eval.Coeval
 
 trait Script {
   type Expr
@@ -40,8 +40,8 @@ object Script {
 
   def fromBase64String(str: String, checkComplexity: Boolean = true): Either[ScriptParseError, Script] =
     for {
-      bytes  <- Base64.decode(str).toEither.left.map(ex => ScriptParseError(s"Unable to decode base64: ${ex.getMessage}"))
-      script <- ScriptReader.fromBytes(bytes, checkComplexity = checkComplexity)
+      bytes  <- Base64.tryDecode(str).toEither.left.map(ex => ScriptParseError(s"Unable to decode base64: ${ex.getMessage}"))
+      script <- ScriptReader.fromBytes(bytes, checkComplexity)
     } yield script
 
   type DirectiveMeta = List[(String, Any)]

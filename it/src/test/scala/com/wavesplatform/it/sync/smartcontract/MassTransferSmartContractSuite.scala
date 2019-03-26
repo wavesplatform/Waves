@@ -125,7 +125,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
         .explicitGet()
 
     val accountSigToGov = ByteStr(crypto.sign(notMiner.privateKey, unsignedToGovSecond.bodyBytes()))
-    val signedToGovGood = unsignedToGovSecond.copy(proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.decode(toUsersID).get))))
+    val signedToGovGood = unsignedToGovSecond.copy(proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.tryDecodeWithLimit(toUsersID).get))))
     val massTransferID  = notMiner.signedBroadcast(signedToGovGood.json()).id
 
     nodes.waitForHeightAriseAndTxPresent(massTransferID)

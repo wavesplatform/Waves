@@ -88,7 +88,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   val smallFeeGen: Gen[Long]     = Gen.choose(400000, 100000000)
 
   val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + ntpTime.correctedTime())
-  val timestampGen: Gen[Long]    = Gen.choose(1, Long.MaxValue - 100)
+  val timestampGen: Gen[Long]    = Gen.choose(1L, Long.MaxValue - 100)
 
   val wavesAssetGen: Gen[Option[ByteStr]] = Gen.const(None)
   val assetIdGen: Gen[Option[ByteStr]]    = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen.map(ByteStr(_)))))
@@ -684,6 +684,61 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         .explicitGet()
     }
   }
+
+  val exchangeTransactionV2WithArbitraryFeeAssetsInOrdersGen: Gen[ExchangeTransaction] =
+    for {
+      buyer                   <- accountGen
+      seller                  <- accountGen
+      matcher                 <- accountGen
+      pair                    <- assetPairGen
+      amount                  <- matcherAmountGen
+      price                   <- priceGen
+      buyerTimestamp          <- timestampGen
+      sellerTimestamp         <- timestampGen
+      buyerExpiration         <- maxOrderTimeGen
+      sellerExpiration        <- maxOrderTimeGen
+      buyerMatcherFee         <- matcherFeeAmountGen
+      sellerMatcherFee        <- matcherFeeAmountGen
+      buyerMatcherFeeAssetId  <- bytes32gen map (b => IssuedAsset(ByteStr(b)))
+      sellerMatcherFeeAssetId <- bytes32gen map (b => IssuedAsset(ByteStr(b)))
+    } yield {
+
+      val buyOrder = OrderV3(buyer,
+                             matcher,
+                             pair,
+                             OrderType.BUY,
+                             amount,
+                             price,
+                             buyerTimestamp,
+                             buyerExpiration,
+                             buyerMatcherFee,
+                             Asset fromCompatId buyerMatcherFeeAssetId.compatId)
+
+      val sellOrder = OrderV3(seller,
+                              matcher,
+                              pair,
+                              OrderType.SELL,
+                              amount,
+                              price,
+                              sellerTimestamp,
+                              sellerExpiration,
+                              sellerMatcherFee,
+                              Asset fromCompatId sellerMatcherFeeAssetId.compatId)
+
+      ExchangeTransactionV2
+        .create(
+          matcher,
+          buyOrder,
+          sellOrder,
+          amount,
+          price,
+          buyOrder.matcherFee,
+          sellOrder.matcherFee,
+          300000L,
+          System.currentTimeMillis() - 10000L
+        )
+        .explicitGet()
+    }
 
   val randomTransactionGen: Gen[ProvenTransaction] = (for {
     tr <- transferV1Gen

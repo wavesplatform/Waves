@@ -55,7 +55,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("lease"), v) ~> route
 
       forAll(nonPositiveLong) { q =>
-        posting(lease.copy(amount = q)) should produce(NegativeAmount(s"$q of waves"))
+        posting(lease.copy(amount = q)) should produce(NonPositiveAmount(s"$q of waves"))
       }
       forAll(invalidBase58) { pk =>
         posting(lease.copy(senderPublicKey = pk)) should produce(InvalidAddress)

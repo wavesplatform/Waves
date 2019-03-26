@@ -2,15 +2,14 @@ package com.wavesplatform
 
 import java.nio.charset.StandardCharsets
 
-import org.scalatest.matchers.{HavePropertyMatchResult, HavePropertyMatcher}
-import play.api.libs.json._
-import play.api.libs.functional.syntax._
 import com.wavesplatform.account.{AddressOrAlias, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{Asset, Proofs}
+import org.scalatest.matchers.{HavePropertyMatchResult, HavePropertyMatcher}
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 import shapeless.{:+:, CNil, Coproduct}
 
 import scala.reflect.ClassTag
@@ -77,7 +76,7 @@ package object http {
     Reads {
       case JsString(str) =>
         Base58
-          .decode(str)
+          .tryDecodeWithLimit(str)
           .toEither
           .flatMap(AddressOrAlias.fromBytes(_, 0))
           .map { case (x, _) => JsSuccess(x) }
