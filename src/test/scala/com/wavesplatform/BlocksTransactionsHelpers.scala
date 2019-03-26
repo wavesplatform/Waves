@@ -15,17 +15,26 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
   object QuickTX {
     val FeeAmount = 400000
 
-    def transfer(from: PrivateKeyAccount, to: AddressOrAlias = accountGen.sample.get, amount: Long = smallFeeGen.sample.get, timestamp: Gen[Long] = timestampGen): Gen[Transaction] =
+    def transfer(from: PrivateKeyAccount,
+                 to: AddressOrAlias = accountGen.sample.get,
+                 amount: Long = smallFeeGen.sample.get,
+                 timestamp: Gen[Long] = timestampGen): Gen[Transaction] =
       for {
         timestamp <- timestamp
       } yield TransferTransactionV1.selfSigned(Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
 
-    def transferV2(from: PrivateKeyAccount, to: AddressOrAlias = accountGen.sample.get, amount: Long = smallFeeGen.sample.get, timestamp: Gen[Long] = timestampGen): Gen[Transaction] =
+    def transferV2(from: PrivateKeyAccount,
+                   to: AddressOrAlias = accountGen.sample.get,
+                   amount: Long = smallFeeGen.sample.get,
+                   timestamp: Gen[Long] = timestampGen): Gen[Transaction] =
       for {
         timestamp <- timestamp
       } yield TransferTransactionV2.selfSigned(Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
 
-    def lease(from: PrivateKeyAccount, to: AddressOrAlias = accountGen.sample.get, amount: Long = smallFeeGen.sample.get, timestamp: Gen[Long] = timestampGen): Gen[LeaseTransactionV1] =
+    def lease(from: PrivateKeyAccount,
+              to: AddressOrAlias = accountGen.sample.get,
+              amount: Long = smallFeeGen.sample.get,
+              timestamp: Gen[Long] = timestampGen): Gen[LeaseTransactionV1] =
       for {
         timestamp <- timestamp
       } yield LeaseTransactionV1.selfSigned(from, amount, FeeAmount, timestamp, to).explicitGet()
