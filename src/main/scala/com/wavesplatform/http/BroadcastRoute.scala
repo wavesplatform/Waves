@@ -32,6 +32,8 @@ trait BroadcastRoute { self: ApiRoute =>
   def utx: UtxPool
   def allChannels: ChannelGroup
 
+  protected lazy val broadcastExecutionContext = BroadcastRoute.executionContext(settings)
+
   protected def doBroadcast(v: Either[ValidationError, Transaction]): Future[Either[ApiError, Transaction]] =
     Future {
       val r = for {
@@ -44,5 +46,5 @@ trait BroadcastRoute { self: ApiRoute =>
       }
 
       r.left.map(ApiError.fromValidationError)
-    }(BroadcastRoute.executionContext(settings))
+    }(broadcastExecutionContext)
 }

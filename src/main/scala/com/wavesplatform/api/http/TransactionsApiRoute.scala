@@ -258,7 +258,7 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       )
     ))
   def broadcast: Route =
-    (pathPrefix("broadcast") & post & withExecutionContext(BroadcastRoute.executionContext)) {
+    (pathPrefix("broadcast") & post & withExecutionContext(broadcastExecutionContext)) {
       (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { jsv =>
         val futureResult: Future[Either[ApiError, Transaction]] = this.doBroadcast(TransactionFactory.fromSignedRequest(jsv))
         complete(futureResult)
