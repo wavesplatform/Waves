@@ -3,7 +3,6 @@ package com.wavesplatform.account
 import java.nio.ByteBuffer
 
 import com.google.common.cache.{Cache, CacheBuilder}
-import com.google.common.collect.{Interners, MapMaker}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -26,12 +25,12 @@ object Address extends ScorexLogging {
   val AddressLength        = 1 + 1 + HashLength + ChecksumLength
   val AddressStringLength  = base58Length(AddressLength)
 
-  private[this] val publicKeyBytesCache: Cache[ByteStr, Address] = new CacheBuilder[ByteStr, Address]()
+  private[this] val publicKeyBytesCache: Cache[ByteStr, Address] = CacheBuilder.newBuilder()
     .weakKeys()
     .maximumSize(1000000)
     .build()
 
-  private[this] val bytesCache: Cache[ByteStr, Either[InvalidAddress, Address]] = new CacheBuilder[ByteStr, Either[InvalidAddress, Address]]()
+  private[this] val bytesCache: Cache[ByteStr, Either[InvalidAddress, Address]] = CacheBuilder.newBuilder()
     .weakKeys()
     .maximumSize(1000000)
     .build()
