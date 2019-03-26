@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{PrivateKey, PublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -14,8 +14,8 @@ import play.api.libs.json._
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Read Order from json") {
-    val pk        = PrivateKey.fromSeed("123".getBytes)
-    val pubKeyStr = Base58.encode(pk)
+    val keyPair   = KeyPair("123".getBytes)
+    val pubKeyStr = Base58.encode(keyPair.publicKey)
 
     val json = Json.parse(s"""
         {
@@ -38,7 +38,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
       case JsError(e) =>
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
-        o.senderPublicKey shouldBe PublicKey(pk)
+        o.senderPublicKey shouldBe keyPair.publicKey
         o.matcherPublicKey shouldBe PublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset.compatId.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
         o.assetPair.priceAsset.compatId.get shouldBe ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
@@ -73,7 +73,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
       case JsError(e) =>
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
-        o.senderPublicKey shouldBe PublicKey(pk)
+        o.senderPublicKey shouldBe keyPair.publicKey
         o.matcherPublicKey shouldBe PublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
         o.assetPair.priceAsset shouldBe IssuedAsset(ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get)

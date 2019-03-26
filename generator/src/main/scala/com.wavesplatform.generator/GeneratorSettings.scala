@@ -19,7 +19,7 @@ case class GeneratorSettings(chainId: String,
                              oracle: OracleTransactionGenerator.Settings,
                              swarm: SmartGenerator.Settings) {
   val addressScheme: Char                        = chainId.head
-  val PrivateKeys: Seq[KeyPair] = accounts.map(s => KeyPair.fromSeed(s).explicitGet())
+  val privateKeyAccounts: Seq[KeyPair] = accounts.map(s => KeyPair.fromSeed(s).explicitGet())
 }
 
 object GeneratorSettings {

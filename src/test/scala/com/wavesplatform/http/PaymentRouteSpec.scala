@@ -40,7 +40,7 @@ class PaymentRouteSpec
           override def getTimestamp(): Long = timestamp
         }
 
-        val sender = testWallet.PrivateKeys.head
+        val sender = testWallet.privateKeyAccounts.head
         val tx     = TransferTransactionV1.selfSigned(Asset.Waves, sender, recipient, amount, timestamp, Asset.Waves, fee, Array())
 
         val route = PaymentApiRoute(restAPISettings, testWallet, utx, allChannels, time).route
