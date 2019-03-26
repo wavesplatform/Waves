@@ -1,7 +1,8 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.api.http.{ApiError, ApiRoute}
 import com.wavesplatform.network._
+import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.transaction.{Transaction, ValidationError}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
@@ -9,21 +10,25 @@ import monix.execution.Scheduler
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-private[wavesplatform] object BroadcastRoute {
-  lazy val executionContext = new ExecutionContextExecutor {
-    private[this] val parallelism = sys.props
-      .get("waves.rest-api.broadcast-parallelism")
-      .map(_.toInt)
-      .getOrElse((Runtime.getRuntime.availableProcessors() / 2) max 1)
+private object BroadcastRoute {
+  private[this] var executionContext = Option.empty[ExecutionContextExecutor]
 
-    private[this] val scheduler = Scheduler.computation(parallelism, "rest-api-broadcast")
+  def executionContext(settings: RestAPISettings): ExecutionContextExecutor = {
+    if (executionContext.isEmpty) {
+      synchronized(if (executionContext.isEmpty) executionContext = Some(new ExecutionContextExecutor {
+        private[this] val parallelism = settings.broadcastParallelism
+        private[this] val scheduler = Scheduler.computation(parallelism, "rest-api-broadcast")
 
-    override def reportFailure(cause: Throwable): Unit = scheduler.reportFailure(cause)
-    override def execute(command: Runnable): Unit      = scheduler.execute(command)
+        override def reportFailure(cause: Throwable): Unit = scheduler.reportFailure(cause)
+        override def execute(command: Runnable): Unit      = scheduler.execute(command)
+      }))
+    }
+
+    executionContext.getOrElse(sys.error("Should not happen"))
   }
 }
 
-trait BroadcastRoute {
+trait BroadcastRoute { self: ApiRoute =>
   def utx: UtxPool
   def allChannels: ChannelGroup
 
@@ -39,5 +44,5 @@ trait BroadcastRoute {
       }
 
       r.left.map(ApiError.fromValidationError)
-    }(BroadcastRoute.executionContext)
+    }(BroadcastRoute.executionContext(settings))
 }

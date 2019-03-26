@@ -145,7 +145,7 @@ object BlockchainType extends Enumeration {
 object BlockchainSettings {
   val configPath: String = "waves.blockchain"
 
-  def fromConfig(config: Config): BlockchainSettings = {
+  def fromRootConfig(config: Config): BlockchainSettings = {
     val blockchainType = config.as[BlockchainType.Value](s"$configPath.type")
     val (addressSchemeCharacter, functionalitySettings, genesisSettings) = blockchainType match {
       case BlockchainType.TESTNET =>
@@ -154,8 +154,8 @@ object BlockchainSettings {
         ('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET)
       case BlockchainType.CUSTOM =>
         val addressSchemeCharacter = config.as[String](s"$configPath.custom.address-scheme-character").charAt(0)
-        val functionalitySettings  = config.as[FunctionalitySettings]("waves.blockchain.custom.functionality")
-        val genesisSettings        = config.as[GenesisSettings]("waves.blockchain.custom.genesis")
+        val functionalitySettings  = config.as[FunctionalitySettings](s"$configPath.custom.functionality")
+        val genesisSettings        = config.as[GenesisSettings](s"$configPath.custom.genesis")
         (addressSchemeCharacter, functionalitySettings, genesisSettings)
     }
 

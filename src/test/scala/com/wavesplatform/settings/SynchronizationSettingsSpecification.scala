@@ -43,7 +43,7 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
         |}
       """.stripMargin).resolve()
 
-    val settings = SynchronizationSettings.fromConfig(config)
+    val settings = SynchronizationSettings.fromRootConfig(config)
     settings.maxRollback should be(100)
     settings.maxChainLength should be(101)
     settings.synchronizationTimeout should be(30.seconds)

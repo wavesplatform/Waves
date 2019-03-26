@@ -16,10 +16,12 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
         |    api-key-different-host: yes
         |    transactions-by-address-limit = 10000
         |    distribution-address-limit = 10000
+        |    marshalling-parallelism = 2
+        |    broadcast-parallelism = 2
         |  }
         |}
       """.stripMargin)
-    val settings = RestAPISettings.fromConfig(config)
+    val settings = RestAPISettings.fromRootConfig(config)
 
     settings.enable should be(true)
     settings.bindAddress should be("127.0.0.1")
@@ -29,6 +31,8 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
     settings.apiKeyDifferentHost should be(true)
     settings.transactionByAddressLimit should be(10000)
     settings.distributionAddressLimit should be(10000)
+    settings.marshallingParallelism shouldBe 2
+    settings.broadcastParallelism shouldBe 2
   }
 
 }

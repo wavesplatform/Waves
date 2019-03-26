@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 
 class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
-  private val settings    = RestAPISettings.fromConfig(ConfigFactory.load())
+  private val settings    = RestAPISettings.fromRootConfig(ConfigFactory.load())
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 

@@ -55,7 +55,7 @@ object MatcherSettings {
     )
   }
 
-  def fromConfig(config: Config): MatcherSettings = {
+  def fromRootConfig(config: Config): MatcherSettings = {
     val enabled                      = config.as[Boolean](s"$configPath.enable")
     val account                      = config.as[String](s"$configPath.account")
     val bindAddress                  = config.as[String](s"$configPath.bind-address")

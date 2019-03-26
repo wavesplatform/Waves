@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.Base58
 class WalletRouteSpec extends RouteSpec("/wallet") with RestAPISettingsHelper with TestWallet {
   private val route = WalletApiRoute(restAPISettings, testWallet).route
 
-  private val brokenRestApiSettings     = restAPISettings.copy(apiKeyHash = "InvalidAPIKeyHash")
+  private val brokenRestApiSettings     = restAPISettings.copy(apiKeyHash = "InvalidAPIKeyHash", broadcastParallelism = 2, marshallingParallelism = 4)
   private val routeWithIncorrectKeyHash = WalletApiRoute(brokenRestApiSettings, testWallet).route
 
   routePath("/seed") - {

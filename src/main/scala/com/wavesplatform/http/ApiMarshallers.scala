@@ -5,12 +5,13 @@ import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
 import akka.http.scaladsl.model.{MessageEntity, StatusCode}
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.util.ByteString
-import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.api.http.{ApiError, ApiRoute}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.{Transaction, ValidationError}
 import monix.execution.Scheduler
 import play.api.libs.json._
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.control.Exception.nonFatalCatch
 import scala.util.control.NoStackTrace
 
@@ -18,7 +19,7 @@ case class PlayJsonException(cause: Option[Throwable] = None, errors: Seq[(JsPat
     extends IllegalArgumentException
     with NoStackTrace
 
-trait ApiMarshallers {
+trait ApiMarshallers { self: ApiRoute =>
   import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
 
   implicit lazy val ApiErrorMarshaller: ToResponseMarshaller[ApiError] =
@@ -50,7 +51,7 @@ trait ApiMarshallers {
             case JsSuccess(value, _) => value
             case JsError(errors)     => throw PlayJsonException(errors = errors)
           }
-        }(ApiMarshallers.executionContext)))
+        }(ApiMarshallers.executionContext(settings))))
   }
 
   // preserve support for extracting plain strings from requests
@@ -67,13 +68,20 @@ trait ApiMarshallers {
   implicit val stringMarshaller = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
 }
 
-object ApiMarshallers extends ApiMarshallers {
-  lazy val executionContext = {
-    val parallelism = sys.props
-      .get("waves.rest-api.marshalling-parallelism")
-      .map(_.toInt)
-      .getOrElse((Runtime.getRuntime.availableProcessors() / 2) max 1)
+private object ApiMarshallers extends ApiMarshallers {
+  private[this] var executionContext = Option.empty[ExecutionContextExecutor]
 
-    Scheduler.computation(parallelism, "rest-api-marshalling")
+  def executionContext(settings: RestAPISettings): ExecutionContextExecutor = {
+    if (executionContext.isEmpty) {
+      synchronized(if (executionContext.isEmpty) executionContext = Some(new ExecutionContextExecutor {
+        private[this] val parallelism = settings.marshallingParallelism
+        private[this] val scheduler   = Scheduler.computation(parallelism, "rest-api-marshalling")
+
+        override def reportFailure(cause: Throwable): Unit = scheduler.reportFailure(cause)
+        override def execute(command: Runnable): Unit      = scheduler.execute(command)
+      }))
+    }
+
+    executionContext.getOrElse(sys.error("Should not happen"))
   }
 }

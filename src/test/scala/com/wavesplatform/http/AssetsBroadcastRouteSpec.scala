@@ -23,7 +23,7 @@ import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import shapeless.Coproduct
 
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
-  private val settings    = RestAPISettings.fromConfig(ConfigFactory.load())
+  private val settings    = RestAPISettings.fromRootConfig(ConfigFactory.load())
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 

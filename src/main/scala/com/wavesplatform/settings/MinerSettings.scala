@@ -19,7 +19,7 @@ case class MinerSettings(enable: Boolean,
 
 object MinerSettings {
   val configPath = "waves.miner"
-  def fromConfig(c: Config): MinerSettings = {
+  def fromRootConfig(c: Config): MinerSettings = {
     import net.ceedubs.ficus.Ficus._
 
     import scala.concurrent.duration._

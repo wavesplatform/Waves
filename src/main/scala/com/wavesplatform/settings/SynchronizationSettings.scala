@@ -30,7 +30,7 @@ object SynchronizationSettings {
 
   val configPath: String = "waves.synchronization"
 
-  def fromConfig(config: Config): SynchronizationSettings = {
+  def fromRootConfig(config: Config): SynchronizationSettings = {
     val maxRollback             = config.as[Int](s"$configPath.max-rollback")
     val maxChainLength          = config.as[Int](s"$configPath.max-chain-length")
     val synchronizationTimeout  = config.as[FiniteDuration](s"$configPath.synchronization-timeout")
