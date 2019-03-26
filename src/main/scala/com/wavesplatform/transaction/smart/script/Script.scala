@@ -2,11 +2,17 @@ package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.lang.ContentType.{DApp, Expression}
+import com.wavesplatform.lang.ScriptType.Account
 import com.wavesplatform.lang.StdLibVersion._
 import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.transaction.ValidationError.ScriptParseError
+import com.wavesplatform.utils.defaultDecompilerContext
+import com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl
 import monix.eval.Coeval
 import com.wavesplatform.transaction.smart.script.v1.ExprScript
+import DecompileInstances._
+import shapeless.HList
 
 trait Script {
   type Expr
@@ -38,9 +44,23 @@ object Script {
       script <- ScriptReader.fromBytes(bytes, checkComplexity = checkComplexity)
     } yield script
 
-  def decompile(s: Script): String = s match {
-    case e: ExprScript => Decompiler(e.expr, com.wavesplatform.utils.defaultDecompilerContext)
-    case com.wavesplatform.transaction.smart.script.ContractScript.ContractScriptImpl(_, contract, _) =>
-      Decompiler(contract, com.wavesplatform.utils.defaultDecompilerContext)
+  type DirectiveMeta = List[(String, Any)]
+
+  def decompile(s: Script): (String, DirectiveMeta) = {
+    val (scriptText, directives: DirectiveMeta) = s match {
+      case e: ExprScript =>
+        val directives = HList(s.stdLibVersion, Expression).map(PolyDecompile).toList
+        val decompiler = Decompiler(e.expr, defaultDecompilerContext)
+        (decompiler, directives)
+      case ContractScriptImpl(_, contract, _) =>
+        val directives = HList(s.stdLibVersion, Account, DApp).map(PolyDecompile).toList
+        val decompiler = Decompiler(contract, defaultDecompilerContext)
+        (decompiler, directives)
+    }
+    val directivesText = directives
+      .map { case (key, value) => s"{-#$key $value#-}" }
+      .mkString(start = "", sep = "\n", end = "\n")
+
+    (directivesText + scriptText, directives)
   }
 }
