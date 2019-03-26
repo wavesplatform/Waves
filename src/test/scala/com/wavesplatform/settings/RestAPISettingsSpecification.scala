@@ -16,8 +16,6 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
         |    api-key-different-host: yes
         |    transactions-by-address-limit = 10000
         |    distribution-address-limit = 10000
-        |    marshalling-parallelism = 2
-        |    broadcast-parallelism = 2
         |  }
         |}
       """.stripMargin)
@@ -29,10 +27,8 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
     settings.apiKeyHash should be("BASE58APIKEYHASH")
     settings.cors should be(true)
     settings.apiKeyDifferentHost should be(true)
-    settings.transactionByAddressLimit should be(10000)
-    settings.distributionAddressLimit should be(10000)
-    settings.marshallingParallelism shouldBe 2
-    settings.broadcastParallelism shouldBe 2
+    settings.transactionByAddressLimit shouldBe 10000
+    settings.distributionAddressLimit shouldBe 10000
   }
 
 }

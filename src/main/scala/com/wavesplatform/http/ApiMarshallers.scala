@@ -5,13 +5,11 @@ import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
 import akka.http.scaladsl.model.{MessageEntity, StatusCode}
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.util.ByteString
-import com.wavesplatform.api.http.{ApiError, ApiRoute}
-import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.{Transaction, ValidationError}
-import monix.execution.Scheduler
 import play.api.libs.json._
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.Future
 import scala.util.control.Exception.nonFatalCatch
 import scala.util.control.NoStackTrace
 
@@ -19,7 +17,7 @@ case class PlayJsonException(cause: Option[Throwable] = None, errors: Seq[(JsPat
     extends IllegalArgumentException
     with NoStackTrace
 
-trait ApiMarshallers { self: ApiRoute =>
+trait ApiMarshallers {
   import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
 
   implicit lazy val ApiErrorMarshaller: ToResponseMarshaller[ApiError] =
@@ -42,7 +40,7 @@ trait ApiMarshallers { self: ApiRoute =>
     Marshaller.stringMarshaller(`application/json`)
 
   implicit def playJsonUnmarshaller[A](implicit reads: Reads[A]): FromEntityUnmarshaller[A] = {
-    jsonStringUnmarshaller.andThen(Unmarshaller(_ =>
+    jsonStringUnmarshaller.andThen(Unmarshaller(implicit ec =>
       data =>
         Future {
           val json = nonFatalCatch.withApply(t => throw PlayJsonException(cause = Some(t)))(Json.parse(data))
@@ -51,7 +49,7 @@ trait ApiMarshallers { self: ApiRoute =>
             case JsSuccess(value, _) => value
             case JsError(errors)     => throw PlayJsonException(errors = errors)
           }
-        }(ApiMarshallers.executionContext(settings))))
+        }))
   }
 
   // preserve support for extracting plain strings from requests
@@ -61,27 +59,11 @@ trait ApiMarshallers { self: ApiRoute =>
   implicit def playJsonMarshaller[A](implicit writes: Writes[A], jsValueToString: JsValue => String = Json.stringify): ToEntityMarshaller[A] = {
     Marshaller
       .futureMarshaller[String, MessageEntity](jsonStringMarshaller)
-      .compose((value: A) => Future(jsValueToString(Json.toJson(value)))(ApiMarshallers.executionContext(settings)))
+      .composeWithEC(implicit ec => (value: A) => Future(jsValueToString(Json.toJson(value))))
   }
 
   // preserve support for using plain strings as request entities
   implicit val stringMarshaller = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
 }
 
-private object ApiMarshallers {
-  private[this] var executionContext = Option.empty[ExecutionContextExecutor]
-
-  def executionContext(settings: RestAPISettings): ExecutionContextExecutor = {
-    if (executionContext.isEmpty) {
-      synchronized(if (executionContext.isEmpty) executionContext = Some(new ExecutionContextExecutor {
-        private[this] val parallelism = settings.marshallingParallelism
-        private[this] val scheduler   = Scheduler.computation(parallelism, "rest-api-marshalling")
-
-        override def reportFailure(cause: Throwable): Unit = scheduler.reportFailure(cause)
-        override def execute(command: Runnable): Unit      = scheduler.execute(command)
-      }))
-    }
-
-    executionContext.getOrElse(sys.error("Should not happen"))
-  }
-}
+object ApiMarshallers extends ApiMarshallers

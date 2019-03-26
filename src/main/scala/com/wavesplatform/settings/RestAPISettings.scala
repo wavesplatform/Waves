@@ -10,9 +10,7 @@ final case class RestAPISettings(enable: Boolean,
                                  cors: Boolean,
                                  apiKeyDifferentHost: Boolean,
                                  transactionByAddressLimit: Int,
-                                 distributionAddressLimit: Int,
-                                 broadcastParallelism: Int,
-                                 marshallingParallelism: Int)
+                                 distributionAddressLimit: Int)
 
 object RestAPISettings {
   def fromRootConfig(config: Config): RestAPISettings = {
@@ -28,9 +26,7 @@ object RestAPISettings {
       cors = config.as[Boolean]("cors"),
       apiKeyDifferentHost = config.as[Boolean]("api-key-different-host"),
       transactionByAddressLimit = config.as[Int]("transactions-by-address-limit"),
-      distributionAddressLimit = config.as[Int]("distribution-address-limit"),
-      broadcastParallelism = config.as[Int]("broadcast-parallelism"),
-      marshallingParallelism = config.as[Int]("marshalling-parallelism")
+      distributionAddressLimit = config.as[Int]("distribution-address-limit")
     )
   }
 }

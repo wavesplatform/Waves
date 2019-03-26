@@ -28,7 +28,6 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
 
-import scala.concurrent.Future
 import scala.util.Success
 
 @Path("/transactions")
@@ -258,9 +257,9 @@ case class TransactionsApiRoute(settings: RestAPISettings,
       )
     ))
   def broadcast: Route =
-    (pathPrefix("broadcast") & post & withExecutionContext(broadcastExecutionContext)) {
+    (pathPrefix("broadcast") & post) {
       (handleExceptions(jsonExceptionHandler) & jsonEntity[JsObject]) { jsv =>
-        val futureResult: Future[Either[ApiError, Transaction]] = this.doBroadcast(TransactionFactory.fromSignedRequest(jsv))
+        val futureResult: Either[ApiError, Transaction] = this.doBroadcast(TransactionFactory.fromSignedRequest(jsv))
         complete(futureResult)
       }
     }
