@@ -9,8 +9,11 @@ object PrivateKey extends TaggedType[ByteStr] {
     privateKey @@ PrivateKey
   }
 
-  def apply(privateKey: Array[Byte]): PublicKey =
+  def apply(privateKey: Array[Byte]): PrivateKey =
     apply(ByteStr(privateKey))
+
+  def unapply(arg: Array[Byte]): Option[PrivateKey] =
+    Some(apply(arg))
 
   @deprecated("Use KeyPair.fromSeed", "0.17.0")
   def fromSeed(seed: ByteStr): PrivateKey =
