@@ -126,6 +126,29 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           |func get10ofAsset1() = {
           |  TransferSet([ScriptTransfer(i.caller, 10, asset1)])
           |}
+          |
+          |@Callable(i)
+          |func spendMaxFee() = {
+          |  if (extract(i.payment).assetId == asset2) then
+          |    TransferSet([
+          |      ScriptTransfer(i.caller, 11, asset1),
+          |      ScriptTransfer(i.caller, 11, asset1),
+          |      ScriptTransfer(i.caller, 11, asset1),
+          |      ScriptTransfer(i.caller, 11, asset1),
+          |      ScriptTransfer(i.caller, 11, asset1),
+          |      ScriptTransfer(i.caller, 11, asset1),
+          |      ScriptTransfer(i.caller, 11, asset1),
+          |      ScriptTransfer(i.caller, 11, asset1),
+          |      ScriptTransfer(i.caller, 11, asset1),
+          |      ScriptTransfer(i.caller, 11, asset1)
+          |    ])
+          |  else throw("need payment in asset2 " + toBase58String(asset2))
+          |}
+          |
+          |@Callable(i)
+          |func justWriteData() = {
+          |  WriteSet([DataEntry("a", "a")])
+          |}
         """.stripMargin).explicitGet()._1
     val dAppSetScriptTxId = sender.setScript(dApp.address, Some(dAppScript.bytes().base64)).id
 
@@ -136,7 +159,10 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           |@Verifier(tx)
           |func verify() = {
           |  match (tx) {
-          |    case tx:InvokeScriptTransaction => extract(tx.payment).amount > 12
+          |    case tx:InvokeScriptTransaction =>
+          |      if (isDefined(tx.payment)) then
+          |        extract(tx.payment).amount > 12
+          |      else true
           |    case _ => false
           |  }
           |}
@@ -154,6 +180,43 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
     smartCallerScriptInfo.script.isEmpty shouldBe false
     smartCallerScriptInfo.scriptText.isEmpty shouldBe false
     smartCallerScriptInfo.script.get.startsWith("base64:") shouldBe true
+  }
+
+  test("invoke by smart account requires just 1 extra fee") {
+    assertBadRequestAndMessage(
+      sender.invokeScript(
+        smartCaller.address,
+        dApp.address,
+        "justWriteData",
+        fee = 0.00899999.waves
+      ),
+      s"does not exceed minimal value of 900000 WAVES"
+    )
+  }
+
+  test("max fee is 0.053 Waves (0.005 + extraFee(1 smart caller + 1 payment + 10 transfers))") {
+    val paymentAmount = 20
+    assertBadRequestAndMessage(
+      sender.invokeScript(
+        smartCaller.address,
+        dApp.address,
+        "spendMaxFee",
+        payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
+        fee = 0.05299999.waves
+      ),
+      s"with 11 total scripts invoked does not exceed minimal value of 5300000"
+    )
+
+    val invokeScriptTxId = sender
+      .invokeScript(
+        smartCaller.address,
+        dApp.address,
+        "spendMaxFee",
+        payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
+        fee = 5300000
+      )
+      .id
+    nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
   }
 
   test("can't invoke with insufficient payment for @Verifier") {
