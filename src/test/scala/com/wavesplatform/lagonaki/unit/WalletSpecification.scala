@@ -3,11 +3,11 @@ package com.wavesplatform.lagonaki.unit
 import java.io.File
 import java.nio.file.Files
 
+import cats.syntax.option._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.wallet.Wallet
 import org.scalatest.{FunSuite, Matchers}
-import cats.syntax.option._
-import com.wavesplatform.common.state.ByteStr
 
 class WalletSpecification extends FunSuite with Matchers {
 
@@ -65,7 +65,7 @@ class WalletSpecification extends FunSuite with Matchers {
     val w1   = Wallet(WalletSettings(file, "password".some, ByteStr.decodeBase58("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption))
     w1.generateNewAccounts(3)
 
-    assertThrows[IllegalStateException] {
+    assertThrows[IllegalArgumentException] {
       Wallet(WalletSettings(file, "incorrect password".some, None))
     }
   }
