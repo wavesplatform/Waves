@@ -5,15 +5,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction.ValidationError.GenericError
-import supertagged._
 
 import scala.util.{Failure, Success}
 
 final case class KeyPair(seed: ByteStr) {
   private[this] lazy val pair = crypto.createKeyPair(seed)
 
-  lazy val privateKey: PrivateKey = ByteStr(pair._1) @@ PrivateKey
-  lazy val publicKey: PublicKey   = ByteStr(pair._2) @@ PublicKey
+  lazy val privateKey: PrivateKey = PrivateKey(pair._1)
+  lazy val publicKey: PublicKey   = PublicKey(pair._2)
 }
 
 object KeyPair {
