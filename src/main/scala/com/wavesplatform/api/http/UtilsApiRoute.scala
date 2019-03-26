@@ -3,6 +3,7 @@ package com.wavesplatform.api.http
 import java.security.SecureRandom
 
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.RestAPISettings
@@ -280,7 +281,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
       complete(
         Json.obj("message" -> message,
                  "signature" ->
-                   Base58.encode(crypto.sign(Base58.tryDecodeWithLimit(pk).get, Base58.tryDecodeWithLimit(message).get))))
+                   Base58.encode(crypto.sign(PrivateKey(Base58.tryDecodeWithLimit(pk).get), Base58.tryDecodeWithLimit(message).get))))
     }
   }
 

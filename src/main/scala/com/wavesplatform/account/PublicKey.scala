@@ -15,7 +15,7 @@ object PublicKey extends TaggedType[ByteStr] {
 
     override def hashCode(): Int           = publicKey.hashCode()
     override def equals(obj: Any): Boolean = obj match {
-      case ip: InternedPublicKey => ip.publicKey.equals(publicKey)
+      case that: InternedPublicKey => this.publicKey == that.publicKey
       case _ => publicKey.equals(obj)
     }
   }

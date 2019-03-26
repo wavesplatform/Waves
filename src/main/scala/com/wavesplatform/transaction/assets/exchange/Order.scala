@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -23,29 +23,17 @@ import scala.util.Try
   */
 trait Order extends BytesSerializable with JsonSerializable with Proven {
   def senderPublicKey: PublicKey
-
   def matcherPublicKey: PublicKey
-
   def assetPair: AssetPair
-
   def orderType: OrderType
-
   def amount: Long
-
   def price: Long
-
   def timestamp: Long
-
   def expiration: Long
-
   def matcherFee: Long
-
   def proofs: Proofs
-
   def version: Byte
-
-  def signature: Array[Byte] = proofs.proofs(0).arr
-
+  def signature: Array[Byte] = proofs.toSignature
   def matcherFeeAssetId: Asset = Waves
 
   import Order._
@@ -279,8 +267,8 @@ object Order {
     sign(unsigned, sender)
   }
 
-  def sign(unsigned: Order, sender: PrivateKey): Order = {
-    require(unsigned.senderPublicKey == sender)
+  def sign(unsigned: Order, sender: KeyPair): Order = {
+    require(unsigned.senderPublicKey == sender.publicKey)
     val sig = crypto.sign(sender, unsigned.bodyBytes())
     unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
   }

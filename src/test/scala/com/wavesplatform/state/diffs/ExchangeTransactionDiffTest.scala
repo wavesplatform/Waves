@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
-import com.wavesplatform.account.{KeyPair, PublicKey, AddressScheme}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -693,10 +693,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (gen1, gen2, issue1, issue2, exchange) =>
         val exchangeWithResignedOrder = exchange match {
           case e1 @ ExchangeTransactionV1(bo, so, _, _, _, _, _, _, _) =>
-            val newSig = ByteStr(crypto.sign(so.senderPublicKey, bo.bodyBytes()))
+            val newSig = ByteStr(crypto.sign(PrivateKey(so.senderPublicKey), bo.bodyBytes()))
             e1.copy(buyOrder = bo.updateProofs(Proofs(Seq(newSig))).asInstanceOf[OrderV1])
           case e2 @ ExchangeTransactionV2(bo, so, _, _, _, _, _, _, _) =>
-            val newSig = ByteStr(crypto.sign(bo.senderPublicKey, so.bodyBytes()))
+            val newSig = ByteStr(crypto.sign(PrivateKey(bo.senderPublicKey), so.bodyBytes()))
             e2.copy(sellOrder = so.updateProofs(Proofs(Seq(newSig))))
         }
 
@@ -720,8 +720,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (gen1, gen2, issue1, issue2, exchange) =>
         val newProofs = Proofs(
           Seq(
-            ByteStr(crypto.sign(exchange.sender, exchange.sellOrder.bodyBytes())),
-            ByteStr(crypto.sign(exchange.sellOrder.senderPublicKey, exchange.sellOrder.bodyBytes()))
+            ByteStr(crypto.sign(PrivateKey(exchange.sender), exchange.sellOrder.bodyBytes())),
+            ByteStr(crypto.sign(PrivateKey(exchange.sellOrder.senderPublicKey), exchange.sellOrder.bodyBytes()))
           )
         )
 
@@ -829,7 +829,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   }
 
   def changeOrderSignature(signWith: Array[Byte], o: Order): Order = {
-    lazy val newProofs = Proofs(Seq(ByteStr(crypto.sign(signWith, o.bodyBytes()))))
+    lazy val newProofs = Proofs(Seq(ByteStr(crypto.sign(PrivateKey(signWith), o.bodyBytes()))))
 
     o match {
       case o1 @ OrderV1(_, _, _, _, _, _, _, _, _, _) =>
@@ -840,7 +840,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   }
 
   def changeTxSignature(signWith: Array[Byte], et: ExchangeTransaction): ExchangeTransaction = {
-    lazy val newSignature = ByteStr(crypto.sign(signWith, et.bodyBytes()))
+    lazy val newSignature = ByteStr(crypto.sign(PrivateKey(signWith), et.bodyBytes()))
     lazy val newProofs    = Proofs(Seq(newSignature))
 
     et match {

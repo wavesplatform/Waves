@@ -1,8 +1,9 @@
 package com.wavesplatform
 
-import com.wavesplatform.account.PrivateKey
+import com.wavesplatform.account.{PrivateKey, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import scorex.crypto.hash.{Blake2b256, Keccak256}
-import scorex.crypto.signatures.{Curve25519, PrivateKey => SPrivateKey, PublicKey, Signature}
+import scorex.crypto.signatures.{Curve25519, Signature, PrivateKey => SPrivateKey, PublicKey => SPublicKey}
 
 package object crypto {
   val SignatureLength: Int = Curve25519.SignatureLength
@@ -18,14 +19,11 @@ package object crypto {
 
   def secureHash(s: String): Array[Byte] = secureHash(s.getBytes())
 
-  def sign(account: PrivateKey, message: Array[Byte]): Array[Byte] =
+  def sign(account: PrivateKey, message: ByteStr): ByteStr =
     Curve25519.sign(SPrivateKey(account.arr), message)
 
-  def sign(privateKeyBytes: Array[Byte], message: Array[Byte]): Array[Byte] =
-    Curve25519.sign(SPrivateKey(privateKeyBytes), message)
-
-  def verify(signature: Array[Byte], message: Array[Byte], publicKey: Array[Byte]): Boolean =
-    Curve25519.verify(Signature(signature), message, PublicKey(publicKey))
+  def verify(signature: ByteStr, message: ByteStr, publicKey: PublicKey): Boolean =
+    Curve25519.verify(Signature(signature.arr), message, SPublicKey(publicKey.arr))
 
   def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = Curve25519.createKeyPair(seed)
 
