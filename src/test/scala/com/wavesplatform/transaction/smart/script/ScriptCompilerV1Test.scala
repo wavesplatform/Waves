@@ -36,12 +36,12 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers {
 
   property("fails on incorrect content type value") {
     val script = scriptWithContentType("oOooOps".some)
-    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Unsupported content type")
+    ScriptCompiler(script, isAssetScript = false) shouldBe Left("Wrong content type")
   }
 
   property("fails on incorrect script type value") {
     val script = scriptWithScriptType("oOooOps".some)
-    ScriptCompiler.compile(script) shouldBe Left("Unsupported script type")
+    ScriptCompiler.compile(script) shouldBe Left("Wrong script type")
   }
 
   property("fails with right error position") {
