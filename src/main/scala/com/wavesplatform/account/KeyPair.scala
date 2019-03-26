@@ -1,5 +1,6 @@
 package com.wavesplatform.account
 
+import com.google.common.collect.Interners
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -16,6 +17,11 @@ final case class KeyPair(seed: ByteStr) {
 }
 
 object KeyPair {
+  private[this] val interner = Interners.newWeakInterner[KeyPair]()
+
+  def apply(seed: ByteStr): KeyPair =
+    interner.intern(new KeyPair(seed))
+
   def fromSeed(base58: String): Either[GenericError, KeyPair] = Base58.tryDecodeWithLimit(base58) match {
     case Success(x) => Right(KeyPair(x))
     case Failure(e) => Left(GenericError(s"Unable to get a private key from the seed '$base58': ${e.getMessage}"))
