@@ -78,9 +78,9 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   val invalidAssetValue =
     Table(
       ("assetVal", "decimals", "message"),
-      (0l, 2, "negative amount"),
+      (0l, 2, "non-positive amount"),
       (1l, 9, "Too big sequences requested"),
-      (-1l, 1, "negative amount"),
+      (-1l, 1, "non-positive amount"),
       (1l, -1, "Too big sequences requested")
     )
 
