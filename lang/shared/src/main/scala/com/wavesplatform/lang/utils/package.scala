@@ -35,11 +35,11 @@ package object utils {
       .map(d =>
         Try(d.value) match {
           case Success(v) =>
-            val cType = ContentType.parseString(v)
+            val cType = Try(ContentType.parseString(v))
             Either
               .cond(
-                ContentType.SupportedTypes(cType),
-                cType,
+                cType.isSuccess && ContentType.SupportedTypes(cType.get),
+                cType.get,
                 "Unsupported content type"
               )
           case Failure(ex) =>
@@ -54,11 +54,11 @@ package object utils {
       .map(d =>
         Try(d.value) match {
           case Success(v) =>
-            val sType = ScriptType.parseString(v)
+            val sType = Try(ScriptType.parseString(v))
             Either
               .cond(
-                ScriptType.SupportedTypes(sType),
-                sType,
+                sType.isSuccess && ScriptType.SupportedTypes(sType.get),
+                sType.get,
                 "Unsupported script type"
               )
           case Failure(ex) =>
