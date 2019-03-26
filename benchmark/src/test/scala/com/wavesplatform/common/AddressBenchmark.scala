@@ -2,7 +2,7 @@ package com.wavesplatform.common
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.AddressBenchmark.{CachedAddress, PublicKeySt, UncachedAddress}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -42,10 +42,10 @@ object AddressBenchmark {
   }
 
   class UncachedAddress(publicKey: Array[Byte]) {
-    def toAddress = Address.fromPublicKey(publicKey)
+    def toAddress = Address.fromPublicKey(PublicKey(publicKey))
   }
 
   class CachedAddress(publicKey: Array[Byte]) {
-    lazy val toAddress = Address.fromPublicKey(publicKey)
+    lazy val toAddress = Address.fromPublicKey(PublicKey(publicKey))
   }
 }

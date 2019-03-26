@@ -35,7 +35,7 @@ object Address extends ScorexLogging {
     .maximumSize(1000000)
     .build()
 
-  def fromPublicKey(publicKey: ByteStr, chainId: Byte = scheme.chainId): Address = {
+  def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address = {
     publicKeyBytesCache.get(
       publicKey, { () =>
         val withoutChecksum = ByteBuffer
@@ -69,7 +69,7 @@ object Address extends ScorexLogging {
         checkSum          = addressBytes.takeRight(ChecksumLength)
         checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
         _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
-      } yield createUnsafe(addressBytes)).left.map(InvalidAddress)
+      } yield createUnsafe(addressBytes)).left.map(err => InvalidAddress(err))
     })
   }
 

@@ -154,8 +154,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
   }
 
   property("Read Order with empty assetId") {
-    val pk        = PrivateKey.fromSeed("123".getBytes)
-    val pubKeyStr = Base58.encode(pk)
+    val pk        = KeyPair("123".getBytes)
+    val pubKeyStr = Base58.encode(pk.publicKey)
 
     val json = Json.parse(s"""
         {

@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.{KeyPair, Address, AddressOrAlias, AddressScheme}
+import com.wavesplatform.account._
 import com.wavesplatform.api.http.assets.SignedTransferV2Request
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
@@ -42,7 +42,7 @@ trait TransferSending extends ScorexLogging {
 
     val sourceAndDest = (1 to n).map { _ =>
       val destPk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
-      Address.fromPublicKey(destPk).address
+      Address.fromPublicKey(PublicKey(destPk)).address
     }
 
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
@@ -90,7 +90,7 @@ trait TransferSending extends ScorexLogging {
     val sourceAndDest = (1 to n).map { _ =>
       val srcSeed  = Random.shuffle(seeds).head
       val destPk   = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
-      val destAddr = Address.fromPublicKey(destPk).address
+      val destAddr = Address.fromPublicKey(PublicKey(destPk)).address
 
       (srcSeed, destAddr)
     }

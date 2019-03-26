@@ -450,7 +450,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
     Base58.tryDecodeWithLimit(publicKey) match {
       case Success(pubKeyBytes) =>
-        val account = Address.fromPublicKey(pubKeyBytes)
+        val account = Address.fromPublicKey(PublicKey(pubKeyBytes))
         complete(Json.obj("address" -> account.address))
       case Failure(_) => complete(InvalidPublicKey)
     }

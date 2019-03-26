@@ -2,7 +2,7 @@ package com.wavesplatform.generator.utils
 
 import java.util.concurrent.ThreadLocalRandom
 
-import com.wavesplatform.account.{KeyPair, Address}
+import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Implicits._
@@ -143,7 +143,7 @@ object Gen {
 
   val address: Iterator[Address] = Iterator.continually {
     val pk = Array.fill[Byte](KeyLength)(random.nextInt(Byte.MaxValue).toByte)
-    Address.fromPublicKey(pk)
+    Address.fromPublicKey(PublicKey(pk))
   }
 
   def address(uniqNumber: Int): Iterator[Address] = Iterator.randomContinually(address.take(uniqNumber).toSeq)
