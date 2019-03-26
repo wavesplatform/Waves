@@ -6,7 +6,7 @@ import cats.data.NonEmptyList
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform
 import com.wavesplatform._
-import com.wavesplatform.account.{AccountKeyPair, Address}
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey, Address}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -103,14 +103,14 @@ class UtxPoolSpecification
     } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
       .label("transferTransaction")
 
-  private def transferWithRecipient(sender: AccountKeyPair, recipient: PublicKeyAccount, maxAmount: Long, time: Time) =
+  private def transferWithRecipient(sender: AccountKeyPair, recipient: AccountPublicKey, maxAmount: Long, time: Time) =
     (for {
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
       .label("transferWithRecipient")
 
-  private def massTransferWithRecipients(sender: AccountKeyPair, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
+  private def massTransferWithRecipients(sender: AccountKeyPair, recipients: List[AccountPublicKey], maxAmount: Long, time: Time) = {
     val amount    = maxAmount / (recipients.size + 1)
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val minFee    = CommonValidation.FeeConstants(TransferTransaction.typeId) + CommonValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size

@@ -17,7 +17,7 @@ import monix.eval.Coeval
 import scala.util.{Failure, Try}
 
 case class MicroBlock(version: Byte,
-                      sender: PublicKeyAccount,
+                      sender: AccountPublicKey,
                       transactionData: Seq[Transaction],
                       prevResBlockSig: BlockId,
                       totalResBlockSig: BlockId,
@@ -51,7 +51,7 @@ case class MicroBlock(version: Byte,
 
 object MicroBlock extends ScorexLogging {
   private def create(version: Byte,
-                     generator: PublicKeyAccount,
+                     generator: AccountPublicKey,
                      transactionData: Seq[Transaction],
                      prevResBlockSig: BlockId,
                      totalResBlockSig: BlockId,

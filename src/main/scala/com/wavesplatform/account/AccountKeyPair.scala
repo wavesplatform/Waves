@@ -25,7 +25,7 @@ object AccountKeyPair {
     def toAddress: Address = AccountPublicKey.toAddress(kp)
   }
 
-  implicit def toPublicKeyAccount(kp: AccountKeyPair): AccountPublicKey   = kp
-  implicit def toPrivateKeyAccount(kp: AccountKeyPair): AccountPrivateKey = kp.privateKey
+  implicit def toAccountPublicKey(kp: AccountKeyPair): AccountPublicKey   = kp
+  implicit def toAccountPrivateKey(kp: AccountKeyPair): AccountPrivateKey = kp.privateKey
   implicit def toAddress(keyPair: AccountKeyPair): Address                = keyPair.toAddress
 }

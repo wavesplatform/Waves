@@ -1,10 +1,11 @@
 package settings
 
 import cats.Show
+import com.wavesplatform.account.AccountPrivateKey
 import com.wavesplatform.dexgen.utils.GenOrderType
 import settings.OrdersSettings.Settings
 
-class OrdersSettings(settings: Settings, val accounts: Seq[PrivateKeyAccount], val assets: Int) {}
+class OrdersSettings(settings: Settings, val accounts: Seq[AccountPrivateKey], val assets: Int) {}
 
 object OrdersSettings {
 

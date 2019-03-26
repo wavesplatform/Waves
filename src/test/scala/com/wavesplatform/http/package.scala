@@ -43,12 +43,12 @@ package object http {
           case Failure(e) => JsError(e.getMessage)
         }
 
-      case _ => JsError("Can't read PublicKeyAccount")
+      case _ => JsError("Can't read AccountPublicKey")
     },
     Writes(x => JsString(x.base58))
   )
 
-  implicit val publicKeyAccountFormat: Format[PublicKeyAccount] = byteStrFormat.inmap[PublicKeyAccount](
+  implicit val AccountPublicKeyFormat: Format[AccountPublicKey] = byteStrFormat.inmap[AccountPublicKey](
     x => AccountPublicKey(x.arr),
     x => ByteStr(x)
   )
@@ -80,16 +80,16 @@ package object http {
           .toEither
           .flatMap(AddressOrAlias.fromBytes(_, 0))
           .map { case (x, _) => JsSuccess(x) }
-          .getOrElse(JsError("Can't read PublicKeyAccount"))
+          .getOrElse(JsError("Can't read AccountPublicKey"))
 
-      case _ => JsError("Can't read PublicKeyAccount")
+      case _ => JsError("Can't read AccountPublicKey")
     },
     Writes(x => JsString(x.bytes.base58))
   )
 
   implicit val transferTransactionFormat: Format[TransferTransactionV1] = (
     (JsPath \ "assetId").format[Asset] and
-      (JsPath \ "sender").format[PublicKeyAccount] and
+      (JsPath \ "sender").format[AccountPublicKey] and
       (JsPath \ "recipient").format[AddressOrAlias] and
       (JsPath \ "amount").format[Long] and
       (JsPath \ "timestamp").format[Long] and
@@ -105,7 +105,7 @@ package object http {
   )(TransferTransactionV1.apply, unlift(TransferTransactionV1.unapply))
 
   implicit val versionedTransferTransactionFormat: Format[TransferTransactionV2] = (
-    (JsPath \ "sender").format[PublicKeyAccount] and
+    (JsPath \ "sender").format[AccountPublicKey] and
       (JsPath \ "recipient").format[AddressOrAlias] and
       (JsPath \ "assetId").format[Asset] and
       (JsPath \ "amount").format[Long] and

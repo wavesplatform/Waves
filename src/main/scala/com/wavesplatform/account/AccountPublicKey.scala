@@ -28,10 +28,10 @@ object AccountPublicKey extends TaggedType[ByteStr] {
       bytes <- Base58.tryDecodeWithLimit(base58).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
     } yield AccountPublicKey(bytes)).left.map(err => InvalidAddress(s"Invalid sender: $err"))
 
-  implicit def toAddress(publicKeyAccount: AccountPublicKey): Address =
-    publicKeyAccount.toAddress
+  implicit def toAddress(AccountPublicKey: AccountPublicKey): Address =
+    AccountPublicKey.toAddress
 
-  implicit class PublicKeyAccountImplicitOps(private val pk: AccountPublicKey) extends AnyVal {
+  implicit class AccountPublicKeyImplicitOps(private val pk: AccountPublicKey) extends AnyVal {
     def toAddress: Address = Address.fromPublicKey(pk)
   }
 

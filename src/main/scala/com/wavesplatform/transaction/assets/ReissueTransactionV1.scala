@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -13,7 +13,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class ReissueTransactionV1 private (sender: PublicKeyAccount,
+case class ReissueTransactionV1 private (sender: AccountPublicKey,
                                          asset: IssuedAsset,
                                          quantity: Long,
                                          reissuable: Boolean,
@@ -45,7 +45,7 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
     }
   }
 
-  def create(sender: PublicKeyAccount,
+  def create(sender: AccountPublicKey,
              asset: IssuedAsset,
              quantity: Long,
              reissuable: Boolean,
@@ -57,13 +57,13 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
       .map(_ => ReissueTransactionV1(sender, asset, quantity, reissuable, fee, timestamp, signature))
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: AccountPublicKey,
              asset: IssuedAsset,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, asset, quantity, reissuable, fee, timestamp, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
@@ -84,7 +84,7 @@ object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] w
     (
       SignatureBytes(tailIndex(1), "Signature"),
       ConstantByte(tailIndex(2), value = typeId, name = "Transaction type"),
-      PublicKeyAccountBytes(tailIndex(3), "Sender's public key"),
+      AccountPublicKeyBytes(tailIndex(3), "Sender's public key"),
       ByteStrDefinedLength(tailIndex(4), "Asset ID", AssetIdLength),
       LongBytes(tailIndex(5), "Quantity"),
       BooleanByte(tailIndex(6), "Reissuable flag (1 - True, 0 - False)"),

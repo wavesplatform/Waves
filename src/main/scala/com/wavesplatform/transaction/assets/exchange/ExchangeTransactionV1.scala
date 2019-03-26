@@ -2,6 +2,7 @@ package com.wavesplatform.transaction.assets.exchange
 
 import cats.implicits._
 import com.google.common.primitives.{Ints, Longs}
+import com.wavesplatform.account.{AccountPrivateKey, AccountPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -31,7 +32,7 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
   override val assetFee: (Asset, Long) = (Waves, fee)
 
   @ApiModelProperty(hidden = true)
-  override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
+  override val sender: AccountPublicKey = buyOrder.matcherPublicKey
 
   override val bodyBytes: Coeval[Array[Byte]] =
     Coeval.evalOnce(
@@ -51,7 +52,7 @@ object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1]
 
   override val typeId: Byte = ExchangeTransaction.typeId
 
-  def create(matcher: PrivateKeyAccount,
+  def create(matcher: AccountPrivateKey,
              buyOrder: OrderV1,
              sellOrder: OrderV1,
              amount: Long,

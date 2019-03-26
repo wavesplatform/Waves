@@ -198,7 +198,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
   def signOrder: Route =
     processRequest("order", (order: Order) => {
-      wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
+      wallet.AccountPrivateKey(order.senderPublicKey).map(pk => Order.sign(order, pk))
     })
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {

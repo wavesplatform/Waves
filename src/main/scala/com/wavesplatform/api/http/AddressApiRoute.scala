@@ -290,7 +290,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   @Path("/")
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
   def root: Route = (path("addresses") & get) {
-    val accounts = wallet.privateKeyAccounts
+    val accounts = wallet.AccountPrivateKeys
     val json     = JsArray(accounts.map(a => JsString(a.address)))
     complete(json)
   }
@@ -307,7 +307,7 @@ case class AddressApiRoute(settings: RestAPISettings,
       case (start, end) =>
         if (start >= 0 && end >= 0 && start - end < MaxAddressesPerRequest) {
           val json = JsArray(
-            wallet.privateKeyAccounts.map(a => JsString(a.address)).slice(start, end)
+            wallet.AccountPrivateKeys.map(a => JsString(a.address)).slice(start, end)
           )
 
           complete(json)

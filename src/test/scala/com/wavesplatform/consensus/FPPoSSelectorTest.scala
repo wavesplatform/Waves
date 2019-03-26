@@ -1,7 +1,7 @@
 package com.wavesplatform.consensus
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError
@@ -355,7 +355,7 @@ object FPPoSSelectorTest {
       }
   }
 
-  def calcDelay(blockForHit: Block, prevBT: Long, minerPK: PublicKeyAccount, effBalance: Long): Long = {
+  def calcDelay(blockForHit: Block, prevBT: Long, minerPK: AccountPublicKey, effBalance: Long): Long = {
 
     val gs =
       PoSCalculator

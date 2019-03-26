@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.performance
 
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ContentType
@@ -25,13 +25,13 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
 
   private val AmtOfTxs = 10000
 
-  private def simpleSendGen(from: AccountKeyPair, to: PublicKeyAccount, ts: Long): Gen[TransferTransactionV1] =
+  private def simpleSendGen(from: AccountKeyPair, to: AccountPublicKey, ts: Long): Gen[TransferTransactionV1] =
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
     } yield TransferTransactionV1.selfSigned(Waves, from, to.toAddress, amt, ts, Waves, fee, Array.emptyByteArray).explicitGet()
 
-  private def scriptedSendGen(from: AccountKeyPair, to: PublicKeyAccount, ts: Long): Gen[TransferTransactionV2] =
+  private def scriptedSendGen(from: AccountKeyPair, to: AccountPublicKey, ts: Long): Gen[TransferTransactionV2] =
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen

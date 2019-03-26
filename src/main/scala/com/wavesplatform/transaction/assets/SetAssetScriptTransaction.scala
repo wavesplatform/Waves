@@ -108,7 +108,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
   val byteTailDescription: ByteEntity[SetAssetScriptTransaction] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      AccountPublicKeyBytes(tailIndex(2), "Sender's public key"),
       ByteStrDefinedLength(tailIndex(3), "Asset ID", AssetIdLength),
       LongBytes(tailIndex(4), "Fee"),
       LongBytes(tailIndex(5), "Timestamp"),

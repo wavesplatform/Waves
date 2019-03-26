@@ -21,7 +21,7 @@ case class GeneratorSettings(chainId: String,
 
   val assetPairsNum: Int = dex.assets
   //accounts
-  val richPrivateKeyAccounts: Seq[AccountKeyPair] = richAccounts.map(s => AccountKeyPair.fromSeed(s).right.get)
+  val richAccountPrivateKeys: Seq[AccountKeyPair] = richAccounts.map(s => AccountKeyPair.fromSeed(s).right.get)
 
   def accounts(startNonce: Int, end: Int): Seq[AccountKeyPair] =
     (startNonce to end).map { i =>

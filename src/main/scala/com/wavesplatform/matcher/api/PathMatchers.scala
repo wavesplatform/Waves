@@ -22,7 +22,7 @@ object PathMatchers {
 
   object ByteStrPM extends Base58[ByteStr](ByteStr.decodeBase58(_).toOption)
 
-  object PublicKeyPM extends Base58[PublicKeyAccount](AccountPublicKey.fromBase58String(_).toOption)
+  object PublicKeyPM extends Base58[AccountPublicKey](AccountPublicKey.fromBase58String(_).toOption)
 
   object AddressPM extends Base58[Address](Address.fromString(_).toOption)
 }

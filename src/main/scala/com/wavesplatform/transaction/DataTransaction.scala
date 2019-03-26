@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -14,7 +14,7 @@ import play.api.libs.json._
 
 import scala.util.Try
 
-case class DataTransaction private (sender: PublicKeyAccount, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
+case class DataTransaction private (sender: AccountPublicKey, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
     extends ProvenTransaction
     with VersionedTransaction
     with FastHashId {
@@ -63,7 +63,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
       )
   }
 
-  def create(sender: PublicKeyAccount,
+  def create(sender: AccountPublicKey,
              data: List[DataEntry[_]],
              feeAmount: Long,
              timestamp: Long,
@@ -87,11 +87,11 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
     }
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: AccountPublicKey,
              data: List[DataEntry[_]],
              feeAmount: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, data, feeAmount, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
@@ -103,7 +103,7 @@ object DataTransaction extends TransactionParserFor[DataTransaction] with Transa
 
   val byteTailDescription: ByteEntity[DataTransaction] = {
     (
-      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      AccountPublicKeyBytes(tailIndex(1), "Sender's public key"),
       ListDataEntryBytes(tailIndex(2)),
       LongBytes(tailIndex(3), "Timestamp"),
       LongBytes(tailIndex(4), "Fee"),

@@ -96,7 +96,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   def run(): Unit = {
     checkGenesis(settings, blockchainUpdater)
 
-    if (wallet.privateKeyAccounts.isEmpty)
+    if (wallet.AccountPrivateKeys.isEmpty)
       wallet.generateNewAccounts(1)
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]

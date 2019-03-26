@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import com.wavesplatform.account.AccountPublicKey
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction._
@@ -23,7 +24,7 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
   override val assetFee: (Asset, Long) = (Waves, fee)
 
   @ApiModelProperty(hidden = true)
-  override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
+  override val sender: AccountPublicKey = buyOrder.matcherPublicKey
 
   override val bodyBytes: Coeval[Array[Byte]]
 

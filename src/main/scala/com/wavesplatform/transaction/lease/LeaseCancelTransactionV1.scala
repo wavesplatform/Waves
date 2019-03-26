@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.lease
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -12,7 +12,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class LeaseCancelTransactionV1 private (sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr)
+case class LeaseCancelTransactionV1 private (sender: AccountPublicKey, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr)
     extends LeaseCancelTransaction
     with SignedTransaction
     with FastHashId {
@@ -42,15 +42,15 @@ object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransact
     }
   }
 
-  def create(sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] = {
+  def create(sender: AccountPublicKey, leaseId: ByteStr, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, TransactionT] = {
     LeaseCancelTransaction.validateLeaseCancelParams(leaseId, fee).map(_ => LeaseCancelTransactionV1(sender, leaseId, fee, timestamp, signature))
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: AccountPublicKey,
              leaseId: ByteStr,
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, leaseId, fee, timestamp, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bodyBytes())))
     }
@@ -62,7 +62,7 @@ object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransact
 
   val byteTailDescription: ByteEntity[LeaseCancelTransactionV1] = {
     (
-      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      AccountPublicKeyBytes(tailIndex(1), "Sender's public key"),
       LongBytes(tailIndex(2), "Fee"),
       LongBytes(tailIndex(3), "Timestamp"),
       ByteStrDefinedLength(tailIndex(4), "Lease ID", crypto.DigestSize),

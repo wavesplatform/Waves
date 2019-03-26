@@ -26,7 +26,7 @@ abstract class Node(config: Config) extends AutoCloseable {
       .setNettyTimer(GlobalTimer.instance))
 
   val privateKey: AccountKeyPair = AccountKeyPair.fromSeed(config.getString("account-seed")).explicitGet()
-  val publicKey: PublicKeyAccount   = AccountPublicKey.fromBase58String(config.getString("public-key")).explicitGet()
+  val publicKey: AccountPublicKey   = AccountPublicKey.fromBase58String(config.getString("public-key")).explicitGet()
   val address: String               = config.getString("address")
 
   def nodeApiEndpoint: URL

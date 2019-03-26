@@ -15,8 +15,8 @@ import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
-case class OrderV3(senderPublicKey: PublicKeyAccount,
-                   matcherPublicKey: PublicKeyAccount,
+case class OrderV3(senderPublicKey: AccountPublicKey,
+                   matcherPublicKey: AccountPublicKey,
                    assetPair: AssetPair,
                    orderType: OrderType,
                    amount: Long,
@@ -79,7 +79,7 @@ object OrderV3 {
   private val AssetIdLength = 32
 
   def buy(sender: AccountKeyPair,
-          matcher: PublicKeyAccount,
+          matcher: AccountPublicKey,
           pair: AssetPair,
           amount: Long,
           price: Long,
@@ -95,7 +95,7 @@ object OrderV3 {
   }
 
   def sell(sender: AccountKeyPair,
-           matcher: PublicKeyAccount,
+           matcher: AccountPublicKey,
            pair: AssetPair,
            amount: Long,
            price: Long,
@@ -111,7 +111,7 @@ object OrderV3 {
   }
 
   def apply(sender: AccountKeyPair,
-            matcher: PublicKeyAccount,
+            matcher: AccountPublicKey,
             pair: AssetPair,
             orderType: OrderType,
             amount: Long,

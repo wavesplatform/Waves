@@ -17,8 +17,8 @@ import scala.util.Try
 /**
   * Order to matcher service for asset exchange
   */
-case class OrderV2(senderPublicKey: PublicKeyAccount,
-                   matcherPublicKey: PublicKeyAccount,
+case class OrderV2(senderPublicKey: AccountPublicKey,
+                   matcherPublicKey: AccountPublicKey,
                    assetPair: AssetPair,
                    orderType: OrderType,
                    amount: Long,
@@ -48,7 +48,7 @@ object OrderV2 {
   private val AssetIdLength = 32
 
   def buy(sender: AccountKeyPair,
-          matcher: PublicKeyAccount,
+          matcher: AccountPublicKey,
           pair: AssetPair,
           amount: Long,
           price: Long,
@@ -61,7 +61,7 @@ object OrderV2 {
   }
 
   def sell(sender: AccountKeyPair,
-           matcher: PublicKeyAccount,
+           matcher: AccountPublicKey,
            pair: AssetPair,
            amount: Long,
            price: Long,
@@ -74,7 +74,7 @@ object OrderV2 {
   }
 
   def apply(sender: AccountKeyPair,
-            matcher: PublicKeyAccount,
+            matcher: AccountPublicKey,
             pair: AssetPair,
             orderType: OrderType,
             amount: Long,

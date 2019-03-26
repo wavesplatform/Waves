@@ -69,7 +69,7 @@ package object database {
     }
 
     def readSignature: ByteStr          = readByteStr(SignatureLength)
-    def readPublicKey: PublicKeyAccount = AccountPublicKey(readBytes(KeyLength))
+    def readPublicKey: AccountPublicKey = AccountPublicKey(readBytes(KeyLength))
   }
 
   def writeIntSeq(values: Seq[Int]): Array[Byte] = {

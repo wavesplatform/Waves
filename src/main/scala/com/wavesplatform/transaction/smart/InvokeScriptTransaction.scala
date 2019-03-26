@@ -180,7 +180,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
   val byteTailDescription: ByteEntity[InvokeScriptTransaction] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      AccountPublicKeyBytes(tailIndex(2), "Sender's public key"),
       AddressBytes(tailIndex(3), "Contract address"),
       FunctionCallBytes(tailIndex(4), "Function call"),
       SeqBytes(tailIndex(5), "Payment", PaymentBytes(tailIndex(5), "Payment")),

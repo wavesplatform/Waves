@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -13,7 +13,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class BurnTransactionV1 private (sender: PublicKeyAccount, asset: IssuedAsset, quantity: Long, fee: Long, timestamp: Long, signature: ByteStr)
+case class BurnTransactionV1 private (sender: AccountPublicKey, asset: IssuedAsset, quantity: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends BurnTransaction
     with SignedTransaction
     with FastHashId {
@@ -39,7 +39,7 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
     }
   }
 
-  def create(sender: PublicKeyAccount,
+  def create(sender: AccountPublicKey,
              asset: IssuedAsset,
              quantity: Long,
              fee: Long,
@@ -50,12 +50,12 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
       .map(_ => BurnTransactionV1(sender, asset, quantity, fee, timestamp, signature))
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: AccountPublicKey,
              asset: IssuedAsset,
              quantity: Long,
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, asset, quantity, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(crypto.sign(signer, unverified.bodyBytes())))
     }
@@ -67,7 +67,7 @@ object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with Tr
 
   val byteTailDescription: ByteEntity[BurnTransactionV1] = {
     (
-      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      AccountPublicKeyBytes(tailIndex(1), "Sender's public key"),
       ByteStrDefinedLength(tailIndex(2), "Asset ID", AssetIdLength).map(IssuedAsset),
       LongBytes(tailIndex(3), "Quantity"),
       LongBytes(tailIndex(4), "Fee"),

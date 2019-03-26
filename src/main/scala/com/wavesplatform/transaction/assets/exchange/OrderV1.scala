@@ -24,14 +24,14 @@ case class OrderV1(@ApiModelProperty(
                      dataType = "string",
                      example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
                    )
-                   senderPublicKey: PublicKeyAccount,
+                   senderPublicKey: AccountPublicKey,
                    @ApiModelProperty(
                      value = "Base58 encoded Matcher public key",
                      required = true,
                      dataType = "string",
                      example = "HBqhfdFASRQ5eBBpu2y6c6KKi1az6bMx8v1JxX4iW1Q8"
                    )
-                   matcherPublicKey: PublicKeyAccount,
+                   matcherPublicKey: AccountPublicKey,
                    @ApiModelProperty(value = "Asset pair", required = true)
                    assetPair: AssetPair,
                    @ApiModelProperty(
@@ -85,8 +85,8 @@ case class OrderV1(@ApiModelProperty(
 object OrderV1 {
   private val AssetIdLength = 32
 
-  def apply(senderPublicKey: PublicKeyAccount,
-            matcherPublicKey: PublicKeyAccount,
+  def apply(senderPublicKey: AccountPublicKey,
+            matcherPublicKey: AccountPublicKey,
             assetPair: AssetPair,
             orderType: OrderType,
             amount: Long,
@@ -108,7 +108,7 @@ object OrderV1 {
   }
 
   def buy(sender: AccountKeyPair,
-          matcher: PublicKeyAccount,
+          matcher: AccountPublicKey,
           pair: AssetPair,
           amount: Long,
           price: Long,
@@ -121,7 +121,7 @@ object OrderV1 {
   }
 
   def sell(sender: AccountKeyPair,
-           matcher: PublicKeyAccount,
+           matcher: AccountPublicKey,
            pair: AssetPair,
            amount: Long,
            price: Long,
@@ -134,7 +134,7 @@ object OrderV1 {
   }
 
   def apply(sender: AccountKeyPair,
-            matcher: PublicKeyAccount,
+            matcher: AccountPublicKey,
             pair: AssetPair,
             orderType: OrderType,
             amount: Long,

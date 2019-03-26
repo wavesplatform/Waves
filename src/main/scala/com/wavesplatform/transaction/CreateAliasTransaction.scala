@@ -38,7 +38,7 @@ trait CreateAliasTransaction extends ProvenTransaction with VersionedTransaction
 object CreateAliasTransaction {
   val typeId: Byte = 10
 
-  def parseBase(start: Int, bytes: Array[Byte]): Try[(PublicKeyAccount, Alias, Long, Long, Int)] = {
+  def parseBase(start: Int, bytes: Array[Byte]): Try[(AccountPublicKey, Alias, Long, Long, Int)] = {
     for {
       sender <- Try(AccountPublicKey(bytes.slice(start, start + KeyLength)))
       (aliasBytes, aliasEnd) = Deser.parseArraySize(bytes, start + KeyLength)

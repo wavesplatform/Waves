@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.model
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{AccountPublicKey, Address}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -197,7 +197,7 @@ object OrderValidator {
     }
   }
 
-  def matcherSettingsAware(matcherPublicKey: PublicKeyAccount,
+  def matcherSettingsAware(matcherPublicKey: AccountPublicKey,
                            blacklistedAddresses: Set[Address],
                            blacklistedAssets: Set[IssuedAsset],
                            orderFeeSettings: OrderFeeSettings)(order: Order): Result[Order] = {

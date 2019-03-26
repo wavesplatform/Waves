@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
-import com.wavesplatform.account.{AccountKeyPair, AddressScheme}
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -949,7 +949,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   }
 
   /** Generates sequence of sell orders for one big buy order */
-  def sellOrdersForBigBuyOrderGenerator(matcher: PublicKeyAccount,
+  def sellOrdersForBigBuyOrderGenerator(matcher: AccountPublicKey,
                                         sellers: Seq[AccountKeyPair],
                                         assetPair: AssetPair,
                                         price: Long,

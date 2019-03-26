@@ -55,7 +55,7 @@ object CreateAliasTransactionV1 extends TransactionParserFor[CreateAliasTransact
 
   val byteTailDescription: ByteEntity[CreateAliasTransactionV1] = {
     (
-      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      AccountPublicKeyBytes(tailIndex(1), "Sender's public key"),
       AliasBytes(tailIndex(2), "Alias object"),
       LongBytes(tailIndex(3), "Fee"),
       LongBytes(tailIndex(4), "Timestamp"),

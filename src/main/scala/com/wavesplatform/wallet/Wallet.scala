@@ -18,11 +18,11 @@ import scala.util.control.NonFatal
 trait Wallet {
   def seed: Array[Byte]
   def nonce: Int
-  def privateKeyAccounts: Seq[AccountKeyPair]
+  def AccountPrivateKeys: Seq[AccountKeyPair]
   def generateNewAccounts(howMany: Int): Seq[AccountKeyPair]
   def generateNewAccount(): Option[AccountKeyPair]
   def deleteAccount(account: AccountKeyPair): Boolean
-  def privateKeyAccount(account: Address): Either[ValidationError, AccountKeyPair]
+  def AccountPrivateKey(account: Address): Either[ValidationError, AccountKeyPair]
 }
 
 object Wallet extends ScorexLogging {
@@ -31,10 +31,10 @@ object Wallet extends ScorexLogging {
     def findPrivateKey(addressString: String): Either[ValidationError, AccountKeyPair] =
       for {
         acc        <- Address.fromString(addressString)
-        privKeyAcc <- w.privateKeyAccount(acc)
+        privKeyAcc <- w.AccountPrivateKey(acc)
       } yield privKeyAcc
 
-    def exportAccountSeed(account: Address): Either[ValidationError, Array[Byte]] = w.privateKeyAccount(account).map(_.seed)
+    def exportAccountSeed(account: Address): Either[ValidationError, Array[Byte]] = w.AccountPrivateKey(account).map(_.seed)
   }
 
   private case class WalletData(seed: ByteStr, accountSeeds: Set[ByteStr], nonce: Int)
@@ -107,14 +107,14 @@ object Wallet extends ScorexLogging {
       if (!accountsCache.contains(address)) {
         accountsCache += account.address -> account
         walletData = walletData.copy(accountSeeds = walletData.accountSeeds + ByteStr(account.seed))
-        log.info("Added account #" + this.privateKeyAccounts.length)
+        log.info("Added account #" + this.AccountPrivateKeys.length)
         Some(account)
       } else None
     }
 
     override def seed: Array[Byte] = walletData.seed.arr
 
-    override def privateKeyAccounts: Seq[AccountKeyPair] =
+    override def AccountPrivateKeys: Seq[AccountKeyPair] =
       accountsCache.values.toVector
 
     override def generateNewAccounts(howMany: Int): Seq[AccountKeyPair] =
@@ -135,7 +135,7 @@ object Wallet extends ScorexLogging {
       before > walletData.accountSeeds.size
     }
 
-    override def privateKeyAccount(account: Address): Either[ValidationError, AccountKeyPair] =
+    override def AccountPrivateKey(account: Address): Either[ValidationError, AccountKeyPair] =
       accountsCache.get(account.address).toRight[ValidationError](MissingSenderPrivateKey)
     override def nonce: Int = walletData.nonce
 

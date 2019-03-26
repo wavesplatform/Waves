@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.assets
 
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -14,7 +14,7 @@ import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
-case class SponsorFeeTransaction private (sender: PublicKeyAccount,
+case class SponsorFeeTransaction private (sender: AccountPublicKey,
                                           asset: IssuedAsset,
                                           minSponsoredAssetFee: Option[Long],
                                           fee: Long,
@@ -75,7 +75,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     }
   }
 
-  def create(sender: PublicKeyAccount,
+  def create(sender: AccountPublicKey,
              asset: IssuedAsset,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
@@ -90,12 +90,12 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     }
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: AccountPublicKey,
              asset: IssuedAsset,
              minSponsoredAssetFee: Option[Long],
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
     create(sender, asset, minSponsoredAssetFee, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
@@ -113,7 +113,7 @@ object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction]
     (
       OneByte(tailIndex(1), "Transaction type"),
       OneByte(tailIndex(2), "Version"),
-      PublicKeyAccountBytes(tailIndex(3), "Sender's public key"),
+      AccountPublicKeyBytes(tailIndex(3), "Sender's public key"),
       ByteStrDefinedLength(tailIndex(4), "Asset ID", AssetIdLength),
       SponsorFeeOptionLongBytes(tailIndex(5), "Minimal fee in assets*"),
       LongBytes(tailIndex(6), "Fee"),

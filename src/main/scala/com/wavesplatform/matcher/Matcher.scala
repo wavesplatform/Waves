@@ -316,7 +316,7 @@ object Matcher extends ScorexLogging {
     try {
       val privateKey = (for {
         address <- Address.fromString(settings.matcherSettings.account)
-        pk      <- wallet.privateKeyAccount(address)
+        pk      <- wallet.AccountPrivateKey(address)
       } yield pk).explicitGet()
 
       val matcher = new Matcher(actorSystem, time, utx, allChannels, blockchain, spendableBalanceChanged, settings, privateKey)

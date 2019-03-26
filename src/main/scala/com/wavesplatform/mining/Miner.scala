@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import cats.data.EitherT
 import cats.implicits._
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.block.Block._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -262,7 +262,7 @@ class MinerImpl(allChannels: ChannelGroup,
       }
   }
 
-  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKeyAccount): Either[String, Long] = {
+  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: AccountPublicKey): Either[String, Long] = {
     val balance = GeneratingBalanceProvider.balance(blockchainUpdater, fs, account.toAddress, block.uniqueId)
 
     if (GeneratingBalanceProvider.isMiningAllowed(blockchainUpdater, height, balance)) {
@@ -334,7 +334,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(blockchainUpdater.hasScript(_))
+    val nonScriptedAccounts = wallet.AccountPrivateKeys.filterNot(blockchainUpdater.hasScript(_))
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
     debugState = MinerDebugInfo.MiningBlocks

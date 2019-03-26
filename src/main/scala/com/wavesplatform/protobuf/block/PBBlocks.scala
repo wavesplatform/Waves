@@ -16,7 +16,7 @@ object PBBlocks {
                consensusData: NxtLikeConsensusBlockData,
                transactionData: Seq[VanillaTransaction],
                featureVotes: Set[Short],
-               generator: PublicKeyAccount,
+               generator: AccountPublicKey,
                signature: ByteStr): VanillaBlock = {
       VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes)
     }

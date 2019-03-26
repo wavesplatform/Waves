@@ -9,7 +9,7 @@ import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json._
 
-case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") sender: PublicKeyAccount,
+case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") sender: AccountPublicKey,
                               @ApiModelProperty(dataType = "java.lang.String") orderId: Option[ByteStr],
                               @ApiModelProperty() timestamp: Option[Long],
                               @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]) {
@@ -33,7 +33,7 @@ object CancelOrderRequest {
     b => JsString(Base58.encode(b))
   )
 
-  implicit val pkFormat: Format[PublicKeyAccount] = Format(
+  implicit val pkFormat: Format[AccountPublicKey] = Format(
     {
       case JsString(value) => AccountPublicKey.fromBase58String(value).fold(_ => JsError("Invalid public key"), pk => JsSuccess(pk))
       case other           => JsError(s"Expecting string but got $other")

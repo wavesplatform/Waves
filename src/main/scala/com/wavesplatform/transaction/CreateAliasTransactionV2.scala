@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AccountKeyPair, Alias}
+import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -11,7 +11,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-final case class CreateAliasTransactionV2 private (sender: PublicKeyAccount, alias: Alias, fee: Long, timestamp: Long, proofs: Proofs)
+final case class CreateAliasTransactionV2 private (sender: AccountPublicKey, alias: Alias, fee: Long, timestamp: Long, proofs: Proofs)
     extends CreateAliasTransaction {
 
   override val id: Coeval[ByteStr]            = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))
@@ -36,7 +36,7 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
     }
   }
 
-  def create(sender: PublicKeyAccount,
+  def create(sender: AccountPublicKey,
              alias: Alias,
              fee: Long,
              timestamp: Long,
@@ -48,11 +48,11 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
     }
   }
 
-  def signed(sender: PublicKeyAccount,
+  def signed(sender: AccountPublicKey,
              alias: Alias,
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, CreateAliasTransactionV2] = {
+             signer: AccountPrivateKey): Either[ValidationError, CreateAliasTransactionV2] = {
     for {
       unsigned <- create(sender, alias, fee, timestamp, Proofs.empty)
       proofs   <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes()))))
@@ -65,7 +65,7 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
 
   val byteTailDescription: ByteEntity[CreateAliasTransactionV2] = {
     (
-      PublicKeyAccountBytes(tailIndex(1), "Sender's public key"),
+      AccountPublicKeyBytes(tailIndex(1), "Sender's public key"),
       AliasBytes(tailIndex(2), "Alias object"),
       LongBytes(tailIndex(3), "Fee"),
       LongBytes(tailIndex(4), "Timestamp"),

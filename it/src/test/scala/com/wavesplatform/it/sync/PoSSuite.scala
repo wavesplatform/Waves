@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.block.{Block, SignerData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -199,7 +199,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
       .withSpecial(_.raw("waves.miner.enable = yes"))
       .buildNonConflicting()
 
-  private def generatorSignature(signature: Array[Byte], publicKey: PublicKeyAccount): Array[Byte] = {
+  private def generatorSignature(signature: Array[Byte], publicKey: AccountPublicKey): Array[Byte] = {
     val s = new Array[Byte](crypto.DigestSize * 2)
     System.arraycopy(signature, 0, s, 0, crypto.DigestSize)
     System.arraycopy(publicKey, 0, s, crypto.DigestSize, crypto.DigestSize)

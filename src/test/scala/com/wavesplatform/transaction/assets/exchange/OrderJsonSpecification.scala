@@ -128,11 +128,11 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     (json \ "wrong_sender").validate[Array[Byte]] shouldBe a[JsError]
   }
 
-  property("Json Reads PublicKeyAccount") {
-    val publicKey = (json \ "publicKey").as[PublicKeyAccount]
+  property("Json Reads AccountPublicKey") {
+    val publicKey = (json \ "publicKey").as[AccountPublicKey]
     publicKey.bytes shouldBe AccountPublicKey(Base58.tryDecodeWithLimit(base58Str).get).bytes
 
-    (json \ "wrong_publicKey").validate[PublicKeyAccount] match {
+    (json \ "wrong_publicKey").validate[AccountPublicKey] match {
       case e: JsError =>
         e.errors.head._2.head.message shouldBe "error.incorrectAccount"
       case _ => fail("Should be JsError")

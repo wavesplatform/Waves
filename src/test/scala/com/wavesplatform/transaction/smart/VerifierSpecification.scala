@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.smart
 
-import com.wavesplatform.account.AccountKeyPair
+import com.wavesplatform.account.{AccountKeyPair, AccountPublicKey}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -58,7 +58,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
     }
   }
 
-  private def mkAssetDescription(matcherAccount: PublicKeyAccount, decimals: Int): Option[AssetDescription] =
+  private def mkAssetDescription(matcherAccount: AccountPublicKey, decimals: Int): Option[AssetDescription] =
     Some(AssetDescription(matcherAccount, Array.emptyByteArray, Array.emptyByteArray, decimals, reissuable = false, BigInt(0), None, 0))
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {

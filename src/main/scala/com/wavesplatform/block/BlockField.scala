@@ -1,6 +1,7 @@
 package com.wavesplatform.block
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.account.AccountPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
@@ -44,7 +45,7 @@ case class TransactionBlockField(override val name: String, override val value: 
   protected override def b = value.bytes()
 }
 
-case class SignerData(generator: PublicKeyAccount, signature: ByteStr)
+case class SignerData(generator: AccountPublicKey, signature: ByteStr)
 
 case class SignerDataBlockField(override val name: String, override val value: SignerData) extends BlockField[SignerData] {
   protected override def j = Json.obj("generator" -> value.generator.toString, "signature" -> value.signature.base58)

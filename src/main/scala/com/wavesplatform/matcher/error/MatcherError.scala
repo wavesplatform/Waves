@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher.error
 
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{AccountPublicKey, Address}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.matcher.error.MatcherError._
@@ -51,7 +51,7 @@ object MatcherError {
 
   case object CancelRequestIsIncomplete extends MatcherError(request, commonEntity, unexpected, e"Either timestamp or orderId must be specified")
 
-  case class UnexpectedMatcherPublicKey(required: PublicKeyAccount, given: PublicKeyAccount)
+  case class UnexpectedMatcherPublicKey(required: AccountPublicKey, given: AccountPublicKey)
       extends MatcherError(
         order,
         pubKey,

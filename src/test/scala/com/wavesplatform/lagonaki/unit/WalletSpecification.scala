@@ -17,8 +17,8 @@ class WalletSpecification extends FunSuite with Matchers {
   test("wallet - acc creation") {
     w.generateNewAccounts(walletSize)
 
-    w.privateKeyAccounts.size shouldBe walletSize
-    w.privateKeyAccounts.map(_.address) shouldBe Seq(
+    w.AccountPrivateKeys.size shouldBe walletSize
+    w.AccountPrivateKeys.map(_.address) shouldBe Seq(
       "3MqMwwHW4v2nSEDHVWoh8RCQL8QrsWLkkeB",
       "3MuwVgJA8EXHukxo6rcakT5tD6FpvACtitG",
       "3MuAvUG4EAsG9RP9jaWjewCVmggaQD2t39B",
@@ -34,16 +34,16 @@ class WalletSpecification extends FunSuite with Matchers {
 
   test("wallet - acc deletion") {
 
-    val head = w.privateKeyAccounts.head
+    val head = w.AccountPrivateKeys.head
     w.deleteAccount(head)
-    assert(w.privateKeyAccounts.lengthCompare(walletSize - 1) == 0)
+    assert(w.AccountPrivateKeys.lengthCompare(walletSize - 1) == 0)
 
-    w.deleteAccount(w.privateKeyAccounts.head)
-    assert(w.privateKeyAccounts.lengthCompare(walletSize - 2) == 0)
+    w.deleteAccount(w.AccountPrivateKeys.head)
+    assert(w.AccountPrivateKeys.lengthCompare(walletSize - 2) == 0)
 
-    w.privateKeyAccounts.foreach(w.deleteAccount)
+    w.AccountPrivateKeys.foreach(w.deleteAccount)
 
-    assert(w.privateKeyAccounts.isEmpty)
+    assert(w.AccountPrivateKeys.isEmpty)
   }
 
   test("reopening") {
@@ -51,12 +51,12 @@ class WalletSpecification extends FunSuite with Matchers {
 
     val w1 = Wallet(WalletSettings(walletFile, "cookies".some, ByteStr.decodeBase58("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption))
     w1.generateNewAccounts(10)
-    val w1privateKeyAccounts = w1.privateKeyAccounts
+    val w1AccountPrivateKeys = w1.AccountPrivateKeys
     val w1nonce              = w1.nonce
 
     val w2 = Wallet(WalletSettings(walletFile, "cookies".some, None))
-    w2.privateKeyAccounts.nonEmpty shouldBe true
-    w2.privateKeyAccounts shouldEqual w1privateKeyAccounts
+    w2.AccountPrivateKeys.nonEmpty shouldBe true
+    w2.AccountPrivateKeys shouldEqual w1AccountPrivateKeys
     w2.nonce shouldBe w1nonce
   }
 

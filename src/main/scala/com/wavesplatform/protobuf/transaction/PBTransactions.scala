@@ -75,7 +75,7 @@ object PBTransactions {
 
   private[this] def createVanilla(version: Int,
                                   chainId: Byte,
-                                  sender: PublicKeyAccount,
+                                  sender: AccountPublicKey,
                                   feeAmount: Long,
                                   feeAssetId: VanillaAssetId,
                                   timestamp: Long,
@@ -312,7 +312,7 @@ object PBTransactions {
 
   private[this] def createVanillaUnsafe(version: Int,
                                         chainId: Byte,
-                                        sender: PublicKeyAccount,
+                                        sender: AccountPublicKey,
                                         feeAmount: Long,
                                         feeAssetId: VanillaAssetId,
                                         timestamp: Long,

@@ -173,12 +173,12 @@ case class ByteStrDefinedLength(index: Int, name: String, length: Int) extends B
   }
 }
 
-case class PublicKeyAccountBytes(index: Int, name: String) extends ByteEntity[PublicKeyAccount] {
+case class AccountPublicKeyBytes(index: Int, name: String) extends ByteEntity[AccountPublicKey] {
 
   def generateDoc: Seq[ByteEntityDescription] =
-    Seq(ByteEntityDescription(index, name, s"PublicKeyAccount ($ByteArrayType)", KeyLength.toString))
+    Seq(ByteEntityDescription(index, name, s"AccountPublicKey ($ByteArrayType)", KeyLength.toString))
 
-  def deserialize(buf: Array[Byte], offset: Int): Try[(PublicKeyAccount, Int)] = {
+  def deserialize(buf: Array[Byte], offset: Int): Try[(AccountPublicKey, Int)] = {
     Try { AccountPublicKey(buf.slice(offset, offset + KeyLength)) -> (offset + KeyLength) }
   }
 }

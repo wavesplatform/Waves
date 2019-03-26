@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.lease
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{AccountKeyPair, AddressScheme}
+import com.wavesplatform.account.{AccountKeyPair, AccountPrivateKey, AccountPublicKey, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -13,7 +13,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class LeaseCancelTransactionV2 private (chainId: Byte, sender: PublicKeyAccount, leaseId: ByteStr, fee: Long, timestamp: Long, proofs: Proofs)
+case class LeaseCancelTransactionV2 private (chainId: Byte, sender: AccountPublicKey, leaseId: ByteStr, fee: Long, timestamp: Long, proofs: Proofs)
     extends LeaseCancelTransaction
     with FastHashId {
 
@@ -47,7 +47,7 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
   }
 
   def create(chainId: Byte,
-             sender: PublicKeyAccount,
+             sender: AccountPublicKey,
              leaseId: ByteStr,
              fee: Long,
              timestamp: Long,
@@ -59,11 +59,11 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
   }
 
   def signed(chainId: Byte,
-             sender: PublicKeyAccount,
+             sender: AccountPublicKey,
              leaseId: ByteStr,
              fee: Long,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
+             signer: AccountPrivateKey): Either[ValidationError, TransactionT] = {
     create(chainId, sender, leaseId, fee, timestamp, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
@@ -76,7 +76,7 @@ object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransact
   val byteTailDescription: ByteEntity[LeaseCancelTransactionV2] = {
     (
       OneByte(tailIndex(1), "Chain ID"),
-      PublicKeyAccountBytes(tailIndex(2), "Sender's public key"),
+      AccountPublicKeyBytes(tailIndex(2), "Sender's public key"),
       LongBytes(tailIndex(3), "Fee"),
       LongBytes(tailIndex(4), "Timestamp"),
       ByteStrDefinedLength(tailIndex(5), "Lease ID", crypto.DigestSize),

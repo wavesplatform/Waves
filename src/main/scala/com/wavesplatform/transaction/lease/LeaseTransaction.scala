@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.{Address, AddressOrAlias}
+import com.wavesplatform.account.{AccountPublicKey, Address, AddressOrAlias}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{Asset, ProvenTransaction, ValidationError, VersionedTransaction}
 import monix.eval.Coeval
@@ -41,7 +41,7 @@ object LeaseTransaction {
     validateLeaseParams(tx.amount, tx.fee, tx.recipient, tx.sender)
   }
 
-  def validateLeaseParams(amount: Long, fee: Long, recipient: AddressOrAlias, sender: PublicKeyAccount): Either[ValidationError, Unit] =
+  def validateLeaseParams(amount: Long, fee: Long, recipient: AddressOrAlias, sender: AccountPublicKey): Either[ValidationError, Unit] =
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount(amount, "waves"))
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
