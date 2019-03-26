@@ -22,9 +22,6 @@ object PublicKey extends TaggedType[ByteStr] {
   def apply(publicKey: Array[Byte]): PublicKey =
     apply(ByteStr(publicKey))
 
-  def unapply(arg: PublicKey): Option[Array[Byte]] =
-    Some(arg)
-
   def fromBase58String(base58: String): Either[InvalidAddress, PublicKey] =
     (for {
       _     <- Either.cond(base58.length <= KeyStringLength, (), "Bad public key string length")
