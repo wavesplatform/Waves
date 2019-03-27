@@ -1,7 +1,6 @@
 package com.wavesplatform.network
 
 import com.google.common.cache.CacheBuilder
-import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSettings
 import com.wavesplatform.transaction.Transaction
@@ -10,6 +9,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
 import monix.execution.{CancelableFuture, Scheduler}
+import monix.reactive.{Observable, OverflowStrategy}
 
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
@@ -20,7 +20,7 @@ object UtxPoolSynchronizer extends ScorexLogging {
             settings: UtxSynchronizerSettings,
             allChannels: ChannelGroup,
             txSource: ChannelObservable[Transaction],
-            blockSource: ChannelObservable[Block]): CancelableFuture[Unit] = {
+            blockSource: Observable[_]): CancelableFuture[Unit] = {
     implicit val scheduler: Scheduler = Scheduler.singleThread("utx-pool-sync")
 
     val dummy = new Object()
