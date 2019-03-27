@@ -44,6 +44,9 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
 
   override def isLastBlockId(id: ByteStr): Boolean = ngState.exists(_.contains(id)) || lastBlock.exists(_.uniqueId == id)
 
+  private[this] val rollbackSubj = ConcurrentSubject.publish[(BlockId, Seq[Block])](service)
+  override val rollbacksInfo: Observable[(BlockId, Seq[Block])] = rollbackSubj
+
   override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo.cache(1)
   lastBlockInfo.subscribe()(monix.execution.Scheduler.global) // Start caching
 
@@ -216,7 +219,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
     log.info(s"Removing blocks after ${blockId.trim} from blockchain")
 
     val prevNgState = ngState
-    val r = if (prevNgState.exists(_.contains(blockId))) {
+    val result = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
       Right(Seq.empty)
     } else {
@@ -229,7 +232,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
     }
 
     notifyChangedSpendable(prevNgState, ngState)
-    r
+    result.foreach(blocks => rollbackSubj.onNext((blockId, blocks)))
+    result
   }
 
   private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
