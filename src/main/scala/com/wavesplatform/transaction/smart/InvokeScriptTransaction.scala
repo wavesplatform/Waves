@@ -8,10 +8,10 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, REF}
-import com.wavesplatform.lang.v1.{FunctionHeader, ContractLimits, Serde}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset._
-import com.wavesplatform.transaction.ValidationError.GenericError
+import com.wavesplatform.transaction.ValidationError.{GenericError, NonPositiveAmount}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -108,7 +108,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
         .flatMap(_ =>
           Either.cond(tx.payment.forall(_.amount > 0),
                       (),
-                      ValidationError.NegativeAmount(0, tx.payment.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString))))
+                      ValidationError.NonPositiveAmount(0, tx.payment.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString))))
         .flatMap(_ =>
           Either.cond(tx.fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                       (),
@@ -141,9 +141,9 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
         (),
         ValidationError.GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxCallableFunctionNameInBytes} bytes")
       )
-      _ <- Either.cond(p.forall(_.amount > 0), (), ValidationError.NegativeAmount(0, p.find(_.amount <= 0).get.assetId.fold("Waves")(_.toString)))
+      _ <- checkAmounts(p)
       _ <- Either.cond(p.length <= 1, (), ValidationError.GenericError("Multiple payment isn't allowed now"))
-      _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), ValidationError.GenericError("dublicate payments"))
+      _ <- Either.cond(p.map(_.assetId).distinct.length == p.length, (), ValidationError.GenericError("duplicate payments"))
 
       _ <- Either.cond(fc.args.forall(x => x.isInstanceOf[EVALUATED] || x == REF("unit")),
                        (),
@@ -154,6 +154,16 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     } yield tx
   }
 
+  private def checkAmounts(payments: Seq[Payment]): Either[NonPositiveAmount, Unit] =
+    payments
+      .find(_.amount <= 0)
+      .fold(().asRight[NonPositiveAmount])(p =>
+        ValidationError.NonPositiveAmount(
+          p.amount,
+          p.assetId.fold("Waves")(_.toString)
+        ).asLeft[Unit]
+      )
+
   def signed(sender: PublicKeyAccount,
              dappAddress: Address,
              fc: Terms.FUNCTION_CALL,
@@ -161,11 +171,11 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
              fee: Long,
              feeAssetId: Asset,
              timestamp: Long,
-             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] = {
-    create(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
-    }
-  }
+             signer: PrivateKeyAccount): Either[ValidationError, TransactionT] =
+    for {
+      tx     <- create(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty)
+      proofs <- Proofs.create(Seq(ByteStr(crypto.sign(signer, tx.bodyBytes()))))
+    } yield tx.copy(proofs = proofs)
 
   def selfSigned(sender: PrivateKeyAccount,
                  dappAddress: Address,

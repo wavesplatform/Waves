@@ -40,8 +40,8 @@ object Script {
 
   def fromBase64String(str: String, checkComplexity: Boolean = true): Either[ScriptParseError, Script] =
     for {
-      bytes  <- Base64.decode(str).toEither.left.map(ex => ScriptParseError(s"Unable to decode base64: ${ex.getMessage}"))
-      script <- ScriptReader.fromBytes(bytes, checkComplexity = checkComplexity)
+      bytes  <- Base64.tryDecode(str).toEither.left.map(ex => ScriptParseError(s"Unable to decode base64: ${ex.getMessage}"))
+      script <- ScriptReader.fromBytes(bytes, checkComplexity)
     } yield script
 
   type DirectiveMeta = List[(String, Any)]

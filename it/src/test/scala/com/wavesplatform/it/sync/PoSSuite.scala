@@ -143,7 +143,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
   def blockInfo(height: Int): (Array[Byte], Long, NxtLikeConsensusBlockData) = {
     val lastBlock      = Json.parse(nodes.head.get(s"/blocks/at/$height").getResponseBody)
-    val lastBlockId    = Base58.decode((lastBlock \ "signature").as[String]).get
+    val lastBlockId    = Base58.tryDecodeWithLimit((lastBlock \ "signature").as[String]).get
     val lastBlockTS    = (lastBlock \ "timestamp").as[Long]
     val lastBlockCData = (lastBlock \ "nxt-consensus").as[NxtLikeConsensusBlockData]
 
@@ -160,7 +160,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
   def blockSignature(h: Int): Array[Byte] = {
     Base58
-      .decode(
+      .tryDecodeWithLimit(
         (Json.parse(
           nodes.head
             .get(s"/blocks/at/$h")
