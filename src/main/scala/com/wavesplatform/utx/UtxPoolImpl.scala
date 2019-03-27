@@ -59,8 +59,9 @@ class UtxPoolImpl(time: Time,
   private[this] object PoolMetrics {
     private[this] val sizeStats  = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
     private[this] val bytesStats = Kamon.rangeSampler("utx-pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
-    val processingTimeStats      = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
-    val putRequestStats          = Kamon.counter("utx-pool-put-if-new")
+    val putTimeStats                    = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
+    val putRequestStats                 = Kamon.counter("utx-pool-put-if-new")
+    val packTimeStats                   = Kamon.histogram("utx-pack-unconfirmed-time", MeasurementUnit.time.milliseconds)
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()
@@ -152,31 +153,34 @@ class UtxPoolImpl(time: Time,
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val b      = blockchain
-    val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
-    val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
-      .sorted(TransactionsOrdering.InUTXPool)
-      .iterator
-      .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
-        case ((invalid, valid, diff, currRest, isEmpty), tx) =>
-          val updatedBlockchain = composite(b, diff)
-          val updatedRest       = currRest.put(updatedBlockchain, tx)
-          if (updatedRest.isOverfilled) {
-            (invalid, valid, diff, currRest, isEmpty)
-          } else {
-            differ(updatedBlockchain, tx) match {
-              case Right(newDiff) =>
-                (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty)
-              case Left(_) =>
-                (tx.id() +: invalid, valid, diff, currRest, isEmpty)
-            }
-          }
-      }
-      .takeWhile(!_._5)
-      .reduce((_, s) => s)
 
-    invalidTxs.foreach(remove)
-    val txs = reversedValidTxs.reverse
-    (txs, finalConstraint)
+    Instrumented.measure(PoolMetrics.packTimeStats) {
+      val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
+      val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
+        .sorted(TransactionsOrdering.InUTXPool)
+        .iterator
+        .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
+          case ((invalid, valid, diff, currRest, isEmpty), tx) =>
+            val updatedBlockchain = composite(b, diff)
+            val updatedRest       = currRest.put(updatedBlockchain, tx)
+            if (updatedRest.isOverfilled) {
+              (invalid, valid, diff, currRest, isEmpty)
+            } else {
+              differ(updatedBlockchain, tx) match {
+                case Right(newDiff) =>
+                  (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty)
+                case Left(_) =>
+                  (tx.id() +: invalid, valid, diff, currRest, isEmpty)
+              }
+            }
+        }
+        .takeWhile(!_._5)
+        .reduce((_, s) => s)
+
+      invalidTxs.foreach(remove)
+      val txs = reversedValidTxs.reverse
+      (txs, finalConstraint)
+    }
   }
 
   private def canReissue(b: Blockchain, tx: Transaction) = tx match {
@@ -199,7 +203,7 @@ class UtxPoolImpl(time: Time,
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     PoolMetrics.putRequestStats.increment()
     val result = measureSuccessful(
-      PoolMetrics.processingTimeStats, {
+      PoolMetrics.putTimeStats, {
         for {
           _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
 
