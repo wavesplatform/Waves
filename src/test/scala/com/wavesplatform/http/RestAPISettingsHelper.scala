@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.RestAPISettings
-import net.ceedubs.ficus.Ficus._
 
 trait RestAPISettingsHelper {
   def apiKey: String = "test_api_key"
