@@ -342,10 +342,7 @@ class UtxPoolImpl(time: Time,
         remove
       }
 
-      if (removed.nonEmpty)
-        log.trace(
-          s"Transactions is expired and removed from UTX: [${removed.take(100).mkString(", ")}${if (removed.length > 100) ", (" + (removed.length - 100) + " more)"
-          else ""}]")
+      if (removed.nonEmpty) log.trace(s"Transactions is expired and removed from UTX: [${removed.mkString(", ")}]")
     }
 
     private[UtxPoolImpl] def doCleanup(): Unit = {
