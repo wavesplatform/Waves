@@ -199,22 +199,25 @@ class UtxPoolImpl(time: Time,
     cleanup.doExpiredCleanup()
 
     val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
-    val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
+    val (invalidTxs, reversedValidTxs, _, finalConstraint, _, _, iterations) = transactions.values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .iterator
-      .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
-        case ((invalid, valid, diff, currRest, isEmpty), tx) =>
+      .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false, rest, 0)) {
+        case ((invalid, valid, diff, currRest, _, lastOverfilled, iterations), tx) =>
           val updatedBlockchain = composite(blockchain, diff)
           val updatedRest       = currRest.put(updatedBlockchain, tx)
           if (updatedRest.isOverfilled) {
-            log.trace(s"Mining constraints overfilled: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
-            (invalid, valid, diff, currRest, isEmpty)
+            if (updatedRest != lastOverfilled)
+              log.trace(
+                s"Mining constraints will be overfilled by $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
+
+            (invalid, valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
           } else {
             differ(updatedBlockchain, tx) match {
               case Right(newDiff) =>
-                (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty)
+                (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled, iterations + 1)
               case Left(_) =>
-                (tx.id() +: invalid, valid, diff, currRest, isEmpty)
+                (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
             }
           }
       }
@@ -222,6 +225,11 @@ class UtxPoolImpl(time: Time,
       .reduce((_, s) => s)
 
     invalidTxs.foreach(remove)
+    log.trace(
+      s"Packed ${reversedValidTxs.length} transactions of $iterations checked, removed invalid tx ids: [${invalidTxs.take(100).mkString(", ")}${if (invalidTxs.length > 100)
+        " (" + (invalidTxs.length - 100) + " more)"
+      else ""}], final constraint: $finalConstraint")
+
     val txs = reversedValidTxs.reverse
     (txs, finalConstraint)
   }
