@@ -176,6 +176,8 @@ class UtxPoolImpl(time: Time,
 
     invalidTxs.foreach(remove)
     val txs = reversedValidTxs.reverse
+
+    log.trace(s"Packed ${txs.length} unconfirmed transactions, ${invalidTxs.length} invalid removed, final constraint = $finalConstraint")
     (txs, finalConstraint)
   }
 
