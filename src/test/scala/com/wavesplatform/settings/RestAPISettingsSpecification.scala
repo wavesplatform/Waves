@@ -27,7 +27,7 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
     settings.apiKeyHash should be("BASE58APIKEYHASH")
     settings.cors should be(true)
     settings.apiKeyDifferentHost should be(true)
-    settings.transactionByAddressLimit shouldBe 10000
+    settings.transactionsByAddressLimit shouldBe 10000
     settings.distributionAddressLimit shouldBe 10000
   }
 

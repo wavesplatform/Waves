@@ -9,7 +9,7 @@ case class RestAPISettings(enable: Boolean,
                            apiKeyHash: String,
                            cors: Boolean,
                            apiKeyDifferentHost: Boolean,
-                           transactionByAddressLimit: Int,
+                           transactionsByAddressLimit: Int,
                            distributionAddressLimit: Int)
 
 object RestAPISettings {
