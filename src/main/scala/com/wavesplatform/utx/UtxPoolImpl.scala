@@ -170,8 +170,8 @@ class UtxPoolImpl(time: Time,
             }
           }
       }
-      .takeWhile(!_._5)
-      .reduce((_, s) => s)
+      .takeWhile(!_._5) // !currRest.isEmpty
+      .reduce((_, right) => right)
 
     invalidTxs.foreach(remove)
     val txs = reversedValidTxs.reverse
