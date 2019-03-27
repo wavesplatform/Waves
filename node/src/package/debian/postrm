@@ -1,0 +1,15 @@
+${{header}}
+${{detect-loader}}
+
+if [ "$1" = purge ]; then
+    rm -rf /var/lib/${{app_name}}/matcher/journal
+    rm -rf /var/lib/${{app_name}}/matcher/snapshots
+    rm -rf /var/lib/${{app_name}}/matcher/orderhistory.dat
+    rm -rf /var/lib/${{app_name}}/data
+    rm -rf /var/log/${{app_name}}
+
+    userdel waves >/dev/null 2>&1 || true
+    groupdel waves >/dev/null 2>&1 || true
+fi
+
+exit 0

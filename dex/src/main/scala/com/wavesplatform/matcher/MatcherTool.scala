@@ -17,7 +17,7 @@ import com.wavesplatform.db.openDB
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.{LimitOrder, OrderBook}
 import com.wavesplatform.matcher.settings.MatcherSettings
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
+import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB

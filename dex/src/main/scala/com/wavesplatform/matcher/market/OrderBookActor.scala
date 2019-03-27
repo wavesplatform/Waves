@@ -3,7 +3,6 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Props}
 import akka.persistence._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.matcher._
 import com.wavesplatform.matcher.api._
 import com.wavesplatform.matcher.market.MatcherActor.SaveSnapshot
 import com.wavesplatform.matcher.market.OrderBookActor._

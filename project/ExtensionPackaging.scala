@@ -28,7 +28,6 @@ object ExtensionPackaging extends AutoPlugin {
       jar -> ("lib/" + makeJarName(id.organization, id.name, id.revision, art.name, art.classifier))
     },
     classpathOrdering ++= excludeProvidedArtifacts((dependencyClasspath in Runtime).value, findProvidedArtifacts.value),
-    dependencyOverrides ++= Dependencies.EnforcedVersions.value,
     mappings in Universal ++= classpathOrdering.value,
     classpath := makeRelativeClasspathNames(classpathOrdering.value),
   )

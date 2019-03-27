@@ -1,0 +1,21 @@
+[Unit]
+Description=${{descr}}
+Requires=${{start_facilities}}
+
+[Service]
+Type=simple
+EnvironmentFile=${{env_config}}
+ExecStart=/usr/share/${{app_name}}/bin/${{exec}} \
+  -Dlogback.file.directory=/var/log/${{app_name}} \
+  -Dlogback.pattern="%%-5level %%logger{26} - %%msg%%n" \
+  -- /etc/${{app_name}}/waves.conf
+Restart=always
+RestartSec=${{retryTimeout}}
+RestartPreventExitStatus=10 38 61
+SuccessExitStatus=143
+User=${{daemon_user}}
+PermissionsStartOnly=true
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target
