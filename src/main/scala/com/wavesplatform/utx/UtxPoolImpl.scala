@@ -84,8 +84,10 @@ class UtxPoolImpl(time: Time,
     val toRemove = transactions.values.asScala
       .collect { case tx if isExpired(tx) => tx.id() }
 
-    log.trace(s"Removing expired transactions: [${toRemove.mkString(", ")}]")
-    toRemove.foreach(remove)
+    if (toRemove.nonEmpty) {
+      log.trace(s"Removing expired transactions: [${toRemove.mkString(", ")}]")
+      toRemove.foreach(remove)
+    }
   }
 
   override def putIfNew(tx: Transaction): Either[ValidationError, (Boolean, Diff)] = putIfNew(blockchain, tx)
@@ -130,8 +132,11 @@ class UtxPoolImpl(time: Time,
     val transactionsToRemove = transactions.values.asScala.filter { t =>
       TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
     }
-    log.trace(s"Cleaning up invalid transactions: ${transactionsToRemove.mkString(", ")}")
-    removeAll(transactionsToRemove)
+
+    if (transactionsToRemove.nonEmpty) {
+      log.trace(s"Cleaning up invalid transactions: ${transactionsToRemove.mkString(", ")}")
+      removeAll(transactionsToRemove)
+    }
   }
 
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
@@ -175,11 +180,13 @@ class UtxPoolImpl(time: Time,
       .takeWhile(!_._5)
       .reduce((_, s) => s)
 
-    log.trace(s"Removing ${invalidTxs.length} invalid transactions from UTX: [${invalidTxs.mkString(", ")}]")
-    invalidTxs.foreach(remove)
+    if (invalidTxs.nonEmpty) {
+      log.trace(s"Removing ${invalidTxs.length} invalid transactions from UTX: [${invalidTxs.mkString(", ")}]")
+      invalidTxs.foreach(remove)
+    }
 
     val txs = reversedValidTxs.reverse
-    log.trace(s"Packed ${txs.length} unconfirmed transactions, final constraint = $finalConstraint")
+    if (txs.nonEmpty) log.trace(s"Packed ${txs.length} unconfirmed transactions, final constraint = $finalConstraint")
     (txs, finalConstraint)
   }
 
