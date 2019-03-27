@@ -4,7 +4,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.metrics.Metrics
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 import scala.concurrent.duration._
 
@@ -32,9 +31,6 @@ object WavesSettings {
   val configPath: String = "waves"
 
   def fromConfig(config: Config): WavesSettings = {
-    import BlockchainSettings.blockChainSettingsValueReader
-    import MatcherSettings.matcherSettingsValueReader
-
     val directory               = config.as[String](s"$configPath.directory")
     val dataDirectory           = config.as[String](s"$configPath.data-directory")
     val maxCacheSize            = config.as[Int](s"$configPath.max-cache-size")

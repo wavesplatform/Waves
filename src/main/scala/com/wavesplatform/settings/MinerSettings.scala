@@ -22,7 +22,7 @@ object MinerSettings {
   implicit val minerSettingsValueReader: ValueReader[MinerSettings] =
     (cfg, path) => fromConfig(cfg.getConfig(path))
 
-  def fromConfig(config: Config): MinerSettings = {
+  private[this] def fromConfig(config: Config): MinerSettings = {
     import net.ceedubs.ficus.Ficus._
 
     import scala.concurrent.duration._

@@ -5,6 +5,7 @@ import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSett
 import com.wavesplatform.settings.SynchronizationSettings._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.readers.ValueReader
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -19,7 +20,6 @@ case class SynchronizationSettings(maxRollback: Int,
                                    utxSynchronizerSettings: UtxSynchronizerSettings)
 
 object SynchronizationSettings {
-
   case class MicroblockSynchronizerSettings(waitResponseTimeout: FiniteDuration,
                                             processedMicroBlocksCacheTimeout: FiniteDuration,
                                             invCacheTimeout: FiniteDuration)
@@ -28,18 +28,19 @@ object SynchronizationSettings {
 
   case class UtxSynchronizerSettings(networkTxCacheSize: Int, networkTxCacheTime: FiniteDuration, maxBufferSize: Int, maxBufferTime: FiniteDuration)
 
-  val configPath: String = "waves.synchronization"
+  implicit val synchronizationSettingsValueReader: ValueReader[SynchronizationSettings] =
+    (cfg, path) => fromConfig(cfg.getConfig(path))
 
-  def fromRootConfig(config: Config): SynchronizationSettings = {
-    val maxRollback             = config.as[Int](s"$configPath.max-rollback")
-    val maxChainLength          = config.as[Int](s"$configPath.max-chain-length")
-    val synchronizationTimeout  = config.as[FiniteDuration](s"$configPath.synchronization-timeout")
-    val scoreTTL                = config.as[FiniteDuration](s"$configPath.score-ttl")
-    val maxBaseTargetOpt        = config.as[Option[Long]](s"$configPath.max-base-target")
-    val invalidBlocksStorage    = config.as[InvalidBlockStorageSettings](s"$configPath.invalid-blocks-storage")
-    val microBlockSynchronizer  = config.as[MicroblockSynchronizerSettings](s"$configPath.micro-block-synchronizer")
-    val historyReplierSettings  = config.as[HistoryReplierSettings](s"$configPath.history-replier")
-    val utxSynchronizerSettings = config.as[UtxSynchronizerSettings](s"$configPath.utx-synchronizer")
+  private[this] def fromConfig(config: Config): SynchronizationSettings = {
+    val maxRollback             = config.as[Int]("max-rollback")
+    val maxChainLength          = config.as[Int]("max-chain-length")
+    val synchronizationTimeout  = config.as[FiniteDuration]("synchronization-timeout")
+    val scoreTTL                = config.as[FiniteDuration]("score-ttl")
+    val maxBaseTargetOpt        = config.as[Option[Long]]("max-base-target")
+    val invalidBlocksStorage    = config.as[InvalidBlockStorageSettings]("invalid-blocks-storage")
+    val microBlockSynchronizer  = config.as[MicroblockSynchronizerSettings]("micro-block-synchronizer")
+    val historyReplierSettings  = config.as[HistoryReplierSettings]("history-replier")
+    val utxSynchronizerSettings = config.as[UtxSynchronizerSettings]("utx-synchronizer")
 
     SynchronizationSettings(
       maxRollback,

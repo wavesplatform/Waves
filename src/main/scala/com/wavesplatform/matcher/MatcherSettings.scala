@@ -55,11 +55,10 @@ object MatcherSettings {
   implicit val matcherSettingsValueReader: ValueReader[MatcherSettings] =
     (cfg, path) => fromConfig(cfg.getConfig(path))
 
-  def fromRootConfig(config: Config): MatcherSettings = {
-    fromConfig(config.getConfig("waves.matcher"))
-  }
+  @deprecated("Use config.as[MatcherSettings]", "0.17.0")
+  def fromRootConfig(config: Config): MatcherSettings = config.as[MatcherSettings]("waves.matcher")
 
-  def fromConfig(config: Config): MatcherSettings = {
+  private[this] def fromConfig(config: Config): MatcherSettings = {
     val enabled                      = config.as[Boolean]("enable")
     val account                      = config.as[String]("account")
     val bindAddress                  = config.as[String]("bind-address")
