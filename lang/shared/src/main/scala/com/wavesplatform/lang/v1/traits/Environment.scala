@@ -1,11 +1,11 @@
 package com.wavesplatform.lang.v1.traits
 
-import com.wavesplatform.lang.v1.traits.domain.Tx.ContractTransfer
+import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain._
 import shapeless._
 
 object Environment {
-  type InputEntity = Tx :+: Ord :+: ContractTransfer :+: CNil
+  type InputEntity = Tx :+: Ord :+: ScriptTransfer :+: CNil
 }
 
 trait Environment {

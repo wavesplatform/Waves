@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.compiler
 
 import cats.implicits._
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableFunction, VerifierFunction}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
@@ -101,7 +101,7 @@ object Decompiler {
     }
   }
 
-  def apply(e: Contract, ctx: DecompilerContext): String = {
+  def apply(e: DApp, ctx: DecompilerContext): String = {
 
     def intersperse(s: Seq[Coeval[String]]): Coeval[String] = s.toVector.sequence.map(v => v.mkString(NEWLINE + NEWLINE))
 

@@ -4,7 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 import cats.implicits._
-import com.wavesplatform.lang.contract.Contract._
+import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.utils.Serialize._
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.Serde
@@ -19,7 +19,7 @@ object ContractSerDe {
   val CALL_ANNO: Int = 1
   val VER_ANNO: Int  = 3
 
-  def serialize(c: Contract): Array[Byte] = {
+  def serialize(c: DApp): Array[Byte] = {
     val out = new ByteArrayOutputStream()
 
     out.writeInt(0)
@@ -39,14 +39,14 @@ object ContractSerDe {
     out.toByteArray
   }
 
-  def deserialize(arr: Array[Byte]): Either[String, Contract] = {
+  def deserialize(arr: Array[Byte]): Either[String, DApp] = {
     val bb = ByteBuffer.wrap(arr)
     for {
       _    <- tryEi(bb.getInt())
       decs <- deserializeList[DECLARATION](bb, deserializeDeclaration)
       cfs  <- deserializeList(bb, deserializeCallableFunction)
       vf   <- deserializeOption(bb, deserializeVerifierFunction)
-    } yield Contract(decs, cfs, vf)
+    } yield DApp(decs, cfs, vf)
   }
 
   private def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {

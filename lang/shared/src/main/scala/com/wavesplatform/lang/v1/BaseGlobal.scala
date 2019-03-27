@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.ContentType
 import com.wavesplatform.lang.StdLibVersion.StdLibVersion
-import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
+import com.wavesplatform.lang.contract.{DApp, ContractSerDe}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
 
@@ -39,8 +39,8 @@ trait BaseGlobal {
     s ++ checksum(s)
   }
 
-  def serializeContract(c: Contract, stdLibVersion: StdLibVersion): Array[Byte] = {
-    val s = Array(0: Byte, ContentType.Contract.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(c)
+  def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Array[Byte] = {
+    val s = Array(0: Byte, ContentType.DApp.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(c)
     s ++ checksum(s)
   }
 
@@ -56,7 +56,7 @@ trait BaseGlobal {
     } yield (x, ex)
   }
 
-  def compileContract(input: String, ctx: CompilerContext, stdLibVersion: StdLibVersion): Either[String, (Array[Byte], Contract)] = {
+  def compileContract(input: String, ctx: CompilerContext, stdLibVersion: StdLibVersion): Either[String, (Array[Byte], DApp)] = {
     ContractCompiler
       .compile(input, ctx)
       .map { ast =>

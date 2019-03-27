@@ -123,6 +123,15 @@ fields.get(field) match {
     (log.toList, r)
   }
 
+  def applywithLogging[A <: EVALUATED](
+    c:    Either[ExecutionError, EvaluationContext],
+    expr: EXPR
+  ): (Log, Either[ExecutionError, A]) = {
+    val log = ListBuffer[LogItem]()
+    val r = c.flatMap(ap(_, expr, (str: String) => (v: LetExecResult) => log.append((str, v))))
+    (log.toList, r)
+  }
+
   def apply[A <: EVALUATED](c: EvaluationContext, expr: EXPR): Either[ExecutionError, A] = ap(c, expr, _ => _ => ())
 
   def evalWithLogging(c: EvaluationContext, evalC: EvalM[EVALUATED]): (Log, Either[ExecutionError, EVALUATED]) = {
@@ -132,6 +141,18 @@ fields.get(field) match {
     val res = evalC.run(lec).value._2
     (log.toList, res)
   }
+
+  def evalWithLogging(
+    ctx:   Either[ExecutionError, EvaluationContext],
+    evalC: EvalM[EVALUATED]
+  ): (Log, Either[ExecutionError, EVALUATED]) = {
+    val log = ListBuffer[LogItem]()
+    val llc = (str: String) => (v: LetExecResult) => log.append((str, v))
+    val res = ctx.map(LoggedEvaluationContext(llc, _))
+      .flatMap(evalC.run(_).value._2)
+    (log.toList, res)
+  }
+
   private def ap[A <: EVALUATED](c: EvaluationContext, expr: EXPR, llc: LetLogCallback): Either[ExecutionError, A] = {
     val lec = LoggedEvaluationContext(llc, c)
     evalExpr(expr)

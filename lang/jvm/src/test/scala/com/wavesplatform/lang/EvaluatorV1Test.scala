@@ -43,7 +43,10 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     Seq(
       defaultCryptoContext,
       pureContext,
-      WavesContext.build(DirectiveSet(V1, ScriptType.Account, ContentType.Expression), environment)
+      WavesContext.build(
+        DirectiveSet(V1, ScriptType.Account, ContentType.Expression).explicitGet(),
+        environment
+      )
     )
   )
 

@@ -1,15 +1,15 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.contract.Contract._
-import com.wavesplatform.lang.contract.{Contract, ContractSerDe}
+import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.contract.{DApp, ContractSerDe}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import org.scalatest.{Assertion, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with NoShrink {
 
-  def roundTrip(c: Contract): Assertion = {
+  def roundTrip(c: DApp): Assertion = {
     val bytes = ContractSerDe.serialize(c)
     val conEi = ContractSerDe.deserialize(bytes)
 
@@ -19,7 +19,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 
   "roundtrip" - {
 
-    "empty" in roundTrip(Contract(Nil, Nil, None))
+    "empty" in roundTrip(DApp(Nil, Nil, None))
 
 //    "empty" in {
 //      val cf = ContractFunction(
@@ -31,7 +31,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
 //    }
 
     "one-declaration" in roundTrip(
-      Contract(
+      DApp(
         List(
           LET("letName", CONST_BOOLEAN(true))
         ),
@@ -40,7 +40,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
       ))
 
     "two-declarations" in roundTrip(
-      Contract(
+      DApp(
         List(
           LET("letName", CONST_BOOLEAN(true)),
           FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
@@ -50,7 +50,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
       ))
 
     "callable function" in roundTrip(
-      Contract(
+      DApp(
         List(),
         List(
           CallableFunction(
@@ -62,7 +62,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
       ))
 
     "verifier function" in roundTrip(
-      Contract(
+      DApp(
         List(),
         List(),
         Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
@@ -70,7 +70,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
     )
 
     "full contract" in roundTrip(
-      Contract(
+      DApp(
         List(
           LET("letName", CONST_BOOLEAN(true)),
           FUNC("funcName", List("arg1", "arg2"), CONST_BOOLEAN(false))
