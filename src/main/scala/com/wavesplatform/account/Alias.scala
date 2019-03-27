@@ -19,10 +19,40 @@ object Alias {
   val MinLength            = 4
   val MaxLength            = 30
 
-  val aliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
+  val AliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
 
-  private[this] val AliasPatternInfo     = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
-  private[this] def currentChainId: Byte = AddressScheme.current.chainId
+  def create(name: String): Either[ValidationError, Alias] = {
+    createWithChainId(name, currentChainId)
+  }
+
+  def fromString(str: String): Either[ValidationError, Alias] = {
+    val aliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
+
+    if (!str.startsWith(Prefix)) {
+      Left(GenericError(aliasPatternInfo))
+    } else {
+      val charSemicolonAlias = str.drop(Prefix.length)
+      val chainId            = charSemicolonAlias(0).toByte
+      val name               = charSemicolonAlias.drop(2)
+      if (charSemicolonAlias(1) != ':') {
+        Left(GenericError(aliasPatternInfo))
+      } else {
+        createWithChainId(name, chainId)
+      }
+    }
+  }
+
+  def fromBytes(bytes: Array[Byte]): Either[ValidationError, Alias] = {
+    bytes match {
+      case Array(`AddressVersion`, chainId, _, _, rest @ _*) =>
+        createWithChainId(new String(rest.toArray, "UTF-8"), chainId)
+
+      case _ =>
+        Left(GenericError("Bad alias bytes"))
+    }
+  }
+
+  @inline private[this] def currentChainId: Byte = AddressScheme.current.chainId
   private[this] def isValidAliasChar(c: Char): Boolean =
     ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
@@ -32,36 +62,10 @@ object Alias {
     if (name.length < MinLength || MaxLength < name.length)
       Left(GenericError(s"Alias '$name' length should be between $MinLength and $MaxLength"))
     else if (!name.forall(isValidAliasChar))
-      Left(GenericError(s"Alias should contain only following characters: $aliasAlphabet"))
+      Left(GenericError(s"Alias should contain only following characters: $AliasAlphabet"))
     else if (chainId != 0 && chainId != currentChainId)
       Left(GenericError("Alias network char doesn't match current scheme"))
     else
       Right(AliasImpl(if (chainId == 0) currentChainId else chainId, name))
-  }
-
-  def create(name: String): Either[ValidationError, Alias] = createWithChainId(name, currentChainId)
-
-  def fromString(str: String): Either[ValidationError, Alias] =
-    if (!str.startsWith(Prefix)) {
-      Left(GenericError(AliasPatternInfo))
-    } else {
-      val charSemicolonAlias = str.drop(Prefix.length)
-      val chainId            = charSemicolonAlias(0).toByte
-      val name               = charSemicolonAlias.drop(2)
-      if (charSemicolonAlias(1) != ':') {
-        Left(GenericError(AliasPatternInfo))
-      } else {
-        createWithChainId(name, chainId)
-      }
-    }
-
-  def fromBytes(bytes: Array[Byte]): Either[ValidationError, Alias] = {
-    bytes.headOption match {
-      case Some(AddressVersion) =>
-        val chainId = bytes.tail.head
-        createWithChainId(new String(bytes.drop(4), "UTF-8"), chainId)
-
-      case _ => Left(GenericError("Bad alias bytes"))
-    }
   }
 }

@@ -53,7 +53,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     tsOrderFrom,
     tsOrderTo,
     1,
-    Base58.decode("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get
+    Base58.tryDecodeWithLimit("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get
   )
 
   private val sell = OrderV1(
@@ -66,7 +66,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     tsOrderFrom,
     tsOrderTo,
     2,
-    Base58.decode("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
+    Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
   )
 
   private val exV1 = ExchangeTransactionV1
@@ -248,7 +248,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       transfers,
       ts,
       2.waves,
-      Base58.decode("59QuUcqP6p").get,
+      Base58.tryDecodeWithLimit("59QuUcqP6p").get,
       Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
     )
     .right
@@ -332,7 +332,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       ts,
       Waves,
       minFee,
-      Base58.decode("").get,
+      Base58.tryDecodeWithLimit("").get,
       ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get
     )
     .right
@@ -347,7 +347,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       ts,
       Waves,
       minFee,
-      Base58.decode("").get,
+      Base58.tryDecodeWithLimit("").get,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
     )
     .right

@@ -289,7 +289,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
       complete(
         Json.obj("message" -> message,
                  "signature" ->
-                   Base58.encode(crypto.sign(Base58.decode(pk).get, Base58.decode(message).get))))
+                   Base58.encode(crypto.sign(Base58.tryDecodeWithLimit(pk).get, Base58.tryDecodeWithLimit(message).get))))
     }
   }
 

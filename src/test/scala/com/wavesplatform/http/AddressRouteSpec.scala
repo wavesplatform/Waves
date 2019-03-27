@@ -101,7 +101,7 @@ class AddressRouteSpec
         Post(uri, message) ~> route should produce(ApiKeyNotValid)
         Post(uri, message) ~> api_key(apiKey) ~> route ~> check {
           val resp      = responseAs[JsObject]
-          val signature = Base58.decode((resp \ "signature").as[String]).get
+          val signature = Base58.tryDecodeWithLimit((resp \ "signature").as[String]).get
 
           (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes) else message)
           (resp \ "publicKey").as[String] shouldEqual Base58.encode(account.publicKey)

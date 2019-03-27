@@ -53,7 +53,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            db: DB,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
-                           minMatcherFee: Long)
+                           matcherAccountFee: Long)
     extends ApiRoute
     with ScorexLogging {
 
@@ -110,7 +110,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   private def signedGet(publicKey: PublicKeyAccount): Directive0 =
     (headerValueByName("Timestamp") & headerValueByName("Signature")).tflatMap {
       case (timestamp, sig) =>
-        require(crypto.verify(Base58.decode(sig).get, publicKey.publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey.publicKey),
+        require(crypto.verify(Base58.tryDecodeWithLimit(sig).get, publicKey.publicKey ++ Longs.toByteArray(timestamp.toLong), publicKey.publicKey),
                 "Incorrect signature")
         pass
     }
@@ -137,7 +137,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
     complete(
       StatusCodes.OK -> Json.obj(
         "priceAssets" -> matcherSettings.priceAssets,
-        "orderFee"    -> matcherSettings.orderFee.getJson(minMatcherFee).value
+        "orderFee"    -> matcherSettings.orderFee.getJson(matcherAccountFee).value
       )
     )
   }

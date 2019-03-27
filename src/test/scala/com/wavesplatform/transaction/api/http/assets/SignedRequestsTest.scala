@@ -101,7 +101,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     val tx = req.toTx.explicitGet()
     Base58.encode(tx.sender.publicKey) shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     tx.timestamp shouldBe 1479462208828L
-    tx.attachment shouldBe Base58.decode("A").get
+    tx.attachment shouldBe Base58.tryDecodeWithLimit("A").get
     tx.assetId.maybeBase58Repr.get shouldBe "GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u"
     tx.amount shouldBe 100000
     tx.fee shouldBe 100000
@@ -137,7 +137,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     val tx = req.toTx.explicitGet()
     Base58.encode(tx.sender.publicKey) shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
     tx.timestamp shouldBe 1489054107569L
-    tx.attachment shouldBe Base58.decode("2Kk7Zsr1e9jsqSBM5hpF").get
+    tx.attachment shouldBe Base58.tryDecodeWithLimit("2Kk7Zsr1e9jsqSBM5hpF").get
     tx.assetId.maybeBase58Repr.get shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.feeAssetId.maybeBase58Repr.get shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.amount shouldBe 1000

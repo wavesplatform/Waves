@@ -13,12 +13,11 @@ sealed trait Address extends AddressOrAlias {
   val bytes: ByteStr
   lazy val address: String    = bytes.base58
   lazy val stringRepr: String = address
-
 }
 
+//noinspection ScalaDeprecation
 object Address extends ScorexLogging {
-
-  val Prefix: String = "address:"
+  val Prefix = "address:"
 
   val AddressVersion: Byte = 1
   val ChecksumLength       = 4
@@ -26,16 +25,20 @@ object Address extends ScorexLogging {
   val AddressLength        = 1 + 1 + HashLength + ChecksumLength
   val AddressStringLength  = base58Length(AddressLength)
 
-  private def scheme = AddressScheme.current
-
-  private class AddressImpl(val bytes: ByteStr) extends Address
-
-  private[wavesplatform] def createUnsafe(address: ByteStr): Address = new AddressImpl(address)
-
   def fromPublicKey(publicKey: Array[Byte], chainId: Byte = scheme.chainId): Address = {
-    val publicKeyHash   = crypto.secureHash(publicKey)
-    val withoutChecksum = ByteBuffer.allocate(1 + 1 + HashLength).put(AddressVersion).put(chainId).put(publicKeyHash, 0, HashLength).array()
-    val bytes           = ByteBuffer.allocate(AddressLength).put(withoutChecksum).put(crypto.secureHash(withoutChecksum), 0, ChecksumLength).array()
+    val withoutChecksum = ByteBuffer
+      .allocate(1 + 1 + HashLength)
+      .put(AddressVersion)
+      .put(chainId)
+      .put(crypto.secureHash(publicKey), 0, HashLength)
+      .array()
+
+    val bytes = ByteBuffer
+      .allocate(AddressLength)
+      .put(withoutChecksum)
+      .put(calcCheckSum(withoutChecksum), 0, ChecksumLength)
+      .array()
+
     createUnsafe(bytes)
   }
 
@@ -60,10 +63,22 @@ object Address extends ScorexLogging {
       _ <- Either.cond(base58String.length <= AddressStringLength,
                        (),
                        InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}"))
-      byteArray <- Base58.decode(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
+      byteArray <- Base58.tryDecodeWithLimit(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
       address   <- fromBytes(byteArray)
     } yield address
   }
 
-  def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = crypto.secureHash(withoutChecksum).take(ChecksumLength)
+  def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = {
+    val fullHash = crypto.secureHash(withoutChecksum)
+    fullHash.take(ChecksumLength)
+  }
+
+  @inline
+  private[this] def scheme: AddressScheme = AddressScheme.current
+
+  @deprecated("Use fromBytes")
+  private[wavesplatform] def createUnsafe(address: ByteStr): Address = {
+    final case class AddressImpl(bytes: ByteStr) extends Address
+    AddressImpl(address)
+  }
 }

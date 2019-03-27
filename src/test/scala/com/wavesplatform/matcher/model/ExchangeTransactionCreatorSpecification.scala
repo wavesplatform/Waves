@@ -82,7 +82,7 @@ class ExchangeTransactionCreatorSpecification
       val preconditions =
         for {
           ((_, buyOrder), (_, sellOrder)) <- orderV3PairGenerator
-          orderSettings                   <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(buyOrder.matcherFeeAssetId), fixedWavesSettingsGenerator())
+          orderSettings                   <- orderFeeSettingsGenerator(Some(buyOrder.matcherFeeAssetId))
         } yield (buyOrder, sellOrder, orderSettings)
 
       forAll(preconditions) {
@@ -102,7 +102,7 @@ class ExchangeTransactionCreatorSpecification
       val preconditions =
         for {
           ((_, buyOrder), (senderSell, sellOrder)) <- orderV3PairGenerator
-          orderSettings                            <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(buyOrder.matcherFeeAssetId), fixedWavesSettingsGenerator())
+          orderSettings                            <- orderFeeSettingsGenerator(Some(buyOrder.matcherFeeAssetId))
         } yield {
 
           val sellOrderWithUpdatedAmount = sellOrder.updateAmount(sellOrder.amount / 2)
