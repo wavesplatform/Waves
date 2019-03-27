@@ -3,12 +3,13 @@ package com.wavesplatform.metrics
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
+import com.wavesplatform.settings._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers._
+import net.ceedubs.ficus.readers.{ArbitraryTypeReader, ValueReader}
 import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 
