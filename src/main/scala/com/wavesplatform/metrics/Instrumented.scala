@@ -80,7 +80,7 @@ object Instrumented {
         (result, nanoTime.nanos.toSeconds)
 
       case _ =>
-        (result, nanoTime.nanos.toMillis)
+        (result, nanoTime / 1000000L)
     }
   }
 
