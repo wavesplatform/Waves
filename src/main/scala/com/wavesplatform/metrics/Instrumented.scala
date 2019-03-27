@@ -76,14 +76,11 @@ object Instrumented {
       case u if u == MeasurementUnit.time.microseconds =>
         (result, nanoTime.nanos.toMicros)
 
-      case u if u == MeasurementUnit.time.milliseconds =>
-        (result, nanoTime.nanos.toMillis)
-
       case u if u == MeasurementUnit.time.seconds =>
         (result, nanoTime.nanos.toSeconds)
 
       case _ =>
-        ???
+        (result, nanoTime.nanos.toMillis)
     }
   }
 
