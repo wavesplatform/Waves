@@ -10,21 +10,28 @@ package object metrics {
   }
 
   implicit class TimerExt(val timer: Timer) extends AnyVal {
-    def measure[A](f: => A): A = {
+    def measure[T](f: => T): T = {
       val st     = timer.start()
       val result = f
       st.stop()
       result
     }
 
-    def measureSuccessful[A, B](f: => Either[A, B]): Either[A, B] = {
+    def measureSuccessful[LeftT, RightT](f: => Either[LeftT, RightT]): Either[LeftT, RightT] = {
       val st     = timer.start()
       val result = f
       if (result.isRight) st.stop()
       result
     }
 
-    def measureFuture[A](f: => Future[A])(implicit ec: ExecutionContext): Future[A] = {
+    def measureSuccessful[T](f: => Option[T]): Option[T] = {
+      val st     = timer.start()
+      val result = f
+      if (result.isDefined) st.stop()
+      result
+    }
+
+    def measureFuture[T](f: => Future[T])(implicit ec: ExecutionContext): Future[T] = {
       val st     = timer.start()
       val future = f
       future.onComplete(_ => st.stop())
