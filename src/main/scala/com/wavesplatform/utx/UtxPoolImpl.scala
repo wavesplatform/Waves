@@ -225,13 +225,13 @@ class UtxPoolImpl(time: Time,
       .takeWhile(!_._5)
       .reduce((_, s) => s)
 
-    invalidTxs.foreach(remove)
-    log.trace(
-      s"Packed ${reversedValidTxs.length} transactions of $iterations checked, removed invalid tx ids: [${invalidTxs.take(100).mkString(", ")}${if (invalidTxs.length > 100)
-        ", (" + (invalidTxs.length - 100) + " more)"
-      else ""}], final constraint: $finalConstraint")
+    if (invalidTxs.nonEmpty) {
+      log.trace(s"Removing ${invalidTxs.length} invalid transactions from UTX: [${invalidTxs.mkString(", ")}]")
+      invalidTxs.foreach(remove)
+    }
 
     val txs = reversedValidTxs.reverse
+    if (txs.nonEmpty) log.trace(s"Packed ${txs.length} transactions of $iterations checked, final constraint: $finalConstraint")
     (txs, finalConstraint)
   }
 
