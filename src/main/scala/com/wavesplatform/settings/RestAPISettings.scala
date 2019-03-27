@@ -15,6 +15,6 @@ case class RestAPISettings(enable: Boolean,
 object RestAPISettings {
   implicit val restAPISettingsValueReader: ValueReader[RestAPISettings] = ArbitraryTypeReader.arbitraryTypeValueReader
 
-  @deprecated("Use config.as[RestApiSettings]", "0.17.0")
+  // @deprecated("Use config.as[RestApiSettings]", "0.17.0")
   def fromRootConfig(cfg: Config): RestAPISettings = cfg.as[RestAPISettings]("waves.rest-api")
 }

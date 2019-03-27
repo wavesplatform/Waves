@@ -56,7 +56,7 @@ object MatcherSettings {
   implicit val matcherSettingsValueReader: ValueReader[MatcherSettings] =
     (cfg, path) => fromConfig(cfg.getConfig(path))
 
-  @deprecated("Use config.as[MatcherSettings]", "0.17.0")
+  // @deprecated("Use config.as[MatcherSettings]", "0.17.0")
   def fromRootConfig(config: Config): MatcherSettings = config.as[MatcherSettings]("waves.matcher")
 
   private[this] def fromConfig(config: Config): MatcherSettings = {
