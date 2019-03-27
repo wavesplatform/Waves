@@ -48,15 +48,24 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
       new ApiResponse(code = 200, message = "string or error")
     ))
   def decompile: Route = path("script" / "decompile") {
+    import play.api.libs.json.Json.toJsFieldJsValueWrapper
+
     (post & entity(as[String])) { code =>
-      Script.fromBase64String(code) match {
+      Script.fromBase64String(code, checkComplexity = false) match {
         case Left(err) => complete(err)
         case Right(script) =>
-          val ret = Script.decompile(script)
+          val (scriptText, meta) = Script.decompile(script)
+          val directives: List[(String, JsValue)] = meta.map {
+            case (k, v) =>
+              (k, v match {
+                case n: Number => JsNumber(BigDecimal(n.toString))
+                case s         => JsString(s.toString)
+              })
+          }
+          val result  = directives ::: "script" -> JsString(scriptText) :: Nil
+          val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
           complete(
-            Json.obj(
-              "script" -> ret.toString,
-            )
+            Json.obj(wrapped: _*)
           )
       }
     }
@@ -156,7 +165,7 @@ case class UtilsApiRoute(timeService: Time, settings: RestAPISettings) extends A
     (post & entity(as[String])) { code =>
       complete(
         Script
-          .fromBase64String(code)
+          .fromBase64String(code, checkComplexity = false)
           .left
           .map(_.m)
           .flatMap { script =>

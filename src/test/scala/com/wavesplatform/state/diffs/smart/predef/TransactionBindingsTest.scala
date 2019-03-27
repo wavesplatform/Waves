@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.lang.StdLibVersion.V2
 import com.wavesplatform.lang.Testing.evaluated
@@ -259,6 +260,34 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         Coproduct(t),
         T
       )
+      result shouldBe evaluated(true)
+    }
+  }
+
+  property("InvokeScriptTransaction binding") {
+    forAll(invokeScriptGen) { t =>
+      val script =
+        s"""
+            |match tx {
+            | case t : InvokeScriptTransaction  =>
+            |   ${provenPart(t)}
+            |   let dappAddress = t.dappAddress.bytes == base58'${t.dappAddress.bytes.base58}'
+            |   let paymentAmount = if(${t.payment.nonEmpty})
+            |     then extract(t.payment).amount == ${t.payment.headOption.map(_.amount).getOrElse(-1)}
+            |     else isDefined(t.payment) == false
+            |   let paymentAssetId = if(${t.payment.nonEmpty})
+            |     then if (${t.payment.headOption.map(_.assetId != Waves).getOrElse(false)})
+            |             then extract(t.payment).assetId == base58'${t.payment.headOption.flatMap(_.assetId.maybeBase58Repr).getOrElse("")}'
+            |             else isDefined(extract(t.payment).assetId) == false
+            |     else isDefined(t.payment) == false
+            |   let feeAssetId = if (${t.feeAssetId != Waves})
+            |      then extract(t.feeAssetId) == base58'${t.feeAssetId.maybeBase58Repr.getOrElse("")}'
+            |      else isDefined(t.feeAssetId) == false
+            |   ${assertProvenPart("t")} && dappAddress && paymentAmount && paymentAssetId && feeAssetId
+            | case other => throw()
+            | }
+            |""".stripMargin
+      val result = runScriptWithCustomContext(script, Coproduct(t), T, StdLibVersion.V3)
       result shouldBe evaluated(true)
     }
   }
@@ -546,8 +575,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(DirectiveSet(V2, ScriptType.Asset, ContentType.Expression),
-                 new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain, Coeval(null)))
+          .build(
+            DirectiveSet(V2, ScriptType.Asset, ContentType.Expression).explicitGet(),
+            new WavesEnvironment(chainId, Coeval(null), null, EmptyBlockchain, Coeval(null))
+          )
 
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
@@ -566,8 +597,10 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext
           .build(Global) |+|
         WavesContext
-          .build(DirectiveSet(StdLibVersion.V2, ScriptType.Account, ContentType.Expression),
-                 new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null)))
+          .build(
+            DirectiveSet(StdLibVersion.V2, ScriptType.Account, ContentType.Expression).explicitGet(),
+            new WavesEnvironment(chainId, Coeval(t), null, EmptyBlockchain, Coeval(null))
+          )
 
     for {
       compileResult <- ExpressionCompiler(ctx.compilerContext, expr)

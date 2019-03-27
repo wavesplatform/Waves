@@ -1,19 +1,19 @@
 package com.wavesplatform.lang.contract
 
-import com.wavesplatform.lang.contract.Contract.{CallableFunction, VerifierFunction}
+import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilationError, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 
-case class Contract(
+case class DApp(
     dec: List[DECLARATION],
     cfs: List[CallableFunction],
     vf: Option[VerifierFunction]
 )
 
-object Contract {
+object DApp {
 
   sealed trait Annotation {
     def invocationArgName: String

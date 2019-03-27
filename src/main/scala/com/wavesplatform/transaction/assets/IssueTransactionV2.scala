@@ -11,6 +11,7 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.smart.script.v1.ExprScript
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -79,6 +80,9 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
     for {
       _ <- Either.cond(chainId == currentChainId, (), GenericError(s"Wrong chainId actual: ${chainId.toInt}, expected: $currentChainId"))
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
+      _ <- Either.cond(script.forall(_.isInstanceOf[ExprScript]),
+                       (),
+                       ValidationError.GenericError(s"Asset can only be assigned with Expression script, not Contract"))
     } yield IssueTransactionV2(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
   }
 

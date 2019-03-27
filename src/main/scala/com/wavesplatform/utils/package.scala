@@ -7,11 +7,11 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{Storage, VersionedStorage}
-import com.wavesplatform.lang.ScriptType._
 import com.wavesplatform.lang.ContentType._
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, V3}
+import com.wavesplatform.lang._
 import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx._
@@ -93,26 +93,36 @@ package object utils extends ScorexLogging {
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX]] = {
-    for {
+    val directives = for {
       version    <- StdLibVersion.SupportedVersions
       cType      <- ContentType.SupportedTypes
       scriptType <- ScriptType.SupportedTypes
-    } yield {
-      val ds = DirectiveSet(version, scriptType, cType)
-      ds -> Coeval
-        .evalOnce(
-          Monoid
-            .combineAll(Seq(
-              PureContext.build(version),
+    } yield DirectiveSet(version, scriptType, cType)
+
+    val environment = new WavesEnvironment(
+      nByte = AddressScheme.current.chainId,
+      in = Coeval(???),
+      h = Coeval(???),
+      blockchain = EmptyBlockchain,
+      contractAdress = Coeval(???)
+    )
+    directives
+      .filter(_.isRight)
+      .map(_.explicitGet())
+      .map(ds => {
+        val ctx = Coeval.evalOnce(
+          Monoid.combineAll(
+            Seq(
+              PureContext.build(ds.stdLibVersion),
               CryptoContext.build(Global),
-              WavesContext
-                .build(
-                  ds,
-                  new WavesEnvironment(AddressScheme.current.chainId, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
-                )
-            )))
-    }
-  }.toMap
+              WavesContext.build(ds, environment)
+            )
+          )
+        )
+        ds -> ctx
+      })
+      .toMap
+  }
 
   private val lazyFunctionCosts: Map[StdLibVersion, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
     lazyContexts.map(el => (el._1.stdLibVersion, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext))))
@@ -133,13 +143,15 @@ package object utils extends ScorexLogging {
   }
 
   def compilerContext(version: StdLibVersion, cType: ContentType, isAssetScript: Boolean): CompilerContext = {
-    val ds = DirectiveSet(version, ScriptType.isAssetScript(isAssetScript), cType)
+    val ds = DirectiveSet(version, ScriptType.isAssetScript(isAssetScript), cType).explicitGet()
     lazyContexts(ds)().compilerContext
   }
 
-  val defaultDecompilerContext: DecompilerContext = lazyContexts(DirectiveSet(V3, ScriptType.Account, ContentType.Contract))().decompilerContext
+  val defaultDecompilerContext: DecompilerContext =
+    lazyContexts(DirectiveSet(V3, ScriptType.Account, ContentType.DApp).explicitGet())().decompilerContext
 
-  def varNames(version: StdLibVersion, cType: ContentType): Set[String] = compilerContext(version, cType, isAssetScript = false).varDefs.keySet
+  def varNames(version: StdLibVersion, cType: ContentType): Set[String] =
+    compilerContext(version, cType, isAssetScript = false).varDefs.keySet
 
   @tailrec
   final def untilTimeout[T](timeout: FiniteDuration, delay: FiniteDuration = 100.milliseconds, onFailure: => Unit = {})(fn: => T): T = {

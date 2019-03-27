@@ -66,12 +66,12 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val scriptText =
       """
         |{-# STDLIB_VERSION 3 #-}
-        |{-# CONTENT_TYPE CONTRACT #-}
+        |{-# CONTENT_TYPE DAPP #-}
         |
         |	@Callable(i)
         |	func deposit() = {
         |   let pmt = extract(i.payment)
-        |   if (isDefined(pmt.asset)) then throw("can hodl waves only at the moment")
+        |   if (isDefined(pmt.assetId)) then throw("can hodl waves only at the moment")
         |   else {
         |	  	let currentKey = toBase58String(i.caller.bytes)
         |	  	let currentAmount = match getInteger(this, currentKey) {
@@ -96,9 +96,9 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         |			then throw("Can't withdraw negative amount")
         |  else if (newAmount < 0)
         |			then throw("Not enough balance")
-        |			else ContractResult(
+        |			else ScriptResult(
         |					WriteSet([DataEntry(currentKey, newAmount)]),
-        |					TransferSet([ContractTransfer(i.caller, amount, unit)])
+        |					TransferSet([ScriptTransfer(i.caller, amount, unit)])
         |				)
         |	}
         |
@@ -133,7 +133,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       InvokeScriptTransaction
         .selfSigned(
           sender = caller,
-          contractAddress = contract,
+          dappAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("deposit"), List.empty),
           p = Seq(InvokeScriptTransaction.Payment(1.5.waves, Waves)),
           timestamp = System.currentTimeMillis(),
@@ -142,11 +142,11 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    val contractInvocationId = sender
+    val invokeScriptId = sender
       .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
       .id
 
-    nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
+    nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
 
     sender.getData(contract.address, caller.address) shouldBe IntegerDataEntry(caller.address, 1.5.waves)
     val balanceAfter = sender.accountBalances(contract.address)._1
@@ -159,7 +159,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       InvokeScriptTransaction
         .selfSigned(
           sender = caller,
-          contractAddress = contract,
+          dappAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.51.waves))),
           p = Seq(),
           timestamp = System.currentTimeMillis(),
@@ -179,7 +179,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       InvokeScriptTransaction
         .selfSigned(
           sender = caller,
-          contractAddress = contract,
+          dappAddress = contract,
           fc = FUNCTION_CALL(FunctionHeader.User("withdraw"), List(CONST_LONG(1.49.waves))),
           p = Seq(),
           timestamp = System.currentTimeMillis(),
@@ -188,11 +188,11 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    val contractInvocationId = sender
+    val invokeScriptId = sender
       .signedBroadcast(tx.json() + ("type" -> JsNumber(InvokeScriptTransaction.typeId.toInt)))
       .id
 
-    nodes.waitForHeightAriseAndTxPresent(contractInvocationId)
+    nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
 
     val balanceAfter = sender.accountBalances(contract.address)._1
 
