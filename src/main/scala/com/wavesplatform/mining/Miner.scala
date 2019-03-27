@@ -146,7 +146,7 @@ class MinerImpl(allChannels: ChannelGroup,
       consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
       estimators                         = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
       mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
-      (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint)
+      (unconfirmed, updatedMdConstraint) = metrics.measureLog("packing unconfirmed transactions for block")(utx.packUnconfirmed(mdConstraint))
       _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
         .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version))
