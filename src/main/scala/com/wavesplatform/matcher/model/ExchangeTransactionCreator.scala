@@ -5,9 +5,9 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator._
-import com.wavesplatform.settings.fee.AssetType
-import com.wavesplatform.settings.fee.AssetType.AssetType
-import com.wavesplatform.settings.fee.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
+import com.wavesplatform.settings.AssetType
+import com.wavesplatform.settings.AssetType.AssetType
+import com.wavesplatform.settings.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

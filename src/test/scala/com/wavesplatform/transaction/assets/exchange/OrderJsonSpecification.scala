@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
