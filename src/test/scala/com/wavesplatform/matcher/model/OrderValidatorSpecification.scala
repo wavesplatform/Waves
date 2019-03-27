@@ -219,7 +219,7 @@ class OrderValidatorSpecification
         case (order, sender, orderFeeSettings) =>
           val baseFee = orderFeeSettings match {
             case FixedWavesSettings(fee) => fee
-            case _                       => OrderValidator.exchangeTransactionCreationFee
+            case _                       => matcherSettings.exchangeTxBaseFee
           }
 
           val orderValidator = setScriptsAndValidate(orderFeeSettings)(None, None, None, None) _ // assets and accounts don't have any scripts
@@ -615,8 +615,7 @@ class OrderValidatorSpecification
 
   private def tradableBalance(p: Portfolio)(assetId: Asset): Long = assetId.fold(p.spendableBalance)(p.assets.getOrElse(_, 0L))
 
-  private def exchangeTransactionCreator(blockchain: Blockchain) =
-    new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings.orderFee)
+  private def exchangeTransactionCreator(blockchain: Blockchain) = new ExchangeTransactionCreator(blockchain, MatcherAccount, matcherSettings)
 
   private def asa[A](
       p: Portfolio = defaultPortfolio,

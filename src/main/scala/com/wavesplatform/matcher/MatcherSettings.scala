@@ -7,6 +7,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
+import com.wavesplatform.matcher.model.OrderValidator
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
 import com.wavesplatform.settings.DeviationsSettings._
 import com.wavesplatform.settings.OrderAmountSettings._
@@ -26,6 +27,7 @@ case class MatcherSettings(enable: Boolean,
                            account: String,
                            bindAddress: String,
                            port: Int,
+                           exchangeTxBaseFee: Long,
                            actorResponseTimeout: FiniteDuration,
                            dataDir: String,
                            recoverOrderHistory: Boolean,
@@ -68,10 +70,16 @@ object MatcherSettings {
   }
 
   def fromConfig(config: Config): MatcherSettings = {
-    val enabled                      = config.as[Boolean](s"$configPath.enable")
-    val account                      = config.as[String](s"$configPath.account")
-    val bindAddress                  = config.as[String](s"$configPath.bind-address")
-    val port                         = config.as[Int](s"$configPath.port")
+    val enabled     = config.as[Boolean](s"$configPath.enable")
+    val account     = config.as[String](s"$configPath.account")
+    val bindAddress = config.as[String](s"$configPath.bind-address")
+    val port        = config.as[Int](s"$configPath.port")
+
+    val exchangeTxBaseFee = config.getValidatedByPredicate[Long](s"$configPath.exchange-tx-base-fee")(
+      predicate = _ >= OrderValidator.exchangeTransactionCreationFee,
+      errorMsg = s"base fee must be >= ${OrderValidator.exchangeTransactionCreationFee}"
+    )
+
     val actorResponseTimeout         = config.as[FiniteDuration](s"$configPath.actor-response-timeout")
     val dataDirectory                = config.as[String](s"$configPath.data-directory")
     val journalDirectory             = config.as[String](s"$configPath.journal-directory")
@@ -96,8 +104,8 @@ object MatcherSettings {
 
     val orderFee                = config.as[OrderFeeSettings](s"$configPath.order-fee")
     val deviation               = config.as[DeviationsSettings](s"$configPath.max-price-deviations")
-    val orderAmountRestrictions = config.getFailSlowSetOf[(AssetPair, OrderAmountSettings)](s"$configPath.order-amount-restrictions").toMap
-    val allowedAssetPairs       = config.getFailSlowSetOf[AssetPair](s"$configPath.allowed-asset-pairs")
+    val orderAmountRestrictions = config.getValidatedSet[(AssetPair, OrderAmountSettings)](s"$configPath.order-amount-restrictions").toMap
+    val allowedAssetPairs       = config.getValidatedSet[AssetPair](s"$configPath.allowed-asset-pairs")
     val allowOrderV3            = config.as[Boolean](s"$configPath.allow-order-v3")
 
     MatcherSettings(
@@ -105,6 +113,7 @@ object MatcherSettings {
       account,
       bindAddress,
       port,
+      exchangeTxBaseFee,
       actorResponseTimeout,
       dataDirectory,
       recoverOrderHistory,

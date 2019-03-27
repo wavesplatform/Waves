@@ -43,7 +43,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
   val fsWithOrderV3Feature: FunctionalitySettings = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.OrderV3.id -> 0))
 
-  val functionalitySettingsOrderV3MassTransfer =
+  val fsOrderV3MassTransfer =
     fsWithOrderV3Feature.copy(preActivatedFeatures = fsWithOrderV3Feature.preActivatedFeatures + (BlockchainFeatures.MassTransfer.id -> 0))
 
   property("Validation fails when OrderV3 feature is not activation yet") {
@@ -357,7 +357,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         assertDiffAndState(
           Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
           TestBlock.create(exchanges),
-          functionalitySettingsOrderV3MassTransfer
+          fsOrderV3MassTransfer
         ) {
           case (blockDiff, _) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
@@ -393,7 +393,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         assertDiffEi(
           Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
           TestBlock.create(exchanges),
-          functionalitySettingsOrderV3MassTransfer
+          fsOrderV3MassTransfer
         ) { blockDiffEi =>
           blockDiffEi should produce("Insufficient buy fee")
         }
@@ -413,7 +413,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         assertDiffEi(
           Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
           TestBlock.create(exchanges),
-          functionalitySettingsOrderV3MassTransfer
+          fsOrderV3MassTransfer
         ) { blockDiffEi =>
           blockDiffEi should produce("Too much buy")
         }
