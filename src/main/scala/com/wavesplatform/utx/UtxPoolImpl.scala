@@ -134,7 +134,7 @@ class UtxPoolImpl(time: Time,
     }
 
     if (transactionsToRemove.nonEmpty) {
-      log.trace(s"Cleaning up invalid transactions: ${transactionsToRemove.mkString(", ")}")
+      log.trace(s"Cleaning up invalid transactions: [${transactionsToRemove.mkString(", ")}]")
       removeAll(transactionsToRemove)
     }
   }
