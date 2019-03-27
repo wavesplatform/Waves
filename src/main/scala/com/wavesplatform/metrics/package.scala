@@ -9,7 +9,7 @@ package object metrics {
     def safeRecord(value: Long): Unit = histogram.record(Math.max(value, 0L))
   }
 
-  implicit class TimerExt(private val timer: Timer) extends AnyVal {
+  final implicit class TimerExt(private val timer: Timer) extends AnyVal {
     def measure[T](f: => T): T = {
       val startedTimer = timer.start()
       val result       = f
