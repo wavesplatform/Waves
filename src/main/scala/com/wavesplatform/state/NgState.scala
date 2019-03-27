@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 import cats.kernel.Monoid
@@ -14,9 +13,6 @@ import com.wavesplatform.utils.ScorexLogging
 
 class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long, val approvedFeatures: Set[Short]) extends ScorexLogging {
   private[this] val MaxTotalDiffs = 15
-
-  private[this] val microDiffs: MMap[BlockId, (Diff, Long, Long)] = MMap.empty  // microDiff, carryFee, timestamp
-  private[this] val microBlocks: MList[MicroBlock]                = MList.empty // fresh head
 
   private val state = new SynchronizedAppendState[MicroBlock, BlockId, (Diff, Long, Long)](_.totalResBlockSig)
 
@@ -105,13 +101,13 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
           Some((base, microBlocksAsc))
         } else if (!microBlocksAsc.exists(_.totalResBlockSig == blockId)) None
         else {
-          val (accumulatedTxs, maybeFound) = microBlocksAsc.foldLeft((MList.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
+          val (accumulatedTxs, maybeFound) = microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
             case ((accumulated, Some((sig, discarded))), micro) =>
               (accumulated, Some((sig, micro +: discarded)))
 
             case ((accumulated, None), micro) =>
               val found = Some((micro.totalResBlockSig, Seq.empty[MicroBlock])).filter(_._1 == blockId)
-              (accumulated ++= micro.transactionData, found)
+              (accumulated ++ micro.transactionData, found)
           }
 
           maybeFound.map {
