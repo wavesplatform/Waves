@@ -7,8 +7,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.{CallableAnnotation, CallableFunction}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
@@ -68,7 +68,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender"), GETTER(GETTER(REF(senderBinding), "caller"), "bytes"))), REF("nil")))
         )
 
-    Contract(
+    DApp(
       List.empty,
       List(
         CallableFunction(
@@ -99,7 +99,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
                       paymentCount: Int = 11,
                       assetId: Asset = Waves) = {
     val oneTransfer = FUNCTION_CALL(
-      User(FieldNames.ContractTransfer),
+      User(FieldNames.ScriptTransfer),
       List(
         FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes))),
         CONST_LONG(recipientAmount),
@@ -116,7 +116,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       else
         List(FUNCTION_CALL(Native(1100), List(oneTransfer, REF("nil"))))
 
-    Contract(
+    DApp(
       List.empty,
       List(
         CallableFunction(
@@ -134,13 +134,13 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     )
   }
 
-  def simpleContract(funcName: String): Either[String, Contract] = {
+  def simpleContract(funcName: String): Either[String, DApp] = {
     val expr = {
       val script =
         s"""
           |
           |{-# STDLIB_VERSION 3 #-}
-          |{-# CONTENT_TYPE CONTRACT #-}
+          |{-# CONTENT_TYPE DAPP #-}
           |
           |@Callable(xx)
           |func $funcName(amount: Int) = {
@@ -164,7 +164,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             PureContext.build(StdLibVersion.V3),
             CryptoContext.build(Global),
             WavesContext.build(
-              DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression),
+              DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression).explicitGet(),
               new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
             )
           ))
@@ -213,7 +213,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       argBinding    <- validAliasStringGen
     } yield paymentContract(senderBinging, argBinding, func, address, amount, masspayment, paymentCount, assetId)
 
-  def preconditionsAndSetContract(senderBindingToContract: String => Gen[Contract],
+  def preconditionsAndSetContract(senderBindingToContract: String => Gen[DApp],
                                   invokerGen: Gen[PrivateKeyAccount] = accountGen,
                                   masterGen: Gen[PrivateKeyAccount] = accountGen,
                                   payment: Option[Payment] = None,
@@ -292,7 +292,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("many ContractTransfers")
+          _ should produce("many ScriptTransfers")
         }
     }
   }
@@ -320,7 +320,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           case (blockDiff, newState) =>
             newState.balance(acc, Waves) shouldBe amount
             newState.balance(invoker, IssuedAsset(asset.id())) shouldBe (asset.quantity - 1)
-            newState.balance(ci.contractAddress, IssuedAsset(asset.id())) shouldBe 1
+            newState.balance(ci.dappAddress, IssuedAsset(asset.id())) shouldBe 1
         }
     }
   }
@@ -423,7 +423,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg))))
       ci = InvokeScriptTransaction.selfSigned(invoker, master, fc, Seq(Payment(-1, Waves)), fee, Waves, ts)
-    } yield (ci)) { _ should produce("NegativeAmount") }
+    } yield ci) { _ should produce("NonPositiveAmount") }
   }
 
   property("smart asset payment require extra fee") {

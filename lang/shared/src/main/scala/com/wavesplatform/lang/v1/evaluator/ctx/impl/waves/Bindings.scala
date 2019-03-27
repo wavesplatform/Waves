@@ -63,7 +63,7 @@ object Bindings {
         paymentType.typeRef,
         Map(
           "amount" -> CONST_LONG(pmt.amount),
-          "asset" -> (pmt.asset match {
+          "assetId" -> (pmt.asset match {
             case None                 => com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
             case Some(asset: ByteStr) => CONST_BYTESTR(asset)
           })
@@ -93,18 +93,19 @@ object Bindings {
       )
     )
 
-  def buildInvocation(caller: Recipient.Address, payment: Option[Pmt], contractAddress: Recipient.Address) =
+  def buildInvocation(caller: Recipient.Address, callerPk: ByteStr, payment: Option[Pmt], dappAddress: Recipient.Address) =
     CaseObj(
       invocationType.typeRef,
       Map(
         "caller"          -> mapRecipient(caller)._2,
+        "callerPublicKey" -> callerPk,
         "payment"         -> buildPayment(payment)
       )
     )
 
   def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType.typeRef, Map("bytes" -> sender.bytes))
 
-  def contractTransfer(ct: ContractTransfer): CaseObj =
+  def scriptTransfer(ct: ScriptTransfer): CaseObj =
     transactionObject(
       Transfer(
         Proven(h = Header(id = ct.id, fee = 0, timestamp = ct.timestamp, version = 0),
@@ -175,12 +176,13 @@ object Bindings {
                   ),
                   provenTxPart(p, proofsEnabled))
         )
-      case CI(p, address, maybePayment) =>
+      case CI(p, address, maybePayment, feeAssetId) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled).typeRef,
           combine(Map(
-                    "contractAddress" -> mapRecipient(address)._2,
-                    "paymentInfo"     -> buildPayment(maybePayment)
+                    "dappAddress" -> mapRecipient(address)._2,
+                    "payment"     -> buildPayment(maybePayment),
+                    "feeAssetId"     -> feeAssetId
                   ),
                   provenTxPart(p, proofsEnabled))
         )

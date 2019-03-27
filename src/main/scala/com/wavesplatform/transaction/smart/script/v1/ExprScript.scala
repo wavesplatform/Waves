@@ -18,10 +18,12 @@ object ExprScript {
 
   def apply(x: EXPR): Either[String, Script] = apply(V1, x)
 
-  def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true): Either[String, Script] =
+  def apply(version: StdLibVersion, x: EXPR, checkSize: Boolean = true, checkComplexity: Boolean = true): Either[String, Script] =
     for {
       scriptComplexity <- ScriptEstimator(varNames(version, ContentType.Expression), functionCosts(version), x)
-      _                <- Either.cond(scriptComplexity <= MaxExprComplexity, (), s"Script is too complex: $scriptComplexity > $MaxExprComplexity")
+      _ <- Either.cond(!checkComplexity || scriptComplexity <= MaxExprComplexity,
+                       (),
+                       s"Script is too complex: $scriptComplexity > $MaxExprComplexity")
       s = new ExprScriptImpl(version, x, scriptComplexity)
       _ <- if (checkSize) validateBytes(s.bytes().arr) else Right(())
     } yield s

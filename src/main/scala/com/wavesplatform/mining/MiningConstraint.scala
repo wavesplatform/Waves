@@ -45,4 +45,25 @@ case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningCons
 object MultiDimensionalMiningConstraint {
   def apply(constraint1: MiningConstraint, constraint2: MiningConstraint): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(NonEmptyList.of(constraint1, constraint2))
+
+  def formatOverfilledConstraints(currRest: MultiDimensionalMiningConstraint, updatedRest: MultiDimensionalMiningConstraint): Iterator[String] = {
+    if (currRest.constraints.length == updatedRest.constraints.length) {
+      (for ((curr, upd) <- currRest.constraints.toList.iterator.zip(updatedRest.constraints.toList.iterator) if upd.isOverfilled)
+        yield
+          (curr, upd) match {
+            case (OneDimensionalMiningConstraint(rest, description, _), OneDimensionalMiningConstraint(newRest, _, _)) =>
+              Iterator.single(s"$description($rest -> $newRest)")
+
+            case (m: MultiDimensionalMiningConstraint, m1: MultiDimensionalMiningConstraint) =>
+              Iterator.empty ++ formatOverfilledConstraints(m, m1)
+
+            case _ =>
+              Iterator.single(s"$curr -> $upd")
+          }).flatten
+    } else {
+      updatedRest.constraints.toList.iterator
+        .filter(_.isOverfilled)
+        .map(_.toString)
+    }
+  }
 }
