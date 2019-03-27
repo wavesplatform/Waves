@@ -210,7 +210,7 @@ class UtxPoolImpl(time: Time,
           if (updatedRest.isOverfilled) {
             if (updatedRest != lastOverfilled)
               log.trace(
-                s"Mining constraints will be overfilled by $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
+                s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
 
             (invalid, valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
           } else {
