@@ -54,6 +54,8 @@ trait Instrumented { self: ScorexLogging =>
 }
 
 object Instrumented {
+  private[this] val NanosInMS = 1000000L
+
   def withTimeNanos[R](f: => R): (R, Long) = {
     val startTime = System.nanoTime()
     val result: R = f
@@ -63,7 +65,7 @@ object Instrumented {
 
   def withTimeMillis[R](f: => R): (R, Long) = {
     val (result, nanos) = withTimeNanos(f)
-    (result, nanos / 1000000L)
+    (result, nanos / NanosInMS)
   }
 
   def withTime[R](h: Histogram, f: => R): (R, Long) = {
@@ -80,7 +82,7 @@ object Instrumented {
         (result, nanoTime.nanos.toSeconds)
 
       case _ =>
-        (result, nanoTime / 1000000L)
+        (result, nanoTime / NanosInMS)
     }
   }
 
