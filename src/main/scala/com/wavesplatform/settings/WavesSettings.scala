@@ -32,6 +32,9 @@ object WavesSettings {
   val configPath: String = "waves"
 
   def fromConfig(config: Config): WavesSettings = {
+    import BlockchainSettings.blockChainSettingsValueReader
+    import MatcherSettings.matcherSettingsValueReader
+
     val directory               = config.as[String](s"$configPath.directory")
     val dataDirectory           = config.as[String](s"$configPath.data-directory")
     val maxCacheSize            = config.as[Int](s"$configPath.max-cache-size")
@@ -40,11 +43,11 @@ object WavesSettings {
     val ntpServer               = config.as[String](s"$configPath.ntp-server")
     val networkSettings         = config.as[NetworkSettings]("waves.network")
     val walletSettings          = config.as[WalletSettings]("waves.wallet")
-    val blockchainSettings      = BlockchainSettings.fromRootConfig(config)
-    val matcherSettings         = MatcherSettings.fromRootConfig(config)
-    val minerSettings           = MinerSettings.fromRootConfig(config)
-    val restAPISettings         = RestAPISettings.fromRootConfig(config)
-    val synchronizationSettings = SynchronizationSettings.fromRootConfig(config)
+    val blockchainSettings      = config.as[BlockchainSettings]("waves.blockchain")
+    val matcherSettings         = config.as[MatcherSettings]("waves.matcher")
+    val minerSettings           = config.as[MinerSettings]("waves.miner")
+    val restAPISettings         = config.as[RestAPISettings]("waves.rest-api")
+    val synchronizationSettings = config.as[SynchronizationSettings]("waves.synchronization")
     val utxSettings             = config.as[UtxSettings]("waves.utx")
     val featuresSettings        = config.as[FeaturesSettings]("waves.features")
     val metrics                 = config.as[Metrics.Settings]("metrics")

@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.EnumerationReader._
+import net.ceedubs.ficus.readers.ValueReader
 
 import scala.concurrent.duration._
 
@@ -143,19 +144,20 @@ object BlockchainType extends Enumeration {
 }
 
 object BlockchainSettings {
-  val configPath: String = "waves.blockchain"
+  implicit val blockChainSettingsValueReader: ValueReader[BlockchainSettings] =
+    (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
 
-  def fromRootConfig(config: Config): BlockchainSettings = {
-    val blockchainType = config.as[BlockchainType.Value](s"$configPath.type")
+  def fromConfig(config: Config): BlockchainSettings = {
+    val blockchainType = config.as[BlockchainType.Value]("type")
     val (addressSchemeCharacter, functionalitySettings, genesisSettings) = blockchainType match {
       case BlockchainType.TESTNET =>
         ('T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET)
       case BlockchainType.MAINNET =>
         ('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET)
       case BlockchainType.CUSTOM =>
-        val addressSchemeCharacter = config.as[String](s"$configPath.custom.address-scheme-character").charAt(0)
-        val functionalitySettings  = config.as[FunctionalitySettings](s"$configPath.custom.functionality")
-        val genesisSettings        = config.as[GenesisSettings](s"$configPath.custom.genesis")
+        val addressSchemeCharacter = config.as[String](s"custom.address-scheme-character").charAt(0)
+        val functionalitySettings  = config.as[FunctionalitySettings](s"custom.functionality")
+        val genesisSettings        = config.as[GenesisSettings](s"custom.genesis")
         (addressSchemeCharacter, functionalitySettings, genesisSettings)
     }
 

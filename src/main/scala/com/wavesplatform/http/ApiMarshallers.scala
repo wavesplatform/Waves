@@ -2,14 +2,13 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.marshalling.{Marshaller, PredefinedToEntityMarshallers, ToEntityMarshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
-import akka.http.scaladsl.model.{MessageEntity, StatusCode}
+import akka.http.scaladsl.model.StatusCode
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.util.ByteString
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.{Transaction, ValidationError}
 import play.api.libs.json._
 
-import scala.concurrent.Future
 import scala.util.control.Exception.nonFatalCatch
 import scala.util.control.NoStackTrace
 
@@ -39,27 +38,24 @@ trait ApiMarshallers {
   private[this] lazy val jsonStringMarshaller =
     Marshaller.stringMarshaller(`application/json`)
 
-  implicit def playJsonUnmarshaller[A](implicit reads: Reads[A]): FromEntityUnmarshaller[A] = {
-    jsonStringUnmarshaller.andThen(Unmarshaller(implicit ec =>
-      data =>
-        Future {
-          val json = nonFatalCatch.withApply(t => throw PlayJsonException(cause = Some(t)))(Json.parse(data))
+  implicit def playJsonUnmarshaller[A](implicit reads: Reads[A]): FromEntityUnmarshaller[A] =
+    jsonStringUnmarshaller.map { data =>
+      val json = nonFatalCatch.withApply(t => throw PlayJsonException(cause = Some(t)))(Json.parse(data))
 
-          json.validate[A] match {
-            case JsSuccess(value, _) => value
-            case JsError(errors)     => throw PlayJsonException(errors = errors)
-          }
-        }))
-  }
+      json.validate[A] match {
+        case JsSuccess(value, _) => value
+        case JsError(errors)     => throw PlayJsonException(errors = errors)
+      }
+    }
 
   // preserve support for extracting plain strings from requests
   implicit val stringUnmarshaller: FromEntityUnmarshaller[String] = PredefinedFromEntityUnmarshallers.stringUnmarshaller
   implicit val intUnmarshaller: FromEntityUnmarshaller[Int]       = stringUnmarshaller.map(_.toInt)
 
   implicit def playJsonMarshaller[A](implicit writes: Writes[A], jsValueToString: JsValue => String = Json.stringify): ToEntityMarshaller[A] = {
-    Marshaller
-      .futureMarshaller[String, MessageEntity](jsonStringMarshaller)
-      .composeWithEC(implicit ec => (value: A) => Future(jsValueToString(Json.toJson(value))))
+    jsonStringMarshaller
+      .compose(jsValueToString)
+      .compose(writes.writes)
   }
 
   // preserve support for using plain strings as request entities
