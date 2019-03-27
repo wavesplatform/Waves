@@ -28,6 +28,7 @@ import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time,
