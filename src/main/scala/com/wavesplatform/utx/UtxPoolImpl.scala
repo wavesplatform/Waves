@@ -222,8 +222,8 @@ class UtxPoolImpl(time: Time,
             }
           }
       }
-      .takeWhile(!_._5)
-      .reduce((_, s) => s)
+      .takeWhile(!_._5) // !currRest.isEmpty
+      .reduce((_, right) => right)
 
     if (invalidTxs.nonEmpty) {
       log.trace(s"Removing ${invalidTxs.length} invalid transactions from UTX: [${invalidTxs.mkString(", ")}]")
