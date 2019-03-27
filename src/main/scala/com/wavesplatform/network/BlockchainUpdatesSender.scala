@@ -38,25 +38,7 @@ class BlockchainUpdatesSender(settings: WavesSettings, blockchainUpdated: Observ
   // @todo check on startup if Kafka is available?
   private[this] val producer = new KafkaProducer[Int, BlockchainUpdated](createProperties(), IntSerializer, BlockchainUpdatedSerializer)
 
-  private[this] def createProperties(): util.Properties = {
-    val props = new util.Properties()
-    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, settings.blockchainUpdatesSettings.bootstrapServers)
-    props.put(ProducerConfig.CLIENT_ID_CONFIG, settings.blockchainUpdatesSettings.clientId)
-    //  props.put(ProducerConfig.RETRIES_CONFIG, "0")
-    props.put(ProducerConfig.ACKS_CONFIG, "all")
-    props
-  }
-
-  private[this] def createProducerRecord(event: BlockchainUpdated): ProducerRecord[Int, BlockchainUpdated] = {
-    val h = event match {
-      case BlockAdded(_, height, _, _)      => height
-      case MicroBlockAdded(_, height, _, _) => height
-      case RollbackCompleted(_, height)     => height
-    }
-    new ProducerRecord[Int, BlockchainUpdated](settings.blockchainUpdatesSettings.topic, h, event)
-  }
-
-  val obs: Observer[BlockchainUpdated] = new Observer[BlockchainUpdated] {
+  blockchainUpdated.subscribe(new Observer[BlockchainUpdated] {
     override def onNext(evt: BlockchainUpdated): Future[Ack] =
       Future {
         try {
@@ -75,13 +57,29 @@ class BlockchainUpdatesSender(settings: WavesSettings, blockchainUpdated: Observ
     }
 
     override def onComplete(): Unit = {
-      // @todo proper complete logic — shutdown node?
+      // @todo proper complete/shutdown actions
       log.info("Blockchain updates channel closed")
       shutdown()
     }
+  })(scheduler)
+
+  private[this] def createProperties(): util.Properties = {
+    val props = new util.Properties()
+    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, settings.blockchainUpdatesSettings.bootstrapServers)
+    props.put(ProducerConfig.CLIENT_ID_CONFIG, settings.blockchainUpdatesSettings.clientId)
+    //  props.put(ProducerConfig.RETRIES_CONFIG, "0")
+    props.put(ProducerConfig.ACKS_CONFIG, "all")
+    props
   }
 
-  blockchainUpdated.subscribe(obs)(scheduler)
+  private[this] def createProducerRecord(event: BlockchainUpdated): ProducerRecord[Int, BlockchainUpdated] = {
+    val h = event match {
+      case BlockAdded(_, height, _, _)      => height
+      case MicroBlockAdded(_, height, _, _) => height
+      case RollbackCompleted(_, height)     => height
+    }
+    new ProducerRecord[Int, BlockchainUpdated](settings.blockchainUpdatesSettings.topic, h, event)
+  }
 
   def shutdown(): Unit =
     producer.close()
