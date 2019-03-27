@@ -156,7 +156,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeBlockchainUpdatesSender = for {
       s  <- maybeBlockchainUpdatesScheduler
       bu <- blockchainUpdated
-    } yield new BlockchainUpdatesSender(settings, bu, s)
+    } yield new BlockchainUpdatesSender(settings, bu)(s)
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 

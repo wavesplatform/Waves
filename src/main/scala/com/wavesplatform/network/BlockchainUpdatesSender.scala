@@ -2,104 +2,87 @@ package com.wavesplatform.network
 
 import java.util
 
-import com.google.protobuf.ByteString
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings._
-import com.wavesplatform.state.BlockchainUpdated
-import io.netty.bootstrap.Bootstrap
-import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import io.netty.channel.nio.NioEventLoopGroup
-import io.netty.channel.socket.SocketChannel
-import io.netty.channel.socket.nio.NioSocketChannel
-import io.netty.util.concurrent.DefaultThreadFactory
+import com.wavesplatform.state.{BlockAdded, BlockchainUpdated, MicroBlockAdded, RollbackCompleted}
 import monix.execution.{Ack, Scheduler}
 import monix.execution.Ack.{Continue, Stop}
 import monix.reactive.{Observable, Observer}
-import com.wavesplatform.protobuf.events.{PBBlockchainUpdated, PBEvents}
+import com.wavesplatform.protobuf.events.PBEvents
 import com.wavesplatform.utils.ScorexLogging
-import io.netty.buffer.ByteBuf
-import io.netty.handler.codec.{MessageToByteEncoder, MessageToMessageEncoder}
+import org.apache.kafka.common.serialization.{IntegerSerializer, Serializer}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 
 import scala.concurrent.Future
 
-private object PBInt32LengthPrepender extends MessageToByteEncoder[Array[Byte]] {
-  @throws[IndexOutOfBoundsException]
-  override protected def encode(ctx: ChannelHandlerContext, msg: Array[Byte], out: ByteBuf): Unit = {
-    val bodyLen: Int = msg.length
-    out.ensureWritable(4 + bodyLen)
-    out.writeInt(bodyLen)
-    out.writeBytes(msg)
-  }
+private object BlockchainUpdatedSerializer extends Serializer[BlockchainUpdated] {
+  override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {}
+  override def close(): Unit                                                 = {}
+
+  override def serialize(topic: String, data: BlockchainUpdated): Array[Byte] =
+    PBEvents.protobuf(data).toByteArray
 }
 
-private object PBEncoder extends MessageToMessageEncoder[PBBlockchainUpdated] {
-  override def encode(ctx: ChannelHandlerContext, msg: PBBlockchainUpdated, out: util.List[AnyRef]): Unit = {
-    out.add(PBBlockchainUpdated.toByteArray(msg))
-  }
+private object IntSerializer extends Serializer[Int] {
+  val integerSerializer = new IntegerSerializer
+
+  override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = integerSerializer.configure(configs, isKey)
+  override def close(): Unit                                                 = integerSerializer.close()
+
+  override def serialize(topic: String, data: Int): Array[Byte] =
+    integerSerializer.serialize(topic, data)
 }
 
-private class BlockchainUpdatesHandler(blockchainUpdated: Observable[BlockchainUpdated], scheduler: Scheduler)
-    extends ChannelInboundHandlerAdapter
-    with ScorexLogging {
-  implicit def toByteString(bs: ByteStr): ByteString =
-    ByteString.copyFrom(bs.arr)
+class BlockchainUpdatesSender(settings: WavesSettings, blockchainUpdated: Observable[BlockchainUpdated])(implicit scheduler: Scheduler)
+    extends ScorexLogging {
 
-  override def channelActive(ctx: ChannelHandlerContext): Unit = {
-    val obs: Observer[BlockchainUpdated] = new Observer[BlockchainUpdated] {
-      override def onNext(evt: BlockchainUpdated): Future[Ack] =
-        Future {
-          try {
-            ctx.writeAndFlush(PBEvents.protobuf(evt)).get
-            Continue
-          } catch {
-            case e: Throwable =>
-              log.error("Error sending blockchain updates", e)
-              Stop
-          }
-        }(scheduler)
+  // @todo check on startup if Kafka is available?
+  private[this] val producer = new KafkaProducer[Int, BlockchainUpdated](createProperties(), IntSerializer, BlockchainUpdatedSerializer)
 
-      override def onError(ex: Throwable): Unit = {
-        log.error("Error sending blockchain updates", ex)
-        ctx.close
-      }
+  private[this] def createProperties(): util.Properties = {
+    val props = new util.Properties()
+    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, settings.blockchainUpdatesSettings.bootstrapServers)
+    props.put(ProducerConfig.CLIENT_ID_CONFIG, settings.blockchainUpdatesSettings.clientId)
+    //  props.put(ProducerConfig.RETRIES_CONFIG, "0")
+    props.put(ProducerConfig.ACKS_CONFIG, "all")
+    props
+  }
 
-      override def onComplete(): Unit = {
-        log.info("Blockchain updates channel closed")
-        ctx.close
-      }
+  private[this] def createProducerRecord(event: BlockchainUpdated): ProducerRecord[Int, BlockchainUpdated] = {
+    val h = event match {
+      case BlockAdded(_, height, _, _)      => height
+      case MicroBlockAdded(_, height, _, _) => height
+      case RollbackCompleted(_, height)     => height
+    }
+    new ProducerRecord[Int, BlockchainUpdated](settings.blockchainUpdatesSettings.topic, h, event)
+  }
+
+  val obs: Observer[BlockchainUpdated] = new Observer[BlockchainUpdated] {
+    override def onNext(evt: BlockchainUpdated): Future[Ack] =
+      Future {
+        try {
+          producer.send(createProducerRecord(evt)).get
+          Continue
+        } catch {
+          case e: Throwable =>
+            log.error("Error sending blockchain updates", e)
+            Stop
+        }
+      }(scheduler)
+
+    override def onError(ex: Throwable): Unit = {
+      log.error("Error sending blockchain updates", ex)
+      shutdown()
     }
 
-    blockchainUpdated.subscribe(obs)(scheduler)
+    override def onComplete(): Unit = {
+      // @todo proper complete logic — shutdown node?
+      log.info("Blockchain updates channel closed")
+      shutdown()
+    }
   }
 
-  override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = {
-    cause.printStackTrace()
-    ctx.close
-  }
-}
-
-class BlockchainUpdatesSender(settings: WavesSettings, blockchainUpdated: Observable[BlockchainUpdated], scheduler: Scheduler) {
-  private val group = new NioEventLoopGroup(1, new DefaultThreadFactory("nio-updates-group", true))
-
-  private val channel = new Bootstrap()
-    .group(group)
-    .channel(classOf[NioSocketChannel])
-    .handler(
-      new PipelineInitializer[SocketChannel](
-        Seq(
-          PBInt32LengthPrepender,
-          PBEncoder,
-          new BlockchainUpdatesHandler(blockchainUpdated, scheduler)
-        )
-      )
-    )
-    .connect(settings.blockchainUpdatesSettings.address)
-    .channel()
+  blockchainUpdated.subscribe(obs)(scheduler)
 
   def shutdown(): Unit =
-    try {
-      channel.close().await()
-    } finally {
-      group.shutdownGracefully().await()
-    }
+    producer.close()
 }

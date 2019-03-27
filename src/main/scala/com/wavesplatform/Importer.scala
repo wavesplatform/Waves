@@ -86,7 +86,7 @@ object Importer extends ScorexLogging {
             val blockchainUpdatesSender = for {
               s  <- blockchainUpdatesScheduler
               bu <- blockchainUpdated
-            } yield new BlockchainUpdatesSender(settings, bu, s)
+            } yield new BlockchainUpdatesSender(settings, bu)(s)
 
             val blockchainUpdater =
               StorageFactory(settings, db, time, Observer.empty(UncaughtExceptionReporter.LogExceptionsToStandardErr), blockchainUpdated)
