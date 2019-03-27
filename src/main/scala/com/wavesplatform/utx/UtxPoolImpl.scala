@@ -29,6 +29,7 @@ import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.{Observable, Observer}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time,
@@ -274,11 +275,21 @@ class UtxPoolImpl(time: Time,
       (currentTime - transaction.timestamp) > ExpirationTime
     }
 
+    def validate(transaction: Transaction,
+                lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
+                currentTime: Long = time.correctedTime(),
+                height: Int = blockchain.height): Either[ValidationError, Diff] = {
+      for {
+        _ <- Either.cond(!isExpired(transaction), (), GenericError("Transaction is expired"))
+        diff <- TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction)
+      } yield diff
+    }
+
     def isValid(transaction: Transaction,
                 lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
                 currentTime: Long = time.correctedTime(),
                 height: Int = blockchain.height): Boolean = {
-      !isExpired(transaction) && TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction).isRight
+      validate(transaction, lastBlockTimestamp, currentTime, height).isRight
     }
 
     def isScripted(transaction: Transaction): Boolean = {
@@ -319,20 +330,30 @@ class UtxPoolImpl(time: Time,
     }
 
     private[UtxPoolImpl] def doExpiredCleanup(): Unit = {
+      val removed = new ListBuffer[ByteStr]
+
       transactions.entrySet().removeIf { entry =>
         val tx     = entry.getValue
         val remove = TxCheck.isExpired(tx)
-        if (remove) UtxPoolImpl.this.afterRemove(tx)
+        if (remove) {
+          removed += tx.id()
+          UtxPoolImpl.this.afterRemove(tx)
+        }
         remove
       }
+
+      if (removed.nonEmpty) log.trace(s"Transactions is expired and removed from UTX: [${removed.take(100).mkString(", ")}${if (removed.length > 100) ", (" + (removed.length - 100) + " more)" else ""}]")
     }
 
     private[UtxPoolImpl] def doCleanup(): Unit = {
       transactions.entrySet().removeIf { entry =>
         val tx     = entry.getValue
-        val remove = !TxCheck.isValid(tx)
-        if (remove) UtxPoolImpl.this.afterRemove(tx)
-        remove
+        val validateResult = TxCheck.validate(tx)
+        if (validateResult.isLeft) {
+          log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: ${validateResult.left.get}")
+          UtxPoolImpl.this.afterRemove(tx)
+        }
+        validateResult.isLeft
       }
 
       TxCheck.clearCaches()
