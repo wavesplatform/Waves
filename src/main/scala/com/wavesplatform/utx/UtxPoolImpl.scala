@@ -141,9 +141,9 @@ class UtxPoolImpl(time: Time,
     removeExpired(currentTs)
     val b = blockchain
 
-    poolMetrics.packTimeStats.measure {
+    val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = poolMetrics.packTimeStats.measure {
       val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
-      val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
+      transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
         .iterator
         .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
@@ -163,6 +163,7 @@ class UtxPoolImpl(time: Time,
         }
         .takeWhile(!_._5)
         .reduce((_, s) => s)
+    }
 
     if (invalidTxs.nonEmpty) {
       log.trace(s"Removing ${invalidTxs.length} invalid transactions from UTX: [${invalidTxs.mkString(", ")}]")
