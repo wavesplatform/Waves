@@ -17,6 +17,13 @@ package object metrics {
       result
     }
 
+    def measureSuccessful[A, B](f: => Either[A, B]): Either[A, B] = {
+      val st     = timer.start()
+      val result = f
+      if (result.isRight) st.stop()
+      result
+    }
+
     def measureFuture[A](f: => Future[A])(implicit ec: ExecutionContext): Future[A] = {
       val st     = timer.start()
       val future = f

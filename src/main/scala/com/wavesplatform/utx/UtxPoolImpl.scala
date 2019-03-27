@@ -9,7 +9,7 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.metrics.Instrumented
+import com.wavesplatform.metrics.{Instrumented, _}
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
@@ -57,11 +57,11 @@ class UtxPoolImpl(time: Time,
   private val cleanup: CancelableFuture[Unit] = removeInvalidTask.runAsyncLogErr
 
   private[this] object PoolMetrics {
-    private[this] val sizeStats  = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
-    private[this] val bytesStats = Kamon.rangeSampler("utx-pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
-    val putTimeStats                    = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
-    val putRequestStats                 = Kamon.counter("utx-pool-put-if-new")
-    val packTimeStats                   = Kamon.histogram("utx-pack-unconfirmed-time", MeasurementUnit.time.milliseconds)
+    private[this] val sizeStats  = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
+    private[this] val bytesStats = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
+    val putTimeStats             = Kamon.timer("utx.put-if-new")
+    val putRequestStats          = Kamon.counter("utx.put-if-new.requests")
+    val packTimeStats            = Kamon.timer("utx.pack-unconfirmed")
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()
@@ -152,9 +152,9 @@ class UtxPoolImpl(time: Time,
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val b      = blockchain
+    val b = blockchain
 
-    Instrumented.measure(PoolMetrics.packTimeStats) {
+    PoolMetrics.packTimeStats.measure {
       val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
       val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
@@ -202,35 +202,33 @@ class UtxPoolImpl(time: Time,
 
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
     PoolMetrics.putRequestStats.increment()
-    val result = measureSuccessful(
-      PoolMetrics.putTimeStats, {
-        for {
-          _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+    val result = PoolMetrics.putTimeStats.measureSuccessful(for {
+      _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
 
-          transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
-            .map(_.bytes().length)
-            .sum
-          _ <- Either.cond((transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
-                           (),
-                           GenericError("Transaction pool bytes size limit is reached"))
+      transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
+        .map(_.bytes().length)
+        .sum
+      _ <- Either.cond((transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
+        (),
+        GenericError("Transaction pool bytes size limit is reached"))
 
-          _    <- checkNotBlacklisted(tx)
-          _    <- checkScripted(b, tx)
-          _    <- checkAlias(b, tx)
-          _    <- canReissue(b, tx)
-          diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
-        } yield {
-          pessimisticPortfolios.add(tx.id(), diff)
-          val isNew = Option(transactions.put(tx.id(), tx)).isEmpty
-          if (isNew) PoolMetrics.addTransaction(tx)
-          (isNew, diff)
-        }
-      }
-    )
+      _    <- checkNotBlacklisted(tx)
+      _    <- checkScripted(b, tx)
+      _    <- checkAlias(b, tx)
+      _    <- canReissue(b, tx)
+      diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
+    } yield {
+      pessimisticPortfolios.add(tx.id(), diff)
+      val isNew = Option(transactions.put(tx.id(), tx)).isEmpty
+      if (isNew) PoolMetrics.addTransaction(tx)
+      (isNew, diff)
+    })
+
     result.fold(
       err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err"),
       r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}")
     )
+
     result
   }
 }
