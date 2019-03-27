@@ -133,10 +133,8 @@ class UtxPoolImpl(time: Time,
       TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
     }
 
-    if (transactionsToRemove.nonEmpty) {
-      log.trace(s"Cleaning up invalid transactions: [${transactionsToRemove.mkString(", ")}]")
-      removeAll(transactionsToRemove)
-    }
+    if (transactionsToRemove.nonEmpty) log.trace(s"Cleaning up invalid transactions: [${transactionsToRemove.mkString(", ")}]")
+    removeAll(transactionsToRemove)
   }
 
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
