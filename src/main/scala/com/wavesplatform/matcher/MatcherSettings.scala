@@ -44,14 +44,12 @@ object MatcherSettings {
   implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
 
   case class EventsQueueSettings(tpe: String, local: LocalMatcherQueue.Settings, kafka: KafkaMatcherQueue.Settings)
-  private object EventsQueueSettings {
-    implicit val eventsQueueSettingsReader: ValueReader[EventsQueueSettings] = { (cfg, path) =>
-      EventsQueueSettings(
-        tpe = cfg.getString(s"$path.type"),
-        local = cfg.as[LocalMatcherQueue.Settings](s"$path.local"),
-        kafka = cfg.as[KafkaMatcherQueue.Settings](s"$path.kafka")
-      )
-    }
+  private[this] implicit val eventsQueueSettingsReader: ValueReader[EventsQueueSettings] = { (cfg, path) =>
+    EventsQueueSettings(
+      tpe = cfg.getString(s"$path.type"),
+      local = cfg.as[LocalMatcherQueue.Settings](s"$path.local"),
+      kafka = cfg.as[KafkaMatcherQueue.Settings](s"$path.kafka")
+    )
   }
 
   implicit val matcherSettingsValueReader: ValueReader[MatcherSettings] =
