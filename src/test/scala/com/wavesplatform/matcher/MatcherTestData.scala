@@ -10,9 +10,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.matcher.model.{BuyLimitOrder, OrderValidator, SellLimitOrder}
 import com.wavesplatform.matcher.queue.{QueueEvent, QueueEventWithMeta}
-import com.wavesplatform.settings.fee.AssetType
-import com.wavesplatform.settings.fee.OrderFeeSettings.{FixedSettings, FixedWavesSettings, OrderFeeSettings, PercentSettings}
-import com.wavesplatform.settings.loadConfig
+import com.wavesplatform.settings.OrderFeeSettings.{FixedSettings, FixedWavesSettings, OrderFeeSettings, PercentSettings}
+import com.wavesplatform.settings.{AssetType, loadConfig}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderOps._
@@ -300,7 +299,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     } yield orderFeeSettings
   }
 
-  val orderWithMatcherSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
+  val orderWithFeeSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
     for {
       orderFeeSettings <- orderFeeSettingsGenerator()
       (order, sender)  <- orderGenerator
@@ -310,7 +309,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     }
   }
 
-  def orderWithMatcherSettingsGenerator(tpe: OrderType, price: Long): Gen[(Order, OrderFeeSettings)] =
+  def orderWithFeeSettingsGenerator(tpe: OrderType, price: Long): Gen[(Order, OrderFeeSettings)] =
     for {
       sender: PrivateKeyAccount <- accountGen
       pair                      <- assetPairGen
@@ -334,7 +333,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       correctedOrder -> orderFeeSettings
     }
 
-  val orderWithoutWavesInPairAndWithMatcherSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
+  val orderWithoutWavesInPairAndWithFeeSettingsGenerator: Gen[(Order, PrivateKeyAccount, OrderFeeSettings)] = {
     for {
       sender: PrivateKeyAccount <- accountGen
       amountAsset               <- arbitraryAssetIdGen
@@ -347,7 +346,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
     }
   }
 
-  val orderV3WithMatcherSettingsGenerator: Gen[(Order, OrderFeeSettings)] = {
+  val orderV3WithFeeSettingsGenerator: Gen[(Order, OrderFeeSettings)] = {
     for {
       (sender, order)  <- orderV3WithPredefinedFeeAssetGenerator()
       orderFeeSettings <- orderFeeSettingsGenerator(Some(order.matcherFeeAssetId))
