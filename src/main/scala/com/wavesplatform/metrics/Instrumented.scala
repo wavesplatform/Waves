@@ -70,16 +70,16 @@ object Instrumented {
     import scala.concurrent.duration._
     val (result, nanoTime) = withTimeNanos(f)
     h.unit match {
-      case MeasurementUnit.time.nanoseconds =>
+      case u if u == MeasurementUnit.time.nanoseconds =>
         (result, nanoTime)
 
-      case MeasurementUnit.time.microseconds =>
+      case u if u == MeasurementUnit.time.microseconds =>
         (result, nanoTime.nanos.toMicros)
 
-      case MeasurementUnit.time.milliseconds =>
+      case u if u == MeasurementUnit.time.milliseconds =>
         (result, nanoTime.nanos.toMillis)
 
-      case MeasurementUnit.time.seconds =>
+      case u if u == MeasurementUnit.time.seconds =>
         (result, nanoTime.nanos.toSeconds)
 
       case _ =>
