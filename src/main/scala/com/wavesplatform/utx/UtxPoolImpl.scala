@@ -29,7 +29,6 @@ import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.{Observable, Observer}
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable.ListBuffer
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time,
@@ -167,10 +166,10 @@ class UtxPoolImpl(time: Time,
     result
   }
 
-  override def removeAll(txs: Traversable[Transaction]): Unit = {
-    txs.view.map(_.id()).foreach(remove)
-    cleanup.doExpiredCleanup()
-  }
+  override def removeAll(txs: Traversable[Transaction]): Unit =
+    txs.view
+      .map(_.id())
+      .foreach(remove)
 
   private[this] def afterRemove(tx: Transaction): Unit = {
     PoolMetrics.removeTransaction(tx)
@@ -197,8 +196,6 @@ class UtxPoolImpl(time: Time,
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
-    cleanup.doExpiredCleanup()
-
     val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val (invalidTxs, reversedValidTxs, _, finalConstraint, _, _, iterations) = transactions.values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
@@ -327,22 +324,6 @@ class UtxPoolImpl(time: Time,
         .doOnComplete(() => log.debug("UTX pool cleanup stopped"))
         .doOnError(err => log.error("UTX pool cleanup error", err))
         .subscribe()
-    }
-
-    private[UtxPoolImpl] def doExpiredCleanup(): Unit = {
-      val removed = new ListBuffer[ByteStr]
-
-      transactions.entrySet().removeIf { entry =>
-        val tx     = entry.getValue
-        val remove = TxCheck.isExpired(tx)
-        if (remove) {
-          removed += tx.id()
-          UtxPoolImpl.this.afterRemove(tx)
-        }
-        remove
-      }
-
-      if (removed.nonEmpty) log.trace(s"Transactions is expired and removed from UTX: [${removed.mkString(", ")}]")
     }
 
     private[UtxPoolImpl] def doCleanup(): Unit = {
