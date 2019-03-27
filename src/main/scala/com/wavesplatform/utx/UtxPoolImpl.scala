@@ -276,11 +276,11 @@ class UtxPoolImpl(time: Time,
     }
 
     def validate(transaction: Transaction,
-                lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
-                currentTime: Long = time.correctedTime(),
-                height: Int = blockchain.height): Either[ValidationError, Diff] = {
+                 lastBlockTimestamp: Option[Long] = blockchain.lastBlockTimestamp,
+                 currentTime: Long = time.correctedTime(),
+                 height: Int = blockchain.height): Either[ValidationError, Diff] = {
       for {
-        _ <- Either.cond(!isExpired(transaction), (), GenericError("Transaction is expired"))
+        _    <- Either.cond(!isExpired(transaction), (), GenericError("Transaction is expired"))
         diff <- TransactionDiffer(fs, lastBlockTimestamp, currentTime, height)(blockchain, transaction)
       } yield diff
     }
@@ -342,12 +342,15 @@ class UtxPoolImpl(time: Time,
         remove
       }
 
-      if (removed.nonEmpty) log.trace(s"Transactions is expired and removed from UTX: [${removed.take(100).mkString(", ")}${if (removed.length > 100) ", (" + (removed.length - 100) + " more)" else ""}]")
+      if (removed.nonEmpty)
+        log.trace(
+          s"Transactions is expired and removed from UTX: [${removed.take(100).mkString(", ")}${if (removed.length > 100) ", (" + (removed.length - 100) + " more)"
+          else ""}]")
     }
 
     private[UtxPoolImpl] def doCleanup(): Unit = {
       transactions.entrySet().removeIf { entry =>
-        val tx     = entry.getValue
+        val tx             = entry.getValue
         val validateResult = TxCheck.validate(tx)
         if (validateResult.isLeft) {
           log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: ${validateResult.left.get}")
