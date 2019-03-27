@@ -63,8 +63,8 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
             case _ =>
           }
 
-        val simeplCheckTime   = Instrumented.withTime(simpleCheck())._2
-        val scriptedCheckTime = Instrumented.withTime(scriptedCheck())._2
+        val simeplCheckTime   = Instrumented.withTimeMillis(simpleCheck())._2
+        val scriptedCheckTime = Instrumented.withTimeMillis(scriptedCheck())._2
         println(s"[parallel] simple check time: $simeplCheckTime ms,\t [seqential] scripted check time: $scriptedCheckTime ms")
     }
 
