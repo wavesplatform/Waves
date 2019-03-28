@@ -1,20 +1,20 @@
 package com.wavesplatform.lang.v1.evaluator
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.contract.Contract
-import com.wavesplatform.lang.contract.Contract.VerifierFunction
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.task.imports.{raiseError, _}
-import com.wavesplatform.lang.v1.traits.domain.Tx.{ContractTransfer, Pmt}
+import com.wavesplatform.lang.v1.traits.domain.Tx.{ScriptTransfer, Pmt}
 import com.wavesplatform.lang.v1.traits.domain.{Ord, Recipient, Tx}
 
 object ContractEvaluator {
-  case class Invocation(fc: FUNCTION_CALL, invoker: ByteStr, payment: Option[(Long, Option[ByteStr])], contractAddress: ByteStr)
+  case class Invocation(fc: FUNCTION_CALL, caller: Recipient.Address, callerPk: ByteStr, payment: Option[(Long, Option[ByteStr])], dappAddress: ByteStr)
 
-  def eval(c: Contract, i: Invocation): EvalM[EVALUATED] = {
+  def eval(c: DApp, i: Invocation): EvalM[EVALUATED] = {
     val functionName = i.fc.function.asInstanceOf[FunctionHeader.User].name
     c.cfs.find(_.u.name == functionName) match {
       case None =>
@@ -30,7 +30,7 @@ object ContractEvaluator {
             LET(
               f.annotation.invocationArgName,
               Bindings
-                .buildInvocation(Recipient.Address(i.invoker), i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.contractAddress))
+                .buildInvocation(i.caller, i.callerPk, i.payment.map { case (a, t) => Pmt(t, a) }, Recipient.Address(i.dappAddress))
             ),
             BLOCK(f.u, i.fc)
           ))
@@ -57,13 +57,13 @@ object ContractEvaluator {
     EvaluatorV1.evalExpr(expr)
   }
 
-  def verify(v: VerifierFunction, ct: ContractTransfer): EvalM[EVALUATED] = {
-    val t = Bindings.contractTransfer(ct)
+  def verify(v: VerifierFunction, ct: ScriptTransfer): EvalM[EVALUATED] = {
+    val t = Bindings.scriptTransfer(ct)
     val expr =
       BLOCK(LET(v.annotation.invocationArgName, t), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(t))))
     EvaluatorV1.evalExpr(expr)
   }
 
-  def apply(ctx: EvaluationContext, c: Contract, i: Invocation): Either[ExecutionError, ContractResult] =
-    EvaluatorV1.evalWithLogging(ctx, eval(c, i))._2.flatMap(ContractResult.fromObj)
+  def apply(ctx: EvaluationContext, c: DApp, i: Invocation): Either[ExecutionError, ScriptResult] =
+    EvaluatorV1.evalWithLogging(ctx, eval(c, i))._2.flatMap(ScriptResult.fromObj)
 }

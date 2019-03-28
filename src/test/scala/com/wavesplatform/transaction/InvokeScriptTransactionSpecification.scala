@@ -19,12 +19,12 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
   val publicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK"
 
-  property("ContractInvocationTransaction serialization roundtrip") {
+  property("InvokeScriptTransaction serialization roundtrip") {
     forAll(invokeScriptGen) { transaction: InvokeScriptTransaction =>
       val bytes = transaction.bytes()
       val deser = InvokeScriptTransaction.parseBytes(bytes).get
       deser.sender shouldEqual transaction.sender
-      deser.contractAddress shouldEqual transaction.contractAddress
+      deser.dappAddress shouldEqual transaction.dappAddress
       deser.fc shouldEqual transaction.fc
       deser.payment shouldEqual transaction.payment
       deser.fee shouldEqual transaction.fee
@@ -36,7 +36,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     }
   }
 
-  property("JSON format validation for ContractInvocationTransaction") {
+  property("JSON format validation for InvokeScriptTransaction") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val js = Json.parse(s"""{
                          "type": 16,
@@ -48,7 +48,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
                          "timestamp": 1526910778245,
                          "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
                          "version": 1,
-                         "contractAddress" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "dappAddress" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
                          "call": {
                             "function" : "foo",
                              "args" : [
@@ -83,7 +83,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     AddressScheme.current = DefaultAddressScheme
   }
 
-  property("Signed ContractInvocationTransactionRequest parser") {
+  property("Signed InvokeScriptTransactionRequest parser") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
       senderPublicKey = publicKey,
@@ -91,7 +91,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       feeAssetId = None,
       call = InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
       payment = Some(Seq(Payment(1, Waves))),
-      contractAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )
@@ -138,7 +138,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       feeAssetId = None,
       call = InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
       payment = Some(Seq(Payment(0, Waves))),
-      contractAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )
@@ -154,7 +154,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       feeAssetId = None,
       call = InvokeScriptRequest.FunctionCallPart("bar", List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get))),
       payment = Some(Seq(Payment(-1, Waves))),
-      contractAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dappAddress = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs = List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T")
     )

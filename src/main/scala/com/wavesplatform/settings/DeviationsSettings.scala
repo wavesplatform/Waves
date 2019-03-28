@@ -14,14 +14,14 @@ object DeviationsSettings {
     val cfgValidator = ConfigSettingsValidator(cfg)
 
     def validateDeviationPercent(settingName: String): ErrorsListOr[Double] = {
-      cfgValidator.validateByPredicate[Double](settingName)(_ > 0, "value must be > 0")
+      cfgValidator.validateByPredicate[Double](settingName)(_ > 0, "required 0 < percent")
     }
 
     (
-      cfgValidator.validateSafe[Boolean](s"$path.enable"),
+      cfgValidator.validate[Boolean](s"$path.enable"),
       validateDeviationPercent(s"$path.profit"),
       validateDeviationPercent(s"$path.loss"),
       validateDeviationPercent(s"$path.fee")
-    ) mapN DeviationsSettings.apply valueOr (errorsAcc => throw new Exception(errorsAcc.mkString("\n")))
+    ) mapN DeviationsSettings.apply valueOr (errorsAcc => throw new Exception(errorsAcc.mkString(", ")))
   }
 }

@@ -14,9 +14,13 @@ import com.wavesplatform.http.{DebugMessage, RollbackParams, api_key}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction}
@@ -281,6 +285,17 @@ object AsyncHttpApi extends Assertions {
 
     }
 
+    def setScript(sender: String, script: Option[String] = None, fee: Long = 1000000, version: Byte = 1): Future[Transaction] = {
+      signAndBroadcast(
+        Json.obj(
+          "type"    -> SetScriptTransaction.typeId,
+          "version" -> version,
+          "sender"  -> sender,
+          "fee"     -> fee,
+          "script"  -> { if (script.isDefined) JsString(script.get) else JsNull }
+        ))
+    }
+
     def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None, version: Byte = 1): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
@@ -289,7 +304,28 @@ object AsyncHttpApi extends Assertions {
           "assetId" -> assetId,
           "sender"  -> sender,
           "fee"     -> fee,
-          "script"  -> script
+          "script"  -> { if (script.isDefined) JsString(script.get) else JsNull }
+        ))
+    }
+
+    def invokeScript(caller: String,
+                     dappAddress: String,
+                     func: String,
+                     args: List[Terms.EXPR] = List.empty,
+                     payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
+                     fee: Long = 500000,
+                     feeAssetId: Option[String] = None,
+                     version: Byte = 1): Future[Transaction] = {
+      signAndBroadcast(
+        Json.obj(
+          "type"        -> InvokeScriptTransaction.typeId,
+          "version"     -> version,
+          "sender"      -> caller,
+          "dappAddress" -> dappAddress,
+          "call"        -> InvokeScriptTransaction.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func), args)),
+          "payment"     -> payment,
+          "fee"         -> fee,
+          "feeAssetId"  -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
         ))
     }
 

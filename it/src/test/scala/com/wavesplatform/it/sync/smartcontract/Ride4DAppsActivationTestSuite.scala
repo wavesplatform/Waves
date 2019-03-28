@@ -32,7 +32,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
 
   val scriptV3 = ScriptCompiler.compile("""
                                             |{-# STDLIB_VERSION 3 #-}
-                                            |{-# CONTENT_TYPE CONTRACT #-}
+                                            |{-# CONTENT_TYPE DAPP #-}
                                             |
                                             |@Callable(i)
                                             |func doAction() = { WriteSet([DataEntry("0", true)]) }
@@ -46,7 +46,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
                                         """.stripMargin).explicitGet()._1
 
   test("send waves to accounts") {
-    val contractTransfer =
+    val scriptTransfer =
       TransferTransactionV2
         .selfSigned(
           assetId = Waves,
@@ -59,8 +59,8 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
           attachment = Array.emptyByteArray
         )
         .explicitGet()
-    val contractTransferId = sender
-      .signedBroadcast(contractTransfer.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt)))
+    val scriptTransferId = sender
+      .signedBroadcast(scriptTransfer.json() + ("type" -> JsNumber(TransferTransactionV2.typeId.toInt)))
       .id
 
     val callerTransfer =
@@ -81,7 +81,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
       .id
 
     nodes.waitForHeightAriseAndTxPresent(callerTransferId)
-    nodes.waitForTransaction(contractTransferId)
+    nodes.waitForTransaction(scriptTransferId)
   }
 
   test("can't set contract to account before Ride4DApps activation") {

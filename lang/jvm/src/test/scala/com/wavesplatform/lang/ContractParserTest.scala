@@ -12,7 +12,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
-  private def parse(x: String): CONTRACT = Parser.parseContract(x) match {
+  private def parse(x: String): DAPP = Parser.parseContract(x) match {
     case Success(r, _)            => r
     case e: Failure[Char, String] => catchParseError(x, e)
   }
@@ -68,7 +68,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |
         |
         |""".stripMargin
-    parse(code) shouldBe CONTRACT(
+    parse(code) shouldBe DAPP(
       AnyPos,
       List.empty,
       List(
@@ -101,7 +101,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |
         |
         |""".stripMargin
-    parse(code) shouldBe CONTRACT(
+    parse(code) shouldBe DAPP(
       AnyPos,
       List(
         FUNC(
@@ -145,7 +145,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         | }
         |
         |""".stripMargin
-    parse(code) shouldBe CONTRACT(
+    parse(code) shouldBe DAPP(
       AnyPos,
       List(
         FUNC(
@@ -201,7 +201,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |
         |
         |""".stripMargin
-    parse(code) shouldBe CONTRACT(
+    parse(code) shouldBe DAPP(
       AnyPos,
       List.empty,
       List(
