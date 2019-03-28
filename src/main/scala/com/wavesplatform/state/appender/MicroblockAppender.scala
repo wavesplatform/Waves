@@ -2,7 +2,7 @@ package com.wavesplatform.state.appender
 
 import cats.data.EitherT
 import com.wavesplatform.block.MicroBlock
-import com.wavesplatform.metrics.{BlockStats, Instrumented}
+import com.wavesplatform.metrics.{BlockStats, _}
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.network._
 import com.wavesplatform.state.Blockchain
@@ -18,17 +18,17 @@ import monix.execution.Scheduler
 
 import scala.util.{Left, Right}
 
-object MicroblockAppender extends ScorexLogging with Instrumented {
-
+object MicroblockAppender extends ScorexLogging {
   def apply(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
-      microBlock: MicroBlock): Task[Either[ValidationError, Unit]] =
-    Task(
-      measureSuccessful(
-        microblockProcessingTimeStats,
-        for {
-          _ <- blockchainUpdater.processMicroBlock(microBlock, verify)
-        } yield utxStorage.removeAll(microBlock.transactionData)
-      )).executeOn(scheduler)
+      microBlock: MicroBlock): Task[Either[ValidationError, Unit]] = {
+    def doProcessing() =
+      blockchainUpdater
+        .processMicroBlock(microBlock, verify)
+        .map(_ => utxStorage.removeAll(microBlock.transactionData))
+
+    Task(metrics.microblockProcessingTimeStats.measureSuccessful(doProcessing()))
+      .executeOn(scheduler)
+  }
 
   def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
             utxStorage: UtxPool,
@@ -55,5 +55,7 @@ object MicroblockAppender extends ScorexLogging with Instrumented {
     }
   }
 
-  private val microblockProcessingTimeStats = Kamon.histogram("microblock-processing-time")
+  private[this] object metrics {
+    val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time")
+  }
 }
