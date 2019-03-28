@@ -109,11 +109,18 @@ class UtxPoolImpl(time: Time,
     pessimisticPortfolios.remove(txId)
   }
 
-  private def removeInvalid(): Unit = transactions.values().removeIf { tx =>
-    val validateResult = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
-    if (validateResult.isLeft) log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: ${validateResult.left.get}")
-    validateResult.isLeft
-  }
+  private[this] def removeInvalid(): Unit =
+    transactions
+      .values()
+      .removeIf(tx =>
+        TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx) match {
+          case Left(error) =>
+            log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: $error")
+            true
+
+          case Right(_) =>
+            false
+      })
 
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
     blockchain.balance(addr, assetId) -
