@@ -9,8 +9,8 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.Script
+import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
 
 case class LeaseBalance(in: Long, out: Long)
@@ -96,6 +96,15 @@ object Sponsorship {
     }
   }
 
+  def calcWavesFeeAmount(tx: Transaction, getSponsorship: IssuedAsset => Option[Long]): Long = tx.assetFee match {
+    case (asset @ IssuedAsset(_), amountInAsset) =>
+      val sponsorship = getSponsorship(asset).getOrElse(0L)
+      Sponsorship.toWaves(amountInAsset, sponsorship)
+
+    case (Asset.Waves, amountInWaves) =>
+      amountInWaves
+  }
+
   def sponsoredFeesSwitchHeight(blockchain: Blockchain, fs: FunctionalitySettings): Int =
     blockchain
       .featureActivationHeight(BlockchainFeatures.FeeSponsorship.id)
@@ -124,7 +133,8 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 scripts: Map[Address, Option[Script]],
                 assetScripts: Map[IssuedAsset, Option[Script]],
                 accountData: Map[Address, AccountDataInfo],
-                sponsorship: Map[IssuedAsset, Sponsorship])
+                sponsorship: Map[IssuedAsset, Sponsorship],
+                totalFee: Long)
 
 object Diff {
 
@@ -136,7 +146,8 @@ object Diff {
                scripts: Map[Address, Option[Script]] = Map.empty,
                assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
                accountData: Map[Address, AccountDataInfo] = Map.empty,
-               sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty): Diff =
+               sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
+               wavesFee: Long = 0): Diff =
     Diff(
       transactions = Map(),
       portfolios = portfolios,
@@ -147,7 +158,8 @@ object Diff {
       scripts = scripts,
       assetScripts = assetScripts,
       accountData = accountData,
-      sponsorship = sponsorship
+      sponsorship = sponsorship,
+      totalFee = wavesFee
     )
 
   def apply(height: Int,
@@ -160,7 +172,8 @@ object Diff {
             scripts: Map[Address, Option[Script]] = Map.empty,
             assetScripts: Map[IssuedAsset, Option[Script]] = Map.empty,
             accountData: Map[Address, AccountDataInfo] = Map.empty,
-            sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty): Diff =
+            sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
+            wavesFee: Long = 0L): Diff =
     Diff(
       transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
       portfolios = portfolios,
@@ -171,10 +184,11 @@ object Diff {
       scripts = scripts,
       assetScripts = assetScripts,
       accountData = accountData,
-      sponsorship = sponsorship
+      sponsorship = sponsorship,
+      totalFee = wavesFee
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0L)
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
@@ -190,7 +204,8 @@ object Diff {
         scripts = older.scripts ++ newer.scripts,
         assetScripts = older.assetScripts ++ newer.assetScripts,
         accountData = older.accountData.combine(newer.accountData),
-        sponsorship = older.sponsorship.combine(newer.sponsorship)
+        sponsorship = older.sponsorship.combine(newer.sponsorship),
+        totalFee = older.totalFee + newer.totalFee
       )
   }
 }

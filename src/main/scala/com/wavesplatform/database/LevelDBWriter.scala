@@ -221,7 +221,8 @@ class LevelDBWriter(writableDB: DB,
                                   assetScripts: Map[IssuedAsset, Option[Script]],
                                   data: Map[BigInt, AccountDataInfo],
                                   aliases: Map[Alias, BigInt],
-                                  sponsorship: Map[IssuedAsset, Sponsorship]): Unit = readWrite { rw =>
+                                  sponsorship: Map[IssuedAsset, Sponsorship],
+                                  totalFee: Long): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -404,21 +405,7 @@ class LevelDBWriter(writableDB: DB,
     rw.put(Keys.carryFee(height), carry)
     expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
-    rw.put(
-      Keys.blockTransactionsFee(height), {
-        val byTransaction = block.transactionData.iterator.map(tx =>
-          tx.assetFee match {
-            case (asset @ IssuedAsset(_), amountInAsset) =>
-              val sponsorship = rw.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
-              Sponsorship.toWaves(amountInAsset, sponsorship)
-
-            case (Asset.Waves, amountInWaves) =>
-              amountInWaves
-        })
-
-        byTransaction.sum
-      }
-    )
+    rw.put(Keys.blockTransactionsFee(height), totalFee)
 
     expiredKeys.foreach(rw.delete(_, "expired-keys"))
 

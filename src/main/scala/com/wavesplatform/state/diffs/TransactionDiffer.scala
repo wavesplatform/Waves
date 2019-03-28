@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.metrics._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ValidationError.UnsupportedTransactionType
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -59,7 +60,7 @@ object TransactionDiffer extends Instrumented with ScorexLogging {
       blockchain: Blockchain,
       tx: Transaction): Either[ValidationError, Diff] = {
     stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
-      tx match {
+      val diff = tx match {
         case gtx: GenesisTransaction      => GenesisTransactionDiff(currentBlockHeight)(gtx)
         case ptx: PaymentTransaction      => PaymentTransactionDiff(blockchain, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
         case itx: IssueTransaction        => AssetTransactionsDiff.issue(currentBlockHeight)(itx)
@@ -78,6 +79,19 @@ object TransactionDiffer extends Instrumented with ScorexLogging {
         case stx: SponsorFeeTransaction  => AssetTransactionsDiff.sponsor(blockchain, settings, currentBlockTimestamp, currentBlockHeight)(stx)
         case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff.apply(blockchain, currentBlockHeight)(ci)
         case _                           => Left(UnsupportedTransactionType)
+      }
+
+      diff.map { diff =>
+        def getSponsorship(asset: IssuedAsset) = {
+          val diffSponsorship = diff.sponsorship.get(asset).collect {
+            case SponsorshipValue(value) => value
+            case SponsorshipNoInfo => 0L
+          }
+
+          diffSponsorship.orElse(blockchain.assetDescription(asset).map(_.sponsorship))
+        }
+
+        diff.copy(totalFee = Sponsorship.calcWavesFeeAmount(tx, getSponsorship))
       }
     }
   }
