@@ -448,7 +448,10 @@ class BlockchainUpdaterImpl(blockchain: Blockchain, spendableBalanceChanged: Obs
   }
 
   override def totalFee(height: Int): Option[Long] = readLock {
-    blockchain.totalFee(height)
+    if (height == this.height)
+      ngState.map(_.bestLiquidDiff.totalFee)
+    else
+      blockchain.totalFee(height)
   }
 
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readLock {
