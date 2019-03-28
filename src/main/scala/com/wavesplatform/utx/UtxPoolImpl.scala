@@ -210,6 +210,8 @@ class UtxPoolImpl(time: Time,
                 s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
 
             (invalid, valid, diff, currRest, currRest.isEmpty, updatedRest, iterations + 1)
+          } else if (TxCheck.isExpired(tx)) {
+            (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled, iterations + 1)
           } else {
             differ(updatedBlockchain, tx) match {
               case Right(newDiff) =>
