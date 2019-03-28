@@ -41,8 +41,7 @@ object CancelOrderRequest {
     pk => JsString(Base58.encode(pk.publicKey))
   )
 
-  implicit val format: OFormat[CancelOrderRequest] = {
-    implicit val byteStrWrites = com.wavesplatform.utils.byteStrWrites
-    Json.format
-  }
+  implicit val byteStrWrites = com.wavesplatform.utils.byteStrWrites
+
+  implicit val format: OFormat[CancelOrderRequest] = Json.format
 }

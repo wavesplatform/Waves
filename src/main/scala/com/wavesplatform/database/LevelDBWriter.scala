@@ -85,7 +85,7 @@ class LevelDBWriter(writableDB: DB,
     val propsDisabled = sys.props.get("waves.db.disable-txs-by-address").exists(s => s == "1" || s.toLowerCase == "true")
     val dbDisabled    = readOnly(_.get(Keys.DisableTxsByAddress).fold(false)(identity))
 
-    if (propsDisabled && !dbDisabled) readWrite(_.put(Keys.DisableTxsByAddress, true))
+    if (propsDisabled && !dbDisabled) readWrite(_.put(Keys.DisableTxsByAddress, Some(true)))
     propsDisabled || dbDisabled
   }
 
