@@ -34,7 +34,7 @@ object ScriptRunner {
           Coeval(dappAddress)
         )
         EvaluatorV1.applywithLogging[EVALUATED](ctx, s.expr)
-      case ContractScript.ContractScriptImpl(_, DApp(_, _, Some(vf)), _) =>
+      case ContractScript.ContractScriptImpl(_, DApp(decls, _, Some(vf)), _) =>
         val ctx = BlockchainContext.build(
           script.stdLibVersion,
           AddressScheme.current.chainId,
@@ -45,8 +45,8 @@ object ScriptRunner {
           true,
           Coeval(dappAddress)
         )
-        val evalContract = in.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.apply(t)),
-                                        _.eliminate(t => ContractEvaluator.verify(vf, RealTransactionWrapper.ord(t)), _ => ???))
+        val evalContract = in.eliminate(t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.apply(t)),
+                                        _.eliminate(t => ContractEvaluator.verify(decls,vf, RealTransactionWrapper.ord(t)), _ => ???))
         EvaluatorV1.evalWithLogging(ctx, evalContract)
 
       case ContractScript.ContractScriptImpl(_, DApp(_, _, None), _) =>

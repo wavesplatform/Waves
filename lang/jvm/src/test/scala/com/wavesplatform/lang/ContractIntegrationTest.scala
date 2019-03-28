@@ -6,14 +6,15 @@ import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, sampleTypes}
 import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ScriptResult}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV1, ScriptResult}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
+import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -107,4 +108,46 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     )
   }
 
+  def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
+    val parsed   = Parser.parseContract(script).get.value
+    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
+    val evalm    = ContractEvaluator.verify(compiled.dec, compiled.vf.get, tx)
+    EvaluatorV1.evalWithLogging(Right(ctx.evaluationContext), evalm)._2
+  }
+
+  property("Simple verify") {
+    val dummyTx = Tx.Transfer(
+      p = Tx.Proven(
+        h = Tx.Header(id = ByteStr.empty, fee = 0, timestamp = 0, version = 0),
+        sender = Recipient.Address(ByteStr.empty),
+        bodyBytes = ByteStr.empty,
+        senderPk = ByteStr.empty,
+        proofs = IndexedSeq.empty
+      ),
+      feeAssetId = None,
+      assetId = None,
+      amount = 0,
+      recipient = Recipient.Address(ByteStr.empty),
+      attachment = ByteStr.empty
+    )
+    parseCompileAndVerify(
+      """
+        |
+        |func fooHelper2() = {
+        |   false
+        |}
+        |
+        |func fooHelper() = {
+        |   fooHelper2() || false
+        |}
+        |
+        |@Verifier(t)
+        |func verify() = {
+        |  fooHelper()
+        |}
+        |
+      """.stripMargin,
+      dummyTx
+    ) shouldBe Testing.evaluated(false)
+  }
 }
