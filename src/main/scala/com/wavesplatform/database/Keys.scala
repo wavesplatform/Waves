@@ -1,5 +1,7 @@
 package com.wavesplatform.database
 
+import java.nio.charset.StandardCharsets
+
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
@@ -154,4 +156,6 @@ object Keys {
       writeTransactionHN
     )
 
+  val DisableTxsByAddress =
+    Key[Boolean]("address-transactions-disable", "address-transactions-disable".getBytes(StandardCharsets.US_ASCII), _.head == 1, flag => Array(if (flag) 1 else 0))
 }

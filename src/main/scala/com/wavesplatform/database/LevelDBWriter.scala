@@ -80,7 +80,14 @@ class LevelDBWriter(writableDB: DB,
     with ScorexLogging {
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
-  private[this] val disableTxsByAddress                  = sys.props.get("waves.db.disable-txs-by-address").exists(s => s == "1" || s.toLowerCase == "true")
+
+  private[this] lazy val disableTxsByAddress = {
+    val propsDisabled = sys.props.get("waves.db.disable-txs-by-address").exists(s => s == "1" || s.toLowerCase == "true")
+    val dbDisabled    = readOnly(_.get(Keys.DisableTxsByAddress))
+
+    if (propsDisabled && !dbDisabled) readWrite(_.put(Keys.DisableTxsByAddress, true))
+    propsDisabled || dbDisabled
+  }
 
   import LevelDBWriter._
 
@@ -600,51 +607,52 @@ class LevelDBWriter(writableDB: DB,
   }
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
-    readOnly { db =>
-      if (disableTxsByAddress) throw new IllegalStateException("Transactions by address are disabled")
+    if (disableTxsByAddress)
+      Left("Transactions by address are disabled, please enable it and rebuild the state")
+    else
+      readOnly { db =>
+        def takeTypes(txNums: Stream[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
+          if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
 
-      def takeTypes(txNums: Stream[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
-        if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
+        def takeAfter(txNums: Stream[(Height, Type, TxNum)], maybeAfter: Option[(Height, TxNum)]): Stream[(Height, Type, TxNum)] = maybeAfter match {
+          case None => txNums
+          case Some((afterHeight, filterHeight)) =>
+            txNums
+              .dropWhile { case (streamHeight, _, _) => streamHeight > afterHeight }
+              .dropWhile { case (streamHeight, _, streamNum) => streamNum >= filterHeight && streamHeight >= afterHeight }
+        }
 
-      def takeAfter(txNums: Stream[(Height, Type, TxNum)], maybeAfter: Option[(Height, TxNum)]): Stream[(Height, Type, TxNum)] = maybeAfter match {
-        case None => txNums
-        case Some((afterHeight, filterHeight)) =>
-          txNums
-            .dropWhile { case (streamHeight, _, _) => streamHeight > afterHeight }
-            .dropWhile { case (streamHeight, _, streamNum) => streamNum >= filterHeight && streamHeight >= afterHeight }
-      }
+        def readTransactions(): Seq[(Int, Transaction)] = {
+          val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
-      def readTransactions(): Seq[(Int, Transaction)] = {
-        val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
+          db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { id =>
+            val addressId = AddressId(id)
 
-        db.get(Keys.addressId(address)).fold(Seq.empty[(Int, Transaction)]) { id =>
-          val addressId = AddressId(id)
+            val heightNumStream = (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toStream
+              .flatMap(seqNr =>
+                db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
+                  case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
+                  case None                   => Nil
+              })
 
-          val heightNumStream = (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toStream
-            .flatMap(seqNr =>
-              db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
-                case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
-                case None                   => Nil
-            })
+            takeAfter(takeTypes(heightNumStream, types), maybeAfter)
+              .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, _)) }
+              .take(count)
+              .toVector
+          }
+        }
 
-          takeAfter(takeTypes(heightNumStream, types), maybeAfter)
-            .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, _)) }
-            .take(count)
-            .toVector
+        fromId match {
+          case None =>
+            Right(readTransactions())
+
+          case Some(id) =>
+            db.get(Keys.transactionHNById(TransactionId(id))) match {
+              case None => Left(s"Transaction $id does not exist")
+              case _    => Right(readTransactions())
+            }
         }
       }
-
-      fromId match {
-        case None =>
-          Right(readTransactions())
-
-        case Some(id) =>
-          db.get(Keys.transactionHNById(TransactionId(id))) match {
-            case None => Left(s"Transaction $id does not exist")
-            case _    => Right(readTransactions())
-          }
-      }
-    }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
     if (db.get(Keys.aliasIsDisabled(alias))) Left(AliasIsDisabled(alias))
