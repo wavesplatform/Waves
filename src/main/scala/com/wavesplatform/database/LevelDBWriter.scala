@@ -79,7 +79,8 @@ class LevelDBWriter(writableDB: DB,
     extends Caches(spendableBalanceChanged)
     with ScorexLogging {
 
-  private val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
+  private[this] val balanceSnapshotMaxRollbackDepth: Int = maxRollbackDepth + 1000
+  private[this] val disableTxsByAddress                  = sys.props.get("waves.db.disable-txs-by-address").exists(s => s == "1" || s.toLowerCase == "true")
 
   import LevelDBWriter._
 
@@ -357,7 +358,7 @@ class LevelDBWriter(writableDB: DB,
       }
     }
 
-    for ((addressId, txIds) <- addressTransactions) {
+    if (!disableTxsByAddress) for ((addressId, txIds) <- addressTransactions) {
       val kk        = Keys.addressTransactionSeqNr(addressId)
       val nextSeqNr = rw.get(kk) + 1
       val txTypeNumSeq = txIds.map { txId =>
@@ -463,16 +464,18 @@ class LevelDBWriter(writableDB: DB,
             leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
             discardLeaseBalance(address)
 
-            val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
-            val txSeqNr  = rw.get(kTxSeqNr)
-            val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
+            if (!disableTxsByAddress) {
+              val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
+              val txSeqNr  = rw.get(kTxSeqNr)
+              val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
 
-            rw.get(kTxHNSeq)
-              .filter(_._1 == Height(currentHeight))
-              .foreach { _ =>
-                rw.delete(kTxHNSeq)
-                rw.put(kTxSeqNr, (txSeqNr - 1).max(0))
-              }
+              rw.get(kTxHNSeq)
+                .filter(_._1 == Height(currentHeight))
+                .foreach { _ =>
+                  rw.delete(kTxHNSeq)
+                  rw.put(kTxSeqNr, (txSeqNr - 1).max(0))
+                }
+            }
           }
 
           val transactions = transactionsAtHeight(h)
@@ -598,6 +601,8 @@ class LevelDBWriter(writableDB: DB,
 
   override def addressTransactions(address: Address, types: Set[Type], count: Int, fromId: Option[ByteStr]): Either[String, Seq[(Int, Transaction)]] =
     readOnly { db =>
+      if (disableTxsByAddress) throw new IllegalStateException("Transactions by address are disabled")
+
       def takeTypes(txNums: Stream[(Height, Type, TxNum)], maybeTypes: Set[Type]) =
         if (maybeTypes.nonEmpty) txNums.filter { case (_, tp, _) => maybeTypes.contains(tp) } else txNums
 
