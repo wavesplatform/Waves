@@ -41,14 +41,11 @@ case class MatcherSettings(enable: Boolean,
                            disableExtraFeeForScript: Boolean)
 
 object MatcherSettings {
-
   implicit val addressReader: ValueReader[Address] = (cfg, path) => Address.fromString(cfg.getString(path)).explicitGet()
-
   implicit val chosenCase: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-  val configPath: String              = "waves.matcher"
 
   case class EventsQueueSettings(tpe: String, local: LocalMatcherQueue.Settings, kafka: KafkaMatcherQueue.Settings)
-  private implicit val reader: ValueReader[EventsQueueSettings] = { (cfg, path) =>
+  private[this] implicit val eventsQueueSettingsReader: ValueReader[EventsQueueSettings] = { (cfg, path) =>
     EventsQueueSettings(
       tpe = cfg.getString(s"$path.type"),
       local = cfg.as[LocalMatcherQueue.Settings](s"$path.local"),
@@ -56,34 +53,40 @@ object MatcherSettings {
     )
   }
 
-  def fromConfig(config: Config): MatcherSettings = {
-    val enabled                      = config.as[Boolean](s"$configPath.enable")
-    val account                      = config.as[String](s"$configPath.account")
-    val bindAddress                  = config.as[String](s"$configPath.bind-address")
-    val port                         = config.as[Int](s"$configPath.port")
-    val minOrderFee                  = config.as[Long](s"$configPath.min-order-fee")
-    val orderMatchTxFee              = config.as[Long](s"$configPath.order-match-tx-fee")
-    val dataDirectory                = config.as[String](s"$configPath.data-directory")
-    val journalDirectory             = config.as[String](s"$configPath.journal-directory")
-    val snapshotsDirectory           = config.as[String](s"$configPath.snapshots-directory")
-    val snapshotsInterval            = config.as[Int](s"$configPath.snapshots-interval")
-    val snapshotsLoadingTimeout      = config.as[FiniteDuration](s"$configPath.snapshots-loading-timeout")
-    val startEventsProcessingTimeout = config.as[FiniteDuration](s"$configPath.start-events-processing-timeout")
-    val makeSnapshotsAtStart         = config.as[Boolean](s"$configPath.make-snapshots-at-start")
-    val maxOrdersPerRequest          = config.as[Int](s"$configPath.rest-order-limit")
-    val baseAssets                   = config.as[List[String]](s"$configPath.price-assets")
+  implicit val matcherSettingsValueReader: ValueReader[MatcherSettings] =
+    (cfg, path) => fromConfig(cfg.getConfig(path))
 
-    val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
-    val blacklistedNames  = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
+  // @deprecated("Use config.as[MatcherSettings]", "0.17.0")
+  def fromRootConfig(config: Config): MatcherSettings = config.as[MatcherSettings]("waves.matcher")
 
-    val blacklistedAddresses       = config.as[Set[String]](s"$configPath.blacklisted-addresses")
-    val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings](s"$configPath.order-book-snapshot-http-cache")
+  private[this] def fromConfig(config: Config): MatcherSettings = {
+    val enabled                      = config.as[Boolean]("enable")
+    val account                      = config.as[String]("account")
+    val bindAddress                  = config.as[String]("bind-address")
+    val port                         = config.as[Int]("port")
+    val minOrderFee                  = config.as[Long]("min-order-fee")
+    val orderMatchTxFee              = config.as[Long]("order-match-tx-fee")
+    val dataDirectory                = config.as[String]("data-directory")
+    val journalDirectory             = config.as[String]("journal-directory")
+    val snapshotsDirectory           = config.as[String]("snapshots-directory")
+    val snapshotsInterval            = config.as[Int]("snapshots-interval")
+    val snapshotsLoadingTimeout      = config.as[FiniteDuration]("snapshots-loading-timeout")
+    val startEventsProcessingTimeout = config.as[FiniteDuration]("start-events-processing-timeout")
+    val makeSnapshotsAtStart         = config.as[Boolean]("make-snapshots-at-start")
+    val maxOrdersPerRequest          = config.as[Int]("rest-order-limit")
+    val baseAssets                   = config.as[List[String]]("price-assets")
 
-    val balanceWatchingBufferInterval = config.as[FiniteDuration](s"$configPath.balance-watching-buffer-interval")
+    val blacklistedAssets = config.as[List[String]]("blacklisted-assets")
+    val blacklistedNames  = config.as[List[String]]("blacklisted-names").map(_.r)
 
-    val eventsQueue              = config.as[EventsQueueSettings](s"$configPath.events-queue")
+    val blacklistedAddresses       = config.as[Set[String]]("blacklisted-addresses")
+    val orderBookSnapshotHttpCache = config.as[OrderBookSnapshotHttpCache.Settings]("order-book-snapshot-http-cache")
+
+    val balanceWatchingBufferInterval = config.as[FiniteDuration]("balance-watching-buffer-interval")
+
+    val eventsQueue              = config.as[EventsQueueSettings](s"events-queue")
     val recoverOrderHistory      = !new File(dataDirectory).exists()
-    val disableExtraFeeForScript = config.as[Boolean](s"$configPath.disable-extra-fee-for-script")
+    val disableExtraFeeForScript = config.as[Boolean](s"disable-extra-fee-for-script")
 
     MatcherSettings(
       enabled,

@@ -64,7 +64,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |  }
         |}""".stripMargin))
 
-    val settings = MatcherSettings.fromConfig(config)
+    val settings = MatcherSettings.fromRootConfig(config)
     settings.enable should be(true)
     settings.account should be("3Mqjki7bLtMEBRCYeQis39myp9B4cnooDEX")
     settings.bindAddress should be("127.0.0.1")
