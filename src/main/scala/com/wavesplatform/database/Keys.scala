@@ -157,5 +157,5 @@ object Keys {
     )
 
   val DisableTxsByAddress =
-    Key[Boolean]("address-transactions-disable", "address-transactions-disable".getBytes(StandardCharsets.US_ASCII), _.head == 1, flag => Array(if (flag) 1 else 0))
+    Key[Boolean]("address-transactions-disable", "address-transactions-disable".getBytes(StandardCharsets.US_ASCII), _.head == 1, flag => Array[Byte](if (flag) 1 else 0))
 }
