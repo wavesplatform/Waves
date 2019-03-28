@@ -143,7 +143,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |
         |@Verifier(t)
         |func verify() = {
-        |  fooHelper()
+        |  t.senderPublicKey == base58'' && fooHelper()
         |}
         |
       """.stripMargin,
