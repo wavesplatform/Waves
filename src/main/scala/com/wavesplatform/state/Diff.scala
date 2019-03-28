@@ -103,11 +103,13 @@ object Sponsorship {
       .getOrElse(Int.MaxValue)
 
   def toWaves(assetFee: Long, sponsorship: Long): Long = {
+    if (sponsorship == 0) return Long.MaxValue
     val waves = BigInt(assetFee) * CommonValidation.FeeUnit / sponsorship
     waves.bigInteger.longValueExact()
   }
 
   def fromWaves(wavesFee: Long, sponsorship: Long): Long = {
+    if (wavesFee == 0 || sponsorship == 0) return 0
     val assetFee = BigInt(wavesFee) * sponsorship / CommonValidation.FeeUnit
     assetFee.bigInteger.longValueExact()
   }
