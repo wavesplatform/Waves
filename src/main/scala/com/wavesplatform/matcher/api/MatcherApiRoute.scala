@@ -53,6 +53,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
                            db: DB,
                            time: Time,
                            currentOffset: () => QueueEventWithMeta.Offset,
+                           lastOffset: () => Future[QueueEventWithMeta.Offset],
                            matcherAccountFee: Long)
     extends ApiRoute
     with ScorexLogging {
@@ -71,7 +72,7 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
       getMatcherPublicKey ~ getOrderBook ~ marketStatus ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
         getAllOrderHistory ~ tradableBalance ~ reservedBalance ~ orderStatus ~
         historyDelete ~ cancel ~ cancelAll ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder ~
-        getSettings ~ getCurrentOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
+        getSettings ~ getCurrentOffset ~ getLastOffset ~ getOldestSnapshotOffset ~ getAllSnapshotOffsets
     }
   }
 
@@ -523,6 +524,12 @@ case class MatcherApiRoute(assetPairBuilder: AssetPairBuilder,
   @ApiOperation(value = "Get a current offset in the queue", notes = "", httpMethod = "GET")
   def getCurrentOffset: Route = (path("debug" / "currentOffset") & get & withAuth) {
     complete(StatusCodes.OK -> currentOffset())
+  }
+
+  @Path("/debug/lastOffset")
+  @ApiOperation(value = "Get the last offset in the queue", notes = "", httpMethod = "GET")
+  def getLastOffset: Route = (path("debug" / "lastOffset") & get & withAuth) {
+    complete(lastOffset().map(StatusCodes.OK -> _))
   }
 
   @Path("/debug/oldestSnapshotOffset")

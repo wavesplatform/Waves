@@ -129,6 +129,7 @@ class Matcher(actorSystem: ActorSystem,
       db,
       time,
       () => currentOffset,
+      () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(blockchain, matcherPublicKey.toAddress)
     )
   )
