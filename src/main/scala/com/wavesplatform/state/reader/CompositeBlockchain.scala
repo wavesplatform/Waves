@@ -217,6 +217,8 @@ class CompositeBlockchain(inner: Blockchain, maybeDiff: => Option[Diff], carry: 
 
   override def parent(block: Block, back: Int): Option[Block] = inner.parent(block, back)
 
+  override def totalFee(height: Int): Option[Long] = inner.totalFee(height)
+
   /** Features related */
   override def approvedFeatures: Map[Short, Int] = inner.approvedFeatures
 

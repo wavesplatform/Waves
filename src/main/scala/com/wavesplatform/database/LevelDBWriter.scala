@@ -404,6 +404,22 @@ class LevelDBWriter(writableDB: DB,
     rw.put(Keys.carryFee(height), carry)
     expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
+    rw.put(
+      Keys.blockTransactionsFee(height), {
+        val byTransaction = block.transactionData.iterator.map(tx =>
+          tx.assetFee match {
+            case (asset @ IssuedAsset(_), amountInAsset) =>
+              val sponsorship = rw.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
+              Sponsorship.toWaves(amountInAsset, sponsorship)
+
+            case (Asset.Waves, amountInWaves) =>
+              amountInWaves
+        })
+
+        byTransaction.sum
+      }
+    )
+
     expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
@@ -529,6 +545,7 @@ class LevelDBWriter(writableDB: DB,
           rw.delete(Keys.blockHeaderAndSizeAt(h))
           rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
           rw.delete(Keys.carryFee(currentHeight))
+          rw.delete(Keys.blockTransactionsFee(currentHeight))
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
             DisableHijackedAliases.revert(rw)
@@ -870,6 +887,10 @@ class LevelDBWriter(writableDB: DB,
       height = Height(h - back + 1)
       block <- loadBlock(height, db)
     } yield block
+  }
+
+  override def totalFee(height: Int): Option[Long] = readOnly { db =>
+    Try(db.get(Keys.blockTransactionsFee(height))).toOption
   }
 
   override def featureVotes(height: Int): Map[Short, Int] = readOnly { db =>

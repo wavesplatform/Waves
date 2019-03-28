@@ -231,4 +231,17 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
       }
     }
   }
+
+  @Path("/totalFee/{height}")
+  @ApiOperation(value = "Block total fee", notes = "Block total fee, taking into account the sponsored assets", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "height", value = "Block height", required = true, dataType = "integer", paramType = "path")
+    ))
+  def totalFee: Route = (path("totalFee" / IntNumber) & get) { height =>
+    blockchain.totalFee(height).toRight(BlockDoesNotExist) match {
+      case Right(fee) => complete(Json.obj("height" -> height, "totalFee" -> fee))
+      case Left(e)  => complete(e)
+    }
+  }
 }

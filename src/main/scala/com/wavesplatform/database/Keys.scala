@@ -154,4 +154,12 @@ object Keys {
       writeTransactionHN
     )
 
+  val BlockTransactionsFeePrefix: Short = 55
+  def blockTransactionsFee(height: Int): Key[Long] =
+    Key(
+      "block-transactions-fee",
+      h(BlockTransactionsFeePrefix, height),
+      Longs.fromByteArray,
+      Longs.toByteArray
+    )
 }
