@@ -109,14 +109,10 @@ class UtxPoolImpl(time: Time,
     pessimisticPortfolios.remove(txId)
   }
 
-  private def removeInvalid(): Unit = {
-    val b = blockchain
-    val transactionsToRemove = transactions.values.asScala.filter { t =>
-      TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
-    }
-
-    if (transactionsToRemove.nonEmpty) log.trace(s"Cleaning up invalid transactions: [${transactionsToRemove.mkString(", ")}]")
-    removeAll(transactionsToRemove)
+  private def removeInvalid(): Unit = transactions.values().removeIf { tx =>
+    val validateResult = TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx)
+    if (validateResult.isLeft) log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: ${validateResult.left.get}")
+    validateResult.isLeft
   }
 
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
@@ -199,8 +195,8 @@ class UtxPoolImpl(time: Time,
         .map(_.bytes().length)
         .sum
       _ <- Either.cond((transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
-        (),
-        GenericError("Transaction pool bytes size limit is reached"))
+                       (),
+                       GenericError("Transaction pool bytes size limit is reached"))
 
       _    <- checkNotBlacklisted(tx)
       _    <- checkScripted(b, tx)
