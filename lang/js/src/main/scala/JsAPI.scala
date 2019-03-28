@@ -1,6 +1,7 @@
 import cats.kernel.Monoid
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.StdLibVersion.{StdLibVersion, _}
-import com.wavesplatform.lang.contract.Contract
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveParser
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.CTX
@@ -45,13 +46,14 @@ object JsAPI {
     r(ast)
   }
 
-  private def toJs(c: Contract): js.Object = {
+  private def toJs(c: DApp): js.Object = {
     toJs(TRUE) // later
   }
 
   private def wavesContext(v: com.wavesplatform.lang.StdLibVersion.StdLibVersion, isTokenContext: Boolean, isContract: Boolean) =
     WavesContext.build(
-      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) ContentType.Contract else ContentType.Expression),
+      DirectiveSet(v, ScriptType.isAssetScript(isTokenContext), if (isContract) ContentType.DApp else ContentType.Expression)
+        .explicitGet(),
       new Environment {
         override def height: Long                                                                                    = 0
         override def chainId: Byte                                                                                   = 1: Byte
@@ -115,14 +117,14 @@ object JsAPI {
 
   @JSExportTopLevel("contractLimits")
   def contractLimits(): js.Dynamic = js.Dynamic.literal(
-    "MaxExprComplexity"                -> ContractLimits.MaxExprComplexity,
-    "MaxExprSizeInBytes"               -> ContractLimits.MaxExprSizeInBytes,
-    "MaxContractComplexity"            -> ContractLimits.MaxContractComplexity,
-    "MaxContractSizeInBytes"           -> ContractLimits.MaxContractSizeInBytes,
-    "MaxContractInvocationArgs"        -> ContractLimits.MaxInvokeScriptArgs,
-    "MaxContractInvocationSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
-    "MaxWriteSetSizeInBytes"           -> ContractLimits.MaxWriteSetSizeInBytes,
-    "MaxPaymentAmount"                 -> ContractLimits.MaxPaymentAmount
+    "MaxExprComplexity"          -> ContractLimits.MaxExprComplexity,
+    "MaxExprSizeInBytes"         -> ContractLimits.MaxExprSizeInBytes,
+    "MaxContractComplexity"      -> ContractLimits.MaxContractComplexity,
+    "MaxContractSizeInBytes"     -> ContractLimits.MaxContractSizeInBytes,
+    "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
+    "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
+    "MaxWriteSetSizeInBytes"     -> ContractLimits.MaxWriteSetSizeInBytes,
+    "MaxPaymentAmount"           -> ContractLimits.MaxPaymentAmount
   )
 
   @JSExportTopLevel("scriptInfo")
@@ -145,7 +147,7 @@ object JsAPI {
       case DirectiveSet(ver, scriptType, contentType) =>
         contentType match {
           case ContentType.Expression =>
-            val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset, contentType == ContentType.Contract)
+            val ctx = buildScriptContext(ver, scriptType == ScriptType.Asset, contentType == ContentType.DApp)
             Global
               .compileExpression(input, ctx.compilerContext, letBLockVersions contains ver, ver)
               .fold(
@@ -156,7 +158,7 @@ object JsAPI {
                     js.Dynamic.literal("result" -> Global.toBuffer(bytes), "ast" -> toJs(ast))
                 }
               )
-          case ContentType.Contract =>
+          case ContentType.DApp =>
             // Just ignore stdlib version here
             Global
               .compileContract(input, fullContractContext.compilerContext, ver)

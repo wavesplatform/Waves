@@ -74,7 +74,7 @@ object Expressions {
 
   case class INVALID(position: Pos, message: String) extends EXPR
 
-  case class CONTRACT(position: Pos, decs: List[Declaration], fs: List[ANNOTATEDFUNC])
+  case class DAPP(position: Pos, decs: List[Declaration], fs: List[ANNOTATEDFUNC])
 
   implicit class PartOps[T](val self: PART[T]) extends AnyVal {
     def toEither: Either[String, T] = self match {

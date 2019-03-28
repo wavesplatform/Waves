@@ -10,16 +10,6 @@ import scala.util.{Failure, Success, Try}
 
 package object utils {
 
-  def directiveConsistency(t: DirectiveSet): Either[String, DirectiveSet] = t match {
-    case DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Contract) => Right(t)
-    case DirectiveSet(_, _, ContentType.Expression)                               => Right(t)
-    case _ =>
-      Left(
-        s"Inconsistent set of directives $t," +
-          s" could be (V3, ACCOUNT, CONTRACT) or (<any>, <any>, EXPRESSION)")
-
-  }
-
   def extractStdLibVersion(directives: List[Directive]): Either[String, StdLibVersion] = {
     directives
       .find(_.key == DirectiveKey.STDLIB_VERSION)
@@ -45,13 +35,15 @@ package object utils {
       .map(d =>
         Try(d.value) match {
           case Success(v) =>
-            val cType = ContentType.parseString(v)
-            Either
-              .cond(
-                ContentType.SupportedTypes(cType),
-                cType,
-                "Unsupported content type"
-              )
+            ContentType.parseString(v).right.flatMap { cType =>
+              Either
+                .cond(
+                  ContentType.SupportedTypes(cType),
+                  cType,
+                  "Unsupported content type"
+                )
+            }
+
           case Failure(ex) =>
             Left("Can't parse content type")
       })
@@ -64,13 +56,15 @@ package object utils {
       .map(d =>
         Try(d.value) match {
           case Success(v) =>
-            val sType = ScriptType.parseString(v)
-            Either
-              .cond(
-                ScriptType.SupportedTypes(sType),
-                sType,
-                "Unsupported script type"
-              )
+            ScriptType.parseString(v).right.flatMap { sType =>
+              Either
+                .cond(
+                  ScriptType.SupportedTypes(sType),
+                  sType,
+                  "Unsupported script type"
+                )
+            }
+
           case Failure(ex) =>
             Left("Can't parse script type")
       })
@@ -82,7 +76,7 @@ package object utils {
       v <- extractStdLibVersion(directives)
       c <- extractContentType(directives)
       t <- extractScriptType(directives)
-      r <- directiveConsistency(DirectiveSet(v, t, c))
+      r <- DirectiveSet(v, t, c)
     } yield r
 
 }

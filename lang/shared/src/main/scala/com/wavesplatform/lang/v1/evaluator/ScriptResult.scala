@@ -7,9 +7,9 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types}
 import com.wavesplatform.lang.v1.traits.domain.DataItem
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 
-case class ContractResult(ds: List[DataItem[_]], ts: List[(Address, Long, Option[ByteStr])])
+case class ScriptResult(ds: List[DataItem[_]], ts: List[(Address, Long, Option[ByteStr])])
 
-object ContractResult {
+object ScriptResult {
   type E[A] = Either[String, A]
 
   private def err(actual: AnyRef, expected: String = "") =
@@ -42,8 +42,8 @@ object ContractResult {
       fields(FieldNames.Transfers) match {
         case ARR(xs) =>
           val l: Vector[E[(Address, Long, Option[ByteStr])]] = xs.map {
-            case CaseObj(t, contractTransferFields) if t.name == FieldNames.ContractTransfer =>
-              (contractTransferFields(FieldNames.Recipient), contractTransferFields(FieldNames.Amount), contractTransferFields(FieldNames.Asset)) match {
+            case CaseObj(t, scriptTransferFields) if t.name == FieldNames.ScriptTransfer =>
+              (scriptTransferFields(FieldNames.Recipient), scriptTransferFields(FieldNames.Amount), scriptTransferFields(FieldNames.Asset)) match {
                 case (CaseObj(at, fields2), CONST_LONG(b), maybeToken) if at.name == Types.addressType.typeRef.name =>
                   for {
                     token <- maybeToken match {
@@ -57,7 +57,7 @@ object ContractResult {
                     }
                   } yield r
                 case other =>
-                  err(other, FieldNames.ContractTransfer)
+                  err(other, FieldNames.ScriptTransfer)
               }
             case other => err(other, FieldNames.TransferSet)
           }.toVector
@@ -80,16 +80,16 @@ object ContractResult {
       for {
         w <- writes
         p <- payments
-      } yield ContractResult(w, p)
+      } yield ScriptResult(w, p)
   }
 
-  def fromObj(e: EVALUATED): Either[ExecutionError, ContractResult] =
+  def fromObj(e: EVALUATED): Either[ExecutionError, ScriptResult] =
     e match {
       case c @ CaseObj(tpe, _) =>
         tpe.name match {
-          case FieldNames.WriteSet       => processWriteSet(c).map(ContractResult(_, List.empty))
-          case FieldNames.TransferSet    => processTransferSet(c).map(ContractResult(List.empty, _))
-          case FieldNames.ContractResult => processContractSet(c)
+          case FieldNames.WriteSet       => processWriteSet(c).map(ScriptResult(_, List.empty))
+          case FieldNames.TransferSet    => processTransferSet(c).map(ScriptResult(List.empty, _))
+          case FieldNames.ScriptResult => processContractSet(c)
           case f                         => err(f)
         }
       case c => err(c.toString)
