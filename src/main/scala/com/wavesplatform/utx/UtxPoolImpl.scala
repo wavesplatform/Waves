@@ -329,15 +329,18 @@ class UtxPoolImpl(time: Time,
     }
 
     private[UtxPoolImpl] def doCleanup(): Unit = {
-      transactions.entrySet().removeIf { entry =>
-        val tx             = entry.getValue
-        val validateResult = TxCheck.validate(tx)
-        if (validateResult.isLeft) {
-          log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: ${validateResult.left.get}")
-          UtxPoolImpl.this.afterRemove(tx)
-        }
-        validateResult.isLeft
-      }
+      UtxPoolImpl.this.transactions
+        .values()
+        .removeIf(tx =>
+          TxCheck.validate(tx) match {
+            case Left(error) =>
+              log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: $error")
+              UtxPoolImpl.this.afterRemove(tx)
+              true
+
+            case Right(_) =>
+              false
+        })
 
       TxCheck.clearCaches()
     }
