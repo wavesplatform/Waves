@@ -59,7 +59,7 @@ inThisBuild(
       "-Ywarn-unused:-imports",
       "-Xlint",
       "-Ypartial-unification",
-      "-opt:_"
+      "-opt:l:inline"
     )
   ))
 
