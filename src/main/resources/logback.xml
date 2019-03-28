@@ -41,6 +41,8 @@
     <logger name="com.wavesplatform.transaction.smart" level="INFO"/>
     <logger name="com.wavesplatform.network.RxScoreObserver$" level="INFO"/>
 
+    <logger name="scorex.crypto.signatures.Curve25519" level="INFO"/>
+
     <logger name="org.apache.kafka" level="INFO"/>
     <logger name="org.apache.kafka.common.network.Selector" level="DEBUG"/> <!-- https://issues.apache.org/jira/browse/KAFKA-5133 -->
 

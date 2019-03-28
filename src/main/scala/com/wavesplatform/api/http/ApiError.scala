@@ -23,20 +23,21 @@ trait ApiError {
 }
 
 object ApiError {
-  implicit def fromValidationError(e: ValidationError): ApiError = {
+  implicit def fromValidationError(e: ValidationError): ApiError =
     e match {
-      case ValidationError.InvalidAddress(_)       => InvalidAddress
-      case ValidationError.NegativeAmount(x, of)   => NegativeAmount(s"$x of $of")
-      case ValidationError.NegativeMinFee(x, of)   => NegativeMinFee(s"$x per $of")
-      case ValidationError.InsufficientFee(x)      => InsufficientFee(x)
-      case ValidationError.InvalidName             => InvalidName
-      case ValidationError.InvalidSignature(_, _)  => InvalidSignature
-      case ValidationError.InvalidRequestSignature => InvalidSignature
-      case ValidationError.TooBigArray             => TooBigArrayAllocation
-      case ValidationError.OverflowError           => OverflowError
-      case ValidationError.ToSelf                  => ToSelfError
-      case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
-      case ValidationError.GenericError(ge)        => CustomValidationError(ge)
+      case ValidationError.InvalidAddress(_)        => InvalidAddress
+      case ValidationError.NegativeAmount(x, of)    => NegativeAmount(s"$x of $of")
+      case ValidationError.NonPositiveAmount(x, of) => NonPositiveAmount(s"$x of $of")
+      case ValidationError.NegativeMinFee(x, of)    => NegativeMinFee(s"$x per $of")
+      case ValidationError.InsufficientFee(x)       => InsufficientFee(x)
+      case ValidationError.InvalidName              => InvalidName
+      case ValidationError.InvalidSignature(_, _)   => InvalidSignature
+      case ValidationError.InvalidRequestSignature  => InvalidSignature
+      case ValidationError.TooBigArray              => TooBigArrayAllocation
+      case ValidationError.OverflowError            => OverflowError
+      case ValidationError.ToSelf                   => ToSelfError
+      case ValidationError.MissingSenderPrivateKey  => MissingSenderPrivateKey
+      case ValidationError.GenericError(ge)         => CustomValidationError(ge)
       case ValidationError.AlreadyInTheState(tx, txHeight) =>
         CustomValidationError(s"Transaction $tx is already in the state on a height of $txHeight")
       case ValidationError.AccountBalanceError(errs)  => CustomValidationError(errs.values.mkString(", "))
@@ -56,7 +57,6 @@ object ApiError {
         }
       case error => CustomValidationError(error.toString)
     }
-  }
 
   implicit val lvWrites: Writes[LazyVal] = Writes { lv =>
     lv.value.value.attempt

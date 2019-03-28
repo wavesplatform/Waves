@@ -365,10 +365,10 @@ object Parser {
 
   def parseExpr(str: String): core.Parsed[EXPR, Char, String] = P(Start ~ unusedText ~ (baseExpr | invalid) ~ End).parse(str)
 
-  def parseContract(str: String): core.Parsed[CONTRACT, Char, String] =
+  def parseContract(str: String): core.Parsed[DAPP, Char, String] =
     P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ End ~~ Index)
       .map {
-        case (ds, fs, end) => CONTRACT(Pos(0, end), ds.toList, fs.toList)
+        case (ds, fs, end) => DAPP(Pos(0, end), ds.toList, fs.toList)
       }
       .parse(str)
 }

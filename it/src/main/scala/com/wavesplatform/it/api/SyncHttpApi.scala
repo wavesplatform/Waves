@@ -9,7 +9,9 @@ import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Req
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
@@ -151,7 +153,7 @@ object SyncHttpApi extends Assertions {
               decimals: Byte,
               reissuable: Boolean,
               fee: Long,
-              version: Byte = 1,
+              version: Byte = 2,
               script: Option[String] = None,
               waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script)), waitForTx)
@@ -319,8 +321,24 @@ object SyncHttpApi extends Assertions {
     def connect(address: InetSocketAddress): Unit =
       sync(async(n).connect(address))
 
+    def setScript(sender: String, script: Option[String] = None, fee: Long = 1000000, waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).setScript(sender, script, fee)), waitForTx)
+    }
+
     def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None, waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).setAssetScript(assetId, sender, fee, script)), waitForTx)
+    }
+
+    def invokeScript(caller: String,
+                     dappAddress: String,
+                     func: String,
+                     args: List[Terms.EXPR] = List.empty,
+                     payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
+                     fee: Long = 500000,
+                     feeAssetId: Option[String] = None,
+                     version: Byte = 1,
+                     waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).invokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, version)), waitForTx)
     }
 
     def waitForUtxIncreased(fromSize: Int): Int = sync(async(n).waitForUtxIncreased(fromSize))

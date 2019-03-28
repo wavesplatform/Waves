@@ -53,6 +53,7 @@ import org.slf4j.bridge.SLF4JBridgeHandler
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
+import scala.util.control.NonFatal
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
 
@@ -68,10 +69,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val wallet: Wallet = try {
     Wallet(settings.walletSettings)
   } catch {
-    case e: IllegalStateException =>
-      log.error(s"Failed to open wallet file '${settings.walletSettings.file.get.getAbsolutePath}")
+    case NonFatal(e) =>
+      log.error(s"Failed to open wallet file '${settings.walletSettings.file.get.getAbsolutePath}", e)
       throw e
   }
+
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
   private val extensionLoaderScheduler        = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
