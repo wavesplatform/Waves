@@ -9,7 +9,7 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.metrics.Instrumented
+import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
@@ -37,7 +37,6 @@ class UtxPoolImpl(time: Time,
                   fs: FunctionalitySettings,
                   utxSettings: UtxSettings)
     extends ScorexLogging
-    with Instrumented
     with AutoCloseable
     with UtxPool {
   outer =>
@@ -55,23 +54,6 @@ class UtxPoolImpl(time: Time,
       removeInvalidTask
 
   private val cleanup: CancelableFuture[Unit] = removeInvalidTask.runAsyncLogErr
-
-  private[this] object PoolMetrics {
-    private[this] val sizeStats  = Kamon.rangeSampler("utx-pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
-    private[this] val bytesStats = Kamon.rangeSampler("utx-pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
-    val processingTimeStats      = Kamon.histogram("utx-transaction-processing-time", MeasurementUnit.time.milliseconds)
-    val putRequestStats          = Kamon.counter("utx-pool-put-if-new")
-
-    def addTransaction(tx: Transaction): Unit = {
-      sizeStats.increment()
-      bytesStats.increment(tx.bytes().length)
-    }
-
-    def removeTransaction(tx: Transaction): Unit = {
-      sizeStats.decrement()
-      bytesStats.decrement(tx.bytes().length)
-    }
-  }
 
   override def close(): Unit = {
     cleanup.cancel()
@@ -123,7 +105,7 @@ class UtxPoolImpl(time: Time,
   }
 
   private def remove(txId: ByteStr): Unit = {
-    Option(transactions.remove(txId)).foreach(PoolMetrics.removeTransaction)
+    Option(transactions.remove(txId)).foreach(poolMetrics.removeTransaction)
     pessimisticPortfolios.remove(txId)
   }
 
@@ -155,28 +137,31 @@ class UtxPoolImpl(time: Time,
   override def packUnconfirmed(rest: MultiDimensionalMiningConstraint): (Seq[Transaction], MultiDimensionalMiningConstraint) = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val b      = blockchain
-    val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
-    val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = transactions.values.asScala.toSeq
-      .sorted(TransactionsOrdering.InUTXPool)
-      .iterator
-      .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
-        case ((invalid, valid, diff, currRest, _), tx) =>
-          val updatedBlockchain = composite(b, diff)
-          val updatedRest       = currRest.put(updatedBlockchain, tx)
-          if (updatedRest.isOverfilled) {
-            (invalid, valid, diff, currRest, currRest.isEmpty)
-          } else {
-            differ(updatedBlockchain, tx) match {
-              case Right(newDiff) =>
-                (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty)
-              case Left(_) =>
-                (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty)
+    val b = blockchain
+
+    val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = poolMetrics.packTimeStats.measure {
+      val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
+      transactions.values.asScala.toSeq
+        .sorted(TransactionsOrdering.InUTXPool)
+        .iterator
+        .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
+          case ((invalid, valid, diff, currRest, _), tx) =>
+            val updatedBlockchain = composite(b, diff)
+            val updatedRest       = currRest.put(updatedBlockchain, tx)
+            if (updatedRest.isOverfilled) {
+              (invalid, valid, diff, currRest, currRest.isEmpty)
+            } else {
+              differ(updatedBlockchain, tx) match {
+                case Right(newDiff) =>
+                  (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty)
+                case Left(_) =>
+                  (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty)
+              }
             }
-          }
-      }
-      .takeWhile(!_._5) // !currRest.isEmpty
-      .reduce((_, right) => right)
+        }
+        .takeWhile(!_._5) // !currRest.isEmpty
+        .reduce((_, right) => right)
+    }
 
     if (invalidTxs.nonEmpty) {
       log.trace(s"Removing ${invalidTxs.length} invalid transactions from UTX: [${invalidTxs.mkString(", ")}]")
@@ -206,37 +191,53 @@ class UtxPoolImpl(time: Time,
     }
 
   private def putIfNew(b: Blockchain, tx: Transaction): Either[ValidationError, (Boolean, Diff)] = {
-    PoolMetrics.putRequestStats.increment()
-    val result = measureSuccessful(
-      PoolMetrics.processingTimeStats, {
-        for {
-          _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+    poolMetrics.putRequestStats.increment()
+    val result = poolMetrics.putTimeStats.measureSuccessful(for {
+      _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
 
-          transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
-            .map(_.bytes().length)
-            .sum
-          _ <- Either.cond((transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
-                           (),
-                           GenericError("Transaction pool bytes size limit is reached"))
+      transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
+        .map(_.bytes().length)
+        .sum
+      _ <- Either.cond((transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
+        (),
+        GenericError("Transaction pool bytes size limit is reached"))
 
-          _    <- checkNotBlacklisted(tx)
-          _    <- checkScripted(b, tx)
-          _    <- checkAlias(b, tx)
-          _    <- canReissue(b, tx)
-          diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
-        } yield {
-          pessimisticPortfolios.add(tx.id(), diff)
-          val isNew = Option(transactions.put(tx.id(), tx)).isEmpty
-          if (isNew) PoolMetrics.addTransaction(tx)
-          (isNew, diff)
-        }
-      }
-    )
+      _    <- checkNotBlacklisted(tx)
+      _    <- checkScripted(b, tx)
+      _    <- checkAlias(b, tx)
+      _    <- canReissue(b, tx)
+      diff <- TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(b, tx)
+    } yield {
+      pessimisticPortfolios.add(tx.id(), diff)
+      val isNew = Option(transactions.put(tx.id(), tx)).isEmpty
+      if (isNew) poolMetrics.addTransaction(tx)
+      (isNew, diff)
+    })
+
     result.fold(
       err => log.trace(s"UTX putIfNew(${tx.id()}) failed with $err"),
       r => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = ${r._1}")
     )
+
     result
+  }
+
+  private[this] object poolMetrics {
+    private[this] val sizeStats  = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, Duration.of(500, ChronoUnit.MILLIS))
+    private[this] val bytesStats = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, Duration.of(500, ChronoUnit.MILLIS))
+    val putTimeStats             = Kamon.timer("utx.put-if-new")
+    val putRequestStats          = Kamon.counter("utx.put-if-new.requests")
+    val packTimeStats            = Kamon.timer("utx.pack-unconfirmed")
+
+    def addTransaction(tx: Transaction): Unit = {
+      sizeStats.increment()
+      bytesStats.increment(tx.bytes().length)
+    }
+
+    def removeTransaction(tx: Transaction): Unit = {
+      sizeStats.decrement()
+      bytesStats.decrement(tx.bytes().length)
+    }
   }
 }
 
