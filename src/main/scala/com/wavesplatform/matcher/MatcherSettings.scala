@@ -44,7 +44,8 @@ case class MatcherSettings(enable: Boolean,
                            eventsQueue: EventsQueueSettings,
                            orderFee: OrderFeeSettings,
                            deviation: DeviationsSettings,
-                           allowedAssetPairs: Set[AssetPair])
+                           allowedAssetPairs: Set[AssetPair],
+                           allowOrderV3: Boolean)
 
 object MatcherSettings {
 
@@ -93,6 +94,7 @@ object MatcherSettings {
     val orderFee          = config.as[OrderFeeSettings](s"$configPath.order-fee")
     val deviation         = config.as[DeviationsSettings](s"$configPath.max-price-deviations")
     val allowedAssetPairs = config.as[AllowedAssetPairsSettings](s"$configPath.allowed-asset-pairs").value
+    val allowOrderV3      = config.as[Boolean](s"$configPath.allow-order-v3")
 
     MatcherSettings(
       enabled,
@@ -118,7 +120,8 @@ object MatcherSettings {
       eventsQueue,
       orderFee,
       deviation,
-      allowedAssetPairs
+      allowedAssetPairs,
+      allowOrderV3
     )
   }
 }

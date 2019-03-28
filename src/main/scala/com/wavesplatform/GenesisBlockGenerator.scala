@@ -1,4 +1,4 @@
-package tools
+package com.wavesplatform
 
 import java.io.{File, FileNotFoundException}
 
@@ -8,7 +8,6 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.GenesisTransaction

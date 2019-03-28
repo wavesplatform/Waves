@@ -206,63 +206,55 @@ class OrderValidatorSpecification
         }
       }
 
-      "matcherFee is too small (fixed mode)" in {
-        forAll(orderV3Generator) { order =>
-          validateByMatcherSettings(FixedSettings(order.matcherFeeAssetId, order.matcherFee + 1))(order) should produce("FeeNotEnough")
-        }
+      "matcherFee is too small (fixed mode)" in forAll(orderV3Generator) { order =>
+        validateByMatcherSettings(FixedSettings(order.matcherFeeAssetId, order.matcherFee + 1))(order) should produce("FeeNotEnough")
       }
 
-      "matcherFee is too small (waves mode)" in {
-        forAll(orderV3WithPredefinedFeeAssetGenerator(Some(Waves))) {
-          case (_, order) => validateByMatcherSettings(FixedWavesSettings(order.matcherFee + 1))(order) should produce("FeeNotEnough")
-        }
+      "matcherFee is too small (waves mode)" in forAll(orderV3WithPredefinedFeeAssetGenerator(Some(Waves))) {
+        case (_, order) => validateByMatcherSettings(FixedWavesSettings(order.matcherFee + 1))(order) should produce("FeeNotEnough")
       }
 
-      "matcherFee is less than calculated by ExchangeTransactionCreator one" in {
-        forAll(orderWithFeeSettingsGenerator) {
-          case (order, sender, orderFeeSettings) =>
-            val baseFee = orderFeeSettings match {
-              case FixedWavesSettings(fee) => fee
-              case _                       => OrderValidator.exchangeTransactionCreationFee
-            }
+      "matcherFee is less than calculated by ExchangeTransactionCreator one" in forAll(orderWithFeeSettingsGenerator) {
+        case (order, sender, orderFeeSettings) =>
+          val baseFee = orderFeeSettings match {
+            case FixedWavesSettings(fee) => fee
+            case _                       => OrderValidator.exchangeTransactionCreationFee
+          }
 
-            val orderValidator = setScriptsAndValidate(orderFeeSettings)(None, None, None, None) _ // assets and accounts don't have any scripts
-            val minFee         = ExchangeTransactionCreator.minFee(stub[Blockchain], MatcherAccount, order.assetPair, baseFee)
-            val correctedOrder = Order.sign(order.updateFee(minFee - 1), sender)
+          val orderValidator = setScriptsAndValidate(orderFeeSettings)(None, None, None, None) _ // assets and accounts don't have any scripts
+          val minFee         = ExchangeTransactionCreator.minFee(stub[Blockchain], MatcherAccount, order.assetPair, baseFee)
+          val correctedOrder = Order.sign(order.updateFee(minFee - 1), sender)
 
-            orderFeeSettings match {
-              case _: FixedWavesSettings => orderValidator(correctedOrder) should produce("FeeNotEnough")
-              case _                     => orderValidator(correctedOrder) shouldBe 'right
-            }
-        }
+          orderFeeSettings match {
+            case _: FixedWavesSettings => orderValidator(correctedOrder) should produce("FeeNotEnough")
+            case _                     => orderValidator(correctedOrder) shouldBe 'right
+          }
       }
 
-      "matcherFee is insufficient in case of scripted account or asset" in {
-        forAll(orderWithoutWavesInPairAndWithFeeSettingsGenerator) {
-          case (order, _, orderFeeSettings) =>
-            val trueScript = ExprScript(Terms.TRUE).explicitGet()
+      "matcherFee is insufficient in case of scripted account or asset" in forAll(orderWithoutWavesInPairAndWithFeeSettingsGenerator) {
+        case (order, _, orderFeeSettings) =>
+          val trueScript = ExprScript(Terms.TRUE).explicitGet()
 
-            def setAssetsAndMatcherAccountScriptsAndValidate(amountAssetScript: Option[Script],
-                                                             priceAssetScript: Option[Script],
-                                                             matcherAccountScript: Option[Script]): Result[Order] =
-              setScriptsAndValidate(orderFeeSettings)(amountAssetScript, priceAssetScript, None, matcherAccountScript)(order)
+          def setAssetsAndMatcherAccountScriptsAndValidate(amountAssetScript: Option[Script],
+                                                           priceAssetScript: Option[Script],
+                                                           matcherAccountScript: Option[Script]): Result[Order] =
+            setScriptsAndValidate(orderFeeSettings)(amountAssetScript, priceAssetScript, None, matcherAccountScript)(order)
 
-            orderFeeSettings match {
-              case _: FixedWavesSettings =>
-                setAssetsAndMatcherAccountScriptsAndValidate(Some(trueScript), None, None) should produce("FeeNotEnough")
-                setAssetsAndMatcherAccountScriptsAndValidate(None, Some(trueScript), None) should produce("FeeNotEnough")
-                setAssetsAndMatcherAccountScriptsAndValidate(None, None, Some(trueScript)) should produce("FeeNotEnough")
+          orderFeeSettings match {
+            case _: FixedWavesSettings =>
+              setAssetsAndMatcherAccountScriptsAndValidate(Some(trueScript), None, None) should produce("FeeNotEnough")
+              setAssetsAndMatcherAccountScriptsAndValidate(None, Some(trueScript), None) should produce("FeeNotEnough")
+              setAssetsAndMatcherAccountScriptsAndValidate(None, None, Some(trueScript)) should produce("FeeNotEnough")
 
-                setAssetsAndMatcherAccountScriptsAndValidate(None, None, None) shouldBe 'right
+              setAssetsAndMatcherAccountScriptsAndValidate(None, None, None) shouldBe 'right
 
-              case _ =>
-                setAssetsAndMatcherAccountScriptsAndValidate(Some(trueScript), None, None) shouldBe 'right
-                setAssetsAndMatcherAccountScriptsAndValidate(None, Some(trueScript), None) shouldBe 'right
-                setAssetsAndMatcherAccountScriptsAndValidate(None, None, Some(trueScript)) shouldBe 'right
+            case _ =>
+              setAssetsAndMatcherAccountScriptsAndValidate(Some(trueScript), None, None) shouldBe 'right
+              setAssetsAndMatcherAccountScriptsAndValidate(None, Some(trueScript), None) shouldBe 'right
+              setAssetsAndMatcherAccountScriptsAndValidate(None, None, Some(trueScript)) shouldBe 'right
 
-                setAssetsAndMatcherAccountScriptsAndValidate(None, None, None) shouldBe 'right
-            }
-        }
+              setAssetsAndMatcherAccountScriptsAndValidate(None, None, None) shouldBe 'right
+          }
       }
 
       "buy order's price is too high" in {
@@ -385,6 +377,17 @@ class OrderValidatorSpecification
             validateByMatcherSettings(orderFeeSettings, allowedAssetPairs = Set(order.assetPair))(order) shouldBe 'right
             validateByMatcherSettings(orderFeeSettings, allowedAssetPairs = Set.empty[AssetPair])(order) shouldBe 'right // empty allowedAssetPairs set means that all pairs are allowed
         }
+      }
+
+      "it's version = 3 and matcher disallows that" in forAll(orderWithFeeSettingsGenerator) {
+        case (order, _, orderFeeSettings) =>
+          if (order.version == 3) {
+            validateByMatcherSettings(orderFeeSettings, allowOrderV3 = false)(order) should produce("OrderV3IsNotAllowed")
+            validateByMatcherSettings(orderFeeSettings, allowOrderV3 = true)(order) shouldBe 'right
+          } else {
+            validateByMatcherSettings(orderFeeSettings, allowOrderV3 = false)(order) shouldBe 'right
+            validateByMatcherSettings(orderFeeSettings, allowOrderV3 = true)(order) shouldBe 'right
+          }
       }
     }
 
@@ -599,13 +602,16 @@ class OrderValidatorSpecification
 
   private def validateByMatcherSettings(orderFeeSettings: OrderFeeSettings,
                                         blacklistedAssets: Set[IssuedAsset] = Set.empty[IssuedAsset],
-                                        allowedAssetPairs: Set[AssetPair] = Set.empty[AssetPair]): Order => Result[Order] =
+                                        allowedAssetPairs: Set[AssetPair] = Set.empty[AssetPair],
+                                        allowOrderV3: Boolean = true): Order => Result[Order] =
     order =>
       OrderValidator
-        .matcherSettingsAware(MatcherAccount,
-                              Set.empty,
-                              blacklistedAssets,
-                              matcherSettings.copy(orderFee = orderFeeSettings, allowedAssetPairs = allowedAssetPairs))(order)
+        .matcherSettingsAware(
+          MatcherAccount,
+          Set.empty,
+          blacklistedAssets,
+          matcherSettings.copy(orderFee = orderFeeSettings, allowedAssetPairs = allowedAssetPairs, allowOrderV3 = allowOrderV3)
+        )(order)
 
   private def setScriptsAndValidate(orderFeeSettings: OrderFeeSettings)(
       amountAssetScript: Option[Script],

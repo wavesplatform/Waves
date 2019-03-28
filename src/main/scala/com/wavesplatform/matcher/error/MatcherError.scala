@@ -211,6 +211,14 @@ object MatcherError {
         e"Trading is not allowed for the pair: ${'amountAssetId -> orderAssetPair.amountAsset} - ${'priceAssetId -> orderAssetPair.priceAsset}"
       )
 
+  case object OrderV3IsNotAllowed
+      extends MatcherError(
+        order,
+        commonEntity,
+        denied,
+        e"The orders of version 3 are not allowed by matcher"
+      )
+
   sealed abstract class Entity(val code: Int)
   object Entity {
     object common  extends Entity(0)
