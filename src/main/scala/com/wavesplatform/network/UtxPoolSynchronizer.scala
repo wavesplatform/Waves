@@ -9,7 +9,7 @@ import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
 import monix.execution.{CancelableFuture, Scheduler}
-import monix.reactive.{Observable, OverflowStrategy}
+import monix.reactive.Observable
 
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
