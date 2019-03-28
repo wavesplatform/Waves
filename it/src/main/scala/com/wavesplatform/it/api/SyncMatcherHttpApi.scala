@@ -6,7 +6,8 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
 import com.wavesplatform.it.matcher.MatcherState
 import com.wavesplatform.matcher.queue.QueueEventWithMeta
-import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{RequestBuilder, Response}
@@ -207,22 +208,26 @@ object SyncMatcherHttpApi extends Assertions {
                      price: Long,
                      fee: Long = 300000L,
                      version: Byte = 1: Byte,
-                     timeToLive: Duration = 30.days - 1.seconds): Order = {
+                     timeToLive: Duration = 30.days - 1.seconds,
+                     matcherFeeAssetId: Asset = Waves): Order = {
       val creationTime        = System.currentTimeMillis()
       val timeToLiveTimestamp = creationTime + timeToLive.toMillis
       val matcherPublicKey    = m.publicKey
       val unsigned =
-        Order(PublicKeyAccount(sender.publicKey),
-              matcherPublicKey,
-              pair,
-              orderType,
-              amount,
-              price,
-              creationTime,
-              timeToLiveTimestamp,
-              fee,
-              Proofs.empty,
-              version)
+        Order(
+          PublicKeyAccount(sender.publicKey),
+          matcherPublicKey,
+          pair,
+          orderType,
+          amount,
+          price,
+          creationTime,
+          timeToLiveTimestamp,
+          fee,
+          Proofs.empty,
+          version,
+          matcherFeeAssetId
+        )
       Order.sign(unsigned, sender)
     }
 

@@ -205,6 +205,7 @@ object Order {
             matcherFeeAssetId: Asset): Order = version match {
     case 3 =>
       OrderV3(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, proofs)
+    case _ => Order(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
   }
 
   def correctAmount(a: Long, price: Long): Long = {
