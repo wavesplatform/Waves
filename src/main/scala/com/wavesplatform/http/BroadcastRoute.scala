@@ -6,16 +6,11 @@ import com.wavesplatform.transaction.{Transaction, ValidationError}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 
-import scala.concurrent.Future
-
 trait BroadcastRoute {
   def utx: UtxPool
-
   def allChannels: ChannelGroup
 
-  import scala.concurrent.ExecutionContext.Implicits.global
-
-  protected def doBroadcast(v: Either[ValidationError, Transaction]): Future[Either[ApiError, Transaction]] = Future {
+  protected def doBroadcast(v: Either[ValidationError, Transaction]): Either[ApiError, Transaction] = {
     val r = for {
       tx <- v
       r  <- utx.putIfNew(tx)

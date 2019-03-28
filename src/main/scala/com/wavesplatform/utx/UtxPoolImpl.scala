@@ -142,23 +142,26 @@ class UtxPoolImpl(time: Time,
     removeExpired(currentTs)
     val b = blockchain
 
-    val (invalidTxs, reversedValidTxs, _, finalConstraint, _) = poolMetrics.packTimeStats.measure {
+    val (invalidTxs, reversedValidTxs, _, finalConstraint, _, _) = poolMetrics.packTimeStats.measure {
       val differ = TransactionDiffer(fs, blockchain.lastBlockTimestamp, currentTs, b.height) _
       transactions.values.asScala.toSeq
         .sorted(TransactionsOrdering.InUTXPool)
         .iterator
-        .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false)) {
-          case ((invalid, valid, diff, currRest, _), tx) =>
+        .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false, rest)) {
+          case ((invalid, valid, diff, currRest, _, lastOverfilled), tx) =>
             val updatedBlockchain = composite(b, diff)
             val updatedRest       = currRest.put(updatedBlockchain, tx)
             if (updatedRest.isOverfilled) {
-              (invalid, valid, diff, currRest, currRest.isEmpty)
+              if (updatedRest != lastOverfilled)
+                log.trace(
+                  s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
+              (invalid, valid, diff, currRest, isEmpty, updatedRest)
             } else {
               differ(updatedBlockchain, tx) match {
                 case Right(newDiff) =>
-                  (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty)
+                  (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled)
                 case Left(_) =>
-                  (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty)
+                  (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled)
               }
             }
         }

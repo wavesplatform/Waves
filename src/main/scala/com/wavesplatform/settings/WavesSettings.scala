@@ -4,7 +4,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.metrics.Metrics
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 import scala.concurrent.duration._
 
@@ -40,11 +39,11 @@ object WavesSettings {
     val ntpServer               = config.as[String](s"$configPath.ntp-server")
     val networkSettings         = config.as[NetworkSettings]("waves.network")
     val walletSettings          = config.as[WalletSettings]("waves.wallet")
-    val blockchainSettings      = BlockchainSettings.fromConfig(config)
-    val matcherSettings         = MatcherSettings.fromConfig(config)
-    val minerSettings           = MinerSettings.fromConfig(config)
-    val restAPISettings         = RestAPISettings.fromConfig(config)
-    val synchronizationSettings = SynchronizationSettings.fromConfig(config)
+    val blockchainSettings      = config.as[BlockchainSettings]("waves.blockchain")
+    val matcherSettings         = config.as[MatcherSettings]("waves.matcher")
+    val minerSettings           = config.as[MinerSettings]("waves.miner")
+    val restAPISettings         = config.as[RestAPISettings]("waves.rest-api")
+    val synchronizationSettings = config.as[SynchronizationSettings]("waves.synchronization")
     val utxSettings             = config.as[UtxSettings]("waves.utx")
     val featuresSettings        = config.as[FeaturesSettings]("waves.features")
     val metrics                 = config.as[Metrics.Settings]("metrics")

@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.Transaction
 
 class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
-  private val settings    = RestAPISettings.fromConfig(ConfigFactory.load())
+  private val settings    = RestAPISettings.fromRootConfig(ConfigFactory.load())
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]
 

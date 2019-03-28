@@ -19,7 +19,7 @@ import com.wavesplatform.wallet.Wallet
 
 class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMockFactory with Eventually {
 
-  private val settings    = RestAPISettings.fromConfig(ConfigFactory.load())
+  private val settings    = RestAPISettings.fromRootConfig(ConfigFactory.load())
   private val wallet      = stub[Wallet]
   private val utx         = stub[UtxPool]
   private val allChannels = stub[ChannelGroup]

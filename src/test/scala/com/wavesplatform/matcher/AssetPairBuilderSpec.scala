@@ -40,7 +40,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
        |  blacklisted-names = ["name$$"]
        |  price-assets = [${predefinedPriceAssets.mkString(",")}]
        |}""".stripMargin)
-  private val settings    = MatcherSettings.fromConfig(loadConfig(priceAssets))
+  private val settings    = MatcherSettings.fromRootConfig(loadConfig(priceAssets))
   private val blockchain  = stub[Blockchain]
 
   private val builder = new AssetPairBuilder(settings, blockchain)

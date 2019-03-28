@@ -13,7 +13,7 @@ trait RestAPISettingsHelper {
 
   lazy val restAPISettings = {
     val keyHash = Base58.encode(crypto.secureHash(apiKey.getBytes()))
-    RestAPISettings.fromConfig(
+    RestAPISettings.fromRootConfig(
       ConfigFactory
         .parseString(
           s"""
