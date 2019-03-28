@@ -132,6 +132,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     )
     parseCompileAndVerify(
       """
+        |let some = base58''
         |
         |func fooHelper2() = {
         |   false
@@ -143,7 +144,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |
         |@Verifier(t)
         |func verify() = {
-        |  t.senderPublicKey == base58'' && fooHelper()
+        |  t.senderPublicKey == some && fooHelper()
         |}
         |
       """.stripMargin,
