@@ -236,10 +236,10 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, all
     def addBlockFields(blockId: ByteStr): JsObject =
       json ++ blockchain
         .heightOf(blockId)
-        .map(height => Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).getOrElse(0)))
+        .map(height => Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))))
         .getOrElse(JsObject.empty)
 
     def addBlockFields(height: Int): JsObject =
-      json ++ Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).map(JsNumber(_)).getOrElse(JsNull))
+      json ++ Json.obj("height" -> height, "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_)))
   }
 }
