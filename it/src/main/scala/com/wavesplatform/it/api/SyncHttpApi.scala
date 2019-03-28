@@ -151,7 +151,7 @@ object SyncHttpApi extends Assertions {
               description: String,
               quantity: Long,
               decimals: Byte,
-              reissuable: Boolean,
+              reissuable: Boolean = true,
               fee: Long = 100000000,
               version: Byte = 2,
               script: Option[String] = None,
