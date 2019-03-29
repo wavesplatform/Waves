@@ -137,6 +137,7 @@ object OrderValidator {
       matcherPublicKey: PublicKeyAccount,
       blacklistedAddresses: Set[Address],
       blacklistedAssets: Set[Option[AssetId]],
+      allowedAssetPairs: Set[AssetPair]
   )(order: Order): ValidationResult = {
     for {
       _ <- (Right(order): ValidationResult)
@@ -144,6 +145,7 @@ object OrderValidator {
         .ensure("Invalid address")(_ => !blacklistedAddresses.contains(order.sender.toAddress))
         .ensure(s"Invalid amount asset ${order.assetPair.amountAsset}")(_ => !blacklistedAssets(order.assetPair.amountAsset))
         .ensure(s"Invalid price asset ${order.assetPair.priceAsset}")(_ => !blacklistedAssets(order.assetPair.priceAsset))
+        .ensure(s"Asset pair ${order.assetPair} is not in whitelist")(_ => allowedAssetPairs.isEmpty || allowedAssetPairs(order.assetPair))
     } yield order
   }
 

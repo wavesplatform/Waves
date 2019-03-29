@@ -8,6 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
@@ -37,7 +38,8 @@ case class MatcherSettings(enable: Boolean,
                            blacklistedAddresses: Set[String],
                            orderBookSnapshotHttpCache: OrderBookSnapshotHttpCache.Settings,
                            balanceWatchingBufferInterval: FiniteDuration,
-                           eventsQueue: EventsQueueSettings)
+                           eventsQueue: EventsQueueSettings,
+                           allowedAssetPairs: Set[AssetPair])
 
 object MatcherSettings {
 
@@ -80,7 +82,18 @@ object MatcherSettings {
 
     val balanceWatchingBufferInterval = config.as[FiniteDuration](s"$configPath.balance-watching-buffer-interval")
 
-    val eventsQueue         = config.as[EventsQueueSettings](s"$configPath.events-queue")
+    val eventsQueue = config.as[EventsQueueSettings](s"$configPath.events-queue")
+
+    def getAssetPairFromString(source: String): AssetPair = {
+      val sourceArr = source.split("-")
+      val res = sourceArr match {
+        case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
+        case _                               => throw new Exception(s"Incorrect assets count (expected 2, but got ${sourceArr.size}): $source")
+      }
+      res fold (ex => throw new Exception(ex.getMessage), identity)
+    }
+
+    val allowedAssetPairs   = config.as[Set[String]](s"$configPath.allowed-asset-pairs").map(getAssetPairFromString)
     val recoverOrderHistory = !new File(dataDirectory).exists()
 
     MatcherSettings(
@@ -105,7 +118,8 @@ object MatcherSettings {
       blacklistedAddresses,
       orderBookSnapshotHttpCache,
       balanceWatchingBufferInterval,
-      eventsQueue
+      eventsQueue,
+      allowedAssetPairs
     )
   }
 }

@@ -137,6 +137,22 @@ class OrderValidatorSpecification
               )) should produce("Invalid price")
           }
       }
+
+      "asset pair is not in whitelist" in {
+
+        def validateByAssetPairWhitelist(allowedAssetPairs: Set[AssetPair]): Order => OrderValidator.ValidationResult =
+          OrderValidator.matcherSettingsAware(MatcherAccount, Set.empty, Set.empty, allowedAssetPairs)
+
+        forAll(orderGenerator) {
+          case (order, _) =>
+            validateByAssetPairWhitelist(Set.empty[AssetPair])(order) shouldBe 'right
+            validateByAssetPairWhitelist(Set(order.assetPair))(order) shouldBe 'right
+
+            validateByAssetPairWhitelist(Set(AssetPair.createAssetPair("A1", "A2").get))(order) should produce(
+              s"Asset pair ${order.assetPair} is not in whitelist"
+            )
+        }
+      }
     }
 
     "validate order with any number of signatures from a scripted account" in forAll(Gen.choose(0, 5)) { proofsNumber =>
@@ -315,5 +331,6 @@ class OrderValidatorSpecification
   )(f: Either[String, Order] => A): A =
     f(OrderValidator.accountStateAware(o.sender, tradableBalance(p), 0, orderStatus)(o))
 
-  private def msa(ba: Set[Address], o: Order) = OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty) _
+  private def msa(ba: Set[Address], o: Order) =
+    OrderValidator.matcherSettingsAware(o.matcherPublicKey, ba, Set.empty, matcherSettings.allowedAssetPairs) _
 }
