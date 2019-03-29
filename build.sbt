@@ -51,12 +51,11 @@ inThisBuild(
     crossPaths := false,
     scalacOptions ++= Seq(
       "-feature",
-      "-deprecation:false",
+      "-deprecation",
       "-language:higherKinds",
       "-language:implicitConversions",
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
-      "-Ywarn-unused:-imports",
       "-Xlint",
       "-Ypartial-unification",
       "-opt:l:inline"
@@ -227,9 +226,9 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
 addCommandAlias(
   "checkPR",
   """;
-    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings");
+    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings", "-deprecation:false", "-Ywarn-unused:-imports");
     |Global / checkPRRaw;
-    |set scalacOptions in ThisBuild -= "-Xfatal-warnings";
+    |set scalacOptions in ThisBuild --= Seq("-Xfatal-warnings", "-deprecation:false", "-Ywarn-unused:-imports");
   """.stripMargin
 )
 
