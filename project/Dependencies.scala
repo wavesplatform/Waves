@@ -18,7 +18,7 @@ object Dependencies {
 
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
 
-  private val akkaHttp           = akkaHttpModule("akka-http")
+  val akkaHttp                   = akkaHttpModule("akka-http")
   private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
   private val kamonCore          = kamonModule("core", "1.1.5")
@@ -134,7 +134,7 @@ object Dependencies {
       kindProjector,
       monixModule("reactive").value,
       nettyModule("handler"),
-      akkaModule("testkit") % Test,
+      akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test
     ) ++ test
   )

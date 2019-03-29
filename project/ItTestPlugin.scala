@@ -6,10 +6,12 @@ import sbt.Tests.Group
 import sbt._
 
 // Separate projects for integration tests because of IDEA: https://youtrack.jetbrains.com/issue/SCL-14363#focus=streamItem-27-3061842.0-0
-object ItSettings {
-  val logDirectory = taskKey[File]("Directory with integration test logs")
+object ItTestPlugin extends AutoPlugin {
 
-  def settings: Seq[Def.Setting[_]] =
+  object autoImport extends ItKeys
+  import autoImport._
+
+  override def projectSettings: Seq[Def.Setting[_]] =
     inConfig(Test)(
       Seq(
         logDirectory := {
@@ -44,15 +46,17 @@ object ItSettings {
                   bootJars = Vector.empty[java.io.File],
                   workingDirectory = Option(baseDirectory.value),
                   runJVMOptions = Vector(
-                    "-XX:+IgnoreUnrecognizedVMOptions",
-                    "--add-modules=java.xml.bind",
                     "-Dwaves.it.logging.appender=FILE",
-                    s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}"
-                  ) ++ javaOptionsValue,
+                    s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}" // foo.bar.Baz -> f.b.Baz
+                  ) ++ javaOptionsValue ++ ModernJavaSettings.options,
                   connectInput = false,
                   envVars = envVarsValue
                 ))
             )
         }
       ))
+}
+
+trait ItKeys {
+  val logDirectory = taskKey[File]("The directory where logs of integration tests are written")
 }

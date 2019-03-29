@@ -1,20 +1,26 @@
-import sbt._
+import java.io.File
+
+import WavesDockerKeys._
+import sbt.plugins.JvmPlugin
+import sbt.{AutoPlugin, Def, Plugins, inTask, taskKey}
+import sbtdocker.DockerPlugin
 import sbtdocker.DockerPlugin.autoImport._
 
-object DockerSettings {
-  val additionalFiles = taskKey[Seq[File]]("Additional files to copy to /opt/waves")
-  val exposedPorts = taskKey[Set[Int]]("Exposed ports")
-
-  def settings: Seq[Def.Setting[_]] =
+object WavesDockerPlugin extends AutoPlugin {
+  override def requires: Plugins = JvmPlugin && DockerPlugin
+  
+  override def projectSettings: Seq[Def.Setting[_]] =
     inTask(docker)(
       Seq(
         additionalFiles := Seq.empty,
+        exposedPorts := Set.empty,
+        baseImage := "anapsix/alpine-java:8_server-jre",
         dockerfile := {
           val yourKitArchive = "YourKit-JavaProfiler-2019.1-docker.zip"
           val bin            = "/opt/waves/start-waves.sh"
 
           new Dockerfile {
-            from("anapsix/alpine-java:8_server-jre")
+            from(baseImage.value)
 
             runRaw(s"""mkdir -p /opt/waves && \\
                     |apk update && \\
@@ -32,18 +38,10 @@ object DockerSettings {
         },
         buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
       ))
+}
 
-  def dexSettings: Seq[Def.Setting[_]] =
-    inTask(docker)(
-      Seq(
-        additionalFiles := Seq.empty,
-        dockerfile := {
-          new Dockerfile {
-            from("com.wavesplatform/node-it:latest")
-            add(additionalFiles.value, "/opt/waves/")
-            expose(exposedPorts.value.toSeq: _*)
-          }
-        },
-        buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
-      ))
+object WavesDockerKeys {
+  val additionalFiles = taskKey[Seq[File]]("Additional files to copy to /opt/waves")
+  val exposedPorts    = taskKey[Set[Int]]("Exposed ports")
+  val baseImage       = taskKey[String]("A base image for this container")
 }

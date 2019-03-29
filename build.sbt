@@ -1,7 +1,11 @@
 // IDEA notes
-// * Do not name the root directory with the existed project name (node, dex, ...)
-// * To run integration tests from IDEA, enable the "sbt" checkbox
 // * May require to run from SBT: node / Compile / managedSources
+// * If you choose "use sbt" for running tests, then debug will not work because of fork: https://www.jetbrains.com/help/idea/run-debug-and-test-scala.html#28575304
+//   Also the logs will be written to the working directory, because we can't use SBT javaOptions.
+//
+// * To work with scratches, make sure:
+//   1. You've selected the appropriate project
+//   2. You've checked "Make project before run"
 
 import sbt.Keys._
 import sbt._
@@ -12,8 +16,6 @@ lazy val common = crossProject(JSPlatform, JVMPlatform)
   .disablePlugins(ProtocPlugin)
   .settings(
     libraryDependencies += Dependencies.scalaTest,
-    //resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"), //
-    //resolvers += Resolver.sbtPluginRepo("releases"), //
     coverageExcludedPackages := ""
   )
 
@@ -31,8 +33,8 @@ lazy val lang =
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
-      resolvers += Resolver.sbtPluginRepo("releases"),
-      Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // doesn't work
+      resolvers += Resolver.sbtPluginRepo("releases")
+      // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // doesn't work
     )
 
 lazy val langJS  = lang.js
@@ -46,7 +48,7 @@ lazy val node = project
 
 lazy val `node-it` = project.dependsOn(node)
 
-lazy val `node-generator` = project.dependsOn(node % "compile->test")
+lazy val `node-generator` = project.dependsOn(node, `node-it` % "compile->test")
 
 lazy val benchmark = project
   .dependsOn(
@@ -62,12 +64,36 @@ lazy val `dex-it` = project
     `node-it` % "compile;test->test"
   )
 
-lazy val `dex-generator` = project.dependsOn(dex)
+lazy val `dex-generator` = project.dependsOn(dex, `dex-it` % "compile->test")
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 
-git.useGitDescribe := true
-git.uncommittedSignifier := Some("DIRTY")
+lazy val root = (project in file("."))
+  .settings(
+    checkPRRaw := {
+      try {
+        clean.value // Hack to run clean before all tasks
+      } finally {
+        test.all(ScopeFilter(inProjects(commonJVM, langJVM, node, dex), inConfigurations(Test))).value
+        (commonJS / Compile / fastOptJS).value
+        (langJS / Compile / fastOptJS).value
+        compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `dex-generator`), inConfigurations(Test))).value
+      }
+    }
+  )
+  .aggregate(
+    commonJS,
+    commonJVM,
+    langJS,
+    langJVM,
+    node,
+    `node-it`,
+    `node-generator`,
+    benchmark,
+    dex,
+    `dex-it`,
+    `dex-generator`
+  )
 
 inScope(Global)(
   Seq(
@@ -77,9 +103,6 @@ inScope(Global)(
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
-    crossPaths := false,
-    scalafmtOnCompile := true,
-    dependencyOverrides ++= Dependencies.enforcedVersions.value,
     scalacOptions ++= Seq(
       "-feature",
       "-deprecation",
@@ -90,20 +113,12 @@ inScope(Global)(
       "-Ywarn-unused-import",
       "-Ypartial-unification"
     ),
+    crossPaths := false,
+    scalafmtOnCompile := true,
+    dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable := true,
     logBuffered := false,
     coverageExcludedPackages := ".*",
-    checkPRRaw := {
-      try {
-        clean.all(ScopeFilter(inAnyProject)).value
-      } finally {
-        test.all(ScopeFilter(inProjects(commonJVM, langJVM, node, dex), inConfigurations(Test))).value
-        (commonJS / Compile / fastOptJS).value
-        (langJS / Compile / fastOptJS).value
-        compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `dex-generator`), inConfigurations(Test))).value
-      }
-    },
-    logBuffered := false,
     parallelExecution := false,
     testListeners := Seq.empty, // Fix for doubled test reports
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
@@ -113,6 +128,10 @@ inScope(Global)(
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
     }
   ))
+
+// ThisBuild options
+git.useGitDescribe := true
+git.uncommittedSignifier := Some("DIRTY")
 
 // TODO: https://stackoverflow.com/a/14274715
 addCommandAlias(
