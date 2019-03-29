@@ -3,6 +3,8 @@ package com.wavesplatform.settings
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSettings
 import com.wavesplatform.settings.SynchronizationSettings.{HistoryReplierSettings, MicroblockSynchronizerSettings, UtxSynchronizerSettings}
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -29,7 +31,6 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
         |
         |    utx-synchronizer {
         |      network-tx-cache-size = 7000000
-        |      network-tx-cache-time = 70s
         |      max-buffer-size = 777
         |      max-buffer-time = 999ms
         |      max-queue-size = 7777
@@ -46,7 +47,7 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
         |}
       """.stripMargin).resolve()
 
-    val settings = SynchronizationSettings.fromConfig(config)
+    val settings = config.as[SynchronizationSettings]("waves.synchronization")
     settings.maxRollback should be(100)
     settings.maxChainLength should be(101)
     settings.synchronizationTimeout should be(30.seconds)
@@ -60,11 +61,11 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
       processedMicroBlocksCacheTimeout = 2.seconds,
       invCacheTimeout = 3.seconds
     )
-    settings.historyReplierSettings shouldBe HistoryReplierSettings(
+    settings.historyReplier shouldBe HistoryReplierSettings(
       maxMicroBlockCacheSize = 5,
       maxBlockCacheSize = 2
     )
 
-    settings.utxSynchronizerSettings shouldBe UtxSynchronizerSettings(7000000, 70.seconds, 777, 999.millis, 4, 2, 7777)
+    settings.utxSynchronizer shouldBe UtxSynchronizerSettings(7000000, 777, 999.millis, 4, 2, 7777)
   }
 }

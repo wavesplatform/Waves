@@ -50,7 +50,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |    }
         |  }
         |}""".stripMargin))
-    val settings = BlockchainSettings.fromConfig(config)
+    val settings = BlockchainSettings.fromRootConfig(config)
 
     settings.addressSchemeCharacter should be('C')
     settings.functionalitySettings.featureCheckBlocksPeriod should be(10000)
@@ -86,7 +86,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |    type = TESTNET
         |  }
         |}""".stripMargin))
-    val settings = BlockchainSettings.fromConfig(config)
+    val settings = BlockchainSettings.fromRootConfig(config)
 
     settings.addressSchemeCharacter should be('T')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1477958400000L)
@@ -124,7 +124,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |    type = MAINNET
         |  }
         |}""".stripMargin))
-    val settings = BlockchainSettings.fromConfig(config)
+    val settings = BlockchainSettings.fromRootConfig(config)
 
     settings.addressSchemeCharacter should be('W')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1479168000000L)

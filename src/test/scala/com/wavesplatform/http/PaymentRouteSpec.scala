@@ -4,8 +4,8 @@ import com.wavesplatform.api.http.{ApiKeyNotValid, PaymentApiRoute}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state.Diff
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NoShrink, TestWallet, TransactionGen}
@@ -48,7 +48,7 @@ class PaymentRouteSpec
         val req = Json.obj("sender" -> sender.address, "recipient" -> recipient.stringRepr, "amount" -> amount, "fee" -> fee)
 
         Post(routePath(""), req) ~> route should produce(ApiKeyNotValid)
-        Post(routePath(""), req) ~> api_key(apiKey) ~> route ~> check {
+        Post(routePath(""), req) ~> ApiKeyHeader ~> route ~> check {
           val resp = responseAs[JsObject]
 
           (resp \ "id").as[String] shouldEqual tx.explicitGet().id().toString

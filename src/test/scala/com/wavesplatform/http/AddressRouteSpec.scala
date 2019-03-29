@@ -87,7 +87,7 @@ class AddressRouteSpec
     val account = allAccounts.head
     val path    = routePath(s"/seed/${account.address}")
     Get(path) ~> route should produce(ApiKeyNotValid)
-    Get(path) ~> api_key(apiKey) ~> route ~> check {
+    Get(path) ~> ApiKeyHeader ~> route ~> check {
       val json = responseAs[JsObject]
       (json \ "address").as[String] shouldEqual account.address
       (json \ "seed").as[String] shouldEqual Base58.encode(account.seed)
@@ -99,7 +99,7 @@ class AddressRouteSpec
       case (account, message) =>
         val uri = routePath(s"/$path/${account.address}")
         Post(uri, message) ~> route should produce(ApiKeyNotValid)
-        Post(uri, message) ~> api_key(apiKey) ~> route ~> check {
+        Post(uri, message) ~> ApiKeyHeader ~> route ~> check {
           val resp      = responseAs[JsObject]
           val signature = Base58.tryDecodeWithLimit((resp \ "signature").as[String]).get
 
@@ -121,7 +121,7 @@ class AddressRouteSpec
         val messageBytes = message.getBytes()
         val signature    = crypto.sign(account, messageBytes)
         val validBody = Json.obj(
-          "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else ("base64:" ++ Base64.encode(messageBytes)) else message),
+          "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else "base64:" ++ Base64.encode(messageBytes) else message),
           "publickey" -> JsString(Base58.encode(account.publicKey)),
           "signature" -> JsString(Base58.encode(signature))
         )
@@ -130,10 +130,10 @@ class AddressRouteSpec
           Json.obj("message" -> JsString(""), "publickey" -> JsString(Base58.encode(account.publicKey)), "signature" -> JsString(""))
 
         Post(uri, validBody) ~> route should produce(ApiKeyNotValid)
-        Post(uri, emptySignature) ~> api_key(apiKey) ~> route ~> check {
+        Post(uri, emptySignature) ~> ApiKeyHeader ~> route ~> check {
           (responseAs[JsObject] \ "valid").as[Boolean] shouldBe false
         }
-        Post(uri, validBody) ~> api_key(apiKey) ~> route ~> check {
+        Post(uri, validBody) ~> ApiKeyHeader ~> route ~> check {
           (responseAs[JsObject] \ "valid").as[Boolean] shouldBe true
         }
     }
@@ -144,13 +144,13 @@ class AddressRouteSpec
 
   routePath("") in {
     Post(routePath("")) ~> route should produce(ApiKeyNotValid)
-    Post(routePath("")) ~> api_key(apiKey) ~> route ~> check {
+    Post(routePath("")) ~> ApiKeyHeader ~> route ~> check {
       allAddresses should not contain (responseAs[JsObject] \ "address").as[String]
     }
   }
 
   routePath("/{address}") in {
-    Delete(routePath(s"/${allAddresses.head}")) ~> api_key(apiKey) ~> route ~> check {
+    Delete(routePath(s"/${allAddresses.head}")) ~> ApiKeyHeader ~> route ~> check {
       (responseAs[JsObject] \ "deleted").as[Boolean] shouldBe true
     }
   }
