@@ -7,7 +7,6 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Order.assetIdBytes
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{JsObject, Json}
 
@@ -73,7 +72,7 @@ object AssetPair {
   }
 
   implicit val assetPairReader: ValueReader[AssetPair] = { (cfg, path) =>
-    val source    = cfg.as[String](path)
+    val source    = cfg.getString(path)
     val sourceArr = source.split("-")
     val res = sourceArr match {
       case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
