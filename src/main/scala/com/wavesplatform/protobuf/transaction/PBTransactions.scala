@@ -303,8 +303,34 @@ object PBTransactions {
       case Data.SponsorFee(SponsorFeeTransactionData(Some(AssetAmount(assetId, minFee)))) =>
         vt.assets.SponsorFeeTransaction.create(sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
-      case data =>
-        throw new IllegalArgumentException(s"Unsupported transaction data: $data")
+      case Data.InvokeScript(InvokeScriptTransactionData(dappAddress, functionCall, payments)) =>
+        import com.wavesplatform.lang.v1.Serde
+        import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+
+        for {
+          address <- Address.fromBytes(dappAddress.toByteArray)
+
+          fcAndLength <- Serde
+            .deserialize(functionCall.toByteArray)
+            .left
+            .map(str => GenericError(s"Invalid InvokeScript function call: $str"))
+
+          fc = fcAndLength._1
+
+          _ <- Either.cond(fc.isInstanceOf[FUNCTION_CALL], (), GenericError(s"Not a function call: $fc"))
+
+          tx <- vt.smart.InvokeScriptTransaction.create(sender,
+                                                        address,
+                                                        fc.asInstanceOf[FUNCTION_CALL],
+                                                        payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, p.assetId)),
+                                                        feeAmount,
+                                                        feeAssetId,
+                                                        timestamp,
+                                                        proofs)
+        } yield tx
+
+      case _ =>
+        Left(ValidationError.UnsupportedTransactionType)
     }
 
     result
@@ -532,6 +558,22 @@ object PBTransactions {
       case Data.SponsorFee(SponsorFeeTransactionData(Some(AssetAmount(assetId, minFee)))) =>
         vt.assets.SponsorFeeTransaction(sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
+      case Data.InvokeScript(InvokeScriptTransactionData(dappAddress, functionCall, payments)) =>
+        import com.wavesplatform.lang.v1.Serde
+        import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+
+        vt.smart.InvokeScriptTransaction(
+          chainId,
+          sender,
+          Address.fromBytes(dappAddress.toByteArray).explicitGet(),
+          Serde.deserialize(functionCall.toByteArray).explicitGet()._1.asInstanceOf[FUNCTION_CALL],
+          payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, p.assetId)),
+          feeAmount,
+          feeAssetId,
+          timestamp,
+          proofs
+        )
+
       case data =>
         throw new IllegalArgumentException(s"Unsupported transaction data: $data")
     }
@@ -658,6 +700,14 @@ object PBTransactions {
       case tx @ vt.assets.SponsorFeeTransaction(sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs) =>
         val data = SponsorFeeTransactionData(Some(AssetAmount(assetId.id, minSponsoredAssetFee.getOrElse(0L))))
         PBTransactions.create(sender, NoChainId, fee, tx.assetFee._1, timestamp, 2, proofs, Data.SponsorFee(data))
+
+      case vt.smart.InvokeScriptTransaction(chainId, sender, dappAddress, fc, payment, fee, feeAssetId, timestamp, proofs) =>
+        import com.wavesplatform.lang.v1.Serde
+
+        val data = InvokeScriptTransactionData(dappAddress.toByteString,
+                                               ByteString.copyFrom(Serde.serialize(fc)),
+                                               payment.map(p => (p.assetId, p.amount): Amount))
+        PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 2, proofs, Data.InvokeScript(data))
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
