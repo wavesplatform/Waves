@@ -216,7 +216,7 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
     log.info(s"Removing blocks after ${blockId.trim} from blockchain")
 
     val prevNgState = ngState
-    val r = if (prevNgState.exists(_.contains(blockId))) {
+    val result = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
       Right(Seq.empty)
     } else {
@@ -229,7 +229,8 @@ class BlockchainUpdaterImpl(blockchain: Blockchain,
     }
 
     notifyChangedSpendable(prevNgState, ngState)
-    r
+    internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, blockchainReady))
+    result
   }
 
   private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
