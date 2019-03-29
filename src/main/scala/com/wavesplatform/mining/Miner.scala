@@ -9,7 +9,7 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{GeneratingBalanceProvider, PoSSelector}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
+import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented, _}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state._
@@ -20,7 +20,6 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
-import kamon.metric.MeasurementUnit
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
@@ -62,8 +61,7 @@ class MinerImpl(allChannels: ChannelGroup,
                 val appenderScheduler: SchedulerService)
     extends Miner
     with MinerDebugInfo
-    with ScorexLogging
-    with Instrumented {
+    with ScorexLogging {
 
   import Miner._
 
@@ -75,9 +73,6 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
-
-  private val blockBuildTimeStats      = Kamon.histogram("pack-and-forge-block-time", MeasurementUnit.time.milliseconds)
-  private val microBlockBuildTimeStats = Kamon.histogram("forge-microblock-time", MeasurementUnit.time.milliseconds)
 
   @volatile private var debugState: MinerDebugInfo.State = MinerDebugInfo.Disabled
 
@@ -138,30 +133,25 @@ class MinerImpl(allChannels: ChannelGroup,
     val refBlockID          = referencedBlockInfo.blockId
     lazy val currentTime    = timeService.correctedTime()
     lazy val blockDelay     = currentTime - lastBlock.timestamp
-    lazy val balance =
-      GeneratingBalanceProvider.balance(blockchainUpdater, blockchainSettings.functionalitySettings, account.toAddress, refBlockID)
+    lazy val balance        = GeneratingBalanceProvider.balance(blockchainUpdater, blockchainSettings.functionalitySettings, account.toAddress, refBlockID)
 
-    measureSuccessful(
-      blockBuildTimeStats,
-      for {
-        _ <- checkQuorumAvailable()
-        validBlockDelay <- pos
-          .getValidBlockDelay(height, account.publicKey, refBlockBT, balance)
-          .leftMap(_.toString)
-          .ensure(s"$currentTime: Block delay $blockDelay was NOT less than estimated delay")(_ < blockDelay)
-        _ = log.debug(
-          s"Forging with ${account.address}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID")
-        _ = log.debug(s"Previous block ID $refBlockID at $height with target $refBlockBT")
-        consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
-        estimators                         = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
-        mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
-        (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint)
-        _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-        block <- Block
-          .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version))
-          .leftMap(_.err)
-      } yield (estimators, block, updatedMdConstraint.constraints.head)
-    )
+    metrics.blockBuildTimeStats.measureSuccessful(for {
+      _ <- checkQuorumAvailable()
+      validBlockDelay <- pos
+        .getValidBlockDelay(height, account.publicKey, refBlockBT, balance)
+        .leftMap(_.toString)
+        .ensure(s"$currentTime: Block delay $blockDelay was NOT less than estimated delay")(_ < blockDelay)
+      _ = log.debug(s"Forging with ${account.address}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID")
+      _ = log.debug(s"Previous block ID $refBlockID at $height with target $refBlockBT")
+      consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
+      estimators                         = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
+      mdConstraint                       = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
+      (unconfirmed, updatedMdConstraint) = metrics.measureLog("packing unconfirmed transactions for block")(utx.packUnconfirmed(mdConstraint))
+      _                                  = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+      block <- Block
+        .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version))
+        .leftMap(_.err)
+    } yield (estimators, block, updatedMdConstraint.constraints.head))
   }
 
   private def checkQuorumAvailable(): Either[String, Unit] = {
@@ -191,7 +181,7 @@ class MinerImpl(allChannels: ChannelGroup,
       log.trace(s"Skipping microBlock because utx is empty")
       Task.now(Retry)
     } else {
-      val (unconfirmed, updatedTotalConstraint) = measureLog("packing unconfirmed transactions for microblock") {
+      val (unconfirmed, updatedTotalConstraint) = metrics.measureLog("packing unconfirmed transactions for microblock") {
         val mdConstraint                       = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
         val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint)
         (unconfirmed, updatedMdConstraint.constraints.head)
@@ -219,7 +209,7 @@ class MinerImpl(allChannels: ChannelGroup,
             ))
           microBlock <- EitherT.fromEither[Task](
             MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature))
-          _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
+          _ = metrics.microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
           _ <- EitherT(MicroblockAppender(blockchainUpdater, utx, appenderScheduler, verify = false)(microBlock))
         } yield (microBlock, signedBlock)).value map {
           case Left(err) => Error(err)
@@ -357,6 +347,17 @@ class MinerImpl(allChannels: ChannelGroup,
   }
 
   override def state: MinerDebugInfo.State = debugState
+
+  private[this] object metrics {
+    def measureLog[R](s: String)(f: => R): R = {
+      val (result, time) = Instrumented.withTimeMillis(f)
+      log.trace(s"$s took ${time}ms")
+      result
+    }
+
+    val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time")
+    val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time")
+  }
 }
 
 object Miner {

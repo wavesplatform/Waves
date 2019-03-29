@@ -135,7 +135,7 @@ class Matcher(actorSystem: ActorSystem,
       addressActors,
       matcherQueue.storeEvent,
       p => Option(orderBooks.get()).flatMap(_.get(p)),
-      getMarketStatus,
+      p => Option(marketStatuses.get(p)),
       validateOrder,
       orderBooksSnapshotCache,
       settings,
@@ -143,6 +143,7 @@ class Matcher(actorSystem: ActorSystem,
       db,
       time,
       () => currentOffset,
+      () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(blockchain, matcherPublicKey.toAddress)
     )
   )

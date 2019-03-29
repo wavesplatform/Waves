@@ -17,7 +17,7 @@ import shapeless.Coproduct
 
 import scala.util.{Failure, Success, Try}
 
-object Verifier extends Instrumented with ScorexLogging {
+object Verifier extends ScorexLogging {
 
   private val stats = TxProcessingStats
 

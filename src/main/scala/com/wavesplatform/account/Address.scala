@@ -76,8 +76,7 @@ object Address extends ScorexLogging {
   @inline
   private[this] def scheme: AddressScheme = AddressScheme.current
 
-  @deprecated("Use fromBytes")
-  private[wavesplatform] def createUnsafe(address: ByteStr): Address = {
+  private[this] def createUnsafe(address: ByteStr): Address = {
     final case class AddressImpl(bytes: ByteStr) extends Address
     AddressImpl(address)
   }
