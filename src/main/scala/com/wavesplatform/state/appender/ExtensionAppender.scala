@@ -3,7 +3,7 @@ package com.wavesplatform.state.appender
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.metrics.{BlockStats, Instrumented, Metrics}
+import com.wavesplatform.metrics.{BlockStats, Metrics}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase, formatBlocks, id}
 import com.wavesplatform.settings.WavesSettings
@@ -20,7 +20,7 @@ import org.influxdb.dto.Point
 
 import scala.util.{Left, Right}
 
-object ExtensionAppender extends ScorexLogging with Instrumented {
+object ExtensionAppender extends ScorexLogging {
 
   def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
             utxStorage: UtxPool,

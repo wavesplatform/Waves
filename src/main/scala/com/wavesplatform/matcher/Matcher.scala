@@ -103,11 +103,14 @@ class Matcher(actorSystem: ActorSystem,
                                                matcherSettings.blacklistedAssets.map(AssetPair.extractAssetId(_).get),
                                                matcherSettings.allowedAssetPairs)(o)
       _ <- OrderValidator.timeAware(time)(o)
-      _ <- OrderValidator.blockchainAware(blockchain,
-                                          transactionCreator.createTransaction,
-                                          settings.matcherSettings.orderMatchTxFee,
-                                          matcherPublicKey.toAddress,
-                                          time)(o)
+      _ <- OrderValidator.blockchainAware(
+        blockchain,
+        transactionCreator.createTransaction,
+        settings.matcherSettings.minOrderFee,
+        matcherPublicKey.toAddress,
+        time,
+        matcherSettings.disableExtraFeeForScript
+      )(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair)
     } yield o
 
@@ -127,6 +130,7 @@ class Matcher(actorSystem: ActorSystem,
       db,
       time,
       () => currentOffset,
+      () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(blockchain, matcherPublicKey.toAddress)
     )
   )

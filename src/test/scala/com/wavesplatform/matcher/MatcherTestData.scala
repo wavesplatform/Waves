@@ -68,7 +68,7 @@ trait MatcherTestData extends NTPTime { _: Suite =>
       |  }
       |}""".stripMargin))
 
-  val matcherSettings = MatcherSettings.fromConfig(config)
+  val matcherSettings = MatcherSettings.fromRootConfig(config)
 
   def valueFromGen[T](gen: Gen[T]): T = {
     var value = gen.sample

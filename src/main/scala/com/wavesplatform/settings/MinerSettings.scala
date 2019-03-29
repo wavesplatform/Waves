@@ -2,6 +2,7 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.Config
 import com.wavesplatform.mining.Miner
+import net.ceedubs.ficus.readers.ValueReader
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -18,13 +19,13 @@ case class MinerSettings(enable: Boolean,
 }
 
 object MinerSettings {
-  val configPath = "waves.miner"
-  def fromConfig(c: Config): MinerSettings = {
+  implicit val minerSettingsValueReader: ValueReader[MinerSettings] =
+    (cfg, path) => fromConfig(cfg.getConfig(path))
+
+  private[this] def fromConfig(config: Config): MinerSettings = {
     import net.ceedubs.ficus.Ficus._
 
     import scala.concurrent.duration._
-
-    val config = c.getConfig(configPath)
 
     val enable                      = config.as[Boolean]("enable")
     val quorum                      = config.as[Int]("quorum")
