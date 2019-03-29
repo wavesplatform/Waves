@@ -226,11 +226,9 @@ def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this
 addCommandAlias(
   "checkPR",
   """;
-    |set scalacOptions in ThisBuild --= Seq("-deprecation");
-    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings", "-deprecation:false", "-Ywarn-unused:-imports");
+    |set scalacOptions in ThisBuild ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports");
     |Global / checkPRRaw;
-    |set scalacOptions in ThisBuild --= Seq("-Xfatal-warnings", "-deprecation:false", "-Ywarn-unused:-imports");
-    |set scalacOptions in ThisBuild ++= Seq("-deprecation");
+    |set scalacOptions in ThisBuild --= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports");
   """.stripMargin
 )
 
