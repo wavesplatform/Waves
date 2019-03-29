@@ -149,7 +149,7 @@ class OrderValidatorSpecification
             validateByAssetPairWhitelist(Set(order.assetPair))(order) shouldBe 'right
 
             validateByAssetPairWhitelist(Set(AssetPair.createAssetPair("A1", "A2").get))(order) should produce(
-              s"Asset pair ${order.assetPair} is not in whitelist"
+              s"Trading is not allowed for the pair: ${order.assetPair}"
             )
         }
       }
