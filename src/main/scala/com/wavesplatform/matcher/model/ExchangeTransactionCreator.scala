@@ -26,7 +26,7 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
     val (buy, sell)       = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) = calculateMatcherFee(buy, sell, executedAmount)
 
-    val txFee = minFee(blockchain, settings.orderMatchTxFee, matcherPrivateKey, counter.order.assetPair, settings.disableExtraFeeForScript)
+    val txFee = minFee(blockchain, settings.orderMatchTxFee, matcherPrivateKey, counter.order.assetPair, disableExtraFeeForScript = false)
     if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading, blockchain.height))
       ExchangeTransactionV2.create(matcherPrivateKey, buy, sell, executedAmount, price, buyFee, sellFee, txFee, timestamp)
     else
