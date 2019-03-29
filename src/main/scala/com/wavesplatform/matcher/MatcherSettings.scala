@@ -8,11 +8,13 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.matcher.MatcherSettings.EventsQueueSettings
 import com.wavesplatform.matcher.api.OrderBookSnapshotHttpCache
 import com.wavesplatform.matcher.queue.{KafkaMatcherQueue, LocalMatcherQueue}
-import com.wavesplatform.settings.AllowedAssetPairsSettings._
 import com.wavesplatform.settings.DeviationsSettings._
+import com.wavesplatform.settings.OrderAmountSettings._
 import com.wavesplatform.settings.OrderFeeSettings._
-import com.wavesplatform.settings.{AllowedAssetPairsSettings, DeviationsSettings}
+import com.wavesplatform.settings.utils.ConfigOps._
+import com.wavesplatform.settings.{DeviationsSettings, OrderAmountSettings}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.assets.exchange.AssetPair._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
@@ -44,6 +46,7 @@ case class MatcherSettings(enable: Boolean,
                            eventsQueue: EventsQueueSettings,
                            orderFee: OrderFeeSettings,
                            deviation: DeviationsSettings,
+                           orderAmountRestrictions: Map[AssetPair, OrderAmountSettings],
                            allowedAssetPairs: Set[AssetPair],
                            allowOrderV3: Boolean)
 
@@ -91,10 +94,11 @@ object MatcherSettings {
     val eventsQueue         = config.as[EventsQueueSettings](s"$configPath.events-queue")
     val recoverOrderHistory = !new File(dataDirectory).exists()
 
-    val orderFee          = config.as[OrderFeeSettings](s"$configPath.order-fee")
-    val deviation         = config.as[DeviationsSettings](s"$configPath.max-price-deviations")
-    val allowedAssetPairs = config.as[AllowedAssetPairsSettings](s"$configPath.allowed-asset-pairs").value
-    val allowOrderV3      = config.as[Boolean](s"$configPath.allow-order-v3")
+    val orderFee                = config.as[OrderFeeSettings](s"$configPath.order-fee")
+    val deviation               = config.as[DeviationsSettings](s"$configPath.max-price-deviations")
+    val orderAmountRestrictions = config.getFailSlowSetOf[(AssetPair, OrderAmountSettings)](s"$configPath.order-amount-restrictions").toMap
+    val allowedAssetPairs       = config.getFailSlowSetOf[AssetPair](s"$configPath.allowed-asset-pairs")
+    val allowOrderV3            = config.as[Boolean](s"$configPath.allow-order-v3")
 
     MatcherSettings(
       enabled,
@@ -120,6 +124,7 @@ object MatcherSettings {
       eventsQueue,
       orderFee,
       deviation,
+      orderAmountRestrictions,
       allowedAssetPairs,
       allowOrderV3
     )
