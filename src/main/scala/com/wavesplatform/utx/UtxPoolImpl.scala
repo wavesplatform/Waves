@@ -28,7 +28,7 @@ import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration.DurationLong
+import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(time: Time,
@@ -109,17 +109,18 @@ class UtxPoolImpl(time: Time,
     pessimisticPortfolios.remove(txId)
   }
 
-  private def removeInvalid(): Unit = {
-    val b = blockchain
-    val transactionsToRemove = transactions.values.asScala.filter { t =>
-      TransactionDiffer(fs, b.lastBlockTimestamp, time.correctedTime(), b.height)(b, t).isLeft
-    }
+  private[this] def removeInvalid(): Unit =
+    transactions
+      .values()
+      .removeIf(tx =>
+        TransactionDiffer(fs, blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height)(blockchain, tx) match {
+          case Left(error) =>
+            log.trace(s"Transaction [${tx.id()}] is removed during UTX cleanup: $error")
+            true
 
-    if (transactionsToRemove.nonEmpty) {
-      log.trace(s"Cleaning up invalid transactions: [${transactionsToRemove.mkString(", ")}]")
-      removeAll(transactionsToRemove)
-    }
-  }
+          case Right(_) =>
+            false
+      })
 
   override def spendableBalance(addr: Address, assetId: Option[AssetId]): Long =
     blockchain.balance(addr, assetId) -
@@ -147,25 +148,25 @@ class UtxPoolImpl(time: Time,
         .sorted(TransactionsOrdering.InUTXPool)
         .iterator
         .scanLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, rest, false, rest)) {
-          case ((invalid, valid, diff, currRest, isEmpty, lastOverfilled), tx) =>
+          case ((invalid, valid, diff, currRest, _, lastOverfilled), tx) =>
             val updatedBlockchain = composite(b, diff)
             val updatedRest       = currRest.put(updatedBlockchain, tx)
             if (updatedRest.isOverfilled) {
               if (updatedRest != lastOverfilled)
                 log.trace(
                   s"Mining constraints overfilled with $tx: ${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currRest, updatedRest).mkString(", ")}")
-              (invalid, valid, diff, currRest, isEmpty, updatedRest)
+              (invalid, valid, diff, currRest, currRest.isEmpty, updatedRest)
             } else {
               differ(updatedBlockchain, tx) match {
                 case Right(newDiff) =>
                   (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRest, currRest.isEmpty, lastOverfilled)
                 case Left(_) =>
-                  (tx.id() +: invalid, valid, diff, currRest, isEmpty, lastOverfilled)
+                  (tx.id() +: invalid, valid, diff, currRest, currRest.isEmpty, lastOverfilled)
               }
             }
         }
-        .takeWhile(!_._5)
-        .reduce((_, s) => s)
+        .takeWhile(!_._5) // !currRest.isEmpty
+        .reduce((_, right) => right)
     }
 
     if (invalidTxs.nonEmpty) {
@@ -204,8 +205,8 @@ class UtxPoolImpl(time: Time,
         .map(_.bytes().length)
         .sum
       _ <- Either.cond((transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
-        (),
-        GenericError("Transaction pool bytes size limit is reached"))
+                       (),
+                       GenericError("Transaction pool bytes size limit is reached"))
 
       _    <- checkNotBlacklisted(tx)
       _    <- checkScripted(b, tx)
