@@ -104,7 +104,7 @@ package object utils extends ScorexLogging {
       in = Coeval(???),
       h = Coeval(???),
       blockchain = EmptyBlockchain,
-      contractAdress = Coeval(???)
+      address = Coeval(???)
     )
     directives
       .filter(_.isRight)

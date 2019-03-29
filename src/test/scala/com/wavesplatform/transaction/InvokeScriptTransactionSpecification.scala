@@ -18,7 +18,7 @@ import play.api.libs.json.{JsObject, Json}
 class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   val publicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK"
-  
+
   property("InvokeScriptTransaction serialization roundtrip") {
     forAll(invokeScriptGen) { transaction: InvokeScriptTransaction =>
       val bytes = transaction.bytes()

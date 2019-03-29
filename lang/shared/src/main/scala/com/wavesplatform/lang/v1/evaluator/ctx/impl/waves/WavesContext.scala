@@ -374,7 +374,7 @@ object WavesContext {
     )
 
     val txVar   = ("tx", ((scriptInputType, "Processing transaction"), LazyVal(EitherT(inputEntityCoeval))))
-    val thisVar = ("this", ((addressType.typeRef, "Contract address"), LazyVal(EitherT(thisCoeval))))
+    val thisVar = ("this", ((addressType.typeRef, "Script address"), LazyVal(EitherT(thisCoeval))))
 
     val vars = Map(
       1 -> Map(txVar),
@@ -388,7 +388,7 @@ object WavesContext {
           ("Sell", ((sellType.typeRef, "Sell OrderType"), LazyVal(EitherT(sellOrdTypeCoeval)))),
           ("Buy", ((buyType.typeRef, "Buy OrderType"), LazyVal(EitherT(buyOrdTypeCoeval))))
         )
-        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == ContentType.Expression) Map(txVar) else Map(thisVar)
+        val v3Part2: Map[String, ((FINAL, String), LazyVal)] = if (ds.contentType == ContentType.Expression) Map(txVar, thisVar) else Map(thisVar)
         (v3Part1 ++ v3Part2)
       }
     )
