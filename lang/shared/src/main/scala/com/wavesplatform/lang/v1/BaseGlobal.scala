@@ -1,8 +1,7 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.ContentType
-import com.wavesplatform.lang.StdLibVersion.StdLibVersion
-import com.wavesplatform.lang.contract.{DApp, ContractSerDe}
+import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppDirective}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
 
@@ -35,12 +34,12 @@ trait BaseGlobal {
   def checksum(arr: Array[Byte]): Array[Byte] = secureHash(arr).take(4)
 
   def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion): Array[Byte] = {
-    val s = Array(stdLibVersion.toByte) ++ Serde.serialize(expr)
+    val s = Array(stdLibVersion.id.toByte) ++ Serde.serialize(expr)
     s ++ checksum(s)
   }
 
   def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Array[Byte] = {
-    val s = Array(0: Byte, ContentType.DApp.toByte, stdLibVersion.toByte) ++ ContractSerDe.serialize(c)
+    val s = Array(0: Byte, DAppDirective.id.toByte, stdLibVersion.id.toByte) ++ ContractSerDe.serialize(c)
     s ++ checksum(s)
   }
 

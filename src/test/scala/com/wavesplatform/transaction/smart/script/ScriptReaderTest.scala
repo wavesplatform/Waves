@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.smart.script
 
 import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.StdLibVersion
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs.produce
@@ -15,7 +15,7 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
 
   property("should parse all bytes for V1") {
     forAll(exprGen) { sc =>
-      val body     = Array(V1.toByte) ++ Serde.serialize(sc) ++ "foo".getBytes
+      val body     = Array(V1.id.toByte) ++ Serde.serialize(sc) ++ "foo".getBytes
       val allBytes = body ++ crypto.secureHash(body).take(checksumLength)
       ScriptReader.fromBytes(allBytes) should produce("bytes left")
     }
@@ -30,9 +30,9 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
 
   property("should parse expression with all supported std lib version") {
     val scriptEthList =
-      StdLibVersion.SupportedVersions.map { version =>
+      DirectiveDictionary[StdLibVersion].all.map { version =>
         ScriptCompiler.compile(s"""
-                                  |{-# STDLIB_VERSION ${version} #-}
+                                  |{-# STDLIB_VERSION $version #-}
                                   |  true
                                   """.stripMargin)
       }

@@ -1,10 +1,8 @@
 package com.wavesplatform.code
 
 import com.wavesplatform.common.state.diffs.ProduceError.produce
-import com.wavesplatform.lang.ContentType.{DApp, Expression}
-import com.wavesplatform.lang.ScriptType.{Account, Asset}
-import com.wavesplatform.lang.StdLibVersion.{V1, V2, V3}
-import com.wavesplatform.lang.utils.DirectiveSet
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values._
 import org.scalatest.{Matchers, PropSpec}
 
 class DirectiveSetConstructingTest extends PropSpec with Matchers {

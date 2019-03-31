@@ -1,6 +1,6 @@
 package com.wavesplatform.utils
 
-import com.wavesplatform.lang.StdLibVersion
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, TRUE}
 import com.wavesplatform.lang.v1.compiler.Types.BOOLEAN
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, UserFunction}

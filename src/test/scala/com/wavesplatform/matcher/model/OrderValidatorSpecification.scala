@@ -7,7 +7,7 @@ import com.wavesplatform.account.{Address, PrivateKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.OrderBookActor.MarketStatus

@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.Terms

@@ -5,7 +5,7 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

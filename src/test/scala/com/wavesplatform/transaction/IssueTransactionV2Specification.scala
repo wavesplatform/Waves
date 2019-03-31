@@ -8,15 +8,16 @@ import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.{TransactionGen, WithDB}
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.smart.script.ContractScript
-import com.wavesplatform.lang.{ContentType, Global, ScriptType, StdLibVersion}
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.utils.DirectiveSet
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.utils
 import monix.eval.Coeval
 import cats.kernel.Monoid
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.DirectiveSet
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
@@ -100,20 +101,20 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
     }
 
     val ctx = {
-      utils.functionCosts(StdLibVersion.V3)
+      utils.functionCosts(V3)
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(StdLibVersion.V3),
+            PureContext.build(V3),
             CryptoContext.build(Global),
             WavesContext.build(
-              DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression).explicitGet(),
+              DirectiveSet(V3, Account, Expression).explicitGet(),
               new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), utils.EmptyBlockchain, Coeval(???))
             )
           ))
     }
 
-    val script = ContractScript(StdLibVersion.V3, compiler.ContractCompiler(ctx.compilerContext, contract).explicitGet())
+    val script = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, contract).explicitGet())
 
     val tx = IssueTransactionV2
       .create(

@@ -4,8 +4,8 @@ import com.wavesplatform.account.{AddressScheme, PublicKeyAccount}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.StdLibVersion
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.script.{ContractScript, Script}

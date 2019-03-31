@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.StdLibVersion.V1
+import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain}

@@ -4,7 +4,7 @@ import com.wavesplatform.account.PublicKeyAccount._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.StdLibVersion._
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.testing.{ScriptGen, TypedScriptGen}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
