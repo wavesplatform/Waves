@@ -28,19 +28,20 @@ object DirectiveParser {
       .!
       .map(DirectiveKey.textMap)
 
-  private def withValueP(key: DirectiveKey): P[DirectiveValue] =
+  private val directiveValueP: P[String] =
     P(CharIn('a' to 'z') | CharIn('A' to 'Z') | CharIn('0' to '9'))
-      .repX(min = 1)
-      .!
-      .map(key.valueDic.textMap)
+      .repX(min = 1).!
 
   private val parser: P[Directive] =
-    P(space ~ start ~ directiveKeyP.flatMap(withValueP) ~ end ~ space)
-      .map { v => Directive(v.key, v) }
+    P(space ~ start ~ directiveKeyP ~ directiveValueP ~ end ~ space)
+      .map {
+        case (key, value) => Directive(key, key.valueDic.textMap(value))
+      }
 
   def apply(input: String): Either[ExecutionError, List[Directive]] = {
     input
       .split("\n")
+      .filter(!_.isBlank)
       .toList
       .traverse(parser.parse(_) match {
         case Success(value, _) => Right(value)

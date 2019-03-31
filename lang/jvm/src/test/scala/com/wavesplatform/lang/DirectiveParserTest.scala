@@ -11,21 +11,24 @@ class DirectiveParserTest extends PropSpec with PropertyChecks with Matchers {
   def parse(s: String): Either[ExecutionError, List[Directive]] = DirectiveParser(s)
 
   property("parse directives") {
-    parse("{-# STDLIB_VERSION 1 #-}") shouldBe List(Directive(STDLIB_VERSION, V1))
+    parse("{-# STDLIB_VERSION 1 #-}") shouldBe Right(List(Directive(STDLIB_VERSION, V1)))
+
     parse("""
         |
         |{-# STDLIB_VERSION 1 #-}
         |
-      """.stripMargin) shouldBe List(Directive(STDLIB_VERSION, V1))
+      """.stripMargin) shouldBe Right(List(Directive(STDLIB_VERSION, V1)))
+
     parse("""
             |
             |{-# CONTENT_TYPE EXPRESSION #-}
             |
-      """.stripMargin) shouldBe List(Directive(CONTENT_TYPE, Expression))
+      """.stripMargin) shouldBe Right(List(Directive(CONTENT_TYPE, Expression)))
+
     parse("""
             |
             |{-# SCRIPT_TYPE ASSET #-}
             |
-      """.stripMargin) shouldBe List(Directive(SCRIPT_TYPE, Asset))
+      """.stripMargin) shouldBe Right(List(Directive(SCRIPT_TYPE, Asset)))
   }
 }

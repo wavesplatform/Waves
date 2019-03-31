@@ -19,7 +19,7 @@ object DirectiveKey {
 
   val STDLIB_VERSION = DirectiveKey[StdLibVersion]("STDLIB_VERSION")
   val CONTENT_TYPE   = DirectiveKey[ContentType]("CONTENT_TYPE")
-  val SCRIPT_TYPE    = DirectiveKey[ScriptType]("CONTENT_TYPE")
+  val SCRIPT_TYPE    = DirectiveKey[ScriptType]("SCRIPT_TYPE")
 
   val all: Set[DirectiveKey] =
     Set(
