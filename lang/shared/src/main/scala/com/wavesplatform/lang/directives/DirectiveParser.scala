@@ -4,7 +4,6 @@ import com.wavesplatform.lang.ExecutionError
 import fastparse.WhitespaceApi
 import fastparse.core.Parsed.{Failure, Success}
 import cats.implicits._
-import com.wavesplatform.lang.directives.values.DirectiveValue
 
 object DirectiveParser {
 
@@ -35,7 +34,8 @@ object DirectiveParser {
   private val parser: P[Directive] =
     P(space ~ start ~ directiveKeyP ~ directiveValueP ~ end ~ space)
       .map {
-        case (key, value) => Directive(key, key.valueDic.textMap(value))
+        case (key, value) =>
+          Directive(key, key.valueDic.textMap(value))
       }
 
   def apply(input: String): Either[ExecutionError, List[Directive]] = {
