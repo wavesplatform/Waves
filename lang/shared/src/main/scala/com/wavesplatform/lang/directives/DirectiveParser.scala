@@ -38,14 +38,10 @@ object DirectiveParser {
           Directive(key, key.valueDic.textMap(value))
       }
 
-  def apply(input: String): Either[ExecutionError, List[Directive]] = {
-    input
-      .split("\n")
-      .filter(_.trim.nonEmpty)
+  def apply(input: String): Either[ExecutionError, List[Directive]] = Right {
+    input.split("\n")
+      .map(str => parser.parse(str))
+      .collect({ case Success(value, _) => value })
       .toList
-      .traverse(parser.parse(_) match {
-        case Success(value, _) => Right(value)
-        case Failure(_, _, _)  => Left(s"Directive parse error for $input")
-      })
   }
 }
