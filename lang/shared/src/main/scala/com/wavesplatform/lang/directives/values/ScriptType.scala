@@ -10,8 +10,8 @@ case object Asset   extends ScriptType("ASSET", 2)
 
 object ScriptType {
   implicit val dictionary: DirectiveDictionary[ScriptType] = new {
-    val default: ScriptType      = Account
-    val all:     Set[ScriptType] = Set(Account, Asset)
+    override val default: ScriptType      = Account
+    override val all:     Iterable[ScriptType] = Seq(Account, Asset)
   } with DirectiveDictionary[ScriptType]
 
   def isAssetScript(b: Boolean): ScriptType = if (b) Asset else Account

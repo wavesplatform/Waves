@@ -10,8 +10,8 @@ case object V2 extends StdLibVersion(2)
 case object V3 extends StdLibVersion(3)
 
 object StdLibVersion {
-    implicit val dictionary = new {
-      val default: StdLibVersion      = V2
-      val all:     Set[StdLibVersion] = Set(V1, V2, V3)
+    implicit val dictionary: DirectiveDictionary[StdLibVersion] = new {
+      override val default: StdLibVersion      = V2
+      override val all:     Iterable[StdLibVersion] = Seq(V1, V2, V3)
     } with DirectiveDictionary[StdLibVersion]
 }

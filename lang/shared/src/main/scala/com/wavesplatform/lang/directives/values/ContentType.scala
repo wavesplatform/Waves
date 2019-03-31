@@ -11,8 +11,8 @@ case object DApp       extends ContentType("DAPP", 2)
 
 object ContentType {
   implicit val dictionary: DirectiveDictionary[ContentType] = new {
-    val default: ContentType      = Expression
-    val all:     Set[ContentType] = Set(Expression, DApp)
+    override val default: ContentType      = Expression
+    override val all:     Iterable[ContentType] = Seq(Expression, DApp)
   } with DirectiveDictionary[ContentType]
 
   def isDApp(isDApp: Boolean): ContentType = if (isDApp) DApp else Expression
