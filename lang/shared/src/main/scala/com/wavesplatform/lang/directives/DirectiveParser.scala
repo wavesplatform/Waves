@@ -41,7 +41,7 @@ object DirectiveParser {
   def apply(input: String): Either[ExecutionError, List[Directive]] = {
     input
       .split("\n")
-      .filter(!_.isBlank)
+      .filter(_.trim.nonEmpty)
       .toList
       .traverse(parser.parse(_) match {
         case Success(value, _) => Right(value)
