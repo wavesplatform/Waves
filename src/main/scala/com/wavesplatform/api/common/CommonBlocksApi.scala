@@ -62,8 +62,8 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
     blockchain.lastBlock
   }
 
-  def lastBlockHeader(): Option[(VanillaBlock, Int)] = {
-    blockchain.lastBlockHeaderAndSize
+  def lastBlockHeaderAndSize(): Option[(VanillaBlock, Int)] = {
+    blockchain.lastBlock.map(block => (block, block.bytes().length))
   }
 
   def firstBlock(): VanillaBlock = {
