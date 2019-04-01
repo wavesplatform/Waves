@@ -23,11 +23,11 @@ object WavesContext {
   import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 
   lazy val writeSetType = CaseType(FieldNames.WriteSet, List(FieldNames.Data -> LIST(dataEntryType.typeRef)))
-  val contractTransfer =
-    CaseType(FieldNames.ContractTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
-  lazy val contractTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(contractTransfer.typeRef)))
-  lazy val contractResultType =
-    CaseType(FieldNames.ContractResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> contractTransferSetType.typeRef))
+  val scriptTransfer =
+    CaseType(FieldNames.ScriptTransfer, List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector))
+  lazy val scriptTransferSetType = CaseType(FieldNames.TransferSet, List(FieldNames.Transfers -> LIST(scriptTransfer.typeRef)))
+  lazy val scriptResultType =
+    CaseType(FieldNames.ScriptResult, List(FieldNames.Data -> writeSetType.typeRef, FieldNames.Transfers -> scriptTransferSetType.typeRef))
 
   def build(ds: DirectiveSet, env: Environment): CTX = {
 
@@ -289,7 +289,7 @@ object WavesContext {
             _.eliminate(
               o => orderObject(o, proofsEnabled).asRight[String],
               _.eliminate(
-                o => Bindings.contractTransfer(o).asRight[String],
+                o => Bindings.scriptTransfer(o).asRight[String],
                 _ => "Expected Transaction or Order".asLeft[CaseObj]
               )
             )
@@ -419,7 +419,7 @@ object WavesContext {
 
     CTX(
       types ++ (if (version == V3) {
-                  List(writeSetType, paymentType, contractTransfer, contractTransferSetType, contractResultType, invocationType)
+                  List(writeSetType, paymentType, scriptTransfer, scriptTransferSetType, scriptResultType, invocationType)
                 } else List.empty),
       commonVars ++ vars(version),
       functions ++ (if (version == V3) {

@@ -4,7 +4,7 @@ import com.wavesplatform.account.{Address, PublicKeyAccount}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.matcher.error.MatcherError._
-import com.wavesplatform.settings.DeviationsSettings
+import com.wavesplatform.settings.{DeviationsSettings, OrderAmountSettings}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair.assetIdStr
@@ -201,6 +201,32 @@ object MatcherError {
         fee,
         outOfBound,
         e"The order's matcher fee ${'matcherFee -> ord.matcherFee} is out of deviation bounds (max-price-deviation-fee: ${'maxPriceDeviationFee -> deviationSettings.maxPriceFee}%, in relation to the best-bid/ask)"
+      )
+
+  case class AssetPairIsNotAllowed(orderAssetPair: AssetPair)
+      extends MatcherError(
+        order,
+        assetPair,
+        denied,
+        e"Trading is not allowed for the pair: ${'amountAssetId -> orderAssetPair.amountAsset} - ${'priceAssetId -> orderAssetPair.priceAsset}"
+      )
+
+  case object OrderV3IsNotAllowed
+      extends MatcherError(
+        order,
+        commonEntity,
+        denied,
+        e"The orders of version 3 are not allowed by matcher"
+      )
+
+  case class OrderInvalidAmount(ord: Order, amtSettings: OrderAmountSettings)
+      extends MatcherError(
+        order,
+        amount,
+        denied,
+        e"The order's amount (${'assetPair -> ord.assetPair}, ${'amount -> ord.amount}) does not meet matcher requirements: max amount = ${'maxAmount -> BigDecimal
+          .valueOf(amtSettings.maxAmount)}, min amount = ${'minAmount -> BigDecimal
+          .valueOf(amtSettings.minAmount)}, step size = ${'stepSize   -> BigDecimal.valueOf(amtSettings.stepSize)}"
       )
 
   sealed abstract class Entity(val code: Int)

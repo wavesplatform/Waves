@@ -8,7 +8,7 @@ import akka.pattern.ask
 import akka.stream.scaladsl.{Keep, RestartSource, Sink, Source}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.util.Timeout
-import com.wavesplatform.matcher.queue.KafkaMatcherQueue.Settings
+import com.wavesplatform.matcher.queue.KafkaMatcherQueue.{Settings, eventDeserializer, eventSerializer}
 import com.wavesplatform.utils.ScorexLogging
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
@@ -22,22 +22,10 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
 
   private val duringShutdown = new AtomicBoolean(false)
 
-  private val deserializer = new Deserializer[QueueEvent] {
-    override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
-    override def deserialize(topic: String, data: Array[Byte]): QueueEvent          = QueueEvent.fromBytes(data)
-    override def close(): Unit                                                      = {}
-  }
-
-  private val serializer = new Serializer[QueueEvent] {
-    override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
-    override def serialize(topic: String, data: QueueEvent): Array[Byte]            = QueueEvent.toBytes(data)
-    override def close(): Unit                                                      = {}
-  }
-
   private val producerControl = new AtomicReference[() => Unit](() => ())
   private val producerSettings = {
     val config = mat.system.settings.config.getConfig("akka.kafka.producer")
-    ProducerSettings(config, new ByteArraySerializer, serializer)
+    ProducerSettings(config, new ByteArraySerializer, eventSerializer)
   }
 
   private def newProducer =
@@ -76,7 +64,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
   private val consumerControl = new AtomicReference[Consumer.Control](Consumer.NoopControl)
   private val consumerSettings = {
     val config = mat.system.settings.config.getConfig("akka.kafka.consumer")
-    ConsumerSettings(config, new ByteArrayDeserializer, deserializer).withClientId("consumer")
+    ConsumerSettings(config, new ByteArrayDeserializer, eventDeserializer).withClientId("consumer")
   }
 
   private val metadataConsumer = mat.system.actorOf(
@@ -85,7 +73,6 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
   )
 
   override def startConsume(fromOffset: QueueEventWithMeta.Offset, process: QueueEventWithMeta => Unit): Unit = {
-    log.info(s"Start consuming from $fromOffset")
     var currentOffset  = fromOffset // Store locally to know a previous processed offset when the source is restarted
     val topicPartition = new TopicPartition(settings.topic, 0)
 
@@ -96,6 +83,7 @@ class KafkaMatcherQueue(settings: Settings)(implicit mat: ActorMaterializer) ext
         randomFactor = 0.2,
         maxRestarts = -1
       ) { () =>
+        log.info(s"Start consuming from $currentOffset")
         Consumer
           .plainSource(consumerSettings, Subscriptions.assignmentWithOffset(topicPartition -> currentOffset))
           .mapMaterializedValue(consumerControl.set)
@@ -154,4 +142,16 @@ object KafkaMatcherQueue {
   case class Settings(topic: String, consumer: ConsumerSettings, producer: ProducerSettings)
   case class ConsumerSettings(bufferSize: Int, minBackoff: FiniteDuration, maxBackoff: FiniteDuration)
   case class ProducerSettings(bufferSize: Int)
+
+  val eventDeserializer: Deserializer[QueueEvent] = new Deserializer[QueueEvent] {
+    override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
+    override def deserialize(topic: String, data: Array[Byte]): QueueEvent          = QueueEvent.fromBytes(data)
+    override def close(): Unit                                                      = {}
+  }
+
+  val eventSerializer: Serializer[QueueEvent] = new Serializer[QueueEvent] {
+    override def configure(configs: java.util.Map[String, _], isKey: Boolean): Unit = {}
+    override def serialize(topic: String, data: QueueEvent): Array[Byte]            = QueueEvent.toBytes(data)
+    override def close(): Unit                                                      = {}
+  }
 }

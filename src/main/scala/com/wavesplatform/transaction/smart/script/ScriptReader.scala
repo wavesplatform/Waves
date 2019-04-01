@@ -11,7 +11,7 @@ object ScriptReader {
 
   val checksumLength = 4
 
-  def fromBytes(bytes: Array[Byte]): Either[ScriptParseError, Script] = {
+  def fromBytes(bytes: Array[Byte], checkComplexity: Boolean = true): Either[ScriptParseError, Script] = {
     val checkSum          = bytes.takeRight(checksumLength)
     val computedCheckSum  = crypto.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
     val versionByte: Byte = bytes.head
@@ -19,7 +19,7 @@ object ScriptReader {
       a <- {
         if (versionByte == 0)
           Right((ContentType.parseId(bytes(1)), StdLibVersion.parseVersion(bytes(2)), 3))
-        else if (versionByte == StdLibVersion.V1.toByte || versionByte == StdLibVersion.V2.toByte)
+        else if (versionByte == StdLibVersion.V1.toByte || versionByte == StdLibVersion.V2.toByte || versionByte == StdLibVersion.V3.toByte)
           Right((ContentType.Expression, StdLibVersion(versionByte.toInt), 1))
         else Left(ScriptParseError(s"Can't parse script bytes starting with [${bytes(0).toInt},${bytes(1).toInt},${bytes(2).toInt}]"))
       }
@@ -30,11 +30,15 @@ object ScriptReader {
       s <- scriptType match {
         case ContentType.Expression =>
           for {
-            _     <- ExprScript.validateBytes(scriptBytes)
+            _ <- if (checkComplexity) {
+              ExprScript.validateBytes(scriptBytes)
+            } else {
+              Right(())
+            }
             bytes <- Serde.deserialize(scriptBytes).map(_._1)
-            s     <- ExprScript(stdLibVersion, bytes, checkSize = false)
+            s     <- ExprScript(stdLibVersion, bytes, checkSize = false, checkComplexity = checkComplexity)
           } yield s
-        case ContentType.Contract =>
+        case ContentType.DApp =>
           for {
             bytes <- ContractSerDe.deserialize(scriptBytes)
             s     <- ContractScript(stdLibVersion, bytes)

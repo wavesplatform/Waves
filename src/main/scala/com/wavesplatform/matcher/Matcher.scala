@@ -114,14 +114,15 @@ class Matcher(actorSystem: ActorSystem,
   private def validateOrder(o: Order) = {
     import com.wavesplatform.matcher.error._
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, matcherSettings.orderFee)(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, matcherSettings)(o)
       _ <- OrderValidator.timeAware(time)(o)
       _ <- OrderValidator.marketAware(matcherSettings.orderFee, matcherSettings.deviation, getMarketStatus(o.assetPair))(o)
       _ <- OrderValidator.blockchainAware(blockchain,
                                           transactionCreator.createTransaction,
                                           matcherPublicKey.toAddress,
                                           time,
-                                          matcherSettings.orderFee)(o)
+                                          matcherSettings.orderFee,
+                                          matcherSettings.orderAmountRestrictions)(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(x))
     } yield o
   }
@@ -134,7 +135,7 @@ class Matcher(actorSystem: ActorSystem,
       addressActors,
       matcherQueue.storeEvent,
       p => Option(orderBooks.get()).flatMap(_.get(p)),
-      getMarketStatus,
+      p => Option(marketStatuses.get(p)),
       validateOrder,
       orderBooksSnapshotCache,
       settings,
@@ -142,6 +143,7 @@ class Matcher(actorSystem: ActorSystem,
       db,
       time,
       () => currentOffset,
+      () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(blockchain, matcherPublicKey.toAddress)
     )
   )

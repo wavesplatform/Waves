@@ -9,6 +9,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.ValidationError
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.features.FeatureProvider._
 
 import scala.util.{Right, Try}
 
@@ -73,7 +74,7 @@ object TransferTransactionDiff {
   }
 
   private def validateOverflow(blockchain: Blockchain, tx: TransferTransaction) = {
-    if (blockchain.activatedFeatures.contains(BlockchainFeatures.Ride4DApps.id)) {
+    if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
       Right(()) // lets transaction validates itself
     } else {
       Try(Math.addExact(tx.fee, tx.amount))

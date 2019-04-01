@@ -14,7 +14,7 @@ import monix.execution.schedulers.SchedulerService
 
 @Sharable
 class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: SchedulerService) extends ChannelInboundHandlerAdapter with ScorexLogging {
-  private lazy val historyReplierSettings = settings.historyReplierSettings
+  private lazy val historyReplierSettings = settings.historyReplier
 
   private implicit val s: SchedulerService = scheduler
 

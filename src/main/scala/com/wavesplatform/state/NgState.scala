@@ -102,13 +102,13 @@ class NgState(val base: Block, val baseBlockDiff: Diff, val baseBlockCarry: Long
           Some((base, microBlocksAsc))
         } else if (!microBlocksAsc.exists(_.totalResBlockSig == blockId)) None
         else {
-          val (accumulatedTxs, maybeFound) = microBlocksAsc.foldLeft((MList.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
+          val (accumulatedTxs, maybeFound) = microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
             case ((accumulated, Some((sig, discarded))), micro) =>
               (accumulated, Some((sig, micro +: discarded)))
 
             case ((accumulated, None), micro) =>
               val found = Some((micro.totalResBlockSig, Seq.empty[MicroBlock])).filter(_._1 == blockId)
-              (accumulated ++= micro.transactionData, found)
+              (accumulated ++ micro.transactionData, found)
           }
 
           maybeFound.map {
