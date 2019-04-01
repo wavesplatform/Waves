@@ -348,18 +348,6 @@ class UtxPoolSpecification
       utx.putIfNew(txs.head) should matchPattern { case Right((false, _)) => }
     }
 
-    /* "evicts expired transactions when removeAll is called" in forAll(dualTxGen) {
-      case (utx, time, txs1, txs2) =>
-        all(txs1.map(utx.putIfNew)) shouldBe 'right
-        utx.all.size shouldEqual txs1.size
-
-        time.advance(maxAge + 1000.millis)
-        utx.removeAll(Seq.empty)
-
-        all(txs2.map(utx.putIfNew)) shouldBe 'right
-        utx.all.size shouldEqual txs2.size
-    } */
-
     "packUnconfirmed result is limited by constraint" in forAll(dualTxGen) {
       case (utx, time, txs, _) =>
         all(txs.map(utx.putIfNew)) shouldBe 'right
