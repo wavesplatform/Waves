@@ -77,3 +77,9 @@ case class NegativeMinFee(msg: String) extends ApiError {
   override val message: String  = s"negative fee per: $msg"
   override val code: StatusCode = StatusCodes.BadRequest
 }
+
+case class NonPositiveAmount(msg: String) extends ApiError {
+  override val id: Int          = 115
+  override val message: String  = s"non-positive amount: $msg"
+  override val code: StatusCode = StatusCodes.BadRequest
+}

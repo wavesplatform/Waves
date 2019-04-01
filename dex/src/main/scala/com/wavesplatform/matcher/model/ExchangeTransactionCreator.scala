@@ -1,18 +1,18 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.account.{Address, PrivateKeyAccount}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.matcher.model.ExchangeTransactionCreator._
-import com.wavesplatform.settings.fee.AssetType
-import com.wavesplatform.settings.fee.AssetType.AssetType
-import com.wavesplatform.settings.fee.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
+import com.wavesplatform.settings.AssetType
+import com.wavesplatform.settings.AssetType.AssetType
+import com.wavesplatform.settings.OrderFeeSettings.{OrderFeeSettings, PercentSettings}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.CommonValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.{Asset, ValidationError}
-import com.wavesplatform.common.utils.EitherExt2
 
 class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: PrivateKeyAccount, matcherOrderFeeSettings: OrderFeeSettings) {
 
@@ -23,25 +23,25 @@ class ExchangeTransactionCreator(blockchain: Blockchain, matcherPrivateKey: Priv
       p.toLong
     }
 
-    def getNomDenomByAssetType(assetType: AssetType, buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) = {
-      val (buyND, sellND) = assetType match {
+    def getBuySellAmountTxOrTotal(assetType: AssetType, buyAmount: Long, buyPrice: Long, sellAmount: Long, sellPrice: Long): (Long, Long) = {
+      val (buyAmt, sellAmt) = assetType match {
         case AssetType.AMOUNT    => buy.getReceiveAmount(buyAmount, buyPrice) -> sell.getSpendAmount(sellAmount, sellPrice)
         case AssetType.PRICE     => buy.getSpendAmount(buyAmount, buyPrice)   -> sell.getReceiveAmount(sellAmount, sellPrice)
         case AssetType.RECEIVING => buy.getReceiveAmount(buyAmount, buyPrice) -> sell.getReceiveAmount(sellAmount, sellPrice)
         case AssetType.SPENDING  => buy.getSpendAmount(buyAmount, buyPrice)   -> sell.getSpendAmount(sellAmount, sellPrice)
       }
 
-      buyND.explicitGet() -> sellND.explicitGet()
+      buyAmt.explicitGet() -> sellAmt.explicitGet()
     }
 
     matcherOrderFeeSettings match {
       case PercentSettings(assetType, _) =>
-        val (buyFeeNominator, sellFeeNominator)     = getNomDenomByAssetType(assetType, executedAmount, executedPrice, executedAmount, executedPrice)
-        val (buyFeeDenominator, sellFeeDenominator) = getNomDenomByAssetType(assetType, buy.amount, buy.price, sell.amount, sell.price)
+        val (buyAmountFromTx, sellAmountFromTx) = getBuySellAmountTxOrTotal(assetType, executedAmount, executedPrice, executedAmount, executedPrice)
+        val (buyAmountTotal, sellAmountTotal)   = getBuySellAmountTxOrTotal(assetType, buy.amount, buy.price, sell.amount, sell.price)
 
         (
-          Math.min(buy.matcherFee, calcFee(buy, buyFeeNominator, buyFeeDenominator)),
-          Math.min(sell.matcherFee, calcFee(sell, sellFeeNominator, sellFeeDenominator))
+          Math.min(buy.matcherFee, calcFee(buy, buyAmountFromTx, buyAmountTotal)),
+          Math.min(sell.matcherFee, calcFee(sell, sellAmountFromTx, sellAmountTotal))
         )
 
       case _ => calcFee(buy, executedAmount, buy.amount) -> calcFee(sell, executedAmount, sell.amount)
@@ -82,7 +82,7 @@ object ExchangeTransactionCreator {
 
     def assetFee(assetId: Asset): Long = assetId match {
       case Waves => 0L
-      case asset @ IssuedAsset(_) =>
+      case asset: IssuedAsset =>
         if (blockchain.hasAssetScript(asset)) CommonValidation.ScriptExtraFee
         else 0L
     }

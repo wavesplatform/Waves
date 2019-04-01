@@ -11,7 +11,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
+import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -24,15 +24,13 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.script.Script
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
-import kamon.metric.MeasurementUnit
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings, time: Time)
     extends BlockchainUpdater
     with NG
-    with ScorexLogging
-    with Instrumented {
+    with ScorexLogging {
 
   import com.wavesplatform.state.BlockchainUpdaterImpl._
   import settings.blockchainSettings.functionalitySettings
@@ -175,13 +173,13 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
                   s"Competitors liquid block $block(score=${block.blockScore()}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore()}))",
                   block))
             } else
-              measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)) match {
+              metrics.forgeBlockTimeStats.measureSuccessful(ng.totalDiffOf(block.reference)) match {
                 case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                 case Some((referencedForgedBlock, referencedLiquidDiff, carry, discarded)) =>
                   if (referencedForgedBlock.signaturesValid().isRight) {
                     if (discarded.nonEmpty) {
-                      microBlockForkStats.increment()
-                      microBlockForkHeightStats.record(discarded.size)
+                      metrics.microBlockForkStats.increment()
+                      metrics.microBlockForkHeightStats.record(discarded.size)
                     }
 
                     val constraint: MiningConstraint = {
@@ -234,7 +232,7 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     log.info(s"Removing blocks after ${blockId.trim} from blockchain")
 
     val prevNgState = ngState
-    val r = if (prevNgState.exists(_.contains(blockId))) {
+    val result = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
       Right(Seq.empty)
     } else {
@@ -247,7 +245,8 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
     }
 
     notifyChangedSpendable(prevNgState, ngState)
-    r
+    internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, blockchainReady))
+    result
   }
 
   private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
@@ -277,10 +276,10 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
       case Some(ng) =>
         ng.lastMicroBlock match {
           case None if ng.base.uniqueId != microBlock.prevResBlockSig =>
-            blockMicroForkStats.increment()
+            metrics.blockMicroForkStats.increment()
             Left(MicroBlockAppendError("It's first micro and it doesn't reference base block(which exists)", microBlock))
           case Some(prevMicro) if prevMicro.totalResBlockSig != microBlock.prevResBlockSig =>
-            microMicroForkStats.increment()
+            metrics.microMicroForkStats.increment()
             Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
           case _ =>
             for {
@@ -664,16 +663,17 @@ class BlockchainUpdaterImpl(blockchain: LevelDBWriter, spendableBalanceChanged: 
         blockchain.leaseBalance(address)
     }
   }
+
+  private[this] object metrics {
+    val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork")
+    val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork")
+    val microBlockForkStats       = Kamon.counter("blockchain-updater.micro-block-fork")
+    val microBlockForkHeightStats = Kamon.histogram("blockchain-updater.micro-block-fork-height")
+    val forgeBlockTimeStats       = Kamon.timer("blockchain-updater.forge-block-time")
+  }
 }
 
 object BlockchainUpdaterImpl extends ScorexLogging {
-
-  private val blockMicroForkStats       = Kamon.counter("block-micro-fork")
-  private val microMicroForkStats       = Kamon.counter("micro-micro-fork")
-  private val microBlockForkStats       = Kamon.counter("micro-block-fork")
-  private val microBlockForkHeightStats = Kamon.histogram("micro-block-fork-height")
-  private val forgeBlockTimeStats       = Kamon.histogram("forge-block-time", MeasurementUnit.time.milliseconds)
-
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.signerData.generator == b2.signerData.generator &&
       b1.consensusData.baseTarget == b2.consensusData.baseTarget &&

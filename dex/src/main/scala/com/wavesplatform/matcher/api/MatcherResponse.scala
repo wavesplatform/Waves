@@ -33,9 +33,12 @@ sealed abstract class WrappedMatcherResponse(code: StatusCode, val json: JsObjec
           case _: C.Success => true
           case _            => false
         }),
-        "status" -> getClass.getSimpleName.replace("$", ""),
-        "result" -> JsNull // For backward compatibility
+        "status" -> getClass.getSimpleName.replace("$", "")
       )
+      .deepMerge(code match {
+        case _: C.Success => JsObject.empty
+        case _            => Json.obj("result" -> JsNull) // For backward compatibility
+      })
       .deepMerge(json)
   )
 }

@@ -10,6 +10,7 @@ import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import net.ceedubs.ficus.Ficus._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import org.scalatest.{FreeSpec, Matchers}
@@ -42,7 +43,7 @@ class AssetPairBuilderSpec extends FreeSpec with Matchers with MockFactory {
        |  blacklisted-names = ["name$$"]
        |  price-assets = [${predefinedPriceAssets.map(_.id.base58).mkString(",")}]
        |}""".stripMargin)
-  private val settings    = MatcherSettings.fromConfig(loadConfig(priceAssets))
+  private val settings    = loadConfig(priceAssets).as[MatcherSettings]("waves.matcher")
   private val blockchain  = stub[Blockchain]
 
   private val builder = new AssetPairBuilder(settings, blockchain)

@@ -36,6 +36,6 @@ object PublicKeyAccount {
   def fromBase58String(s: String): Either[InvalidAddress, PublicKeyAccount] =
     (for {
       _     <- Either.cond(s.length <= KeyStringLength, (), "Bad public key string length")
-      bytes <- Base58.decode(s).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
+      bytes <- Base58.tryDecodeWithLimit(s).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
     } yield PublicKeyAccount(bytes)).left.map(err => InvalidAddress(s"Invalid sender: $err"))
 }

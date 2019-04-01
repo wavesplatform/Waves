@@ -27,6 +27,7 @@ case class WavesSettings(directory: String,
 
 object WavesSettings {
 
+  import BlockchainSettings.blockChainSettingsValueReader
   import NetworkSettings.networkSettingsValueReader
 
   val configPath: String = "waves"
@@ -41,10 +42,10 @@ object WavesSettings {
     val extensions              = config.as[Seq[String]](s"$configPath.extensions")
     val networkSettings         = config.as[NetworkSettings]("waves.network")
     val walletSettings          = config.as[WalletSettings]("waves.wallet")
-    val blockchainSettings      = BlockchainSettings.fromConfig(config)
+    val blockchainSettings      = config.as[BlockchainSettings]("waves.blockchain")
     val minerSettings           = MinerSettings.fromConfig(config)
-    val restAPISettings         = RestAPISettings.fromConfig(config)
-    val synchronizationSettings = SynchronizationSettings.fromConfig(config)
+    val restAPISettings         = config.as[RestAPISettings]("waves.rest-api")
+    val synchronizationSettings = config.as[SynchronizationSettings]("waves.synchronization")
     val utxSettings             = config.as[UtxSettings]("waves.utx")
     val featuresSettings        = config.as[FeaturesSettings]("waves.features")
     val metrics                 = config.as[Metrics.Settings]("metrics")

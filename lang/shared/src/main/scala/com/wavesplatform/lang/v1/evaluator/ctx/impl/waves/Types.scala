@@ -15,12 +15,12 @@ object Types {
 
   val optionAddress        = UNION(addressType.typeRef, UNIT)
   val listTransfers        = LIST(transfer.typeRef)
-  val paymentType          = CaseType("AttachedPayment", List("asset" -> optionByteVector, "amount" -> LONG))
+  val paymentType          = CaseType("AttachedPayment", List("assetId" -> optionByteVector, "amount" -> LONG))
 
   val optionPayment = UNION(paymentType.typeRef, UNIT)
 
   val invocationType =
-    CaseType("Invocation", List("caller" -> addressType.typeRef, "payment" -> optionPayment))
+    CaseType("Invocation", List("caller" -> addressType.typeRef, "callerPublicKey" -> BYTESTR, "payment" -> optionPayment))
 
   private val header = List(
     "id"        -> BYTESTR,
@@ -81,7 +81,7 @@ object Types {
     "InvokeScriptTransaction",
     addProofsIfNeeded(
       List(
-        "contractAddress" -> addressType.typeRef,
+        "dappAddress" -> addressType.typeRef,
         "payment"     -> optionPayment,
         "feeAssetId" -> optionByteVector
       ) ++ header ++ proven,

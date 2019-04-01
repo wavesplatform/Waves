@@ -229,6 +229,7 @@ object SyncMatcherHttpApi extends Assertions {
       sync(async(m).ordersByAddress(sender, activeOnly), waitTime)
 
     def getCurrentOffset: QueueEventWithMeta.Offset                   = sync(async(m).getCurrentOffset)
+    def getLastOffset: QueueEventWithMeta.Offset                      = sync(async(m).getLastOffset)
     def getOldestSnapshotOffset: QueueEventWithMeta.Offset            = sync(async(m).getOldestSnapshotOffset)
     def getAllSnapshotOffsets: Map[String, QueueEventWithMeta.Offset] = sync(async(m).getAllSnapshotOffsets)
 

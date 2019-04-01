@@ -41,7 +41,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
           PureContext.build(StdLibVersion.V1),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(StdLibVersion.V1, ScriptType.Account, ContentType.Expression),
+            DirectiveSet(StdLibVersion.V1, ScriptType.Account, ContentType.Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
           )
         ))
@@ -55,7 +55,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
           PureContext.build(StdLibVersion.V2),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(V2, ScriptType.Account, ContentType.Expression),
+            DirectiveSet(V2, ScriptType.Account, ContentType.Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
@@ -69,7 +69,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
           PureContext.build(StdLibVersion.V3),
           CryptoContext.build(Global),
           WavesContext.build(
-            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression),
+            DirectiveSet(StdLibVersion.V3, ScriptType.Account, ContentType.Expression).explicitGet(),
             new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
           )
         ))
@@ -101,7 +101,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
         1526641218066L,
         Waves,
         100000000,
-        Base58.decode("4t2Xazb2SX").get,
+        Base58.tryDecodeWithLimit("4t2Xazb2SX").get,
         Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
       )
       .right

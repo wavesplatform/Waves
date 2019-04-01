@@ -103,6 +103,8 @@ object OrdersFromScriptedAccTestSuite {
 
   private val matcherConfig = ConfigFactory.parseString(s"""
                                                            |waves {
+                                                           |  utx.allow-skip-checks = false
+                                                           |
                                                            |  blockchain.custom.functionality.pre-activated-features = {
                                                            |    ${BlockchainFeatures.SmartAccountTrading.id} = $activationHeight,
                                                            |    ${BlockchainFeatures.SmartAssets.id} = 1000

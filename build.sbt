@@ -34,7 +34,7 @@ lazy val lang =
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       resolvers += Resolver.bintrayIvyRepo("portable-scala", "sbt-plugins"),
       resolvers += Resolver.sbtPluginRepo("releases")
-      // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // doesn't work
+      // Compile / scalafmt / sourceDirectories += file("shared").getAbsoluteFile / "src" / "main" / "scala" // This doesn't work too
     )
 
 lazy val langJS  = lang.js

@@ -3,6 +3,8 @@ package com.wavesplatform.transaction
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.transaction.assets.exchange.AssetPair
+import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json._
 
 import scala.util.Success
@@ -15,7 +17,7 @@ object Asset {
   implicit val assetReads: Reads[IssuedAsset] = Reads {
     case JsString(str) if str.length > AssetIdStringLength => JsError("invalid.feeAssetId")
     case JsString(str) =>
-      Base58.decode(str) match {
+      Base58.tryDecodeWithLimit(str) match {
         case Success(arr) => JsSuccess(IssuedAsset(ByteStr(arr)))
         case _            => JsError("Expected base58-encoded assetId")
       }
@@ -37,6 +39,10 @@ object Asset {
 
   implicit val assetJsonFormat: Format[IssuedAsset] = Format(assetReads, assetWrites)
   implicit val assetIdJsonFormat: Format[Asset]     = Format(assetIdReads, assetIdWrites)
+
+  implicit val assetReader: ValueReader[Asset] = { (cfg, path) =>
+    AssetPair.extractAssetId(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
+  }
 
   def fromString(maybeStr: Option[String]): Asset = {
     maybeStr.map(x => IssuedAsset(ByteStr.decodeBase58(x).get)).getOrElse(Waves)

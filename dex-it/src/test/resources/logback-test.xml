@@ -1,5 +1,4 @@
-<!-- Copy from node-it/src/test/resources/logback-test.xml . IDEA doesn't show logs in the run tab without this -->
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?><!-- Copy from node-it/src/test/resources/logback-test.xml . IDEA doesn't show logs in the run tab without this -->
 <configuration>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>

@@ -17,7 +17,7 @@ import shapeless.Coproduct
 
 import scala.util.{Failure, Success, Try}
 
-object Verifier extends Instrumented with ScorexLogging {
+object Verifier extends ScorexLogging {
 
   private val stats = TxProcessingStats
 
@@ -48,8 +48,8 @@ object Verifier extends Instrumented with ScorexLogging {
       tx =>
         tx.checkedAssets()
           .flatMap {
-            case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).flatMap(_.script)
-            case _                      => None
+            case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script)
+            case _                  => None
           }
           .foldRight(Either.right[ValidationError, Transaction](tx)) { (script, txr) =>
             txr.right.flatMap(tx =>
@@ -100,6 +100,7 @@ object Verifier extends Instrumented with ScorexLogging {
                      blockchain: Blockchain,
                      matcherScriptOpt: Option[Script],
                      height: Int): ValidationResult[Transaction] = {
+
     val typeId    = et.builder.typeId
     val sellOrder = et.sellOrder
     val buyOrder  = et.buyOrder
@@ -116,47 +117,47 @@ object Verifier extends Instrumented with ScorexLogging {
         }
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et)))
 
-    def sellerOrderVerification =
+    def orderVerification(order: Order) = {
       blockchain
-        .accountScript(sellOrder.sender.toAddress)
-        .map(script =>
-          if (sellOrder.version != 1) {
-            stats.orderValidation.measure(verifyOrder(blockchain, script, height, sellOrder))
+        .accountScript(order.sender.toAddress)
+        .map { script =>
+          if (order.version != 1) {
+            stats.orderValidation.measure(verifyOrder(blockchain, script, height, order))
           } else {
             Left(GenericError("Can't process order with signature from scripted account"))
-        })
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(sellOrder)))
-
-    def buyerOrderVerification =
-      blockchain
-        .accountScript(buyOrder.sender.toAddress)
-        .map(script =>
-          if (buyOrder.version != 1) {
-            stats.orderValidation.measure(verifyOrder(blockchain, script, height, buyOrder))
-          } else {
-            Left(GenericError("Can't process order with signature from scripted account"))
-        })
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(buyOrder)))
-
-    def assetVerification(assetId: Asset, tx: ExchangeTransaction) =
-      assetId match {
-        case Waves => Right(tx)
-        case asset @ IssuedAsset(_) =>
-          blockchain.assetScript(asset).fold[ValidationResult[Transaction]](Right(tx)) { script =>
-            verifyTx(blockchain, script, height, tx, isTokenScript = true).left.map {
-              case x: HasScriptType => x
-              case GenericError(x)  => ScriptExecutionError(x, List.empty, isTokenScript = true)
-              case x                => ScriptExecutionError(x.toString, List.empty, isTokenScript = true)
-            }
           }
+        }
+        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(order)))
+    }
+
+    def assetVerification(assetId: Asset) = assetId match {
+      case Waves => Right(et)
+      case asset: IssuedAsset =>
+        blockchain.assetScript(asset).fold[ValidationResult[Transaction]](Right(et)) { script =>
+          verifyTx(blockchain, script, height, et, isTokenScript = true) leftMap {
+            case x: HasScriptType => x
+            case GenericError(x)  => ScriptExecutionError(x, List.empty, isTokenScript = true)
+            case x                => ScriptExecutionError(x.toString, List.empty, isTokenScript = true)
+          }
+        }
+    }
+
+    lazy val txAssetsVerification: ValidationResult[Transaction] = {
+      Set(
+        buyOrder.assetPair.amountAsset,
+        buyOrder.assetPair.priceAsset,
+        buyOrder.matcherFeeAssetId,
+        sellOrder.matcherFeeAssetId
+      ).foldLeft[ValidationResult[Transaction]](Right(et)) {
+        case (verificationResult, asset) => verificationResult flatMap (_ => assetVerification(asset))
       }
+    }
 
     for {
       _ <- matcherTxVerification
-      _ <- sellerOrderVerification
-      _ <- buyerOrderVerification
-      _ <- assetVerification(et.buyOrder.assetPair.amountAsset, et)
-      _ <- assetVerification(et.buyOrder.assetPair.priceAsset, et)
+      _ <- orderVerification(sellOrder)
+      _ <- orderVerification(buyOrder)
+      _ <- txAssetsVerification
     } yield et
   }
 

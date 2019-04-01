@@ -20,16 +20,15 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
 
   private val jsonRejectionHandler = RejectionHandler
     .newBuilder()
-    .handle {
-      case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors))
-    }
+    .handle { case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors)) }
     .result()
 
-  def _json[A: Reads](f: A => Route): Route                 = (handleRejections(jsonRejectionHandler) & entity(as[A])).apply(f)
-  def json[A: Reads](f: A => ToResponseMarshallable): Route = _json[A](a => complete(f(a)))
+  def jsonEntity[A: Reads]: Directive1[A]                   = handleRejections(jsonRejectionHandler) & entity(as[A])
+  def json[A: Reads](f: A => ToResponseMarshallable): Route = jsonEntity.apply(a => complete(f(a)))
 
   val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
     case JsResultException(err)                                         => complete(WrongJson(errors = err))
+    case PlayJsonException(cause, errors)                               => complete(WrongJson(cause, errors))
     case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
     case e: ValidationError                                             => complete(ApiError.fromValidationError(e))
     case e: IllegalArgumentException                                    => complete(ApiError.fromValidationError(GenericError(e)))
@@ -56,5 +55,5 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
 
 trait WithSettings { this: ApiRoute =>
   def settings: RestAPISettings
-  protected override lazy val apiKeyHash: Option[Array[Byte]] = Base58.decode(settings.apiKeyHash).toOption
+  protected override lazy val apiKeyHash: Option[Array[Byte]] = Base58.tryDecodeWithLimit(settings.apiKeyHash).toOption
 }

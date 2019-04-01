@@ -10,7 +10,6 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.{NoShrink, crypto}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -82,7 +81,7 @@ class ExchangeTransactionCreatorSpecification
       val preconditions =
         for {
           ((_, buyOrder), (_, sellOrder)) <- orderV3PairGenerator
-          orderSettings                   <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(buyOrder.matcherFeeAssetId), fixedWavesSettingsGenerator())
+          orderSettings                   <- orderFeeSettingsGenerator(Some(buyOrder.matcherFeeAssetId))
         } yield (buyOrder, sellOrder, orderSettings)
 
       forAll(preconditions) {
@@ -102,7 +101,7 @@ class ExchangeTransactionCreatorSpecification
       val preconditions =
         for {
           ((_, buyOrder), (senderSell, sellOrder)) <- orderV3PairGenerator
-          orderSettings                            <- Gen.oneOf(percentSettingsGenerator, fixedSettingsGenerator(buyOrder.matcherFeeAssetId), fixedWavesSettingsGenerator())
+          orderSettings                            <- orderFeeSettingsGenerator(Some(buyOrder.matcherFeeAssetId))
         } yield {
 
           val sellOrderWithUpdatedAmount = sellOrder.updateAmount(sellOrder.amount / 2)

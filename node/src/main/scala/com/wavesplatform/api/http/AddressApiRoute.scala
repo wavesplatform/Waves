@@ -425,7 +425,7 @@ case class AddressApiRoute(settings: RestAPISettings,
       } else {
         //DECODE SIGNATURE
         val msg: Try[Array[Byte]] =
-          if (decode) if (m.message.startsWith("base64:")) Base64.decode(m.message) else Base58.decode(m.message, 2048)
+          if (decode) if (m.message.startsWith("base64:")) Base64.tryDecode(m.message) else Base58.tryDecodeWithLimit(m.message, 2048)
           else Success(m.message.getBytes)
         verifySigned(msg, m.signature, m.publickey, address)
       }
@@ -433,7 +433,7 @@ case class AddressApiRoute(settings: RestAPISettings,
   }
 
   private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: String) = {
-    (msg, Base58.decode(signature), Base58.decode(publicKey)) match {
+    (msg, Base58.tryDecodeWithLimit(signature), Base58.tryDecodeWithLimit(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = PublicKeyAccount(pubKeyBytes)
         val isValid = account.address == address && crypto.verify(signatureBytes, msgBytes, pubKeyBytes)
@@ -449,7 +449,7 @@ case class AddressApiRoute(settings: RestAPISettings,
     ))
   @ApiOperation(value = "Address from Public Key", notes = "Generate a address from public key", httpMethod = "GET")
   def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
-    Base58.decode(publicKey) match {
+    Base58.tryDecodeWithLimit(publicKey) match {
       case Success(pubKeyBytes) =>
         val account = Address.fromPublicKey(pubKeyBytes)
         complete(Json.obj("address" -> account.address))

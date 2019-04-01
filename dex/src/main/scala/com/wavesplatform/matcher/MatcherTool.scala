@@ -20,6 +20,7 @@ import com.wavesplatform.matcher.settings.MatcherSettings
 import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.utils.ScorexLogging
+import net.ceedubs.ficus.Ficus._
 import org.iq80.leveldb.DB
 
 import scala.collection.JavaConverters._
@@ -81,11 +82,11 @@ object MatcherTool extends ScorexLogging {
 
     val userConfig                = args.headOption.fold(ConfigFactory.empty())(f => ConfigFactory.parseFile(new File(f)))
     val actualConfig              = loadConfig(userConfig)
-    val settings: MatcherSettings = MatcherSettings.fromConfig(actualConfig)
+    val settings: MatcherSettings = actualConfig.as[MatcherSettings]("waves.matcher")
     val db                        = openDB(settings.dataDir)
 
     AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = Base58.decode(settings.account).get(1)
+      override val chainId: Byte = Base58.tryDecodeWithLimit(settings.account).get(1)
     }
 
     val start = System.currentTimeMillis()

@@ -1,20 +1,20 @@
 package com.wavesplatform.api
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import com.wavesplatform.http.ApiMarshallers
+import com.wavesplatform.account.PublicKeyAccount
 import com.wavesplatform.api.http.DataRequest._
 import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
 import com.wavesplatform.api.http.assets.SponsorFeeRequest._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.leasing._
+import com.wavesplatform.http.ApiMarshallers
 import com.wavesplatform.transaction.ValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.account.PublicKeyAccount
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import play.api.libs.json._
 
 import scala.util.{Success, Try}

@@ -7,6 +7,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Order.assetIdBytes
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
+import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{JsObject, Json}
 
 import scala.annotation.meta.field
@@ -68,5 +69,15 @@ object AssetPair {
       Asset.fromCompatId(amount.map(ByteStr(_))),
       Asset.fromCompatId(price.map(ByteStr(_)))
     )
+  }
+
+  implicit val assetPairReader: ValueReader[AssetPair] = { (cfg, path) =>
+    val source    = cfg.getString(path)
+    val sourceArr = source.split("-")
+    val res = sourceArr match {
+      case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
+      case _                               => throw new Exception(s"Incorrect assets count (expected 2, but got ${sourceArr.size}): $source")
+    }
+    res fold (ex => throw new Exception(ex.getMessage), identity)
   }
 }

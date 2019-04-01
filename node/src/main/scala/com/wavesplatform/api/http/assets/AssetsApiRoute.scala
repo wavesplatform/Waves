@@ -44,7 +44,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     with BroadcastRoute
     with WithSettings {
 
-  private val distributionTaskScheduler = {
+  private[this] val distributionTaskScheduler = {
     val executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS))
     Scheduler(executor)
   }
@@ -315,7 +315,7 @@ object AssetsApiRoute {
     for {
       _ <- Either.cond(assetParam.length <= AssetIdStringLength, (), GenericError("Unexpected assetId length"))
       assetId <- Base58
-        .decode(assetParam)
+        .tryDecodeWithLimit(assetParam)
         .fold(
           _ => GenericError("Must be base58-encoded assetId").asLeft[IssuedAsset],
           arr => IssuedAsset(ByteStr(arr)).asRight[ValidationError]

@@ -31,7 +31,7 @@ object Dependencies {
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.6" % Test
 
-  val enforcedVersions: Def.Initialize[Seq[ModuleID]] = Def.setting(
+  val enforcedVersions = Def.setting(
     Seq(
       akkaModule("actor"),
       akkaModule("stream"),
@@ -67,9 +67,9 @@ object Dependencies {
       shapeless.value
     ))
 
-  val console: Seq[ModuleID] = Seq("com.github.scopt" %% "scopt" % "3.6.0")
+  val console = Seq("com.github.scopt" %% "scopt" % "3.6.0")
 
-  val lang: Def.Initialize[Seq[ModuleID]] = Def.setting(
+  val lang = Def.setting(
     Seq(
       // defined here because %%% can only be used within a task or setting macro
       // explicit dependency can likely be removed when monix 3 is released
@@ -92,7 +92,7 @@ object Dependencies {
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4")
     ))
 
-  lazy val itTest: Seq[ModuleID] = scalaTest +: Seq(
+  lazy val itTest = scalaTest +: Seq(
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded"),
     jacksonModule("dataformat", "dataformat-properties"),
@@ -100,7 +100,7 @@ object Dependencies {
     "org.scalacheck"      %% "scalacheck"       % "1.14.0"
   ).map(_ % Test)
 
-  lazy val test: Seq[ModuleID] = scalaTest +: Seq(
+  lazy val test = scalaTest +: Seq(
     logback.exclude("org.scala-js", "scalajs-library_2.12"),
     "org.scalacheck" %% "scalacheck" % "1.14.0",
     ("io.github.amrhassan" %% "scalacheck-cats" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
@@ -108,7 +108,7 @@ object Dependencies {
     "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0"
   ).map(_ % Test)
 
-  lazy val node: Def.Initialize[Seq[sbt.ModuleID]] = Def.setting(
+  lazy val node = Def.setting(
     Seq(
       "commons-net"          % "commons-net" % "3.6",
       "com.iheart"           %% "ficus" % "1.4.2",
@@ -123,6 +123,7 @@ object Dependencies {
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
       "com.typesafe.play"        %% "play-json"     % "2.7.1",
       "org.ethereum"             % "leveldbjni-all" % "1.18.3",
+      ("org.iq80.leveldb" % "leveldb" % "0.9").exclude("com.google.guava", "guava"),
       // "io.swagger"                   %% "swagger-scala-module" % "1.0.4",
       "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.0.0",
       jacksonModule("core", "databind"),
@@ -139,7 +140,17 @@ object Dependencies {
     ) ++ test
   )
 
-  lazy val protobuf: Def.Initialize[Seq[ModuleID]] = Def.setting {
+  lazy val matcher = Seq(
+    akkaModule("actor"),
+    akkaHttp,
+    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0"
+  ) ++ Seq(
+    akkaModule("testkit"),
+    akkaModule("persistence-tck"),
+    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.1",
+  ).map(_ % Test) ++ test
+
+  lazy val protobuf = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(
       // "com.google.protobuf" % "protobuf-java" % "3.4.0",

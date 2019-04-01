@@ -25,6 +25,7 @@ import com.wavesplatform.state.VolumeAndFee
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils.{ErrorStartingMatcher, ScorexLogging, forceStopApplication}
+import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
@@ -32,7 +33,7 @@ import scala.util.{Failure, Success}
 
 class Matcher(context: Context) extends Extension with ScorexLogging {
 
-  private val settings = MatcherSettings.fromConfig(context.settings.config)
+  private val settings = context.settings.config.as[MatcherSettings]("waves.matcher")
 
   private val matcherPrivateKey = (for {
     address <- Address.fromString(settings.account)
@@ -100,16 +101,20 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
     case x => throw new IllegalArgumentException(s"Unknown queue type: $x")
   }
 
+  private val getMarketStatus: AssetPair => Option[MarketStatus] = p => Option(marketStatuses.get(p))
+
   private def validateOrder(o: Order) = {
     import com.wavesplatform.matcher.error._
     for {
-      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings.orderFee)(o)
+      _ <- OrderValidator.matcherSettingsAware(matcherPublicKey, blacklistedAddresses, blacklistedAssets, settings)(o)
       _ <- OrderValidator.timeAware(context.time)(o)
+      _ <- OrderValidator.marketAware(settings.orderFee, settings.deviation, getMarketStatus(o.assetPair))(o)
       _ <- OrderValidator.blockchainAware(context.blockchain,
                                           transactionCreator.createTransaction,
                                           matcherPublicKey.toAddress,
                                           context.time,
-                                          settings.orderFee)(o)
+                                          settings.orderFee,
+                                          settings.orderAmountRestrictions)(o)
       _ <- pairBuilder.validateAssetPair(o.assetPair).left.map(x => MatcherError.AssetPairCommonValidationFailed(o.assetPair, x))
     } yield o
   }
@@ -130,8 +135,9 @@ class Matcher(context: Context) extends Extension with ScorexLogging {
       db,
       context.time,
       () => currentOffset,
+      () => matcherQueue.lastEventOffset,
       ExchangeTransactionCreator.minAccountFee(context.blockchain, matcherPublicKey.toAddress),
-      Base58.decode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
+      Base58.tryDecode(context.settings.config.getString("waves.rest-api.api-key-hash")).toOption
     )
   )
 

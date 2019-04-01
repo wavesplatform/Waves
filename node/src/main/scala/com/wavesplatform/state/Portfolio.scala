@@ -84,7 +84,7 @@ object Portfolio {
       val keyReads = implicitly[Reads[Long]]
       val valueReads: String => JsResult[IssuedAsset] = (s: String) =>
         Base58
-          .decode(s)
+          .tryDecodeWithLimit(s)
           .fold(
             _ => JsError("Expected base58-encoded string"),
             arr => JsSuccess(IssuedAsset(ByteStr(arr)))

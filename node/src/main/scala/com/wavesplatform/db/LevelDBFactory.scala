@@ -10,9 +10,12 @@ object LevelDBFactory extends ScorexLogging {
   private val javaFactory   = "org.iq80.leveldb.impl.Iq80DBFactory"
 
   lazy val factory: DBFactory = {
+    val isTesting       = sys.props.get("sbt-testing").isDefined
+    val nativeFactories = if (isTesting) List.empty else List(nativeFactory)
+
     val pairs = for {
-      loader      <- List(ClassLoader.getSystemClassLoader, this.getClass.getClassLoader).view
-      factoryName <- List(nativeFactory, javaFactory)
+      loader      <- List(ClassLoader.getSystemClassLoader, getClass.getClassLoader).view
+      factoryName <- nativeFactories :+ javaFactory
       factory     <- Try(loader.loadClass(factoryName).getConstructor().newInstance().asInstanceOf[DBFactory]).toOption
     } yield (factoryName, factory)
 

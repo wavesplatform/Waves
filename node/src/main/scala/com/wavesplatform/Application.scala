@@ -51,6 +51,7 @@ import org.influxdb.dto.Point
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Try
+import scala.util.control.NonFatal
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
   app =>
@@ -70,10 +71,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val wallet: Wallet = try {
     Wallet(settings.walletSettings)
   } catch {
-    case e: IllegalStateException =>
-      log.error(s"Failed to open wallet file '${settings.walletSettings.file.get.getAbsolutePath}")
+    case NonFatal(e) =>
+      log.error(s"Failed to open wallet file '${settings.walletSettings.file.get.getAbsolutePath}", e)
       throw e
   }
+
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
   private val extensionLoaderScheduler        = singleThread("rx-extension-loader", reporter = log.error("Error in Extension Loader", _))
@@ -178,7 +180,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     rxExtensionLoaderShutdown = Some(sh)
 
-    UtxPoolSynchronizer.start(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
+    UtxPoolSynchronizer.start(utxStorage,
+                              settings.synchronizationSettings.utxSynchronizer,
+                              allChannels,
+                              transactions,
+                              blockchainUpdater.lastBlockInfo)
 
     val microBlockSink = microblockDatas
       .mapTask(scala.Function.tupled(processMicroBlock))

@@ -115,7 +115,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
        transferFromAToB)
 
   def dummyEvalContext(version: StdLibVersion): EvaluationContext =
-    lazyContexts(DirectiveSet(V1, ScriptType.Asset, ContentType.Expression))().evaluationContext
+    lazyContexts(DirectiveSet(V1, ScriptType.Asset, ContentType.Expression).explicitGet())().evaluationContext
 
   private def eval(code: String) = {
     val untyped = Parser.parseExpr(code).get.value
