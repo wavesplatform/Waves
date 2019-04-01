@@ -33,7 +33,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   def matcherFee: Long
   def proofs: Proofs
   def version: Byte
-  def signature: Array[Byte] = proofs.toSignature
+  def signature: Array[Byte]   = proofs.toSignature
   def matcherFeeAssetId: Asset = Waves
 
   import Order._

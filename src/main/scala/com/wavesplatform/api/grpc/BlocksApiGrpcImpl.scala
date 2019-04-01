@@ -2,7 +2,7 @@ package com.wavesplatform.api.grpc
 
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.{UInt32Value, UInt64Value}
-import com.wavesplatform.account.PublicKeyAccount
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.BlockDoesNotExist
@@ -42,7 +42,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       case BlockAndHeight(Some(PBBlock(Some(header), _, _)), _) =>
         request.filter match {
           case BlocksRangeRequest.Filter.Generator(generator) =>
-            header.generator == generator || PublicKeyAccount(header.generator.toByteArray).toAddress.bytes == generator.toByteStr
+            header.generator == generator || PublicKey(header.generator.toByteArray).toAddress.bytes == generator.toByteStr
           case BlocksRangeRequest.Filter.Empty => true
         }
 

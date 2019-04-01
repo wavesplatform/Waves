@@ -1,6 +1,6 @@
 package com.wavesplatform.api.grpc
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PublicKeyAccount}
+import com.wavesplatform.account.{Address, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -21,9 +21,9 @@ trait PBImplicitConversions {
 
   implicit class PBTransactionConversions(tx: PBTransaction) {
     def toVanilla = PBSignedTransaction(Some(tx)).toVanilla
-    def sender    = PublicKeyAccount(tx.senderPublicKey.toByteArray)
+    def sender    = PublicKey(tx.senderPublicKey.toByteArray)
 
-    def signed(signer: Array[Byte]): PBSignedTransaction = {
+    def signed(signer: PrivateKey): PBSignedTransaction = {
       import com.wavesplatform.common.utils._
       PBSignedTransaction(
         Some(tx),
@@ -62,7 +62,7 @@ trait PBImplicitConversions {
       header.featureVotes.map(shortToInt).toSeq,
       header.timestamp,
       header.version,
-      ByteString.copyFrom(header.signerData.generator.publicKey)
+      ByteString.copyFrom(header.signerData.generator)
     )
   }
 
@@ -72,16 +72,16 @@ trait PBImplicitConversions {
     def toAddressOrAlias = PBRecipients.toAddressOrAlias(r).explicitGet()
   }
 
-  implicit class VanillaByteStrConversions(bs: ByteStr) {
-    def toPBByteString     = ByteString.copyFrom(bs.arr)
-    def toPublicKeyAccount = PublicKeyAccount(bs.arr)
-    def toAddress          = Address.fromBytes(bs.arr).explicitGet()
+  implicit class VanillaByteStrConversions(bytes: ByteStr) {
+    def toPBByteString     = ByteString.copyFrom(bytes.arr)
+    def toPublicKeyAccount = PublicKey(bytes)
+    def toAddress          = Address.fromBytes(bytes).explicitGet()
   }
 
-  implicit class PBByteStringConversions(bs: ByteString) {
-    def toByteStr          = ByteStr(bs.toByteArray)
-    def toPublicKeyAccount = PublicKeyAccount(bs.toByteArray)
-    def toAddress          = Address.fromBytes(bs.toByteArray).explicitGet()
+  implicit class PBByteStringConversions(bytes: ByteString) {
+    def toByteStr          = ByteStr(bytes.toByteArray)
+    def toPublicKeyAccount = PublicKey(bytes.toByteArray)
+    def toAddress          = Address.fromBytes(bytes.toByteArray).explicitGet()
   }
 
   implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString

@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import cats.implicits._
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey, Alias}
+import com.wavesplatform.account.{Alias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -36,11 +36,7 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
     }
   }
 
-  def create(sender: PublicKey,
-             alias: Alias,
-             fee: Long,
-             timestamp: Long,
-             proofs: Proofs): Either[ValidationError, CreateAliasTransactionV2] = {
+  def create(sender: PublicKey, alias: Alias, fee: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, CreateAliasTransactionV2] = {
     if (fee <= 0) {
       Left(ValidationError.InsufficientFee())
     } else {
@@ -48,11 +44,7 @@ object CreateAliasTransactionV2 extends TransactionParserFor[CreateAliasTransact
     }
   }
 
-  def signed(sender: PublicKey,
-             alias: Alias,
-             fee: Long,
-             timestamp: Long,
-             signer: PrivateKey): Either[ValidationError, CreateAliasTransactionV2] = {
+  def signed(sender: PublicKey, alias: Alias, fee: Long, timestamp: Long, signer: PrivateKey): Either[ValidationError, CreateAliasTransactionV2] = {
     for {
       unsigned <- create(sender, alias, fee, timestamp, Proofs.empty)
       proofs   <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes()))))
