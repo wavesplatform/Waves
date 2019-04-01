@@ -280,8 +280,6 @@ class UtxPoolImpl(time: Time,
             case Right(_) =>
               false
         })
-
-      TxCheck.clearCaches()
     }
   }
 
